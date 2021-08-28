@@ -1,0 +1,151 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <title>Texcraft</title>
+    <meta name="description" content="Texcraft">
+    <meta name="author" content="The Texcraft contributors">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=PT+Serif:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'PT Serif', serif;
+            line-height: 1.6;
+        }
+        #container {
+            max-width: 600px; margin: 10px auto;
+        }
+        h1 {
+            font-weight: normal;
+            font-size: 2.3em;
+            text-align: center;
+        }
+
+        h2 {
+            font-weight: normal;
+        }
+
+        ul {
+            margin: 0;
+        }
+
+        a {
+            color: #2F6690;
+            text-underline-offset: 2px;
+        }
+        a:hover {
+            color: #3A7CA5;
+
+        }
+        ul li {
+            padding: 5px 0;
+        }
+        .code {
+            font-family: 'Roboto Mono', monospace;
+        }
+        .tooltip {
+            cursor: help;
+        }
+    </style>
+
+</head>
+
+<body>
+
+
+<div id="container">
+    <h1>Texcraft</h1>
+
+    <p>
+        Texcraft is a project to create a new, modern implementation of TeX.
+        The name is a portmanteau of <b>TeX</b> and O<b>xide</b>,
+        the latter referencing the programming language used in the project, Rust.
+        The project is currently in a very early prototyping/proof-of-concept phase.
+    </p>
+    <ul>
+        <li><a href="">GitHub repository</a></li>
+        <li>Texcraft architecture document</li>
+        <li><a href="/rustdoc/texcraft/">Documentation generated from the Rust code</a></li>
+    </ul>
+
+    <h2>Project description</h2>
+    <p>
+        Texcraft is not a specific distribution of TeX.
+        Instead, it is directly inspired by
+        <a title="'After the design of LLVM IR, the next most important aspect of LLVM
+is that it is designed as a set of libraries, rather than as a monolithic command line compiler like GCC...'"
+           href="http://www.aosabook.org/en/llvm.html" class="tooltip">LLVM</a>
+        and is an attempt to implement TeX as a collection of loosely coupled libraries.
+        A library in Texcraft might be:
+    </p>
+    <ul>
+        <li>A new pagination algorithm</li>
+        <li>Handling for a particular font format.</li>
+        <li>
+            Implementations of a subset of TeX primitives, like the various <span class="code">\def</span> commands.
+        </li>
+    </ul>
+    <p>
+        These components can then be combined in a modular way to create a specific TeX distribution,
+        just like pieces of LLVM can be combined to create a specific compiler.
+        Parts of Texcraft could also be used to create other software exposing some limited TeX functionality
+        - for example, a web service that validates TeX formulas using the Texcraft formula parser.
+    </p>
+
+    <p>
+        This is a new approach to implementing TeX.
+        The existing distributions all have separate monolithic codebases that are hard to reuse.
+        There are many benefits to an LLVM-style approach:
+    </p>
+    <ul>
+        <li>It will be significantly easier to create new TeX distributions or to
+            extend existing ones with new features; for example, grid based typesetting.
+            While Texcraft sounds like a pure software project,
+            one of the main motivations is facilitating innovation on the typesetting side.
+        </li>
+        <li>Distributions can share code and features easily.</li>
+        <li>Texcraft components can be used in other contexts too, not just in TeX compilers.</li>
+    </ul>
+    <p>
+        While a modular architecture is key to these goals,
+        we also think that Texcraft being written in a modern programming language and style will help significantly, too.
+    </p>
+
+    <p>
+        The main goal of Texcraft is make TeX implementation development easier,
+        but there is also an opportunity here to fix common UX issues:
+    </p>
+    <ul>
+        <li>
+            Documents will be automatically recompiled if the internal references change,
+            and this will extend to BibTeX.
+        </li>
+        <li>
+            Errors will have clearer messages,
+            will not trap users in confusing interactive prompts,
+            and in many cases will auto-suggest a solution:
+            <ul>
+
+                <li class="code">undefined control sequence \Uppercase: did you mean \uppercase?</li>
+                <li class="code">
+                    “Could not find chap_1.tex.tex; did you mean to write \input{chap_1} instead of
+                    \input{chap_1.tex}?
+                </li>
+            </ul>
+        </li>
+    </ul>
+    <p>
+        There are some interesting stretch goals in this area, for example creating a package manager for automatically
+        downloading and managing CTAN packages for individual TeX projects.
+    </p>
+
+
+</div>
+
+
+</body>
+</html>

@@ -1,0 +1,16 @@
+
+\def\month #1postfix{Some replacement #1 text}
+a
+\let\parr=\par
+
+\def\par{A}
+
+\month Hello postfix
+
+\month Starting new par postfix
+
+S
+
+\let\par=\parr
+
+\bye

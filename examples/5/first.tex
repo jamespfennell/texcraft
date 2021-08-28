@@ -1,0 +1,34 @@
+
+
+
+
+\count 50 =   -2147483647
+\advance\count 50 -1
+\advance\count 50 -1
+
+
+\year=30
+
+A 
+\spacefactor=3
+B
+
+%\showthe\year
+
+
+\def\A{first definition of A}
+\edef\B{first defintion of B \A \expandafter\def\noexpand\A{second defn of A} \A }
+
+\message{uuid
+
+
+\the\count 50
+
+\A
+
+\B
+
+enduuid}
+
+
+\end

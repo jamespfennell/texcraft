@@ -1,0 +1,50 @@
+\def\swap#1#2{
+  \count 80 #1
+  #1 #2
+  #2 \count 80 
+}
+
+\def\fibonnaci#1{
+  \countdef\n 1
+  \n #1
+  \countdef\a 3
+  \a 0
+  \countdef\b 4
+  \b 1
+  \countdef\k 2
+  \k 1
+
+  \fibonnaciInc
+}
+
+\def\fibonnaciInc{
+  \advance \a \b
+  \swap \a \b
+  \the\a;
+  \advance \k 1
+  \ifnum\k<\n\fibonnaciInc\fi
+}
+
+\fibonnaci{20}
+
+\fibonnaci{30}
+
+
+\the \count 6
+
+%\the \catcode`A
+
+
+\count 6 = \time
+\divide \count 6 by 60
+\count 5 = \count 6
+\multiply \count 5 by -60
+\advance \time by \count 5
+
+\the \count 6:\the \time
+
+\the\year-\the\month-\the\day
+
+
+
+\end
