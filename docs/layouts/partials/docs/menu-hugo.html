@@ -1,0 +1,28 @@
+<!--
+  This overrides the book template's version of this file to get
+  rid of target="_blank" from the HTML anchors.
+-->
+{{ if . }}
+  {{ template "book-menu-hugo" . }}
+{{ end }}
+
+{{ define "book-menu-hugo" }}
+<ul>
+  {{ range . }}
+  <li>
+    <a href="{{ .URL }}" {{ if not .Page }} rel="noopener"{{ end }}>
+      {{- .Pre -}}
+      {{ with .Page }}
+        {{ partial "docs/title" .Page }}
+      {{ else }}
+        {{ .Name }}
+      {{ end }}
+      {{- .Post -}}
+    </a>
+    {{- with .Children }}
+      {{ template "book-menu-hugo" . }}
+    {{- end }}
+  </li>
+  {{ end }}
+</ul>
+{{ end }}
