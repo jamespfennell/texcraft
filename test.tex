@@ -1,0 +1,8 @@
+\def\welcome#1{Welcome to #1!}
+\welcome{the Texcraft Playground}
+
+\def\twodigit#1{\ifnum#1 < 10 0\fi\the#1}
+Today's date is \the\year-\twodigit\month-\twodigit\day.
+
+Hint:\newline
+You can add single new lines using the \\newline command.

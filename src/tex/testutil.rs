@@ -11,20 +11,20 @@ macro_rules! expansion_test {
             $setup_fn(&mut state_1);
             let mut input_1 = input::Unit::new();
             input_1.push_new_str($lhs);
-            let output_1 = driver::expand(&mut state_1, &mut input_1).unwrap();
+            let output_1 = driver::exec(&mut state_1, &mut input_1, false).unwrap();
 
             let mut state_2 = Base::<State>::new(catcode::tex_defaults(), new_state());
             $setup_fn(&mut state_2);
             let mut input_2 = input::Unit::new();
             input_2.push_new_str($rhs);
-            let output_2 = driver::expand(&mut state_2, &mut input_2).unwrap();
+            let output_2 = driver::exec(&mut state_2, &mut input_2, false).unwrap();
 
             if output_1 != output_2 {
                 println!("Expansion output is different:");
                 println!("------[lhs]------");
-                println!("{}", crate::tex::token::write_tokens(&output_1, false));
+                println!("{}", crate::tex::token::write_tokens(&output_1));
                 println!("------[rhs]------");
-                println!("{}", crate::tex::token::write_tokens(&output_2, false));
+                println!("{}", crate::tex::token::write_tokens(&output_2));
                 println!("-----------------");
                 panic!("Expansion test failed");
             }
@@ -40,10 +40,10 @@ macro_rules! expansion_failure_test {
             setup_expansion_test(&mut state);
             let mut input = input::Unit::new();
             input.push_new_str($input);
-            let result = driver::expand(&mut state, &mut input);
+            let result = driver::exec(&mut state, &mut input, false);
             if let Ok(output) = result {
                 println!("Expansion succeeded:");
-                println!("{}", crate::tex::token::write_tokens(&output, false));
+                println!("{}", crate::tex::token::write_tokens(&output));
                 panic!("Expansion failure test did not pass: expansion successful");
             }
         }

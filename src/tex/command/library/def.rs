@@ -367,10 +367,7 @@ mod arguments {
             if self.prefix.len() == 0 {
                 d.push_str(&format![" . No prefix\n",]);
             } else {
-                d.push_str(&format![
-                    " . Prefix: `{}`\n",
-                    write_tokens(&self.prefix, false)
-                ]);
+                d.push_str(&format![" . Prefix: `{}`\n", write_tokens(&self.prefix)]);
             }
 
             d.push_str(&format![" . Parameters ({}):\n", self.num_parameters()]);
@@ -387,7 +384,7 @@ mod arguments {
                         d.push_str(&format![
                             "    {}: delimited by `{}`\n",
                             colored_parameter_number(parameter_number),
-                            write_tokens(factory.substring(), false)
+                            write_tokens(factory.substring())
                         ]);
                     }
                 }
@@ -395,12 +392,12 @@ mod arguments {
             }
 
             d.push_str(&format![" . Full argument specification: `"]);
-            d.push_str(&format!["{}", write_tokens(&self.prefix, false)]);
+            d.push_str(&format!["{}", write_tokens(&self.prefix)]);
             let mut parameter_number = 1;
             for parameter in &self.parameters {
                 d.push_str(&format!["{}", colored_parameter_number(parameter_number)]);
                 if let PreparedParameter::Delimited(factory) = parameter {
-                    d.push_str(&format!["{}", write_tokens(factory.substring(), false)]);
+                    d.push_str(&format!["{}", write_tokens(factory.substring())]);
                 }
                 parameter_number += 1;
             }
@@ -679,10 +676,7 @@ mod replacement {
 
         pub fn pretty_print(&self) -> String {
             let mut b = String::default();
-            b.push_str(&format![
-                "{}",
-                crate::tex::token::write_tokens(&self.head, false)
-            ]);
+            b.push_str(&format!["{}", crate::tex::token::write_tokens(&self.head)]);
             for replacement in self.replacements.iter() {
                 b.push_str(&format![
                     "{}",
@@ -690,7 +684,7 @@ mod replacement {
                 ]);
                 b.push_str(&format![
                     "{}",
-                    crate::tex::token::write_tokens(&replacement.tokens, false)
+                    crate::tex::token::write_tokens(&replacement.tokens)
                 ]);
             }
             b

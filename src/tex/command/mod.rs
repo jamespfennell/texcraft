@@ -196,6 +196,7 @@ pub enum Command<S> {
     Expansion(Expansion<S>),
     Execution(ExecutionPrimitive<S>),
     Variable(variable::Command<S>),
+    Character(char, CatCode),
 }
 
 impl<S> Command<S> {
@@ -203,7 +204,8 @@ impl<S> Command<S> {
         match self {
             Command::Expansion(cmd) => cmd.id(),
             Command::Execution(cmd) => cmd.id,
-            Command::Variable(_) => None,
+            Command::Variable(..) => None,
+            Command::Character(..) => None,
         }
     }
 
@@ -213,6 +215,7 @@ impl<S> Command<S> {
             Command::Execution(cmd) => cmd.docs.to_string(),
             Command::Variable(variable::Command::Static(_, docs)) => docs.to_string(),
             Command::Variable(variable::Command::Dynamic(_, docs)) => docs.to_string(),
+            Command::Character(c, cat_code) => format!["Implicit character '{}' with cat code {}", c, cat_code],
         }
     }
 }

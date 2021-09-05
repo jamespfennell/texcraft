@@ -1,0 +1,171 @@
+body {
+    font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif,Apple Color Emoji,Segoe UI Emoji;
+    margin: 0;
+    padding:0;
+}
+h1 {
+  font-weight: normal;
+  font-size: 1.4em;
+  display: block;
+  padding: 0;
+  flex-grow: 1;
+  text-align: right;
+}
+p {
+  line-height: 1.4;
+}
+li {
+  margin-bottom: 1em;
+  line-height: 1.4;
+}
+textarea {
+  outline: none;
+  resize: none;
+  overflow: auto;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  margin: 0px;
+  background: none;
+  border: 0px;
+}
+a {
+  color: royalblue;
+  text-decoration: underline;
+  cursor: pointer;
+}
+a:hover {
+  color: rgb(49, 81, 179);
+}
+
+.monospace {
+  font-family: monospace;
+  text-underline-position: under;
+}
+
+#grid {
+  width: 100vw;
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 10px; 
+
+  background-color: linen;
+  display: grid;
+  grid-template-columns: [cleft] 1fr [cmiddle] 1fr [cright];
+  grid-template-rows: [rtop] 45px [rmiddle] auto [rbottom];
+  gap: 10px;
+}
+
+#gridTop {
+  grid-column: cleft / cright;
+  grid-row: rtop / rmiddle;
+  display: flex;
+  align-items: stretch;
+}
+
+#gridTop .button {
+  border: 1px solid mediumaquamarine;
+  padding: 10px;
+  cursor: pointer;
+  box-sizing: border-box;
+  border-radius: 7px;
+  text-align: center;
+  margin-right: 5px;
+
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+#gridTop #runButton {
+  background-color:mediumaquamarine;
+}
+
+#gridTop .whiteButton {
+  background-color: white;
+}
+
+#gridTop .button:hover {
+  border-color: rgb(51, 104, 86);
+}
+
+#gridTop .text, h1 {
+  margin: 0px 10px 0px 0px;
+  display: flex;
+  align-items: center;
+  justify-content: right;
+}
+
+.page {
+  border: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.pageHeader {
+  border: 1px solid darkgray;
+  border-radius: 7px 7px 0px 0px;
+  background: white;
+  padding: 0px 10px;
+  height: 35px;
+  flex-grow: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items:center;
+}
+
+.pageHeaderLeft {
+  font-weight: bold;
+}
+
+.pageFrame {
+  border: 1px solid darkgray;
+  border-radius: 0px 0px 7px 7px;
+  border-top: 0;
+  background: white;
+  padding: 10px;
+  flex-grow: 1;
+  overflow: auto;
+}
+
+#gridLeft {
+  grid-column: cleft / cmiddle;
+  grid-row: rmiddle / rbottom;
+}
+
+#gridRight {
+  grid-column: cmiddle / cright;
+  grid-row: rmiddle / rbottom;
+  overflow: auto;
+}
+
+#output {
+  padding: 0px;
+  white-space: pre;
+}
+
+.markdown {
+  padding: 10px;
+}
+
+.markdown h2 {
+  margin-top: 0;
+}
+
+.ls h3 {
+  padding: 0;
+  font-weight: normal;
+  margin: 0;
+  font-size: 1em;
+}
+
+.ls p {
+  padding: 0;
+  margin: 0.2em 0 1em 10px;
+  font-style: italic;
+}
+
+.small {
+  font-size: 0.9em;
+}

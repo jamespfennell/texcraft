@@ -94,52 +94,27 @@ impl Recorder for VecRecorder {
 }
 
 /// Write a collection of tokens to a string.
-pub fn write_tokens<'a, T>(tokens: T, add_source_new_lines: bool) -> String
+pub fn write_tokens<'a, T>(tokens: T) -> String
 where
     T: IntoIterator<Item = &'a Token>,
 {
     let mut result: String = String::default();
-    let mut current_line = 1;
-    let mut preceeding_newlines = 0;
+    let mut preceeding_space = true;
     for token in tokens.into_iter() {
-        if let Some(source) = &token.source {
-            if add_source_new_lines && source.line.line_number != current_line {
-                if preceeding_newlines == 0 {
-                    preceeding_newlines += 1;
-                    result.push('\n');
-                }
-                current_line = source.line.line_number;
-            }
-        }
         match &token.value {
-            Value::Character('\n', _) => {
-                if preceeding_newlines == 0 {
-                    preceeding_newlines = 1;
-                    result.push('\n');
+            Value::Character(c, cat_code) => {
+                // If this space character is redundant, don't write it.
+                // An exception is made for newline characters, which are considered intentional.
+                if preceeding_space && cat_code == &CatCode::Space && *c != '\n' {
+                    continue;
                 }
-            }
-            Value::Character(c, catcode::CatCode::Space) => {
                 result.push(*c);
-            }
-            Value::Character(c, _) => {
-                preceeding_newlines = 0;
-                result.push(*c);
+                preceeding_space = cat_code == &CatCode::Space;
             }
             Value::ControlSequence(c, s) => {
-                if s == "par" {
-                    if preceeding_newlines == 0 {
-                        result.push('\n');
-                        preceeding_newlines += 1;
-                    }
-                    if preceeding_newlines == 1 {
-                        result.push('\n');
-                        preceeding_newlines += 1;
-                    }
-                } else {
-                    preceeding_newlines = 0;
-                    result.push(*c);
-                    result.push_str(s.as_str());
-                }
+                result.push(*c);
+                result.push_str(s.as_str());
+                preceeding_space = false;
             }
         }
     }

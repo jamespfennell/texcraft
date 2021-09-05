@@ -6,6 +6,7 @@ use std::process;
 use texcraft::tex::command::library::catcodecmd;
 use texcraft::tex::command::library::conditional;
 use texcraft::tex::command::library::def;
+use texcraft::tex::command::library::execwhitespace;
 use texcraft::tex::command::library::registers;
 use texcraft::tex::command::library::the;
 use texcraft::tex::command::library::time;
@@ -13,7 +14,7 @@ use texcraft::tex::command::library::variableops;
 use texcraft::tex::command::library::WholeLibraryState;
 use texcraft::tex::driver;
 use texcraft::tex::input;
-use texcraft::tex::state::Base;
+use texcraft::tex::prelude::*;
 use texcraft::tex::token;
 use texcraft::tex::token::catcode;
 
@@ -67,8 +68,8 @@ fn expand(file_name: &str) -> Result<(), anyhow::Error> {
     let f = Box::new(io::BufReader::new(fs::File::open(file_name)?));
     input.push_new_source(f);
 
-    let tokens = driver::expand(&mut s, &mut input)?;
-    let pretty = token::write_tokens(&tokens, true);
+    let tokens = driver::exec(&mut s, &mut input, true)?;
+    let pretty = token::write_tokens(&tokens);
     print!("{}", pretty);
     Ok(())
 }
@@ -80,7 +81,7 @@ fn docs(cs_name: &String, optional_file_name: Option<&String>) -> Result<(), any
         let mut input = input::Unit::new();
         let f = Box::new(io::BufReader::new(fs::File::open(file_name)?));
         input.push_new_source(f);
-        driver::expand(&mut s, &mut input)?;
+        driver::exec(&mut s, &mut input, true)?;
     }
 
     if cs_name == "list" {
@@ -131,5 +132,8 @@ fn init_state() -> Base<WholeLibraryState> {
     s.set_command("day", time::get_day());
     s.set_command("month", time::get_month());
     s.set_command("year", time::get_year());
+    s.set_command("par", execwhitespace::get_par());
+    s.set_command("newline", execwhitespace::get_newline());
+    s.set_command("\\", command::Command::Character('\\', CatCode::Other));
     s
 }

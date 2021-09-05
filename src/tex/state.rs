@@ -116,6 +116,7 @@
 use crate::datastructures::scopedmap::ScopedMap;
 use crate::tex::command;
 use crate::tex::command::library::catcodecmd;
+use crate::tex::token;
 use crate::tex::token::catcode::RawCatCode;
 use std::collections::HashMap;
 
@@ -124,6 +125,11 @@ pub struct Base<S> {
     pub primitives: ScopedMap<String, command::Command<S>>,
     pub cat_codes: catcodecmd::Component,
     pub state: S,
+
+    // Only used in exec mode.
+    // TODO: this kind of feels like it shouldn't be on the state?
+    pub exec_output: Vec<token::Token>,
+    pub num_trailing_newlines: usize,
 }
 
 /// Base state that every TeX state is expected to include using composition.
@@ -134,6 +140,8 @@ impl<S> Base<S> {
             primitives: ScopedMap::new(),
             cat_codes: catcodecmd::Component::new(initial_cat_codes),
             state: state,
+            exec_output: Vec::new(),
+            num_trailing_newlines: 0,
         }
     }
 

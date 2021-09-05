@@ -4,19 +4,28 @@ use crate::tex::command::Command;
 use crate::tex::input;
 use crate::tex::prelude::*;
 use crate::tex::token;
+use std::mem;
 
-pub fn expand<S>(state: &mut Base<S>, input: &mut input::Unit) -> anyhow::Result<Vec<Token>> {
-    let mut recorder = token::VecRecorder::new();
-    run(state, input, Some(&mut recorder), false)?;
-    Ok(recorder.tokens())
+pub fn exec<S>(
+    state: &mut Base<S>,
+    input: &mut input::Unit,
+    err_for_undefined_cs: bool,
+) -> anyhow::Result<Vec<Token>> {
+    let undefined_cs_handler = match err_for_undefined_cs {
+        true => default_undefined_cs_handler,
+        false => handle_character,
+    };
+    run(state, input, handle_character, undefined_cs_handler)?;
+    let mut result = Vec::new();
+    mem::swap(&mut result, &mut state.exec_output);
+    Ok(result)
 }
 
 pub fn run<S>(
     state: &mut Base<S>,
     input: &mut input::Unit,
-    //execution_input_recorder: Option<&mut dyn token::Recorder>,
-    mut execution_output_recorder: Option<&mut dyn token::Recorder>,
-    _fail_if_undefefined_cs: bool,
+    character_handler: fn(token::Token, &mut Base<S>) -> anyhow::Result<()>,
+    undefined_cs_handler: fn(token::Token, &mut Base<S>) -> anyhow::Result<()>,
 ) -> anyhow::Result<()> {
     loop {
         let fully_expanded_token = ExpansionInput::<S>::new(state, input).next();
@@ -26,11 +35,9 @@ pub fn run<S>(
                     input.clear();
                     break;
                 }
-                Some(token) => match &token.value {
+                Some(mut token) => match &token.value {
                     Character(..) => {
-                        if let Some(ref mut recorder) = execution_output_recorder {
-                            recorder.record(&token);
-                        }
+                        character_handler(token, state)?;
                     }
                     ControlSequence(_, name) => match state.get_command(name) {
                         Some(Command::Execution(cmd_ref)) => {
@@ -50,14 +57,12 @@ pub fn run<S>(
                             let mut expanding_input = ExecutionInput::<S>::new(state, input);
                             cmd.call(token, &mut expanding_input)?;
                         }
+                        Some(Command::Character(c, cat_code)) => {
+                            token.value = Character(*c, *cat_code);
+                            character_handler(token, state)?;   
+                        }
                         _ => {
-                            if let Some(ref mut recorder) = execution_output_recorder {
-                                recorder.record(&token);
-                            }
-                            if name != "par" {
-                                // return Err(error::new_undefined_cs_error(token, state));
-                            }
-                            // TODO: undefined control sequence error
+                            undefined_cs_handler(token, state)?;
                         }
                     },
                 },
@@ -69,6 +74,22 @@ pub fn run<S>(
         };
     }
     Ok(())
+}
+
+fn handle_character<S>(mut token: token::Token, state: &mut Base<S>) -> anyhow::Result<()> {
+    if let token::Value::Character('\n', cat_code) = token.value {
+        token.value = token::Value::Character(' ', cat_code);
+    }
+    state.exec_output.push(token);
+    state.num_trailing_newlines = 0;
+    Ok(())
+}
+
+fn default_undefined_cs_handler<S>(
+    mut token: token::Token,
+    state: &mut Base<S>,
+) -> anyhow::Result<()> {
+    Err(error::new_undefined_cs_error(token, state))
 }
 
 struct RawStream<'a, S> {

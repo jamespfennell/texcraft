@@ -7,6 +7,7 @@ pub mod conditional;
 pub mod def;
 #[macro_use]
 pub mod registers;
+pub mod execwhitespace;
 pub mod texcraft;
 pub mod the;
 pub mod time;

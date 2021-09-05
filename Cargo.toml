@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["James Fennell <james@jpfennell.com>"]
 edition = "2018"
 
+[profile.release]
+lto = true          # Enable Link Time Optimization
+
 [dependencies]
 # Used for the many situations in which multiple integer types are supported: e.g, parsing, variables.
 num-traits = "0.2.14"

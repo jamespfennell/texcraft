@@ -17,7 +17,10 @@ Initial implemention work has focused on the core internal APIs (commands, varia
 
 ## Trying it out
 
+Try it out in the [Texcraft playground](https://play.texcraft.dev)!
 
+
+## Contributing
 
 ## See also
 

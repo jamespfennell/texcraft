@@ -1,0 +1,6 @@
+ui/node_modules
+ui/dist
+wasm/target
+wasm/pkg
+tmp
+backend

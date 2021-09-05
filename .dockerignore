@@ -1,2 +1,13 @@
 target
-
+docs/public
+docs/resources
+playground/ui/node_modules
+playground/ui/dist
+playground/wasm/pkg
+playground/wasm/target
+*Dockerfile
+.github
+*.log
+*.pdf
+*.dvi
+.git
