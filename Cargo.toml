@@ -18,4 +18,8 @@ anyhow = "1.0"
 colored = "2"
 
 # Used in the time module for getting the current time on startup.
-chrono = "0.4"
+chrono = {version="0.4.19", default-features = false, features = ["clock"], optional = true}
+
+[features]
+default = ["time"]
+time = ["chrono"]

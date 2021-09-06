@@ -15,13 +15,8 @@ lto = true
 # The `wasm-bindgen` crate provides the bare minimum functionality needed
 # to interact with JavaScript.
 wasm-bindgen = "0.2.45"
-texcraft = { path = "../.." }
-
-# The `web-sys` crate allows you to interact with the various browser APIs,
-# like the DOM.
-[dependencies.web-sys]
-version = "0.3.22"
-features = ["console"]
+texcraft = { path = "../..", default-features = false }
+web-sys = {version = "0.3.22", features = ["console"]}
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
@@ -29,10 +24,3 @@ features = ["console"]
 # in debug mode.
 [target."cfg(debug_assertions)".dependencies]
 console_error_panic_hook = "0.1.5"
-
-# These crates are used for running unit tests.
-[dev-dependencies]
-wasm-bindgen-test = "0.2.45"
-futures = "0.1.27"
-js-sys = "0.3.22"
-wasm-bindgen-futures = "0.3.22"

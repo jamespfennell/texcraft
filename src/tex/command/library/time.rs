@@ -1,6 +1,7 @@
 //! Variable commands related to time.
 
 use crate::tex::variable;
+#[cfg(feature = "time")]
 use chrono::prelude::*;
 
 /// Trait for states that contain a [time Component](Component).
@@ -19,6 +20,7 @@ pub struct Component {
 
 impl Component {
     /// Create a new component with the variables initialized to the current time.
+    #[cfg(feature = "time")]
     pub fn new() -> Component {
         let dt: DateTime<Local> = Local::now();
         Component {
@@ -26,6 +28,16 @@ impl Component {
             day: dt.date().day() as i32,
             month: dt.date().month() as i32,
             year: dt.date().year(),
+        }
+    }
+
+    #[cfg(not(feature = "time"))]
+    pub fn new() -> Component {
+        Component {
+            minutes_since_midnight: 0,
+            day: 0,
+            month: 0,
+            year: 0,
         }
     }
 
