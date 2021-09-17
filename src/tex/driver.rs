@@ -59,7 +59,7 @@ pub fn run<S>(
                         }
                         Some(Command::Character(c, cat_code)) => {
                             token.value = Character(*c, *cat_code);
-                            character_handler(token, state)?;   
+                            character_handler(token, state)?;
                         }
                         _ => {
                             undefined_cs_handler(token, state)?;

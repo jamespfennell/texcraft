@@ -5,7 +5,9 @@ use crate::tex::prelude::*;
 use crate::tex::variable::Variable;
 
 const ADVANCE_DOC: &str = "Add an integer to a variable";
-const MULTIPLY_DOC: &str = "Multiple a variable by an integer";
+const ADVANCECHK_DOC: &str = "Add an integer to a variable and error on overflow";
+const MULTIPLY_DOC: &str = "Multiply a variable by an integer";
+const MULTIPLYCHK_DOC: &str = "Multiply a variable by an integer and error on overflow";
 const DIVIDE_DOC: &str = "Divide a variable by an integer";
 
 macro_rules! create_arithmetic_primitive {
@@ -35,14 +37,55 @@ macro_rules! create_arithmetic_primitive {
 }
 
 fn add(_: Token, lhs: &mut i32, rhs: i32) -> anyhow::Result<()> {
-    // Note: TeX explicitely permits overflow in arithmetic operations
+    // Note: TeX explicitely permits overflow in \advance
     *lhs = lhs.wrapping_add(rhs);
     Ok(())
 }
 
+fn checked_add(token: Token, lhs: &mut i32, rhs: i32) -> anyhow::Result<()> {
+    match lhs.checked_add(rhs) {
+        Some(result) => {
+            *lhs = result;
+            Ok(())
+        }
+        None => Err(
+            error::TokenError::new(token, "overflow in checked addition")
+                .add_note(format!["left hand side evaluated to {}", *lhs])
+                .add_note(format!["right hand side evaluated {}", rhs])
+                .add_note(format![
+                    "overflowed result would be {}",
+                    lhs.wrapping_add(rhs)
+                ])
+                .add_note("use \\advance instead of \\advancechk to permit overflowing")
+                .cast(),
+        ),
+    }
+}
+
 fn multiply(_: Token, lhs: &mut i32, rhs: i32) -> anyhow::Result<()> {
+    // Note: TeX explicitely permits overflow in \multiply
     *lhs = lhs.wrapping_mul(rhs);
     Ok(())
+}
+
+fn checked_multiply(token: Token, lhs: &mut i32, rhs: i32) -> anyhow::Result<()> {
+    match lhs.checked_mul(rhs) {
+        Some(result) => {
+            *lhs = result;
+            Ok(())
+        }
+        None => Err(
+            error::TokenError::new(token, "overflow in checked multiplication")
+                .add_note(format!["left hand side evaluated to {}", *lhs])
+                .add_note(format!["right hand side evaluated {}", rhs])
+                .add_note(format![
+                    "overflowed result would be {}",
+                    lhs.wrapping_mul(rhs)
+                ])
+                .add_note("use \\multiply instead of \\multiplychk to permit overflowing")
+                .cast(),
+        ),
+    }
 }
 
 fn divide(token: Token, lhs: &mut i32, rhs: i32) -> anyhow::Result<()> {
@@ -54,7 +97,9 @@ fn divide(token: Token, lhs: &mut i32, rhs: i32) -> anyhow::Result<()> {
 }
 
 create_arithmetic_primitive![advance_fn, add];
+create_arithmetic_primitive![advancechk_fn, checked_add];
 create_arithmetic_primitive![multiply_fn, multiply];
+create_arithmetic_primitive![multiplychk_fn, checked_multiply];
 create_arithmetic_primitive![divide_fn, divide];
 
 /// Get the `\advance` command.
@@ -66,11 +111,29 @@ pub fn get_advance<S>() -> command::ExecutionPrimitive<S> {
     }
 }
 
+/// Get the `\advancechk` command.
+pub fn get_advancechk<S>() -> command::ExecutionPrimitive<S> {
+    command::ExecutionPrimitive {
+        call_fn: advancechk_fn,
+        docs: ADVANCECHK_DOC,
+        id: None,
+    }
+}
+
 /// Get the `\multiply` command.
 pub fn get_multiply<S>() -> command::ExecutionPrimitive<S> {
     command::ExecutionPrimitive {
         call_fn: multiply_fn,
         docs: MULTIPLY_DOC,
+        id: None,
+    }
+}
+
+/// Get the `\multiplychk` command.
+pub fn get_multiplychk<S>() -> command::ExecutionPrimitive<S> {
+    command::ExecutionPrimitive {
+        call_fn: multiplychk_fn,
+        docs: MULTIPLYCHK_DOC,
         id: None,
     }
 }
@@ -110,7 +173,9 @@ mod tests {
     fn setup_expansion_test(s: &mut Base<State>) {
         s.set_command("the", the::get_the());
         s.set_command("advance", get_advance());
+        s.set_command("advancechk", get_advancechk());
         s.set_command("multiply", get_multiply());
+        s.set_command("multiplychk", get_multiplychk());
         s.set_command("divide", get_divide());
         s.set_command("count", registers::get_count());
         s.set_command("catcode", catcodecmd::get_catcode());
@@ -145,6 +210,12 @@ mod tests {
         r"\count 1 1\advance\count 1 be 2 \the \count 1"
     ];
     expansion_failure_test![advance_catcode_not_supported, r"\advance\catcode 100 by 2"];
+    arithmetic_test![advancechk_base_case, r"\advancechk", "1", "2", "3"];
+    arithmetic_test![advancechk_negative_summand, r"\advancechk", "10", "-2", "8"];
+    expansion_failure_test![
+        advancechk_overflow,
+        r"\count 1 2147483647 \advancechk\count 1 by 1"
+    ];
 
     arithmetic_test![multiply_base_case, r"\multiply", "5", "4", "20"];
     arithmetic_test![multiply_base_case_with_by, r"\multiply", "5", "by 4", "20"];
@@ -157,6 +228,11 @@ mod tests {
         "100000",
         "100000",
         "1410065408"
+    ];
+    arithmetic_test![multiplychk_base_case, r"\multiplychk", "5", "4", "20"];
+    expansion_failure_test![
+        multiplychk_overflow,
+        r"\count 1 100000 \multiplychk\count 1 by 100000"
     ];
 
     arithmetic_test![divide_base_case, r"\divide", "9", "4", "2"];

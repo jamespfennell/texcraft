@@ -126,7 +126,9 @@ fn init_state() -> Base<WholeLibraryState> {
     s.set_command("countdef", registers::get_countdef());
     s.set_command("catcode", catcodecmd::get_catcode());
     s.set_command("advance", variableops::get_advance());
+    s.set_command("advancechk", variableops::get_advancechk());
     s.set_command("multiply", variableops::get_multiply());
+    s.set_command("multiplychk", variableops::get_multiplychk());
     s.set_command("divide", variableops::get_divide());
     s.set_command("time", time::get_time());
     s.set_command("day", time::get_day());
