@@ -50,6 +50,7 @@ fn write_catcode_register_fn<S>(state: &mut Base<S>, addr: usize) -> &mut RawCat
 fn catcode_fn<S>(
     _catcode_token: &Token,
     input: &mut command::ExpansionInput<S>,
+    _: usize,
 ) -> anyhow::Result<Variable<S>> {
     let addr: u32 = parse::parse_number(input)?;
     Ok(Variable::CatCode(TypedVariable::new(
@@ -61,7 +62,7 @@ fn catcode_fn<S>(
 
 /// Get the `\catcode` command.
 pub fn get_catcode<S>() -> variable::Command<S> {
-    variable::Command::Dynamic(catcode_fn, CATCODE_DOC)
+    variable::Command::Dynamic(catcode_fn, 0, CATCODE_DOC)
 }
 
 #[cfg(test)]

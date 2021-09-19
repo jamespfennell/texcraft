@@ -248,7 +248,9 @@ pub enum Command<S> {
         fn(
             token: &token::Token,
             input: &mut command::ExpansionInput<S>,
+            addr: usize,
         ) -> anyhow::Result<Variable<S>>,
+        usize, // addr
         &'static str,
     ),
 }
@@ -270,7 +272,7 @@ impl<S> Command<S> {
     ) -> anyhow::Result<Variable<S>> {
         match self {
             Command::Static(v, _) => Ok(*v),
-            Command::Dynamic(f, _) => (*f)(token, input),
+            Command::Dynamic(f, addr, _) => (*f)(token, input, *addr),
         }
     }
 }

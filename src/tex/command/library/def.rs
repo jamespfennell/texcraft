@@ -1,5 +1,6 @@
 //! Primitives for creating user-defined macros (`\def` and friends).
 
+use crate::tex::parse;
 use crate::tex::prelude::*;
 use crate::tex::token::stream;
 use colored::*;
@@ -23,26 +24,8 @@ fn char_to_parameter_index(c: char) -> Option<usize> {
 }
 
 fn def_primitive_fn<S>(def_token: Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()> {
-    let name = match input.unexpanded_stream().next()? {
-        None => {
-            return Err(error::TokenError::new(
-                def_token,
-                "unexpected end of input while reading the target of a macro definition",
-            )
-            .cast());
-        }
-        Some(token) => match token.value {
-            ControlSequence(_, name) => name,
-            _ => {
-                return Err(error::TokenError::new(
-                    token,
-                    "unexpected target of a macro definition",
-                )
-                .add_note("the target of a macro definition must be a control sequence")
-                .cast());
-            }
-        },
-    };
+    let name =
+        parse::parse_command_target("macro definition", def_token, input.unexpanded_stream())?;
 
     let (arguments, replacement_end_token) =
         arguments::Definition::build(input.unexpanded_stream())?;

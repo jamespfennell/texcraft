@@ -21,3 +21,38 @@ pub fn parse_optional_space<S>(input: &mut command::ExpansionInput<S>) -> anyhow
     get_optional_element![input, Character(_, CatCode::Space) => (),];
     Ok(())
 }
+
+// TODO: take a &token instead
+// TODO: just take execution input as input
+pub fn parse_command_target<S: stream::Stream>(
+    target_description: &str,
+    token: Token,
+    input: &mut S,
+) -> anyhow::Result<String> {
+    Ok(match input.next()? {
+        None => {
+            return Err(error::TokenError::new(
+                token,
+                format![
+                    "unexpected end of input while reading the target of a {}",
+                    target_description
+                ],
+            )
+            .cast());
+        }
+        Some(token) => match token.value {
+            ControlSequence(_, name) => name,
+            _ => {
+                return Err(error::TokenError::new(
+                    token,
+                    format!["unexpected target of a {}", target_description],
+                )
+                .add_note(format![
+                    "the target of a {} must be a control sequence",
+                    target_description
+                ])
+                .cast());
+            }
+        },
+    })
+}

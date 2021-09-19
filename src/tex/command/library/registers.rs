@@ -1,6 +1,6 @@
 //! TeX registers and commands to access them
-use crate::tex::parse;
 
+use crate::tex::parse;
 use crate::tex::prelude::*;
 use crate::tex::variable;
 use crate::tex::variable::{TypedVariable, Variable};
@@ -87,6 +87,7 @@ fn write_int_register_fn<S: HasRegisters>(state: &mut S, addr: usize) -> &mut i3
 fn count_fn<S: HasRegisters>(
     count_token: &Token,
     input: &mut ExpansionInput<S>,
+    _: usize,
 ) -> anyhow::Result<Variable<S>> {
     let addr: usize = parse::parse_number(input)?;
     if addr >= input.state().registers().int_registers.num() {
@@ -105,29 +106,19 @@ fn count_fn<S: HasRegisters>(
 
 /// Get the `\count` command.
 pub fn get_count<S: HasRegisters>() -> variable::Command<S> {
-    variable::Command::Dynamic(count_fn, COUNT_DOC)
+    variable::Command::Dynamic(count_fn, 0, COUNT_DOC)
 }
 
 fn countdef_fn<S: HasRegisters>(
     countdef_token: Token,
     input: &mut command::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    // TODO: this logic appears a lot. Can we generalize it? Maybe parse_cs_name? It appears in \def, and will appear in \let too
-    // parse_cs_target
-    let cs_name = match input.next()? {
-        None => {
-            return Err(error::EndOfInputError::new(
-                "Unexpected end of input while determining the target of a countdef",
-            )
-            .cast());
-        }
-        Some(token) => match token.value {
-            Character(..) => {
-                return Err(error::TokenError::new(token, "").cast());
-            }
-            ControlSequence(_, name) => name,
-        },
-    };
+    // TODO: don't clone the token!
+    let cs_name = parse::parse_command_target(
+        "countdef",
+        countdef_token.clone(),
+        input.unexpanded_stream(),
+    )?;
     parse::parse_optional_equals(&mut input.regular())?;
     let addr: usize = parse::parse_number(&mut input.regular())?;
     if addr >= input.state().registers().int_registers.num() {

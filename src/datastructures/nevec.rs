@@ -80,6 +80,22 @@ impl<T> Nevec<T> {
     pub fn len(&self) -> usize {
         1 + self.tail.len()
     }
+
+    /// Get a reference to the element at the provided index.
+    pub fn get(&self, i: usize) -> Option<&T> {
+        if i == 0 {
+            return Some(&self.first);
+        }
+        self.tail.get(i - 1)
+    }
+
+    /// Get a mutable reference to the element at the provided index.
+    pub fn get_mut(&mut self, i: usize) -> Option<&mut T> {
+        if i == 0 {
+            return Some(&mut self.first);
+        }
+        self.tail.get_mut(i - 1)
+    }
 }
 
 impl<T> Index<usize> for Nevec<T> {

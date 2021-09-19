@@ -214,7 +214,7 @@ impl<S> Command<S> {
             Command::Expansion(cmd) => cmd.doc(),
             Command::Execution(cmd) => cmd.docs.to_string(),
             Command::Variable(variable::Command::Static(_, docs)) => docs.to_string(),
-            Command::Variable(variable::Command::Dynamic(_, docs)) => docs.to_string(),
+            Command::Variable(variable::Command::Dynamic(_, _, docs)) => docs.to_string(),
             Command::Character(c, cat_code) => {
                 format!["Implicit character '{}' with cat code {}", c, cat_code]
             }

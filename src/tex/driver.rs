@@ -174,7 +174,7 @@ impl<'a, S> ExpansionInput<'a, S> {
 
 /// This type is the same as [RawStream] except it stores a mutable reference to the state.
 /// It is used as the backing type for [ExecutionInput].
-struct RawStreamMutState<'a, S> {
+pub struct RawStreamMutState<'a, S> {
     state: &'a mut Base<S>,
     input: &'a mut input::Unit,
 }
@@ -238,7 +238,7 @@ impl<'a, S> ExecutionInput<'a, S> {
         &self.raw_stream.input
     }
 
-    pub fn unexpanded_stream(&mut self) -> &mut dyn Stream {
+    pub fn unexpanded_stream(&mut self) -> &mut RawStreamMutState<'a, S> {
         &mut self.raw_stream
     }
 

@@ -2,6 +2,7 @@
 //!
 //! This module contains implementations of TeX primtives for Texcraft.
 
+pub mod alloc;
 pub mod catcodecmd;
 pub mod conditional;
 pub mod def;
