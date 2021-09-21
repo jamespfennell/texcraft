@@ -49,7 +49,7 @@ jobs:
         with:
           tags: jamespfennell/texcraft.dev:latest
           file: ./docs/Dockerfile
-          # Only push to Docker Hub if this workflow is a push to master
+          # Only push to Docker Hub if this workflow is a push to main
           push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
 
   build-the-playground:
@@ -73,5 +73,5 @@ jobs:
         with:
           tags: jamespfennell/play.texcraft.dev:latest
           file: ./playground/Dockerfile
-          # Only push to Docker Hub if this workflow is a push to master
-          push: ${{ github.ref == 'refs/heads/playground' && github.event_name == 'push' }}
+          # Only push to Docker Hub if this workflow is a push to main
+          push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
