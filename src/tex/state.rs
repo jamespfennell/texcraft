@@ -122,7 +122,7 @@ use std::collections::HashMap;
 
 /// The parts of state that every TeX engine must have.
 pub struct Base<S> {
-    pub primitives: ScopedMap<String, command::Command<S>>,
+    pub primitives: ScopedMap<token::CsName, command::Command<S>>,
     pub cat_codes: catcodecmd::Component,
     pub state: S,
 
@@ -145,11 +145,15 @@ impl<S> Base<S> {
         }
     }
 
-    pub fn get_command(&self, name: &String) -> Option<&command::Command<S>> {
+    pub fn get_command(&self, name: &token::CsName) -> Option<&command::Command<S>> {
         self.primitives.get(name)
     }
 
-    pub fn set_command<A: Into<String>, B: Into<command::Command<S>>>(&mut self, name: A, cmd: B) {
+    pub fn set_command<A: Into<token::CsName>, B: Into<command::Command<S>>>(
+        &mut self,
+        name: A,
+        cmd: B,
+    ) {
         self.primitives.insert(name, cmd)
     }
 

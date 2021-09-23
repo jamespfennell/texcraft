@@ -20,6 +20,9 @@ colored = "2"
 # Used in the time module for getting the current time on startup.
 chrono = {version="0.4.19", default-features = false, features = ["clock"], optional = true}
 
+# Currently used as an efficient string type for control sequence names 
+smol_str = "0.1.18"
+
 [features]
 default = ["time"]
 time = ["chrono"]

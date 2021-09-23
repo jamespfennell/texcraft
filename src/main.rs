@@ -85,19 +85,19 @@ fn docs(cs_name: &String, optional_file_name: Option<&String>) -> Result<(), any
         cs_names.sort();
         let mut last_prefix = None;
         for cs_name in cs_names.iter() {
-            let new_last_prefix = cs_name.chars().nth(0);
+            let new_last_prefix = cs_name.as_str().to_string().chars().nth(0);
             if last_prefix != new_last_prefix {
                 println![""];
                 last_prefix = new_last_prefix;
             }
             let doc = primitives.get(&cs_name).unwrap().doc();
             let first_line = doc.split("\n").nth(0).unwrap_or("");
-            println!["\\{}  {}", cs_name.bold(), first_line];
+            println!["\\{}  {}", cs_name.as_str().to_string().bold(), first_line];
         }
         return Ok(());
     }
 
-    match s.get_command(cs_name) {
+    match s.get_command(&token::CsName::from(cs_name.as_str())) {
         None => {
             println!("Unknown command \\{}", cs_name);
             process::exit(1);

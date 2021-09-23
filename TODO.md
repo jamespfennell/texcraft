@@ -43,9 +43,7 @@ This is related to logging
   - out the type?
 - Lazily construct the KMP matcher for macros
 - Don't use a KMP matcher for small macros
-- Don't use if statements in the driver, instead use static dispatch on different ExpansionInput types
-- Don't put user defined macros in Rc<> automatically - wait if/until the macro is cloned by \let
 - Make one allocation for each UDM
-- https://stackoverflow.com/questions/31264670/do-i-have-to-be-concerned-about-the-overhead-of-rc
 - General optimizations around datastuctures used
 - Use a different hash function for maps
+- Use SmolStr with Rc instead of Arc

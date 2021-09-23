@@ -307,12 +307,12 @@ pub fn add_context<S>(error: &mut anyhow::Error, state: &Base<S>, input: &input:
 pub fn new_undefined_cs_error<S>(token: token::Token, state: &Base<S>) -> anyhow::Error {
     let a = "expected a control sequence".to_string();
     let name = match &token.value {
-        token::Value::ControlSequence(_, name) => name,
+        token::Value::ControlSequence(_, name) => name.as_str(),
         _ => &a,
     };
     let mut cs_names = Vec::<String>::new();
     for cs_name in state.primitives.keys() {
-        cs_names.push(String::clone(cs_name));
+        cs_names.push(cs_name.as_str().to_string());
     }
 
     let close_cs_name = spellcheck::find_close_words(cs_names, name);

@@ -52,7 +52,7 @@ impl From<io::Error> for LexerError {
 pub struct Lexer {
     raw_lexer: RawLexer,
     trim_next_whitespace: bool,
-    new_par_control_sequence_name: String,
+    new_par_control_sequence_name: token::CsName,
 }
 
 impl Lexer {
@@ -144,6 +144,12 @@ impl Lexer {
                 code: RawCatCode::Regular(CatCode::Letter),
                 ..
             }) => {
+                // _____  _____  ____   _____
+                //   |    |   |  |   \  |   |  | | |
+                //   |    |   |  |   |  |   |  | | |
+                //   |    |___|  |___/  |___|  o o o
+                //
+                // TODO: optimize this! We shouldn't allocate a string. Instead get the underlying &str
                 let mut name = String::new();
                 name.push(char);
                 while let Some(RawToken {
@@ -159,7 +165,10 @@ impl Lexer {
             }
             Some(first_raw_token) => first_raw_token.char.to_string(),
         };
-        Ok(token::Value::ControlSequence(raw_token.char, name))
+        Ok(token::Value::ControlSequence(
+            raw_token.char,
+            token::CsName::from(name.as_str()),
+        ))
     }
 
     pub fn last_non_empty_line(&self) -> Option<Rc<token::Line>> {
@@ -170,7 +179,7 @@ impl Lexer {
         Lexer {
             raw_lexer: RawLexer::new(file),
             trim_next_whitespace: false,
-            new_par_control_sequence_name: "par".to_string(),
+            new_par_control_sequence_name: token::CsName::from("par"),
         }
     }
 }
@@ -259,6 +268,7 @@ mod tests {
     use super::*;
     use crate::tex::token::catcode;
     use crate::tex::token::catcode::{CatCode::*, RawCatCode::*};
+    use crate::tex::token::CsName;
     use crate::tex::token::Value::Character;
     use crate::tex::token::Value::ControlSequence;
     use std::array::IntoIter;
@@ -268,7 +278,7 @@ mod tests {
         run_test(
             r"\a{b}",
             Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', "a".to_string()),
+                ControlSequence('\\', CsName::from("a")),
                 Character('{', BeginGroup),
                 Character('b', Letter),
                 Character('}', EndGroup),
@@ -281,7 +291,7 @@ mod tests {
         run_test(
             r"\a b",
             Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', "a".to_string()),
+                ControlSequence('\\', CsName::from("a")),
                 Character('b', Letter),
             ])),
         );
@@ -291,7 +301,7 @@ mod tests {
         run_test(
             "\\a  b",
             Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', "a".to_string()),
+                ControlSequence('\\', CsName::from("a")),
                 Character('b', Letter),
             ])),
         );
@@ -301,7 +311,7 @@ mod tests {
         run_test(
             "\\a\n b",
             Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', "a".to_string()),
+                ControlSequence('\\', CsName::from("a")),
                 Character('b', Letter),
             ])),
         );
@@ -311,7 +321,7 @@ mod tests {
         run_test(
             "\\ABC{D}",
             Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', "ABC".to_string()),
+                ControlSequence('\\', CsName::from("ABC")),
                 Character('{', BeginGroup),
                 Character('D', Letter),
                 Character('}', EndGroup),
@@ -322,7 +332,7 @@ mod tests {
     fn multi_character_control_sequence() {
         run_test(
             "\\ABC",
-            Vec::from_iter(IntoIter::new([ControlSequence('\\', "ABC".to_string())])),
+            Vec::from_iter(IntoIter::new([ControlSequence('\\', CsName::from("ABC"))])),
         );
     }
     #[test]
@@ -330,7 +340,7 @@ mod tests {
         run_test(
             "\\{{",
             Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', "{".to_string()),
+                ControlSequence('\\', CsName::from("{")),
                 Character('{', BeginGroup),
             ])),
         );
@@ -341,7 +351,7 @@ mod tests {
         run_test(
             "\\{A",
             Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', "{".to_string()),
+                ControlSequence('\\', CsName::from("{")),
                 Character('A', Letter),
             ])),
         );
@@ -390,7 +400,7 @@ mod tests {
             "A%\n\n B",
             Vec::from_iter(IntoIter::new([
                 Character('A', Letter),
-                ControlSequence('\\', "par".to_string()),
+                ControlSequence('\\', CsName::from("par")),
                 Character('B', Letter),
             ])),
         );
@@ -400,7 +410,7 @@ mod tests {
         run_test(
             "\\A %\nB",
             Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', "A".to_string()),
+                ControlSequence('\\', CsName::from("A")),
                 Character('B', Letter),
             ])),
         );
@@ -444,7 +454,7 @@ mod tests {
             "A\n\nB",
             Vec::from_iter(IntoIter::new([
                 Character('A', Letter),
-                ControlSequence('\\', "par".to_string()),
+                ControlSequence('\\', CsName::from("par")),
                 Character('B', Letter),
             ])),
         );
@@ -455,7 +465,7 @@ mod tests {
             "A\n \nB",
             Vec::from_iter(IntoIter::new([
                 Character('A', Letter),
-                ControlSequence('\\', "par".to_string()),
+                ControlSequence('\\', CsName::from("par")),
                 Character('B', Letter),
             ])),
         );

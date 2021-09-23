@@ -4,13 +4,43 @@ pub mod catcode;
 pub mod lexer;
 pub mod stream;
 
+use smol_str::SmolStr;
 use crate::tex::token::catcode::CatCode;
 use std::rc::Rc;
+
+/// Immutable string type used for storing control sequence names.
+///
+/// The implementation of this type is opaque so that it can be performance optimized
+/// without worrying about downstream consumers.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CsName(SmolStr);
+
+impl CsName {
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl From<&str> for CsName {
+    fn from(s: &str) -> Self {
+        CsName(SmolStr::new(s))
+    }
+}
+
+impl std::fmt::Display for CsName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write![f, "{}", self.0]
+    }
+}
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Value {
     Character(char, CatCode),
-    ControlSequence(char, String),
+    ControlSequence(char, CsName),
 }
 
 #[derive(Debug, Eq, Clone)]
@@ -23,13 +53,12 @@ impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.value {
             Value::Character(c, _) => {
-                write![f, "{}", c]?;
+                write![f, "{}", c]
             }
             Value::ControlSequence(prefix, name) => {
-                write![f, "{}{}", prefix, name]?;
+                write![f, "{}{}", prefix, name.as_str()]
             }
         }
-        Ok(())
     }
 }
 impl PartialEq for Token {

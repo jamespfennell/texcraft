@@ -17,6 +17,8 @@ pub use variable::parse_variable;
 
 use crate::tex::prelude::*;
 
+use super::token::CsName;
+
 pub fn parse_optional_space<S>(input: &mut command::ExpansionInput<S>) -> anyhow::Result<()> {
     get_optional_element![input, Character(_, CatCode::Space) => (),];
     Ok(())
@@ -28,7 +30,7 @@ pub fn parse_command_target<S: stream::Stream>(
     target_description: &str,
     token: Token,
     input: &mut S,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<CsName> {
     Ok(match input.next()? {
         None => {
             return Err(error::TokenError::new(
