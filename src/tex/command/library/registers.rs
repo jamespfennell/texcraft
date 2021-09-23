@@ -69,9 +69,9 @@ pub struct Component {
 
 impl Component {
     /// Creates a new registers component.
-    pub fn new() -> Component {
+    pub fn new(num_int_registers: usize) -> Component {
         Component {
-            int_registers: Registers::new(256),
+            int_registers: Registers::new(num_int_registers),
         }
     }
 }
@@ -172,7 +172,7 @@ mod tests {
 
     fn new_state() -> State {
         State {
-            registers: registers::Component::new(),
+            registers: registers::Component::new(256),
         }
     }
 

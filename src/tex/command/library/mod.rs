@@ -9,6 +9,7 @@ pub mod alloc;
 pub mod catcodecmd;
 pub mod conditional;
 pub mod def;
+pub mod letassignment;
 #[macro_use]
 pub mod registers;
 pub mod execwhitespace;
@@ -31,7 +32,7 @@ impl WholeLibraryState {
         let mut s = Base::<WholeLibraryState>::new(
             catcode::tex_defaults(),
             WholeLibraryState {
-                registers: registers::Component::new(),
+                registers: registers::Component::new(32768),
                 time: time::Component::new(),
                 alloc: alloc::Component::new(),
             },
@@ -39,6 +40,7 @@ impl WholeLibraryState {
         conditional::add_all_conditionals(&mut s);
         def::add_all_commands(&mut s);
         s.set_command("the", the::get_the());
+        s.set_command("let", letassignment::get_let());
         s.set_command("count", registers::get_count());
         s.set_command("countdef", registers::get_countdef());
         s.set_command("catcode", catcodecmd::get_catcode());
@@ -65,7 +67,6 @@ impl time::HasTime for WholeLibraryState {
         &mut self.time
     }
 }
-
 
 impl alloc::HasAlloc for WholeLibraryState {
     fn alloc(&self) -> &alloc::Component {

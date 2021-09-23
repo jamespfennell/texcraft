@@ -1,0 +1,148 @@
+% Digits of pi using the Rabinowitz and Wagon spigot algorithm [1]
+%
+% This TeX script calculates the first n digits of pi. It uses \count registers
+% for working memory and is runnable on both Texcraft and pdfTeX. The variable n 
+% is specified at the end of the script, and is restricted as follows:
+%
+% - pdfTeX: n cannot be much larger than 1000 as pdfTeX runs out of stack space.
+%
+% - Texcraft: n cannot be larger than 7559 as the algorithm requires n + (10n)//3 + 12
+%   integers in memory, and we assume 2^15 registers, as in pdfTeX.
+%   The playground has a version of this script that uses Texcraft allocation commands
+%   instead of \count registers and is thus not subject to this restriction.
+%   But also, for some currently unknown value of n, 32-bit integer overflow will occur
+%   and the result will be incorrect. From the original paper [1] we know that this n
+%   is at least 5000. 
+%
+% \count register layout:
+%
+% - [0, 25196): used for the length 10n/3 working array
+% - [25196, 32756): used for storing the n results
+% - [32756, 32768=2^15): used for 12 named variables via \countdef
+%
+% [1] http://www.cs.williams.edu/~heeringa/classes/cs135/s15/readings/spigot.pdf
+
+% While loop: repeatedly executes #2 while `\ifnum #1` is true
+\def\while#1#2{
+  \ifnum #1
+    #2%
+    \while{#1}{#2}\fi
+}
+
+% Modulus: calculates `#1 % #2` and puts the result in #1
+\countdef \tempTwo 32756
+\def\modulus#1#2{
+  \tempTwo = #1
+  \divide \tempTwo by #2
+  \multiply \tempTwo by #2
+  \multiply \tempTwo by -1
+  \advance \tempTwo by #1
+  #1= \tempTwo
+}
+
+\countdef \n 32767
+\n = 2500
+
+\def\result{\count}
+% \newarray\result\n
+\countdef \resultIndex 32766
+\resultIndex = 25196
+
+% allocate an array of length (10n)/3
+\countdef \len 32765
+\len = \n
+\multiply \len by 10
+\divide \len by 3
+\def\r{\count}
+
+% initialize each element of the array to 2
+\countdef \i 32764
+\i = 0
+\while{\i < \len}{
+  \r \i = 2
+  \advance \i by 1
+}
+
+\countdef \j 32763
+\countdef \k 32762 % todo: can remove
+\countdef \carry 32761
+\countdef \preDigit 32760
+\countdef \firstPreDigit 32759
+\firstPreDigit = -1
+\countdef \numTrailingPreDigits 32758
+\numTrailingPreDigits = 0
+
+\countdef \outerLoopIndex 32757
+\outerLoopIndex = 0
+\while{\outerLoopIndex < \n}{
+  \advance \outerLoopIndex by 1
+  %
+  \i = \len
+  \while{\i > 0}{
+    \advance \i by -1
+    %
+    % r[i] = r[i] * 10 + carry
+    \multiply \r \i by 10
+    \advance \r \i by \carry
+    %
+    % Calculate j = 2i+1
+    \j = 2
+    \multiply \j by \i
+    \advance \j by 1
+    %
+    % carry = (r[i]/j)(i)
+    \carry = \r \i
+    \divide \carry by \j
+    \multiply \carry by \i
+    %
+    % r[i] = r[i] % j
+    \ifnum \i > 0 \modulus{\r\i}{\j} \fi
+  }
+  %
+  \preDigit = \r 0
+  \divide \preDigit by 10
+  %
+  \ifnum \preDigit < 9
+    \ifnum \firstPreDigit > -1
+      \result\resultIndex = \firstPreDigit
+      \advance\resultIndex by 1
+    \fi
+    \while{\numTrailingPreDigits > 0}{
+      \result\resultIndex = 9
+      \advance\resultIndex by 1
+      \advance\numTrailingPreDigits by -1
+    }
+    \firstPreDigit = \preDigit
+  \fi
+  \ifnum \preDigit = 9
+    \advance\numTrailingPreDigits by 1
+  \fi
+  \ifnum \preDigit = 10
+    \ifnum \firstPreDigit < 9
+      \advance \firstPreDigit by 1
+    \else 
+      \firstPreDigit = 0
+    \fi
+    \result\resultIndex = \firstPreDigit
+    \advance\resultIndex by 1
+    \while{\numTrailingPreDigits > 0}{
+      \result\resultIndex = 0
+      \advance\resultIndex by 1
+      \advance\numTrailingPreDigits by -1
+    }
+    \firstPreDigit = 0
+  \fi
+  \modulus{\r 0}{10}
+}
+
+\while{\resultIndex < \n}{\result\resultIndex-1\advance\resultIndex1}
+
+\advance\n by 25196
+\i=25196
+\while{\i<\n}{%
+  \ifnum \result\i > -1 \the\result\i \fi
+  \advance\i by 1%
+}
+
+% To run on pdfTeX, uncomment the following line.
+% \end

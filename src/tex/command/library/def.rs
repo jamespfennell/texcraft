@@ -3,6 +3,7 @@
 use crate::tex::parse;
 use crate::tex::prelude::*;
 use crate::tex::token::stream;
+use crate::tex::token::write_tokens;
 use colored::*;
 use std::rc;
 
@@ -86,23 +87,23 @@ impl<S> command::ExpansionGeneric<S> for UserDefinedMacro {
                 ));
             }
         };
-        let result = self.replacement.perform_replacement(arguments);
-        /*
+
         // TODO: figure out logging
-        println!["expanding macro\nParameters:"];
+        /*println!["expanding macro\nParameters:"];
         for i in 0..arguments.len() {
             println![
                 " {}{}={}",
                 "#".bright_yellow().bold(),
                 (i + 1).to_string().bright_yellow().bold(),
-                writer::write_tokens(&arguments[i]).bright_yellow()
+                write_tokens(&arguments[i]).bright_yellow()
             ]
-        }
+        }*/
 
-        println!["Expansion: {}", writer::write_tokens(&result)];
+        let result = self.replacement.perform_replacement(arguments);
+        // println!["Expansion: {}", write_tokens(&result)];
 
-        println!["Docs for this macro:\n{}", ExpansionGeneric::<S>::doc(self)];
-        */
+        //println!["Docs for this macro:\n{}", ExpansionGeneric::<S>::doc(self)];
+
         Ok(stream::VecStream::new(result))
     }
 

@@ -9,9 +9,10 @@ use texcraft::tex::command::library::def;
 use texcraft::tex::command::library::registers;
 use texcraft::tex::command::library::the;
 use texcraft::tex::command::library::execwhitespace;
+use texcraft::tex::command::library::alloc;
+use texcraft::tex::command::library::letassignment;
 use texcraft::tex::command::library::time;
 use texcraft::tex::command::library::variableops;
-use texcraft::tex::command::library::WholeLibraryState;
 use texcraft::tex::driver;
 use texcraft::tex::input;
 use texcraft::tex::prelude::*;
@@ -40,7 +41,17 @@ pub fn greet(input: String, minutes_since_midnight: i32, day: i32, month: i32, y
 }
 
 struct PlaygroundState {
+    alloc: alloc::Component,
     time: time::Component,
+}
+
+impl alloc::HasAlloc for PlaygroundState {
+    fn alloc(&self) -> &alloc::Component {
+        &self.alloc
+    }
+    fn alloc_mut(&mut self) -> &mut alloc::Component {
+        &mut self.alloc
+    }
 }
 
 impl time::HasTime for PlaygroundState {
@@ -56,6 +67,7 @@ fn init_state(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> B
     let mut s = Base::<PlaygroundState>::new(
         catcode::tex_defaults(), 
         PlaygroundState{
+            alloc: alloc::Component::new(),
             time: time::Component::new_with_values(minutes_since_midnight, day, month, year),
         },
     );
@@ -64,6 +76,8 @@ fn init_state(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> B
     s.set_command("the", the::get_the());
     //s.set_command("count", registers::get_count());
     //s.set_command("countdef", registers::get_countdef());
+    s.set_command("newint", alloc::get_newint());
+    s.set_command("newarray", alloc::get_newarray());
     s.set_command("catcode", catcodecmd::get_catcode());
     s.set_command("advance", variableops::get_advance());
     s.set_command("multiply", variableops::get_multiply());
@@ -73,6 +87,7 @@ fn init_state(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> B
     s.set_command("month", time::get_month());
     s.set_command("year", time::get_year());
     s.set_command("par", execwhitespace::get_par());
+    s.set_command("let", letassignment::get_let());
     s.set_command("newline", execwhitespace::get_newline());
     s.set_command("\\", command::Command::Character('\\', CatCode::Other));
     s

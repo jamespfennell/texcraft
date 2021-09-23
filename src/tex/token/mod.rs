@@ -114,6 +114,7 @@ where
             Value::ControlSequence(c, s) => {
                 result.push(*c);
                 result.push_str(s.as_str());
+                result.push(' ');
                 preceeding_space = false;
             }
         }

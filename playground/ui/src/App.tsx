@@ -159,7 +159,7 @@ class App extends Component {
               });
             }));
           }
-          for (const texFile of [Content.WelcomeDotTex, Content.PrimesDotTex, Content.UndefinedcsDotTex]) {
+          for (const texFile of [Content.WelcomeDotTex, Content.PrimesDotTex, Content.DigitsOfPiDotTex, Content.UndefinedcsDotTex]) {
             entries.push(
               new DirectoryEntry(texFile, function () { that.openTexFile(texFile) })
             );

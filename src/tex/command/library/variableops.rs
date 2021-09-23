@@ -17,6 +17,7 @@ macro_rules! create_arithmetic_primitive {
             input: &mut ExecutionInput<S>,
         ) -> anyhow::Result<()> {
             let variable = parse::parse_variable(&mut input.regular())?;
+
             parse::parse_optional_by(&mut input.regular())?;
             let n: i32 = parse::parse_number(&mut input.regular())?;
             match variable {
@@ -164,7 +165,7 @@ mod tests {
 
     fn new_state() -> State {
         State {
-            registers: registers::Component::new(),
+            registers: registers::Component::new(256),
         }
     }
 

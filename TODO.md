@@ -28,6 +28,9 @@ Conditionals
   - Finish extracting TeXBook tests to their own package. 
 
 
+In exec mode, should print as soon as data becomes available.
+This is related to logging
+
 ## Low priority
 - show if conditional token in the error message
 - Cleanup the input controller, especailly the hacky use of the expansions stack for caching lexing results
@@ -35,6 +38,7 @@ Conditionals
 
 
 ## Optimization ideas:
+- profile the primes script to see where stuff is happening
 - Make the `Command` type flat/not nested and remove the docs so that it has better cache locality. Also maybe move
   - out the type?
 - Lazily construct the KMP matcher for macros

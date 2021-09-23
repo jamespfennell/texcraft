@@ -97,12 +97,18 @@ pub mod examples;
 pub mod library;
 pub mod tutorial;
 
-// TODO: default clone implementation does not seem to work
-#[derive(Copy, Clone)]
 pub struct ExpansionPrimitive<S> {
     call_fn: fn(token: Token, input: &mut ExpansionInput<S>) -> anyhow::Result<stream::VecStream>,
     docs: &'static str,
     id: Option<TypeId>,
+}
+
+impl<S> Copy for ExpansionPrimitive<S> {}
+
+impl<S> Clone for ExpansionPrimitive<S> {
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
 impl<S> ExpansionPrimitive<S> {
@@ -139,10 +145,19 @@ pub trait ExpansionGeneric<S> {
     }
 }
 
-#[derive(Clone)]
 pub enum Expansion<S> {
     Primitive(ExpansionPrimitive<S>),
     Generic(rc::Rc<dyn ExpansionGeneric<S>>),
+}
+
+// We need to implement Clone manually as the derived implementation requires S to be Clone.
+impl<S> Clone for Expansion<S> {
+    fn clone(&self) -> Self {
+        match self {
+            Expansion::Primitive(e) => Expansion::Primitive(e.clone()),
+            Expansion::Generic(r) => Expansion::Generic(r.clone()),
+        }
+    }
 }
 
 impl<S> Expansion<S> {
@@ -226,6 +241,18 @@ impl<S> std::fmt::Debug for Command<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "This is a command",)?;
         Ok(())
+    }
+}
+
+// We need to implement Clone manually as the derived implementation requires S to be Clone.
+impl<S> Clone for Command<S> {
+    fn clone(&self) -> Self {
+        match self {
+            Command::Expansion(e) => Command::Expansion::<S>(e.clone()),
+            Command::Execution(e) => Command::Execution(e.clone()),
+            Command::Variable(v) => Command::Variable(v.clone()),
+            Command::Character(c, cat_code) => Command::Character(*c, *cat_code),
+        }
     }
 }
 

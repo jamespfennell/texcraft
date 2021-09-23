@@ -85,10 +85,7 @@ fn handle_character<S>(mut token: token::Token, state: &mut Base<S>) -> anyhow::
     Ok(())
 }
 
-fn default_undefined_cs_handler<S>(
-    mut token: token::Token,
-    state: &mut Base<S>,
-) -> anyhow::Result<()> {
+fn default_undefined_cs_handler<S>(token: token::Token, state: &mut Base<S>) -> anyhow::Result<()> {
     Err(error::new_undefined_cs_error(token, state))
 }
 

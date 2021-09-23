@@ -1,5 +1,5 @@
 //! Allocation of variables and arrays
-//! 
+//!
 //! This module contains implementions of brand new Texcraft commands
 //! `\newint` and `\newarray` which perform dynamic memory allocation.
 
