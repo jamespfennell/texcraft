@@ -4,8 +4,8 @@ pub mod catcode;
 pub mod lexer;
 pub mod stream;
 
-use smol_str::SmolStr;
 use crate::tex::token::catcode::CatCode;
+use smol_str::SmolStr;
 use std::rc::Rc;
 
 /// Immutable string type used for storing control sequence names.

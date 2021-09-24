@@ -130,7 +130,9 @@
 //! For some stream implementations, like `VecStream`, it is admissible to skip
 //! `prepare_imut_state`. This exception is on an per-implementation basis.
 
+use crate::tex::error;
 use crate::tex::token::Token;
+use crate::tex::token::Value::*;
 
 /// A `Stream` is a source of tokens that are possibly generated on demand.
 ///
@@ -169,6 +171,46 @@ pub trait Stream {
     fn consume(&mut self) -> anyhow::Result<()> {
         self.next().map(|_| ())
     }
+}
+
+/// Removes the provided vector of tokens from the front of the stream.
+///
+/// Returns an error if the stream does not start with the tokens.
+pub fn remove_tokens_from_stream(
+    tokens: &Vec<Token>,
+    stream: &mut dyn Stream,
+    action: &str,
+) -> anyhow::Result<()> {
+    for prefix_token in tokens.iter() {
+        let stream_token = match stream.next()? {
+            None => {
+                return Err(error::EndOfInputError::new(format![
+                    "unexpected end of input while {}",
+                    action
+                ])
+                .cast());
+            }
+            Some(token) => token,
+        };
+        if &stream_token != prefix_token {
+            let note = match &prefix_token.value {
+                Character(c, catcode) => format![
+                    "expected a character token with value '{}' and catcode {}",
+                    c, catcode
+                ],
+                ControlSequence(_, name) => {
+                    format!["expected a control sequence token \\{}", name]
+                }
+            };
+            return Err(error::TokenError::new(
+                stream_token,
+                format!["unexpected token while {}", action],
+            )
+            .add_note(note)
+            .cast());
+        }
+    }
+    Ok(())
 }
 
 /// A `VecStream` is a stream consisting of a vector of tokens that are returned in order.

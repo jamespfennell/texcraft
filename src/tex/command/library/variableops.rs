@@ -24,6 +24,9 @@ macro_rules! create_arithmetic_primitive {
                 Variable::Int(variable) => {
                     $arithmetic_op(token,  variable.get_mut(input.state_mut()), n)
                 }
+                Variable::BaseInt(variable) => {
+                    $arithmetic_op(token,  variable.get_mut(input.base_mut()), n)
+                }
                 Variable::CatCode(_) => Err(error::TokenError::new(
                     token,
                     "arithmetic commands cannot be applied to variables of type X",

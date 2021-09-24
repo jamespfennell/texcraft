@@ -130,6 +130,7 @@ pub struct Base<S> {
     // TODO: this kind of feels like it shouldn't be on the state?
     pub exec_output: Vec<token::Token>,
     pub num_trailing_newlines: usize,
+    pub tracing_macros: i32,
 }
 
 /// Base state that every TeX state is expected to include using composition.
@@ -142,6 +143,7 @@ impl<S> Base<S> {
             state: state,
             exec_output: Vec::new(),
             num_trailing_newlines: 0,
+            tracing_macros: 0,
         }
     }
 

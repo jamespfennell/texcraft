@@ -99,6 +99,10 @@ fn read_number_from_address<S, T: PrimInt>(
             // TODO: this case may not work; e.g., requesting a register index u8 from a register value i32
             Ok(num_traits::cast::cast(*variable.get(stream.state())).unwrap())
         }
+        variable::Variable::BaseInt(variable) => {
+            // TODO: this case may not work; e.g., requesting a register index u8 from a register value i32
+            Ok(num_traits::cast::cast(*variable.get(stream.base())).unwrap())
+        }
         variable::Variable::CatCode(v) => {
             // This will always work becuase cat codes are between 0 and 15 inclusive and can
             // fit in any integral type.

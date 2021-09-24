@@ -179,6 +179,7 @@ use crate::tex::token::catcode::RawCatCode;
 /// Enum with a variant for each type of variable in TeX.
 pub enum Variable<S> {
     Int(TypedVariable<S, i32>),
+    BaseInt(TypedVariable<Base<S>, i32>),
 
     /// CatCode variables can live in the Base, so the type is a little different here.
     CatCode(TypedVariable<Base<S>, RawCatCode>),
@@ -290,6 +291,10 @@ impl<S> Command<S> {
             Variable::Int(variable) => {
                 let val: i32 = parse::parse_number(&mut input.regular())?;
                 *variable.get_mut(input.state_mut()) = val;
+            }
+            Variable::BaseInt(variable) => {
+                let val: i32 = parse::parse_number(&mut input.regular())?;
+                *variable.get_mut(input.base_mut()) = val;
             }
             Variable::CatCode(variable) => {
                 // TODO: don't use u8 here, use usize to get better error messages

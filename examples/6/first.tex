@@ -1,14 +1,13 @@
 \def\A{first definition of A}
-\edef\B{first defintion of B \A \newif\ifabc \abcfalse }
+\def\B#1{first #1defintion #1of B \A}
 
 \A
 
-\abctrue
 
-\B
+
+\B{Hello}
 
 
 
 \A
 
-\end

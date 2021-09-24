@@ -16,6 +16,7 @@ pub mod execwhitespace;
 pub mod texcraft;
 pub mod the;
 pub mod time;
+pub mod tracing;
 pub mod variableops;
 
 /// A state struct that is compatible with every primitive in the Texcraft commands library.
@@ -51,6 +52,7 @@ impl WholeLibraryState {
         s.set_command("day", time::get_day());
         s.set_command("month", time::get_month());
         s.set_command("year", time::get_year());
+        s.set_command("tracingmacros", tracing::get_tracingmacros());
         s.set_command("newint", alloc::get_newint());
         s.set_command("newarray", alloc::get_newarray());
         s

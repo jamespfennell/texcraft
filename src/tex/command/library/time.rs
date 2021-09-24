@@ -60,58 +60,38 @@ impl Component {
     }
 }
 
-fn read_minutes_since_midnight<S: HasTime>(state: &S, _: usize) -> &i32 {
-    &state.get_time().minutes_since_midnight
-}
-
-fn write_minutes_since_midnight<S: HasTime>(state: &mut S, _: usize) -> &mut i32 {
-    &mut state.get_time_mut().minutes_since_midnight
-}
-
 /// Get the `\time` command.
 pub fn get_time<S: HasTime>() -> variable::Variable<S> {
     variable::Variable::Int(variable::TypedVariable::new(
-        read_minutes_since_midnight,
-        write_minutes_since_midnight,
+        |state: &S, _: usize| -> &i32 { &state.get_time().minutes_since_midnight },
+        |state: &mut S, _: usize| -> &mut i32 { &mut state.get_time_mut().minutes_since_midnight },
         0,
     ))
 }
 
-fn read_day<S: HasTime>(state: &S, _: usize) -> &i32 {
-    &state.get_time().day
-}
-
-fn write_day<S: HasTime>(state: &mut S, _: usize) -> &mut i32 {
-    &mut state.get_time_mut().day
-}
-
 /// Get the `\day` command.
 pub fn get_day<S: HasTime>() -> variable::Variable<S> {
-    variable::Variable::Int(variable::TypedVariable::new(read_day, write_day, 0))
-}
-
-fn read_month<S: HasTime>(state: &S, _: usize) -> &i32 {
-    &state.get_time().month
-}
-
-fn write_month<S: HasTime>(state: &mut S, _: usize) -> &mut i32 {
-    &mut state.get_time_mut().month
+    variable::Variable::Int(variable::TypedVariable::new(
+        |state: &S, _: usize| -> &i32 { &state.get_time().day },
+        |state: &mut S, _: usize| -> &mut i32 { &mut state.get_time_mut().day },
+        0,
+    ))
 }
 
 /// Get the `\month` command.
 pub fn get_month<S: HasTime>() -> variable::Variable<S> {
-    variable::Variable::Int(variable::TypedVariable::new(read_month, write_month, 0))
-}
-
-fn read_year<S: HasTime>(state: &S, _: usize) -> &i32 {
-    &state.get_time().year
-}
-
-fn write_year<S: HasTime>(state: &mut S, _: usize) -> &mut i32 {
-    &mut state.get_time_mut().year
+    variable::Variable::Int(variable::TypedVariable::new(
+        |state: &S, _: usize| -> &i32 { &state.get_time().month },
+        |state: &mut S, _: usize| -> &mut i32 { &mut state.get_time_mut().month },
+        0,
+    ))
 }
 
 /// Get the `\year` command.
 pub fn get_year<S: HasTime>() -> variable::Variable<S> {
-    variable::Variable::Int(variable::TypedVariable::new(read_year, write_year, 0))
+    variable::Variable::Int(variable::TypedVariable::new(
+        |state: &S, _: usize| -> &i32 { &state.get_time().year },
+        |state: &mut S, _: usize| -> &mut i32 { &mut state.get_time_mut().year },
+        0,
+    ))
 }

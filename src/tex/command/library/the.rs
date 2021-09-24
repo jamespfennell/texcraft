@@ -27,6 +27,10 @@ fn the_primitive_fn<S>(
                             let value = *variable.get(input.state());
                             return Ok(int_to_tokens(value));
                         }
+                        variable::Variable::BaseInt(variable) => {
+                            let value = *variable.get(input.base());
+                            return Ok(int_to_tokens(value));
+                        }
                         variable::Variable::CatCode(v) => {
                             let val = (*v.get(input.base())).int();
                             return Ok(int_to_tokens(val.into()));

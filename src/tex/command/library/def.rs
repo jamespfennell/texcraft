@@ -1,13 +1,73 @@
 //! Primitives for creating user-defined macros (`\def` and friends).
 
+use crate::algorithms::substringsearch::KMPMatcherFactory;
+use crate::datastructures::nevec::Nevec;
+use crate::tex::error;
 use crate::tex::parse;
 use crate::tex::prelude::*;
+use crate::tex::token::catcode;
 use crate::tex::token::stream;
-use crate::tex::token::write_tokens;
-use colored::*;
+
+use crate::tex::macrotypes::*;
 use std::rc;
 
 const DEF_DOC: &str = "Define a custom macro";
+
+/// Get the `\def` command.
+pub fn get_def<S>() -> command::ExecutionPrimitive<S> {
+    command::ExecutionPrimitive {
+        call_fn: def_primitive_fn,
+        docs: DEF_DOC,
+        id: None,
+    }
+}
+
+fn def_primitive_fn<S>(def_token: Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()> {
+    let name =
+        parse::parse_command_target("macro definition", def_token, input.unexpanded_stream())?;
+    let (prefix, raw_parameters, replacement_end_token) =
+        parse_prefix_and_parameters(input.unexpanded_stream())?;
+    let parameters: Vec<Parameter> = raw_parameters
+        .into_iter()
+        .map(|a| match a {
+            RawParameter::Undelimited => Parameter::Undelimited,
+            RawParameter::Delimited(vec) => Parameter::Delimited(KMPMatcherFactory::new(vec)),
+        })
+        .collect();
+    let replacement = parse_replacement_text(
+        input.unexpanded_stream(),
+        replacement_end_token,
+        parameters.len(),
+    )?;
+    let user_defined_macro = Macro::new(prefix, parameters, replacement);
+    input
+        .base_mut()
+        .set_command(name, rc::Rc::new(user_defined_macro));
+    Ok(())
+}
+
+/// Add all of the commands defined in this module to the provided state.
+pub fn add_all_commands<S>(s: &mut Base<S>) -> () {
+    s.set_command("def", get_def());
+}
+
+enum RawParameter {
+    Undelimited,
+    Delimited(Nevec<Token>),
+}
+
+impl RawParameter {
+    fn push(&mut self, t: Token) {
+        match self {
+            RawParameter::Undelimited => {
+                *self = RawParameter::Delimited(nevec![t]);
+            }
+            RawParameter::Delimited(vec) => {
+                vec.push(t);
+            }
+        }
+    }
+}
 
 fn char_to_parameter_index(c: char) -> Option<usize> {
     match c {
@@ -24,664 +84,190 @@ fn char_to_parameter_index(c: char) -> Option<usize> {
     }
 }
 
-fn def_primitive_fn<S>(def_token: Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()> {
-    let name =
-        parse::parse_command_target("macro definition", def_token, input.unexpanded_stream())?;
+fn parse_prefix_and_parameters(
+    input: &mut dyn stream::Stream,
+) -> anyhow::Result<(Vec<Token>, Vec<RawParameter>, Option<Token>)> {
+    let mut prefix = Vec::new();
+    let mut parameters = Vec::new();
+    let mut replacement_end_token = None;
 
-    let (arguments, replacement_end_token) =
-        arguments::Definition::build(input.unexpanded_stream())?;
-
-    let replacement = replacement::Definition::build(
-        input.unexpanded_stream(),
-        replacement_end_token,
-        arguments.num_parameters(),
-    )?;
-
-    let user_defined_macro = UserDefinedMacro {
-        arguments: arguments,
-        replacement: replacement,
-    };
-
-    input
-        .base_mut()
-        .set_command(name, rc::Rc::new(user_defined_macro));
-
-    Ok(())
-}
-
-/// Get the `\def` command.
-pub fn get_def<S>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive {
-        call_fn: def_primitive_fn,
-        docs: DEF_DOC,
-        id: None,
-    }
-}
-
-/// Add all of the commands defined in this module to the provided state.
-pub fn add_all_commands<S>(s: &mut Base<S>) -> () {
-    s.set_command("def", get_def());
-}
-
-/// Representation of a user defined macro and logic for expanding it.
-pub struct UserDefinedMacro {
-    arguments: arguments::Definition,
-    replacement: replacement::Definition,
-}
-
-impl<S> command::ExpansionGeneric<S> for UserDefinedMacro {
-    fn call(
-        &self,
-        token: Token,
-        input: &mut ExpansionInput<S>,
-    ) -> anyhow::Result<stream::VecStream> {
-        let arguments = match self
-            .arguments
-            .scan_for_arguments(&token, input.unexpanded_stream())
-        {
-            Ok(a) => a,
-            Err(err) => {
-                return Err(error::UserDefinedMacroError::new(
-                    err,
-                    command::ExpansionGeneric::<S>::doc(self),
-                ));
+    while let Some(token) = input.next()? {
+        match token.value {
+            Character(_, catcode::CatCode::BeginGroup) => {
+                return Ok((prefix, parameters, replacement_end_token));
             }
-        };
-
-        // TODO: figure out logging
-        /*println!["expanding macro\nParameters:"];
-        for i in 0..arguments.len() {
-            println![
-                " {}{}={}",
-                "#".bright_yellow().bold(),
-                (i + 1).to_string().bright_yellow().bold(),
-                write_tokens(&arguments[i]).bright_yellow()
-            ]
-        }*/
-
-        let result = self.replacement.perform_replacement(arguments);
-        // println!["Expansion: {}", write_tokens(&result)];
-
-        //println!["Docs for this macro:\n{}", ExpansionGeneric::<S>::doc(self)];
-
-        Ok(stream::VecStream::new(result))
-    }
-
-    fn doc(&self) -> String {
-        let mut d = String::default();
-        d.push_str(&format!["User defined macro\n\n",]);
-        d.push_str(&format![
-            "{}\n{}",
-            "Argument definition".italic(),
-            self.arguments.pretty_print()
-        ]);
-        d.push_str(&format![
-            "\n\n{} `{}`\n",
-            "Replacement definition:".italic(),
-            self.replacement.pretty_print()
-        ]);
-        d
-    }
-}
-
-fn colored_parameter_number(n: usize) -> String {
-    let color = match n {
-        1 => |s: String| s.bright_yellow(),
-        _ => |s: String| s.bright_blue(),
-    };
-    format![
-        "{}{}",
-        color("#".to_string()).bold(),
-        color(n.to_string()).bold()
-    ]
-}
-
-/// Logic for handling arguments in user defined macros.
-mod arguments {
-
-    use super::char_to_parameter_index;
-    use super::colored_parameter_number;
-    use crate::algorithms::substringsearch::KMPMatcherFactory;
-    use crate::datastructures::nevec::Nevec;
-    use crate::tex::prelude::*;
-    use crate::tex::token::catcode;
-    use crate::tex::token::write_tokens;
-
-    pub struct Definition {
-        prefix: Vec<Token>,
-        parameters: Vec<PreparedParameter>,
-    }
-
-    enum PreparedParameter {
-        Undelimited,
-        Delimited(KMPMatcherFactory<Token>),
-    }
-
-    enum Parameter {
-        Undelimited,
-        Delimited(Nevec<Token>),
-    }
-
-    impl Parameter {
-        fn push(&mut self, t: Token) {
-            match self {
-                Parameter::Undelimited => {
-                    *self = Parameter::Delimited(nevec![t]);
-                }
-                Parameter::Delimited(vec) => {
-                    vec.push(t);
-                }
-            }
-        }
-    }
-
-    impl Definition {
-        pub fn build(
-            input: &mut dyn stream::Stream,
-        ) -> anyhow::Result<(Definition, Option<Token>)> {
-            let mut prefix = Vec::new();
-            let mut parameters = Vec::new();
-            let mut replacement_end_token = None;
-
-            while let Some(token) = input.next()? {
-                match token.value {
-                    Character(_, catcode::CatCode::BeginGroup) => {
-                        return Ok((
-                            Definition::build_post_process(prefix, parameters),
-                            replacement_end_token,
-                        ));
-                    }
-                    Character(_, catcode::CatCode::EndGroup) => {
-                        return Err(error::TokenError::new(
+            Character(_, catcode::CatCode::EndGroup) => {
+                return Err(error::TokenError::new(
                     token,
-                    "unexpected end group token while parsing the parameter of a macro definition").cast());
-                    }
-                    Character(_, catcode::CatCode::Parameter) => {
-                        let parameter_token = match input.next()? {
-                            None => {
-                                return Err(error::EndOfInputError::new(
+                    "unexpected end group token while parsing the parameter of a macro definition",
+                )
+                .cast());
+            }
+            Character(_, catcode::CatCode::Parameter) => {
+                let parameter_token = match input.next()? {
+                    None => {
+                        return Err(error::EndOfInputError::new(
                 "unexpected end of input while reading the token after a parameter token")
                 .add_note("a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
                 .cast());
+                    }
+                    Some(token) => token,
+                };
+                match parameter_token.value {
+                    Character(_, catcode::CatCode::BeginGroup) => {
+                        // In this case we end the group according to the special #{ rule
+                        replacement_end_token = Some(parameter_token.clone());
+                        match parameters.last_mut() {
+                            None => {
+                                prefix.push(parameter_token);
                             }
-                            Some(token) => token,
-                        };
-                        match parameter_token.value {
-                            Character(_, catcode::CatCode::BeginGroup) => {
-                                // In this case we end the group according to the special #{ rule
-                                replacement_end_token = Some(parameter_token.clone());
-                                match parameters.last_mut() {
-                                    None => {
-                                        prefix.push(parameter_token);
-                                    }
-                                    Some(spec) => {
-                                        spec.push(parameter_token);
-                                    }
-                                }
-                                return Ok((
-                                    Definition::build_post_process(prefix, parameters),
-                                    replacement_end_token,
-                                ));
+                            Some(spec) => {
+                                spec.push(parameter_token);
                             }
-                            Character(c, _) => {
-                                let parameter_index = match char_to_parameter_index(c) {
-                                    None => {
-                                        return Err(error::TokenError::new(
+                        }
+                        return Ok((prefix, parameters, replacement_end_token));
+                    }
+                    Character(c, _) => {
+                        let parameter_index = match char_to_parameter_index(c) {
+                            None => {
+                                return Err(error::TokenError::new(
                                             parameter_token,
                                             "unexpected character after a parameter token")
                                     .add_note("a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
                                     .cast());
-                                    }
-                                    Some(n) => n,
-                                };
-                                if parameter_index != parameters.len() {
-                                    return Err(error::TokenError::new(
+                            }
+                            Some(n) => n,
+                        };
+                        if parameter_index != parameters.len() {
+                            return Err(error::TokenError::new(
                                 parameter_token,
                                 format!["unexpected parameter number {}", parameter_index+0])
                                 .add_note(
                                     format!["this macro has {} parameter(s) so far, so parameter number #{} was expected.",
                                     parameters.len(), parameters.len()+1
                                     ]).cast());
-                                }
-                                parameters.push(Parameter::Undelimited);
-                            }
-                            _ => {
-                                return Err(error::TokenError::new(
+                        }
+                        parameters.push(RawParameter::Undelimited);
+                    }
+                    _ => {
+                        return Err(error::TokenError::new(
                                     parameter_token,
                                     "unexpected control sequence after a parameter token")
                                     .add_note(
                                     "a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
                                     .cast());
-                            }
-                        }
                     }
-                    _ => match parameters.last_mut() {
-                        None => {
-                            prefix.push(token);
-                        }
-                        Some(spec) => {
-                            spec.push(token);
-                        }
-                    },
                 }
             }
-            Err(error::EndOfInputError::new(
+            _ => match parameters.last_mut() {
+                None => {
+                    prefix.push(token);
+                }
+                Some(parameter) => {
+                    parameter.push(token);
+                }
+            },
+        }
+    }
+    Err(error::EndOfInputError::new(
                 "unexpected end of input while reading the parameter text of a macro")
                 .add_note("the parameter text of a macro must end with a closing brace { or another token with catcode 1 (begin group)")
                 .cast())
-        }
+}
 
-        fn build_post_process(prefix: Vec<Token>, parameters: Vec<Parameter>) -> Definition {
-            let processed_parameters: Vec<PreparedParameter> = parameters
-                .into_iter()
-                .map(|a| match a {
-                    Parameter::Undelimited => PreparedParameter::Undelimited,
-                    Parameter::Delimited(vec) => {
-                        PreparedParameter::Delimited(KMPMatcherFactory::new(vec))
-                    }
-                })
-                .collect();
-            Definition {
-                prefix,
-                parameters: processed_parameters,
+fn parse_replacement_text(
+    input: &mut dyn stream::Stream,
+    opt_final_token: Option<Token>,
+    num_parameters: usize,
+) -> anyhow::Result<Vec<Replacement>> {
+    let mut result = Vec::new();
+    let mut scope_depth = 0;
+
+    while let Some(token) = input.next()? {
+        match token.value {
+            Character(_, catcode::CatCode::BeginGroup) => {
+                scope_depth += 1;
             }
-        }
-
-        pub fn num_parameters(&self) -> usize {
-            self.parameters.len()
-        }
-
-        pub fn scan_for_arguments(
-            &self,
-            macro_token: &Token,
-            stream: &mut dyn stream::Stream,
-        ) -> anyhow::Result<Vec<Vec<Token>>> {
-            self.consume_prefix(stream)?;
-
-            let mut parameter_values = Vec::new();
-
-            let mut index = 0;
-            for parameter in self.parameters.iter() {
-                parameter_values.push(match parameter {
-                    PreparedParameter::Undelimited => {
-                        read_undelimited_parameter(macro_token, stream, index + 1)?
+            Character(_, catcode::CatCode::EndGroup) => {
+                if scope_depth == 0 {
+                    if let Some(final_token) = opt_final_token {
+                        result.push(Replacement::Token(final_token));
                     }
-                    PreparedParameter::Delimited(matcher_factory) => {
-                        read_delimited_parameter(macro_token, stream, matcher_factory, index + 1)?
-                    }
-                });
-                index += 1;
+                    return Ok(result);
+                }
+                scope_depth -= 1;
             }
-            Ok(parameter_values)
-        }
-
-        fn consume_prefix(&self, stream: &mut dyn stream::Stream) -> anyhow::Result<()> {
-            for prefix_token in self.prefix.iter() {
-                let stream_token = match stream.next()? {
+            Character(_, catcode::CatCode::Parameter) => {
+                let parameter_token = match input.next()? {
                     None => {
                         return Err(error::EndOfInputError::new(
-                        "unexpected end of input while matching the argument prefix for a user-defined macro")
+                            "unexpected end of input while reading a parameter number",
+                        )
                         .cast());
                     }
                     Some(token) => token,
                 };
-                if &stream_token != prefix_token {
-                    let note = match &prefix_token.value {
-                        Character(c, catcode) => format![
-                            "expected a character token with value '{}' and catcode {}",
-                            c, catcode
-                        ],
-                        ControlSequence(_, name) => {
-                            format!["expected a control sequence token \\{}", name]
-                        }
-                    };
-                    return Err(error::TokenError::new(
-                        stream_token,
-                        "unexpected token while matching the prefix of user-defined macro",
-                    )
-                    .add_note(note)
-                    .cast());
-                }
-            }
-            Ok(())
-        }
-
-        pub fn pretty_print(&self) -> String {
-            let mut d = String::default();
-            if self.prefix.len() == 0 {
-                d.push_str(&format![" . No prefix\n",]);
-            } else {
-                d.push_str(&format![" . Prefix: `{}`\n", write_tokens(&self.prefix)]);
-            }
-
-            d.push_str(&format![" . Parameters ({}):\n", self.num_parameters()]);
-            let mut parameter_number = 1;
-            for parameter in &self.parameters {
-                match parameter {
-                    PreparedParameter::Undelimited => {
-                        d.push_str(&format![
-                            "    {}: undelimited\n",
-                            colored_parameter_number(parameter_number),
-                        ]);
-                    }
-                    PreparedParameter::Delimited(factory) => {
-                        d.push_str(&format![
-                            "    {}: delimited by `{}`\n",
-                            colored_parameter_number(parameter_number),
-                            write_tokens(factory.substring())
-                        ]);
-                    }
-                }
-                parameter_number += 1;
-            }
-
-            d.push_str(&format![" . Full argument specification: `"]);
-            d.push_str(&format!["{}", write_tokens(&self.prefix)]);
-            let mut parameter_number = 1;
-            for parameter in &self.parameters {
-                d.push_str(&format!["{}", colored_parameter_number(parameter_number)]);
-                if let PreparedParameter::Delimited(factory) = parameter {
-                    d.push_str(&format!["{}", write_tokens(factory.substring())]);
-                }
-                parameter_number += 1;
-            }
-            d.push_str(&format!["`"]);
-            d
-        }
-    }
-
-    fn read_delimited_parameter(
-        macro_token: &Token,
-        stream: &mut dyn stream::Stream,
-        matcher_factory: &KMPMatcherFactory<Token>,
-        param_num: usize,
-    ) -> anyhow::Result<Vec<Token>> {
-        let mut matcher = matcher_factory.matcher();
-        let mut result = Vec::new();
-        let mut scope_depth = 0;
-
-        // This handles the case of a macro whose argument ends with the special #{ tokens. In this special case the parsing
-        // will end with a scope depth of 1, because the last token parsed will be the { and all braces before that will
-        // be balanced.
-        let closing_scope_depth = match matcher_factory.substring().last().value {
-            Character(_, catcode::CatCode::BeginGroup) => 1,
-            _ => 0,
-        };
-        while let Some(token) = stream.next()? {
-            match token.value {
-                Character(_, catcode::CatCode::BeginGroup) => {
-                    scope_depth += 1;
-                }
-                Character(_, catcode::CatCode::EndGroup) => {
-                    scope_depth -= 1;
-                }
-                _ => (),
-            };
-            result.push(token);
-            if scope_depth == closing_scope_depth && matcher.next(result.last().unwrap()) {
-                // Remove the suffix.
-                for _ in 0..matcher_factory.substring().len() {
-                    result.pop();
-                }
-                trim_outer_braces_if_present(&mut result);
-                return Ok(result);
-            }
-        }
-        let mut e = error::EndOfInputError::new(format![
-            "unexpected end of input while reading argument #{} for the macro {}",
-            param_num, macro_token
-        ])
-        .add_note(format![
-            "this argument is delimited and must be suffixed by the tokens `{}`",
-            matcher_factory.substring()
-        ]);
-        if let Some(first_token) = result.first() {
-            e = e.add_token_context(first_token, "the argument started here:");
-            e = e.add_note(format![
-                "{} tokens were read for the argument so far",
-                result.len()
-            ]);
-        } else {
-            e = e.add_note("no tokens were read for the argument so far");
-        }
-        Err(e
-            .add_token_context(macro_token, "the macro invocation started here:")
-            .cast())
-    }
-
-    fn trim_outer_braces_if_present(list: &mut Vec<Token>) {
-        if list.len() <= 1 {
-            return;
-        }
-        match list[0].value {
-            Character(_, catcode::CatCode::BeginGroup) => (),
-            _ => {
-                return;
-            }
-        }
-        match list[list.len() - 1].value {
-            Character(_, catcode::CatCode::EndGroup) => (),
-            _ => {
-                return;
-            }
-        }
-        list.remove(0); // TODO: This is concerning
-        list.pop();
-    }
-
-    fn read_undelimited_parameter(
-        macro_token: &Token,
-        stream: &mut dyn stream::Stream,
-        param_num: usize,
-    ) -> anyhow::Result<Vec<Token>> {
-        let opening_brace = match stream.next()? {
-            None => {
-                return Err(error::EndOfInputError::new(format![
-                    "unexpected end of input while reading argument #{} for the macro {}",
-                    param_num, macro_token
-                ])
-                .add_token_context(macro_token, "the macro invocation started here:")
-                .cast());
-            }
-            Some(token) => match token.value {
-                Character(_, catcode::CatCode::BeginGroup) => token,
-                _ => {
-                    return Ok(vec![token]);
-                }
-            },
-        };
-        let mut result = Vec::new();
-        let mut scope_depth = 0;
-        while let Some(token) = stream.next()? {
-            match token.value {
-                Character(_, catcode::CatCode::BeginGroup) => {
-                    scope_depth += 1;
-                }
-                Character(_, catcode::CatCode::EndGroup) => {
-                    if scope_depth == 0 {
-                        return Ok(result);
-                    }
-                    scope_depth -= 1;
-                }
-                _ => (),
-            }
-            result.push(token);
-        }
-        Err(error::EndOfInputError::new(format![
-            "unexpected end of input while reading argument #{} for the macro {}",
-            param_num, macro_token
-        ])
-        .add_note(format![
-            "this argument started with a `{}` and must be finished with a matching closing brace",
-            &opening_brace
-        ])
-        .add_token_context(&opening_brace, "the argument started here:")
-        .add_token_context(macro_token, "the macro invocation started here:")
-        .cast())
-    }
-}
-
-/// Logic for handling replacement text in user defined macros.
-mod replacement {
-
-    use super::char_to_parameter_index;
-    use super::colored_parameter_number;
-    use crate::tex::error;
-    use crate::tex::prelude::*;
-    use crate::tex::token::catcode;
-    use crate::tex::token::stream;
-
-    pub struct Definition {
-        head: Vec<Token>,
-        replacements: Vec<Replacement>,
-    }
-
-    pub struct Replacement {
-        pub parameter_index: usize,
-        pub tokens: Vec<Token>,
-    }
-
-    impl Definition {
-        pub fn build(
-            input: &mut dyn stream::Stream,
-            opt_final_token: Option<Token>,
-            num_parameters: usize,
-        ) -> anyhow::Result<Definition> {
-            let mut spec = Definition {
-                head: Vec::new(),
-                replacements: Vec::new(),
-            };
-            let mut scope_depth = 0;
-
-            while let Some(token) = input.next()? {
-                match token.value {
-                    Character(_, catcode::CatCode::BeginGroup) => {
-                        scope_depth += 1;
-                    }
-                    Character(_, catcode::CatCode::EndGroup) => {
-                        if scope_depth == 0 {
-                            if let Some(final_token) = opt_final_token {
-                                spec.push(final_token);
-                            }
-                            return Ok(spec);
-                        }
-                        scope_depth -= 1;
+                let c = match parameter_token.value {
+                    ControlSequence(..) => {
+                        return Err(error::TokenError::new(
+                            parameter_token,
+                            "unexpected character while reading a parameter number",
+                        )
+                        .add_note("expected a number between 1 and 9 inclusive")
+                        .cast());
                     }
                     Character(_, catcode::CatCode::Parameter) => {
-                        let parameter_token = match input.next()? {
-                            None => {
-                                return Err(error::EndOfInputError::new(
-                                    "unexpected end of input while reading a parameter number",
-                                )
-                                .cast());
-                            }
-                            Some(token) => token,
-                        };
-                        let c = match parameter_token.value {
-                            ControlSequence(..) => {
-                                return Err(error::TokenError::new(
-                                    parameter_token,
-                                    "unexpected character while reading a parameter number",
-                                )
-                                .add_note("expected a number between 1 and 9 inclusive")
-                                .cast());
-                            }
-                            Character(_, catcode::CatCode::Parameter) => {
-                                spec.push(parameter_token);
-                                continue;
-                            }
-                            Character(c, _) => c,
-                        };
-
-                        let parameter_index = match char_to_parameter_index(c) {
-                            None => {
-                                return Err(error::TokenError::new(
-                                    parameter_token,
-                                    "unexpected character while reading a parameter number",
-                                )
-                                .add_note("expected a number between 1 and 9 inclusive")
-                                .cast())
-                            }
-                            Some(n) => n,
-                        };
-                        if parameter_index >= num_parameters {
-                            return Err(error::TokenError::new(
-                                parameter_token,
-                                "unexpected character while reading a parameter number",
-                            )
-                            .cast());
-
-                            /* TODO
-                                    var msg string
-                                    switch numParams {
-                                    case 0:
-                                        msg = "no parameter token because this macro has 0 parameters"
-                                    case 1:
-                                        msg = "the number 1 because this macro has only 1 parameter"
-                                    default:
-                                        msg = fmt.Sprintf(
-                                            "a number between 1 and %[1]d inclusive because this macro has only %[1]d parameters",
-                                            numParams)
-                                    }
-                                    return nil, errors.NewUnexpectedTokenError(t, msg, "the number "+t.Value(), parsingArgumentTemplate)
-                            */
-                        }
-                        spec.replacements.push(Replacement {
-                            parameter_index: parameter_index,
-                            tokens: Vec::new(),
-                        });
+                        result.push(Replacement::Token(parameter_token));
                         continue;
                     }
-                    _ => {}
+                    Character(c, _) => c,
+                };
+
+                let parameter_index = match char_to_parameter_index(c) {
+                    None => {
+                        return Err(error::TokenError::new(
+                            parameter_token,
+                            "unexpected character while reading a parameter number",
+                        )
+                        .add_note("expected a number between 1 and 9 inclusive")
+                        .cast())
+                    }
+                    Some(n) => n,
+                };
+                if parameter_index >= num_parameters {
+                    return Err(error::TokenError::new(
+                        parameter_token,
+                        "unexpected character while reading a parameter number",
+                    )
+                    .cast());
+
+                    /* TODO
+                            var msg string
+                            switch numParams {
+                            case 0:
+                                msg = "no parameter token because this macro has 0 parameters"
+                            case 1:
+                                msg = "the number 1 because this macro has only 1 parameter"
+                            default:
+                                msg = fmt.Sprintf(
+                                    "a number between 1 and %[1]d inclusive because this macro has only %[1]d parameters",
+                                    numParams)
+                            }
+                            return nil, errors.NewUnexpectedTokenError(t, msg, "the number "+t.Value(), parsingArgumentTemplate)
+                    */
                 }
-                spec.push(token);
+                result.push(Replacement::Parameter(parameter_index));
+                continue;
             }
-
-            return Err(error::EndOfInputError::new(
-                "unexpected end of input while reading a parameter number",
-            )
-            .cast());
+            _ => {}
         }
-
-        pub fn perform_replacement(&self, arguments: Vec<Vec<Token>>) -> Vec<Token> {
-            let mut output_size = self.head.len();
-            for replacement in self.replacements.iter() {
-                output_size += arguments[replacement.parameter_index].len();
-                output_size += replacement.tokens.len();
-            }
-            let mut result = Vec::with_capacity(output_size);
-            result.extend(self.head.iter().cloned());
-            for replacement in self.replacements.iter() {
-                result.extend(arguments[replacement.parameter_index].iter().cloned());
-                result.extend(replacement.tokens.iter().cloned());
-            }
-            result
-        }
-
-        pub fn pretty_print(&self) -> String {
-            let mut b = String::default();
-            b.push_str(&format!["{}", crate::tex::token::write_tokens(&self.head)]);
-            for replacement in self.replacements.iter() {
-                b.push_str(&format![
-                    "{}",
-                    colored_parameter_number(replacement.parameter_index + 1),
-                ]);
-                b.push_str(&format![
-                    "{}",
-                    crate::tex::token::write_tokens(&replacement.tokens)
-                ]);
-            }
-            b
-        }
-
-        fn push(&mut self, t: Token) {
-            match self.replacements.last_mut() {
-                None => &mut self.head,
-                Some(r) => &mut r.tokens,
-            }
-            .push(t);
-        }
+        result.push(Replacement::Token(token));
     }
+
+    return Err(error::EndOfInputError::new(
+        "unexpected end of input while reading a parameter number",
+    )
+    .cast());
 }
 
 #[cfg(test)]
