@@ -47,7 +47,7 @@ fn def_primitive_fn<S>(def_token: Token, input: &mut ExecutionInput<S>) -> anyho
 }
 
 /// Add all of the commands defined in this module to the provided state.
-pub fn add_all_commands<S>(s: &mut Base<S>) -> () {
+pub fn add_all_commands<S>(s: &mut Base<S>) {
     s.set_command("def", get_def());
 }
 
@@ -141,7 +141,7 @@ fn parse_prefix_and_parameters(
                         if parameter_index != parameters.len() {
                             return Err(error::TokenError::new(
                                 parameter_token,
-                                format!["unexpected parameter number {}", parameter_index+0])
+                                format!["unexpected parameter number {}", parameter_index+1])
                                 .add_note(
                                     format!["this macro has {} parameter(s) so far, so parameter number #{} was expected.",
                                     parameters.len(), parameters.len()+1
@@ -264,10 +264,10 @@ fn parse_replacement_text(
         result.push(Replacement::Token(token));
     }
 
-    return Err(error::EndOfInputError::new(
-        "unexpected end of input while reading a parameter number",
+    Err(
+        error::EndOfInputError::new("unexpected end of input while reading a parameter number")
+            .cast(),
     )
-    .cast());
 }
 
 #[cfg(test)]

@@ -8,6 +8,7 @@
 //!
 //! ```
 //! # use texcraft::datastructures::circularbuffer::CircularBuffer;
+//! # use std::ops::Index;
 //! let mut buf = CircularBuffer::new(3);
 //! buf.push(0);
 //! buf.push(1);
@@ -48,15 +49,6 @@ impl<T> CircularBuffer<T> {
         *self.data.index_mut(self.head) = elem;
     }
 
-    /// Get the element at the provided index.
-    ///
-    /// The first element in the buffer has index 0, the next element index 1, etc.
-    ///
-    /// This method may panic if the index is valid.
-    pub fn index(&self, i: usize) -> &T {
-        &self.data[self.internal_index(i)]
-    }
-
     /// Return the buffer's capacity.
     pub fn capacity(&self) -> usize {
         self.data.capacity()
@@ -64,6 +56,19 @@ impl<T> CircularBuffer<T> {
 
     fn internal_index(&self, i: usize) -> usize {
         (self.head + self.capacity() - i) % self.capacity()
+    }
+}
+
+impl<T> std::ops::Index<usize> for CircularBuffer<T> {
+    type Output = T;
+
+    /// Get the element at the provided index.
+    ///
+    /// The first element in the buffer has index 0, the next element index 1, etc.
+    ///
+    /// This method may panic if the index is valid.
+    fn index(&self, i: usize) -> &T {
+        &self.data[self.internal_index(i)]
     }
 }
 
@@ -115,15 +120,19 @@ impl<T: Clone> CircularBuffer<T> {
             return self.data.last_mut().unwrap();
         }
         let tail_i = (self.head + 1) % self.capacity();
-        if i == tail_i {
-            // If we're cloning the current tail, we just make it the head by incrementing
-            // the head ptr. No need to clone in this case!
-        } else if i < tail_i {
-            let (front, back) = self.data.split_at_mut(tail_i);
-            (&mut back[0]).clone_from(&front[i]);
-        } else {
-            let (front, back) = self.data.split_at_mut(i);
-            (&mut front[tail_i]).clone_from(&back[0]);
+        match i.cmp(&tail_i) {
+            std::cmp::Ordering::Equal => {
+                // If we're cloning the current tail, we just make it the head by incrementing
+                // the head ptr. No need to clone in this case!
+            }
+            std::cmp::Ordering::Less => {
+                let (front, back) = self.data.split_at_mut(tail_i);
+                (&mut back[0]).clone_from(&front[i]);
+            }
+            std::cmp::Ordering::Greater => {
+                let (front, back) = self.data.split_at_mut(i);
+                (&mut front[tail_i]).clone_from(&back[0]);
+            }
         }
         self.head = tail_i;
         self.data.index_mut(self.head)

@@ -18,26 +18,23 @@ fn the_primitive_fn<S>(
     Ok(match &token.value {
         Character(_, _) => stream::VecStream::new_singleton(token),
         ControlSequence(_, name) => {
-            match input.base().get_command(name) {
-                Some(command::Command::Variable(cmd_ref)) => {
-                    let cmd = *cmd_ref;
-                    let variable = cmd.variable(&token, input)?;
-                    match variable {
-                        variable::Variable::Int(variable) => {
-                            let value = *variable.get(input.state());
-                            return Ok(int_to_tokens(value));
-                        }
-                        variable::Variable::BaseInt(variable) => {
-                            let value = *variable.get(input.base());
-                            return Ok(int_to_tokens(value));
-                        }
-                        variable::Variable::CatCode(v) => {
-                            let val = (*v.get(input.base())).int();
-                            return Ok(int_to_tokens(val.into()));
-                        }
+            if let Some(command::Command::Variable(cmd_ref)) = input.base().get_command(name) {
+                let cmd = *cmd_ref;
+                let variable = cmd.variable(&token, input)?;
+                match variable {
+                    variable::Variable::Int(variable) => {
+                        let value = *variable.get(input.state());
+                        return Ok(int_to_tokens(value));
+                    }
+                    variable::Variable::BaseInt(variable) => {
+                        let value = *variable.get(input.base());
+                        return Ok(int_to_tokens(value));
+                    }
+                    variable::Variable::CatCode(v) => {
+                        let val = (*v.get(input.base())).int();
+                        return Ok(int_to_tokens(val.into()));
                     }
                 }
-                _ => (),
             }
             stream::VecStream::new_singleton(token)
         }
@@ -64,7 +61,7 @@ fn int_to_tokens(mut i: i32) -> stream::VecStream {
         tokens.push(Token::new_other(
             char::from_digit(digit.try_into().unwrap(), 10).unwrap(),
         ));
-        i = i / 10;
+        i /= 10;
     }
     if negative {
         tokens.push(Token::new_other('-'));

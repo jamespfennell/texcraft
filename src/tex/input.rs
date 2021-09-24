@@ -27,15 +27,15 @@ impl Unit {
         }
     }
 
-    pub fn push_new_source(&mut self, reader: Box<dyn io::BufRead>) -> () {
+    pub fn push_new_source(&mut self, reader: Box<dyn io::BufRead>) {
         self.sources.push(Source::new(reader));
     }
 
-    pub fn push_new_str<Str: Into<String>>(&mut self, s: Str) -> () {
+    pub fn push_new_str<Str: Into<String>>(&mut self, s: Str) {
         self.push_new_source(Box::new(io::Cursor::new(s.into())));
     }
 
-    pub fn push_expansion(&mut self, expansion: stream::VecStream) -> () {
+    pub fn push_expansion(&mut self, expansion: stream::VecStream) {
         if let Some(source) = self.sources.last_mut() {
             source.expansions.push(expansion);
         }
@@ -110,6 +110,12 @@ impl Unit {
 
     pub fn clear(&mut self) {
         self.sources = vec![];
+    }
+}
+
+impl Default for Unit {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

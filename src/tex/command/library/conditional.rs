@@ -52,6 +52,12 @@ impl Component {
     }
 }
 
+impl Default for Component {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn branches<'a, S>(input: &'a mut command::ExpansionInput<S>) -> &'a mut Vec<Branch> {
     &mut input.controller_mut().conditional.branches
 }
@@ -80,7 +86,7 @@ fn true_case<S>(
     input: &mut command::ExpansionInput<S>,
 ) -> anyhow::Result<stream::VecStream> {
     input.controller_mut().conditional.branches.push(Branch {
-        token: token,
+        token,
         kind: BranchKind::True,
     });
     Ok(stream::VecStream::new_empty())
@@ -121,7 +127,7 @@ fn false_case<S>(
         last_token = Some(token)
     }
     let token = match last_token {
-        None => original_token.clone(),
+        None => original_token,
         Some(token) => token,
     };
     let branch = input.controller_mut().conditional.branches.pop();
@@ -237,7 +243,7 @@ fn if_case_primitive_fn<S>(
         last_token = Some(token);
     }
     let token = match last_token {
-        None => ifcase_token.clone(),
+        None => ifcase_token,
         Some(token) => token,
     };
     Err(error::TokenError::new(
@@ -267,10 +273,7 @@ fn or_primitive_fn<S>(
     // For an or command to be valid, we must be in a switch statement
     let is_valid = match branch {
         None => false,
-        Some(branch) => match branch.kind {
-            BranchKind::Switch => true,
-            _ => false,
-        },
+        Some(branch) => matches!(branch.kind, BranchKind::Switch),
     };
     if !is_valid {
         return Err(error::TokenError::new(ifcase_token, "unexpected `or` command").cast());
@@ -280,7 +283,7 @@ fn or_primitive_fn<S>(
     let mut last_token = None;
     while let Some(token) = input.unexpanded_stream().next()? {
         if let ControlSequence(_, name) = &token.value {
-            if let Some(c) = input.base().get_command(&name) {
+            if let Some(c) = input.base().get_command(name) {
                 if c.id() == if_id() {
                     depth += 1;
                 }
@@ -295,7 +298,7 @@ fn or_primitive_fn<S>(
         last_token = Some(token);
     }
     let token = match last_token {
-        None => ifcase_token.clone(),
+        None => ifcase_token,
         Some(token) => token,
     };
     Err(error::TokenError::new(
@@ -330,11 +333,7 @@ fn else_primitive_fn<S>(
     // For else token to be valid, we must be in the true branch of a conditional
     let is_valid = match branch {
         None => false,
-        Some(branch) => match branch.kind {
-            BranchKind::True => true,
-            BranchKind::Switch => true,
-            _ => false,
-        },
+        Some(branch) => matches!(branch.kind, BranchKind::True | BranchKind::Switch),
     };
     if !is_valid {
         return Err(error::TokenError::new(else_token, "unexpected `else` command").cast());
@@ -345,7 +344,7 @@ fn else_primitive_fn<S>(
     let mut last_token = None;
     while let Some(token) = input.unexpanded_stream().next()? {
         if let ControlSequence(_, name) = &token.value {
-            if let Some(c) = input.base().get_command(&name) {
+            if let Some(c) = input.base().get_command(name) {
                 if c.id() == if_id() {
                     depth += 1;
                 }
@@ -360,7 +359,7 @@ fn else_primitive_fn<S>(
         last_token = Some(token);
     }
     let token = match last_token {
-        None => else_token.clone(),
+        None => else_token,
         Some(token) => token,
     };
     Err(error::TokenError::new(
@@ -407,7 +406,7 @@ pub fn get_fi<S>() -> command::ExpansionPrimitive<S> {
 }
 
 /// Add all of the conditionals defined in this module to the provided state.
-pub fn add_all_conditionals<S>(s: &mut Base<S>) -> () {
+pub fn add_all_conditionals<S>(s: &mut Base<S>) {
     s.set_command("iftrue", get_if_true());
     s.set_command("iffalse", get_if_false());
     s.set_command("ifnum", get_if_num());

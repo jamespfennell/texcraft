@@ -60,6 +60,12 @@ impl Component {
     }
 }
 
+impl Default for Component {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Get the `\time` command.
 pub fn get_time<S: HasTime>() -> variable::Variable<S> {
     variable::Variable::Int(variable::TypedVariable::new(

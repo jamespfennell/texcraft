@@ -40,9 +40,11 @@ pub fn parse_optional_equals<T: Stream>(input: &mut T) -> anyhow::Result<()> {
             break;
         }
     }
-    while let Some(_) = get_optional_element![
+    while get_optional_element![
         input,
         Character(_, CatCode::Space) => (),
-    ] {}
+    ]
+    .is_some()
+    {}
     Ok(())
 }

@@ -66,7 +66,7 @@ fn expand(file_name: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn docs(cs_name: &String, optional_file_name: Option<&String>) -> Result<(), anyhow::Error> {
+fn docs(cs_name: &str, optional_file_name: Option<&String>) -> Result<(), anyhow::Error> {
     let mut s = init_state();
 
     if let Some(file_name) = optional_file_name {
@@ -85,19 +85,18 @@ fn docs(cs_name: &String, optional_file_name: Option<&String>) -> Result<(), any
         cs_names.sort();
         let mut last_prefix = None;
         for cs_name in cs_names.iter() {
-            let new_last_prefix = cs_name.as_str().to_string().chars().nth(0);
+            let new_last_prefix = cs_name.as_str().to_string().chars().next();
             if last_prefix != new_last_prefix {
-                println![""];
                 last_prefix = new_last_prefix;
             }
-            let doc = primitives.get(&cs_name).unwrap().doc();
-            let first_line = doc.split("\n").nth(0).unwrap_or("");
+            let doc = primitives.get(cs_name).unwrap().doc();
+            let first_line = doc.split('\n').next().unwrap_or("");
             println!["\\{}  {}", cs_name.as_str().to_string().bold(), first_line];
         }
         return Ok(());
     }
 
-    match s.get_command(&token::CsName::from(cs_name.as_str())) {
+    match s.get_command(&token::CsName::from(cs_name)) {
         None => {
             println!("Unknown command \\{}", cs_name);
             process::exit(1);

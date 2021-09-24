@@ -20,7 +20,6 @@ use crate::tex::token::catcode::{CatCode, RawCatCode};
 use std::collections::HashMap;
 use std::fmt;
 use std::io;
-use std::iter::FromIterator;
 use std::rc::Rc;
 
 const MALFORMED_CONTROL_SEQUENCE_ERROR_TITLE: &str = "Unexpected end of file";
@@ -232,7 +231,7 @@ impl RawLexer {
         if self.next_char_index >= self.current_line_as_chars.len() {
             let mut line = String::new();
             self.reader.read_line(&mut line)?;
-            self.current_line_as_chars = Vec::from_iter(line.chars());
+            self.current_line_as_chars = line.chars().collect();
             self.next_char_index = 0;
             self.current_line = Rc::new(token::Line {
                 content: line,
@@ -272,6 +271,7 @@ mod tests {
     use crate::tex::token::Value::Character;
     use crate::tex::token::Value::ControlSequence;
     use std::array::IntoIter;
+    use std::iter::FromIterator;
 
     #[test]
     fn case_1() {

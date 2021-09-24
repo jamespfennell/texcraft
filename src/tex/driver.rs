@@ -96,11 +96,11 @@ struct RawStream<'a, S> {
 
 impl<'a, S> stream::Stream for RawStream<'a, S> {
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
-        self.input.next(&self.state.cat_code_map())
+        self.input.next(self.state.cat_code_map())
     }
 
     fn prepare_imut_peek(&mut self) -> anyhow::Result<()> {
-        self.input.prepare_imut_peek(&self.state.cat_code_map())
+        self.input.prepare_imut_peek(self.state.cat_code_map())
     }
 
     fn imut_peek(&self) -> anyhow::Result<Option<&Token>> {
@@ -135,15 +135,12 @@ impl<'a, S> stream::Stream for ExpansionInput<'a, S> {
 impl<'a, S> ExpansionInput<'a, S> {
     pub fn new(state: &'a Base<S>, input: &'a mut input::Unit) -> ExpansionInput<'a, S> {
         ExpansionInput::<S> {
-            raw_stream: RawStream::<S> {
-                state,
-                input: input,
-            },
+            raw_stream: RawStream::<S> { state, input },
         }
     }
 
     pub fn base(&self) -> &Base<S> {
-        &self.raw_stream.state
+        self.raw_stream.state
     }
 
     pub fn state(&self) -> &S {
@@ -151,7 +148,7 @@ impl<'a, S> ExpansionInput<'a, S> {
     }
 
     pub fn controller(&self) -> &input::Unit {
-        &self.raw_stream.input
+        self.raw_stream.input
     }
 
     pub fn controller_mut(&mut self) -> &mut input::Unit {
@@ -178,11 +175,11 @@ pub struct RawStreamMutState<'a, S> {
 
 impl<'a, S> stream::Stream for RawStreamMutState<'a, S> {
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
-        self.input.next(&self.state.cat_code_map())
+        self.input.next(self.state.cat_code_map())
     }
 
     fn prepare_imut_peek(&mut self) -> anyhow::Result<()> {
-        self.input.prepare_imut_peek(&self.state.cat_code_map())
+        self.input.prepare_imut_peek(self.state.cat_code_map())
     }
 
     fn imut_peek(&self) -> anyhow::Result<Option<&Token>> {
@@ -216,7 +213,7 @@ impl<'a, S> stream::Stream for ExecutionInput<'a, S> {
 
 impl<'a, S> ExecutionInput<'a, S> {
     pub fn base(&self) -> &Base<S> {
-        &self.raw_stream.state
+        self.raw_stream.state
     }
 
     pub fn base_mut(&mut self) -> &mut Base<S> {
@@ -232,7 +229,7 @@ impl<'a, S> ExecutionInput<'a, S> {
     }
 
     pub fn controller(&self) -> &input::Unit {
-        &self.raw_stream.input
+        self.raw_stream.input
     }
 
     pub fn unexpanded_stream(&mut self) -> &mut RawStreamMutState<'a, S> {
@@ -244,15 +241,12 @@ impl<'a, S> ExecutionInput<'a, S> {
     }
 
     pub fn regular(&mut self) -> ExpansionInput<S> {
-        ExpansionInput::<S>::new(&self.raw_stream.state, &mut self.raw_stream.input)
+        ExpansionInput::<S>::new(self.raw_stream.state, &mut self.raw_stream.input)
     }
 
     pub fn new(state: &'a mut Base<S>, input: &'a mut input::Unit) -> ExecutionInput<'a, S> {
         ExecutionInput::<S> {
-            raw_stream: RawStreamMutState::<S> {
-                state,
-                input: input,
-            },
+            raw_stream: RawStreamMutState::<S> { state, input },
         }
     }
 }

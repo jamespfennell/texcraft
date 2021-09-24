@@ -44,7 +44,7 @@ fn write_catcode_register_fn<S>(state: &mut Base<S>, addr: usize) -> &mut RawCat
         .cat_codes
         .cat_codes
         .entry(addr)
-        .or_insert(RawCatCode::default())
+        .or_insert_with(RawCatCode::default)
 }
 
 fn catcode_fn<S>(

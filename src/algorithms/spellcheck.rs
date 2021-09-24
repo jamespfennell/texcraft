@@ -62,6 +62,7 @@
 
 use crate::datastructures::circularbuffer::CircularBuffer;
 use colored::*;
+use std::ops::Index;
 
 /// Find words in the provided dictionary that are close to the search word.
 ///
@@ -99,36 +100,36 @@ fn levenshtein_distance(a: &str, b: &str) -> WordDiff {
         ops: Vec::with_capacity(std::cmp::max(a.len(), b.len())),
     });
 
-    for j in 0..b.len() {
+    for b_j in &b {
         // Here we are comparing an empty a string (i.e., a[:0]) with b[:j+1].
         // There is only one possible action: append (add b[j]) to the diff for b[:j]
         let mut cmp = c.clone_to_front(idx_add);
-        cmp.ops.push(DiffOp::Add(b[j]));
+        cmp.ops.push(DiffOp::Add(*b_j));
         cmp.distance += 1;
     }
 
-    for i in 0..a.len() {
+    for a_i in &a {
         // Here we are comparing a[:i+1] with an empty b string (i.e., b[:0])
         // There is only one possible action: append (subtract a[i]) to the diff for a[:i]
         //let i_subtract = (idx_to_set + 1) % c.len();
         let mut cmp = c.clone_to_front(idx_subtract);
-        cmp.ops.push(DiffOp::Subtract(a[i]));
+        cmp.ops.push(DiffOp::Subtract(*a_i));
         cmp.distance += 1;
 
-        for j in 0..b.len() {
+        for b_j in &b {
             // Here we are comparing a[:i+1] with a b[:j+1]
-            let (idx_to_clone, diff, distance_delta) = if a[i] == b[j] {
-                (idx_modify, DiffOp::Keep(a[i]), 0)
+            let (idx_to_clone, diff, distance_delta) = if a_i == b_j {
+                (idx_modify, DiffOp::Keep(*a_i), 0)
             } else {
                 let cost_modify = c.index(idx_modify).distance;
                 let cost_add = c.index(idx_add).distance;
                 let cost_subtract = c.index(idx_subtract).distance;
                 if cost_modify <= std::cmp::min(cost_subtract, cost_add) {
-                    (idx_modify, DiffOp::Modify(a[i], b[j]), 1)
+                    (idx_modify, DiffOp::Modify(*a_i, *b_j), 1)
                 } else if cost_subtract <= std::cmp::min(cost_modify, cost_add) {
-                    (idx_subtract, DiffOp::Subtract(a[i]), 1)
+                    (idx_subtract, DiffOp::Subtract(*a_i), 1)
                 } else {
-                    (idx_add, DiffOp::Add(b[j]), 1)
+                    (idx_add, DiffOp::Add(*b_j), 1)
                 }
             };
 
@@ -205,21 +206,11 @@ pub struct WordDiff {
 
 impl WordDiff {
     pub fn left(&self) -> String {
-        self.ops
-            .iter()
-            .map(DiffOp::left)
-            .filter(Option::is_some)
-            .map(Option::unwrap)
-            .collect()
+        self.ops.iter().map(DiffOp::left).flatten().collect()
     }
 
     pub fn right(&self) -> String {
-        self.ops
-            .iter()
-            .map(DiffOp::right)
-            .filter(Option::is_some)
-            .map(Option::unwrap)
-            .collect()
+        self.ops.iter().map(DiffOp::right).flatten().collect()
     }
 
     pub fn colored(&self) -> String {

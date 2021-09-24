@@ -22,7 +22,7 @@ pub fn get_newline<S>() -> command::ExecutionPrimitive<S> {
 }
 
 fn par_primitive_fn<S>(mut par_token: Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()> {
-    if input.base().exec_output.len() == 0 || input.base().num_trailing_newlines >= 2 {
+    if input.base().exec_output.is_empty() || input.base().num_trailing_newlines >= 2 {
         return Ok(());
     }
     par_token.value = token::Value::Character('\n', CatCode::Space);

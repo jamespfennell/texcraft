@@ -177,7 +177,7 @@ pub trait Stream {
 ///
 /// Returns an error if the stream does not start with the tokens.
 pub fn remove_tokens_from_stream(
-    tokens: &Vec<Token>,
+    tokens: &[Token],
     stream: &mut dyn Stream,
     action: &str,
 ) -> anyhow::Result<()> {
@@ -314,7 +314,7 @@ impl<T: Stream> StackStream<T> {
 
     /// Create a new empty stack stream.
     pub fn new() -> StackStream<T> {
-        return StackStream { stack: Vec::new() };
+        StackStream { stack: Vec::new() }
     }
 }
 
@@ -347,5 +347,11 @@ impl<T: Stream> Stream for StackStream<T> {
             None => Ok(None),
             Some(stream) => stream.imut_peek(),
         }
+    }
+}
+
+impl<T: Stream> Default for StackStream<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }

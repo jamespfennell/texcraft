@@ -46,27 +46,26 @@ impl Line {
         annotation: &str,
     ) -> std::fmt::Result {
         let _prefix = " ".repeat(margin_width);
-        write!(
+        writeln!(
             f,
-            "{}{} {}:{}:{} \n",
+            "{}{} foo.tex:{}:{}",
             " ".repeat(margin_width - 1),
             ">>>".bright_yellow().bold(),
-            "foo.tex",
             self.line_number,
             self.position
         )?;
         print_line_with_bar(f, margin_width)?;
-        write!(
+        writeln!(
             f,
-            "{}{} {} {}\n",
+            "{}{} {} {}",
             " ".repeat(margin_width - self.line_number.to_string().len() - 1),
             self.line_number.to_string().bright_yellow(),
             bar(),
             self.line.trim_end()
         )?;
-        write!(
+        writeln!(
             f,
-            "{}{} {}{} {}\n",
+            "{}{} {}{} {}",
             " ".repeat(margin_width),
             bar(),
             " ".repeat(self.position),
@@ -82,18 +81,18 @@ fn bar() -> ColoredString {
 }
 
 fn print_line_with_bar(f: &mut std::fmt::Formatter<'_>, margin_width: usize) -> std::fmt::Result {
-    write!(f, "{}{} \n", " ".repeat(margin_width), bar())?;
+    writeln!(f, "{}{} ", " ".repeat(margin_width), bar())?;
     Ok(())
 }
 
 fn print_line_with_note(
     f: &mut std::fmt::Formatter<'_>,
     margin_width: usize,
-    note: &String,
+    note: &str,
 ) -> std::fmt::Result {
-    write!(
+    writeln!(
         f,
-        "{}{} {} {}\n",
+        "{}{} {} {}",
         " ".repeat(margin_width),
         "=".bright_yellow().bold(),
         "note:".bold(),
@@ -102,8 +101,8 @@ fn print_line_with_note(
     Ok(())
 }
 
-fn print_error_header(f: &mut std::fmt::Formatter<'_>, message: &String) -> std::fmt::Result {
-    write!(f, "{}: {}\n", "Error".bright_red().bold(), message.bold())?;
+fn print_error_header(f: &mut std::fmt::Formatter<'_>, message: &str) -> std::fmt::Result {
+    writeln!(f, "{}: {}", "Error".bright_red().bold(), message.bold())?;
     Ok(())
 }
 
@@ -133,7 +132,7 @@ impl std::fmt::Display for TokenError {
             print_line_with_bar(f, 3)?;
         }
         for note in self.notes.iter() {
-            print_line_with_note(f, 3, &note)?;
+            print_line_with_note(f, 3, note)?;
         }
         Ok(())
     }
@@ -213,7 +212,7 @@ impl EndOfInputError {
         if let Some(line) = Line::new(token) {
             self.contexts.push(TokenContext {
                 note: T::into(note),
-                line: line,
+                line,
             });
         }
         self
@@ -248,10 +247,10 @@ impl std::fmt::Display for EndOfInputError {
             print_line_with_bar(f, 3)?;
         }
         for note in self.notes.iter() {
-            print_line_with_note(f, 3, &note)?;
+            print_line_with_note(f, 3, note)?;
         }
         for context in self.contexts.iter() {
-            write!(f, "\n")?;
+            writeln!(f)?;
             print_error_header(f, &context.note)?;
             context.line.fmt(f, 3, "")?;
         }
@@ -259,48 +258,9 @@ impl std::fmt::Display for EndOfInputError {
     }
 }
 
-#[derive(Debug)]
-pub struct UserDefinedMacroError {
-    original_error: anyhow::Error,
-    docs: String,
-}
-
-impl UserDefinedMacroError {
-    pub fn new(original_error: anyhow::Error, docs: String) -> anyhow::Error {
-        anyhow::Error::from(UserDefinedMacroError {
-            original_error,
-            docs,
-        })
-    }
-
-    pub fn add_context<S>(&mut self, state: &Base<S>, input: &input::Unit) {
-        add_context(&mut self.original_error, state, input)
-    }
-}
-
-impl std::error::Error for UserDefinedMacroError {}
-
-impl std::fmt::Display for UserDefinedMacroError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.original_error.fmt(f)?;
-        write!(
-            f,
-            "\n{}\n{}",
-            "Note: this is the documentation for the macro".bold(),
-            self.docs
-        )?;
-        Ok(())
-    }
-}
-
 pub fn add_context<S>(error: &mut anyhow::Error, state: &Base<S>, input: &input::Unit) {
-    match error.downcast_mut::<EndOfInputError>() {
-        Some(error) => error.add_context(state, input),
-        None => (),
-    }
-    match error.downcast_mut::<UserDefinedMacroError>() {
-        Some(error) => error.add_context(state, input),
-        None => (),
+    if let Some(error) = error.downcast_mut::<EndOfInputError>() {
+        error.add_context(state, input);
     }
 }
 

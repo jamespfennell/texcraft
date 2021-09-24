@@ -23,6 +23,10 @@ impl CsName {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 impl From<&str> for CsName {
@@ -69,16 +73,16 @@ impl PartialEq for Token {
 
 impl Token {
     pub fn new_letter(c: char) -> Token {
-        return Token {
+        Token {
             value: Value::Character(c, CatCode::Letter),
             source: None,
-        };
+        }
     }
     pub fn new_other(c: char) -> Token {
-        return Token {
+        Token {
             value: Value::Character(c, CatCode::Other),
             source: None,
-        };
+        }
     }
 }
 
@@ -93,33 +97,6 @@ pub struct Line {
 pub struct Source {
     pub line: Rc<Line>,
     pub position: usize,
-}
-
-pub trait Recorder {
-    fn record(&mut self, token: &Token);
-}
-
-/// `VecRecorder` is a token recorder that copies tokens to an internal vector that can be subsequently retrieved.
-pub struct VecRecorder {
-    tokens: Vec<Token>,
-}
-
-impl VecRecorder {
-    /// Creates a new `VecRecorder`.
-    pub fn new() -> VecRecorder {
-        VecRecorder { tokens: Vec::new() }
-    }
-
-    /// Returns all the tokens that have been recorded so far.
-    pub fn tokens(self) -> Vec<Token> {
-        self.tokens
-    }
-}
-
-impl Recorder for VecRecorder {
-    fn record(&mut self, token: &Token) {
-        self.tokens.push(token.clone())
-    }
 }
 
 /// Write a collection of tokens to a string.

@@ -46,12 +46,12 @@ impl<S> command::ExpansionGeneric<S> for Macro {
 
         if input.base().tracing_macros > 0 {
             println![" +---[ Tracing macro expansion of {} ]--+", token];
-            for i in 0..arguments.len() {
+            for (i, argument) in arguments.iter().enumerate() {
                 println![
                     " | {}{}={}",
                     "#".bright_yellow().bold(),
                     (i + 1).to_string().bright_yellow().bold(),
-                    write_tokens(&arguments[i]).bright_yellow()
+                    write_tokens(argument).bright_yellow()
                 ]
             }
             println![
@@ -66,7 +66,7 @@ impl<S> command::ExpansionGeneric<S> for Macro {
 
     fn doc(&self) -> String {
         let mut d = String::default();
-        d.push_str(&format!["User defined macro\n\n",]);
+        d.push_str("User defined macro\n\n");
         d.push_str(&format![
             "{}\n{}",
             "Parameters definition".italic(),
@@ -93,10 +93,8 @@ impl Macro {
             replacement_text,
         }
     }
-    fn perform_replacement(
-        replacements: &Vec<Replacement>,
-        arguments: &Vec<Vec<Token>>,
-    ) -> Vec<Token> {
+
+    fn perform_replacement(replacements: &[Replacement], arguments: &[Vec<Token>]) -> Vec<Token> {
         let mut output_size = 0;
         for replacement in replacements.iter() {
             output_size += match replacement {
@@ -265,13 +263,10 @@ fn colored_parameter_number(n: usize) -> String {
     ]
 }
 
-pub fn pretty_print_prefix_and_parameters(
-    prefix: &Vec<Token>,
-    parameters: &Vec<Parameter>,
-) -> String {
+pub fn pretty_print_prefix_and_parameters(prefix: &[Token], parameters: &[Parameter]) -> String {
     let mut d = String::default();
-    if prefix.len() == 0 {
-        d.push_str(&format![" . No prefix\n",]);
+    if prefix.is_empty() {
+        d.push_str(" . No prefix\n");
     } else {
         d.push_str(&format![" . Prefix: `{}`\n", write_tokens(prefix)]);
     }
@@ -297,26 +292,26 @@ pub fn pretty_print_prefix_and_parameters(
         parameter_number += 1;
     }
 
-    d.push_str(&format![" . Full argument specification: `"]);
-    d.push_str(&format!["{}", write_tokens(prefix)]);
+    d.push_str(" . Full argument specification: `");
+    d.push_str(&write_tokens(prefix));
     let mut parameter_number = 1;
     for parameter in parameters {
-        d.push_str(&format!["{}", colored_parameter_number(parameter_number)]);
+        d.push_str(&colored_parameter_number(parameter_number));
         if let Parameter::Delimited(factory) = parameter {
-            d.push_str(&format!["{}", write_tokens(factory.substring())]);
+            d.push_str(write_tokens(factory.substring()).as_str());
         }
         parameter_number += 1;
     }
-    d.push_str(&format!["`"]);
+    d.push('`');
     d
 }
 
-pub fn pretty_print_replacement_text(replacements: &Vec<Replacement>) -> String {
+pub fn pretty_print_replacement_text(replacements: &[Replacement]) -> String {
     let mut b = String::default();
     for replacement in replacements.iter() {
         match replacement {
             Replacement::Parameter(i) => {
-                b.push_str(&format!["{}", colored_parameter_number(*i + 1),]);
+                b.push_str(colored_parameter_number(*i + 1).as_str());
             }
             Replacement::Token(token) => {
                 b.push_str(&format!["{}", token,]);

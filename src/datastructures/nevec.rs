@@ -81,6 +81,11 @@ impl<T> Nevec<T> {
         1 + self.tail.len()
     }
 
+    /// Returns whether the vector is non-empty, which it always is.
+    pub fn is_empty(&self) -> bool {
+        true
+    }
+
     /// Get a reference to the element at the provided index.
     pub fn get(&self, i: usize) -> Option<&T> {
         if i == 0 {

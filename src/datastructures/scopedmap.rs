@@ -203,21 +203,28 @@ impl<K: Eq + Hash, V> ScopedMap<K, V> {
         self.key_to_value_stack.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.key_to_value_stack.is_empty()
+    }
+
     pub fn keys(&self) -> std::collections::hash_map::Keys<'_, std::rc::Rc<K>, Nevec<V>> {
         self.key_to_value_stack.keys()
     }
 
     /// Returns a new empty `ScopedMap`.
     pub fn new() -> ScopedMap<K, V> {
-        return ScopedMap {
+        ScopedMap {
             key_to_value_stack: HashMap::new(),
             changed_keys_stack: Vec::<HashSet<Rc<K>>>::new(),
-        };
+        }
     }
+}
 
+impl<K: Eq + Hash, V> std::iter::FromIterator<(K, V)> for ScopedMap<K, V> {
     /// Returns a new `ScopedMap` pre-populated with the provided key, values pairs
     /// ```
     /// # use texcraft::datastructures::scopedmap::ScopedMap;
+    /// # use std::iter::FromIterator;
     /// let mut cat_colors = ScopedMap::from_iter(std::array::IntoIter::new([
     ///    ("paganini", "black"),
     ///    ("mint", "ginger"),
@@ -225,10 +232,16 @@ impl<K: Eq + Hash, V> ScopedMap<K, V> {
     /// assert_eq!(cat_colors.get(&"paganini"), Some(&"black"));
     /// assert_eq!(cat_colors.get(&"mint"), Some(&"ginger"));
     /// ```
-    pub fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> ScopedMap<K, V> {
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> ScopedMap<K, V> {
         let mut map = ScopedMap::new();
         map.extend(iter);
         map
+    }
+}
+
+impl<K: Eq + Hash, V> Default for ScopedMap<K, V> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -77,7 +77,7 @@ impl Component {
 }
 
 fn read_int_register_fn<S: HasRegisters>(state: &S, addr: usize) -> &i32 {
-    &state.registers().int_registers.read(addr)
+    state.registers().int_registers.read(addr)
 }
 
 fn write_int_register_fn<S: HasRegisters>(state: &mut S, addr: usize) -> &mut i32 {

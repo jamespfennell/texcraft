@@ -154,7 +154,7 @@ pub enum Expansion<S> {
 impl<S> Clone for Expansion<S> {
     fn clone(&self) -> Self {
         match self {
-            Expansion::Primitive(e) => Expansion::Primitive(e.clone()),
+            Expansion::Primitive(e) => Expansion::Primitive(*e),
             Expansion::Generic(r) => Expansion::Generic(r.clone()),
         }
     }
@@ -249,8 +249,8 @@ impl<S> Clone for Command<S> {
     fn clone(&self) -> Self {
         match self {
             Command::Expansion(e) => Command::Expansion::<S>(e.clone()),
-            Command::Execution(e) => Command::Execution(e.clone()),
-            Command::Variable(v) => Command::Variable(v.clone()),
+            Command::Execution(e) => Command::Execution(*e),
+            Command::Variable(v) => Command::Variable(*v),
             Command::Character(c, cat_code) => Command::Character(*c, *cat_code),
         }
     }

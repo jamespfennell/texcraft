@@ -140,7 +140,7 @@ impl<S> Base<S> {
         Base {
             primitives: ScopedMap::new(),
             cat_codes: catcodecmd::Component::new(initial_cat_codes),
-            state: state,
+            state,
             exec_output: Vec::new(),
             num_trailing_newlines: 0,
             tracing_macros: 0,
@@ -160,6 +160,6 @@ impl<S> Base<S> {
     }
 
     pub fn cat_code_map(&self) -> &HashMap<u32, RawCatCode> {
-        &self.cat_codes.cat_codes_map()
+        self.cat_codes.cat_codes_map()
     }
 }

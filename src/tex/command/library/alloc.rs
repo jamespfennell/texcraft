@@ -180,6 +180,12 @@ impl Component {
     }
 }
 
+impl Default for Component {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub fn get_newint<S: HasAlloc>() -> command::ExecutionPrimitive<S> {
     command::ExecutionPrimitive {
         call_fn: newint_primitive_fn,
