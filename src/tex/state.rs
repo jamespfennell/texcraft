@@ -113,7 +113,7 @@
 //! - Commands built with this framework can be used in any TeX engine.
 //!
 
-use crate::datastructures::scopedmap::ScopedMap;
+use crate::datastructures::groupingmap::GroupingMap;
 use crate::tex::command;
 use crate::tex::command::library::catcodecmd;
 use crate::tex::token;
@@ -122,7 +122,7 @@ use std::collections::HashMap;
 
 /// The parts of state that every TeX engine must have.
 pub struct Base<S> {
-    pub primitives: ScopedMap<token::CsName, command::Command<S>>,
+    pub primitives: GroupingMap<token::CsName, command::Command<S>>,
     pub cat_codes: catcodecmd::Component,
     pub state: S,
 
@@ -138,7 +138,7 @@ impl<S> Base<S> {
     /// Create a new BaseState.
     pub fn new(initial_cat_codes: HashMap<u32, RawCatCode>, state: S) -> Base<S> {
         Base {
-            primitives: ScopedMap::new(),
+            primitives: GroupingMap::new(),
             cat_codes: catcodecmd::Component::new(initial_cat_codes),
             state,
             exec_output: Vec::new(),

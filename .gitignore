@@ -3,3 +3,6 @@
 *.log
 *.pdf
 *.dvi
+flamegraph.svg
+perf.data*
+callgrind*

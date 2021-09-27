@@ -3,4 +3,4 @@
 pub mod circularbuffer;
 #[macro_use]
 pub mod nevec;
-pub mod scopedmap;
+pub mod groupingmap;

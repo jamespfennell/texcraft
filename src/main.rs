@@ -79,7 +79,7 @@ fn docs(cs_name: &str, optional_file_name: Option<&String>) -> Result<(), anyhow
     if cs_name == "list" {
         let primitives = &s.primitives;
         let mut cs_names = Vec::new();
-        for name in primitives.keys() {
+        for name in primitives.as_regular_map().keys() {
             cs_names.push(name);
         }
         cs_names.sort();

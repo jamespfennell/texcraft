@@ -271,7 +271,7 @@ pub fn new_undefined_cs_error<S>(token: token::Token, state: &Base<S>) -> anyhow
         _ => &a,
     };
     let mut cs_names = Vec::<String>::new();
-    for cs_name in state.primitives.keys() {
+    for cs_name in state.primitives.as_regular_map().keys() {
         cs_names.push(cs_name.as_str().to_string());
     }
 
