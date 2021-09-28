@@ -1,4 +1,3 @@
-use core::time::Duration;
 use criterion::{criterion_group, criterion_main, Criterion};
 use texcraft::tex::command::library::execwhitespace;
 use texcraft::tex::command::library::WholeLibraryState;
@@ -15,8 +14,10 @@ pub fn advance_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("advance");
     group.bench_function("advance", |b| {
         b.iter(|| {
-            // TODO: replace with input.push_singleton(\a token)
-            input.push_new_str(r"\a");
+            input.push_single_token(Token{
+              value: ControlSequence('\\', CsName::from("a")),
+              source: None,
+            });
             driver::exec(&mut state, &mut input, true).unwrap();
         })
     });

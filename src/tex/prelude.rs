@@ -14,5 +14,6 @@ pub use crate::tex::token::catcode::RawCatCode;
 pub use crate::tex::token::stream;
 pub use crate::tex::token::stream::Stream;
 pub use crate::tex::token::Token;
+pub use crate::tex::token::CsName;
 pub use crate::tex::token::Value::Character;
 pub use crate::tex::token::Value::ControlSequence;

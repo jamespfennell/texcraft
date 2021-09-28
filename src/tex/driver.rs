@@ -99,12 +99,8 @@ impl<'a, S> stream::Stream for RawStream<'a, S> {
         self.input.next(self.state.cat_code_map())
     }
 
-    fn prepare_imut_peek(&mut self) -> anyhow::Result<()> {
-        self.input.prepare_imut_peek(self.state.cat_code_map())
-    }
-
-    fn imut_peek(&self) -> anyhow::Result<Option<&Token>> {
-        self.input.imut_peek()
+    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
+        self.input.peek(self.state.cat_code_map())
     }
 }
 
@@ -120,15 +116,9 @@ impl<'a, S> stream::Stream for ExpansionInput<'a, S> {
         self.raw_stream.next()
     }
 
-    fn prepare_imut_peek(&mut self) -> anyhow::Result<()> {
+    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
         while self.expand_next()? {}
-        self.raw_stream.prepare_imut_peek()
-    }
-
-    fn imut_peek(&self) -> anyhow::Result<Option<&Token>> {
-        // The assumption here is that prepare_imut_peek has been called and the
-        // next token in the raw stream is not an expandable command.
-        self.raw_stream.imut_peek()
+        self.raw_stream.peek()
     }
 }
 
@@ -178,12 +168,8 @@ impl<'a, S> stream::Stream for RawStreamMutState<'a, S> {
         self.input.next(self.state.cat_code_map())
     }
 
-    fn prepare_imut_peek(&mut self) -> anyhow::Result<()> {
-        self.input.prepare_imut_peek(self.state.cat_code_map())
-    }
-
-    fn imut_peek(&self) -> anyhow::Result<Option<&Token>> {
-        self.input.imut_peek()
+    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
+        self.input.peek(self.state.cat_code_map())
     }
 }
 
@@ -199,15 +185,9 @@ impl<'a, S> stream::Stream for ExecutionInput<'a, S> {
         self.raw_stream.next()
     }
 
-    fn prepare_imut_peek(&mut self) -> anyhow::Result<()> {
+    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
         while self.expand_next()? {}
-        self.raw_stream.prepare_imut_peek()
-    }
-
-    fn imut_peek(&self) -> anyhow::Result<Option<&Token>> {
-        // The assumption here is that prepare_imut_peek has been called and the
-        // next token in the raw stream is not an expandable command.
-        self.raw_stream.imut_peek()
+        self.raw_stream.peek()
     }
 }
 

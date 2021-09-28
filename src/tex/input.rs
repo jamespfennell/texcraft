@@ -6,6 +6,7 @@ use crate::tex::token::catcode::RawCatCode;
 use crate::tex::token::lexer;
 use crate::tex::token::stream;
 use crate::tex::token::stream::Stream;
+use crate::tex::token::Token;
 use std::collections::HashMap;
 use std::io;
 use std::rc;
@@ -13,6 +14,7 @@ use std::rc;
 /// Structure used for controlling input.
 pub struct Unit {
     sources: Vec<Source>,
+    cache: Option<Token>,
     last_non_empty_line: Option<rc::Rc<token::Line>>,
 
     pub conditional: conditional::Component,
@@ -22,23 +24,30 @@ impl Unit {
     pub fn new() -> Unit {
         Unit {
             sources: Vec::new(),
+            cache: None,
             last_non_empty_line: None,
             conditional: conditional::Component::new(),
         }
     }
 
     pub fn push_new_source(&mut self, reader: Box<dyn io::BufRead>) {
-        self.sources.push(Source::new(reader));
+        self.vacate_cache();
+        self.sources.push(Source::new_reader(reader));
     }
 
     pub fn push_new_str<Str: Into<String>>(&mut self, s: Str) {
+        self.vacate_cache();
         self.push_new_source(Box::new(io::Cursor::new(s.into())));
     }
 
     pub fn push_expansion(&mut self, expansion: stream::VecStream) {
-        if let Some(source) = self.sources.last_mut() {
-            source.expansions.push(expansion);
-        }
+        self.vacate_cache();
+        self.sources.push(Source::Vec(expansion));
+    }
+
+    pub fn push_single_token(&mut self, token: Token) {
+        self.vacate_cache();
+        self.sources.push(Source::Singleton(Some(token)));
     }
 
     pub fn last_non_empty_line(&self) -> Option<rc::Rc<token::Line>> {
@@ -49,67 +58,52 @@ impl Unit {
         &mut self,
         cat_code_map: &HashMap<u32, RawCatCode>,
     ) -> anyhow::Result<Option<token::Token>> {
-        self.prepare_imut_peek(cat_code_map)?;
-        Ok(match self.sources.last_mut() {
-            None => None,
-            Some(source) => source.expansions.next()?,
-        })
+        if self.cache.is_none() {
+            self.populate_cache(cat_code_map)?;
+        }
+        Ok(self.cache.take())
     }
 
     pub fn peek(
         &mut self,
         cat_code_map: &HashMap<u32, RawCatCode>,
     ) -> anyhow::Result<Option<&token::Token>> {
-        self.prepare_imut_peek(cat_code_map)?;
-        self.imut_peek()
+        if self.cache.is_none() {
+            self.populate_cache(cat_code_map)?;
+        }
+        Ok(self.cache.as_ref())
     }
 
-    pub fn prepare_imut_peek(
+    pub fn populate_cache(
         &mut self,
         cat_code_map: &HashMap<u32, RawCatCode>,
     ) -> anyhow::Result<()> {
         loop {
-            match self.sources.last_mut() {
-                None => break,
-                Some(top) => {
-                    if top.expansions.peek()? != None {
-                        break;
-                    }
-                    match top.root.next(cat_code_map)? {
-                        None => {
-                            self.last_non_empty_line = top.root.last_non_empty_line();
-                            // We don't pop off the last source because we may still be processing the file.
-                            // For example if the request happened via an expansion of the last command in
-                            // the file. Think of a file that ends in `\number 4`.
-                            if self.sources.len() > 1 {
-                                self.sources.pop();
-                            } else {
-                                break;
-                            }
-                            continue;
-                        }
-                        Some(t) => {
-                            // TODO: This is kind of hacky. It would be nice to move this caching down to the source
-                            // where it really belongs.
-                            top.expansions.push(stream::VecStream::new_singleton(t));
-                            break;
-                        }
-                    }
+            self.cache = match self.sources.last_mut() {
+                None => return Ok(()),
+                Some(Source::Vec(vec)) => vec.next()?,
+                Some(Source::Singleton(t)) => {
+                    std::mem::swap(&mut self.cache, t);
+                    self.sources.pop();
+                    return Ok(());
                 }
+                Some(Source::Reader(lexer)) => lexer.next(cat_code_map)?,
+            };
+            if self.cache.is_some() {
+                return Ok(());
             }
+            self.sources.pop();
         }
-        Ok(())
-    }
-
-    pub fn imut_peek(&self) -> anyhow::Result<Option<&token::Token>> {
-        Ok(match self.sources.last() {
-            None => None,
-            Some(source) => source.expansions.imut_peek()?,
-        })
     }
 
     pub fn clear(&mut self) {
         self.sources = vec![];
+    }
+
+    fn vacate_cache(&mut self) {
+        if let Some(t) = self.cache.take() {
+            self.sources.push(Source::Singleton(Some(t)));
+        }
     }
 }
 
@@ -119,28 +113,14 @@ impl Default for Unit {
     }
 }
 
-struct Source {
-    root: lexer::Lexer,
-    expansions: stream::StackStream<stream::VecStream>,
+enum Source {
+    Reader(lexer::Lexer),
+    Vec(stream::VecStream),
+    Singleton(Option<Token>),
 }
 
 impl Source {
-    fn new(reader: Box<dyn io::BufRead>) -> Source {
-        Source {
-            root: lexer::Lexer::new(reader),
-            expansions: stream::StackStream::new(),
-        }
+    fn new_reader(reader: Box<dyn io::BufRead>) -> Source {
+        Source::Reader(lexer::Lexer::new(reader))
     }
-
-    /*
-    fn next(
-        &mut self,
-        cat_codes: &ScopedMap<char, RawCatCode>,
-    ) -> anyhow::Result<Option<token::Token>> {
-        match self.expansions.next()? {
-            None => Ok(self.root.next(&cat_codes)?),
-            Some(t) => Ok(Some(t)),
-        }
-    }
-     */
 }

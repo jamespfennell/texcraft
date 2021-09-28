@@ -20,16 +20,16 @@ in a simple SVG format:
     cargo build --release
     flamegraph target/release/texcraft expand performance/digits-of-pi.tex
 
-### pdfTeX vs Texcraft performance as of 2021-09-22
+### pdfTeX vs Texcraft performance as of 2021-09-28
 
 These performance numbers were obtained on 
     [a machine running an 8-core Ryzen 7 CPU](https://pcpartpicker.com/list/Y3FbBc).
 
 | n    | pdfTeX | Texcraft | Multiplier (lower is better, target is 1)
 |------|--------|----------|----
-| 250  | 0.5s   | 3.2s     | 6.4
-| 500  | 1.9s   | 12.7s    | 6.7
-| 1000 | 7.5s   | 50.4s    | 6.7
-| 2500 | \*     | 362.5s   | N/A
+| 100  | 90ms   | 465ms    | 5.2
+| 500  |        |          | 
+| 1000 |        |          |
+| 2500 | \*     |          | N/A
 
 \*pdfTeX cannot execute the script for higher values of n as it runs out of stack space.

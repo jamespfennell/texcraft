@@ -79,57 +79,6 @@
 //!     or the following token in the remaining stream if the expansion returns no tokens.
 //!     This mutation is generally irreversable.
 //!
-//! # Immutable peeking
-//!
-//! Requiring a mutable borrow to peek at the stream is problematical for stream consumers.
-//! The following code seems entirely reasonable: the stream is peeked at, and a lookup occurs
-//! to check if the immutable token corresponds to an expansion control sequence:
-//! ```compile_fail
-//! let state_and_stream: dyn StateAndStream<State> = // some state and stream
-//! let token = state_and_stream.stream().peek();
-//! let is_expansion_command = match token.value {
-//!     None => false,
-//!     Some(ref name) => {
-//!         state_and_stream.state().get_expansion_command(name).is_value()
-//!     }
-//! }
-//! ```
-//! This however does not compile: searching in the expansion map requires an immutable borrow
-//! of the state (and thus the `StateAndStream`) which the borrow checker forbids because the
-//! immutable reference to the token is keeping the mutable borrow of the stream alive.
-//!
-//! However, idempotency of the `peek` method means that in general there should be possible
-//! to retrieve an immutable reference to the next token if a mutable peek has already occured.
-//! In the worst case, stream implementations can maintain an internal cache of the next token,
-//! populate this cache on the first peek, and then return an immutable refernce to this cache
-//! on subsequent peeks.
-//!
-//! This idea is implemetented with a pair of methods on the stream trait:
-//! `prepare_imut_peek` and `imut_peek`. The first method takes a mutable reference to the
-//! stream and performs all necessary mutable processing to generate the next token in the
-//! stream. The second method then returns an immutable reference to this generated token:
-//! ```
-//!
-//! ```
-//! The previous code sample can now be made to work:
-//! ```
-//!
-//! ```
-//!
-//! ## Restrictions on immutable peeking
-//!
-//! In general, it is an error to invoke `imut_peek` without first invoking `prepare_imut_peek`.
-//! Stream implementations which require mutation before peeking (i.e., have a non-empty
-//! implementation of `prepare_imut_peek`) should always return an error from imut_peek` if the
-//! prepare function has not been called first.
-//!
-//! It is also an error to mutate state between `prepare_imut_peek` and `imut_peek`. The borrow
-//! checker will sometimes detect this situation. Stream implementations are not expected to
-//! error in this case because detecting state changes is expensive.
-//!
-//! For some stream implementations, like `VecStream`, it is admissible to skip
-//! `prepare_imut_state`. This exception is on an per-implementation basis.
-
 use crate::tex::error;
 use crate::tex::token::Token;
 use crate::tex::token::Value::*;
@@ -145,24 +94,7 @@ pub trait Stream {
     ///
     /// To peek using an immutable borrow of the stream, use the methods `prepare_imut_peek`
     /// and `imut_peek`.
-    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
-        self.prepare_imut_peek()?;
-        self.imut_peek()
-    }
-
-    /// Performs any mutations needed so as to be able to peek using an immutable borrow
-    /// of the stream. See the module documentation for information on why this method
-    /// exists.
-    fn prepare_imut_peek(&mut self) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    /// Immutably peeks at the next token in the stream. The method `prepare_imut_peek`
-    /// *must* be invoked before this function, otherwise an error will be returned.
-    ///
-    /// The name of this method is intentionally janky so that consumers think
-    /// twice before using it.
-    fn imut_peek(&self) -> anyhow::Result<Option<&Token>>;
+    fn peek(&mut self) -> anyhow::Result<Option<&Token>>;
 
     /// Consumes the next token in the stream without returning it.
     ///
@@ -251,9 +183,9 @@ impl VecStream {
     /// # use texcraft::tex::token::{Token, Value};
     /// let t = Token::new_letter('a');
     /// let mut s = VecStream::new_singleton(t.clone());
-    /// assert_eq!(s.imut_peek().unwrap(), Some(&t));
+    /// assert_eq!(s.peek().unwrap(), Some(&t));
     /// assert_eq!(s.next().unwrap(), Some(t));
-    /// assert_eq!(s.imut_peek().unwrap(), None);
+    /// assert_eq!(s.peek().unwrap(), None);
     /// assert_eq!(s.next().unwrap(), None);
     /// ```
     pub fn new_singleton(t: Token) -> VecStream {
@@ -269,89 +201,10 @@ impl Stream for VecStream {
         })
     }
 
-    fn imut_peek(&self) -> anyhow::Result<Option<&Token>> {
+    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
         Ok(match self {
             VecStream::Singleton(t) => t.as_ref(),
             VecStream::Vector(v) => v.last(),
         })
-    }
-}
-
-/// A StackStream is a stream consisting of a stack of other streams. The next token is read from
-/// the first stream in the stack that is still returning tokens.
-/// ```
-/// # use texcraft::tex::token::stream::StackStream;
-/// # use texcraft::tex::token::stream::Stream;
-/// # use texcraft::tex::token::stream::VecStream;
-/// # use texcraft::tex::token::Token;
-/// let token_1 = Token::new_letter('a');
-/// let stream_1 = VecStream::new(vec![token_1.clone()]);
-/// let token_2 = Token::new_letter('b');
-/// let stream_2 = VecStream::new(vec![token_2.clone()]);
-///
-/// let mut stack_stream = StackStream::new();
-/// stack_stream.push(stream_1);
-/// stack_stream.push(stream_2);
-///
-/// assert_eq!(stack_stream.next().unwrap(), Some(token_2));
-/// assert_eq!(stack_stream.next().unwrap(), Some(token_1));
-/// assert_eq!(stack_stream.next().unwrap(), None);
-/// ```
-pub struct StackStream<T: Stream> {
-    stack: Vec<T>,
-}
-
-impl<T: Stream> StackStream<T> {
-    /// Push a new stream onto the top of the stack.
-    pub fn push(&mut self, stream: T) {
-        self.stack.push(stream)
-    }
-
-    /// Return a mutable reference to the underlying stack of streams
-    pub fn stack_mut(&mut self) -> &mut Vec<T> {
-        &mut self.stack
-    }
-
-    /// Create a new empty stack stream.
-    pub fn new() -> StackStream<T> {
-        StackStream { stack: Vec::new() }
-    }
-}
-
-impl<T: Stream> Stream for StackStream<T> {
-    fn next(&mut self) -> anyhow::Result<Option<Token>> {
-        self.prepare_imut_peek()?;
-        match self.stack.last_mut() {
-            None => Ok(None),
-            Some(stream) => stream.next(),
-        }
-    }
-
-    fn prepare_imut_peek(&mut self) -> anyhow::Result<()> {
-        loop {
-            match self.stack.last_mut() {
-                None => return Ok(()),
-                Some(top) => match top.peek()? {
-                    None => {
-                        self.stack.pop();
-                        continue;
-                    }
-                    Some(..) => return Ok(()),
-                },
-            }
-        }
-    }
-
-    fn imut_peek(&self) -> anyhow::Result<Option<&Token>> {
-        match self.stack.last() {
-            None => Ok(None),
-            Some(stream) => stream.imut_peek(),
-        }
-    }
-}
-
-impl<T: Stream> Default for StackStream<T> {
-    fn default() -> Self {
-        Self::new()
     }
 }
