@@ -14,9 +14,9 @@ pub fn advance_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("advance");
     group.bench_function("advance", |b| {
         b.iter(|| {
-            input.push_single_token(Token{
-              value: ControlSequence('\\', CsName::from("a")),
-              source: None,
+            input.push_single_token(Token {
+                value: ControlSequence('\\', CsName::from("a")),
+                source: None,
             });
             driver::exec(&mut state, &mut input, true).unwrap();
         })

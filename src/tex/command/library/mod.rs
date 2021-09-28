@@ -23,7 +23,7 @@ pub mod variableops;
 ///
 /// This is temporary state struct until we create states corresponding to actualy TeX engines.
 pub struct WholeLibraryState {
-    registers: registers::Component,
+    registers: registers::Component<32768>,
     time: time::Component,
     alloc: alloc::Component,
 }
@@ -33,7 +33,7 @@ impl WholeLibraryState {
         let mut s = Base::<WholeLibraryState>::new(
             catcode::tex_defaults(),
             WholeLibraryState {
-                registers: registers::Component::new(32768),
+                registers: registers::Component::new(),
                 time: time::Component::new(),
                 alloc: alloc::Component::new(),
             },
@@ -59,7 +59,7 @@ impl WholeLibraryState {
     }
 }
 
-implement_has_registers![WholeLibraryState, registers];
+implement_has_registers![WholeLibraryState, registers, 32768];
 
 impl time::HasTime for WholeLibraryState {
     fn get_time(&self) -> &time::Component {

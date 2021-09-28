@@ -9,36 +9,36 @@ const COUNT_DOC: &str = "Get or set an integer register";
 const COUNTDEF_DOC: &str = "Bind an integer register to a control sequence";
 
 /// Trait for a state that has a registers component.
-pub trait HasRegisters {
+pub trait HasRegisters<const N: usize> {
     /// Get a reference to the registers component.
-    fn registers(&self) -> &Component;
+    fn registers(&self) -> &Component<N>;
 
     /// Get a mutable reference to the registers component.
-    fn registers_mut(&mut self) -> &mut Component;
+    fn registers_mut(&mut self) -> &mut Component<N>;
 }
 
 macro_rules! implement_has_registers {
-    ( $type: ident, $field: ident ) => {
-        impl registers::HasRegisters for $type {
-            fn registers(&self) -> &registers::Component {
+    ( $type: ident, $field: ident, $n: expr ) => {
+        impl registers::HasRegisters<$n> for $type {
+            fn registers(&self) -> &registers::Component<$n> {
                 &self.$field
             }
-            fn registers_mut(&mut self) -> &mut registers::Component {
+            fn registers_mut(&mut self) -> &mut registers::Component<$n> {
                 &mut self.$field
             }
         }
     };
 }
 
-struct Registers<T: Copy + Default> {
-    values: Vec<T>,
+struct Registers<T: Copy + Default, const N: usize> {
+    values: [T; N],
     fallback: T,
 }
 
-impl<T: Copy + Default> Registers<T> {
-    fn new(num_registers: usize) -> Registers<T> {
+impl<T: Copy + Default, const N: usize> Registers<T, N> {
+    fn new() -> Registers<T, N> {
         Registers {
-            values: vec![Default::default(); num_registers],
+            values: [Default::default(); N],
             fallback: Default::default(),
         }
     }
@@ -63,34 +63,37 @@ impl<T: Copy + Default> Registers<T> {
 }
 
 /// A component holding the values of all registers.
-pub struct Component {
-    int_registers: Registers<i32>,
+pub struct Component<const N: usize> {
+    int_registers: Registers<i32, N>,
 }
 
-impl Component {
+impl<const N: usize> Component<N> {
     /// Creates a new registers component.
-    pub fn new(num_int_registers: usize) -> Component {
+    pub fn new() -> Component<N> {
         Component {
-            int_registers: Registers::new(num_int_registers),
+            int_registers: Registers::new(),
         }
     }
 }
 
-fn read_int_register_fn<S: HasRegisters>(state: &S, addr: usize) -> &i32 {
+fn read_int_register_fn<S: HasRegisters<N>, const N: usize>(state: &S, addr: usize) -> &i32 {
     state.registers().int_registers.read(addr)
 }
 
-fn write_int_register_fn<S: HasRegisters>(state: &mut S, addr: usize) -> &mut i32 {
+fn write_int_register_fn<S: HasRegisters<N>, const N: usize>(
+    state: &mut S,
+    addr: usize,
+) -> &mut i32 {
     state.registers_mut().int_registers.write(addr)
 }
 
-fn count_fn<S: HasRegisters>(
+fn count_fn<S: HasRegisters<N>, const N: usize>(
     count_token: &Token,
     input: &mut ExpansionInput<S>,
     _: usize,
 ) -> anyhow::Result<Variable<S>> {
     let addr: usize = parse::parse_number(input)?;
-    if addr >= input.state().registers().int_registers.num() {
+    if addr >= N {
         return Err(integer_register_too_large_error(
             count_token.clone(),
             addr,
@@ -105,11 +108,11 @@ fn count_fn<S: HasRegisters>(
 }
 
 /// Get the `\count` command.
-pub fn get_count<S: HasRegisters>() -> variable::Command<S> {
+pub fn get_count<S: HasRegisters<N>, const N: usize>() -> variable::Command<S> {
     variable::Command::Dynamic(count_fn, 0, COUNT_DOC)
 }
 
-fn countdef_fn<S: HasRegisters>(
+fn countdef_fn<S: HasRegisters<N>, const N: usize>(
     countdef_token: Token,
     input: &mut command::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
@@ -138,7 +141,7 @@ fn countdef_fn<S: HasRegisters>(
 }
 
 /// Get the `\countdef` command.
-pub fn get_countdef<S: HasRegisters>() -> command::ExecutionPrimitive<S> {
+pub fn get_countdef<S: HasRegisters<N>, const N: usize>() -> command::ExecutionPrimitive<S> {
     command::ExecutionPrimitive {
         call_fn: countdef_fn,
         docs: COUNTDEF_DOC,
@@ -167,16 +170,16 @@ mod tests {
     use crate::tex::token::catcode;
 
     struct State {
-        registers: registers::Component,
+        registers: registers::Component<256>,
     }
 
     fn new_state() -> State {
         State {
-            registers: registers::Component::new(256),
+            registers: registers::Component::new(),
         }
     }
 
-    implement_has_registers![State, registers];
+    implement_has_registers![State, registers, 256];
 
     fn setup_expansion_test(s: &mut Base<State>) {
         s.set_command("the", the::get_the());

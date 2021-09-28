@@ -163,16 +163,16 @@ mod tests {
     use crate::tex::state::Base;
     use crate::tex::token::catcode;
     struct State {
-        registers: registers::Component,
+        registers: registers::Component<256>,
     }
 
     fn new_state() -> State {
         State {
-            registers: registers::Component::new(256),
+            registers: registers::Component::new(),
         }
     }
 
-    implement_has_registers![State, registers];
+    implement_has_registers![State, registers, 256];
 
     fn setup_expansion_test(s: &mut Base<State>) {
         s.set_command("the", the::get_the());
