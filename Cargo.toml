@@ -7,17 +7,21 @@ edition = "2018"
 [profile.release]
 lto = true          # Enable Link Time Optimization
 
+[dev-dependencies]
+# Performance testing
+criterion = "0.3"
+
 [dependencies]
 # Used for the many situations in which multiple integer types are supported: e.g, parsing, variables.
 num-traits = "0.2.14"
 
-# For error handling.
+# Error handling.
 anyhow = "1.0"
 
-# For nice terminal output.
+# Bice terminal output.
 colored = "2"
 
-# Used in the time module for getting the current time on startup.
+# In the time module for getting the current time on startup.
 chrono = {version="0.4.19", default-features = false, features = ["clock"], optional = true}
 
 # Currently used as an efficient string type for control sequence names 
@@ -26,3 +30,11 @@ smol_str = "0.1.18"
 [features]
 default = ["time"]
 time = ["chrono"]
+
+
+[[bench]]
+name = "digits_of_pi"
+harness = false
+[[bench]]
+name = "advance"
+harness = false

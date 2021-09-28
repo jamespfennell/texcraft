@@ -6,6 +6,8 @@ WORKDIR /texcraft
 COPY Cargo.toml Cargo.toml
 COPY Cargo.lock Cargo.lock
 COPY src src
+# TODO: remove the following line when multi-crate happens
+COPY benches benches
 WORKDIR /texcraft/playground/wasm
 COPY playground/wasm/Cargo.toml Cargo.toml
 COPY playground/wasm/Cargo.lock Cargo.lock

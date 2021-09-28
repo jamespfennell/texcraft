@@ -33,10 +33,3 @@ These performance numbers were obtained on
 | 2500 | \*     | 362.5s   | N/A
 
 \*pdfTeX cannot execute the script for higher values of n as it runs out of stack space.
-
-This table tracks changes to Texcraft's performance over time:
-
-| Date       | Time to compute 1000 digits of pi | Notes |
-|------------|-------|-----------------------------------|
-| 2021-09-23 | 50.4s | Added a better string type for control sequence names; ~11% speed up.
-| 2021-09-22 | 56.8s | Profiling suggests the current implementation of user defined macros is really slow.

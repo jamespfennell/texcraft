@@ -276,7 +276,8 @@ pub fn new_undefined_cs_error<S>(token: token::Token, state: &Base<S>) -> anyhow
     }
 
     let close_cs_name = spellcheck::find_close_words(cs_names, name);
-    let mut err = TokenError::new(token, "undefined control sequence");
+    let title = format!["undefined control sequence {}", &token];
+    let mut err = TokenError::new(token, title);
 
     err = err.add_note(format![
         "did you mean to write \\{}? (diff: \\{})\n",

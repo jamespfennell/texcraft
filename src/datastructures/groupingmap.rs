@@ -53,8 +53,8 @@
 //! assert_eq!(cat_colors.get(&"paganini"), Some(&"gray"));
 //! ```
 //!
-use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::hash::Hash;
 
 /// Implementation of the `GroupingMap` data structure. See the module docs for more
