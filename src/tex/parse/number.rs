@@ -11,7 +11,7 @@ pub fn parse_number<S, T: PrimInt>(stream: &mut ExpansionInput<S>) -> anyhow::Re
     let sign = parse_optional_signs(stream)?;
     let modulus: T = match stream.next()? {
         None => return Err(parse_number_error(None)),
-        Some(token) => match token.value {
+        Some(token) => match token.value() {
             Character('0', CatCode::Other) => parse_decimal(stream, 0)?,
             Character('1', CatCode::Other) => parse_decimal(stream, 1)?,
             Character('2', CatCode::Other) => parse_decimal(stream, 2)?,
@@ -77,7 +77,7 @@ fn parse_number_error(token: Option<Token>) -> anyhow::Error {
         None => {
             error::EndOfInputError::new("unexpected end of input while parsing a relation").cast()
         }
-        Some(token) => match token.value {
+        Some(token) => match token.value() {
             ControlSequence(..) => {
                 error::TokenError::new(token, "unexpected control sequence while parsing a number")
                     .cast()
@@ -118,7 +118,7 @@ fn parse_character<T: PrimInt>(stream: &mut dyn stream::Stream) -> anyhow::Resul
             "unexpected end of input while parsing a character token",
         )
         .cast()),
-        Some(token) => match token.value {
+        Some(token) => match token.value() {
             // TODO: error if the character is too big!
             Character(c, _) => Ok(num_traits::cast::cast(c as i32).unwrap()),
             ControlSequence(..) => Err(error::TokenError::new(
@@ -258,10 +258,10 @@ mod tests {
         ($input: expr, $number: expr) => {
             // TODO: put this in the test util
             // TODO: u32 hack undo please
-            let state = state::Base::<u32>::new(catcode::tex_defaults(), 0);
+            let mut state = state::Base::<u32>::new(catcode::tex_defaults(), 0);
             let mut input = input::Unit::new();
             input.push_new_str($input);
-            let mut e_input = ExpansionInput::new(&state, &mut input);
+            let mut e_input = ExpansionInput::new(&mut state, &mut input);
             let result: i32 = parse_number(&mut e_input).unwrap();
             assert_eq![result, $number];
         };

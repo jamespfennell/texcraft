@@ -2,7 +2,7 @@ macro_rules! get_element {
     ($stream :expr, $err_fn: ident, $($pat:pat => $result:expr,)+) => {
        match ($stream).next()? {
             None => Err($err_fn(None)),
-            Some(token) => match token.value {
+            Some(token) => match token.value() {
                  $(
                      $pat => Ok($result),
                  )+
@@ -16,7 +16,7 @@ macro_rules! get_optional_element {
     ($stream :expr, $($pat:pat => $result:expr,)+) => {
        match match ($stream).peek()? {
             None => None,
-            Some(token) => match token.value {
+            Some(token) => match token.value() {
                  $(
                      $pat => Some($result),
                  )+
@@ -36,7 +36,7 @@ macro_rules! get_optional_element_with_token {
     ($stream :expr, $($pat:pat => $result:expr,)+) => {
        match match ($stream).peek()? {
             None => None,
-            Some(token) => match token.value {
+            Some(token) => match token.value() {
                  $(
                      $pat => Some($result),
                  )+

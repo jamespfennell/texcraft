@@ -7,14 +7,14 @@ pub fn texcraft_primitive_fn<S>(
     _: &mut command::ExpansionInput<S>,
 ) -> anyhow::Result<stream::VecStream> {
     Ok(stream::VecStream::new(vec![
-        Token::new_letter('T'),
-        Token::new_letter('e'),
-        Token::new_letter('x'),
-        Token::new_letter('c'),
-        Token::new_letter('r'),
-        Token::new_letter('a'),
-        Token::new_letter('f'),
-        Token::new_letter('t'),
+        Token::new_character('T', CatCode::Letter),
+        Token::new_character('e', CatCode::Letter),
+        Token::new_character('x', CatCode::Letter),
+        Token::new_character('c', CatCode::Letter),
+        Token::new_character('r', CatCode::Letter),
+        Token::new_character('a', CatCode::Letter),
+        Token::new_character('f', CatCode::Letter),
+        Token::new_character('t', CatCode::Letter),
     ]))
 }
 

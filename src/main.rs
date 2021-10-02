@@ -61,7 +61,7 @@ fn expand(file_name: &str) -> Result<(), anyhow::Error> {
     input.push_new_source(f);
 
     let tokens = driver::exec(&mut s, &mut input, true)?;
-    let pretty = token::write_tokens(&tokens);
+    let pretty = token::write_tokens(&tokens, &s.cs_names);
     print!("{}", pretty);
     Ok(())
 }
@@ -85,17 +85,28 @@ fn docs(cs_name: &str, optional_file_name: Option<&String>) -> Result<(), anyhow
         cs_names.sort();
         let mut last_prefix = None;
         for cs_name in cs_names.iter() {
-            let new_last_prefix = cs_name.as_str().to_string().chars().next();
+            let new_last_prefix = s
+                .cs_names
+                .resolve(cs_name)
+                .expect("")
+                .to_string()
+                .chars()
+                .next();
             if last_prefix != new_last_prefix {
                 last_prefix = new_last_prefix;
             }
             let doc = primitives.get(cs_name).unwrap().doc();
             let first_line = doc.split('\n').next().unwrap_or("");
-            println!["\\{}  {}", cs_name.as_str().to_string().bold(), first_line];
+            println![
+                "\\{}  {}",
+                s.cs_names.resolve(cs_name).expect("").to_string().bold(),
+                first_line
+            ];
         }
         return Ok(());
     }
 
+    /* todo: reenable
     match s.get_command(&token::CsName::from(cs_name)) {
         None => {
             println!("Unknown command \\{}", cs_name);
@@ -105,6 +116,7 @@ fn docs(cs_name: &str, optional_file_name: Option<&String>) -> Result<(), anyhow
             println!("{}", command.doc());
         }
     }
+     */
     Ok(())
 }
 

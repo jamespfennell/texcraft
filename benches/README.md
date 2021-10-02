@@ -27,9 +27,15 @@ These performance numbers were obtained on
 
 | n    | pdfTeX | Texcraft | Multiplier (lower is better, target is 1)
 |------|--------|----------|----
-| 100  | 90ms   | 465ms    | 5.2
+| 100  | 90ms   | 240ms    | 2.7
 | 500  |        |          | 
 | 1000 |        |          |
 | 2500 | \*     |          | N/A
 
 \*pdfTeX cannot execute the script for higher values of n as it runs out of stack space.
+
+## Advance benchmark 
+
+- Texcraft: 330ns
+
+- pdfTeX: 120ns

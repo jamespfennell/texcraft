@@ -19,7 +19,7 @@ struct Line {
 
 impl Line {
     fn new(token: &Token) -> Option<Line> {
-        let source = match &token.source {
+        let source = match token.source() {
             None => {
                 return None;
             }
@@ -29,9 +29,9 @@ impl Line {
             line: source.line.content.clone(),
             line_number: source.line.line_number,
             position: source.position,
-            width: match &token.value {
+            width: match token.value() {
                 Value::Character(_, _) => 1,
-                Value::ControlSequence(_, name) => 1 + name.len(),
+                Value::ControlSequence(_, _) => 100, // TODO + name.len(),
             },
             file_description: source.line.file.to_string(),
         })
@@ -141,7 +141,7 @@ impl std::fmt::Display for TokenError {
 impl TokenError {
     pub fn new<T: Into<String>>(token: Token, message: T) -> TokenError {
         // TODO: better handling for no source case?
-        let source = match token.source {
+        let source = match token.source() {
             None => token::Source {
                 line: Rc::new(token::Line {
                     content: "".to_string(),
@@ -150,20 +150,20 @@ impl TokenError {
                 }),
                 position: 0,
             },
-            Some(source) => source,
+            Some(source) => source.clone(),
         };
         TokenError {
             line: Line {
                 line: source.line.content.clone(),
                 line_number: source.line.line_number,
                 position: source.position,
-                width: match &token.value {
+                width: match token.value() {
                     Value::Character(_, _) => 1,
-                    Value::ControlSequence(_, name) => 1 + name.len(),
+                    Value::ControlSequence(_, _) => 100, // TODO
                 },
                 file_description: "".to_string(), // TODO token.source.line.file.bo).clone(),
             },
-            s: match &token.value {
+            s: match token.value() {
                 Value::Character(_, cat_code) => {
                     format!["catcode is {}", cat_code]
                 }
@@ -266,13 +266,14 @@ pub fn add_context<S>(error: &mut anyhow::Error, state: &Base<S>, input: &input:
 
 pub fn new_undefined_cs_error<S>(token: token::Token, state: &Base<S>) -> anyhow::Error {
     let a = "expected a control sequence".to_string();
-    let name = match &token.value {
-        token::Value::ControlSequence(_, name) => name.as_str(),
+    let name = match &token.value() {
+        token::Value::ControlSequence(_, name) => state.cs_names.resolve(name).expect(""),
         _ => &a,
     };
+
     let mut cs_names = Vec::<String>::new();
     for cs_name in state.primitives.as_regular_map().keys() {
-        cs_names.push(cs_name.as_str().to_string());
+        cs_names.push(state.cs_names.resolve(cs_name).expect("").to_string());
     }
 
     let close_cs_name = spellcheck::find_close_words(cs_names, name);

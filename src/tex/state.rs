@@ -118,6 +118,7 @@ use crate::tex::command;
 use crate::tex::command::library::catcodecmd;
 use crate::tex::token;
 use crate::tex::token::catcode::RawCatCode;
+use crate::tex::token::CsNameInterner;
 use std::collections::HashMap;
 
 /// The parts of state that every TeX engine must have.
@@ -131,6 +132,8 @@ pub struct Base<S> {
     pub exec_output: Vec<token::Token>,
     pub num_trailing_newlines: usize,
     pub tracing_macros: i32,
+
+    pub cs_names: CsNameInterner,
 }
 
 /// Base state that every TeX state is expected to include using composition.
@@ -144,6 +147,7 @@ impl<S> Base<S> {
             exec_output: Vec::new(),
             num_trailing_newlines: 0,
             tracing_macros: 0,
+            cs_names: CsNameInterner::new(),
         }
     }
 
@@ -151,7 +155,12 @@ impl<S> Base<S> {
         self.primitives.get(name)
     }
 
-    pub fn set_command<A: Into<token::CsName>, B: Into<command::Command<S>>>(
+    pub fn set_command<A: AsRef<str>, B: Into<command::Command<S>>>(&mut self, name: A, cmd: B) {
+        self.primitives
+            .insert(self.cs_names.get_or_intern(name), cmd)
+    }
+
+    pub fn set_command_2<A: Into<token::CsName>, B: Into<command::Command<S>>>(
         &mut self,
         name: A,
         cmd: B,
@@ -161,5 +170,9 @@ impl<S> Base<S> {
 
     pub fn cat_code_map(&self) -> &HashMap<u32, RawCatCode> {
         self.cat_codes.cat_codes_map()
+    }
+
+    pub fn input_components(&mut self) -> (&HashMap<u32, RawCatCode>, &mut CsNameInterner) {
+        (self.cat_codes.cat_codes_map(), &mut self.cs_names)
     }
 }

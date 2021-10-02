@@ -6,6 +6,7 @@ use crate::tex::token::catcode::RawCatCode;
 use crate::tex::token::lexer;
 use crate::tex::token::stream;
 use crate::tex::token::stream::Stream;
+use crate::tex::token::CsNameInterner;
 use crate::tex::token::Token;
 use std::collections::HashMap;
 use std::io;
@@ -57,9 +58,10 @@ impl Unit {
     pub fn next(
         &mut self,
         cat_code_map: &HashMap<u32, RawCatCode>,
+        interner: &mut CsNameInterner,
     ) -> anyhow::Result<Option<token::Token>> {
         if self.cache.is_none() {
-            self.populate_cache(cat_code_map)?;
+            self.populate_cache(cat_code_map, interner)?;
         }
         Ok(self.cache.take())
     }
@@ -67,9 +69,10 @@ impl Unit {
     pub fn peek(
         &mut self,
         cat_code_map: &HashMap<u32, RawCatCode>,
+        interner: &mut CsNameInterner,
     ) -> anyhow::Result<Option<&token::Token>> {
         if self.cache.is_none() {
-            self.populate_cache(cat_code_map)?;
+            self.populate_cache(cat_code_map, interner)?;
         }
         Ok(self.cache.as_ref())
     }
@@ -77,6 +80,7 @@ impl Unit {
     pub fn populate_cache(
         &mut self,
         cat_code_map: &HashMap<u32, RawCatCode>,
+        interner: &mut CsNameInterner,
     ) -> anyhow::Result<()> {
         loop {
             self.cache = match self.sources.last_mut() {
@@ -87,7 +91,7 @@ impl Unit {
                     self.sources.pop();
                     return Ok(());
                 }
-                Some(Source::Reader(lexer)) => lexer.next(cat_code_map)?,
+                Some(Source::Reader(lexer)) => lexer.next(cat_code_map, interner)?,
             };
             if self.cache.is_some() {
                 return Ok(());
@@ -121,6 +125,7 @@ enum Source {
 
 impl Source {
     fn new_reader(reader: Box<dyn io::BufRead>) -> Source {
-        Source::Reader(lexer::Lexer::new(reader))
+        let mut interner = CsNameInterner::new();
+        Source::Reader(lexer::Lexer::new(reader, &mut interner))
     }
 }

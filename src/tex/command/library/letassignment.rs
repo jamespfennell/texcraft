@@ -24,7 +24,7 @@ fn let_primitive_fn<S>(let_token: Token, input: &mut ExecutionInput<S>) -> anyho
                 "unexpected end of input while reading the right hand side of a \\let assignment",
             )
             .cast()),
-            Some(token) => match token.value {
+            Some(token) => match token.value() {
                 Character(c, cat_code) => command::Command::Character(c, cat_code),
                 ControlSequence(_, ref name) => match input.base().get_command(name) {
                     None => return Err(error::new_undefined_cs_error(token, input.base())),
@@ -32,7 +32,7 @@ fn let_primitive_fn<S>(let_token: Token, input: &mut ExecutionInput<S>) -> anyho
                 },
             },
         };
-    input.base_mut().set_command(name, command);
+    input.base_mut().set_command_2(name, command);
     Ok(())
 }
 

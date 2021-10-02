@@ -42,7 +42,7 @@ pub fn parse_command_target<S: stream::Stream>(
             )
             .cast());
         }
-        Some(token) => match token.value {
+        Some(token) => match token.value() {
             ControlSequence(_, name) => name,
             _ => {
                 return Err(error::TokenError::new(
@@ -68,7 +68,7 @@ pub fn parse_balanced_tokens(
     let mut result = Vec::new();
     let mut scope_depth = 0;
     while let Some(token) = stream.next()? {
-        match token.value {
+        match token.value() {
             Character(_, CatCode::BeginGroup) => {
                 scope_depth += 1;
             }

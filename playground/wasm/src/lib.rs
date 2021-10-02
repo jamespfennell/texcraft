@@ -35,7 +35,7 @@ pub fn greet(input: String, minutes_since_midnight: i32, day: i32, month: i32, y
     input_unit.push_new_str(input);
 
     match driver::exec(&mut s, &mut input_unit, true) {
-        Ok(tokens) => token::write_tokens(&tokens),
+        Ok(tokens) => token::write_tokens(&tokens, &s.cs_names),
         Err(err) => format!["{}", err],
     }
 }

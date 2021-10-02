@@ -25,15 +25,16 @@
 //! # use texcraft::tex::token::stream::VecStream;
 //! # use texcraft::tex::token::stream::Stream;
 //! # use texcraft::tex::token::Token;
+//! # use texcraft::tex::token::catcode::CatCode;
 //! let mut stream = VecStream::new(vec![
-//!     Token::new_letter('a'),
-//!     Token::new_letter('b'),
-//!     Token::new_letter('c'),
+//!     Token::new_character('a', CatCode::Letter),
+//!     Token::new_character('b', CatCode::Letter),
+//!     Token::new_character('c', CatCode::Letter),
 //! ]);
 //!
-//! assert_eq!(stream.next().unwrap(), Some(Token::new_letter('a')));
-//! assert_eq!(stream.next().unwrap(), Some(Token::new_letter('b')));
-//! assert_eq!(stream.next().unwrap(), Some(Token::new_letter('c')));
+//! assert_eq!(stream.next().unwrap(), Some(Token::new_character('a', CatCode::Letter)));
+//! assert_eq!(stream.next().unwrap(), Some(Token::new_character('b', CatCode::Letter)));
+//! assert_eq!(stream.next().unwrap(), Some(Token::new_character('c', CatCode::Letter)));
 //! assert_eq!(stream.next().unwrap(), None);
 //! ```
 //! As with iterators, a result of `Ok(None)` indicates that the stream is exhausted.
@@ -49,16 +50,17 @@
 //! # use texcraft::tex::token::stream::VecStream;
 //! # use texcraft::tex::token::stream::Stream;
 //! # use texcraft::tex::token::Token;
+//! # use texcraft::tex::token::catcode::CatCode;
 //! let mut stream = VecStream::new(vec![
-//!     Token::new_letter('a'),
-//!     Token::new_letter('b'),
-//!     Token::new_letter('c'),
+//!     Token::new_character('a', CatCode::Letter),
+//!     Token::new_character('b', CatCode::Letter),
+//!     Token::new_character('c', CatCode::Letter),
 //! ]);
 //!
-//! assert_eq!(stream.peek().unwrap(), Some(&Token::new_letter('a')));
-//! assert_eq!(stream.peek().unwrap(), Some(&Token::new_letter('a')));
-//! assert_eq!(stream.next().unwrap(), Some(Token::new_letter('a')));
-//! assert_eq!(stream.peek().unwrap(), Some(&Token::new_letter('b')));
+//! assert_eq!(stream.peek().unwrap(), Some(&Token::new_character('a', CatCode::Letter)));
+//! assert_eq!(stream.peek().unwrap(), Some(&Token::new_character('a', CatCode::Letter)));
+//! assert_eq!(stream.next().unwrap(), Some(Token::new_character('a', CatCode::Letter)));
+//! assert_eq!(stream.peek().unwrap(), Some(&Token::new_character('b', CatCode::Letter)));
 //! ```
 //! The `peek` method returns an immutable reference to the token: because the token is not
 //! being consumed, ownership cannot be transferred as in `next`.
@@ -130,8 +132,8 @@ pub fn remove_tokens_from_stream(
                     "expected a character token with value '{}' and catcode {}",
                     c, catcode
                 ],
-                ControlSequence(_, name) => {
-                    format!["expected a control sequence token \\{}", name]
+                ControlSequence(_, _) => {
+                    format!["expected a control sequence token \\{}", "name"]
                 }
             };
             return Err(error::TokenError::new(
@@ -181,7 +183,8 @@ impl VecStream {
     /// # use texcraft::tex::token::stream::Stream;
     /// # use texcraft::tex::token::stream::VecStream;
     /// # use texcraft::tex::token::{Token, Value};
-    /// let t = Token::new_letter('a');
+    /// # use texcraft::tex::token::catcode::CatCode;
+    /// let t = Token::new_character('a', CatCode::Letter);
     /// let mut s = VecStream::new_singleton(t.clone());
     /// assert_eq!(s.peek().unwrap(), Some(&t));
     /// assert_eq!(s.next().unwrap(), Some(t));

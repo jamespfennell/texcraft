@@ -1,5 +1,12 @@
 # TODO
  
+Main thread:
+
+1. Make the input controller implementation simpler, no stack of stack of stacks.
+1. Reimplement macros again to take advantage of tokens being copyable
+1. Change the token type so that it is 8 bytes and see if this makes things more performant.
+1. Fix up the errors system which is now totally broken
+
 Documentation:
 
 1. The input module and the input unit
@@ -38,12 +45,7 @@ This is related to logging
 
 
 ## Optimization ideas:
-- profile the primes script to see where stuff is happening
 - Make the `Command` type flat/not nested and remove the docs so that it has better cache locality. Also maybe move
   - out the type?
 - Lazily construct the KMP matcher for macros
 - Don't use a KMP matcher for small macros
-- Make one allocation for each UDM
-- General optimizations around datastuctures used
-- Use a different hash function for maps
-- Use SmolStr with Rc instead of Arc

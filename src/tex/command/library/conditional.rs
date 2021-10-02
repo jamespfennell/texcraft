@@ -103,7 +103,7 @@ fn false_case<S>(
     let mut depth = 0;
     let mut last_token = None;
     while let Some(token) = input.unexpanded_stream().next()? {
-        if let ControlSequence(_, name) = &token.value {
+        if let ControlSequence(_, name) = &token.value() {
             if let Some(c) = input.base().get_command(name) {
                 if c.id() == else_id() && depth == 0 {
                     // TODO: push the token
@@ -210,7 +210,7 @@ fn if_case_primitive_fn<S>(
     let mut depth = 0;
     let mut last_token = None;
     while let Some(token) = input.unexpanded_stream().next()? {
-        if let ControlSequence(_, name) = &token.value {
+        if let ControlSequence(_, name) = &token.value() {
             if let Some(c) = input.base().get_command(name) {
                 if c.id() == or_id() && depth == 0 {
                     cases_to_skip -= 1;
@@ -282,7 +282,7 @@ fn or_primitive_fn<S>(
     let mut depth = 0;
     let mut last_token = None;
     while let Some(token) = input.unexpanded_stream().next()? {
-        if let ControlSequence(_, name) = &token.value {
+        if let ControlSequence(_, name) = &token.value() {
             if let Some(c) = input.base().get_command(name) {
                 if c.id() == if_id() {
                     depth += 1;
@@ -343,7 +343,7 @@ fn else_primitive_fn<S>(
     let mut depth = 0;
     let mut last_token = None;
     while let Some(token) = input.unexpanded_stream().next()? {
-        if let ControlSequence(_, name) = &token.value {
+        if let ControlSequence(_, name) = &token.value() {
             if let Some(c) = input.base().get_command(name) {
                 if c.id() == if_id() {
                     depth += 1;

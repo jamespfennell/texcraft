@@ -7,6 +7,7 @@ use crate::tex::prelude::*;
 use crate::tex::token::catcode;
 use crate::tex::token::stream;
 use crate::tex::token::write_tokens;
+use crate::tex::token::CsNameInterner;
 use crate::tex::token::Token;
 use colored::*;
 
@@ -51,12 +52,12 @@ impl<S> command::ExpansionGeneric<S> for Macro {
                     " | {}{}={}",
                     "#".bright_yellow().bold(),
                     (i + 1).to_string().bright_yellow().bold(),
-                    write_tokens(argument).bright_yellow()
+                    write_tokens(argument, &input.base().cs_names).bright_yellow()
                 ]
             }
             println![
                 " | Expansion:\n | ```\n | {}\n | ```",
-                write_tokens(&result)
+                write_tokens(&result, &input.base().cs_names)
             ];
             println![" +--------------------------------+\n"];
         }
@@ -66,11 +67,13 @@ impl<S> command::ExpansionGeneric<S> for Macro {
 
     fn doc(&self) -> String {
         let mut d = String::default();
+        // TODO: wire up the interner here
+        let interner = CsNameInterner::new();
         d.push_str("User defined macro\n\n");
         d.push_str(&format![
             "{}\n{}",
             "Parameters definition".italic(),
-            pretty_print_prefix_and_parameters(&self.prefix, &self.parameters),
+            pretty_print_prefix_and_parameters(&self.prefix, &self.parameters, &interner),
         ]);
         d.push_str(&format![
             "\n\n{} `{}`\n",
@@ -106,10 +109,10 @@ impl Macro {
         for replacement in replacements.iter() {
             match replacement {
                 Replacement::Token(t) => {
-                    result.push(t.clone());
+                    result.push(*t);
                 }
                 Replacement::Parameter(i) => {
-                    result.extend(arguments[*i].iter().cloned());
+                    result.extend(arguments[*i].iter().copied());
                 }
             }
         }
@@ -147,12 +150,12 @@ impl Parameter {
         // This handles the case of a macro whose argument ends with the special #{ tokens. In this special case the parsing
         // will end with a scope depth of 1, because the last token parsed will be the { and all braces before that will
         // be balanced.
-        let closing_scope_depth = match matcher_factory.substring().last().value {
+        let closing_scope_depth = match matcher_factory.substring().last().value() {
             Character(_, catcode::CatCode::BeginGroup) => 1,
             _ => 0,
         };
         while let Some(token) = stream.next()? {
-            match token.value {
+            match token.value() {
                 Character(_, catcode::CatCode::BeginGroup) => {
                     scope_depth += 1;
                 }
@@ -197,13 +200,13 @@ impl Parameter {
         if list.len() <= 1 {
             return;
         }
-        match list[0].value {
+        match list[0].value() {
             Character(_, catcode::CatCode::BeginGroup) => (),
             _ => {
                 return;
             }
         }
-        match list[list.len() - 1].value {
+        match list[list.len() - 1].value() {
             Character(_, catcode::CatCode::EndGroup) => (),
             _ => {
                 return;
@@ -227,7 +230,7 @@ impl Parameter {
                 .add_token_context(macro_token, "the macro invocation started here:")
                 .cast());
             }
-            Some(token) => match token.value {
+            Some(token) => match token.value() {
                 Character(_, catcode::CatCode::BeginGroup) => token,
                 _ => {
                     return Ok(vec![token]);
@@ -263,12 +266,19 @@ fn colored_parameter_number(n: usize) -> String {
     ]
 }
 
-pub fn pretty_print_prefix_and_parameters(prefix: &[Token], parameters: &[Parameter]) -> String {
+pub fn pretty_print_prefix_and_parameters(
+    prefix: &[Token],
+    parameters: &[Parameter],
+    interner: &CsNameInterner,
+) -> String {
     let mut d = String::default();
     if prefix.is_empty() {
         d.push_str(" . No prefix\n");
     } else {
-        d.push_str(&format![" . Prefix: `{}`\n", write_tokens(prefix)]);
+        d.push_str(&format![
+            " . Prefix: `{}`\n",
+            write_tokens(prefix, interner)
+        ]);
     }
 
     d.push_str(&format![" . Parameters ({}):\n", parameters.len()]);
@@ -285,7 +295,7 @@ pub fn pretty_print_prefix_and_parameters(prefix: &[Token], parameters: &[Parame
                 d.push_str(&format![
                     "    {}: delimited by `{}`\n",
                     colored_parameter_number(parameter_number),
-                    write_tokens(factory.substring())
+                    write_tokens(factory.substring(), interner)
                 ]);
             }
         }
@@ -293,12 +303,12 @@ pub fn pretty_print_prefix_and_parameters(prefix: &[Token], parameters: &[Parame
     }
 
     d.push_str(" . Full argument specification: `");
-    d.push_str(&write_tokens(prefix));
+    d.push_str(&write_tokens(prefix, interner));
     let mut parameter_number = 1;
     for parameter in parameters {
         d.push_str(&colored_parameter_number(parameter_number));
         if let Parameter::Delimited(factory) = parameter {
-            d.push_str(write_tokens(factory.substring()).as_str());
+            d.push_str(write_tokens(factory.substring(), interner).as_str());
         }
         parameter_number += 1;
     }

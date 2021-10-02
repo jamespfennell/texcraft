@@ -76,6 +76,12 @@ impl<const N: usize> Component<N> {
     }
 }
 
+impl<const N: usize> Default for Component<N> {
+    fn default() -> Self {
+        Component::new()
+    }
+}
+
 fn read_int_register_fn<S: HasRegisters<N>, const N: usize>(state: &S, addr: usize) -> &i32 {
     state.registers().int_registers.read(addr)
 }
@@ -95,7 +101,7 @@ fn count_fn<S: HasRegisters<N>, const N: usize>(
     let addr: usize = parse::parse_number(input)?;
     if addr >= N {
         return Err(integer_register_too_large_error(
-            count_token.clone(),
+            *count_token,
             addr,
             input.state().registers().int_registers.num(),
         ));
@@ -116,12 +122,8 @@ fn countdef_fn<S: HasRegisters<N>, const N: usize>(
     countdef_token: Token,
     input: &mut command::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    // TODO: don't clone the token!
-    let cs_name = parse::parse_command_target(
-        "countdef",
-        countdef_token.clone(),
-        input.unexpanded_stream(),
-    )?;
+    let cs_name =
+        parse::parse_command_target("countdef", countdef_token, input.unexpanded_stream())?;
     parse::parse_optional_equals(&mut input.regular())?;
     let addr: usize = parse::parse_number(&mut input.regular())?;
     if addr >= input.state().registers().int_registers.num() {
@@ -136,7 +138,7 @@ fn countdef_fn<S: HasRegisters<N>, const N: usize>(
         write_int_register_fn,
         addr,
     ));
-    input.base_mut().set_command(cs_name, new_cmd);
+    input.base_mut().set_command_2(cs_name, new_cmd);
     Ok(())
 }
 
@@ -151,7 +153,7 @@ pub fn get_countdef<S: HasRegisters<N>, const N: usize>() -> command::ExecutionP
 
 fn integer_register_too_large_error(token: Token, addr: usize, num: usize) -> anyhow::Error {
     error::TokenError::new(
-        token.clone(),
+        token,
         format![
             "Register number {} passed to {} is too large; there are only {} integer registers",
             addr, token, num,

@@ -10,7 +10,7 @@ pub fn parse_variable<S>(
             "Unexpected end of input while reading in a variable",
         )
         .cast()),
-        Some(token) => match token.value {
+        Some(token) => match token.value() {
             Character(..) => Err(error::TokenError::new(
                 token,
                 "Unexpected character token while reading in a variable",

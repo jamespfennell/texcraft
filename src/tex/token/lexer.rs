@@ -17,6 +17,7 @@
 use crate::tex::error;
 use crate::tex::token;
 use crate::tex::token::catcode::{CatCode, RawCatCode};
+use crate::tex::token::CsNameInterner;
 use std::collections::HashMap;
 use std::fmt;
 use std::io;
@@ -58,10 +59,11 @@ impl Lexer {
     pub fn next(
         &mut self,
         map: &HashMap<u32, RawCatCode>,
+        interner: &mut CsNameInterner,
     ) -> Result<Option<token::Token>, LexerError> {
         while let Some(raw_token) = self.raw_lexer.next(map)? {
             let value = match raw_token.code {
-                RawCatCode::Escape => self.read_control_sequence(&raw_token, map)?,
+                RawCatCode::Escape => self.read_control_sequence(&raw_token, map, interner)?,
                 RawCatCode::EndOfLine | RawCatCode::Regular(CatCode::Space) => {
                     let num_consumed_new_lines = self.consume_whitespace(map)?
                         + match raw_token.code == RawCatCode::EndOfLine {
@@ -73,10 +75,9 @@ impl Lexer {
                             continue;
                         }
                         (true, false) => token::Value::Character(raw_token.char, CatCode::Space),
-                        (false, _) => token::Value::ControlSequence(
-                            '\\',
-                            self.new_par_control_sequence_name.clone(),
-                        ),
+                        (false, _) => {
+                            token::Value::ControlSequence('\\', self.new_par_control_sequence_name)
+                        }
                     }
                 }
                 RawCatCode::Regular(code) => token::Value::Character(raw_token.char, code),
@@ -98,7 +99,7 @@ impl Lexer {
             self.trim_next_whitespace = matches!(value, token::Value::ControlSequence(..));
             return Ok(Some(token::Token {
                 value,
-                source: Some(raw_token.source),
+                // source: Some(raw_token.source),
             }));
         }
         Ok(None)
@@ -123,15 +124,13 @@ impl Lexer {
         &mut self,
         raw_token: &RawToken,
         map: &HashMap<u32, RawCatCode>,
+        interner: &mut CsNameInterner,
     ) -> Result<token::Value, LexerError> {
         let name = match self.raw_lexer.next(map)? {
             None => {
                 return Err(LexerError::MalformedControlSequence(
                     error::TokenError::new(
-                        token::Token {
-                            value: token::Value::Character(raw_token.char, CatCode::Other),
-                            source: Some(raw_token.source.clone()),
-                        },
+                        token::Token::new_character(raw_token.char, CatCode::Other),
                         MALFORMED_CONTROL_SEQUENCE_ERROR_TITLE,
                     )
                     .add_note(MALFORMED_CONTROL_SEQUENCE_ERROR_HELP)
@@ -166,7 +165,7 @@ impl Lexer {
         };
         Ok(token::Value::ControlSequence(
             raw_token.char,
-            token::CsName::from(name.as_str()),
+            interner.get_or_intern(name),
         ))
     }
 
@@ -174,11 +173,11 @@ impl Lexer {
         self.raw_lexer.last_non_empty_line.clone()
     }
 
-    pub fn new(file: Box<dyn io::BufRead>) -> Lexer {
+    pub fn new(file: Box<dyn io::BufRead>, interner: &mut CsNameInterner) -> Lexer {
         Lexer {
             raw_lexer: RawLexer::new(file),
             trim_next_whitespace: false,
-            new_par_control_sequence_name: token::CsName::from("par"),
+            new_par_control_sequence_name: interner.get_or_intern("par"),
         }
     }
 }
@@ -186,7 +185,6 @@ impl Lexer {
 struct RawToken {
     code: RawCatCode,
     char: char,
-    source: token::Source,
 }
 
 struct RawLexer {
@@ -220,10 +218,12 @@ impl RawLexer {
                     Some(&code) => code,
                 },
                 char,
+                /*
                 source: token::Source {
                     line: self.current_line.clone(),
                     position: self.next_char_index,
                 },
+                 */
             }))
     }
 
@@ -267,250 +267,197 @@ mod tests {
     use super::*;
     use crate::tex::token::catcode;
     use crate::tex::token::catcode::{CatCode::*, RawCatCode::*};
-    use crate::tex::token::CsName;
-    use crate::tex::token::Value::Character;
-    use crate::tex::token::Value::ControlSequence;
-    use std::array::IntoIter;
-    use std::iter::FromIterator;
+    use crate::tex::token::Value;
 
-    #[test]
-    fn case_1() {
-        run_test(
-            r"\a{b}",
-            Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', CsName::from("a")),
-                Character('{', BeginGroup),
-                Character('b', Letter),
-                Character('}', EndGroup),
-            ])),
-        );
+    enum TokenValue {
+        Character(char, catcode::CatCode),
+        ControlSequence(char, &'static str),
     }
+    use TokenValue::Character;
+    use TokenValue::ControlSequence;
 
-    #[test]
-    fn case_2() {
-        run_test(
-            r"\a b",
-            Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', CsName::from("a")),
-                Character('b', Letter),
-            ])),
-        );
-    }
-    #[test]
-    fn case_3() {
-        run_test(
-            "\\a  b",
-            Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', CsName::from("a")),
-                Character('b', Letter),
-            ])),
-        );
-    }
-    #[test]
-    fn case_4() {
-        run_test(
-            "\\a\n b",
-            Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', CsName::from("a")),
-                Character('b', Letter),
-            ])),
-        );
-    }
-    #[test]
-    fn case_5() {
-        run_test(
-            "\\ABC{D}",
-            Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', CsName::from("ABC")),
-                Character('{', BeginGroup),
-                Character('D', Letter),
-                Character('}', EndGroup),
-            ])),
-        );
-    }
-    #[test]
-    fn multi_character_control_sequence() {
-        run_test(
-            "\\ABC",
-            Vec::from_iter(IntoIter::new([ControlSequence('\\', CsName::from("ABC"))])),
-        );
-    }
-    #[test]
-    fn single_non_letter_character_control_sequence() {
-        run_test(
-            "\\{{",
-            Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', CsName::from("{")),
-                Character('{', BeginGroup),
-            ])),
-        );
-    }
-
-    #[test]
-    fn single_non_letter_character_control_sequence_followed_by_letter() {
-        run_test(
-            "\\{A",
-            Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', CsName::from("{")),
-                Character('A', Letter),
-            ])),
-        );
-    }
-
-    #[test]
-    fn case_8() {
-        run_test(
-            "A%a comment here\nC",
-            Vec::from_iter(IntoIter::new([
-                Character('A', Letter),
-                Character('C', Letter),
-            ])),
-        );
-    }
-    #[test]
-    fn case_9() {
-        run_test(
-            "A%a comment here\n%A second comment\nC",
-            Vec::from_iter(IntoIter::new([
-                Character('A', Letter),
-                Character('C', Letter),
-            ])),
-        );
-    }
-    #[test]
-    fn case_10() {
-        run_test(
-            "A%a comment here",
-            Vec::from_iter(IntoIter::new([Character('A', Letter)])),
-        );
-    }
-    #[test]
-    fn case_11() {
-        run_test(
-            "A%\n B",
-            Vec::from_iter(IntoIter::new([
-                Character('A', Letter),
-                Character('B', Letter),
-            ])),
-        );
-    }
-    #[test]
-    fn case_12() {
-        run_test(
-            "A%\n\n B",
-            Vec::from_iter(IntoIter::new([
-                Character('A', Letter),
-                ControlSequence('\\', CsName::from("par")),
-                Character('B', Letter),
-            ])),
-        );
-    }
-    #[test]
-    fn case_13() {
-        run_test(
-            "\\A %\nB",
-            Vec::from_iter(IntoIter::new([
-                ControlSequence('\\', CsName::from("A")),
-                Character('B', Letter),
-            ])),
-        );
-    }
-    #[test]
-    fn double_space_creates_one_space() {
-        run_test(
-            "A  B",
-            Vec::from_iter(IntoIter::new([
-                Character('A', Letter),
-                Character(' ', Space),
-                Character('B', Letter),
-            ])),
-        );
-    }
-    #[test]
-    fn single_newline_creates_one_space() {
-        run_test(
-            "A\nB",
-            Vec::from_iter(IntoIter::new([
-                Character('A', Letter),
-                Character('\n', Space),
-                Character('B', Letter),
-            ])),
-        );
-    }
-    #[test]
-    fn space_and_newline_creates_space() {
-        run_test(
-            "A \nB",
-            Vec::from_iter(IntoIter::new([
-                Character('A', Letter),
-                Character(' ', Space),
-                Character('B', Letter),
-            ])),
-        );
-    }
-    #[test]
-    fn double_newline_creates_par() {
-        run_test(
-            "A\n\nB",
-            Vec::from_iter(IntoIter::new([
-                Character('A', Letter),
-                ControlSequence('\\', CsName::from("par")),
-                Character('B', Letter),
-            ])),
-        );
-    }
-    #[test]
-    fn newline_space_newline_creates_par() {
-        run_test(
-            "A\n \nB",
-            Vec::from_iter(IntoIter::new([
-                Character('A', Letter),
-                ControlSequence('\\', CsName::from("par")),
-                Character('B', Letter),
-            ])),
-        );
-    }
-
-    #[test]
-    fn non_standard_whitespace_character() {
-        run_test(
-            "AYB",
-            Vec::from_iter(IntoIter::new([
-                Character('A', Letter),
-                Character('Y', Space),
-                Character('B', Letter),
-            ])),
-        );
-    }
-
-    #[test]
-    fn non_standard_newline_character() {
-        run_test(
-            "AXB",
-            Vec::from_iter(IntoIter::new([
-                Character('A', Letter),
-                Character('X', Space),
-                Character('B', Letter),
-            ])),
-        );
-    }
-
-    #[test]
-    fn single_ignored_character() {
-        run_test("Z", Vec::new());
-    }
-
-    fn run_test(input: &str, expected: Vec<token::Value>) {
-        let f = Box::new(io::Cursor::new(input.to_string()));
-        let mut lexer = Lexer::new(f);
-        let mut map = catcode::tex_defaults();
-        map.insert('X' as u32, EndOfLine);
-        map.insert('Y' as u32, Regular(Space));
-        map.insert('Z' as u32, Ignored);
-        let mut actual = Vec::new();
-        while let Some(t) = lexer.next(&map).unwrap() {
-            actual.push(t.value);
+    impl TokenValue {
+        fn convert(self, interner: &mut CsNameInterner) -> Value {
+            match self {
+                ControlSequence(c, name) => Value::ControlSequence(c, interner.get_or_intern(name)),
+                Character(c, cat_code) => Value::Character(c, cat_code),
+            }
         }
-        assert_eq!(expected, actual);
     }
+
+    macro_rules! lexer_test {
+        ( $name: ident, $input: expr, $ ( $expected_token : expr, ) * ) => {
+            #[test]
+            fn $name() {
+                let mut interner = CsNameInterner::new();
+                let f = Box::new(io::Cursor::new($input.to_string()));
+                let mut lexer = Lexer::new(f, &mut interner);
+                let mut map = catcode::tex_defaults();
+                map.insert('X' as u32, EndOfLine);
+                map.insert('Y' as u32, Regular(Space));
+                map.insert('Z' as u32, Ignored);
+                let mut actual = Vec::new();
+                while let Some(t) = lexer.next(&map, &mut interner).unwrap() {
+                    actual.push(t.value);
+                }
+                let expected: Vec<Value> = vec![$ ( $expected_token.convert(&mut interner) ) , * ];
+                assert_eq!(expected, actual);
+            }
+        };
+    }
+
+    lexer_test![
+        case_1,
+        r"\a{b}",
+        ControlSequence('\\', "a"),
+        Character('{', BeginGroup),
+        Character('b', Letter),
+        Character('}', EndGroup),
+    ];
+
+    lexer_test![
+        case_2,
+        r"\a b",
+        ControlSequence('\\', "a"),
+        Character('b', Letter),
+    ];
+
+    lexer_test![
+        case_3,
+        "\\a  b",
+        ControlSequence('\\', "a"),
+        Character('b', Letter),
+    ];
+
+    lexer_test![
+        case_4,
+        "\\a\n b",
+        ControlSequence('\\', "a"),
+        Character('b', Letter),
+    ];
+
+    lexer_test![
+        case_5,
+        "\\ABC{D}",
+        ControlSequence('\\', "ABC"),
+        Character('{', BeginGroup),
+        Character('D', Letter),
+        Character('}', EndGroup),
+    ];
+
+    lexer_test![
+        multi_character_control_sequence,
+        "\\ABC",
+        ControlSequence('\\', "ABC"),
+    ];
+
+    lexer_test![
+        single_non_letter_character_control_sequence,
+        "\\{{",
+        ControlSequence('\\', "{"),
+        Character('{', BeginGroup),
+    ];
+
+    lexer_test![
+        single_non_letter_character_control_sequence_followed_by_letter,
+        "\\{A",
+        ControlSequence('\\', "{"),
+        Character('A', Letter),
+    ];
+
+    lexer_test![
+        case_8,
+        "A%a comment here\nC",
+        Character('A', Letter),
+        Character('C', Letter),
+    ];
+
+    lexer_test![
+        case_9,
+        "A%a comment here\n%A second comment\nC",
+        Character('A', Letter),
+        Character('C', Letter),
+    ];
+
+    lexer_test![case_10, "A%a comment here", Character('A', Letter),];
+
+    lexer_test![
+        case_11,
+        "A%\n B",
+        Character('A', Letter),
+        Character('B', Letter),
+    ];
+
+    lexer_test![
+        case_12,
+        "A%\n\n B",
+        Character('A', Letter),
+        ControlSequence('\\', "par"),
+        Character('B', Letter),
+    ];
+
+    lexer_test![
+        case_13,
+        "\\A %\nB",
+        ControlSequence('\\', "A"),
+        Character('B', Letter),
+    ];
+
+    lexer_test![
+        double_space_creates_one_space,
+        "A  B",
+        Character('A', Letter),
+        Character(' ', Space),
+        Character('B', Letter),
+    ];
+
+    lexer_test![
+        single_newline_creates_one_space,
+        "A\nB",
+        Character('A', Letter),
+        Character('\n', Space),
+        Character('B', Letter),
+    ];
+
+    lexer_test![
+        space_and_newline_creates_space,
+        "A \nB",
+        Character('A', Letter),
+        Character(' ', Space),
+        Character('B', Letter),
+    ];
+
+    lexer_test![
+        double_newline_creates_par,
+        "A\n\nB",
+        Character('A', Letter),
+        ControlSequence('\\', "par"),
+        Character('B', Letter),
+    ];
+
+    lexer_test![
+        newline_space_newline_creates_par,
+        "A\n \nB",
+        Character('A', Letter),
+        ControlSequence('\\', "par"),
+        Character('B', Letter),
+    ];
+
+    lexer_test![
+        non_standard_whitespace_character,
+        "AYB",
+        Character('A', Letter),
+        Character('Y', Space),
+        Character('B', Letter),
+    ];
+
+    lexer_test![
+        non_standard_newline_character,
+        "AXB",
+        Character('A', Letter),
+        Character('X', Space),
+        Character('B', Letter),
+    ];
+
+    lexer_test![single_ignored_character, "Z",];
 }

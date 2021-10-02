@@ -35,11 +35,11 @@ pub fn run<S>(
                     input.clear();
                     break;
                 }
-                Some(mut token) => match &token.value {
+                Some(token) => match token.value() {
                     Character(..) => {
                         character_handler(token, state)?;
                     }
-                    ControlSequence(_, name) => match state.get_command(name) {
+                    ControlSequence(_, name) => match state.get_command(&name) {
                         Some(Command::Execution(cmd_ref)) => {
                             // We need to copy the command to avoid a borrow checker error.
                             // This is because `cmd_ref` keeps an immutable reference to the state alive, but in the `call`
@@ -58,7 +58,7 @@ pub fn run<S>(
                             cmd.call(token, &mut expanding_input)?;
                         }
                         Some(Command::Character(c, cat_code)) => {
-                            token.value = Character(*c, *cat_code);
+                            let token = Token::new_character(*c, *cat_code);
                             character_handler(token, state)?;
                         }
                         _ => {
@@ -77,8 +77,8 @@ pub fn run<S>(
 }
 
 fn handle_character<S>(mut token: token::Token, state: &mut Base<S>) -> anyhow::Result<()> {
-    if let token::Value::Character('\n', cat_code) = token.value {
-        token.value = token::Value::Character(' ', cat_code);
+    if let token::Value::Character('\n', cat_code) = token.value() {
+        token = Token::new_character(' ', cat_code);
     }
     state.exec_output.push(token);
     state.num_trailing_newlines = 0;
@@ -90,17 +90,19 @@ fn default_undefined_cs_handler<S>(token: token::Token, state: &mut Base<S>) -> 
 }
 
 struct RawStream<'a, S> {
-    state: &'a Base<S>,
+    state: &'a mut Base<S>,
     input: &'a mut input::Unit,
 }
 
 impl<'a, S> stream::Stream for RawStream<'a, S> {
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
-        self.input.next(self.state.cat_code_map())
+        let (a, b) = self.state.input_components();
+        self.input.next(a, b)
     }
 
     fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
-        self.input.peek(self.state.cat_code_map())
+        let (a, b) = self.state.input_components();
+        self.input.peek(a, b)
     }
 }
 
@@ -123,7 +125,7 @@ impl<'a, S> stream::Stream for ExpansionInput<'a, S> {
 }
 
 impl<'a, S> ExpansionInput<'a, S> {
-    pub fn new(state: &'a Base<S>, input: &'a mut input::Unit) -> ExpansionInput<'a, S> {
+    pub fn new(state: &'a mut Base<S>, input: &'a mut input::Unit) -> ExpansionInput<'a, S> {
         ExpansionInput::<S> {
             raw_stream: RawStream::<S> { state, input },
         }
@@ -165,11 +167,13 @@ pub struct RawStreamMutState<'a, S> {
 
 impl<'a, S> stream::Stream for RawStreamMutState<'a, S> {
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
-        self.input.next(self.state.cat_code_map())
+        let (a, b) = self.state.input_components();
+        self.input.next(a, b)
     }
 
     fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
-        self.input.peek(self.state.cat_code_map())
+        let (a, b) = self.state.input_components();
+        self.input.peek(a, b)
     }
 }
 
@@ -231,19 +235,21 @@ impl<'a, S> ExecutionInput<'a, S> {
     }
 }
 
-fn expand_next<S>(state: &Base<S>, input: &mut input::Unit) -> anyhow::Result<bool> {
-    let command = match input.peek(state.cat_code_map())? {
+fn expand_next<S>(state: &mut Base<S>, input: &mut input::Unit) -> anyhow::Result<bool> {
+    let (a, b) = state.input_components();
+    let command = match input.peek(a, b)? {
         None => None,
-        Some(token) => match token.value {
+        Some(token) => match token.value() {
             Character(..) => None,
             ControlSequence(_, ref name) => state.get_command(name),
         },
     };
     let command = match command {
-        Some(command::Command::Expansion(command)) => command,
+        Some(command::Command::Expansion(command)) => command.clone(),
         _ => return Ok(false),
     };
-    let token = input.next(state.cat_code_map())?.unwrap();
+    let (a, b) = state.input_components();
+    let token = input.next(a, b)?.unwrap();
     let output = command.call(token, &mut ExpansionInput::<S>::new(state, input))?;
     input.push_expansion(output);
     Ok(true)

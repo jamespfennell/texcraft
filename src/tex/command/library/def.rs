@@ -42,7 +42,7 @@ fn def_primitive_fn<S>(def_token: Token, input: &mut ExecutionInput<S>) -> anyho
     let user_defined_macro = Macro::new(prefix, parameters, replacement);
     input
         .base_mut()
-        .set_command(name, rc::Rc::new(user_defined_macro));
+        .set_command_2(name, rc::Rc::new(user_defined_macro));
     Ok(())
 }
 
@@ -92,7 +92,7 @@ fn parse_prefix_and_parameters(
     let mut replacement_end_token = None;
 
     while let Some(token) = input.next()? {
-        match token.value {
+        match token.value() {
             Character(_, catcode::CatCode::BeginGroup) => {
                 return Ok((prefix, parameters, replacement_end_token));
             }
@@ -113,10 +113,10 @@ fn parse_prefix_and_parameters(
                     }
                     Some(token) => token,
                 };
-                match parameter_token.value {
+                match parameter_token.value() {
                     Character(_, catcode::CatCode::BeginGroup) => {
                         // In this case we end the group according to the special #{ rule
-                        replacement_end_token = Some(parameter_token.clone());
+                        replacement_end_token = Some(parameter_token);
                         match parameters.last_mut() {
                             None => {
                                 prefix.push(parameter_token);
@@ -184,7 +184,7 @@ fn parse_replacement_text(
     let mut scope_depth = 0;
 
     while let Some(token) = input.next()? {
-        match token.value {
+        match token.value() {
             Character(_, catcode::CatCode::BeginGroup) => {
                 scope_depth += 1;
             }
@@ -207,7 +207,7 @@ fn parse_replacement_text(
                     }
                     Some(token) => token,
                 };
-                let c = match parameter_token.value {
+                let c = match parameter_token.value() {
                     ControlSequence(..) => {
                         return Err(error::TokenError::new(
                             parameter_token,

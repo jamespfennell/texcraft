@@ -264,7 +264,7 @@ fn array_fn<S: HasAlloc>(
         .len();
     if array_index >= array_len {
         return Err(error::TokenError::new(
-            array_token.clone(),
+            *array_token,
             format![
                 "Array out of bounds: cannot access index {} of array with length {}",
                 array_index, array_len,
