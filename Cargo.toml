@@ -35,6 +35,7 @@ time = ["chrono"]
 [[bench]]
 name = "digits_of_pi"
 harness = false
+
 [[bench]]
 name = "advance"
 harness = false

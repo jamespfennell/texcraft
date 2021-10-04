@@ -12,6 +12,7 @@ pub fn advance_bench(c: &mut Criterion) {
     driver::exec(&mut state, &mut input, true).unwrap();
 
     let mut group = c.benchmark_group("advance");
+    group.sample_size(10000);
     let a_cs = Token::new_control_sequence('\\', state.cs_names.get_or_intern("a"));
     group.bench_function("advance", |b| {
         b.iter(|| {

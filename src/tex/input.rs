@@ -4,8 +4,6 @@ use crate::tex::command::library::conditional;
 use crate::tex::token;
 use crate::tex::token::catcode::RawCatCode;
 use crate::tex::token::lexer;
-use crate::tex::token::stream;
-use crate::tex::token::stream::Stream;
 use crate::tex::token::CsNameInterner;
 use crate::tex::token::Token;
 use std::collections::HashMap;
@@ -41,9 +39,9 @@ impl Unit {
         self.push_new_source(Box::new(io::Cursor::new(s.into())));
     }
 
-    pub fn push_expansion(&mut self, expansion: stream::VecStream) {
+    pub fn push_expansion(&mut self, expansion: Vec<Token>) {
         self.vacate_cache();
-        self.sources.push(Source::Vec(expansion));
+        self.sources.push(Source::Vec(VecSource::new(expansion)));
     }
 
     pub fn push_single_token(&mut self, token: Token) {
@@ -55,6 +53,7 @@ impl Unit {
         self.last_non_empty_line.clone()
     }
 
+    #[inline]
     pub fn next(
         &mut self,
         cat_code_map: &HashMap<u32, RawCatCode>,
@@ -66,6 +65,7 @@ impl Unit {
         Ok(self.cache.take())
     }
 
+    #[inline]
     pub fn peek(
         &mut self,
         cat_code_map: &HashMap<u32, RawCatCode>,
@@ -85,7 +85,7 @@ impl Unit {
         loop {
             self.cache = match self.sources.last_mut() {
                 None => return Ok(()),
-                Some(Source::Vec(vec)) => vec.next()?,
+                Some(Source::Vec(vec)) => vec.next(),
                 Some(Source::Singleton(t)) => {
                     std::mem::swap(&mut self.cache, t);
                     self.sources.pop();
@@ -104,6 +104,7 @@ impl Unit {
         self.sources = vec![];
     }
 
+    #[inline]
     fn vacate_cache(&mut self) {
         if let Some(t) = self.cache.take() {
             self.sources.push(Source::Singleton(Some(t)));
@@ -119,7 +120,7 @@ impl Default for Unit {
 
 enum Source {
     Reader(lexer::Lexer),
-    Vec(stream::VecStream),
+    Vec(VecSource),
     Singleton(Option<Token>),
 }
 
@@ -127,5 +128,20 @@ impl Source {
     fn new_reader(reader: Box<dyn io::BufRead>) -> Source {
         let mut interner = CsNameInterner::new();
         Source::Reader(lexer::Lexer::new(reader, &mut interner))
+    }
+}
+
+struct VecSource {
+    data: Vec<Token>,
+}
+
+impl VecSource {
+    fn new(mut data: Vec<Token>) -> VecSource {
+        data.reverse();
+        VecSource { data }
+    }
+
+    fn next(&mut self) -> Option<Token> {
+        self.data.pop()
     }
 }

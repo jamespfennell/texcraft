@@ -108,6 +108,7 @@ impl<K: Eq + Hash + Clone, V> GroupingMap<K, V> {
     // TODO: specialize this for copiable values? What does HashMap do?
     // TODO: get_or_default
     /// Retrieves the value at the provided key.
+    #[inline]
     pub fn get(&self, key: &K) -> Option<&V> {
         self.values.get(key)
     }

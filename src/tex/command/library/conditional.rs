@@ -84,12 +84,12 @@ fn fi_id() -> Option<any::TypeId> {
 fn true_case<S>(
     token: Token,
     input: &mut command::ExpansionInput<S>,
-) -> anyhow::Result<stream::VecStream> {
+) -> anyhow::Result<Vec<Token>> {
     input.controller_mut().conditional.branches.push(Branch {
         token,
         kind: BranchKind::True,
     });
-    Ok(stream::VecStream::new_empty())
+    Ok(Vec::new())
 }
 
 // The `false_case` function is executed whenever a conditional evaluates to false.
@@ -99,7 +99,7 @@ fn true_case<S>(
 fn false_case<S>(
     original_token: Token,
     input: &mut command::ExpansionInput<S>,
-) -> anyhow::Result<stream::VecStream> {
+) -> anyhow::Result<Vec<Token>> {
     let mut depth = 0;
     let mut last_token = None;
     while let Some(token) = input.unexpanded_stream().next()? {
@@ -111,7 +111,7 @@ fn false_case<S>(
                         token: original_token,
                         kind: BranchKind::Else,
                     });
-                    return Ok(stream::VecStream::new_empty());
+                    return Ok(Vec::new());
                 }
                 if c.id() == if_id() {
                     depth += 1;
@@ -119,7 +119,7 @@ fn false_case<S>(
                 if c.id() == fi_id() {
                     depth -= 1;
                     if depth < 0 {
-                        return Ok(stream::VecStream::new_empty());
+                        return Ok(Vec::new());
                     }
                 }
             }
@@ -147,7 +147,7 @@ macro_rules! create_if_primitive {
         fn $if_primitive_fn<S>(
             token: Token,
             input: &mut ExpansionInput<S>,
-        ) -> anyhow::Result<stream::VecStream> {
+        ) -> anyhow::Result<Vec<Token>> {
             match $if_fn(input)? {
                 true => true_case(token, input),
                 false => false_case(token, input),
@@ -197,7 +197,7 @@ create_if_primitive![if_odd, if_odd_primitive_fn, get_if_odd, IFODD_DOC];
 fn if_case_primitive_fn<S>(
     ifcase_token: Token,
     input: &mut ExpansionInput<S>,
-) -> anyhow::Result<stream::VecStream> {
+) -> anyhow::Result<Vec<Token>> {
     // TODO: should we reading the number from the unexpanded stream? Probably!
     let mut cases_to_skip: i32 = parse::parse_number(input)?;
     if cases_to_skip == 0 {
@@ -205,7 +205,7 @@ fn if_case_primitive_fn<S>(
             token: ifcase_token,
             kind: BranchKind::Switch,
         });
-        return Ok(stream::VecStream::new_empty());
+        return Ok(Vec::new());
     }
     let mut depth = 0;
     let mut last_token = None;
@@ -219,7 +219,7 @@ fn if_case_primitive_fn<S>(
                             token: ifcase_token,
                             kind: BranchKind::Switch,
                         });
-                        return Ok(stream::VecStream::new_empty());
+                        return Ok(Vec::new());
                     }
                 }
                 if c.id() == else_id() && depth == 0 {
@@ -227,7 +227,7 @@ fn if_case_primitive_fn<S>(
                         token: ifcase_token,
                         kind: BranchKind::Else,
                     });
-                    return Ok(stream::VecStream::new_empty());
+                    return Ok(Vec::new());
                 }
                 if c.id() == if_id() {
                     depth += 1;
@@ -235,7 +235,7 @@ fn if_case_primitive_fn<S>(
                 if c.id() == fi_id() {
                     depth -= 1;
                     if depth < 0 {
-                        return Ok(stream::VecStream::new_empty());
+                        return Ok(Vec::new());
                     }
                 }
             }
@@ -268,7 +268,7 @@ pub fn get_if_case<S>() -> command::ExpansionPrimitive<S> {
 fn or_primitive_fn<S>(
     ifcase_token: Token,
     input: &mut ExpansionInput<S>,
-) -> anyhow::Result<stream::VecStream> {
+) -> anyhow::Result<Vec<Token>> {
     let branch = branches(input).pop();
     // For an or command to be valid, we must be in a switch statement
     let is_valid = match branch {
@@ -290,7 +290,7 @@ fn or_primitive_fn<S>(
                 if c.id() == fi_id() {
                     depth -= 1;
                     if depth < 0 {
-                        return Ok(stream::VecStream::new_empty());
+                        return Ok(Vec::new());
                     }
                 }
             }
@@ -328,7 +328,7 @@ pub fn get_or<S>() -> command::ExpansionPrimitive<S> {
 fn else_primitive_fn<S>(
     else_token: Token,
     input: &mut command::ExpansionInput<S>,
-) -> anyhow::Result<stream::VecStream> {
+) -> anyhow::Result<Vec<Token>> {
     let branch = input.controller_mut().conditional.branches.pop();
     // For else token to be valid, we must be in the true branch of a conditional
     let is_valid = match branch {
@@ -351,7 +351,7 @@ fn else_primitive_fn<S>(
                 if c.id() == fi_id() {
                     depth -= 1;
                     if depth < 0 {
-                        return Ok(stream::VecStream::new_empty());
+                        return Ok(Vec::new());
                     }
                 }
             }
@@ -382,10 +382,7 @@ pub fn get_else<S>() -> command::ExpansionPrimitive<S> {
 }
 
 /// Get the `\fi` primitive.
-fn fi_primitive_fn<S>(
-    token: Token,
-    input: &mut ExpansionInput<S>,
-) -> anyhow::Result<stream::VecStream> {
+fn fi_primitive_fn<S>(token: Token, input: &mut ExpansionInput<S>) -> anyhow::Result<Vec<Token>> {
     let branch = input.controller_mut().conditional.branches.pop();
     // For a \fi primitive to be valid, we must be in a conditional.
     // Note that we could be in the false branch: \iftrue\else\fi
@@ -394,7 +391,7 @@ fn fi_primitive_fn<S>(
     if branch.is_none() {
         return Err(error::TokenError::new(token, "unexpected `fi` command").cast());
     }
-    Ok(stream::VecStream::new_empty())
+    Ok(Vec::new())
 }
 
 pub fn get_fi<S>() -> command::ExpansionPrimitive<S> {

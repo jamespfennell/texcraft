@@ -5,8 +5,8 @@ use crate::tex::prelude::*;
 pub fn texcraft_primitive_fn<S>(
     _: Token,
     _: &mut command::ExpansionInput<S>,
-) -> anyhow::Result<stream::VecStream> {
-    Ok(stream::VecStream::new(vec![
+) -> anyhow::Result<Vec<Token>> {
+    Ok(vec![
         Token::new_character('T', CatCode::Letter),
         Token::new_character('e', CatCode::Letter),
         Token::new_character('x', CatCode::Letter),
@@ -15,7 +15,7 @@ pub fn texcraft_primitive_fn<S>(
         Token::new_character('a', CatCode::Letter),
         Token::new_character('f', CatCode::Letter),
         Token::new_character('t', CatCode::Letter),
-    ]))
+    ])
 }
 
 pub fn get_texcraft<S>() -> command::ExpansionPrimitive<S> {

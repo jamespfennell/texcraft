@@ -148,66 +148,25 @@ pub fn remove_tokens_from_stream(
 }
 
 /// A `VecStream` is a stream consisting of a vector of tokens that are returned in order.
-///
-/// The implementation is optimized for empty streams and streams with a single token: these will
-/// be stored entirely on the stack and will not incur a heap allocation.
-///
-/// A `VecStream` may be peeked at immutably without invoking `prepare_imut_peek` first.
 #[derive(Debug)]
-pub enum VecStream {
-    Singleton(Option<Token>),
-    Vector(Vec<Token>),
+pub struct VecStream {
+    data: Vec<Token>,
 }
 
 impl VecStream {
     /// Returns a new `VecStream` consisting of the tokens in the provided vector.
     pub fn new(mut vec: Vec<Token>) -> VecStream {
         vec.reverse();
-        VecStream::Vector(vec)
-    }
-
-    /// Returns a new `VecStream` that is empty.
-    /// ```
-    /// # use texcraft::tex::token::stream::Stream;
-    /// # use texcraft::tex::token::stream::VecStream;
-    /// let mut s = VecStream::new_empty();
-    /// assert_eq!(s.peek().unwrap(), None);
-    /// ```
-    pub fn new_empty() -> VecStream {
-        VecStream::Singleton(None)
-    }
-
-    /// Returns a new `VecStream` consisting of a single token. This stream will be stored entirely
-    /// on the stack.
-    /// ```
-    /// # use texcraft::tex::token::stream::Stream;
-    /// # use texcraft::tex::token::stream::VecStream;
-    /// # use texcraft::tex::token::{Token, Value};
-    /// # use texcraft::tex::token::catcode::CatCode;
-    /// let t = Token::new_character('a', CatCode::Letter);
-    /// let mut s = VecStream::new_singleton(t.clone());
-    /// assert_eq!(s.peek().unwrap(), Some(&t));
-    /// assert_eq!(s.next().unwrap(), Some(t));
-    /// assert_eq!(s.peek().unwrap(), None);
-    /// assert_eq!(s.next().unwrap(), None);
-    /// ```
-    pub fn new_singleton(t: Token) -> VecStream {
-        VecStream::Singleton(Some(t))
+        VecStream { data: vec }
     }
 }
 
 impl Stream for VecStream {
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
-        Ok(match self {
-            VecStream::Singleton(t) => t.take(),
-            VecStream::Vector(v) => v.pop(),
-        })
+        Ok(self.data.pop())
     }
 
     fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
-        Ok(match self {
-            VecStream::Singleton(t) => t.as_ref(),
-            VecStream::Vector(v) => v.last(),
-        })
+        Ok(self.data.last())
     }
 }

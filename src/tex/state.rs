@@ -151,6 +151,7 @@ impl<S> Base<S> {
         }
     }
 
+    #[inline]
     pub fn get_command(&self, name: &token::CsName) -> Option<&command::Command<S>> {
         self.primitives.get(name)
     }

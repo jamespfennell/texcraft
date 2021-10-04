@@ -54,7 +54,7 @@ pub fn parse_number<S, T: PrimInt>(stream: &mut ExpansionInput<S>) -> anyhow::Re
 ///
 /// If the combination of the signs is positive, [None] is returned.
 /// Otherwise, the Token corresponding to the last negative sign is returned.
-fn parse_optional_signs(stream: &mut dyn stream::Stream) -> anyhow::Result<Option<Token>> {
+fn parse_optional_signs<T: stream::Stream>(stream: &mut T) -> anyhow::Result<Option<Token>> {
     let mut result = None;
     while let Some((sign, token)) = get_optional_element_with_token![
         stream,
@@ -112,7 +112,7 @@ fn read_number_from_address<S, T: PrimInt>(
     }
 }
 
-fn parse_character<T: PrimInt>(stream: &mut dyn stream::Stream) -> anyhow::Result<T> {
+fn parse_character<S: stream::Stream, T: PrimInt>(stream: &mut S) -> anyhow::Result<T> {
     match stream.next()? {
         None => Err(error::EndOfInputError::new(
             "unexpected end of input while parsing a character token",
@@ -130,7 +130,7 @@ fn parse_character<T: PrimInt>(stream: &mut dyn stream::Stream) -> anyhow::Resul
     }
 }
 
-fn parse_octal<T: PrimInt>(stream: &mut dyn stream::Stream) -> anyhow::Result<T> {
+fn parse_octal<S: stream::Stream, T: PrimInt>(stream: &mut S) -> anyhow::Result<T> {
     let mut n = num_traits::cast::cast(get_element![
         stream,
         parse_number_error,
@@ -160,7 +160,7 @@ fn parse_octal<T: PrimInt>(stream: &mut dyn stream::Stream) -> anyhow::Result<T>
     Ok(n)
 }
 
-fn parse_decimal<T: PrimInt>(stream: &mut dyn stream::Stream, n_start: i8) -> anyhow::Result<T> {
+fn parse_decimal<S: stream::Stream, T: PrimInt>(stream: &mut S, n_start: i8) -> anyhow::Result<T> {
     let mut n: T = num_traits::cast::cast(n_start).unwrap();
     while let Some(lsd) = get_optional_element![
         stream,
@@ -180,7 +180,7 @@ fn parse_decimal<T: PrimInt>(stream: &mut dyn stream::Stream, n_start: i8) -> an
     Ok(n)
 }
 
-fn parse_hexadecimal<T: PrimInt>(stream: &mut dyn stream::Stream) -> anyhow::Result<T> {
+fn parse_hexadecimal<S: stream::Stream, T: PrimInt>(stream: &mut S) -> anyhow::Result<T> {
     let mut n: T = num_traits::cast::cast(get_element![
         stream,
         parse_number_error,
@@ -258,6 +258,7 @@ mod tests {
         ($input: expr, $number: expr) => {
             // TODO: put this in the test util
             // TODO: u32 hack undo please
+            // TODO: replicate this for the relation tests and destroy the VecStream
             let mut state = state::Base::<u32>::new(catcode::tex_defaults(), 0);
             let mut input = input::Unit::new();
             input.push_new_str($input);
