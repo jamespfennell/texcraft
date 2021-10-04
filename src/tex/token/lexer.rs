@@ -52,7 +52,6 @@ impl From<io::Error> for LexerError {
 pub struct Lexer {
     raw_lexer: RawLexer,
     trim_next_whitespace: bool,
-    new_par_control_sequence_name: token::CsName,
 }
 
 impl Lexer {
@@ -76,7 +75,7 @@ impl Lexer {
                         }
                         (true, false) => token::Value::Character(raw_token.char, CatCode::Space),
                         (false, _) => {
-                            token::Value::ControlSequence('\\', self.new_par_control_sequence_name)
+                            token::Value::ControlSequence('\\', interner.get_or_intern("par"))
                         }
                     }
                 }
@@ -173,11 +172,10 @@ impl Lexer {
         self.raw_lexer.last_non_empty_line.clone()
     }
 
-    pub fn new(file: Box<dyn io::BufRead>, interner: &mut CsNameInterner) -> Lexer {
+    pub fn new(file: Box<dyn io::BufRead>) -> Lexer {
         Lexer {
             raw_lexer: RawLexer::new(file),
             trim_next_whitespace: false,
-            new_par_control_sequence_name: interner.get_or_intern("par"),
         }
     }
 }
@@ -291,7 +289,7 @@ mod tests {
             fn $name() {
                 let mut interner = CsNameInterner::new();
                 let f = Box::new(io::Cursor::new($input.to_string()));
-                let mut lexer = Lexer::new(f, &mut interner);
+                let mut lexer = Lexer::new(f);
                 let mut map = catcode::tex_defaults();
                 map.insert('X' as u32, EndOfLine);
                 map.insert('Y' as u32, Regular(Space));

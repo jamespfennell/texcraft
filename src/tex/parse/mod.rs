@@ -62,8 +62,8 @@ pub fn parse_command_target<S: stream::Stream>(
 /// Parses balanced tokens from the stream.
 ///
 /// Returns `None` if the input ended before balanced tokens completed.
-pub fn parse_balanced_tokens(
-    stream: &mut dyn stream::Stream,
+pub fn parse_balanced_tokens<S: stream::Stream>(
+    stream: &mut S,
 ) -> anyhow::Result<Option<Vec<Token>>> {
     let mut result = Vec::new();
     let mut scope_depth = 0;

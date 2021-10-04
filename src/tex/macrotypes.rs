@@ -19,7 +19,7 @@ pub struct Macro {
 }
 
 pub enum Replacement {
-    Token(Token),
+    Tokens(Vec<Token>),
     Parameter(usize),
 }
 
@@ -39,7 +39,8 @@ impl<S> command::ExpansionGeneric<S> for Macro {
         for (i, argument) in self.parameters.iter().enumerate() {
             arguments.push(argument.parse_argument(&token, input.unexpanded_stream(), i)?);
         }
-        let result = Macro::perform_replacement(&self.replacement_text, &arguments);
+        let mut result = input.controller_mut().expansions_mut();
+        Macro::perform_replacement(&self.replacement_text, &arguments, &mut result);
 
         if input.base().tracing_macros > 0 {
             println![" +---[ Tracing macro expansion of {} ]--+", token];
@@ -52,12 +53,12 @@ impl<S> command::ExpansionGeneric<S> for Macro {
                 ]
             }
             println![
-                " | Expansion:\n | ```\n | {}\n | ```",
-                write_tokens(&result, &input.base().cs_names)
+                " | Expansion:\n | ```\n | todo: renable this\n | ```",
+                // write_tokens(result.iter(), &input.base().cs_names)
             ];
             println![" +--------------------------------+\n"];
         }
-        Ok(result)
+        Ok(Vec::new())
     }
 
     fn doc(&self) -> String {
@@ -92,44 +93,51 @@ impl Macro {
         }
     }
 
-    fn perform_replacement(replacements: &[Replacement], arguments: &[Vec<Token>]) -> Vec<Token> {
+    fn perform_replacement(
+        replacements: &[Replacement],
+        arguments: &[Vec<Token>],
+        result: &mut Vec<Token>,
+    ) {
         let mut output_size = 0;
         for replacement in replacements.iter() {
             output_size += match replacement {
-                Replacement::Token(_) => 1,
+                Replacement::Tokens(tokens) => tokens.len(),
                 Replacement::Parameter(i) => arguments[*i].len(),
             };
         }
-        let mut result = Vec::with_capacity(output_size);
-        for replacement in replacements.iter() {
+        result.reserve(output_size);
+        for replacement in replacements.iter().rev() {
             match replacement {
-                Replacement::Token(t) => {
-                    result.push(*t);
+                Replacement::Tokens(tokens) => {
+                    result.extend(tokens);
                 }
                 Replacement::Parameter(i) => {
                     result.extend(arguments[*i].iter().copied());
                 }
             }
         }
-        result
     }
 }
 
 impl Parameter {
-    pub fn parse_argument(
+    pub fn parse_argument<S: stream::Stream>(
         &self,
         macro_token: &Token,
-        stream: &mut dyn stream::Stream,
+        stream: &mut S,
         index: usize,
     ) -> anyhow::Result<Vec<Token>> {
-        match self {
+        let mut argument = match self {
             Parameter::Undelimited => {
                 Parameter::parse_undelimited_argument(macro_token, stream, index + 1)
             }
             Parameter::Delimited(matcher_factory) => {
                 Parameter::parse_delimited_argument(macro_token, stream, matcher_factory, index + 1)
             }
+        };
+        if let Ok(tokens) = &mut argument {
+            tokens.reverse();
         }
+        argument
     }
 
     fn parse_delimited_argument(
@@ -211,9 +219,9 @@ impl Parameter {
         list.pop();
     }
 
-    fn parse_undelimited_argument(
+    fn parse_undelimited_argument<S: stream::Stream>(
         macro_token: &Token,
-        stream: &mut dyn stream::Stream,
+        stream: &mut S,
         param_num: usize,
     ) -> anyhow::Result<Vec<Token>> {
         let opening_brace = match stream.next()? {
@@ -318,8 +326,8 @@ pub fn pretty_print_replacement_text(replacements: &[Replacement]) -> String {
             Replacement::Parameter(i) => {
                 b.push_str(colored_parameter_number(*i + 1).as_str());
             }
-            Replacement::Token(token) => {
-                b.push_str(&format!["{}", token,]);
+            Replacement::Tokens(_) => {
+                b.push_str("TODO");
             }
         }
     }

@@ -34,11 +34,16 @@ fn def_primitive_fn<S>(def_token: Token, input: &mut ExecutionInput<S>) -> anyho
             RawParameter::Delimited(vec) => Parameter::Delimited(KMPMatcherFactory::new(vec)),
         })
         .collect();
-    let replacement = parse_replacement_text(
+    let mut replacement = parse_replacement_text(
         input.unexpanded_stream(),
         replacement_end_token,
         parameters.len(),
     )?;
+    for r in replacement.iter_mut() {
+        if let Replacement::Tokens(tokens) = r {
+            tokens.reverse();
+        }
+    }
     let user_defined_macro = Macro::new(prefix, parameters, replacement);
     input
         .base_mut()
@@ -180,8 +185,16 @@ fn parse_replacement_text(
     opt_final_token: Option<Token>,
     num_parameters: usize,
 ) -> anyhow::Result<Vec<Replacement>> {
-    let mut result = Vec::new();
+    let mut result = vec![];
     let mut scope_depth = 0;
+    let push = |result: &mut Vec<Replacement>, token| match result.last_mut() {
+        Some(Replacement::Tokens(tokens)) => {
+            tokens.push(token);
+        }
+        _ => {
+            result.push(Replacement::Tokens(vec![token]));
+        }
+    };
 
     while let Some(token) = input.next()? {
         match token.value() {
@@ -191,7 +204,7 @@ fn parse_replacement_text(
             Character(_, catcode::CatCode::EndGroup) => {
                 if scope_depth == 0 {
                     if let Some(final_token) = opt_final_token {
-                        result.push(Replacement::Token(final_token));
+                        push(&mut result, final_token);
                     }
                     return Ok(result);
                 }
@@ -217,7 +230,7 @@ fn parse_replacement_text(
                         .cast());
                     }
                     Character(_, catcode::CatCode::Parameter) => {
-                        result.push(Replacement::Token(parameter_token));
+                        push(&mut result, parameter_token);
                         continue;
                     }
                     Character(c, _) => c,
@@ -261,7 +274,8 @@ fn parse_replacement_text(
             }
             _ => {}
         }
-        result.push(Replacement::Token(token));
+
+        push(&mut result, token);
     }
 
     Err(

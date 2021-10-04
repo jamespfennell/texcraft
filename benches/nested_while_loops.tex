@@ -1,27 +1,3 @@
-% Digits of pi using the Rabinowitz and Wagon spigot algorithm [1]
-%
-% This TeX script calculates the first n digits of pi. It uses \count registers
-% for working memory and is runnable on both Texcraft and pdfTeX. The variable n 
-% is specified at the end of the script, and is restricted as follows:
-%
-% - pdfTeX: n cannot be much larger than 1000 as pdfTeX runs out of stack space.
-%
-% - Texcraft: n cannot be larger than 7559 as the algorithm requires n + (10n)//3 + 12
-%   integers in memory, and we assume 2^15 registers, as in pdfTeX.
-%   The playground has a version of this script that uses Texcraft allocation commands
-%   instead of \count registers and is thus not subject to this restriction.
-%   But also, for some currently unknown value of n, 32-bit integer overflow will occur
-%   and the result will be incorrect. From the original paper [1] we know that this n
-%   is at least 5000. 
-%
-% \count register layout:
-%
-% - [0, 25196): used for the length 10n/3 working array
-% - [25196, 32756): used for storing the n results
-% - [32756, 32768=2^15): used for 12 named variables via \countdef
-%
-% [1] http://www.cs.williams.edu/~heeringa/classes/cs135/s15/readings/spigot.pdf
-
 % While loop: repeatedly executes #2 while `\ifnum #1` is true
 \def\while#1#2{
   \ifnum #1

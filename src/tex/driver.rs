@@ -89,7 +89,7 @@ fn default_undefined_cs_handler<S>(token: token::Token, state: &mut Base<S>) -> 
     Err(error::new_undefined_cs_error(token, state))
 }
 
-struct RawStream<'a, S> {
+pub struct RawStream<'a, S> {
     state: &'a mut Base<S>,
     input: &'a mut input::Unit,
 }
@@ -149,7 +149,7 @@ impl<'a, S> ExpansionInput<'a, S> {
 }
 
 impl<'a, S> ExpansionInput<'a, S> {
-    pub fn unexpanded_stream(&mut self) -> &mut dyn Stream {
+    pub fn unexpanded_stream(&mut self) -> &mut RawStream<'a, S> {
         &mut self.raw_stream
     }
 
@@ -251,6 +251,6 @@ fn expand_next<S>(state: &mut Base<S>, input: &mut input::Unit) -> anyhow::Resul
     let (a, b) = state.input_components();
     let token = input.next(a, b)?.unwrap();
     let output = command.call(token, &mut ExpansionInput::<S>::new(state, input))?;
-    input.push_expansion(output);
+    input.push_expansion(&output);
     Ok(true)
 }

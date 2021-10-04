@@ -10,47 +10,56 @@ use std::collections::HashMap;
 use std::io;
 use std::rc;
 
-/// Structure used for controlling input.
+/// Structure used for controlling input. TODO: rename controller again
 pub struct Unit {
+    current_source: Source,
     sources: Vec<Source>,
-    cache: Option<Token>,
+
     last_non_empty_line: Option<rc::Rc<token::Line>>,
 
     pub conditional: conditional::Component,
 }
 
 impl Unit {
+    // TODO: accept initial_source
     pub fn new() -> Unit {
         Unit {
+            current_source: Source::new_empty(),
             sources: Vec::new(),
-            cache: None,
             last_non_empty_line: None,
             conditional: conditional::Component::new(),
         }
     }
 
     pub fn push_new_source(&mut self, reader: Box<dyn io::BufRead>) {
-        self.vacate_cache();
-        self.sources.push(Source::new_reader(reader));
+        let mut new_source = Source::new(reader);
+        std::mem::swap(&mut new_source, &mut self.current_source);
+        self.sources.push(new_source);
     }
 
     pub fn push_new_str<Str: Into<String>>(&mut self, s: Str) {
-        self.vacate_cache();
         self.push_new_source(Box::new(io::Cursor::new(s.into())));
     }
 
-    pub fn push_expansion(&mut self, expansion: Vec<Token>) {
-        self.vacate_cache();
-        self.sources.push(Source::Vec(VecSource::new(expansion)));
+    pub fn push_expansion(&mut self, expansion: &[Token]) {
+        self.clear_next_token();
+        self.current_source
+            .expansions
+            .extend(expansion.iter().rev());
     }
 
     pub fn push_single_token(&mut self, token: Token) {
-        self.vacate_cache();
-        self.sources.push(Source::Singleton(Some(token)));
+        self.clear_next_token();
+        self.current_source.expansions.push(token);
     }
 
     pub fn last_non_empty_line(&self) -> Option<rc::Rc<token::Line>> {
         self.last_non_empty_line.clone()
+    }
+
+    pub fn expansions_mut(&mut self) -> &mut Vec<Token> {
+        self.clear_next_token();
+        &mut self.current_source.expansions
     }
 
     #[inline]
@@ -59,10 +68,28 @@ impl Unit {
         cat_code_map: &HashMap<u32, RawCatCode>,
         interner: &mut CsNameInterner,
     ) -> anyhow::Result<Option<token::Token>> {
-        if self.cache.is_none() {
-            self.populate_cache(cat_code_map, interner)?;
+        if let Some(token) = self.current_source.next_token.take() {
+            return Ok(Some(token));
         }
-        Ok(self.cache.take())
+        if let Some(token) = self.current_source.expansions.pop() {
+            return Ok(Some(token));
+        }
+        if let Some(token) = self.current_source.root.next(cat_code_map, interner)? {
+            return Ok(Some(token));
+        }
+        self.next_recurse(cat_code_map, interner)
+    }
+
+    fn next_recurse(
+        &mut self,
+        cat_code_map: &HashMap<u32, RawCatCode>,
+        interner: &mut CsNameInterner,
+    ) -> anyhow::Result<Option<token::Token>> {
+        if self.pop_source() {
+            self.next(cat_code_map, interner)
+        } else {
+            Ok(None)
+        }
     }
 
     #[inline]
@@ -71,44 +98,54 @@ impl Unit {
         cat_code_map: &HashMap<u32, RawCatCode>,
         interner: &mut CsNameInterner,
     ) -> anyhow::Result<Option<&token::Token>> {
-        if self.cache.is_none() {
-            self.populate_cache(cat_code_map, interner)?;
+        if self.current_source.next_token.is_some() {
+            return Ok(self.current_source.next_token.as_ref());
         }
-        Ok(self.cache.as_ref())
+        let has_expanded_token = self.current_source.expansions.last().is_some();
+        if has_expanded_token {
+            return Ok(self.current_source.expansions.last());
+        }
+        if let Some(token) = self.current_source.root.next(cat_code_map, interner)? {
+            self.current_source.next_token = Some(token);
+            return Ok(self.current_source.next_token.as_ref());
+        }
+        self.peek_recurse(cat_code_map, interner)
     }
 
-    pub fn populate_cache(
+    pub fn peek_recurse(
         &mut self,
         cat_code_map: &HashMap<u32, RawCatCode>,
         interner: &mut CsNameInterner,
-    ) -> anyhow::Result<()> {
-        loop {
-            self.cache = match self.sources.last_mut() {
-                None => return Ok(()),
-                Some(Source::Vec(vec)) => vec.next(),
-                Some(Source::Singleton(t)) => {
-                    std::mem::swap(&mut self.cache, t);
-                    self.sources.pop();
-                    return Ok(());
-                }
-                Some(Source::Reader(lexer)) => lexer.next(cat_code_map, interner)?,
-            };
-            if self.cache.is_some() {
-                return Ok(());
+    ) -> anyhow::Result<Option<&token::Token>> {
+        if self.pop_source() {
+            self.peek(cat_code_map, interner)
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn pop_source(&mut self) -> bool {
+        match self.sources.pop() {
+            None => {
+                // self.current_source = Source::new_empty();
+                false
             }
-            self.sources.pop();
+            Some(source) => {
+                self.current_source = source;
+                true
+            }
+        }
+    }
+
+    fn clear_next_token(&mut self) {
+        if let Some(token) = self.current_source.next_token.take() {
+            self.current_source.expansions.push(token);
         }
     }
 
     pub fn clear(&mut self) {
-        self.sources = vec![];
-    }
-
-    #[inline]
-    fn vacate_cache(&mut self) {
-        if let Some(t) = self.cache.take() {
-            self.sources.push(Source::Singleton(Some(t)));
-        }
+        //self.current_source = Source::new_empty();
+        //self.sources = vec![];
     }
 }
 
@@ -118,30 +155,22 @@ impl Default for Unit {
     }
 }
 
-enum Source {
-    Reader(lexer::Lexer),
-    Vec(VecSource),
-    Singleton(Option<Token>),
+struct Source {
+    next_token: Option<Token>,
+    expansions: Vec<Token>,
+    root: lexer::Lexer,
 }
 
 impl Source {
-    fn new_reader(reader: Box<dyn io::BufRead>) -> Source {
-        let mut interner = CsNameInterner::new();
-        Source::Reader(lexer::Lexer::new(reader, &mut interner))
-    }
-}
-
-struct VecSource {
-    data: Vec<Token>,
-}
-
-impl VecSource {
-    fn new(mut data: Vec<Token>) -> VecSource {
-        data.reverse();
-        VecSource { data }
+    fn new(reader: Box<dyn io::BufRead>) -> Source {
+        Source {
+            next_token: None,
+            expansions: Vec::with_capacity(32),
+            root: lexer::Lexer::new(reader),
+        }
     }
 
-    fn next(&mut self) -> Option<Token> {
-        self.data.pop()
+    fn new_empty() -> Source {
+        Source::new(Box::new(io::Cursor::new("")))
     }
 }

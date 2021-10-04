@@ -14,9 +14,10 @@ pub fn advance_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("advance");
     group.sample_size(10000);
     let a_cs = Token::new_control_sequence('\\', state.cs_names.get_or_intern("a"));
+    let expansion = vec![a_cs; 1000];
     group.bench_function("advance", |b| {
         b.iter(|| {
-            input.push_single_token(a_cs);
+            input.push_expansion(&expansion);
             driver::exec(&mut state, &mut input, true).unwrap();
         })
     });

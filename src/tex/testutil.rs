@@ -102,7 +102,7 @@ pub fn tokenize_with_map(
 ) -> stream::VecStream {
     let mut interner = CsNameInterner::new();
     let f = Box::new(io::Cursor::new(input.to_string()));
-    let mut lexer = lexer::Lexer::new(f, &mut interner);
+    let mut lexer = lexer::Lexer::new(f);
     let mut result = Vec::new();
     while let Some(t) = lexer.next(cat_codes, &mut &mut interner).unwrap() {
         result.push(t);

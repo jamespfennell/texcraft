@@ -6,6 +6,8 @@ Main thread:
 1. Reimplement macros again to take advantage of tokens being copyable
 1. Change the token type so that it is 8 bytes and see if this makes things more performant.
 1. Fix up the errors system which is now totally broken
+1. Have scratch space in the input controller for parsing stuff -> will grow but that's okay
+    We can have a token::HasScratchSpace trait and implement it
 
 Documentation:
 

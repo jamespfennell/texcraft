@@ -22,12 +22,14 @@ in a simple SVG format:
 
 ### pdfTeX vs Texcraft performance as of 2021-09-28
 
+Use the environment variable `DIGITS_OF_PI_N` to customize the `n` when running using `cargo bench`.
+
 These performance numbers were obtained on 
     [a machine running an 8-core Ryzen 7 CPU](https://pcpartpicker.com/list/Y3FbBc).
 
 | n    | pdfTeX | Texcraft | Multiplier (lower is better, target is 1)
 |------|--------|----------|----
-| 100  | 90ms   | 240ms    | 2.7
+| 250  | 487ms  | 1224ms   | 2.5
 | 500  |        |          | 
 | 1000 |        |          |
 | 2500 | \*     |          | N/A
@@ -36,6 +38,6 @@ These performance numbers were obtained on
 
 ## Advance benchmark 
 
-- Texcraft: 330ns
+- Texcraft: 220ns
 
 - pdfTeX: 120ns

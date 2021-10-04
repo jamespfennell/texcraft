@@ -28,24 +28,11 @@ jobs:
         with:
           command: test
 
-  benchmarks:
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Install toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-
-      - name: Run the benchmarks
+      - name: Compile the benchmarks
         uses: actions-rs/cargo@v1
         with:
-          command: bench
+          command: bench 
+          args: --no-run
 
   style-enforcement:
     runs-on: ubuntu-latest
