@@ -32,8 +32,3 @@ Try it out in the [Texcraft playground](https://play.texcraft.dev)!
     This project turned out be to non-viable for some reasons like performance, but the source code is an excellent
     reference for those who are writing their own TeX implementations.
 
-## License
-
-Some open source license, but details TBD.
-
-
