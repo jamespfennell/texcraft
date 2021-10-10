@@ -4,7 +4,7 @@ use crate::tex::prelude::*;
 
 pub fn texcraft_primitive_fn<S>(
     _: Token,
-    _: &mut command::ExpansionInput<S>,
+    _: &mut command::ExpandedInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     Ok(vec![
         Token::new_character('T', CatCode::Letter),
@@ -30,7 +30,6 @@ pub fn get_texcraft<S>() -> command::ExpansionPrimitive<S> {
 mod tests {
     use super::*;
     use crate::tex::driver;
-    use crate::tex::input;
     use crate::tex::state::Base;
     use crate::tex::token::catcode;
 

@@ -1,7 +1,7 @@
 //! Error types and error display logic.
 
 use crate::algorithms::spellcheck;
-use crate::tex::input;
+use crate::tex::driver;
 use crate::tex::state::Base;
 use crate::tex::token;
 use crate::tex::token::{Token, Value};
@@ -222,8 +222,8 @@ impl EndOfInputError {
         anyhow::Error::from(self)
     }
 
-    pub fn add_context<S>(&mut self, _state: &Base<S>, input: &input::Unit) {
-        if let Some(last_line) = input.last_non_empty_line() {
+    pub fn add_context<S>(&mut self, execution_input: &driver::ExecutionInput<S>) {
+        if let Some(last_line) = execution_input.controller().last_non_empty_line() {
             self.last_line = Some(Line {
                 line: last_line.content.clone(),
                 line_number: last_line.line_number,
@@ -258,9 +258,9 @@ impl std::fmt::Display for EndOfInputError {
     }
 }
 
-pub fn add_context<S>(error: &mut anyhow::Error, state: &Base<S>, input: &input::Unit) {
+pub fn add_context<S>(error: &mut anyhow::Error, execution_input: &driver::ExecutionInput<S>) {
     if let Some(error) = error.downcast_mut::<EndOfInputError>() {
-        error.add_context(state, input);
+        error.add_context(execution_input);
     }
 }
 

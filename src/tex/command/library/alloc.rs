@@ -241,7 +241,7 @@ fn newarray_primitive_fn<S: HasAlloc>(
         newarray_token,
         input.unexpanded_stream(),
     )?;
-    let len: usize = parse::parse_number(&mut input.regular())?;
+    let len: usize = parse::parse_number(input.regular())?;
     let addr = input.state_mut().alloc_mut().alloc_array(len);
     input
         .base_mut()
@@ -254,7 +254,7 @@ fn newarray_primitive_fn<S: HasAlloc>(
 /// Variable command function for commands defined using \newarray.
 fn array_fn<S: HasAlloc>(
     array_token: &Token,
-    input: &mut ExpansionInput<S>,
+    input: &mut ExpandedInput<S>,
     array_addr: usize,
 ) -> anyhow::Result<Variable<S>> {
     let array_index: usize = parse::parse_number(input)?;
@@ -295,7 +295,6 @@ mod test {
     use super::*;
     use crate::tex::command::library::the::get_the;
     use crate::tex::driver;
-    use crate::tex::input;
     use crate::tex::token::catcode;
 
     struct State {

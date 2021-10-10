@@ -7,7 +7,7 @@ use num_traits::PrimInt;
 /// The number may be octal, decimal, hexadecimal, cast from a character token, or read
 /// from an internal registers. The full definition of a number in the TeX grammer
 /// is given on page X of the TeXBook.
-pub fn parse_number<S, T: PrimInt>(stream: &mut ExpansionInput<S>) -> anyhow::Result<T> {
+pub fn parse_number<S, T: PrimInt>(stream: &mut ExpandedInput<S>) -> anyhow::Result<T> {
     let sign = parse_optional_signs(stream)?;
     let modulus: T = match stream.next()? {
         None => return Err(parse_number_error(None)),
@@ -92,7 +92,7 @@ fn parse_number_error(token: Option<Token>) -> anyhow::Error {
 
 fn read_number_from_address<S, T: PrimInt>(
     variable: variable::Variable<S>,
-    stream: &mut ExpansionInput<S>,
+    stream: &mut ExpandedInput<S>,
 ) -> anyhow::Result<T> {
     match variable {
         variable::Variable::Int(variable) => {
@@ -249,21 +249,18 @@ fn add_lsd<T: PrimInt>(n: T, base: i32, lsd: i32) -> T {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tex::input;
     use crate::tex::state;
 
     use crate::tex::token::catcode;
 
     macro_rules! parse_number_test {
         ($input: expr, $number: expr) => {
-            // TODO: put this in the test util
-            // TODO: u32 hack undo please
             // TODO: replicate this for the relation tests and destroy the VecStream
-            let mut state = state::Base::<u32>::new(catcode::tex_defaults(), 0);
-            let mut input = input::Unit::new();
-            input.push_new_str($input);
-            let mut e_input = ExpansionInput::new(&mut state, &mut input);
-            let result: i32 = parse_number(&mut e_input).unwrap();
+            let mut execution_input = driver::ExecutionInput::new_with_str(
+                state::Base::<()>::new(catcode::tex_defaults(), ()),
+                $input,
+            );
+            let result: i32 = parse_number(execution_input.regular()).unwrap();
             assert_eq![result, $number];
         };
     }

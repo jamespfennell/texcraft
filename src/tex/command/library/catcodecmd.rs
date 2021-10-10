@@ -49,7 +49,7 @@ fn write_catcode_register_fn<S>(state: &mut Base<S>, addr: usize) -> &mut RawCat
 
 fn catcode_fn<S>(
     _catcode_token: &Token,
-    input: &mut command::ExpansionInput<S>,
+    input: &mut command::ExpandedInput<S>,
     _: usize,
 ) -> anyhow::Result<Variable<S>> {
     let addr: u32 = parse::parse_number(input)?;
@@ -70,7 +70,6 @@ mod tests {
     use crate::tex::command::library::catcodecmd;
     use crate::tex::command::library::the;
     use crate::tex::driver;
-    use crate::tex::input;
     use crate::tex::state::Base;
     use crate::tex::token::catcode;
 

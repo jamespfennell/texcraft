@@ -19,7 +19,7 @@ use crate::tex::prelude::*;
 
 use super::token::CsName;
 
-pub fn parse_optional_space<S>(input: &mut command::ExpansionInput<S>) -> anyhow::Result<()> {
+pub fn parse_optional_space<S>(input: &mut command::ExpandedInput<S>) -> anyhow::Result<()> {
     get_optional_element![input, Character(_, CatCode::Space) => (),];
     Ok(())
 }

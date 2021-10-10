@@ -159,7 +159,6 @@ mod tests {
     use crate::tex::command::library::registers;
     use crate::tex::command::library::the;
     use crate::tex::driver;
-    use crate::tex::input;
     use crate::tex::state::Base;
     use crate::tex::token::catcode;
     struct State {

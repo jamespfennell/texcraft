@@ -248,7 +248,7 @@ pub enum Command<S> {
     Dynamic(
         fn(
             token: &token::Token,
-            input: &mut command::ExpansionInput<S>,
+            input: &mut command::ExpandedInput<S>,
             addr: usize,
         ) -> anyhow::Result<Variable<S>>,
         usize, // addr
@@ -269,7 +269,7 @@ impl<S> Command<S> {
     pub fn variable(
         &self,
         token: &token::Token,
-        input: &mut command::ExpansionInput<S>,
+        input: &mut command::ExpandedInput<S>,
     ) -> anyhow::Result<Variable<S>> {
         match self {
             Command::Static(v, _) => Ok(*v),
@@ -285,20 +285,20 @@ impl<S> Command<S> {
         token: token::Token,
         input: &mut command::ExecutionInput<S>,
     ) -> anyhow::Result<()> {
-        let variable = self.variable(&token, &mut input.regular())?;
+        let variable = self.variable(&token, input.regular())?;
         parse::parse_optional_equals(input)?;
         match variable {
             Variable::Int(variable) => {
-                let val: i32 = parse::parse_number(&mut input.regular())?;
+                let val: i32 = parse::parse_number(input.regular())?;
                 *variable.get_mut(input.state_mut()) = val;
             }
             Variable::BaseInt(variable) => {
-                let val: i32 = parse::parse_number(&mut input.regular())?;
+                let val: i32 = parse::parse_number(input.regular())?;
                 *variable.get_mut(input.base_mut()) = val;
             }
             Variable::CatCode(variable) => {
                 // TODO: don't use u8 here, use usize to get better error messages
-                let val: u8 = parse::parse_number(&mut input.regular())?;
+                let val: u8 = parse::parse_number(input.regular())?;
                 match RawCatCode::from_int(val) {
                     None => {
                         return Err(error::TokenError::new(

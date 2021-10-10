@@ -3,7 +3,7 @@ use crate::tex::variable;
 
 /// Parses a variable.
 pub fn parse_variable<S>(
-    input: &mut command::ExpansionInput<S>,
+    input: &mut command::ExpandedInput<S>,
 ) -> anyhow::Result<variable::Variable<S>> {
     match input.next()? {
         None => Err(error::EndOfInputError::new(

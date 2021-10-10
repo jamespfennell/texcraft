@@ -42,7 +42,6 @@ mod test {
     use super::*;
     use crate::tex::command::library::def;
     use crate::tex::driver;
-    use crate::tex::input;
     use crate::tex::token::catcode;
 
     struct State;

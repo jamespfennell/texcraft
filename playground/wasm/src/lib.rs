@@ -3,18 +3,17 @@
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
+use texcraft::tex::command::library::alloc;
 use texcraft::tex::command::library::catcodecmd;
 use texcraft::tex::command::library::conditional;
 use texcraft::tex::command::library::def;
+use texcraft::tex::command::library::execwhitespace;
+use texcraft::tex::command::library::letassignment;
 use texcraft::tex::command::library::registers;
 use texcraft::tex::command::library::the;
-use texcraft::tex::command::library::execwhitespace;
-use texcraft::tex::command::library::alloc;
-use texcraft::tex::command::library::letassignment;
 use texcraft::tex::command::library::time;
 use texcraft::tex::command::library::variableops;
 use texcraft::tex::driver;
-use texcraft::tex::input;
 use texcraft::tex::prelude::*;
 use texcraft::tex::token;
 use texcraft::tex::token::catcode;
@@ -29,13 +28,21 @@ pub fn main_js() -> Result<(), JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn greet(input: String, minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> String {
-    let mut s = init_state(minutes_since_midnight, day, month, year);
-    let mut input_unit = input::Unit::new();
-    input_unit.push_new_str(input);
-
-    match driver::exec(&mut s, &mut input_unit, true) {
-        Ok(tokens) => token::write_tokens(&tokens, &s.cs_names),
+pub fn greet(
+    input: String,
+    minutes_since_midnight: i32,
+    day: i32,
+    month: i32,
+    year: i32,
+) -> String {
+    let mut execution_input = driver::ExecutionInput::new_with_str(
+        init_state(minutes_since_midnight, day, month, year),
+        input,
+    );
+    match driver::exec(&mut execution_input, true) {
+        Ok(tokens) => {
+          token::write_tokens(&tokens, &execution_input.base().cs_names)
+        },
         Err(err) => format!["{}", err],
     }
 }
@@ -63,10 +70,15 @@ impl time::HasTime for PlaygroundState {
     }
 }
 
-fn init_state(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> Base<PlaygroundState> {
+fn init_state(
+    minutes_since_midnight: i32,
+    day: i32,
+    month: i32,
+    year: i32,
+) -> Base<PlaygroundState> {
     let mut s = Base::<PlaygroundState>::new(
-        catcode::tex_defaults(), 
-        PlaygroundState{
+        catcode::tex_defaults(),
+        PlaygroundState {
             alloc: alloc::Component::new(),
             time: time::Component::new_with_values(minutes_since_midnight, day, month, year),
         },

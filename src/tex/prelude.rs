@@ -4,10 +4,9 @@
 
 pub use crate::tex::command;
 pub use crate::tex::command::ExecutionInput;
-pub use crate::tex::command::ExpansionInput;
+pub use crate::tex::command::ExpandedInput;
 pub use crate::tex::driver;
 pub use crate::tex::error;
-pub use crate::tex::input;
 pub use crate::tex::state::Base;
 pub use crate::tex::token::catcode::CatCode;
 pub use crate::tex::token::catcode::RawCatCode;

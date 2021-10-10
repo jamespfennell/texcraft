@@ -141,7 +141,6 @@ pub mod testutil;
 pub mod command;
 pub mod driver;
 pub mod error;
-pub mod input;
 pub mod macrotypes;
 pub mod parse;
 pub mod prelude;

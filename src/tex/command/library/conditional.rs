@@ -58,7 +58,7 @@ impl Default for Component {
     }
 }
 
-fn branches<'a, S>(input: &'a mut command::ExpansionInput<S>) -> &'a mut Vec<Branch> {
+fn branches<S>(input: &mut command::ExpandedInput<S>) -> &mut Vec<Branch> {
     &mut input.controller_mut().conditional.branches
 }
 
@@ -81,10 +81,7 @@ fn fi_id() -> Option<any::TypeId> {
 }
 
 // The `true_case` function is executed whenever a conditional evaluates to true.
-fn true_case<S>(
-    token: Token,
-    input: &mut command::ExpansionInput<S>,
-) -> anyhow::Result<Vec<Token>> {
+fn true_case<S>(token: Token, input: &mut command::ExpandedInput<S>) -> anyhow::Result<Vec<Token>> {
     input.controller_mut().conditional.branches.push(Branch {
         token,
         kind: BranchKind::True,
@@ -98,7 +95,7 @@ fn true_case<S>(
 // either a \else or \fi command.
 fn false_case<S>(
     original_token: Token,
-    input: &mut command::ExpansionInput<S>,
+    input: &mut command::ExpandedInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     let mut depth = 0;
     let mut last_token = None;
@@ -146,7 +143,7 @@ macro_rules! create_if_primitive {
     ($if_fn: ident, $if_primitive_fn: ident, $get_if: ident, $docs: expr) => {
         fn $if_primitive_fn<S>(
             token: Token,
-            input: &mut ExpansionInput<S>,
+            input: &mut ExpandedInput<S>,
         ) -> anyhow::Result<Vec<Token>> {
             match $if_fn(input)? {
                 true => true_case(token, input),
@@ -164,15 +161,15 @@ macro_rules! create_if_primitive {
     };
 }
 
-fn if_true<S>(_: &mut command::ExpansionInput<S>) -> anyhow::Result<bool> {
+fn if_true<S>(_: &mut command::ExpandedInput<S>) -> anyhow::Result<bool> {
     Ok(true)
 }
 
-fn if_false<S>(_: &mut command::ExpansionInput<S>) -> anyhow::Result<bool> {
+fn if_false<S>(_: &mut command::ExpandedInput<S>) -> anyhow::Result<bool> {
     Ok(false)
 }
 
-fn if_num<S>(stream: &mut command::ExpansionInput<S>) -> anyhow::Result<bool> {
+fn if_num<S>(stream: &mut command::ExpandedInput<S>) -> anyhow::Result<bool> {
     let a: i32 = parse::parse_number(stream)?;
     let r = parse::parse_relation(stream)?;
     let b: i32 = parse::parse_number(stream)?;
@@ -184,7 +181,7 @@ fn if_num<S>(stream: &mut command::ExpansionInput<S>) -> anyhow::Result<bool> {
     })
 }
 
-fn if_odd<S>(stream: &mut command::ExpansionInput<S>) -> anyhow::Result<bool> {
+fn if_odd<S>(stream: &mut command::ExpandedInput<S>) -> anyhow::Result<bool> {
     let n: i32 = parse::parse_number(stream)?;
     Ok((n % 2) == 1)
 }
@@ -196,7 +193,7 @@ create_if_primitive![if_odd, if_odd_primitive_fn, get_if_odd, IFODD_DOC];
 
 fn if_case_primitive_fn<S>(
     ifcase_token: Token,
-    input: &mut ExpansionInput<S>,
+    input: &mut ExpandedInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     // TODO: should we reading the number from the unexpanded stream? Probably!
     let mut cases_to_skip: i32 = parse::parse_number(input)?;
@@ -267,7 +264,7 @@ pub fn get_if_case<S>() -> command::ExpansionPrimitive<S> {
 
 fn or_primitive_fn<S>(
     ifcase_token: Token,
-    input: &mut ExpansionInput<S>,
+    input: &mut ExpandedInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     let branch = branches(input).pop();
     // For an or command to be valid, we must be in a switch statement
@@ -327,7 +324,7 @@ pub fn get_or<S>() -> command::ExpansionPrimitive<S> {
 
 fn else_primitive_fn<S>(
     else_token: Token,
-    input: &mut command::ExpansionInput<S>,
+    input: &mut command::ExpandedInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     let branch = input.controller_mut().conditional.branches.pop();
     // For else token to be valid, we must be in the true branch of a conditional
@@ -382,7 +379,7 @@ pub fn get_else<S>() -> command::ExpansionPrimitive<S> {
 }
 
 /// Get the `\fi` primitive.
-fn fi_primitive_fn<S>(token: Token, input: &mut ExpansionInput<S>) -> anyhow::Result<Vec<Token>> {
+fn fi_primitive_fn<S>(token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<Vec<Token>> {
     let branch = input.controller_mut().conditional.branches.pop();
     // For a \fi primitive to be valid, we must be in a conditional.
     // Note that we could be in the false branch: \iftrue\else\fi
@@ -419,7 +416,6 @@ mod tests {
 
     use super::*;
     use crate::tex::driver;
-    use crate::tex::input;
     use crate::tex::state::Base;
     use crate::tex::token::catcode;
 

@@ -16,7 +16,7 @@ fn optional_by_error(token: Option<Token>) -> anyhow::Error {
     }
 }
 
-pub fn parse_optional_by<S>(stream: &mut ExpansionInput<S>) -> anyhow::Result<()> {
+pub fn parse_optional_by<S>(stream: &mut ExpandedInput<S>) -> anyhow::Result<()> {
     let next_is_b = get_optional_element![
         stream,
         Character('b', CatCode::Letter) => (),

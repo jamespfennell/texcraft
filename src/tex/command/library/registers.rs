@@ -95,7 +95,7 @@ fn write_int_register_fn<S: HasRegisters<N>, const N: usize>(
 
 fn count_fn<S: HasRegisters<N>, const N: usize>(
     count_token: &Token,
-    input: &mut ExpansionInput<S>,
+    input: &mut ExpandedInput<S>,
     _: usize,
 ) -> anyhow::Result<Variable<S>> {
     let addr: usize = parse::parse_number(input)?;
@@ -124,8 +124,8 @@ fn countdef_fn<S: HasRegisters<N>, const N: usize>(
 ) -> anyhow::Result<()> {
     let cs_name =
         parse::parse_command_target("countdef", countdef_token, input.unexpanded_stream())?;
-    parse::parse_optional_equals(&mut input.regular())?;
-    let addr: usize = parse::parse_number(&mut input.regular())?;
+    parse::parse_optional_equals(input.regular())?;
+    let addr: usize = parse::parse_number(input.regular())?;
     if addr >= input.state().registers().int_registers.num() {
         return Err(integer_register_too_large_error(
             countdef_token,
@@ -167,7 +167,6 @@ mod tests {
     use crate::tex::command::library::registers;
     use crate::tex::command::library::the;
     use crate::tex::driver;
-    use crate::tex::input;
     use crate::tex::state::Base;
     use crate::tex::token::catcode;
 

@@ -9,15 +9,15 @@ macro_rules! expansion_test {
         fn $name() {
             let mut state_1 = Base::<State>::new(catcode::tex_defaults(), new_state());
             $setup_fn(&mut state_1);
-            let mut input_1 = input::Unit::new();
-            input_1.push_new_str($lhs);
-            let output_1 = driver::exec(&mut state_1, &mut input_1, false).unwrap();
+            let mut execution_input_1 = driver::ExecutionInput::new_with_str(state_1, $lhs);
+            let output_1 = driver::exec(&mut execution_input_1, false).unwrap();
+            let state_1 = execution_input_1.take_base();
 
             let mut state_2 = Base::<State>::new(catcode::tex_defaults(), new_state());
             $setup_fn(&mut state_2);
-            let mut input_2 = input::Unit::new();
-            input_2.push_new_str($rhs);
-            let output_2 = driver::exec(&mut state_2, &mut input_2, false).unwrap();
+            let mut execution_input_2 = driver::ExecutionInput::new_with_str(state_2, $lhs);
+            let output_2 = driver::exec(&mut execution_input_2, false).unwrap();
+            let state_2 = execution_input_2.take_base();
 
             let equal = match output_1.len() == output_2.len() {
                 false => false,
@@ -69,9 +69,9 @@ macro_rules! expansion_failure_test {
         fn $name() {
             let mut state = Base::<State>::new(catcode::tex_defaults(), new_state());
             setup_expansion_test(&mut state);
-            let mut input = input::Unit::new();
-            input.push_new_str($input);
-            let result = driver::exec(&mut state, &mut input, false);
+            let mut execution_input = driver::ExecutionInput::new_with_str(state, $input);
+            let result = driver::exec(&mut execution_input, false);
+            let state = execution_input.take_base();
             if let Ok(output) = result {
                 println!("Expansion succeeded:");
                 println!(

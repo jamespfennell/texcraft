@@ -6,7 +6,6 @@ use std::process;
 use texcraft::tex::command::library::execwhitespace;
 use texcraft::tex::command::library::WholeLibraryState;
 use texcraft::tex::driver;
-use texcraft::tex::input;
 use texcraft::tex::prelude::*;
 use texcraft::tex::token;
 
@@ -54,27 +53,29 @@ fn main() {
 }
 
 fn expand(file_name: &str) -> Result<(), anyhow::Error> {
-    let mut s = init_state();
-
-    let mut input = input::Unit::new();
-    let f = Box::new(io::BufReader::new(fs::File::open(file_name)?));
-    input.push_new_source(f);
-
-    let tokens = driver::exec(&mut s, &mut input, true)?;
+    let mut execution_input = driver::ExecutionInput::new_with_source(
+        init_state(),
+        Box::new(io::BufReader::new(fs::File::open(file_name)?)),
+    );
+    let tokens = driver::exec(&mut execution_input, true)?;
+    let s = execution_input.take_base();
     let pretty = token::write_tokens(&tokens, &s.cs_names);
     print!("{}", pretty);
     Ok(())
 }
 
 fn docs(cs_name: &str, optional_file_name: Option<&String>) -> Result<(), anyhow::Error> {
-    let mut s = init_state();
-
-    if let Some(file_name) = optional_file_name {
-        let mut input = input::Unit::new();
-        let f = Box::new(io::BufReader::new(fs::File::open(file_name)?));
-        input.push_new_source(f);
-        driver::exec(&mut s, &mut input, true)?;
-    }
+    let s = match optional_file_name {
+        None => init_state(),
+        Some(file_name) => {
+            let mut execution_input = driver::ExecutionInput::new_with_source(
+                init_state(),
+                Box::new(io::BufReader::new(fs::File::open(file_name)?)),
+            );
+            driver::exec(&mut execution_input, true)?;
+            execution_input.take_base()
+        }
+    };
 
     if cs_name == "list" {
         let primitives = &s.primitives;

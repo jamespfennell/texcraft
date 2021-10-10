@@ -91,14 +91,14 @@ use std::any::TypeId;
 use std::rc;
 
 pub use driver::ExecutionInput;
-pub use driver::ExpansionInput;
+pub use driver::ExpandedInput;
 
 pub mod examples;
 pub mod library;
 pub mod tutorial;
 
 pub struct ExpansionPrimitive<S> {
-    call_fn: fn(token: Token, input: &mut ExpansionInput<S>) -> anyhow::Result<Vec<Token>>,
+    call_fn: fn(token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<Vec<Token>>,
     docs: &'static str,
     id: Option<TypeId>,
 }
@@ -112,7 +112,7 @@ impl<S> Clone for ExpansionPrimitive<S> {
 }
 
 impl<S> ExpansionPrimitive<S> {
-    pub fn call(&self, token: Token, input: &mut ExpansionInput<S>) -> anyhow::Result<Vec<Token>> {
+    pub fn call(&self, token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<Vec<Token>> {
         (self.call_fn)(token, input)
     }
 
@@ -126,7 +126,7 @@ impl<S> ExpansionPrimitive<S> {
 }
 
 pub trait ExpansionGeneric<S> {
-    fn call(&self, token: Token, input: &mut ExpansionInput<S>) -> anyhow::Result<Vec<Token>>;
+    fn call(&self, token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<Vec<Token>>;
 
     fn doc(&self) -> String {
         "this command has no documentation".to_string()
@@ -153,7 +153,7 @@ impl<S> Clone for Expansion<S> {
 }
 
 impl<S> Expansion<S> {
-    pub fn call(&self, token: Token, input: &mut ExpansionInput<S>) -> anyhow::Result<Vec<Token>> {
+    pub fn call(&self, token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<Vec<Token>> {
         match self {
             Expansion::Primitive(e) => ExpansionPrimitive::call(e, token, input),
             Expansion::Generic(e) => ExpansionGeneric::call(e.as_ref(), token, input),

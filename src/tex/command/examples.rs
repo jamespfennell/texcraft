@@ -40,7 +40,6 @@ macro_rules! exercises {
             #[cfg(test)]
             mod tests{
                 use crate::tex::driver;
-                use crate::tex::input;
                 use crate::tex::state::Base;
                 use crate::tex::command::library::*;
                 use crate::tex::token::catcode;

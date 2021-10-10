@@ -8,6 +8,8 @@ Main thread:
 1. Fix up the errors system which is now totally broken
 1. Have scratch space in the input controller for parsing stuff -> will grow but that's okay
     We can have a token::HasScratchSpace trait and implement it
+1. Make commands smaller (two or three words?)
+1. Replace the groupingMap with a groupingVec
 
 Documentation:
 

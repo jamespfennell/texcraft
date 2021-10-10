@@ -29,7 +29,7 @@ pub enum Parameter {
 }
 
 impl<S> command::ExpansionGeneric<S> for Macro {
-    fn call(&self, token: Token, input: &mut ExpansionInput<S>) -> anyhow::Result<Vec<Token>> {
+    fn call(&self, token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<Vec<Token>> {
         stream::remove_tokens_from_stream(
             &self.prefix,
             input.unexpanded_stream(),

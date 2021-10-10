@@ -7,7 +7,7 @@ const THE_DOC: &str = "Output text describing some inputted tokens";
 
 fn the_primitive_fn<S>(
     _the_token: Token,
-    input: &mut ExpansionInput<S>,
+    input: &mut ExpandedInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     let token = match input.next()? {
         None => {

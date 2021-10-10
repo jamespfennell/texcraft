@@ -12,9 +12,8 @@ fn digits_of_pi(tex_input: &str) -> () {
     let mut state = WholeLibraryState::new();
     state.set_command("par", execwhitespace::get_par());
     state.set_command("end", execwhitespace::get_newline());
-    let mut input = input::Unit::new();
-    input.push_new_str(tex_input);
-    driver::exec(&mut state, &mut input, true).unwrap();
+    let mut execution_input = driver::ExecutionInput::new_with_str(state, tex_input);
+    driver::exec(&mut execution_input, true).unwrap();
 }
 
 pub fn digits_of_pi_bench(c: &mut Criterion) {
