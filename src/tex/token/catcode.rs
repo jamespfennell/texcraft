@@ -26,79 +26,97 @@
 use std::collections::HashMap;
 
 use CatCode::*;
-use RawCatCode::*;
 
-// Exercise 7.3 in the TeX book
-/// Enum representing all 11 category codes that can be returned by the lexer.
+/// Enum representing all 16 category codes in TeX.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum CatCode {
+    Escape,
     BeginGroup,
     EndGroup,
     MathShift,
     AlignmentTab,
+    EndOfLine,
     Parameter,
     Superscript,
     Subscript,
+    Ignored,
     Space,
     Letter,
     Other,
     Active,
-}
-
-impl std::default::Default for CatCode {
-    fn default() -> Self {
-        CatCode::Other
-    }
+    Comment,
+    Invalid,
 }
 
 impl CatCode {
     pub fn int(&self) -> u8 {
         match self {
+            Escape => 0,
             BeginGroup => 1,
             EndGroup => 2,
             MathShift => 3,
             AlignmentTab => 4,
+            EndOfLine => 5,
             Parameter => 6,
             Superscript => 7,
             Subscript => 8,
+            Ignored => 9,
             Space => 10,
             Letter => 11,
             Other => 12,
             Active => 13,
-        }
-    }
-
-    pub fn to_str(&self) -> &str {
-        match self {
-            BeginGroup => "begin group",
-            EndGroup => "end group",
-            MathShift => "math shift",
-            AlignmentTab => "alignment tab",
-            Parameter => "parameter",
-            Superscript => "superscript",
-            Subscript => "subscript",
-            Space => "space",
-            Letter => "letter",
-            Other => "other",
-            Active => "active",
+            Comment => 14,
+            Invalid => 15,
         }
     }
 
     pub fn from_int(int: u8) -> Option<CatCode> {
         match int {
+            0 => Some(Escape),
             1 => Some(BeginGroup),
             2 => Some(EndGroup),
             3 => Some(MathShift),
             4 => Some(AlignmentTab),
+            5 => Some(EndOfLine),
             6 => Some(Parameter),
             7 => Some(Superscript),
             8 => Some(Subscript),
+            9 => Some(Ignored),
             10 => Some(Space),
             11 => Some(Letter),
             12 => Some(Other),
             13 => Some(Active),
+            14 => Some(Comment),
+            15 => Some(Invalid),
             _ => None,
         }
+    }
+
+    pub fn to_str(&self) -> &str {
+        match self {
+            Escape => "escape",
+            BeginGroup => "begin group",
+            EndGroup => "end group",
+            MathShift => "math shift",
+            AlignmentTab => "alignment tab",
+            EndOfLine => "end of line",
+            Parameter => "parameter",
+            Superscript => "superscript",
+            Subscript => "subscript",
+            Ignored => "ignored",
+            Space => "space",
+            Letter => "letter",
+            Other => "other",
+            Active => "active",
+            Comment => "comment",
+            Invalid => "invalid",
+        }
+    }
+}
+
+impl std::default::Default for CatCode {
+    fn default() -> Self {
+        CatCode::Other
     }
 }
 
@@ -109,142 +127,87 @@ impl std::fmt::Display for CatCode {
     }
 }
 
-/// Enum representing all 16 category codes in TeX.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum RawCatCode {
-    Regular(CatCode),
-    Escape,
-    EndOfLine,
-    Ignored,
-    Comment,
-    Invalid,
-}
-
-impl From<CatCode> for RawCatCode {
-    fn from(cat_code: CatCode) -> Self {
-        RawCatCode::Regular(cat_code)
-    }
-}
-
-impl std::default::Default for RawCatCode {
-    fn default() -> Self {
-        RawCatCode::Regular(CatCode::default())
-    }
-}
-
-impl RawCatCode {
-    pub fn int(&self) -> u8 {
-        match self {
-            Regular(cat_code) => cat_code.int(),
-            Escape => 0,
-            EndOfLine => 5,
-            Ignored => 9,
-            Comment => 14,
-            Invalid => 15,
-        }
-    }
-
-    pub fn from_int(int: u8) -> Option<RawCatCode> {
-        match int {
-            0 => Some(Escape),
-            5 => Some(EndOfLine),
-            9 => Some(Ignored),
-            14 => Some(Comment),
-            15 => Some(Invalid),
-            int => CatCode::from_int(int).map(RawCatCode::from),
-        }
-    }
-}
-
-pub fn or_default(c: Option<&RawCatCode>) -> RawCatCode {
-    match c {
-        None => Regular(Other),
-        Some(&c) => c,
-    }
-}
-
-pub fn tex_defaults() -> HashMap<u32, RawCatCode> {
+pub fn tex_defaults() -> HashMap<u32, CatCode> {
     let mut cat_code_map = HashMap::new();
     set_tex_defaults(&mut cat_code_map);
     cat_code_map
 }
 
-pub fn set_tex_defaults(cat_code_map: &mut HashMap<u32, RawCatCode>) {
+pub fn set_tex_defaults(cat_code_map: &mut HashMap<u32, CatCode>) {
     cat_code_map.extend(std::array::IntoIter::new([
         ('\\' as u32, Escape),
-        ('{' as u32, Regular(BeginGroup)),
-        ('}' as u32, Regular(EndGroup)),
-        ('$' as u32, Regular(MathShift)),
-        ('&' as u32, Regular(AlignmentTab)),
+        ('{' as u32, BeginGroup),
+        ('}' as u32, EndGroup),
+        ('$' as u32, MathShift),
+        ('&' as u32, AlignmentTab),
         ('\n' as u32, EndOfLine),
-        ('#' as u32, Regular(Parameter)),
-        ('^' as u32, Regular(Superscript)),
-        ('_' as u32, Regular(Subscript)),
-        ('~' as u32 as u32, Regular(Active)),
+        ('#' as u32, Parameter),
+        ('^' as u32, Superscript),
+        ('_' as u32, Subscript),
+        ('~' as u32 as u32, Active),
         ('%' as u32, Comment),
         //
-        (' ' as u32, Regular(Space)), // TODO: other white space characters?
+        (' ' as u32, Space),
         //
-        ('A' as u32, Regular(Letter)),
-        ('B' as u32, Regular(Letter)),
-        ('C' as u32, Regular(Letter)),
-        ('D' as u32, Regular(Letter)),
-        ('E' as u32, Regular(Letter)),
-        ('F' as u32, Regular(Letter)),
-        ('G' as u32, Regular(Letter)),
-        ('H' as u32, Regular(Letter)),
-        ('I' as u32, Regular(Letter)),
-        ('J' as u32, Regular(Letter)),
-        ('K' as u32, Regular(Letter)),
-        ('L' as u32, Regular(Letter)),
-        ('M' as u32, Regular(Letter)),
-        ('N' as u32, Regular(Letter)),
-        ('O' as u32, Regular(Letter)),
-        ('P' as u32, Regular(Letter)),
-        ('Q' as u32, Regular(Letter)),
-        ('R' as u32, Regular(Letter)),
-        ('S' as u32, Regular(Letter)),
-        ('T' as u32, Regular(Letter)),
-        ('U' as u32, Regular(Letter)),
-        ('V' as u32, Regular(Letter)),
-        ('W' as u32, Regular(Letter)),
-        ('X' as u32, Regular(Letter)),
-        ('Y' as u32, Regular(Letter)),
-        ('Z' as u32, Regular(Letter)),
+        ('A' as u32, Letter),
+        ('B' as u32, Letter),
+        ('C' as u32, Letter),
+        ('D' as u32, Letter),
+        ('E' as u32, Letter),
+        ('F' as u32, Letter),
+        ('G' as u32, Letter),
+        ('H' as u32, Letter),
+        ('I' as u32, Letter),
+        ('J' as u32, Letter),
+        ('K' as u32, Letter),
+        ('L' as u32, Letter),
+        ('M' as u32, Letter),
+        ('N' as u32, Letter),
+        ('O' as u32, Letter),
+        ('P' as u32, Letter),
+        ('Q' as u32, Letter),
+        ('R' as u32, Letter),
+        ('S' as u32, Letter),
+        ('T' as u32, Letter),
+        ('U' as u32, Letter),
+        ('V' as u32, Letter),
+        ('W' as u32, Letter),
+        ('X' as u32, Letter),
+        ('Y' as u32, Letter),
+        ('Z' as u32, Letter),
         //
-        ('a' as u32, Regular(Letter)),
-        ('b' as u32, Regular(Letter)),
-        ('c' as u32, Regular(Letter)),
-        ('d' as u32, Regular(Letter)),
-        ('e' as u32, Regular(Letter)),
-        ('f' as u32, Regular(Letter)),
-        ('g' as u32, Regular(Letter)),
-        ('h' as u32, Regular(Letter)),
-        ('i' as u32, Regular(Letter)),
-        ('j' as u32, Regular(Letter)),
-        ('k' as u32, Regular(Letter)),
-        ('l' as u32, Regular(Letter)),
-        ('m' as u32, Regular(Letter)),
-        ('n' as u32, Regular(Letter)),
-        ('o' as u32, Regular(Letter)),
-        ('p' as u32, Regular(Letter)),
-        ('q' as u32, Regular(Letter)),
-        ('r' as u32, Regular(Letter)),
-        ('s' as u32, Regular(Letter)),
-        ('t' as u32, Regular(Letter)),
-        ('u' as u32, Regular(Letter)),
-        ('v' as u32, Regular(Letter)),
-        ('w' as u32, Regular(Letter)),
-        ('x' as u32, Regular(Letter)),
-        ('y' as u32, Regular(Letter)),
-        ('z' as u32, Regular(Letter)),
+        ('a' as u32, Letter),
+        ('b' as u32, Letter),
+        ('c' as u32, Letter),
+        ('d' as u32, Letter),
+        ('e' as u32, Letter),
+        ('f' as u32, Letter),
+        ('g' as u32, Letter),
+        ('h' as u32, Letter),
+        ('i' as u32, Letter),
+        ('j' as u32, Letter),
+        ('k' as u32, Letter),
+        ('l' as u32, Letter),
+        ('m' as u32, Letter),
+        ('n' as u32, Letter),
+        ('o' as u32, Letter),
+        ('p' as u32, Letter),
+        ('q' as u32, Letter),
+        ('r' as u32, Letter),
+        ('s' as u32, Letter),
+        ('t' as u32, Letter),
+        ('u' as u32, Letter),
+        ('v' as u32, Letter),
+        ('w' as u32, Letter),
+        ('x' as u32, Letter),
+        ('y' as u32, Letter),
+        ('z' as u32, Letter),
     ]))
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::tex::token::catcode::RawCatCode::Regular;
-    use crate::tex::token::catcode::{CatCode, RawCatCode};
+    use crate::tex::token::catcode::CatCode;
 
     fn all_cat_codes() -> Vec<CatCode> {
         vec![
@@ -263,26 +226,19 @@ mod tests {
     }
 
     #[test]
-    fn serialize_and_deserialize_raw_cat_code() {
-        for cat_code in all_cat_codes() {
-            assert_eq!(CatCode::from_int(cat_code.int()), Some(cat_code))
-        }
-    }
-
-    #[test]
     fn serialize_and_deserialize_cat_code() {
         let mut all_raw_cat_codes = vec![
-            RawCatCode::Escape,
-            RawCatCode::EndOfLine,
-            RawCatCode::Ignored,
-            RawCatCode::Comment,
-            RawCatCode::Invalid,
+            CatCode::Escape,
+            CatCode::EndOfLine,
+            CatCode::Ignored,
+            CatCode::Comment,
+            CatCode::Invalid,
         ];
         for cat_code in all_cat_codes() {
-            all_raw_cat_codes.push(Regular(cat_code))
+            all_raw_cat_codes.push(cat_code);
         }
         for cat_code in all_raw_cat_codes {
-            assert_eq!(RawCatCode::from_int(cat_code.int()), Some(cat_code))
+            assert_eq!(CatCode::from_int(cat_code.int()), Some(cat_code))
         }
     }
 }

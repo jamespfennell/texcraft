@@ -86,6 +86,7 @@
 
 use crate::tex::driver;
 use crate::tex::prelude::*;
+use crate::tex::token;
 use crate::tex::variable;
 use std::any::TypeId;
 use std::rc;
@@ -199,7 +200,7 @@ pub enum Command<S> {
     Expansion(Expansion<S>),
     Execution(ExecutionPrimitive<S>),
     Variable(variable::Command<S>),
-    Character(char, CatCode),
+    Character(token::Token),
 }
 
 impl<S> Command<S> {
@@ -218,8 +219,9 @@ impl<S> Command<S> {
             Command::Execution(cmd) => cmd.docs.to_string(),
             Command::Variable(variable::Command::Static(_, docs)) => docs.to_string(),
             Command::Variable(variable::Command::Dynamic(_, _, docs)) => docs.to_string(),
-            Command::Character(c, cat_code) => {
-                format!["Implicit character '{}' with cat code {}", c, cat_code]
+            Command::Character(_) => {
+                "todo".to_string()
+                // format!["Implicit character '{}' with cat code {}", token.value(), cat_code]
             }
         }
     }
@@ -239,7 +241,7 @@ impl<S> Clone for Command<S> {
             Command::Expansion(e) => Command::Expansion::<S>(e.clone()),
             Command::Execution(e) => Command::Execution(*e),
             Command::Variable(v) => Command::Variable(*v),
-            Command::Character(c, cat_code) => Command::Character(*c, *cat_code),
+            Command::Character(tv) => Command::Character(*tv),
         }
     }
 }

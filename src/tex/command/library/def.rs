@@ -5,7 +5,6 @@ use crate::datastructures::nevec::Nevec;
 use crate::tex::error;
 use crate::tex::parse;
 use crate::tex::prelude::*;
-use crate::tex::token::catcode;
 use crate::tex::token::stream;
 
 use crate::tex::macrotypes::*;
@@ -98,17 +97,17 @@ fn parse_prefix_and_parameters(
 
     while let Some(token) = input.next()? {
         match token.value() {
-            Character(_, catcode::CatCode::BeginGroup) => {
+            Value::BeginGroup(_) => {
                 return Ok((prefix, parameters, replacement_end_token));
             }
-            Character(_, catcode::CatCode::EndGroup) => {
+            Value::EndGroup(_) => {
                 return Err(error::TokenError::new(
                     token,
                     "unexpected end group token while parsing the parameter of a macro definition",
                 )
                 .cast());
             }
-            Character(_, catcode::CatCode::Parameter) => {
+            Value::Parameter(_) => {
                 let parameter_token = match input.next()? {
                     None => {
                         return Err(error::EndOfInputError::new(
@@ -119,7 +118,7 @@ fn parse_prefix_and_parameters(
                     Some(token) => token,
                 };
                 match parameter_token.value() {
-                    Character(_, catcode::CatCode::BeginGroup) => {
+                    Value::BeginGroup(_) => {
                         // In this case we end the group according to the special #{ rule
                         replacement_end_token = Some(parameter_token);
                         match parameters.last_mut() {
@@ -132,7 +131,16 @@ fn parse_prefix_and_parameters(
                         }
                         return Ok((prefix, parameters, replacement_end_token));
                     }
-                    Character(c, _) => {
+                    ControlSequence(..) => {
+                        return Err(error::TokenError::new(
+                                    parameter_token,
+                                    "unexpected control sequence after a parameter token")
+                                    .add_note(
+                                    "a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
+                                    .cast());
+                    }
+                    _ => {
+                        let c = parameter_token.char().unwrap();
                         let parameter_index = match char_to_parameter_index(c) {
                             None => {
                                 return Err(error::TokenError::new(
@@ -153,14 +161,6 @@ fn parse_prefix_and_parameters(
                                     ]).cast());
                         }
                         parameters.push(RawParameter::Undelimited);
-                    }
-                    _ => {
-                        return Err(error::TokenError::new(
-                                    parameter_token,
-                                    "unexpected control sequence after a parameter token")
-                                    .add_note(
-                                    "a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
-                                    .cast());
                     }
                 }
             }
@@ -198,10 +198,10 @@ fn parse_replacement_text(
 
     while let Some(token) = input.next()? {
         match token.value() {
-            Character(_, catcode::CatCode::BeginGroup) => {
+            Value::BeginGroup(_) => {
                 scope_depth += 1;
             }
-            Character(_, catcode::CatCode::EndGroup) => {
+            Value::EndGroup(_) => {
                 if scope_depth == 0 {
                     if let Some(final_token) = opt_final_token {
                         push(&mut result, final_token);
@@ -210,7 +210,7 @@ fn parse_replacement_text(
                 }
                 scope_depth -= 1;
             }
-            Character(_, catcode::CatCode::Parameter) => {
+            Value::Parameter(_) => {
                 let parameter_token = match input.next()? {
                     None => {
                         return Err(error::EndOfInputError::new(
@@ -229,11 +229,11 @@ fn parse_replacement_text(
                         .add_note("expected a number between 1 and 9 inclusive")
                         .cast());
                     }
-                    Character(_, catcode::CatCode::Parameter) => {
+                    Value::Parameter(_) => {
                         push(&mut result, parameter_token);
                         continue;
                     }
-                    Character(c, _) => c,
+                    _ => parameter_token.char().unwrap(),
                 };
 
                 let parameter_index = match char_to_parameter_index(c) {

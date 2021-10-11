@@ -16,8 +16,9 @@
 
 use crate::tex::error;
 use crate::tex::token;
-use crate::tex::token::catcode::{CatCode, RawCatCode};
+use crate::tex::token::catcode::CatCode;
 use crate::tex::token::CsNameInterner;
+use crate::tex::token::Token;
 use std::collections::HashMap;
 use std::fmt;
 use std::io;
@@ -57,15 +58,18 @@ pub struct Lexer {
 impl Lexer {
     pub fn next(
         &mut self,
-        map: &HashMap<u32, RawCatCode>,
+        map: &HashMap<u32, CatCode>,
         interner: &mut CsNameInterner,
     ) -> Result<Option<token::Token>, LexerError> {
         while let Some(raw_token) = self.raw_lexer.next(map)? {
+            let c = raw_token.char;
             let value = match raw_token.code {
-                RawCatCode::Escape => self.read_control_sequence(&raw_token, map, interner)?,
-                RawCatCode::EndOfLine | RawCatCode::Regular(CatCode::Space) => {
+                CatCode::Escape => Token::new_control_sequence(
+                    self.read_control_sequence(&raw_token, map, interner)?,
+                ),
+                CatCode::EndOfLine | CatCode::Space => {
                     let num_consumed_new_lines = self.consume_whitespace(map)?
-                        + match raw_token.code == RawCatCode::EndOfLine {
+                        + match raw_token.code == CatCode::EndOfLine {
                             true => 1, // we consumed an additional new line for the first token
                             false => 0,
                         };
@@ -73,16 +77,23 @@ impl Lexer {
                         (true, true) => {
                             continue;
                         }
-                        (true, false) => token::Value::Character(raw_token.char, CatCode::Space),
-                        (false, _) => {
-                            token::Value::ControlSequence('\\', interner.get_or_intern("par"))
-                        }
+                        (true, false) => Token::new_space(raw_token.char),
+                        (false, _) => Token::new_control_sequence(interner.get_or_intern("par")),
                     }
                 }
-                RawCatCode::Regular(code) => token::Value::Character(raw_token.char, code),
-                RawCatCode::Comment => {
+                CatCode::BeginGroup => Token::new_begin_group(c),
+                CatCode::EndGroup => Token::new_end_group(c),
+                CatCode::MathShift => Token::new_math_shift(c),
+                CatCode::AlignmentTab => Token::new_alignment_tab(c),
+                CatCode::Parameter => Token::new_parameter(c),
+                CatCode::Superscript => Token::new_superscript(c),
+                CatCode::Subscript => Token::new_subscript(c),
+                CatCode::Letter => Token::new_letter(c),
+                CatCode::Other => Token::new_other(c),
+                CatCode::Active => Token::new_active_character(c),
+                CatCode::Comment => {
                     while let Some(next_raw_token) = self.raw_lexer.peek(map)? {
-                        if next_raw_token.code == RawCatCode::EndOfLine {
+                        if next_raw_token.code == CatCode::EndOfLine {
                             break;
                         }
                         self.raw_lexer.advance();
@@ -90,26 +101,23 @@ impl Lexer {
                     self.trim_next_whitespace = true;
                     continue;
                 }
-                RawCatCode::Ignored => {
+                CatCode::Ignored => {
                     continue;
                 }
-                RawCatCode::Invalid => return Err(LexerError::InvalidToken),
+                CatCode::Invalid => return Err(LexerError::InvalidToken),
             };
-            self.trim_next_whitespace = matches!(value, token::Value::ControlSequence(..));
-            return Ok(Some(token::Token {
-                value,
-                // source: Some(raw_token.source),
-            }));
+            self.trim_next_whitespace = matches!(value.value(), token::Value::ControlSequence(..));
+            return Ok(Some(value));
         }
         Ok(None)
     }
 
-    fn consume_whitespace(&mut self, map: &HashMap<u32, RawCatCode>) -> Result<usize, LexerError> {
+    fn consume_whitespace(&mut self, map: &HashMap<u32, CatCode>) -> Result<usize, LexerError> {
         let mut num_new_lines: usize = 0;
         while let Some(RawToken { code, .. }) = self.raw_lexer.peek(map)? {
             num_new_lines += match code {
-                RawCatCode::EndOfLine => 1,
-                RawCatCode::Regular(CatCode::Space) => 0,
+                CatCode::EndOfLine => 1,
+                CatCode::Space => 0,
                 _ => {
                     break;
                 }
@@ -122,14 +130,14 @@ impl Lexer {
     fn read_control_sequence(
         &mut self,
         raw_token: &RawToken,
-        map: &HashMap<u32, RawCatCode>,
+        map: &HashMap<u32, CatCode>,
         interner: &mut CsNameInterner,
-    ) -> Result<token::Value, LexerError> {
+    ) -> Result<token::CsName, LexerError> {
         let name = match self.raw_lexer.next(map)? {
             None => {
                 return Err(LexerError::MalformedControlSequence(
                     error::TokenError::new(
-                        token::Token::new_character(raw_token.char, CatCode::Other),
+                        token::Token::new_other(raw_token.char),
                         MALFORMED_CONTROL_SEQUENCE_ERROR_TITLE,
                     )
                     .add_note(MALFORMED_CONTROL_SEQUENCE_ERROR_HELP)
@@ -138,7 +146,7 @@ impl Lexer {
             }
             Some(RawToken {
                 char,
-                code: RawCatCode::Regular(CatCode::Letter),
+                code: CatCode::Letter,
                 ..
             }) => {
                 // _____  _____  ____   _____
@@ -151,7 +159,7 @@ impl Lexer {
                 name.push(char);
                 while let Some(RawToken {
                     char: subsequent_char,
-                    code: RawCatCode::Regular(CatCode::Letter),
+                    code: CatCode::Letter,
                     ..
                 }) = self.raw_lexer.peek(map)?
                 {
@@ -162,10 +170,7 @@ impl Lexer {
             }
             Some(first_raw_token) => first_raw_token.char.to_string(),
         };
-        Ok(token::Value::ControlSequence(
-            raw_token.char,
-            interner.get_or_intern(name),
-        ))
+        Ok(interner.get_or_intern(name))
     }
 
     pub fn last_non_empty_line(&self) -> Option<Rc<token::Line>> {
@@ -181,7 +186,7 @@ impl Lexer {
 }
 
 struct RawToken {
-    code: RawCatCode,
+    code: CatCode,
     char: char,
 }
 
@@ -194,7 +199,7 @@ struct RawLexer {
 }
 
 impl RawLexer {
-    fn next(&mut self, map: &HashMap<u32, RawCatCode>) -> Result<Option<RawToken>, LexerError> {
+    fn next(&mut self, map: &HashMap<u32, CatCode>) -> Result<Option<RawToken>, LexerError> {
         let result = self.peek(map);
         self.advance();
         result
@@ -204,7 +209,7 @@ impl RawLexer {
         self.next_char_index += 1;
     }
 
-    fn peek(&mut self, map: &HashMap<u32, RawCatCode>) -> Result<Option<RawToken>, LexerError> {
+    fn peek(&mut self, map: &HashMap<u32, CatCode>) -> Result<Option<RawToken>, LexerError> {
         self.fill_buffer()?;
         Ok(self
             .current_line_as_chars
@@ -212,7 +217,7 @@ impl RawLexer {
             .copied()
             .map(|char| RawToken {
                 code: match map.get(&(char as u32)) {
-                    None => RawCatCode::Regular(CatCode::Other),
+                    None => CatCode::Other,
                     Some(&code) => code,
                 },
                 char,
@@ -264,12 +269,12 @@ impl RawLexer {
 mod tests {
     use super::*;
     use crate::tex::token::catcode;
-    use crate::tex::token::catcode::{CatCode::*, RawCatCode::*};
+    use crate::tex::token::catcode::CatCode::*;
     use crate::tex::token::Value;
 
     enum TokenValue {
         Character(char, catcode::CatCode),
-        ControlSequence(char, &'static str),
+        ControlSequence(&'static str),
     }
     use TokenValue::Character;
     use TokenValue::ControlSequence;
@@ -277,8 +282,8 @@ mod tests {
     impl TokenValue {
         fn convert(self, interner: &mut CsNameInterner) -> Value {
             match self {
-                ControlSequence(c, name) => Value::ControlSequence(c, interner.get_or_intern(name)),
-                Character(c, cat_code) => Value::Character(c, cat_code),
+                ControlSequence(name) => Value::ControlSequence(interner.get_or_intern(name)),
+                Character(c, cat_code) => Value::new(c, cat_code),
             }
         }
     }
@@ -292,7 +297,7 @@ mod tests {
                 let mut lexer = Lexer::new(f);
                 let mut map = catcode::tex_defaults();
                 map.insert('X' as u32, EndOfLine);
-                map.insert('Y' as u32, Regular(Space));
+                map.insert('Y' as u32, Space);
                 map.insert('Z' as u32, Ignored);
                 let mut actual = Vec::new();
                 while let Some(t) = lexer.next(&map, &mut interner).unwrap() {
@@ -307,7 +312,7 @@ mod tests {
     lexer_test![
         case_1,
         r"\a{b}",
-        ControlSequence('\\', "a"),
+        ControlSequence("a"),
         Character('{', BeginGroup),
         Character('b', Letter),
         Character('}', EndGroup),
@@ -316,28 +321,28 @@ mod tests {
     lexer_test![
         case_2,
         r"\a b",
-        ControlSequence('\\', "a"),
+        ControlSequence("a"),
         Character('b', Letter),
     ];
 
     lexer_test![
         case_3,
         "\\a  b",
-        ControlSequence('\\', "a"),
+        ControlSequence("a"),
         Character('b', Letter),
     ];
 
     lexer_test![
         case_4,
         "\\a\n b",
-        ControlSequence('\\', "a"),
+        ControlSequence("a"),
         Character('b', Letter),
     ];
 
     lexer_test![
         case_5,
         "\\ABC{D}",
-        ControlSequence('\\', "ABC"),
+        ControlSequence("ABC"),
         Character('{', BeginGroup),
         Character('D', Letter),
         Character('}', EndGroup),
@@ -346,20 +351,20 @@ mod tests {
     lexer_test![
         multi_character_control_sequence,
         "\\ABC",
-        ControlSequence('\\', "ABC"),
+        ControlSequence("ABC"),
     ];
 
     lexer_test![
         single_non_letter_character_control_sequence,
         "\\{{",
-        ControlSequence('\\', "{"),
+        ControlSequence("{"),
         Character('{', BeginGroup),
     ];
 
     lexer_test![
         single_non_letter_character_control_sequence_followed_by_letter,
         "\\{A",
-        ControlSequence('\\', "{"),
+        ControlSequence("{"),
         Character('A', Letter),
     ];
 
@@ -390,14 +395,14 @@ mod tests {
         case_12,
         "A%\n\n B",
         Character('A', Letter),
-        ControlSequence('\\', "par"),
+        ControlSequence("par"),
         Character('B', Letter),
     ];
 
     lexer_test![
         case_13,
         "\\A %\nB",
-        ControlSequence('\\', "A"),
+        ControlSequence("A"),
         Character('B', Letter),
     ];
 
@@ -429,7 +434,7 @@ mod tests {
         double_newline_creates_par,
         "A\n\nB",
         Character('A', Letter),
-        ControlSequence('\\', "par"),
+        ControlSequence("par"),
         Character('B', Letter),
     ];
 
@@ -437,7 +442,7 @@ mod tests {
         newline_space_newline_creates_par,
         "A\n \nB",
         Character('A', Letter),
-        ControlSequence('\\', "par"),
+        ControlSequence("par"),
         Character('B', Letter),
     ];
 

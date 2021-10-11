@@ -27,14 +27,14 @@
 //! # use texcraft::tex::token::Token;
 //! # use texcraft::tex::token::catcode::CatCode;
 //! let mut stream = VecStream::new(vec![
-//!     Token::new_character('a', CatCode::Letter),
-//!     Token::new_character('b', CatCode::Letter),
-//!     Token::new_character('c', CatCode::Letter),
+//!     Token::new_letter('a'),
+//!     Token::new_letter('b'),
+//!     Token::new_letter('c'),
 //! ]);
 //!
-//! assert_eq!(stream.next().unwrap(), Some(Token::new_character('a', CatCode::Letter)));
-//! assert_eq!(stream.next().unwrap(), Some(Token::new_character('b', CatCode::Letter)));
-//! assert_eq!(stream.next().unwrap(), Some(Token::new_character('c', CatCode::Letter)));
+//! assert_eq!(stream.next().unwrap(), Some(Token::new_letter('a')));
+//! assert_eq!(stream.next().unwrap(), Some(Token::new_letter('b')));
+//! assert_eq!(stream.next().unwrap(), Some(Token::new_letter('c')));
 //! assert_eq!(stream.next().unwrap(), None);
 //! ```
 //! As with iterators, a result of `Ok(None)` indicates that the stream is exhausted.
@@ -52,15 +52,15 @@
 //! # use texcraft::tex::token::Token;
 //! # use texcraft::tex::token::catcode::CatCode;
 //! let mut stream = VecStream::new(vec![
-//!     Token::new_character('a', CatCode::Letter),
-//!     Token::new_character('b', CatCode::Letter),
-//!     Token::new_character('c', CatCode::Letter),
+//!     Token::new_letter('a'),
+//!     Token::new_letter('b'),
+//!     Token::new_letter('c'),
 //! ]);
 //!
-//! assert_eq!(stream.peek().unwrap(), Some(&Token::new_character('a', CatCode::Letter)));
-//! assert_eq!(stream.peek().unwrap(), Some(&Token::new_character('a', CatCode::Letter)));
-//! assert_eq!(stream.next().unwrap(), Some(Token::new_character('a', CatCode::Letter)));
-//! assert_eq!(stream.peek().unwrap(), Some(&Token::new_character('b', CatCode::Letter)));
+//! assert_eq!(stream.peek().unwrap(), Some(&Token::new_letter('a')));
+//! assert_eq!(stream.peek().unwrap(), Some(&Token::new_letter('a')));
+//! assert_eq!(stream.next().unwrap(), Some(Token::new_letter('a')));
+//! assert_eq!(stream.peek().unwrap(), Some(&Token::new_letter('b')));
 //! ```
 //! The `peek` method returns an immutable reference to the token: because the token is not
 //! being consumed, ownership cannot be transferred as in `next`.
@@ -83,7 +83,6 @@
 //!
 use crate::tex::error;
 use crate::tex::token::Token;
-use crate::tex::token::Value::*;
 
 /// A `Stream` is a source of tokens that are possibly generated on demand.
 ///
@@ -127,15 +126,18 @@ pub fn remove_tokens_from_stream(
             Some(token) => token,
         };
         if &stream_token != prefix_token {
+            /*
             let note = match &prefix_token.value {
-                Character(c, catcode) => format![
-                    "expected a character token with value '{}' and catcode {}",
-                    c, catcode
-                ],
-                ControlSequence(_, _) => {
+                ControlSequence(_) => {
                     format!["expected a control sequence token \\{}", "name"]
                 }
+                _ => format![ //Character(c, catcode) => format![
+                    "expected a character token with value 'todo' and catcode todo",
+                    //c, catcode
+                ],
             };
+             */
+            let note = "todo";
             return Err(error::TokenError::new(
                 stream_token,
                 format!["unexpected token while {}", action],

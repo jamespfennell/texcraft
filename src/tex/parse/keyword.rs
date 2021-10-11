@@ -1,5 +1,4 @@
 use crate::tex::prelude::*;
-use crate::tex::token::catcode::CatCode;
 
 fn optional_by_error(token: Option<Token>) -> anyhow::Error {
     match token {
@@ -19,15 +18,15 @@ fn optional_by_error(token: Option<Token>) -> anyhow::Error {
 pub fn parse_optional_by<S>(stream: &mut ExpandedInput<S>) -> anyhow::Result<()> {
     let next_is_b = get_optional_element![
         stream,
-        Character('b', CatCode::Letter) => (),
-        Character('B', CatCode::Letter) => (),
+        Value::Letter('b') => (),
+        Value::Letter('B') => (),
     ];
     if let Some(()) = next_is_b {
         get_element![
             stream,
             optional_by_error,
-            Character('y', CatCode::Letter) => (),
-            Character('Y', CatCode::Letter) => (),
+            Value::Letter('y') => (),
+            Value::Letter('Y') => (),
         ]
     } else {
         Ok(())

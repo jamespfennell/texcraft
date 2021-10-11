@@ -18,9 +18,9 @@ pub fn parse_relation<T: stream::Stream>(stream: &mut T) -> anyhow::Result<Relat
     get_element![
         stream,
         parse_relation_error,
-        Character('<', CatCode::Other) => Relation::LessThan,
-        Character('=', CatCode::Other) => Relation::Equal,
-        Character('>', CatCode::Other) => Relation::GreaterThan,
+        Value::Other('<') => Relation::LessThan,
+        Value::Other('=') => Relation::Equal,
+        Value::Other('>') => Relation::GreaterThan,
     ]
 }
 
@@ -71,7 +71,7 @@ mod tests {
         let mut map = catcode::tex_defaults();
         map.insert(
             '<' as u32,
-            catcode::RawCatCode::Regular(catcode::CatCode::Letter),
+            catcode::CatCode::Letter,
         );
         let inputs = vec![r"", r"a", r"\A", r"<"];
         for input in inputs.iter() {

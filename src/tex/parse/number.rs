@@ -12,21 +12,21 @@ pub fn parse_number<S, T: PrimInt>(stream: &mut ExpandedInput<S>) -> anyhow::Res
     let modulus: T = match stream.next()? {
         None => return Err(parse_number_error(None)),
         Some(token) => match token.value() {
-            Character('0', CatCode::Other) => parse_decimal(stream, 0)?,
-            Character('1', CatCode::Other) => parse_decimal(stream, 1)?,
-            Character('2', CatCode::Other) => parse_decimal(stream, 2)?,
-            Character('3', CatCode::Other) => parse_decimal(stream, 3)?,
-            Character('4', CatCode::Other) => parse_decimal(stream, 4)?,
-            Character('5', CatCode::Other) => parse_decimal(stream, 5)?,
-            Character('6', CatCode::Other) => parse_decimal(stream, 6)?,
-            Character('7', CatCode::Other) => parse_decimal(stream, 7)?,
-            Character('8', CatCode::Other) => parse_decimal(stream, 8)?,
-            Character('9', CatCode::Other) => parse_decimal(stream, 9)?,
-            Character('\'', CatCode::Other) => parse_octal(stream)?,
-            Character('"', CatCode::Other) => parse_hexadecimal(stream)?,
-            Character('`', CatCode::Other) => parse_character(stream)?,
-            ControlSequence(_, ref name) => {
-                let cmd = stream.base().get_command(name);
+            Value::Other('0') => parse_decimal(stream, 0)?,
+            Value::Other('1') => parse_decimal(stream, 1)?,
+            Value::Other('2') => parse_decimal(stream, 2)?,
+            Value::Other('3') => parse_decimal(stream, 3)?,
+            Value::Other('4') => parse_decimal(stream, 4)?,
+            Value::Other('5') => parse_decimal(stream, 5)?,
+            Value::Other('6') => parse_decimal(stream, 6)?,
+            Value::Other('7') => parse_decimal(stream, 7)?,
+            Value::Other('8') => parse_decimal(stream, 8)?,
+            Value::Other('9') => parse_decimal(stream, 9)?,
+            Value::Other('\'') => parse_octal(stream)?,
+            Value::Other('"') => parse_hexadecimal(stream)?,
+            Value::Other('`') => parse_character(stream)?,
+            ControlSequence(name) => {
+                let cmd = stream.base().get_command(&name);
                 if let Some(command::Command::Variable(cmd_ref)) = cmd {
                     // TODO: don't clone here, use the same trick as the driver?
                     let cmd = *cmd_ref;
@@ -40,7 +40,7 @@ pub fn parse_number<S, T: PrimInt>(stream: &mut ExpandedInput<S>) -> anyhow::Res
             _ => return Err(parse_number_error(Some(token))),
         },
     };
-    get_optional_element![stream, Character(_, CatCode::Space) => (),];
+    get_optional_element![stream, Value::Space(_) => (),];
     match sign {
         None => Ok(modulus),
         Some(minus_token) => match num_traits::cast::cast::<_, T>(-1) {
@@ -58,9 +58,9 @@ fn parse_optional_signs<T: stream::Stream>(stream: &mut T) -> anyhow::Result<Opt
     let mut result = None;
     while let Some((sign, token)) = get_optional_element_with_token![
         stream,
-        Character('+', CatCode::Other) => true,
-        Character('-', CatCode::Other) => false,
-        Character(_, CatCode::Space) => true,
+        Value::Other('+') => true,
+        Value::Other('-') => false,
+        Value::Space(_) => true,
     ] {
         result = match (result.is_none(), sign) {
             (true, true) => None,
@@ -82,10 +82,8 @@ fn parse_number_error(token: Option<Token>) -> anyhow::Error {
                 error::TokenError::new(token, "unexpected control sequence while parsing a number")
                     .cast()
             }
-            Character(_, _) => {
-                error::TokenError::new(token, "unexpected character token when parsing a number")
-                    .cast()
-            }
+            _ => error::TokenError::new(token, "unexpected character token when parsing a number")
+                .cast(),
         },
     }
 }
@@ -119,13 +117,13 @@ fn parse_character<S: stream::Stream, T: PrimInt>(stream: &mut S) -> anyhow::Res
         )
         .cast()),
         Some(token) => match token.value() {
-            // TODO: error if the character is too big!
-            Character(c, _) => Ok(num_traits::cast::cast(c as i32).unwrap()),
             ControlSequence(..) => Err(error::TokenError::new(
                 token,
                 "unexpected control sequence while parsing a character number",
             )
             .cast()),
+            // TODO: error if the character is too big!
+            _ => Ok(num_traits::cast::cast(token.char().unwrap() as i32).unwrap()),
         },
     }
 }
@@ -134,26 +132,26 @@ fn parse_octal<S: stream::Stream, T: PrimInt>(stream: &mut S) -> anyhow::Result<
     let mut n = num_traits::cast::cast(get_element![
         stream,
         parse_number_error,
-            Character('0', CatCode::Other) => 0,
-            Character('1', CatCode::Other) => 1,
-            Character('2', CatCode::Other) => 2,
-            Character('3', CatCode::Other) => 3,
-            Character('4', CatCode::Other) => 4,
-            Character('5', CatCode::Other) => 5,
-            Character('6', CatCode::Other) => 6,
-            Character('7', CatCode::Other) => 7,
+            Value::Other('0') => 0,
+            Value::Other('1') => 1,
+            Value::Other('2') => 2,
+            Value::Other('3') => 3,
+            Value::Other('4') => 4,
+            Value::Other('5') => 5,
+            Value::Other('6') => 6,
+            Value::Other('7') => 7,
     ]?)
     .unwrap();
     while let Some(lsd) = get_optional_element![
         stream,
-        Character('0', CatCode::Other) => 0,
-        Character('1', CatCode::Other) => 1,
-        Character('2', CatCode::Other) => 2,
-        Character('3', CatCode::Other) => 3,
-        Character('4', CatCode::Other) => 4,
-        Character('5', CatCode::Other) => 5,
-        Character('6', CatCode::Other) => 6,
-        Character('7', CatCode::Other) => 7,
+        Value::Other('0') => 0,
+        Value::Other('1') => 1,
+        Value::Other('2') => 2,
+        Value::Other('3') => 3,
+        Value::Other('4') => 4,
+        Value::Other('5') => 5,
+        Value::Other('6') => 6,
+        Value::Other('7') => 7,
     ] {
         n = add_lsd(n, 8, lsd);
     }
@@ -164,16 +162,16 @@ fn parse_decimal<S: stream::Stream, T: PrimInt>(stream: &mut S, n_start: i8) -> 
     let mut n: T = num_traits::cast::cast(n_start).unwrap();
     while let Some(lsd) = get_optional_element![
         stream,
-        Character('0', CatCode::Other) => 0,
-        Character('1', CatCode::Other) => 1,
-        Character('2', CatCode::Other) => 2,
-        Character('3', CatCode::Other) => 3,
-        Character('4', CatCode::Other) => 4,
-        Character('5', CatCode::Other) => 5,
-        Character('6', CatCode::Other) => 6,
-        Character('7', CatCode::Other) => 7,
-        Character('8', CatCode::Other) => 8,
-        Character('9', CatCode::Other) => 9,
+        Value::Other('0') => 0,
+        Value::Other('1') => 1,
+        Value::Other('2') => 2,
+        Value::Other('3') => 3,
+        Value::Other('4') => 4,
+        Value::Other('5') => 5,
+        Value::Other('6') => 6,
+        Value::Other('7') => 7,
+        Value::Other('8') => 8,
+        Value::Other('9') => 9,
     ] {
         n = add_lsd(n, 10, lsd);
     }
@@ -184,58 +182,58 @@ fn parse_hexadecimal<S: stream::Stream, T: PrimInt>(stream: &mut S) -> anyhow::R
     let mut n: T = num_traits::cast::cast(get_element![
         stream,
         parse_number_error,
-            Character('0', CatCode::Other) => 0,
-            Character('1', CatCode::Other) => 1,
-            Character('2', CatCode::Other) => 2,
-            Character('3', CatCode::Other) => 3,
-            Character('4', CatCode::Other) => 4,
-            Character('5', CatCode::Other) => 5,
-            Character('6', CatCode::Other) => 6,
-            Character('7', CatCode::Other) => 7,
-            Character('8', CatCode::Other) => 8,
-            Character('9', CatCode::Other) => 9,
+            Value::Other('0') => 0,
+            Value::Other('1') => 1,
+            Value::Other('2') => 2,
+            Value::Other('3') => 3,
+            Value::Other('4') => 4,
+            Value::Other('5') => 5,
+            Value::Other('6') => 6,
+            Value::Other('7') => 7,
+            Value::Other('8') => 8,
+            Value::Other('9') => 9,
 
-            Character('A', CatCode::Other) => 10,
-            Character('B', CatCode::Other) => 11,
-            Character('C', CatCode::Other) => 12,
-            Character('D', CatCode::Other) => 13,
-            Character('E', CatCode::Other) => 14,
-            Character('F', CatCode::Other) => 15,
+            Value::Other('A') => 10,
+            Value::Other('B') => 11,
+            Value::Other('C') => 12,
+            Value::Other('D') => 13,
+            Value::Other('E') => 14,
+            Value::Other('F') => 15,
 
-            Character('A', CatCode::Letter) => 10,
-            Character('B', CatCode::Letter) => 11,
-            Character('C', CatCode::Letter) => 12,
-            Character('D', CatCode::Letter) => 13,
-            Character('E', CatCode::Letter) => 14,
-            Character('F', CatCode::Letter) => 15,
+            Value::Letter('A') => 10,
+            Value::Letter('B') => 11,
+            Value::Letter('C') => 12,
+            Value::Letter('D') => 13,
+            Value::Letter('E') => 14,
+            Value::Letter('F') => 15,
     ]?)
     .unwrap();
     while let Some(lsd) = get_optional_element![
         stream,
-        Character('0', CatCode::Other) => 0,
-        Character('1', CatCode::Other) => 1,
-        Character('2', CatCode::Other) => 2,
-        Character('3', CatCode::Other) => 3,
-        Character('4', CatCode::Other) => 4,
-        Character('5', CatCode::Other) => 5,
-        Character('6', CatCode::Other) => 6,
-        Character('7', CatCode::Other) => 7,
-        Character('8', CatCode::Other) => 8,
-        Character('9', CatCode::Other) => 9,
+        Value::Other('0') => 0,
+        Value::Other('1') => 1,
+        Value::Other('2') => 2,
+        Value::Other('3') => 3,
+        Value::Other('4') => 4,
+        Value::Other('5') => 5,
+        Value::Other('6') => 6,
+        Value::Other('7') => 7,
+        Value::Other('8') => 8,
+        Value::Other('9') => 9,
 
-        Character('A', CatCode::Other) => 10,
-        Character('B', CatCode::Other) => 11,
-        Character('C', CatCode::Other) => 12,
-        Character('D', CatCode::Other) => 13,
-        Character('E', CatCode::Other) => 14,
-        Character('F', CatCode::Other) => 15,
+            Value::Other('A') => 10,
+            Value::Other('B') => 11,
+            Value::Other('C') => 12,
+            Value::Other('D') => 13,
+            Value::Other('E') => 14,
+            Value::Other('F') => 15,
 
-        Character('A', CatCode::Letter) => 10,
-        Character('B', CatCode::Letter) => 11,
-        Character('C', CatCode::Letter) => 12,
-        Character('D', CatCode::Letter) => 13,
-        Character('E', CatCode::Letter) => 14,
-        Character('F', CatCode::Letter) => 15,
+        Value::Letter('A') => 10,
+        Value::Letter('B') => 11,
+        Value::Letter('C') => 12,
+        Value::Letter('D') => 13,
+        Value::Letter('E') => 14,
+        Value::Letter('F') => 15,
     ] {
         n = add_lsd(n, 16, lsd);
     }

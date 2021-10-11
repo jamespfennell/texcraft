@@ -1,6 +1,6 @@
 use crate::tex::parse;
 use crate::tex::prelude::*;
-use crate::tex::token::catcode::RawCatCode;
+use crate::tex::token::catcode::CatCode;
 use crate::tex::variable;
 use crate::tex::variable::TypedVariable;
 use crate::tex::variable::Variable;
@@ -12,24 +12,24 @@ const CATCODE_DOC: &str = "Get or set a catcode register";
 /// A component holding the current category code values.
 pub struct Component {
     // TODO: maybe keying off of u32 is the wrong choice, because these may not be valid unicode characters.
-    cat_codes: HashMap<u32, RawCatCode>,
-    fallback: RawCatCode,
+    cat_codes: HashMap<u32, CatCode>,
+    fallback: CatCode,
 }
 
 impl Component {
-    pub fn new(initial_cat_codes: HashMap<u32, RawCatCode>) -> Component {
+    pub fn new(initial_cat_codes: HashMap<u32, CatCode>) -> Component {
         Component {
             cat_codes: initial_cat_codes,
-            fallback: RawCatCode::default(),
+            fallback: CatCode::default(),
         }
     }
 
-    pub fn cat_codes_map(&self) -> &HashMap<u32, RawCatCode> {
+    pub fn cat_codes_map(&self) -> &HashMap<u32, CatCode> {
         &self.cat_codes
     }
 }
 
-fn read_catcode_register_fn<S>(state: &Base<S>, addr: usize) -> &RawCatCode {
+fn read_catcode_register_fn<S>(state: &Base<S>, addr: usize) -> &CatCode {
     let addr = u32::try_from(addr).unwrap();
     state
         .cat_codes
@@ -38,13 +38,13 @@ fn read_catcode_register_fn<S>(state: &Base<S>, addr: usize) -> &RawCatCode {
         .unwrap_or(&state.cat_codes.fallback)
 }
 
-fn write_catcode_register_fn<S>(state: &mut Base<S>, addr: usize) -> &mut RawCatCode {
+fn write_catcode_register_fn<S>(state: &mut Base<S>, addr: usize) -> &mut CatCode {
     let addr = u32::try_from(addr).unwrap();
     state
         .cat_codes
         .cat_codes
         .entry(addr)
-        .or_insert_with(RawCatCode::default)
+        .or_insert_with(CatCode::default)
 }
 
 fn catcode_fn<S>(

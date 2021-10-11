@@ -125,6 +125,6 @@ fn init_state() -> Base<WholeLibraryState> {
     let mut s = WholeLibraryState::new();
     s.set_command("par", execwhitespace::get_par());
     s.set_command("newline", execwhitespace::get_newline());
-    s.set_command("\\", command::Command::Character('\\', CatCode::Other));
+    s.set_command("\\", command::Command::Character(Token::new_other('\\')));
     s
 }

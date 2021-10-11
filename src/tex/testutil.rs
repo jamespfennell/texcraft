@@ -24,16 +24,14 @@ macro_rules! expansion_test {
                 true => {
                     let mut result = true;
                     for (token_1, token_2) in output_1.iter().zip(output_2.iter()) {
-                        use crate::tex::token::Value::Character;
                         use crate::tex::token::Value::ControlSequence;
                         let token_equal = match (&token_1.value(), &token_2.value()) {
-                            (Character(..), Character(..)) => token_1.value() == token_2.value(),
-                            (ControlSequence(c_1, cs_name_1), ControlSequence(c_2, cs_name_2)) => {
+                            (ControlSequence(cs_name_1), ControlSequence(cs_name_2)) => {
                                 let name_1 = state_1.cs_names.resolve(cs_name_1);
                                 let name_2 = state_2.cs_names.resolve(cs_name_2);
-                                c_1 == c_2 && name_1 == name_2
+                                name_1 == name_2
                             }
-                            _ => false,
+                            _ => token_1 == token_2,
                         };
                         if !token_equal {
                             result = false;
@@ -98,7 +96,7 @@ pub fn tokenize(input: &str) -> stream::VecStream {
 
 pub fn tokenize_with_map(
     input: &str,
-    cat_codes: &HashMap<u32, catcode::RawCatCode>,
+    cat_codes: &HashMap<u32, catcode::CatCode>,
 ) -> stream::VecStream {
     let mut interner = CsNameInterner::new();
     let f = Box::new(io::Cursor::new(input.to_string()));

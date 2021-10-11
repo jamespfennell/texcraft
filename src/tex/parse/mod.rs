@@ -20,7 +20,7 @@ use crate::tex::prelude::*;
 use super::token::CsName;
 
 pub fn parse_optional_space<S>(input: &mut command::ExpandedInput<S>) -> anyhow::Result<()> {
-    get_optional_element![input, Character(_, CatCode::Space) => (),];
+    get_optional_element![input, Value::Space(_) => (),];
     Ok(())
 }
 
@@ -43,7 +43,7 @@ pub fn parse_command_target<S: stream::Stream>(
             .cast());
         }
         Some(token) => match token.value() {
-            ControlSequence(_, name) => name,
+            ControlSequence(name) => name,
             _ => {
                 return Err(error::TokenError::new(
                     token,
@@ -69,10 +69,10 @@ pub fn parse_balanced_tokens<S: stream::Stream>(
     let mut scope_depth = 0;
     while let Some(token) = stream.next()? {
         match token.value() {
-            Character(_, CatCode::BeginGroup) => {
+            Value::BeginGroup(_) => {
                 scope_depth += 1;
             }
-            Character(_, CatCode::EndGroup) => {
+            Value::EndGroup(_) => {
                 if scope_depth == 0 {
                     return Ok(Some(result));
                 }

@@ -43,8 +43,37 @@ pub struct CsName(DefaultSymbol);
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum Value {
-    Character(char, CatCode),
-    ControlSequence(char, CsName),
+    BeginGroup(char),
+    EndGroup(char),
+    MathShift(char),
+    AlignmentTab(char),
+    Parameter(char),
+    Superscript(char),
+    Subscript(char),
+    Space(char),
+    Letter(char),
+    Other(char),
+    Active(char),
+    ControlSequence(CsName),
+}
+
+impl Value {
+    pub fn new(c: char, cat_code: CatCode) -> Value {
+        match cat_code {
+            CatCode::BeginGroup => Value::BeginGroup(c),
+            CatCode::EndGroup => Value::EndGroup(c),
+            CatCode::MathShift => Value::MathShift(c),
+            CatCode::AlignmentTab => Value::AlignmentTab(c),
+            CatCode::Parameter => Value::Parameter(c),
+            CatCode::Superscript => Value::Superscript(c),
+            CatCode::Subscript => Value::Subscript(c),
+            CatCode::Space => Value::Space(c),
+            CatCode::Letter => Value::Letter(c),
+            CatCode::Other => Value::Other(c),
+            CatCode::Active => Value::Active(c),
+            _ => panic!("raw cat code not allowed")
+        }
+    }
 }
 
 #[derive(Debug, Eq, Clone, Copy)]
@@ -56,11 +85,11 @@ pub struct Token {
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.value {
-            Value::Character(c, _) => {
-                write![f, "{}", c]
+            Value::ControlSequence(_) => {
+                write![f, "todo"] // TODO
             }
-            Value::ControlSequence(prefix, _) => {
-                write![f, "{}todo", prefix] // TODO
+            _ => {
+                write![f, "{}", self.char().unwrap()]
             }
         }
     }
@@ -71,16 +100,30 @@ impl PartialEq for Token {
     }
 }
 
-impl Token {
-    pub fn new_character(c: char, cat_code: CatCode) -> Token {
-        Token {
-            value: Value::Character(c, cat_code),
+macro_rules! token_constructor {
+    ($name: ident, $value: expr) => {
+        pub fn $name(c: char) -> Token {
+            Token { value: $value(c) }
         }
-    }
+    };
+}
 
-    pub fn new_control_sequence(prefix: char, name: CsName) -> Token {
+impl Token {
+    token_constructor!(new_begin_group, Value::BeginGroup);
+    token_constructor!(new_end_group, Value::EndGroup);
+    token_constructor!(new_math_shift, Value::MathShift);
+    token_constructor!(new_alignment_tab, Value::AlignmentTab);
+    token_constructor!(new_parameter, Value::Parameter);
+    token_constructor!(new_superscript, Value::Superscript);
+    token_constructor!(new_subscript, Value::Subscript);
+    token_constructor!(new_space, Value::Space);
+    token_constructor!(new_letter, Value::Letter);
+    token_constructor!(new_other, Value::Other);
+    token_constructor!(new_active_character, Value::Active);
+
+    pub fn new_control_sequence(name: CsName) -> Token {
         Token {
-            value: Value::ControlSequence(prefix, name),
+            value: Value::ControlSequence(name),
         }
     }
 
@@ -90,6 +133,23 @@ impl Token {
 
     pub fn source(&self) -> Option<&Source> {
         None
+    }
+
+    pub fn char(&self) -> Option<char> {
+        match self.value {
+            Value::BeginGroup(c) => Some(c),
+            Value::EndGroup(c) => Some(c),
+            Value::MathShift(c) => Some(c),
+            Value::AlignmentTab(c) => Some(c),
+            Value::Parameter(c) => Some(c),
+            Value::Superscript(c) => Some(c),
+            Value::Subscript(c) => Some(c),
+            Value::Space(c) => Some(c),
+            Value::Letter(c) => Some(c),
+            Value::Other(c) => Some(c),
+            Value::Active(c) => Some(c),
+            Value::ControlSequence(..) => None,
+        }
     }
 }
 
@@ -115,20 +175,22 @@ where
     let mut preceeding_space = true;
     for token in tokens.into_iter() {
         match &token.value {
-            Value::Character(c, cat_code) => {
-                // If this space character is redundant, don't write it.
-                // An exception is made for newline characters, which are considered intentional.
-                if preceeding_space && cat_code == &CatCode::Space && *c != '\n' {
+            Value::ControlSequence(s) => {
+                let name = interner.resolve(s).unwrap_or("invalidCsName");
+                result.push('\\');
+                result.push_str(name);
+                result.push(' ');
+                preceeding_space = false;
+            }
+            Value::Space(c) => {
+                if preceeding_space && *c != '\n' {
                     continue;
                 }
                 result.push(*c);
-                preceeding_space = cat_code == &CatCode::Space;
+                preceeding_space = false;
             }
-            Value::ControlSequence(c, s) => {
-                let name = interner.resolve(s).unwrap_or("invalidCsName");
-                result.push(*c);
-                result.push_str(name);
-                result.push(' ');
+            _ => {
+                result.push(token.char().unwrap());
                 preceeding_space = false;
             }
         }
@@ -142,9 +204,9 @@ mod tests {
 
     #[test]
     fn token_size() {
-        assert_eq!(std::mem::size_of::<Token>(), 12);
-        assert_eq!(std::mem::size_of::<Result<Token, ()>>(), 12);
-        assert_eq!(std::mem::size_of::<Result<Option<Token>, ()>>(), 12);
+        assert_eq!(std::mem::size_of::<Token>(), 8);
+        assert_eq!(std::mem::size_of::<Result<Token, ()>>(), 8);
+        assert_eq!(std::mem::size_of::<Result<Option<Token>, ()>>(), 8);
         assert_eq!(std::mem::size_of::<anyhow::Result<Token>>(), 16);
     }
 }

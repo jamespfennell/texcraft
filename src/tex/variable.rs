@@ -150,7 +150,7 @@
 //! | Glue      | TBD            | `\skip`                  | Not implemented
 //! | Muglue    | TBD            | `\muskip`                | Not implemented
 //! | Box       | TBD            | `\box` and `\setbox`     | Not implemented
-//! | Category code  | [RawCatCode](super::token::catcode::RawCatCode) | `\catcode` | Implemented
+//! | Category code  | [CatCode](super::token::catcode::CatCode) | `\catcode` | Implemented
 //! | Math code | TBD            | `\mathcode`              | Not implemented
 //! | Delimiter code | TBD       | `\delcode`               | Not implemented
 //! | Space factor code | TBD    | `\sfcode`                | Not implemented
@@ -174,7 +174,7 @@ use crate::tex::error;
 use crate::tex::parse;
 use crate::tex::state::Base;
 use crate::tex::token;
-use crate::tex::token::catcode::RawCatCode;
+use crate::tex::token::catcode::CatCode;
 
 /// Enum with a variant for each type of variable in TeX.
 pub enum Variable<S> {
@@ -182,7 +182,7 @@ pub enum Variable<S> {
     BaseInt(TypedVariable<Base<S>, i32>),
 
     /// CatCode variables can live in the Base, so the type is a little different here.
-    CatCode(TypedVariable<Base<S>, RawCatCode>),
+    CatCode(TypedVariable<Base<S>, CatCode>),
 }
 
 impl<S> Copy for Variable<S> {}
@@ -299,7 +299,7 @@ impl<S> Command<S> {
             Variable::CatCode(variable) => {
                 // TODO: don't use u8 here, use usize to get better error messages
                 let val: u8 = parse::parse_number(input.regular())?;
-                match RawCatCode::from_int(val) {
+                match CatCode::from_int(val) {
                     None => {
                         return Err(error::TokenError::new(
                             token,

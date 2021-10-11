@@ -4,7 +4,6 @@ use crate::tex::command::library::conditional;
 use crate::tex::command::Command;
 use crate::tex::prelude::*;
 use crate::tex::token;
-use crate::tex::token::catcode::RawCatCode;
 use crate::tex::token::lexer;
 use crate::tex::token::CsNameInterner;
 use crate::tex::token::Token;
@@ -42,10 +41,7 @@ pub fn run<S>(
                     break;
                 }
                 Some(token) => match token.value() {
-                    Character(..) => {
-                        character_handler(token, execution_input.base_mut())?;
-                    }
-                    ControlSequence(_, name) => match execution_input.base().get_command(&name) {
+                    ControlSequence(name) => match execution_input.base().get_command(&name) {
                         Some(Command::Execution(cmd_ref)) => {
                             // We need to copy the command to avoid a borrow checker error. This is because
                             // `cmd_ref` keeps an immutable reference to the state alive, but in the `call`
@@ -62,14 +58,16 @@ pub fn run<S>(
                             let cmd = *cmd_ref;
                             cmd.call(token, execution_input)?;
                         }
-                        Some(Command::Character(c, cat_code)) => {
-                            let token = Token::new_character(*c, *cat_code);
-                            character_handler(token, execution_input.base_mut())?;
+                        Some(Command::Character(token)) => {
+                            character_handler(*token, execution_input.base_mut())?;
                         }
                         _ => {
                             undefined_cs_handler(token, execution_input.base_mut())?;
                         }
                     },
+                    _ => {
+                        character_handler(token, execution_input.base_mut())?;
+                    }
                 },
             },
             Err(mut error) => {
@@ -82,8 +80,8 @@ pub fn run<S>(
 }
 
 fn handle_character<S>(mut token: token::Token, state: &mut Base<S>) -> anyhow::Result<()> {
-    if let token::Value::Character('\n', cat_code) = token.value() {
-        token = Token::new_character(' ', cat_code);
+    if let Some('\n') = token.char() {
+        token = Token::new_space(' ');
     }
     state.exec_output.push(token);
     state.num_trailing_newlines = 0;
@@ -159,7 +157,7 @@ impl InputController {
     #[inline]
     fn next(
         &mut self,
-        cat_code_map: &HashMap<u32, RawCatCode>,
+        cat_code_map: &HashMap<u32, CatCode>,
         interner: &mut CsNameInterner,
     ) -> anyhow::Result<Option<token::Token>> {
         if let Some(token) = self.current_source.next_token.take() {
@@ -176,7 +174,7 @@ impl InputController {
 
     fn next_recurse(
         &mut self,
-        cat_code_map: &HashMap<u32, RawCatCode>,
+        cat_code_map: &HashMap<u32, CatCode>,
         interner: &mut CsNameInterner,
     ) -> anyhow::Result<Option<token::Token>> {
         if self.pop_source() {
@@ -189,7 +187,7 @@ impl InputController {
     #[inline]
     fn peek(
         &mut self,
-        cat_code_map: &HashMap<u32, RawCatCode>,
+        cat_code_map: &HashMap<u32, CatCode>,
         interner: &mut CsNameInterner,
     ) -> anyhow::Result<Option<&token::Token>> {
         if self.current_source.next_token.is_some() {
@@ -208,7 +206,7 @@ impl InputController {
 
     fn peek_recurse(
         &mut self,
-        cat_code_map: &HashMap<u32, RawCatCode>,
+        cat_code_map: &HashMap<u32, CatCode>,
         interner: &mut CsNameInterner,
     ) -> anyhow::Result<Option<&token::Token>> {
         if self.pop_source() {
@@ -361,8 +359,8 @@ impl<S> ExpandedInput<S> {
         let command = match self.raw_stream.peek()? {
             None => return Ok(false),
             Some(token) => match token.value() {
-                Character(..) => return Ok(false),
-                ControlSequence(_, ref name) => self.base().get_command(name),
+                ControlSequence(name) => self.base().get_command(&name),
+                _ => return Ok(false),
             },
         };
         let command = match command {

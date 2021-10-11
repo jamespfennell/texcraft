@@ -4,7 +4,6 @@ use crate::algorithms::substringsearch::KMPMatcherFactory;
 use crate::tex::error;
 use crate::tex::parse;
 use crate::tex::prelude::*;
-use crate::tex::token::catcode;
 use crate::tex::token::stream;
 use crate::tex::token::write_tokens;
 use crate::tex::token::CsNameInterner;
@@ -154,15 +153,15 @@ impl Parameter {
         // will end with a scope depth of 1, because the last token parsed will be the { and all braces before that will
         // be balanced.
         let closing_scope_depth = match matcher_factory.substring().last().value() {
-            Character(_, catcode::CatCode::BeginGroup) => 1,
+            Value::BeginGroup(_) => 1,
             _ => 0,
         };
         while let Some(token) = stream.next()? {
             match token.value() {
-                Character(_, catcode::CatCode::BeginGroup) => {
+                Value::BeginGroup(_) => {
                     scope_depth += 1;
                 }
-                Character(_, catcode::CatCode::EndGroup) => {
+                Value::EndGroup(_) => {
                     scope_depth -= 1;
                 }
                 _ => (),
@@ -204,13 +203,13 @@ impl Parameter {
             return;
         }
         match list[0].value() {
-            Character(_, catcode::CatCode::BeginGroup) => (),
+            Value::BeginGroup(_) => (),
             _ => {
                 return;
             }
         }
         match list[list.len() - 1].value() {
-            Character(_, catcode::CatCode::EndGroup) => (),
+            Value::EndGroup(_) => (),
             _ => {
                 return;
             }
@@ -234,7 +233,7 @@ impl Parameter {
                 .cast());
             }
             Some(token) => match token.value() {
-                Character(_, catcode::CatCode::BeginGroup) => token,
+                Value::BeginGroup(_) => token,
                 _ => {
                     return Ok(vec![token]);
                 }

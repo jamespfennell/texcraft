@@ -25,11 +25,11 @@ fn let_primitive_fn<S>(let_token: Token, input: &mut ExecutionInput<S>) -> anyho
             )
             .cast()),
             Some(token) => match token.value() {
-                Character(c, cat_code) => command::Command::Character(c, cat_code),
-                ControlSequence(_, ref name) => match input.base().get_command(name) {
+                ControlSequence(name) => match input.base().get_command(&name) {
                     None => return Err(error::new_undefined_cs_error(token, input.base())),
                     Some(cmd) => cmd.clone(),
                 },
+                _ => command::Command::Character(token),
             },
         };
     input.base_mut().set_command_2(name, command);

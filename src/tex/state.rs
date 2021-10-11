@@ -117,7 +117,7 @@ use crate::datastructures::groupingmap::GroupingMap;
 use crate::tex::command;
 use crate::tex::command::library::catcodecmd;
 use crate::tex::token;
-use crate::tex::token::catcode::RawCatCode;
+use crate::tex::token::catcode::CatCode;
 use crate::tex::token::CsNameInterner;
 use std::collections::HashMap;
 
@@ -139,7 +139,7 @@ pub struct Base<S> {
 /// Base state that every TeX state is expected to include using composition.
 impl<S> Base<S> {
     /// Create a new BaseState.
-    pub fn new(initial_cat_codes: HashMap<u32, RawCatCode>, state: S) -> Base<S> {
+    pub fn new(initial_cat_codes: HashMap<u32, CatCode>, state: S) -> Base<S> {
         Base {
             primitives: GroupingMap::new(),
             cat_codes: catcodecmd::Component::new(initial_cat_codes),
@@ -169,11 +169,11 @@ impl<S> Base<S> {
         self.primitives.insert(name, cmd)
     }
 
-    pub fn cat_code_map(&self) -> &HashMap<u32, RawCatCode> {
+    pub fn cat_code_map(&self) -> &HashMap<u32, CatCode> {
         self.cat_codes.cat_codes_map()
     }
 
-    pub fn input_components(&mut self) -> (&HashMap<u32, RawCatCode>, &mut CsNameInterner) {
+    pub fn input_components(&mut self) -> (&HashMap<u32, CatCode>, &mut CsNameInterner) {
         (self.cat_codes.cat_codes_map(), &mut self.cs_names)
     }
 }

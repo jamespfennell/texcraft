@@ -30,8 +30,8 @@ impl Line {
             line_number: source.line.line_number,
             position: source.position,
             width: match token.value() {
-                Value::Character(_, _) => 1,
-                Value::ControlSequence(_, _) => 100, // TODO + name.len(),
+                Value::ControlSequence(_) => 100, // TODO + name.len(),
+                _ => 1,
             },
             file_description: source.line.file.to_string(),
         })
@@ -158,17 +158,21 @@ impl TokenError {
                 line_number: source.line.line_number,
                 position: source.position,
                 width: match token.value() {
-                    Value::Character(_, _) => 1,
-                    Value::ControlSequence(_, _) => 100, // TODO
+                    Value::ControlSequence(_) => 100, // TODO
+                    _ => 1,
                 },
                 file_description: "".to_string(), // TODO token.source.line.file.bo).clone(),
             },
-            s: match token.value() {
+            s: "".to_string(),
+            /*
+            match token.value() {
                 Value::Character(_, cat_code) => {
+
                     format!["catcode is {}", cat_code]
                 }
                 Value::ControlSequence(_, _) => "".to_string(),
             },
+                */
             message: T::into(message),
             notes: vec![],
         }
@@ -267,7 +271,7 @@ pub fn add_context<S>(error: &mut anyhow::Error, execution_input: &driver::Execu
 pub fn new_undefined_cs_error<S>(token: token::Token, state: &Base<S>) -> anyhow::Error {
     let a = "expected a control sequence".to_string();
     let name = match &token.value() {
-        token::Value::ControlSequence(_, name) => state.cs_names.resolve(name).expect(""),
+        token::Value::ControlSequence(name) => state.cs_names.resolve(name).expect(""),
         _ => &a,
     };
 
