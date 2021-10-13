@@ -290,6 +290,20 @@ impl<S> stream::Stream for UnexpandedStream<S> {
     }
 }
 
+impl<S> UnexpandedStream<S> {
+    /// Returns a reference to the base state.
+    #[inline]
+    pub fn base(&self) -> &Base<S> {
+        &self.state
+    }
+
+    /// Returns a mutable reference to the input controller.
+    #[inline]
+    pub fn controller_mut(&mut self) -> &mut InputController {
+        &mut self.input
+    }
+}
+
 /// Type that provides access to the input stream (with or without expansion) and the state.
 ///
 /// This type satisfies the [Stream](stream::Stream) trait. As a stream, it returns expanded tokens
@@ -297,6 +311,7 @@ impl<S> stream::Stream for UnexpandedStream<S> {
 /// [unexpanded_stream](ExpandedInput::unexpanded_stream) method.
 pub struct ExpandedInput<S> {
     raw_stream: UnexpandedStream<S>,
+    scratch_space: Vec<Token>,
 }
 
 impl<S> stream::Stream for ExpandedInput<S> {
@@ -347,6 +362,10 @@ impl<S> ExpandedInput<S> {
     #[inline]
     pub fn unexpanded_stream(&mut self) -> &mut UnexpandedStream<S> {
         &mut self.raw_stream
+    }
+
+    pub fn unexpanded_and_scratch_space(&mut self) -> (&mut UnexpandedStream<S>, &mut Vec<Token>) {
+        (&mut self.raw_stream, &mut self.scratch_space)
     }
 
     /// Expands the next token in the input stream.
@@ -445,6 +464,7 @@ impl<S> ExecutionInput<S> {
                     state,
                     input: InputController::new_empty(),
                 },
+                scratch_space: Vec::new(),
             },
         }
     }
@@ -456,6 +476,7 @@ impl<S> ExecutionInput<S> {
                     state,
                     input: InputController::new_with_source(reader),
                 },
+                scratch_space: Vec::new(),
             },
         }
     }
@@ -466,6 +487,7 @@ impl<S> ExecutionInput<S> {
                     state,
                     input: InputController::new_with_str(s),
                 },
+                scratch_space: Vec::new(),
             },
         }
     }

@@ -1,5 +1,7 @@
 //! Primitives for creating user-defined macros (`\def` and friends).
 
+use arrayvec::ArrayVec;
+
 use crate::algorithms::substringsearch::KMPMatcherFactory;
 use crate::datastructures::nevec::Nevec;
 use crate::tex::error;
@@ -26,7 +28,7 @@ fn def_primitive_fn<S>(def_token: Token, input: &mut ExecutionInput<S>) -> anyho
         parse::parse_command_target("macro definition", def_token, input.unexpanded_stream())?;
     let (prefix, raw_parameters, replacement_end_token) =
         parse_prefix_and_parameters(input.unexpanded_stream())?;
-    let parameters: Vec<Parameter> = raw_parameters
+    let parameters: ArrayVec<Parameter, 9> = raw_parameters
         .into_iter()
         .map(|a| match a {
             RawParameter::Undelimited => Parameter::Undelimited,

@@ -71,7 +71,7 @@ impl Value {
             CatCode::Letter => Value::Letter(c),
             CatCode::Other => Value::Other(c),
             CatCode::Active => Value::Active(c),
-            _ => panic!("raw cat code not allowed")
+            _ => panic!("raw cat code not allowed"),
         }
     }
 }

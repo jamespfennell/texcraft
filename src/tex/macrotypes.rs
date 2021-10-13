@@ -8,12 +8,13 @@ use crate::tex::token::stream;
 use crate::tex::token::write_tokens;
 use crate::tex::token::CsNameInterner;
 use crate::tex::token::Token;
+use arrayvec::ArrayVec;
 use colored::*;
 
 /// Texcraft internal representation of a TeX macro.
 pub struct Macro {
     prefix: Vec<Token>,
-    parameters: Vec<Parameter>,
+    parameters: ArrayVec<Parameter, 9>,
     replacement_text: Vec<Replacement>,
 }
 
@@ -34,21 +35,34 @@ impl<S> command::ExpansionGeneric<S> for Macro {
             input.unexpanded_stream(),
             "matching the prefix for a user-defined macro",
         )?;
-        let mut arguments = Vec::with_capacity(self.parameters.len());
-        for (i, argument) in self.parameters.iter().enumerate() {
-            arguments.push(argument.parse_argument(&token, input.unexpanded_stream(), i)?);
+        let mut argument_indices: ArrayVec<(usize, usize), 9> = Default::default();
+        let (unexpanded_stream, argument_tokens) = input.unexpanded_and_scratch_space();
+        argument_tokens.clear();
+        for (i, parameter) in self.parameters.iter().enumerate() {
+            let start_index = argument_tokens.len();
+            let trim_outer_braces =
+                parameter.parse_argument(&token, unexpanded_stream, i, argument_tokens)?;
+            argument_indices.push(match trim_outer_braces {
+                true => (start_index + 1, argument_tokens.len() - 1),
+                false => (start_index, argument_tokens.len()),
+            });
         }
-        let mut result = input.controller_mut().expansions_mut();
+        let arguments: ArrayVec<&[Token], 9> = argument_indices
+            .into_iter()
+            .map(|(i, j)| &argument_tokens[i..j])
+            .collect();
+
+        let mut result = unexpanded_stream.controller_mut().expansions_mut();
         Macro::perform_replacement(&self.replacement_text, &arguments, &mut result);
 
-        if input.base().tracing_macros > 0 {
+        if unexpanded_stream.base().tracing_macros > 0 {
             println![" +---[ Tracing macro expansion of {} ]--+", token];
             for (i, argument) in arguments.iter().enumerate() {
                 println![
                     " | {}{}={}",
                     "#".bright_yellow().bold(),
                     (i + 1).to_string().bright_yellow().bold(),
-                    write_tokens(argument, &input.base().cs_names).bright_yellow()
+                    write_tokens(*argument, &unexpanded_stream.base().cs_names).bright_yellow()
                 ]
             }
             println![
@@ -82,7 +96,7 @@ impl<S> command::ExpansionGeneric<S> for Macro {
 impl Macro {
     pub fn new(
         prefix: Vec<Token>,
-        parameters: Vec<Parameter>,
+        parameters: ArrayVec<Parameter, 9>,
         replacement_text: Vec<Replacement>,
     ) -> Macro {
         Macro {
@@ -94,7 +108,7 @@ impl Macro {
 
     fn perform_replacement(
         replacements: &[Replacement],
-        arguments: &[Vec<Token>],
+        arguments: &[&[Token]],
         result: &mut Vec<Token>,
     ) {
         let mut output_size = 0;
@@ -111,7 +125,7 @@ impl Macro {
                     result.extend(tokens);
                 }
                 Replacement::Parameter(i) => {
-                    result.extend(arguments[*i].iter().copied());
+                    result.extend(arguments[*i].iter().rev().copied());
                 }
             }
         }
@@ -124,19 +138,21 @@ impl Parameter {
         macro_token: &Token,
         stream: &mut S,
         index: usize,
-    ) -> anyhow::Result<Vec<Token>> {
-        let mut argument = match self {
+        result: &mut Vec<Token>,
+    ) -> anyhow::Result<bool> {
+        match self {
             Parameter::Undelimited => {
-                Parameter::parse_undelimited_argument(macro_token, stream, index + 1)
+                Parameter::parse_undelimited_argument(macro_token, stream, index + 1, result)?;
+                Ok(false)
             }
-            Parameter::Delimited(matcher_factory) => {
-                Parameter::parse_delimited_argument(macro_token, stream, matcher_factory, index + 1)
-            }
-        };
-        if let Ok(tokens) = &mut argument {
-            tokens.reverse();
+            Parameter::Delimited(matcher_factory) => Parameter::parse_delimited_argument(
+                macro_token,
+                stream,
+                matcher_factory,
+                index + 1,
+                result,
+            ),
         }
-        argument
     }
 
     fn parse_delimited_argument(
@@ -144,9 +160,9 @@ impl Parameter {
         stream: &mut dyn stream::Stream,
         matcher_factory: &KMPMatcherFactory<Token>,
         param_num: usize,
-    ) -> anyhow::Result<Vec<Token>> {
+        result: &mut Vec<Token>,
+    ) -> anyhow::Result<bool> {
         let mut matcher = matcher_factory.matcher();
-        let mut result = Vec::new();
         let mut scope_depth = 0;
 
         // This handles the case of a macro whose argument ends with the special #{ tokens. In this special case the parsing
@@ -156,6 +172,7 @@ impl Parameter {
             Value::BeginGroup(_) => 1,
             _ => 0,
         };
+        let start_index = result.len();
         while let Some(token) = stream.next()? {
             match token.value() {
                 Value::BeginGroup(_) => {
@@ -172,8 +189,9 @@ impl Parameter {
                 for _ in 0..matcher_factory.substring().len() {
                     result.pop();
                 }
-                Parameter::trim_outer_braces_if_present(&mut result);
-                return Ok(result);
+                return Ok(Parameter::should_trim_outer_braces_if_present(
+                    &result[start_index..],
+                ));
             }
         }
         let mut e = error::EndOfInputError::new(format![
@@ -198,31 +216,31 @@ impl Parameter {
             .cast())
     }
 
-    fn trim_outer_braces_if_present(list: &mut Vec<Token>) {
+    fn should_trim_outer_braces_if_present(list: &[Token]) -> bool {
         if list.len() <= 1 {
-            return;
+            return false;
         }
         match list[0].value() {
             Value::BeginGroup(_) => (),
             _ => {
-                return;
+                return false;
             }
         }
         match list[list.len() - 1].value() {
             Value::EndGroup(_) => (),
             _ => {
-                return;
+                return false;
             }
         }
-        list.remove(0); // TODO: This is concerning
-        list.pop();
+        true
     }
 
     fn parse_undelimited_argument<S: stream::Stream>(
         macro_token: &Token,
         stream: &mut S,
         param_num: usize,
-    ) -> anyhow::Result<Vec<Token>> {
+        result: &mut Vec<Token>,
+    ) -> anyhow::Result<()> {
         let opening_brace = match stream.next()? {
             None => {
                 return Err(error::EndOfInputError::new(format![
@@ -235,13 +253,14 @@ impl Parameter {
             Some(token) => match token.value() {
                 Value::BeginGroup(_) => token,
                 _ => {
-                    return Ok(vec![token]);
+                    result.push(token);
+                    return Ok(());
                 }
             },
         };
-        match parse::parse_balanced_tokens(stream)? {
-            Some(result) => Ok(result),
-            None => Err(error::EndOfInputError::new(format![
+        match parse::parse_balanced_tokens(stream, result)? {
+            true => Ok(()),
+            false => Err(error::EndOfInputError::new(format![
                 "unexpected end of input while reading argument #{} for the macro {}",
                 param_num, macro_token
             ])

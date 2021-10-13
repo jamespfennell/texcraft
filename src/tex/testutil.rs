@@ -15,7 +15,7 @@ macro_rules! expansion_test {
 
             let mut state_2 = Base::<State>::new(catcode::tex_defaults(), new_state());
             $setup_fn(&mut state_2);
-            let mut execution_input_2 = driver::ExecutionInput::new_with_str(state_2, $lhs);
+            let mut execution_input_2 = driver::ExecutionInput::new_with_str(state_2, $rhs);
             let output_2 = driver::exec(&mut execution_input_2, false).unwrap();
             let state_2 = execution_input_2.take_base();
 

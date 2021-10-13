@@ -61,11 +61,11 @@ pub fn parse_command_target<S: stream::Stream>(
 
 /// Parses balanced tokens from the stream.
 ///
-/// Returns `None` if the input ended before balanced tokens completed.
+/// Returns false if the input ended before balanced tokens completed.
 pub fn parse_balanced_tokens<S: stream::Stream>(
     stream: &mut S,
-) -> anyhow::Result<Option<Vec<Token>>> {
-    let mut result = Vec::new();
+    result: &mut Vec<Token>,
+) -> anyhow::Result<bool> {
     let mut scope_depth = 0;
     while let Some(token) = stream.next()? {
         match token.value() {
@@ -74,7 +74,7 @@ pub fn parse_balanced_tokens<S: stream::Stream>(
             }
             Value::EndGroup(_) => {
                 if scope_depth == 0 {
-                    return Ok(Some(result));
+                    return Ok(true);
                 }
                 scope_depth -= 1;
             }
@@ -82,5 +82,5 @@ pub fn parse_balanced_tokens<S: stream::Stream>(
         }
         result.push(token);
     }
-    Ok(None)
+    Ok(false)
 }
