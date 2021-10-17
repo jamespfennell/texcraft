@@ -6,12 +6,11 @@
 use crate::datastructures::nevec::Nevec;
 use crate::tex::parse;
 use crate::tex::prelude::*;
-use crate::tex::variable;
 use crate::tex::variable::{TypedVariable, Variable};
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound::Included;
 
-const NEWINT_DOC: &str = r"Allocate a new integer variable
+pub const NEWINT_DOC: &str = r"Allocate a new integer variable
 
 Usage: `\newint <control sequence>`
 
@@ -40,7 +39,7 @@ If there is no current group (i.e., this is the global scope)
 then the variable is never deallocated.
 ";
 
-const NEWARRAY_DOC: &str = r"Allocate a new integer array
+pub const NEWARRAY_DOC: &str = r"Allocate a new integer array
 
 Usage: `\newarray <control sequence> <array length>`
 
@@ -186,12 +185,9 @@ impl Default for Component {
     }
 }
 
-pub fn get_newint<S: HasAlloc>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive {
-        call_fn: newint_primitive_fn,
-        docs: NEWINT_DOC,
-        id: None,
-    }
+/// Get the `\newint` exeuction command.
+pub fn get_newint<S: HasAlloc>() -> command::ExecutionFn<S> {
+    newint_primitive_fn
 }
 
 fn newint_primitive_fn<S: HasAlloc>(
@@ -201,15 +197,23 @@ fn newint_primitive_fn<S: HasAlloc>(
     let name =
         parse::parse_command_target("newint allocation", newint_token, input.unexpanded_stream())?;
     let addr = input.state_mut().alloc_mut().alloc_int();
-    input.base_mut().primitives.insert(
-        name,
-        Variable::Int(TypedVariable::new(
-            singleton_ref_fn,
-            singleton_mut_ref_fn,
-            addr,
-        )),
-    );
+    input
+        .base_mut()
+        .primitives
+        .insert(name, command::VariableCommand(singleton_fn, addr));
     Ok(())
+}
+
+fn singleton_fn<S: HasAlloc>(
+    _: Token,
+    _: &mut command::ExpandedInput<S>,
+    addr: usize,
+) -> anyhow::Result<Variable<S>> {
+    Ok(Variable::Int(TypedVariable::new(
+        singleton_ref_fn,
+        singleton_mut_ref_fn,
+        addr,
+    )))
 }
 
 fn singleton_ref_fn<S: HasAlloc>(state: &S, addr: usize) -> &i32 {
@@ -224,12 +228,9 @@ fn singleton_mut_ref_fn<S: HasAlloc>(state: &mut S, addr: usize) -> &mut i32 {
     &mut a.stack.get_mut(stack_i).unwrap().singletons[inner_i].value
 }
 
-pub fn get_newarray<S: HasAlloc>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive {
-        call_fn: newarray_primitive_fn,
-        docs: NEWARRAY_DOC,
-        id: None,
-    }
+/// Get the `\newarray` execution command.
+pub fn get_newarray<S: HasAlloc>() -> command::ExecutionFn<S> {
+    newarray_primitive_fn
 }
 
 fn newarray_primitive_fn<S: HasAlloc>(
@@ -246,14 +247,14 @@ fn newarray_primitive_fn<S: HasAlloc>(
     input
         .base_mut()
         .primitives
-        .insert(name, variable::Command::Dynamic(array_fn, addr, "TODO"));
+        .insert(name, command::VariableCommand(array_fn, addr));
     // TODO: Return the arraydef version
     Ok(())
 }
 
 /// Variable command function for commands defined using \newarray.
 fn array_fn<S: HasAlloc>(
-    array_token: &Token,
+    array_token: Token,
     input: &mut ExpandedInput<S>,
     array_addr: usize,
 ) -> anyhow::Result<Variable<S>> {
@@ -264,7 +265,7 @@ fn array_fn<S: HasAlloc>(
         .len();
     if array_index >= array_len {
         return Err(error::TokenError::new(
-            *array_token,
+            array_token,
             format![
                 "Array out of bounds: cannot access index {} of array with length {}",
                 array_index, array_len,

@@ -4,11 +4,36 @@ use crate::tex::parse;
 use crate::tex::prelude::*;
 use crate::tex::variable::Variable;
 
-const ADVANCE_DOC: &str = "Add an integer to a variable";
-const ADVANCECHK_DOC: &str = "Add an integer to a variable and error on overflow";
-const MULTIPLY_DOC: &str = "Multiply a variable by an integer";
-const MULTIPLYCHK_DOC: &str = "Multiply a variable by an integer and error on overflow";
-const DIVIDE_DOC: &str = "Divide a variable by an integer";
+pub const ADVANCE_DOC: &str = "Add an integer to a variable";
+pub const ADVANCECHK_DOC: &str = "Add an integer to a variable and error on overflow";
+pub const MULTIPLY_DOC: &str = "Multiply a variable by an integer";
+pub const MULTIPLYCHK_DOC: &str = "Multiply a variable by an integer and error on overflow";
+pub const DIVIDE_DOC: &str = "Divide a variable by an integer";
+
+/// Get the `\advance` command.
+pub fn get_advance<S>() -> command::ExecutionFn<S> {
+    advance_fn
+}
+
+/// Get the `\advancechk` command.
+pub fn get_advancechk<S>() -> command::ExecutionFn<S> {
+    advancechk_fn
+}
+
+/// Get the `\multiply` command.
+pub fn get_multiply<S>() -> command::ExecutionFn<S> {
+    multiply_fn
+}
+
+/// Get the `\multiplychk` command.
+pub fn get_multiplychk<S>() -> command::ExecutionFn<S> {
+    multiplychk_fn
+}
+
+/// Get the `\divide` command.
+pub fn get_divide<S>() -> command::ExecutionFn<S> {
+    divide_fn
+}
 
 macro_rules! create_arithmetic_primitive {
     ($prim_fn: ident, $arithmetic_op: ident) => {
@@ -105,51 +130,6 @@ create_arithmetic_primitive![advancechk_fn, checked_add];
 create_arithmetic_primitive![multiply_fn, multiply];
 create_arithmetic_primitive![multiplychk_fn, checked_multiply];
 create_arithmetic_primitive![divide_fn, divide];
-
-/// Get the `\advance` command.
-pub fn get_advance<S>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive {
-        call_fn: advance_fn,
-        docs: ADVANCE_DOC,
-        id: None,
-    }
-}
-
-/// Get the `\advancechk` command.
-pub fn get_advancechk<S>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive {
-        call_fn: advancechk_fn,
-        docs: ADVANCECHK_DOC,
-        id: None,
-    }
-}
-
-/// Get the `\multiply` command.
-pub fn get_multiply<S>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive {
-        call_fn: multiply_fn,
-        docs: MULTIPLY_DOC,
-        id: None,
-    }
-}
-
-/// Get the `\multiplychk` command.
-pub fn get_multiplychk<S>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive {
-        call_fn: multiplychk_fn,
-        docs: MULTIPLYCHK_DOC,
-        id: None,
-    }
-}
-
-/// Get the `\divide` command.
-pub fn get_divide<S>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive {
-        call_fn: divide_fn,
-        docs: DIVIDE_DOC,
-        id: None,
-    }
-}
 
 #[cfg(test)]
 mod tests {

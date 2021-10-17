@@ -1,13 +1,12 @@
 use crate::tex::parse;
 use crate::tex::prelude::*;
 use crate::tex::token::catcode::CatCode;
-use crate::tex::variable;
 use crate::tex::variable::TypedVariable;
 use crate::tex::variable::Variable;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
-const CATCODE_DOC: &str = "Get or set a catcode register";
+pub const CATCODE_DOC: &str = "Get or set a catcode register";
 
 /// A component holding the current category code values.
 pub struct Component {
@@ -29,40 +28,36 @@ impl Component {
     }
 }
 
-fn read_catcode_register_fn<S>(state: &Base<S>, addr: usize) -> &CatCode {
-    let addr = u32::try_from(addr).unwrap();
-    state
-        .cat_codes
-        .cat_codes
-        .get(&addr)
-        .unwrap_or(&state.cat_codes.fallback)
-}
-
-fn write_catcode_register_fn<S>(state: &mut Base<S>, addr: usize) -> &mut CatCode {
-    let addr = u32::try_from(addr).unwrap();
-    state
-        .cat_codes
-        .cat_codes
-        .entry(addr)
-        .or_insert_with(CatCode::default)
+/// Get the `\catcode` command.
+pub fn get_catcode<S>() -> command::VariableFn<S> {
+    catcode_fn
 }
 
 fn catcode_fn<S>(
-    _catcode_token: &Token,
+    _catcode_token: Token,
     input: &mut command::ExpandedInput<S>,
     _: usize,
 ) -> anyhow::Result<Variable<S>> {
     let addr: u32 = parse::parse_number(input)?;
     Ok(Variable::CatCode(TypedVariable::new(
-        read_catcode_register_fn,
-        write_catcode_register_fn,
+        |state: &Base<S>, addr: usize| -> &CatCode {
+            let addr = u32::try_from(addr).unwrap();
+            state
+                .cat_codes
+                .cat_codes
+                .get(&addr)
+                .unwrap_or(&state.cat_codes.fallback)
+        },
+        |state: &mut Base<S>, addr: usize| -> &mut CatCode {
+            let addr = u32::try_from(addr).unwrap();
+            state
+                .cat_codes
+                .cat_codes
+                .entry(addr)
+                .or_insert_with(CatCode::default)
+        },
         addr as usize,
     )))
-}
-
-/// Get the `\catcode` command.
-pub fn get_catcode<S>() -> variable::Command<S> {
-    variable::Command::Dynamic(catcode_fn, 0, CATCODE_DOC)
 }
 
 #[cfg(test)]

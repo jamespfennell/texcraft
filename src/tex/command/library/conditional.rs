@@ -6,14 +6,14 @@ use crate::tex::parse;
 use crate::tex::prelude::*;
 use std::any;
 
-const ELSE_DOC: &str = "Start the else branch of a conditional or switch statement";
-const IFCASE_DOC: &str = "Begin a switch statement";
-const IFNUM_DOC: &str = "Compare two variables";
-const IFODD_DOC: &str = "Check if a variable is odd";
-const IFTRUE_DOC: &str = "Evaluate the true branch";
-const IFFALSE_DOC: &str = "Evaluate the false branch";
-const FI_DOC: &str = "End a conditional or switch statement";
-const OR_DOC: &str = "Begin the next branch of a switch statement";
+pub const ELSE_DOC: &str = "Start the else branch of a conditional or switch statement";
+pub const IFCASE_DOC: &str = "Begin a switch statement";
+pub const IFNUM_DOC: &str = "Compare two variables";
+pub const IFODD_DOC: &str = "Check if a variable is odd";
+pub const IFTRUE_DOC: &str = "Evaluate the true branch";
+pub const IFFALSE_DOC: &str = "Evaluate the false branch";
+pub const FI_DOC: &str = "End a conditional or switch statement";
+pub const OR_DOC: &str = "Begin the next branch of a switch statement";
 
 /// A component that is attached to the input unit for keeping track of conditional branches
 /// as they are expanded.
@@ -67,17 +67,17 @@ enum Else {}
 enum Or {}
 enum Fi {}
 
-fn if_id() -> Option<any::TypeId> {
-    Some(any::TypeId::of::<If>())
+fn if_id() -> any::TypeId {
+    any::TypeId::of::<If>()
 }
-fn else_id() -> Option<any::TypeId> {
-    Some(any::TypeId::of::<Else>())
+fn else_id() -> any::TypeId {
+    any::TypeId::of::<Else>()
 }
-fn or_id() -> Option<any::TypeId> {
-    Some(any::TypeId::of::<Or>())
+fn or_id() -> any::TypeId {
+    any::TypeId::of::<Or>()
 }
-fn fi_id() -> Option<any::TypeId> {
-    Some(any::TypeId::of::<Fi>())
+fn fi_id() -> any::TypeId {
+    any::TypeId::of::<Fi>()
 }
 
 // The `true_case` function is executed whenever a conditional evaluates to true.
@@ -154,8 +154,7 @@ macro_rules! create_if_primitive {
         pub fn $get_if<S>() -> command::ExpansionPrimitive<S> {
             command::ExpansionPrimitive {
                 call_fn: $if_primitive_fn,
-                docs: $docs,
-                id: Some(any::TypeId::of::<If>()),
+                id: if_id(),
             }
         }
     };
@@ -257,8 +256,7 @@ fn if_case_primitive_fn<S>(
 pub fn get_if_case<S>() -> command::ExpansionPrimitive<S> {
     command::ExpansionPrimitive {
         call_fn: if_case_primitive_fn,
-        docs: IFCASE_DOC,
-        id: Some(any::TypeId::of::<If>()),
+        id: if_id(),
     }
 }
 
@@ -317,8 +315,7 @@ fn or_primitive_fn<S>(
 pub fn get_or<S>() -> command::ExpansionPrimitive<S> {
     command::ExpansionPrimitive {
         call_fn: or_primitive_fn,
-        docs: OR_DOC,
-        id: Some(any::TypeId::of::<Or>()),
+        id: or_id(),
     }
 }
 
@@ -373,8 +370,7 @@ fn else_primitive_fn<S>(
 pub fn get_else<S>() -> command::ExpansionPrimitive<S> {
     command::ExpansionPrimitive {
         call_fn: else_primitive_fn,
-        docs: ELSE_DOC,
-        id: Some(any::TypeId::of::<Else>()),
+        id: else_id(),
     }
 }
 
@@ -394,8 +390,7 @@ fn fi_primitive_fn<S>(token: Token, input: &mut ExpandedInput<S>) -> anyhow::Res
 pub fn get_fi<S>() -> command::ExpansionPrimitive<S> {
     command::ExpansionPrimitive {
         call_fn: fi_primitive_fn,
-        docs: FI_DOC,
-        id: Some(any::TypeId::of::<Fi>()),
+        id: fi_id(),
     }
 }
 

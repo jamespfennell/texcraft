@@ -9,18 +9,14 @@ use crate::tex::parse;
 use crate::tex::prelude::*;
 use crate::tex::token::stream;
 
-use crate::tex::macrotypes::*;
+use crate::tex::texmacro::*;
 use std::rc;
 
-const DEF_DOC: &str = "Define a custom macro";
+pub const DEF_DOC: &str = "Define a custom macro";
 
 /// Get the `\def` command.
-pub fn get_def<S>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive {
-        call_fn: def_primitive_fn,
-        docs: DEF_DOC,
-        id: None,
-    }
+pub fn get_def<S>() -> command::ExecutionFn<S> {
+    def_primitive_fn
 }
 
 fn def_primitive_fn<S>(def_token: Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()> {

@@ -7,6 +7,7 @@ use crate::tex::token;
 use crate::tex::token::lexer;
 use crate::tex::token::CsNameInterner;
 use crate::tex::token::Token;
+use crate::tex::variable;
 use std::collections::HashMap;
 use std::io;
 use std::mem;
@@ -56,12 +57,13 @@ pub fn run<S>(
                         }
                         Some(Command::Variable(cmd_ref)) => {
                             let cmd = *cmd_ref;
-                            cmd.call(token, execution_input)?;
+                            let var = cmd.resolve(token, execution_input.regular())?;
+                            variable::set(var, token, execution_input)?;
                         }
                         Some(Command::Character(token)) => {
                             character_handler(*token, execution_input.base_mut())?;
                         }
-                        _ => {
+                        None | Some(Command::Expansion(_)) | Some(Command::Macro(_)) => {
                             undefined_cs_handler(token, execution_input.base_mut())?;
                         }
                     },
@@ -382,19 +384,25 @@ impl<S> ExpandedInput<S> {
                 _ => return Ok(false),
             },
         };
-        let command = match command {
-            Some(command::Command::Expansion(command)) => command.clone(),
-            _ => return Ok(false),
-        };
-        let token = self.raw_stream.next()?.unwrap();
-        let output = command.call(token, self)?;
-        self.controller_mut().push_expansion(&output);
-        Ok(true)
+        match command {
+            Some(command::Command::Expansion(command)) => {
+                let command = *command;
+                let token = self.raw_stream.next()?.unwrap();
+                let output = command.call(token, self)?;
+                self.controller_mut().push_expansion(&output);
+                Ok(true)
+            }
+            Some(command::Command::Macro(command)) => {
+                let command = command.clone();
+                let token = self.raw_stream.next()?.unwrap();
+                command.call(token, self)?;
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
     }
 }
 
-// I have no idea why aliasing Input<S> to this works; i.e., why the lifetime
-// parameter can be elided.
 pub struct ExecutionInput<S> {
     raw_stream: ExpandedInput<S>,
 }

@@ -3,14 +3,13 @@
 use crate::tex::parse;
 use crate::tex::prelude::*;
 
-const LET_DOC: &str = "Assign a command or character to a control sequence";
+pub const LET_DOC: &str = "Assign a command or character to a control sequence";
 
 /// Get the `\let` command.
 pub fn get_let<S>() -> command::ExecutionPrimitive<S> {
     command::ExecutionPrimitive {
         call_fn: let_primitive_fn,
-        docs: LET_DOC,
-        id: None,
+        id: command::null_type_id(),
     }
 }
 

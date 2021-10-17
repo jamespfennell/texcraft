@@ -242,78 +242,39 @@ impl<S, T> TypedVariable<S, T> {
     }
 }
 
-/// A variant of [Command](super::command::Command) that is invoked to produce a [Variable].
-pub enum Command<S> {
-    Static(Variable<S>, &'static str),
-    Dynamic(
-        fn(
-            token: &token::Token,
-            input: &mut command::ExpandedInput<S>,
-            addr: usize,
-        ) -> anyhow::Result<Variable<S>>,
-        usize, // addr
-        &'static str,
-    ),
-}
-
-impl<S> Copy for Command<S> {}
-
-impl<S> Clone for Command<S> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<S> Command<S> {
-    /// Obtain the variable that this command refers to.
-    pub fn variable(
-        &self,
-        token: &token::Token,
-        input: &mut command::ExpandedInput<S>,
-    ) -> anyhow::Result<Variable<S>> {
-        match self {
-            Command::Static(v, _) => Ok(*v),
-            Command::Dynamic(f, addr, _) => (*f)(token, input, *addr),
+/// Execution command that sets the value of the variable this command refers to.
+pub fn set<S>(
+    variable: Variable<S>,
+    token: token::Token,
+    input: &mut command::ExecutionInput<S>,
+) -> anyhow::Result<()> {
+    parse::parse_optional_equals(input)?;
+    match variable {
+        Variable::Int(variable) => {
+            let val: i32 = parse::parse_number(input.regular())?;
+            *variable.get_mut(input.state_mut()) = val;
         }
-    }
-}
-
-impl<S> Command<S> {
-    /// Execution command that sets the value of the variable this command refers to.
-    pub fn call(
-        &self,
-        token: token::Token,
-        input: &mut command::ExecutionInput<S>,
-    ) -> anyhow::Result<()> {
-        let variable = self.variable(&token, input.regular())?;
-        parse::parse_optional_equals(input)?;
-        match variable {
-            Variable::Int(variable) => {
-                let val: i32 = parse::parse_number(input.regular())?;
-                *variable.get_mut(input.state_mut()) = val;
-            }
-            Variable::BaseInt(variable) => {
-                let val: i32 = parse::parse_number(input.regular())?;
-                *variable.get_mut(input.base_mut()) = val;
-            }
-            Variable::CatCode(variable) => {
-                // TODO: don't use u8 here, use usize to get better error messages
-                let val: u8 = parse::parse_number(input.regular())?;
-                match CatCode::from_int(val) {
-                    None => {
-                        return Err(error::TokenError::new(
-                            token,
-                            format!["the number {} is not a valid category code", val],
-                        )
-                        .add_note("category codes must be between 0 and 15 inclusive")
-                        .cast())
-                    }
-                    Some(cat_code) => {
-                        *variable.get_mut(input.base_mut()) = cat_code;
-                    }
+        Variable::BaseInt(variable) => {
+            let val: i32 = parse::parse_number(input.regular())?;
+            *variable.get_mut(input.base_mut()) = val;
+        }
+        Variable::CatCode(variable) => {
+            // TODO: don't use u8 here, use usize to get better error messages
+            let val: u8 = parse::parse_number(input.regular())?;
+            match CatCode::from_int(val) {
+                None => {
+                    return Err(error::TokenError::new(
+                        token,
+                        format!["the number {} is not a valid category code", val],
+                    )
+                    .add_note("category codes must be between 0 and 15 inclusive")
+                    .cast())
+                }
+                Some(cat_code) => {
+                    *variable.get_mut(input.base_mut()) = cat_code;
                 }
             }
         }
-        Ok(())
     }
+    Ok(())
 }

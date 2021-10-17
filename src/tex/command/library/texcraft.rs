@@ -2,6 +2,11 @@
 
 use crate::tex::prelude::*;
 
+/// Get the `\texcraft` expansion primtive.
+pub fn get_texcraft<S>() -> command::ExpansionFn<S> {
+    texcraft_primitive_fn
+}
+
 pub fn texcraft_primitive_fn<S>(
     _: Token,
     _: &mut command::ExpandedInput<S>,
@@ -16,14 +21,6 @@ pub fn texcraft_primitive_fn<S>(
         Token::new_letter('f'),
         Token::new_letter('t'),
     ])
-}
-
-pub fn get_texcraft<S>() -> command::ExpansionPrimitive<S> {
-    command::ExpansionPrimitive {
-        call_fn: texcraft_primitive_fn,
-        docs: "",
-        id: None,
-    }
 }
 
 #[cfg(test)]

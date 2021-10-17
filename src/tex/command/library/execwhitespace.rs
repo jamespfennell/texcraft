@@ -1,6 +1,11 @@
 /// Commands for printing whitespace in exec mode
 use crate::tex::prelude::*;
 
+/// Get the `\newline` command.
+pub fn get_newline<S>() -> command::ExecutionFn<S> {
+    newline_primitive_fn
+}
+
 fn newline_primitive_fn<S>(_: Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()> {
     let newline_token = Token::new_space('\n');
     input.base_mut().exec_output.push(newline_token);
@@ -8,13 +13,9 @@ fn newline_primitive_fn<S>(_: Token, input: &mut ExecutionInput<S>) -> anyhow::R
     Ok(())
 }
 
-/// Get the `\newline` command.
-pub fn get_newline<S>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive {
-        call_fn: newline_primitive_fn,
-        docs: "",
-        id: None,
-    }
+/// Get the `\par` command.
+pub fn get_par<S>() -> command::ExecutionFn<S> {
+    par_primitive_fn
 }
 
 fn par_primitive_fn<S>(_: Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()> {
@@ -29,13 +30,4 @@ fn par_primitive_fn<S>(_: Token, input: &mut ExecutionInput<S>) -> anyhow::Resul
     input.base_mut().exec_output.push(par_token);
     input.base_mut().num_trailing_newlines += 1;
     Ok(())
-}
-
-/// Get the `\par` command.
-pub fn get_par<S>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive {
-        call_fn: par_primitive_fn,
-        docs: "",
-        id: None,
-    }
 }

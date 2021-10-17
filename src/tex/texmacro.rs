@@ -1,4 +1,4 @@
-//! Types used in the TeX macro system.
+//! The TeX macro system.
 
 use crate::algorithms::substringsearch::KMPMatcherFactory;
 use crate::tex::error;
@@ -11,7 +11,7 @@ use crate::tex::token::Token;
 use arrayvec::ArrayVec;
 use colored::*;
 
-/// Texcraft internal representation of a TeX macro.
+/// A TeX Macro.
 pub struct Macro {
     prefix: Vec<Token>,
     parameters: ArrayVec<Parameter, 9>,
@@ -28,8 +28,8 @@ pub enum Parameter {
     Delimited(KMPMatcherFactory<Token>),
 }
 
-impl<S> command::ExpansionGeneric<S> for Macro {
-    fn call(&self, token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<Vec<Token>> {
+impl Macro {
+    pub fn call<S>(&self, token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<()> {
         stream::remove_tokens_from_stream(
             &self.prefix,
             input.unexpanded_stream(),
@@ -71,10 +71,10 @@ impl<S> command::ExpansionGeneric<S> for Macro {
             ];
             println![" +--------------------------------+\n"];
         }
-        Ok(Vec::new())
+        Ok(())
     }
 
-    fn doc(&self) -> String {
+    pub fn doc(&self) -> String {
         let mut d = String::default();
         // TODO: wire up the interner here
         let interner = CsNameInterner::new();
@@ -91,9 +91,7 @@ impl<S> command::ExpansionGeneric<S> for Macro {
         ]);
         d
     }
-}
 
-impl Macro {
     pub fn new(
         prefix: Vec<Token>,
         parameters: ArrayVec<Parameter, 9>,

@@ -1,12 +1,13 @@
 //! TeX registers and commands to access them
 
+use crate::tex::command;
+use crate::tex::command::null_type_id;
 use crate::tex::parse;
 use crate::tex::prelude::*;
-use crate::tex::variable;
 use crate::tex::variable::{TypedVariable, Variable};
 
-const COUNT_DOC: &str = "Get or set an integer register";
-const COUNTDEF_DOC: &str = "Bind an integer register to a control sequence";
+pub const COUNT_DOC: &str = "Get or set an integer register";
+pub const COUNTDEF_DOC: &str = "Bind an integer register to a control sequence";
 
 /// Trait for a state that has a registers component.
 pub trait HasRegisters<const N: usize> {
@@ -82,40 +83,37 @@ impl<const N: usize> Default for Component<N> {
     }
 }
 
-fn read_int_register_fn<S: HasRegisters<N>, const N: usize>(state: &S, addr: usize) -> &i32 {
-    state.registers().int_registers.read(addr)
-}
-
-fn write_int_register_fn<S: HasRegisters<N>, const N: usize>(
-    state: &mut S,
-    addr: usize,
-) -> &mut i32 {
-    state.registers_mut().int_registers.write(addr)
+/// Get the `\count` command.
+pub fn get_count<S: HasRegisters<N>, const N: usize>() -> command::VariableFn<S> {
+    count_fn
 }
 
 fn count_fn<S: HasRegisters<N>, const N: usize>(
-    count_token: &Token,
+    count_token: Token,
     input: &mut ExpandedInput<S>,
     _: usize,
 ) -> anyhow::Result<Variable<S>> {
     let addr: usize = parse::parse_number(input)?;
     if addr >= N {
         return Err(integer_register_too_large_error(
-            *count_token,
+            count_token,
             addr,
             input.state().registers().int_registers.num(),
         ));
     }
     Ok(Variable::Int(TypedVariable::new(
-        read_int_register_fn,
-        write_int_register_fn,
+        int_register_ref_fn,
+        int_register_mut_ref_fn,
         addr,
     )))
 }
 
-/// Get the `\count` command.
-pub fn get_count<S: HasRegisters<N>, const N: usize>() -> variable::Command<S> {
-    variable::Command::Dynamic(count_fn, 0, COUNT_DOC)
+/// Get the `\countdef` command.
+pub fn get_countdef<S: HasRegisters<N>, const N: usize>() -> command::ExecutionPrimitive<S> {
+    command::ExecutionPrimitive {
+        call_fn: countdef_fn,
+        id: null_type_id(),
+    }
 }
 
 fn countdef_fn<S: HasRegisters<N>, const N: usize>(
@@ -133,22 +131,32 @@ fn countdef_fn<S: HasRegisters<N>, const N: usize>(
             input.state().registers().int_registers.num(),
         ));
     }
-    let new_cmd = Variable::Int(TypedVariable::new(
-        read_int_register_fn,
-        write_int_register_fn,
-        addr,
-    ));
+    let new_cmd = command::VariableCommand(singleton_fn, addr);
     input.base_mut().set_command_2(cs_name, new_cmd);
     Ok(())
 }
 
-/// Get the `\countdef` command.
-pub fn get_countdef<S: HasRegisters<N>, const N: usize>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive {
-        call_fn: countdef_fn,
-        docs: COUNTDEF_DOC,
-        id: None,
-    }
+fn singleton_fn<S: HasRegisters<N>, const N: usize>(
+    _: Token,
+    _: &mut command::ExpandedInput<S>,
+    addr: usize,
+) -> anyhow::Result<Variable<S>> {
+    Ok(Variable::Int(TypedVariable::new(
+        int_register_ref_fn,
+        int_register_mut_ref_fn,
+        addr,
+    )))
+}
+
+fn int_register_ref_fn<S: HasRegisters<N>, const N: usize>(state: &S, addr: usize) -> &i32 {
+    state.registers().int_registers.read(addr)
+}
+
+fn int_register_mut_ref_fn<S: HasRegisters<N>, const N: usize>(
+    state: &mut S,
+    addr: usize,
+) -> &mut i32 {
+    state.registers_mut().int_registers.write(addr)
 }
 
 fn integer_register_too_large_error(token: Token, addr: usize, num: usize) -> anyhow::Error {

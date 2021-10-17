@@ -30,7 +30,7 @@ pub fn parse_number<S, T: PrimInt>(stream: &mut ExpandedInput<S>) -> anyhow::Res
                 if let Some(command::Command::Variable(cmd_ref)) = cmd {
                     // TODO: don't clone here, use the same trick as the driver?
                     let cmd = *cmd_ref;
-                    let variable = cmd.variable(&token, stream)?;
+                    let variable = cmd.resolve(token, stream)?;
                     read_number_from_address(variable, stream)?
                 } else {
                     println!("Command: {:?}", cmd);

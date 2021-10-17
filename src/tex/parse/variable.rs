@@ -13,7 +13,7 @@ pub fn parse_variable<S>(
         Some(token) => match token.value() {
             ControlSequence(name) => match input.base().get_command(&name) {
                 None => Err(error::TokenError::new(token, "Undefined control sequence").cast()),
-                Some(&command::Command::Variable(cmd)) => cmd.variable(&token, input),
+                Some(&command::Command::Variable(cmd)) => cmd.resolve(token, input),
                 Some(_) => Err(error::TokenError::new(
                     token,
                     "Expected variable command (register or parameter); found something else",

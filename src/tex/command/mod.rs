@@ -7,7 +7,8 @@
 //!  This documentation describes the *Texcraft commands API*,
 //! which is the mechanism by which TeX engines add new primitives.
 //!
-//! This is a theoretical overview; for a more hands-on experience, see [the command API tutorial](tutorial) which walks through
+//! This is a theoretical overview; for a more hands-on experience, see
+//! [the command API tutorial](tutorial) which walks through
 //! process of creating 3 new primitives.
 //!
 //! A note on terminology: *commands* can be categorized into primitives,
@@ -16,55 +17,6 @@
 //! We often use the word command and primitive interchangeably here because in the context
 //! of implementing TeX engines they’re basically synonymous.
 //! A TeX engine could theoretically provide a native user defined macro...but it’s unlikely.
-//!
-//! ## Types of commands
-//!
-//! Commands in Texcraft are instances of [Command].
-//! [Command] is an enum type where each variant corresponds to a different type of command in TeX.
-//! The main variants are for expansion and execution commands, but there are others.
-//! Some of the variants such as [variable commands](super::variable::Command)
-//!     are themselves enums with sub-variants.
-//! So it’s basically a tree with [Command] at the root,
-//!     and concrete instances of particular command types at the leaves.
-//!
-//!
-//! - [Command] The root command type with the following variants:
-//!
-//!     - `Expansion`, holding an instance of [Expansion].
-//!         Any command that can be expanded. This an enum with two variants:
-//!
-//!         - `Primitive`, holding an instance of [ExpansionPrimitive].
-//!             An expansion command that is implemented in the engine. Examples: `\the`, `\ifnum`.
-//!
-//!         - `Macro`, holding an instance of [def::UserDefinedMacro](library::def::UserDefinedMacro).
-//!              Examples: `\newcommand` and `\include` in LaTeX.
-//!
-//!     - `Execution`, holding an instance of [ExecutionPrimitive].
-//!         A non-expandable command that performs operations on the state. Examples: `\def`, `\par`.
-//!
-//!     - `Variable`, holding an instance of [variable::Command](super::variable::Command).
-//!         A command that is used to reference a variable, like a parameter or a register.
-//!         Such a command is can be *resolved* to get the variable.
-//!         This command is an enum with two variants:
-//!
-//!         - `Static`, holding an instance of [variable::Variable](super::variable::Variable).
-//!             A command that resolves to a fixed variable, which is stored in the enum variant.
-//!             Examples: `\year`, `\tracingmacros`.
-//!
-//!         - `Dynamic`, holding a specific kind of function pointer.
-//!             A command that reads input tokens before resolving.
-//!             Examples: `\count` (which reads a number and resolves to the integer register at that index)
-//!             and `\catcode` (same, but for cat code registers).
-//!
-//!     - `Character` (not yet implemented).
-//!         A command that aliases a character.
-//!         Depending on the context in which this command appears it may behave like a
-//!         character (when typesetting) or like an unexpandable command (when parsing integers).
-//!         Created using `\let\cmd=<character>`.
-//!
-//!     - ???
-//!
-//!         - As Texcraft is developed more variants may need to be added.
 //!
 //! ## Expansion vs execution
 //!
@@ -94,14 +46,33 @@ use std::rc;
 pub use driver::ExecutionInput;
 pub use driver::ExpandedInput;
 
+use super::texmacro;
+
 pub mod examples;
 pub mod library;
 pub mod tutorial;
 
+enum NullTypeIdType {}
+
+/// Returns a [TypeId] that can be used to represent "no type ID".
+///
+/// Ideally "no type ID" would be represented using the `None` variant of `Option<TypeId>`,
+/// but this type takes up two words instead of one.
+pub fn null_type_id() -> TypeId {
+    std::any::TypeId::of::<NullTypeIdType>()
+}
+
+/// The Rust type of expansion primitive functions.
+pub type ExpansionFn<S> =
+    fn(token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<Vec<Token>>;
+
+/// An expansion primitive in Texcraft.
+///
+/// This type bundles together an [ExpansionFn] and a [TypeId] that can be used to classify the
+/// primitive.
 pub struct ExpansionPrimitive<S> {
-    call_fn: fn(token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<Vec<Token>>,
-    docs: &'static str,
-    id: Option<TypeId>,
+    call_fn: ExpansionFn<S>,
+    id: TypeId,
 }
 
 impl<S> Copy for ExpansionPrimitive<S> {}
@@ -117,74 +88,30 @@ impl<S> ExpansionPrimitive<S> {
         (self.call_fn)(token, input)
     }
 
-    pub fn doc(&self) -> String {
-        self.docs.to_string()
-    }
-
-    pub fn id(&self) -> Option<TypeId> {
+    pub fn id(&self) -> TypeId {
         self.id
     }
 }
 
-pub trait ExpansionGeneric<S> {
-    fn call(&self, token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<Vec<Token>>;
+/// The Rust type of execution primitive functions.
+pub type ExecutionFn<S> = fn(token: Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()>;
 
-    fn doc(&self) -> String {
-        "this command has no documentation".to_string()
-    }
-
-    fn id(&self) -> Option<TypeId> {
-        None
-    }
-}
-
-pub enum Expansion<S> {
-    Primitive(ExpansionPrimitive<S>),
-    Generic(rc::Rc<dyn ExpansionGeneric<S>>),
-}
-
-// We need to implement Clone manually as the derived implementation requires S to be Clone.
-impl<S> Clone for Expansion<S> {
-    fn clone(&self) -> Self {
-        match self {
-            Expansion::Primitive(e) => Expansion::Primitive(*e),
-            Expansion::Generic(r) => Expansion::Generic(r.clone()),
-        }
-    }
-}
-
-impl<S> Expansion<S> {
-    pub fn call(&self, token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<Vec<Token>> {
-        match self {
-            Expansion::Primitive(e) => ExpansionPrimitive::call(e, token, input),
-            Expansion::Generic(e) => ExpansionGeneric::call(e.as_ref(), token, input),
-        }
-    }
-
-    pub fn doc(&self) -> String {
-        match self {
-            Expansion::Primitive(e) => ExpansionPrimitive::doc(e),
-            Expansion::Generic(e) => ExpansionGeneric::doc(e.as_ref()),
-        }
-    }
-
-    pub fn id(&self) -> Option<TypeId> {
-        match self {
-            Expansion::Primitive(e) => e.id,
-            Expansion::Generic(e) => ExpansionGeneric::id(e.as_ref()),
-        }
-    }
-}
-
+/// An execution primitive in Texcraft.
+///
+/// This type bundles together an [ExecutionFn] and a [TypeId] that can be used to classify the
+/// primitive.
 pub struct ExecutionPrimitive<S> {
-    call_fn: fn(token: Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()>,
-    docs: &'static str,
-    id: Option<TypeId>,
+    call_fn: ExecutionFn<S>,
+    id: TypeId,
 }
 
 impl<S> ExecutionPrimitive<S> {
     pub fn call(&self, token: Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()> {
         (self.call_fn)(token, input)
+    }
+
+    pub fn id(&self) -> TypeId {
+        self.id
     }
 }
 
@@ -196,33 +123,64 @@ impl<S> Clone for ExecutionPrimitive<S> {
     }
 }
 
+pub type VariableFn<S> = fn(
+    token: Token,
+    input: &mut ExpandedInput<S>,
+    addr: usize,
+) -> anyhow::Result<variable::Variable<S>>;
+
+pub struct VariableCommand<S>(VariableFn<S>, usize);
+
+impl<S> Copy for VariableCommand<S> {}
+
+impl<S> Clone for VariableCommand<S> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<S> VariableCommand<S> {
+    /// Obtain the variable that this command refers to.
+    pub fn resolve(
+        &self,
+        token: token::Token,
+        input: &mut command::ExpandedInput<S>,
+    ) -> anyhow::Result<variable::Variable<S>> {
+        (self.0)(token, input, self.1)
+    }
+}
+
+/// A TeX command in Texcraft.
 pub enum Command<S> {
-    Expansion(Expansion<S>),
+    /// An expansion command that is implemented in the engine. Examples: `\the`, `\ifnum`.
+    Expansion(ExpansionPrimitive<S>),
+
+    /// A user defined macro.
+    /// Examples: `\newcommand` and `\include` in LaTeX.
+    Macro(rc::Rc<texmacro::Macro>),
+
+    /// A non-expandable command that performs operations on the state. Examples: `\def`, `\par`.
     Execution(ExecutionPrimitive<S>),
-    Variable(variable::Command<S>),
+
+    /// A command that is used to reference a variable, like a parameter or a register.
+    /// Such a command is *resolved* to get the variable using the function pointer it holds.
+    Variable(VariableCommand<S>),
+
+    /// A command that aliases a character.
+    /// Depending on the context in which this command appears it may behave like a
+    ///   character (when typesetting) or like an unexpandable command (when parsing integers).
+    /// Created using `\let\cmd=<character>`.
     Character(token::Token),
 }
 
 impl<S> Command<S> {
-    pub fn id(&self) -> Option<TypeId> {
+    pub fn id(&self) -> TypeId {
         match self {
             Command::Expansion(cmd) => cmd.id(),
-            Command::Execution(cmd) => cmd.id,
-            Command::Variable(..) => None,
-            Command::Character(..) => None,
-        }
-    }
-
-    pub fn doc(&self) -> String {
-        match self {
-            Command::Expansion(cmd) => cmd.doc(),
-            Command::Execution(cmd) => cmd.docs.to_string(),
-            Command::Variable(variable::Command::Static(_, docs)) => docs.to_string(),
-            Command::Variable(variable::Command::Dynamic(_, _, docs)) => docs.to_string(),
-            Command::Character(_) => {
-                "todo".to_string()
-                // format!["Implicit character '{}' with cat code {}", token.value(), cat_code]
-            }
+            Command::Macro(_) => null_type_id(),
+            Command::Execution(cmd) => cmd.id(),
+            Command::Variable(_) => null_type_id(),
+            Command::Character(_) => null_type_id(),
         }
     }
 }
@@ -238,7 +196,8 @@ impl<S> std::fmt::Debug for Command<S> {
 impl<S> Clone for Command<S> {
     fn clone(&self) -> Self {
         match self {
-            Command::Expansion(e) => Command::Expansion::<S>(e.clone()),
+            Command::Expansion(e) => Command::Expansion::<S>(*e),
+            Command::Macro(m) => Command::Macro(m.clone()),
             Command::Execution(e) => Command::Execution(*e),
             Command::Variable(v) => Command::Variable(*v),
             Command::Character(tv) => Command::Character(*tv),
@@ -246,15 +205,33 @@ impl<S> Clone for Command<S> {
     }
 }
 
-impl<S> From<variable::Variable<S>> for Command<S> {
-    fn from(cmd: variable::Variable<S>) -> Self {
-        Command::Variable(variable::Command::Static(cmd, "Unspecified variable"))
+impl<S> From<ExpansionFn<S>> for Command<S> {
+    fn from(cmd: ExpansionFn<S>) -> Self {
+        Command::Expansion(ExpansionPrimitive {
+            call_fn: cmd,
+            id: null_type_id(),
+        })
     }
 }
 
-impl<S> From<variable::Command<S>> for Command<S> {
-    fn from(cmd: variable::Command<S>) -> Self {
-        Command::Variable(cmd)
+impl<S> From<ExpansionPrimitive<S>> for Command<S> {
+    fn from(cmd: ExpansionPrimitive<S>) -> Self {
+        Command::Expansion(cmd)
+    }
+}
+
+impl<S> From<rc::Rc<texmacro::Macro>> for Command<S> {
+    fn from(cmd: rc::Rc<texmacro::Macro>) -> Self {
+        Command::Macro(cmd)
+    }
+}
+
+impl<S> From<ExecutionFn<S>> for Command<S> {
+    fn from(cmd: ExecutionFn<S>) -> Self {
+        Command::Execution(ExecutionPrimitive {
+            call_fn: cmd,
+            id: null_type_id(),
+        })
     }
 }
 
@@ -264,20 +241,24 @@ impl<S> From<ExecutionPrimitive<S>> for Command<S> {
     }
 }
 
-impl<S> From<Expansion<S>> for Command<S> {
-    fn from(cmd: Expansion<S>) -> Self {
-        Command::Expansion(cmd)
+impl<S> From<VariableFn<S>> for Command<S> {
+    fn from(f: VariableFn<S>) -> Self {
+        Command::Variable(VariableCommand(f, 0))
     }
 }
 
-impl<S> From<ExpansionPrimitive<S>> for Command<S> {
-    fn from(cmd: ExpansionPrimitive<S>) -> Self {
-        Command::Expansion(Expansion::Primitive(cmd))
+impl<S> From<VariableCommand<S>> for Command<S> {
+    fn from(cmd: VariableCommand<S>) -> Self {
+        Command::Variable(cmd)
     }
 }
 
-impl<S, T: ExpansionGeneric<S> + 'static> From<rc::Rc<T>> for Command<S> {
-    fn from(cmd: rc::Rc<T>) -> Self {
-        Command::Expansion(Expansion::Generic(cmd))
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn command_size() {
+        assert_eq!(std::mem::size_of::<Command<()>>(), 24);
     }
 }

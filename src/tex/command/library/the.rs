@@ -1,9 +1,15 @@
+/// The `\the` expansion primitive.
 use crate::tex::prelude::*;
 use crate::tex::variable;
 use std::char;
 use std::convert::TryInto;
 
-const THE_DOC: &str = "Output text describing some inputted tokens";
+pub const THE_DOC: &str = "Output text describing some inputted tokens";
+
+/// Get the `\the` expansion primitive.
+pub fn get_the<S>() -> command::ExpansionFn<S> {
+    the_primitive_fn
+}
 
 fn the_primitive_fn<S>(
     _the_token: Token,
@@ -19,7 +25,7 @@ fn the_primitive_fn<S>(
         ControlSequence(name) => {
             if let Some(command::Command::Variable(cmd_ref)) = input.base().get_command(name) {
                 let cmd = *cmd_ref;
-                let variable = cmd.variable(&token, input)?;
+                let variable = cmd.resolve(token, input)?;
                 match variable {
                     variable::Variable::Int(variable) => {
                         let value = *variable.get(input.state());
@@ -35,23 +41,15 @@ fn the_primitive_fn<S>(
                     }
                 }
             }
-            new_singleton(token)
+            vec![token]
         }
-        _ => new_singleton(token),
+        _ => vec![token],
     })
-}
-
-pub fn get_the<S>() -> command::ExpansionPrimitive<S> {
-    command::ExpansionPrimitive {
-        call_fn: the_primitive_fn,
-        docs: THE_DOC,
-        id: None,
-    }
 }
 
 fn int_to_tokens(mut i: i32) -> Vec<Token> {
     if i == 0 {
-        return new_singleton(Token::new_other('0'));
+        return vec![Token::new_other('0')];
     }
     let negative = i < 0;
     // TODO: allocate the capacity precisely?
@@ -68,8 +66,4 @@ fn int_to_tokens(mut i: i32) -> Vec<Token> {
     }
     tokens.reverse();
     tokens
-}
-
-fn new_singleton(token: Token) -> Vec<Token> {
-    vec![token]
 }

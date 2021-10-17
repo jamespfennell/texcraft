@@ -96,7 +96,7 @@ fn docs(cs_name: &str, optional_file_name: Option<&String>) -> Result<(), anyhow
             if last_prefix != new_last_prefix {
                 last_prefix = new_last_prefix;
             }
-            let doc = primitives.get(cs_name).unwrap().doc();
+            let doc = "todo".to_string();
             let first_line = doc.split('\n').next().unwrap_or("");
             println![
                 "\\{}  {}",
