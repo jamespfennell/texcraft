@@ -44,7 +44,7 @@ fn def_primitive_fn<S>(def_token: Token, input: &mut ExecutionInput<S>) -> anyho
     let user_defined_macro = Macro::new(prefix, parameters, replacement);
     input
         .base_mut()
-        .set_command_2(name, rc::Rc::new(user_defined_macro));
+        .set_command_using_csname(name, rc::Rc::new(user_defined_macro));
     Ok(())
 }
 

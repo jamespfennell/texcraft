@@ -276,8 +276,8 @@ pub fn new_undefined_cs_error<S>(token: token::Token, state: &Base<S>) -> anyhow
     };
 
     let mut cs_names = Vec::<String>::new();
-    for cs_name in state.primitives.as_regular_map().keys() {
-        cs_names.push(state.cs_names.resolve(cs_name).expect("").to_string());
+    for (cs_name, _) in state.get_commands_as_map().into_iter() {
+        cs_names.push(cs_name);
     }
 
     let close_cs_name = spellcheck::find_close_words(cs_names, name);

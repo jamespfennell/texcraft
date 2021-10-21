@@ -199,8 +199,7 @@ fn newint_primitive_fn<S: HasAlloc>(
     let addr = input.state_mut().alloc_mut().alloc_int();
     input
         .base_mut()
-        .primitives
-        .insert(name, command::VariableCommand(singleton_fn, addr));
+        .set_command_using_csname(name, command::VariableCommand(singleton_fn, addr));
     Ok(())
 }
 
@@ -246,8 +245,7 @@ fn newarray_primitive_fn<S: HasAlloc>(
     let addr = input.state_mut().alloc_mut().alloc_array(len);
     input
         .base_mut()
-        .primitives
-        .insert(name, command::VariableCommand(array_fn, addr));
+        .set_command_using_csname(name, command::VariableCommand(array_fn, addr));
     // TODO: Return the arraydef version
     Ok(())
 }

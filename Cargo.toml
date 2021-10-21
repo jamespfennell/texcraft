@@ -6,6 +6,7 @@ edition = "2018"
 
 [profile.release]
 lto = true          # Enable Link Time Optimization
+opt-level = 2
 
 [dev-dependencies]
 # Performance testing

@@ -113,7 +113,7 @@
 //! - Commands built with this framework can be used in any TeX engine.
 //!
 
-use crate::datastructures::groupingmap::GroupingMap;
+use crate::datastructures::groupingmap::GroupingVec;
 use crate::tex::command;
 use crate::tex::command::library::catcodecmd;
 use crate::tex::token;
@@ -121,9 +121,11 @@ use crate::tex::token::catcode::CatCode;
 use crate::tex::token::CsNameInterner;
 use std::collections::HashMap;
 
+use super::token::CsName;
+
 /// The parts of state that every TeX engine must have.
 pub struct Base<S> {
-    pub primitives: GroupingMap<token::CsName, command::Command<S>>,
+    primitives: GroupingVec<command::Command<S>>,
     pub cat_codes: catcodecmd::Component,
     pub state: S,
 
@@ -141,7 +143,7 @@ impl<S> Base<S> {
     /// Create a new BaseState.
     pub fn new(initial_cat_codes: HashMap<u32, CatCode>, state: S) -> Base<S> {
         Base {
-            primitives: GroupingMap::new(),
+            primitives: Default::default(),
             cat_codes: catcodecmd::Component::new(initial_cat_codes),
             state,
             exec_output: Vec::new(),
@@ -153,20 +155,44 @@ impl<S> Base<S> {
 
     #[inline]
     pub fn get_command(&self, name: &token::CsName) -> Option<&command::Command<S>> {
-        self.primitives.get(name)
+        self.primitives.get(&name.to_usize())
     }
 
     pub fn set_command<A: AsRef<str>, B: Into<command::Command<S>>>(&mut self, name: A, cmd: B) {
         self.primitives
-            .insert(self.cs_names.get_or_intern(name), cmd)
+            .insert(self.cs_names.get_or_intern(name).to_usize(), B::into(cmd))
     }
 
-    pub fn set_command_2<A: Into<token::CsName>, B: Into<command::Command<S>>>(
+    pub fn set_command_using_csname<B: Into<command::Command<S>>>(
         &mut self,
-        name: A,
+        name: token::CsName,
         cmd: B,
     ) {
-        self.primitives.insert(name, cmd)
+        self.primitives.insert(name.to_usize(), B::into(cmd))
+    }
+
+    /// Return a regular hash map with all the commands as they are currently defined.
+    ///
+    /// This function is extremely slow and is only intended to be invoked on error paths.
+    pub fn get_commands_as_map(&self) -> HashMap<String, command::Command<S>> {
+        let mut map = HashMap::new();
+        for (key, value) in self.primitives.backing_container().iter().enumerate() {
+            // We should potentially be panicing instead of continuing in the following 3 expressions.
+            let cmd = match value {
+                None => continue,
+                Some(cmd) => cmd.clone(),
+            };
+            let cs_name = match CsName::try_from_usize(key) {
+                None => continue,
+                Some(cs_name) => cs_name,
+            };
+            let cs_name_str = match self.cs_names.resolve(&cs_name) {
+                None => continue,
+                Some(cs_name_str) => cs_name_str,
+            };
+            map.insert(cs_name_str.to_string(), cmd);
+        }
+        map
     }
 
     pub fn cat_code_map(&self) -> &HashMap<u32, CatCode> {

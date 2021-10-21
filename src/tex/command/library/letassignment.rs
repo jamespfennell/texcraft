@@ -31,7 +31,7 @@ fn let_primitive_fn<S>(let_token: Token, input: &mut ExecutionInput<S>) -> anyho
                 _ => command::Command::Character(token),
             },
         };
-    input.base_mut().set_command_2(name, command);
+    input.base_mut().set_command_using_csname(name, command);
     Ok(())
 }
 

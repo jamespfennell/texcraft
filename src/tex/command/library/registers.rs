@@ -132,7 +132,7 @@ fn countdef_fn<S: HasRegisters<N>, const N: usize>(
         ));
     }
     let new_cmd = command::VariableCommand(singleton_fn, addr);
-    input.base_mut().set_command_2(cs_name, new_cmd);
+    input.base_mut().set_command_using_csname(cs_name, new_cmd);
     Ok(())
 }
 

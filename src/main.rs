@@ -78,31 +78,22 @@ fn docs(cs_name: &str, optional_file_name: Option<&String>) -> Result<(), anyhow
     };
 
     if cs_name == "list" {
-        let primitives = &s.primitives;
         let mut cs_names = Vec::new();
-        for name in primitives.as_regular_map().keys() {
-            cs_names.push(name);
+        let commands = s.get_commands_as_map();
+        for cs_name in commands.keys() {
+            cs_names.push(cs_name);
         }
         cs_names.sort();
         let mut last_prefix = None;
-        for cs_name in cs_names.iter() {
-            let new_last_prefix = s
-                .cs_names
-                .resolve(cs_name)
-                .expect("")
-                .to_string()
-                .chars()
-                .next();
+        for cs_name in cs_names.into_iter() {
+            let _cmd = commands.get(cs_name);
+            let new_last_prefix = cs_name.chars().next();
             if last_prefix != new_last_prefix {
                 last_prefix = new_last_prefix;
             }
             let doc = "todo".to_string();
             let first_line = doc.split('\n').next().unwrap_or("");
-            println![
-                "\\{}  {}",
-                s.cs_names.resolve(cs_name).expect("").to_string().bold(),
-                first_line
-            ];
+            println!["\\{}  {}", cs_name.bold(), first_line];
         }
         return Ok(());
     }

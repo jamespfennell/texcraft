@@ -6,7 +6,7 @@ pub mod stream;
 
 use crate::tex::token::catcode::CatCode;
 use std::rc::Rc;
-use string_interner::{DefaultSymbol, StringInterner};
+use string_interner::{DefaultSymbol, StringInterner, Symbol};
 
 pub struct CsNameInterner {
     interner: StringInterner,
@@ -40,6 +40,17 @@ impl Default for CsNameInterner {
 /// without worrying about downstream consumers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CsName(DefaultSymbol);
+
+impl CsName {
+    #[inline]
+    pub fn to_usize(&self) -> usize {
+        self.0.to_usize()
+    }
+
+    pub fn try_from_usize(u: usize) -> Option<CsName> {
+        DefaultSymbol::try_from_usize(u).map(CsName)
+    }
+}
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum Value {
