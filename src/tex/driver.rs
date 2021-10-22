@@ -377,24 +377,24 @@ impl<S> ExpandedInput<S> {
     /// This method is not recursive. Only a single expansion will be performed. The next
     /// token may be expandable, and to expand it this function needs to be invoked again.
     pub fn expand_next(&mut self) -> anyhow::Result<bool> {
-        let command = match self.raw_stream.peek()? {
+        let (token, command) = match self.raw_stream.peek()? {
             None => return Ok(false),
             Some(token) => match token.value() {
-                ControlSequence(name) => self.base().get_command(&name),
+                ControlSequence(name) => (*token, self.base().get_command(&name)),
                 _ => return Ok(false),
             },
         };
         match command {
             Some(command::Command::Expansion(command)) => {
                 let command = *command;
-                let token = self.raw_stream.next()?.unwrap();
+                let _ = self.raw_stream.next();
                 let output = command.call(token, self)?;
                 self.controller_mut().push_expansion(&output);
                 Ok(true)
             }
             Some(command::Command::Macro(command)) => {
                 let command = command.clone();
-                let token = self.raw_stream.next()?.unwrap();
+                let _ = self.raw_stream.next();
                 command.call(token, self)?;
                 Ok(true)
             }

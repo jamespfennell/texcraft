@@ -90,7 +90,7 @@ impl Value {
 #[derive(Debug, Eq, Clone, Copy)]
 pub struct Token {
     value: Value,
-    // pub source: Option<Source>,
+    source: u32,
 }
 
 impl std::fmt::Display for Token {
@@ -114,7 +114,7 @@ impl PartialEq for Token {
 macro_rules! token_constructor {
     ($name: ident, $value: expr) => {
         pub fn $name(c: char) -> Token {
-            Token { value: $value(c) }
+            Token { value: $value(c), source: 4 }
         }
     };
 }
@@ -135,9 +135,11 @@ impl Token {
     pub fn new_control_sequence(name: CsName) -> Token {
         Token {
             value: Value::ControlSequence(name),
+            source: 3,
         }
     }
 
+    #[inline]
     pub fn value(&self) -> Value {
         self.value
     }
@@ -215,9 +217,9 @@ mod tests {
 
     #[test]
     fn token_size() {
-        assert_eq!(std::mem::size_of::<Token>(), 8);
-        assert_eq!(std::mem::size_of::<Result<Token, ()>>(), 8);
-        assert_eq!(std::mem::size_of::<Result<Option<Token>, ()>>(), 8);
+        assert_eq!(std::mem::size_of::<Token>(), 12);
+        assert_eq!(std::mem::size_of::<Result<Token, ()>>(), 12);
+        assert_eq!(std::mem::size_of::<Result<Option<Token>, ()>>(), 12);
         assert_eq!(std::mem::size_of::<anyhow::Result<Token>>(), 16);
     }
 }

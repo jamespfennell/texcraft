@@ -29,7 +29,7 @@ These performance numbers were obtained on
 
 | n    | pdfTeX | Texcraft | Multiplier (lower is better, target is 1)
 |------|--------|----------|----
-| 250  | 487ms  | 1224ms   | 2.5
+| 250  | 487ms  | 710ms    | 1.46
 | 500  |        |          | 
 | 1000 |        |          |
 | 2500 | \*     |          | N/A
