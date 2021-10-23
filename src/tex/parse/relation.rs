@@ -68,11 +68,11 @@ mod tests {
 
     #[test]
     fn invalid_inputs() {
-        let mut map = catcode::tex_defaults();
-        map.insert('<' as u32, catcode::CatCode::Letter);
         let inputs = vec![r"", r"a", r"\A", r"<"];
         for input in inputs.iter() {
-            let mut stream = testutil::tokenize_with_map(input, &map);
+            let mut map = catcode::tex_defaults();
+            map.insert('<' as u32, catcode::CatCode::Letter);
+            let mut stream = testutil::tokenize_with_map(input, map);
             let result = parse_relation(&mut stream);
             if let Ok(_) = result {
                 panic!["Parsed a relation from invalid input"];

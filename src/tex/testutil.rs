@@ -27,8 +27,8 @@ macro_rules! expansion_test {
                         use crate::tex::token::Value::ControlSequence;
                         let token_equal = match (&token_1.value(), &token_2.value()) {
                             (ControlSequence(cs_name_1), ControlSequence(cs_name_2)) => {
-                                let name_1 = state_1.cs_names.resolve(cs_name_1);
-                                let name_2 = state_2.cs_names.resolve(cs_name_2);
+                                let name_1 = state_1.cs_name_interner().resolve(cs_name_1).unwrap();
+                                let name_2 = state_2.cs_name_interner().resolve(cs_name_2).unwrap();
                                 name_1 == name_2
                             }
                             _ => token_1 == token_2,
@@ -47,12 +47,12 @@ macro_rules! expansion_test {
                 println!("------[lhs]------");
                 println!(
                     "{}",
-                    crate::tex::token::write_tokens(&output_1, &state_1.cs_names)
+                    crate::tex::token::write_tokens(&output_1, &state_1.cs_name_interner())
                 );
                 println!("------[rhs]------");
                 println!(
                     "{}",
-                    crate::tex::token::write_tokens(&output_2, &state_2.cs_names)
+                    crate::tex::token::write_tokens(&output_2, &state_2.cs_name_interner())
                 );
                 println!("-----------------");
                 panic!("Expansion test failed");
@@ -74,7 +74,7 @@ macro_rules! expansion_failure_test {
                 println!("Expansion succeeded:");
                 println!(
                     "{}",
-                    crate::tex::token::write_tokens(&output, &state.cs_names)
+                    crate::tex::token::write_tokens(&output, &state.cs_name_interner())
                 );
                 panic!("Expansion failure test did not pass: expansion successful");
             }
@@ -85,24 +85,25 @@ macro_rules! expansion_failure_test {
 use crate::tex::token::catcode;
 use crate::tex::token::lexer;
 use crate::tex::token::stream;
-use crate::tex::token::CsNameInterner;
 use std::collections::HashMap;
 use std::io;
 
+use super::state::InputRelatedState;
+
 pub fn tokenize(input: &str) -> stream::VecStream {
     let map = catcode::tex_defaults();
-    tokenize_with_map(input, &map)
+    tokenize_with_map(input, map)
 }
 
 pub fn tokenize_with_map(
     input: &str,
-    cat_codes: &HashMap<u32, catcode::CatCode>,
+    cat_codes: HashMap<u32, catcode::CatCode>,
 ) -> stream::VecStream {
-    let mut interner = CsNameInterner::new();
+    let mut input_related_state = InputRelatedState::new(cat_codes);
     let f = Box::new(io::Cursor::new(input.to_string()));
     let mut lexer = lexer::Lexer::new(f);
     let mut result = Vec::new();
-    while let Some(t) = lexer.next(cat_codes, &mut &mut interner).unwrap() {
+    while let Some(t) = lexer.next(&mut input_related_state).unwrap() {
         result.push(t);
     }
     stream::VecStream::new(result)

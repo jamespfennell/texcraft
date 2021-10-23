@@ -1,18 +1,18 @@
 # Texcraft
 
 Texcraft is a project to create an LLVM-style infrastructure for building TeX engines and distributions.
-The goals of the project include:
+Goals:
 
 - Creating modern reimplementations of existing TeX distributions (TeX, pdfTeX, XeTeX, etc.)
     with a focus on modularity and code reuse.
 
-- Enabling direct integration of TeX engines with things like IDEs and webservices. 
+- Enabling direct integration of TeX engines with IDEs, webservices, and JavaScript (using WASM).
 
 - Providing a framework for building new TeX engines with novel features (new page
     breaking algorithms, support for different font formats, etc.).
 
-Initial implemention work has focused on the core internal APIs (commands, variables, state)
-    and the expansion primitives.
+Initial implemention work has focused on the core internal APIs (commands, variables, state),
+    expansion primitives, and performance.
 
 
 ## Trying it out
@@ -20,7 +20,20 @@ Initial implemention work has focused on the core internal APIs (commands, varia
 Try it out in the [Texcraft playground](https://play.texcraft.dev)!
 
 
-## Contributing
+## Performance
+
+One of the hardest parts of implementing a TeX engine is matching the
+  high performance of Knuth's original implementation.
+The Texcraft project maintains benchmarks for measuring performance
+  and comparing them to pdfTeX.
+These currently report that the speeds of Texcraft and pdfTeX are about the same.
+It's possible that Texcraft's numbers will regress slightly as more features are added.
+
+For context, when the first benchmark was introduced
+  Texcraft was over seven times slower than pdfTeX!
+This was despite Texcraft being written in idiomatic Rust.
+Since then a series of performance optimizations has closed the gap.
+
 
 ## See also
 

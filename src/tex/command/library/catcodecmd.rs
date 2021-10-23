@@ -3,30 +3,10 @@ use crate::tex::prelude::*;
 use crate::tex::token::catcode::CatCode;
 use crate::tex::variable::TypedVariable;
 use crate::tex::variable::Variable;
-use std::collections::HashMap;
+
 use std::convert::TryFrom;
 
 pub const CATCODE_DOC: &str = "Get or set a catcode register";
-
-/// A component holding the current category code values.
-pub struct Component {
-    // TODO: maybe keying off of u32 is the wrong choice, because these may not be valid unicode characters.
-    cat_codes: HashMap<u32, CatCode>,
-    fallback: CatCode,
-}
-
-impl Component {
-    pub fn new(initial_cat_codes: HashMap<u32, CatCode>) -> Component {
-        Component {
-            cat_codes: initial_cat_codes,
-            fallback: CatCode::default(),
-        }
-    }
-
-    pub fn cat_codes_map(&self) -> &HashMap<u32, CatCode> {
-        &self.cat_codes
-    }
-}
 
 /// Get the `\catcode` command.
 pub fn get_catcode<S>() -> command::VariableFn<S> {
@@ -42,19 +22,14 @@ fn catcode_fn<S>(
     Ok(Variable::CatCode(TypedVariable::new(
         |state: &Base<S>, addr: usize| -> &CatCode {
             let addr = u32::try_from(addr).unwrap();
-            state
-                .cat_codes
-                .cat_codes
-                .get(&addr)
-                .unwrap_or(&state.cat_codes.fallback)
+            state.cat_codes().get(&addr).unwrap_or(&CatCode::Other)
         },
         |state: &mut Base<S>, addr: usize| -> &mut CatCode {
             let addr = u32::try_from(addr).unwrap();
             state
-                .cat_codes
-                .cat_codes
+                .cat_codes_mut()
                 .entry(addr)
-                .or_insert_with(CatCode::default)
+                .or_insert_with(|| CatCode::Other)
         },
         addr as usize,
     )))

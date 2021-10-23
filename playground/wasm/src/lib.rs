@@ -41,7 +41,7 @@ pub fn greet(
     );
     match driver::exec(&mut execution_input, true) {
         Ok(tokens) => {
-          token::write_tokens(&tokens, &execution_input.base().cs_names)
+          token::write_tokens(&tokens, &execution_input.base().cs_name_interner())
         },
         Err(err) => format!["{}", err],
     }

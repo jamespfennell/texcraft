@@ -19,10 +19,17 @@ impl CsNameInterner {
         }
     }
 
+    #[inline]
     pub fn get_or_intern<T: AsRef<str>>(&mut self, string: T) -> CsName {
         CsName(self.interner.get_or_intern(string))
     }
 
+    #[inline]
+    pub fn get<T: AsRef<str>>(&self, string: T) -> Option<CsName> {
+        self.interner.get(string).map(CsName)
+    }
+
+    #[inline]
     pub fn resolve(&self, cs_name: &CsName) -> Option<&str> {
         self.interner.resolve(cs_name.0)
     }
@@ -114,7 +121,10 @@ impl PartialEq for Token {
 macro_rules! token_constructor {
     ($name: ident, $value: expr) => {
         pub fn $name(c: char) -> Token {
-            Token { value: $value(c), source: 4 }
+            Token {
+                value: $value(c),
+                source: 4,
+            }
         }
     };
 }

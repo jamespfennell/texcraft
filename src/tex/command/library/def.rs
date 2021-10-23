@@ -41,7 +41,7 @@ fn def_primitive_fn<S>(def_token: Token, input: &mut ExecutionInput<S>) -> anyho
             tokens.reverse();
         }
     }
-    let user_defined_macro = Macro::new(prefix, parameters, replacement);
+    let user_defined_macro = unsafe { Macro::new_unchecked(prefix, parameters, replacement) };
     input
         .base_mut()
         .set_command_using_csname(name, rc::Rc::new(user_defined_macro));

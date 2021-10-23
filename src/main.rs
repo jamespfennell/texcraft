@@ -59,7 +59,7 @@ fn expand(file_name: &str) -> Result<(), anyhow::Error> {
     );
     let tokens = driver::exec(&mut execution_input, true)?;
     let s = execution_input.take_base();
-    let pretty = token::write_tokens(&tokens, &s.cs_names);
+    let pretty = token::write_tokens(&tokens, s.cs_name_interner());
     print!("{}", pretty);
     Ok(())
 }

@@ -115,7 +115,7 @@
 
 use crate::datastructures::groupingmap::GroupingVec;
 use crate::tex::command;
-use crate::tex::command::library::catcodecmd;
+
 use crate::tex::token;
 use crate::tex::token::catcode::CatCode;
 use crate::tex::token::CsNameInterner;
@@ -125,8 +125,8 @@ use super::token::CsName;
 
 /// The parts of state that every TeX engine must have.
 pub struct Base<S> {
+    input_related: InputRelatedState,
     primitives: GroupingVec<command::Command<S>>,
-    pub cat_codes: catcodecmd::Component,
     pub state: S,
 
     // Only used in exec mode.
@@ -134,8 +134,6 @@ pub struct Base<S> {
     pub exec_output: Vec<token::Token>,
     pub num_trailing_newlines: usize,
     pub tracing_macros: i32,
-
-    pub cs_names: CsNameInterner,
 }
 
 /// Base state that every TeX state is expected to include using composition.
@@ -143,13 +141,12 @@ impl<S> Base<S> {
     /// Create a new BaseState.
     pub fn new(initial_cat_codes: HashMap<u32, CatCode>, state: S) -> Base<S> {
         Base {
+            input_related: InputRelatedState::new(initial_cat_codes),
             primitives: Default::default(),
-            cat_codes: catcodecmd::Component::new(initial_cat_codes),
             state,
             exec_output: Vec::new(),
             num_trailing_newlines: 0,
             tracing_macros: 0,
-            cs_names: CsNameInterner::new(),
         }
     }
 
@@ -159,8 +156,13 @@ impl<S> Base<S> {
     }
 
     pub fn set_command<A: AsRef<str>, B: Into<command::Command<S>>>(&mut self, name: A, cmd: B) {
-        self.primitives
-            .insert(self.cs_names.get_or_intern(name).to_usize(), B::into(cmd))
+        self.primitives.insert(
+            self.input_related
+                .cs_name_interner
+                .get_or_intern(name)
+                .to_usize(),
+            B::into(cmd),
+        )
     }
 
     pub fn set_command_using_csname<B: Into<command::Command<S>>>(
@@ -186,7 +188,7 @@ impl<S> Base<S> {
                 None => continue,
                 Some(cs_name) => cs_name,
             };
-            let cs_name_str = match self.cs_names.resolve(&cs_name) {
+            let cs_name_str = match self.input_related.cs_name_interner.resolve(&cs_name) {
                 None => continue,
                 Some(cs_name_str) => cs_name_str,
             };
@@ -195,11 +197,54 @@ impl<S> Base<S> {
         map
     }
 
-    pub fn cat_code_map(&self) -> &HashMap<u32, CatCode> {
-        self.cat_codes.cat_codes_map()
+    #[inline]
+    pub fn cs_name_interner(&self) -> &CsNameInterner {
+        &self.input_related.cs_name_interner
     }
 
-    pub fn input_components(&mut self) -> (&HashMap<u32, CatCode>, &mut CsNameInterner) {
-        (self.cat_codes.cat_codes_map(), &mut self.cs_names)
+    #[inline]
+    pub fn cat_codes(&self) -> &HashMap<u32, CatCode> {
+        &self.input_related.cat_codes
+    }
+
+    #[inline]
+    pub fn cat_codes_mut(&mut self) -> &mut HashMap<u32, CatCode> {
+        &mut self.input_related.cat_codes
+    }
+
+    #[inline]
+    pub fn input_related(&mut self) -> &mut InputRelatedState {
+        &mut self.input_related
+    }
+
+    #[inline]
+    pub fn input_related_and_commands(
+        &mut self,
+    ) -> (&mut InputRelatedState, &GroupingVec<command::Command<S>>) {
+        (&mut self.input_related, &self.primitives)
+    }
+}
+
+pub struct InputRelatedState {
+    cs_name_interner: CsNameInterner,
+    cat_codes: HashMap<u32, CatCode>,
+}
+
+impl InputRelatedState {
+    pub fn new(initial_cat_codes: HashMap<u32, CatCode>) -> InputRelatedState {
+        InputRelatedState {
+            cs_name_interner: Default::default(),
+            cat_codes: initial_cat_codes,
+        }
+    }
+
+    #[inline]
+    pub fn cat_codes(&self) -> &HashMap<u32, CatCode> {
+        &self.cat_codes
+    }
+
+    #[inline]
+    pub fn cs_name_interner_mut(&mut self) -> &mut CsNameInterner {
+        &mut self.cs_name_interner
     }
 }

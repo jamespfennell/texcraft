@@ -15,9 +15,9 @@
 //! followed by the single letter token B.
 
 use crate::tex::error;
+use crate::tex::state::InputRelatedState;
 use crate::tex::token;
 use crate::tex::token::catcode::CatCode;
-use crate::tex::token::CsNameInterner;
 use crate::tex::token::Token;
 use std::collections::HashMap;
 use std::fmt;
@@ -58,17 +58,17 @@ pub struct Lexer {
 impl Lexer {
     pub fn next(
         &mut self,
-        map: &HashMap<u32, CatCode>,
-        interner: &mut CsNameInterner,
+        input_related_state: &mut InputRelatedState,
     ) -> Result<Option<token::Token>, LexerError> {
-        while let Some(raw_token) = self.raw_lexer.next(map)? {
+        while let Some(raw_token) = self.raw_lexer.next(input_related_state.cat_codes())? {
             let c = raw_token.char;
             let value = match raw_token.code {
                 CatCode::Escape => Token::new_control_sequence(
-                    self.read_control_sequence(&raw_token, map, interner)?,
+                    self.read_control_sequence(&raw_token, input_related_state)?,
                 ),
                 CatCode::EndOfLine | CatCode::Space => {
-                    let num_consumed_new_lines = self.consume_whitespace(map)?
+                    let num_consumed_new_lines = self
+                        .consume_whitespace(input_related_state.cat_codes())?
                         + match raw_token.code == CatCode::EndOfLine {
                             true => 1, // we consumed an additional new line for the first token
                             false => 0,
@@ -78,7 +78,11 @@ impl Lexer {
                             continue;
                         }
                         (true, false) => Token::new_space(raw_token.char),
-                        (false, _) => Token::new_control_sequence(interner.get_or_intern("par")),
+                        (false, _) => Token::new_control_sequence(
+                            input_related_state
+                                .cs_name_interner_mut()
+                                .get_or_intern("par"),
+                        ),
                     }
                 }
                 CatCode::BeginGroup => Token::new_begin_group(c),
@@ -92,7 +96,9 @@ impl Lexer {
                 CatCode::Other => Token::new_other(c),
                 CatCode::Active => Token::new_active_character(c),
                 CatCode::Comment => {
-                    while let Some(next_raw_token) = self.raw_lexer.peek(map)? {
+                    while let Some(next_raw_token) =
+                        self.raw_lexer.peek(input_related_state.cat_codes())?
+                    {
                         if next_raw_token.code == CatCode::EndOfLine {
                             break;
                         }
@@ -130,10 +136,9 @@ impl Lexer {
     fn read_control_sequence(
         &mut self,
         raw_token: &RawToken,
-        map: &HashMap<u32, CatCode>,
-        interner: &mut CsNameInterner,
+        input_related_state: &mut InputRelatedState,
     ) -> Result<token::CsName, LexerError> {
-        let name = match self.raw_lexer.next(map)? {
+        let name = match self.raw_lexer.next(input_related_state.cat_codes())? {
             None => {
                 return Err(LexerError::MalformedControlSequence(
                     error::TokenError::new(
@@ -161,7 +166,7 @@ impl Lexer {
                     char: subsequent_char,
                     code: CatCode::Letter,
                     ..
-                }) = self.raw_lexer.peek(map)?
+                }) = self.raw_lexer.peek(input_related_state.cat_codes())?
                 {
                     self.raw_lexer.advance();
                     name.push(subsequent_char);
@@ -170,7 +175,9 @@ impl Lexer {
             }
             Some(first_raw_token) => first_raw_token.char.to_string(),
         };
-        Ok(interner.get_or_intern(name))
+        Ok(input_related_state
+            .cs_name_interner_mut()
+            .get_or_intern(name))
     }
 
     pub fn last_non_empty_line(&self) -> Option<Rc<token::Line>> {
@@ -270,6 +277,7 @@ mod tests {
     use super::*;
     use crate::tex::token::catcode;
     use crate::tex::token::catcode::CatCode::*;
+    use crate::tex::token::CsNameInterner;
     use crate::tex::token::Value;
 
     enum TokenValue {
@@ -292,18 +300,18 @@ mod tests {
         ( $name: ident, $input: expr, $ ( $expected_token : expr, ) * ) => {
             #[test]
             fn $name() {
-                let mut interner = CsNameInterner::new();
                 let f = Box::new(io::Cursor::new($input.to_string()));
                 let mut lexer = Lexer::new(f);
                 let mut map = catcode::tex_defaults();
                 map.insert('X' as u32, EndOfLine);
                 map.insert('Y' as u32, Space);
                 map.insert('Z' as u32, Ignored);
+                let mut input_related_state = InputRelatedState::new(map);
                 let mut actual = Vec::new();
-                while let Some(t) = lexer.next(&map, &mut interner).unwrap() {
+                while let Some(t) = lexer.next(&mut input_related_state).unwrap() {
                     actual.push(t.value);
                 }
-                let expected: Vec<Value> = vec![$ ( $expected_token.convert(&mut interner) ) , * ];
+                let expected: Vec<Value> = vec![$ ( $expected_token.convert(input_related_state.cs_name_interner_mut()) ) , * ];
                 assert_eq!(expected, actual);
             }
         };

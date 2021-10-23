@@ -18,8 +18,15 @@ pub struct Macro {
     replacement_text: Vec<Replacement>,
 }
 
+/// A token list or parameter in a replacement text.
 pub enum Replacement {
+    /// A list of tokens.
     Tokens(Vec<Token>),
+
+    /// A parameter.
+    ///
+    /// In order to be valid, the parameters index must be less than the number
+    /// of parameters in the macro.
     Parameter(usize),
 }
 
@@ -42,15 +49,22 @@ impl Macro {
             let start_index = argument_tokens.len();
             let trim_outer_braces =
                 parameter.parse_argument(&token, unexpanded_stream, i, argument_tokens)?;
-            argument_indices.push(match trim_outer_braces {
+            let element = match trim_outer_braces {
                 true => (start_index + 1, argument_tokens.len() - 1),
                 false => (start_index, argument_tokens.len()),
-            });
+            };
+            unsafe {
+                argument_indices.push_unchecked(element);
+            }
         }
-        let arguments: ArrayVec<&[Token], 9> = argument_indices
-            .into_iter()
-            .map(|(i, j)| &argument_tokens[i..j])
-            .collect();
+
+        let mut arguments: ArrayVec<&[Token], 9> = Default::default();
+        for (i, j) in &argument_indices {
+            let slice = unsafe { argument_tokens.get_unchecked(*i..*j) };
+            unsafe {
+                arguments.push_unchecked(slice);
+            }
+        }
 
         let mut result = unexpanded_stream.controller_mut().expansions_mut();
         Macro::perform_replacement(&self.replacement_text, &arguments, &mut result);
@@ -62,7 +76,8 @@ impl Macro {
                     " | {}{}={}",
                     "#".bright_yellow().bold(),
                     (i + 1).to_string().bright_yellow().bold(),
-                    write_tokens(*argument, &unexpanded_stream.base().cs_names).bright_yellow()
+                    write_tokens(*argument, unexpanded_stream.base().cs_name_interner())
+                        .bright_yellow()
                 ]
             }
             println![
@@ -92,7 +107,14 @@ impl Macro {
         d
     }
 
-    pub fn new(
+    /// Create a new macro.
+    ///
+    /// # Safety
+    ///
+    /// This constructor does not check that the replacement text is valid; i.e., that indices
+    /// appearing in any [Replacement::Parameter] are less than the number of parameters. If
+    /// this is not the case, undefined behavior will occur when the macro is expanded.
+    pub unsafe fn new_unchecked(
         prefix: Vec<Token>,
         parameters: ArrayVec<Parameter, 9>,
         replacement_text: Vec<Replacement>,
@@ -113,7 +135,7 @@ impl Macro {
         for replacement in replacements.iter() {
             output_size += match replacement {
                 Replacement::Tokens(tokens) => tokens.len(),
-                Replacement::Parameter(i) => arguments[*i].len(),
+                Replacement::Parameter(i) => unsafe { arguments.get_unchecked(*i) }.len(),
             };
         }
         result.reserve(output_size);
@@ -123,7 +145,7 @@ impl Macro {
                     result.extend(tokens);
                 }
                 Replacement::Parameter(i) => {
-                    result.extend(arguments[*i].iter().rev().copied());
+                    result.extend(unsafe { arguments.get_unchecked(*i) }.iter().rev().copied());
                 }
             }
         }
@@ -181,8 +203,9 @@ impl Parameter {
                 }
                 _ => (),
             };
+            let matches_delimiter = matcher.next(&token);
             result.push(token);
-            if scope_depth == closing_scope_depth && matcher.next(result.last().unwrap()) {
+            if scope_depth == closing_scope_depth && matches_delimiter {
                 // Remove the suffix.
                 for _ in 0..matcher_factory.substring().len() {
                     result.pop();

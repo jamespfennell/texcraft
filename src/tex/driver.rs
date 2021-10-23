@@ -3,12 +3,13 @@
 use crate::tex::command::library::conditional;
 use crate::tex::command::Command;
 use crate::tex::prelude::*;
+use crate::tex::state::InputRelatedState;
 use crate::tex::token;
 use crate::tex::token::lexer;
-use crate::tex::token::CsNameInterner;
+
 use crate::tex::token::Token;
 use crate::tex::variable;
-use std::collections::HashMap;
+
 use std::io;
 use std::mem;
 use std::rc;
@@ -135,15 +136,15 @@ impl InputController {
         self.push_new_source(Box::new(io::Cursor::new(s.into())));
     }
 
+    #[inline]
     pub fn push_expansion(&mut self, expansion: &[Token]) {
-        self.clear_next_token();
         self.current_source
             .expansions
             .extend(expansion.iter().rev());
     }
 
+    #[inline]
     pub fn push_single_token(&mut self, token: Token) {
-        self.clear_next_token();
         self.current_source.expansions.push(token);
     }
 
@@ -151,36 +152,31 @@ impl InputController {
         self.last_non_empty_line.clone()
     }
 
+    #[inline]
     pub fn expansions_mut(&mut self) -> &mut Vec<Token> {
-        self.clear_next_token();
         &mut self.current_source.expansions
     }
 
     #[inline]
     fn next(
         &mut self,
-        cat_code_map: &HashMap<u32, CatCode>,
-        interner: &mut CsNameInterner,
+        input_related_state: &mut InputRelatedState,
     ) -> anyhow::Result<Option<token::Token>> {
-        if let Some(token) = self.current_source.next_token.take() {
-            return Ok(Some(token));
-        }
         if let Some(token) = self.current_source.expansions.pop() {
             return Ok(Some(token));
         }
-        if let Some(token) = self.current_source.root.next(cat_code_map, interner)? {
+        if let Some(token) = self.current_source.root.next(input_related_state)? {
             return Ok(Some(token));
         }
-        self.next_recurse(cat_code_map, interner)
+        self.next_recurse(input_related_state)
     }
 
     fn next_recurse(
         &mut self,
-        cat_code_map: &HashMap<u32, CatCode>,
-        interner: &mut CsNameInterner,
+        input_related_state: &mut InputRelatedState,
     ) -> anyhow::Result<Option<token::Token>> {
         if self.pop_source() {
-            self.next(cat_code_map, interner)
+            self.next(input_related_state)
         } else {
             Ok(None)
         }
@@ -189,30 +185,24 @@ impl InputController {
     #[inline]
     fn peek(
         &mut self,
-        cat_code_map: &HashMap<u32, CatCode>,
-        interner: &mut CsNameInterner,
+        input_related_state: &mut InputRelatedState,
     ) -> anyhow::Result<Option<&token::Token>> {
-        if self.current_source.next_token.is_some() {
-            return Ok(self.current_source.next_token.as_ref());
+        if let Some(token) = self.current_source.expansions.last() {
+            return Ok(Some(unsafe { launder(token) }));
         }
-        let has_expanded_token = self.current_source.expansions.last().is_some();
-        if has_expanded_token {
+        if let Some(token) = self.current_source.root.next(input_related_state)? {
+            self.current_source.expansions.push(token);
             return Ok(self.current_source.expansions.last());
         }
-        if let Some(token) = self.current_source.root.next(cat_code_map, interner)? {
-            self.current_source.next_token = Some(token);
-            return Ok(self.current_source.next_token.as_ref());
-        }
-        self.peek_recurse(cat_code_map, interner)
+        self.peek_recurse(input_related_state)
     }
 
     fn peek_recurse(
         &mut self,
-        cat_code_map: &HashMap<u32, CatCode>,
-        interner: &mut CsNameInterner,
+        input_related_state: &mut InputRelatedState,
     ) -> anyhow::Result<Option<&token::Token>> {
         if self.pop_source() {
-            self.peek(cat_code_map, interner)
+            self.peek(input_related_state)
         } else {
             Ok(None)
         }
@@ -220,20 +210,11 @@ impl InputController {
 
     fn pop_source(&mut self) -> bool {
         match self.sources.pop() {
-            None => {
-                // self.current_source = Source::new_empty();
-                false
-            }
+            None => false,
             Some(source) => {
                 self.current_source = source;
                 true
             }
-        }
-    }
-
-    fn clear_next_token(&mut self) {
-        if let Some(token) = self.current_source.next_token.take() {
-            self.current_source.expansions.push(token);
         }
     }
 
@@ -250,7 +231,6 @@ impl Default for InputController {
 }
 
 struct Source {
-    next_token: Option<Token>,
     expansions: Vec<Token>,
     root: lexer::Lexer,
 }
@@ -258,7 +238,6 @@ struct Source {
 impl Source {
     fn new(reader: Box<dyn io::BufRead>) -> Source {
         Source {
-            next_token: None,
             expansions: Vec::with_capacity(32),
             root: lexer::Lexer::new(reader),
         }
@@ -281,14 +260,12 @@ pub struct UnexpandedStream<S> {
 impl<S> stream::Stream for UnexpandedStream<S> {
     #[inline]
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
-        let (a, b) = self.state.input_components();
-        self.input.next(a, b)
+        self.input.next(self.state.input_related())
     }
 
     #[inline]
     fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
-        let (a, b) = self.state.input_components();
-        self.input.peek(a, b)
+        self.input.peek(self.state.input_related())
     }
 }
 
@@ -317,16 +294,58 @@ pub struct ExpandedInput<S> {
 }
 
 impl<S> stream::Stream for ExpandedInput<S> {
-    #[inline]
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
-        while self.expand_next()? {}
-        self.raw_stream.next()
+        let (token, command) = match self.raw_stream.next()? {
+            None => return Ok(None),
+            Some(token) => match token.value() {
+                ControlSequence(name) => (token, self.base().get_command(&name)),
+                _ => return Ok(Some(token)),
+            },
+        };
+        match command {
+            Some(command::Command::Expansion(command)) => {
+                let command = *command;
+                let output = command.call(token, self)?;
+                self.controller_mut().push_expansion(&output);
+                self.next()
+            }
+            Some(command::Command::Macro(command)) => {
+                let command = command.clone();
+                command.call(token, self)?;
+                self.next()
+            }
+            _ => Ok(Some(token)),
+        }
     }
 
-    #[inline]
     fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
-        while self.expand_next()? {}
-        self.raw_stream.peek()
+        let (input_related_state, commands_map) =
+            self.raw_stream.state.input_related_and_commands();
+        let (token, command) = match self.raw_stream.input.peek(input_related_state)? {
+            None => return Ok(None),
+            Some(token) => match token.value() {
+                ControlSequence(name) => (token, commands_map.get(&name.to_usize())),
+                _ => return Ok(Some(unsafe { launder(token) })),
+            },
+        };
+        match command {
+            Some(command::Command::Expansion(command)) => {
+                let command = *command;
+                let token = *token;
+                let _ = self.raw_stream.next();
+                let output = command.call(token, self)?;
+                self.controller_mut().push_expansion(&output);
+                self.peek()
+            }
+            Some(command::Command::Macro(command)) => {
+                let command = command.clone();
+                let token = *token;
+                let _ = self.raw_stream.next();
+                command.call(token, self)?;
+                self.peek()
+            }
+            _ => Ok(Some(unsafe { launder(token) })),
+        }
     }
 }
 
@@ -499,4 +518,17 @@ impl<S> ExecutionInput<S> {
             },
         }
     }
+}
+
+/// Strips the lifetime from the token.
+///
+/// This function is intended to get around limitations of the borrow checker only. It
+/// should only be used when the code is actually fine but the borrow checker is being
+/// too conservative. Don't do anything fancy.
+///
+/// See this question for the type of code this function is designed for:
+/// https://stackoverflow.com/questions/69680201/is-this-use-of-unsafe-trivially-safe
+#[inline]
+unsafe fn launder<'a, 'b>(token: &'a Token) -> &'b Token {
+    &*(token as *const Token)
 }

@@ -169,10 +169,7 @@ enum EndOfGroupAction<V> {
 impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V, T> {
     /// Inserts the key, value pair.
     pub fn insert(&mut self, key: K, mut val: V) {
-        match (
-            self.backing_container.get_mut(&key),
-            self.groups.last_mut(),
-        ) {
+        match (self.backing_container.get_mut(&key), self.groups.last_mut()) {
             (None, None) => {
                 self.backing_container.insert(key, val);
             }

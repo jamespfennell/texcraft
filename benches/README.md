@@ -29,10 +29,10 @@ These performance numbers were obtained on
 
 | n    | pdfTeX | Texcraft | Multiplier (lower is better, target is 1)
 |------|--------|----------|----
-| 250  | 487ms  | 710ms    | 1.46
-| 500  |        |          | 
-| 1000 |        |          |
-| 2500 | \*     |          | N/A
+| 250  | 487ms  | 470ms    | 0.97
+| 500  | 1.90s  | 1.88s    | 0.99
+| 1000 | 7.60s  | 7.53s    | 0.99
+| 2500 | \*     | 48s      | N/A
 
 \*pdfTeX cannot execute the script for higher values of n as it runs out of stack space.
 

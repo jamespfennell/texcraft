@@ -271,7 +271,7 @@ pub fn add_context<S>(error: &mut anyhow::Error, execution_input: &driver::Execu
 pub fn new_undefined_cs_error<S>(token: token::Token, state: &Base<S>) -> anyhow::Error {
     let a = "expected a control sequence".to_string();
     let name = match &token.value() {
-        token::Value::ControlSequence(name) => state.cs_names.resolve(name).expect(""),
+        token::Value::ControlSequence(name) => state.cs_name_interner().resolve(name).expect(""),
         _ => &a,
     };
 

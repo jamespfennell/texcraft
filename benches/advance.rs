@@ -7,10 +7,16 @@ pub fn advance_bench(c: &mut Criterion) {
     let mut state = WholeLibraryState::new();
     state.set_command("par", execwhitespace::get_par());
     state.set_command("newline", execwhitespace::get_newline());
-    let a_cs = Token::new_control_sequence(state.cs_names.get_or_intern("a"));
     let mut execution_input =
         driver::ExecutionInput::new_with_str(state, r"\countdef\k 0 \def\a{\advance\k by 1}");
     driver::exec(&mut execution_input, true).unwrap();
+    let a_cs = Token::new_control_sequence(
+        execution_input
+            .base()
+            .cs_name_interner()
+            .get("a")
+            .expect("a should have been interned already"),
+    );
 
     let mut group = c.benchmark_group("advance");
     group.sample_size(10000);
