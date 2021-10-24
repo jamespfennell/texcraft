@@ -26,13 +26,11 @@ One of the hardest parts of implementing a TeX engine is matching the
   high performance of Knuth's original implementation.
 The Texcraft project maintains benchmarks for measuring performance
   and comparing them to pdfTeX.
-These currently report that the speeds of Texcraft and pdfTeX are about the same.
-It's possible that Texcraft's numbers will regress slightly as more features are added.
+These currently report that Texcraft is 5-10% faster,
+  though we expect that Texcraft's numbers will regress as more features are added.
 
 For context, when the first benchmark was introduced
   Texcraft was over seven times slower than pdfTeX!
-This was despite Texcraft being written in idiomatic Rust.
-Since then a series of performance optimizations has closed the gap.
 
 
 ## See also
