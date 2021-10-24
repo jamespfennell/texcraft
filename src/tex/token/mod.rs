@@ -97,7 +97,7 @@ impl Value {
 #[derive(Debug, Eq, Clone, Copy)]
 pub struct Token {
     value: Value,
-    source: u32,
+    _source: u32,
 }
 
 impl std::fmt::Display for Token {
@@ -123,7 +123,7 @@ macro_rules! token_constructor {
         pub fn $name(c: char) -> Token {
             Token {
                 value: $value(c),
-                source: 4,
+                _source: 4,
             }
         }
     };
@@ -145,7 +145,7 @@ impl Token {
     pub fn new_control_sequence(name: CsName) -> Token {
         Token {
             value: Value::ControlSequence(name),
-            source: 3,
+            _source: 3,
         }
     }
 

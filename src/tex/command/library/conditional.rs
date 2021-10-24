@@ -40,7 +40,7 @@ enum BranchKind {
 
 #[derive(Debug)]
 struct Branch {
-    token: Token,
+    _token: Token,
     kind: BranchKind,
 }
 
@@ -83,7 +83,7 @@ fn fi_id() -> any::TypeId {
 // The `true_case` function is executed whenever a conditional evaluates to true.
 fn true_case<S>(token: Token, input: &mut command::ExpandedInput<S>) -> anyhow::Result<Vec<Token>> {
     input.controller_mut().conditional.branches.push(Branch {
-        token,
+        _token: token,
         kind: BranchKind::True,
     });
     Ok(Vec::new())
@@ -105,7 +105,7 @@ fn false_case<S>(
                 if c.id() == else_id() && depth == 0 {
                     // TODO: push the token
                     input.controller_mut().conditional.branches.push(Branch {
-                        token: original_token,
+                        _token: original_token,
                         kind: BranchKind::Else,
                     });
                     return Ok(Vec::new());
@@ -198,7 +198,7 @@ fn if_case_primitive_fn<S>(
     let mut cases_to_skip: i32 = parse::parse_number(input)?;
     if cases_to_skip == 0 {
         branches(input).push(Branch {
-            token: ifcase_token,
+            _token: ifcase_token,
             kind: BranchKind::Switch,
         });
         return Ok(Vec::new());
@@ -212,7 +212,7 @@ fn if_case_primitive_fn<S>(
                     cases_to_skip -= 1;
                     if cases_to_skip == 0 {
                         branches(input).push(Branch {
-                            token: ifcase_token,
+                            _token: ifcase_token,
                             kind: BranchKind::Switch,
                         });
                         return Ok(Vec::new());
@@ -220,7 +220,7 @@ fn if_case_primitive_fn<S>(
                 }
                 if c.id() == else_id() && depth == 0 {
                     branches(input).push(Branch {
-                        token: ifcase_token,
+                        _token: ifcase_token,
                         kind: BranchKind::Else,
                     });
                     return Ok(Vec::new());

@@ -14,7 +14,7 @@ struct Line {
     line_number: usize,
     position: usize,
     width: usize,
-    file_description: String,
+    _file_description: String,
 }
 
 impl Line {
@@ -33,7 +33,7 @@ impl Line {
                 Value::ControlSequence(_) => 100, // TODO + name.len(),
                 _ => 1,
             },
-            file_description: source.line.file.to_string(),
+            _file_description: source.line.file.to_string(),
         })
     }
 }
@@ -161,7 +161,7 @@ impl TokenError {
                     Value::ControlSequence(_) => 100, // TODO
                     _ => 1,
                 },
-                file_description: "".to_string(), // TODO token.source.line.file.bo).clone(),
+                _file_description: "".to_string(), // TODO token.source.line.file.bo).clone(),
             },
             s: "".to_string(),
             /*
@@ -233,7 +233,7 @@ impl EndOfInputError {
                 line_number: last_line.line_number,
                 position: last_line.content.trim_end().len(),
                 width: 1,
-                file_description: String::clone(last_line.file.as_ref()),
+                _file_description: String::clone(last_line.file.as_ref()),
             })
         }
     }

@@ -66,8 +66,8 @@ impl Macro {
             }
         }
 
-        let mut result = unexpanded_stream.controller_mut().expansions_mut();
-        Macro::perform_replacement(&self.replacement_text, &arguments, &mut result);
+        let result = unexpanded_stream.controller_mut().expansions_mut();
+        Macro::perform_replacement(&self.replacement_text, &arguments, result);
 
         if unexpanded_stream.base().tracing_macros > 0 {
             println![" +---[ Tracing macro expansion of {} ]--+", token];
