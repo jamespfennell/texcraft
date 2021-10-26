@@ -3,22 +3,23 @@
 
 !Cargo.toml
 !Cargo.lock
-!src
 !benches
+!crates/texlang-core
+!crates/texlang-stdlib
+!crates/texcraft-stdext
 
-!playground/wasm/Cargo.toml
-!playground/wasm/Cargo.lock
-!playground/wasm/src
+!crates/playground/Cargo.toml
+!crates/playground/src
 
-!playground/ui/src
-!playground/ui/static
-!playground/ui/*.json
-!playground/ui/.babelrc
-!playground/ui/webpack.config.js
+!crates/playground/ui/src
+!crates/playground/ui/static
+!crates/playground/ui/*.json
+!crates/playground/ui/.babelrc
+!crates/playground/ui/webpack.config.js
 
-!playground/go.mod
-!playground/go.sum
-!playground/*.go
+!crates/playground/go.mod
+!crates/playground/go.sum
+!crates/playground/*.go
 
 !docs/config.toml
 !docs/content/*

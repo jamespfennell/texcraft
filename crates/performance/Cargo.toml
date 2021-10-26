@@ -1,0 +1,20 @@
+[package]
+name = "performance"
+version = "0.0.0"
+edition = "2021"
+
+[dev-dependencies]
+# Performance testing
+criterion = "0.3"
+
+[dependencies]
+texlang-core = { path = "../../crates/texlang-core", default-features = false }
+texlang-stdlib = { path = "../../crates/texlang-stdlib", default-features = false }
+
+[[bench]]
+name = "digits_of_pi"
+harness = false
+
+[[bench]]
+name = "advance"
+harness = false

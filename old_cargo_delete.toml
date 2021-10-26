@@ -1,0 +1,43 @@
+[package]
+name = "texcraft"
+version = "0.1.0"
+authors = ["James Fennell <james@jpfennell.com>"]
+edition = "2021"
+
+[profile.release]
+lto = true          # Enable Link Time Optimization
+opt-level = 2
+
+
+[dependencies]
+# Used for the many situations in which multiple integer types are supported: e.g, parsing, variables.
+num-traits = "0.2.14"
+
+# Error handling.
+anyhow = "1.0"
+
+# Nice terminal output.
+colored = "2"
+
+# In the time module for getting the current time on startup.
+chrono = {version="0.4.19", default-features = false, features = ["clock"], optional = true}
+
+# String interning for control sequence names.
+string-interner = "0.13.0"
+
+# In the macros system
+arrayvec = "0.7.1"
+
+
+[features]
+default = ["time"]
+time = ["chrono"]
+
+
+[[bench]]
+name = "digits_of_pi"
+harness = false
+
+[[bench]]
+name = "advance"
+harness = false

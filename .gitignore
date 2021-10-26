@@ -6,3 +6,4 @@
 flamegraph.svg
 perf.data*
 callgrind*
+pkg

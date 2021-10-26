@@ -16,12 +16,8 @@ FROM rust:1.56 AS rust-builder
 WORKDIR /rustdoc
 COPY Cargo.lock .
 COPY Cargo.toml .
-RUN mkdir src
-RUN echo "fn main() {}" > src/main.rs
-# TODO: remove the following line when multi-crate happens
-COPY benches benches
+COPY crates crates
 RUN cargo fetch
-COPY src src
 RUN cargo doc --no-deps --lib
 
 FROM nginx

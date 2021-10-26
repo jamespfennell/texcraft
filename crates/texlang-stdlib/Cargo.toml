@@ -1,0 +1,27 @@
+[package]
+name = "texlang-stdlib"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+# In the time module for getting the current time on startup.
+chrono = {version="0.4.19", default-features = false, features = ["clock"], optional = true}
+
+texcraft-stdext = { path = "../texcraft-stdext" }
+texlang-core = { path = "../texlang-core" }
+
+
+# Error handling.
+anyhow = "1.0"
+
+
+# In the macros system
+arrayvec = "0.7.1"
+
+[features]
+default = ["time"]
+time = ["chrono"]
+

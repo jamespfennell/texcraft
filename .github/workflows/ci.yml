@@ -92,6 +92,6 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           tags: jamespfennell/play.texcraft.dev:latest
-          file: ./playground/Dockerfile
+          file: ./crates/playground/Dockerfile
           # Only push to Docker Hub if this workflow is a push to main
           push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
