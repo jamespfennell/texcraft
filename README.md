@@ -23,15 +23,13 @@ Try it out in the [Texcraft playground](https://play.texcraft.dev)!
 ## Performance
 
 One of the hardest parts of implementing a TeX engine is matching the
-  high performance of Knuth's original implementation.
-The Texcraft project maintains benchmarks for measuring performance
+  performance of Knuth's original implementation.
+The Texcraft project maintains benchmarks in `crates/performance` for measuring performance
   and comparing them to pdfTeX.
-These currently report that Texcraft is 5-10% faster,
-  though we expect that Texcraft's numbers will regress as more features are added.
-
-For context, when the first benchmark was introduced
-  Texcraft was over seven times slower than pdfTeX!
-
+At time of writing these report that Texcraft is about 15% faster,
+  though we expect this will regress as more features are added.
+For context, when the first benchmark was created
+  Texcraft was over *seven times slower* than pdfTeX!
 
 ## See also
 

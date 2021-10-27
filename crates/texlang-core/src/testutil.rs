@@ -83,32 +83,7 @@ macro_rules! expansion_failure_test {
     };
 }
 
-use crate::token::catcode;
-use crate::token::lexer;
 use crate::token::stream;
-use std::collections::HashMap;
-use std::io;
-
-use super::state::InputRelatedState;
-
-pub fn tokenize(input: &str) -> stream::VecStream {
-    let map = catcode::tex_defaults();
-    tokenize_with_map(input, map)
-}
-
-pub fn tokenize_with_map(
-    input: &str,
-    cat_codes: HashMap<u32, catcode::CatCode>,
-) -> stream::VecStream {
-    let mut input_related_state = InputRelatedState::new(cat_codes);
-    let f = Box::new(io::Cursor::new(input.to_string()));
-    let mut lexer = lexer::Lexer::new(f);
-    let mut result = Vec::new();
-    while let Some(t) = lexer.next(&mut input_related_state).unwrap() {
-        result.push(t);
-    }
-    stream::VecStream::new(result)
-}
 
 pub fn length(stream: &mut dyn stream::Stream) -> u64 {
     let mut result = 0;

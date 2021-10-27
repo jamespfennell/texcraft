@@ -132,14 +132,14 @@ fn parse_octal<S: stream::Stream, T: PrimInt>(stream: &mut S) -> anyhow::Result<
     let mut n = num_traits::cast::cast(get_element![
         stream,
         parse_number_error,
-            Value::Other('0') => 0,
-            Value::Other('1') => 1,
-            Value::Other('2') => 2,
-            Value::Other('3') => 3,
-            Value::Other('4') => 4,
-            Value::Other('5') => 5,
-            Value::Other('6') => 6,
-            Value::Other('7') => 7,
+        Value::Other('0') => 0,
+        Value::Other('1') => 1,
+        Value::Other('2') => 2,
+        Value::Other('3') => 3,
+        Value::Other('4') => 4,
+        Value::Other('5') => 5,
+        Value::Other('6') => 6,
+        Value::Other('7') => 7,
     ]?)
     .unwrap();
     while let Some(lsd) = get_optional_element![
@@ -182,30 +182,30 @@ fn parse_hexadecimal<S: stream::Stream, T: PrimInt>(stream: &mut S) -> anyhow::R
     let mut n: T = num_traits::cast::cast(get_element![
         stream,
         parse_number_error,
-            Value::Other('0') => 0,
-            Value::Other('1') => 1,
-            Value::Other('2') => 2,
-            Value::Other('3') => 3,
-            Value::Other('4') => 4,
-            Value::Other('5') => 5,
-            Value::Other('6') => 6,
-            Value::Other('7') => 7,
-            Value::Other('8') => 8,
-            Value::Other('9') => 9,
+        Value::Other('0') => 0,
+        Value::Other('1') => 1,
+        Value::Other('2') => 2,
+        Value::Other('3') => 3,
+        Value::Other('4') => 4,
+        Value::Other('5') => 5,
+        Value::Other('6') => 6,
+        Value::Other('7') => 7,
+        Value::Other('8') => 8,
+        Value::Other('9') => 9,
 
-            Value::Other('A') => 10,
-            Value::Other('B') => 11,
-            Value::Other('C') => 12,
-            Value::Other('D') => 13,
-            Value::Other('E') => 14,
-            Value::Other('F') => 15,
+        Value::Other('A') => 10,
+        Value::Other('B') => 11,
+        Value::Other('C') => 12,
+        Value::Other('D') => 13,
+        Value::Other('E') => 14,
+        Value::Other('F') => 15,
 
-            Value::Letter('A') => 10,
-            Value::Letter('B') => 11,
-            Value::Letter('C') => 12,
-            Value::Letter('D') => 13,
-            Value::Letter('E') => 14,
-            Value::Letter('F') => 15,
+        Value::Letter('A') => 10,
+        Value::Letter('B') => 11,
+        Value::Letter('C') => 12,
+        Value::Letter('D') => 13,
+        Value::Letter('E') => 14,
+        Value::Letter('F') => 15,
     ]?)
     .unwrap();
     while let Some(lsd) = get_optional_element![
@@ -221,12 +221,12 @@ fn parse_hexadecimal<S: stream::Stream, T: PrimInt>(stream: &mut S) -> anyhow::R
         Value::Other('8') => 8,
         Value::Other('9') => 9,
 
-            Value::Other('A') => 10,
-            Value::Other('B') => 11,
-            Value::Other('C') => 12,
-            Value::Other('D') => 13,
-            Value::Other('E') => 14,
-            Value::Other('F') => 15,
+        Value::Other('A') => 10,
+        Value::Other('B') => 11,
+        Value::Other('C') => 12,
+        Value::Other('D') => 13,
+        Value::Other('E') => 14,
+        Value::Other('F') => 15,
 
         Value::Letter('A') => 10,
         Value::Letter('B') => 11,
@@ -247,15 +247,13 @@ fn add_lsd<T: PrimInt>(n: T, base: i32, lsd: i32) -> T {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state;
-
     use crate::token::catcode;
 
     macro_rules! parse_number_test {
         ($input: expr, $number: expr) => {
             // TODO: replicate this for the relation tests and destroy the VecStream
             let mut execution_input = driver::ExecutionInput::new_with_str(
-                state::Base::<()>::new(catcode::tex_defaults(), ()),
+                Base::<()>::new(catcode::tex_defaults(), ()),
                 $input,
             );
             let result: i32 = parse_number(execution_input.regular()).unwrap();
@@ -365,5 +363,16 @@ mod tests {
         parse_number_test![r"+-4", -4];
         parse_number_test![r"--4", 4];
         parse_number_test![r"  -  - 4", 4];
+    }
+
+    #[test]
+    fn number_with_letter_catcode() {
+        let mut map = catcode::tex_defaults();
+        map.insert('1' as u32, catcode::CatCode::Letter);
+        let mut input = driver::ExecutionInput::new_with_str(Base::<()>::new(map, ()), r"1");
+        let result = parse_number::<(), i32>(input.regular());
+        if let Ok(_) = result {
+            panic!["Parsed a relation from invalid input"];
+        }
     }
 }

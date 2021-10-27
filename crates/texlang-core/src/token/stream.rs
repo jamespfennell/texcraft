@@ -21,22 +21,7 @@
 //!
 //! Tokens are consume from a stream using the `next` method. This method is almost the same
 //! as the `next` method in Rust's iterator trait, except a stream can return an error.
-//! ```
-//! # use texlang_core::token::stream::VecStream;
-//! # use texlang_core::token::stream::Stream;
-//! # use texlang_core::token::Token;
-//! # use texlang_core::token::catcode::CatCode;
-//! let mut stream = VecStream::new(vec![
-//!     Token::new_letter('a'),
-//!     Token::new_letter('b'),
-//!     Token::new_letter('c'),
-//! ]);
 //!
-//! assert_eq!(stream.next().unwrap(), Some(Token::new_letter('a')));
-//! assert_eq!(stream.next().unwrap(), Some(Token::new_letter('b')));
-//! assert_eq!(stream.next().unwrap(), Some(Token::new_letter('c')));
-//! assert_eq!(stream.next().unwrap(), None);
-//! ```
 //! As with iterators, a result of `Ok(None)` indicates that the stream is exhausted.
 //!
 //! # Peeking at the next token
@@ -44,26 +29,11 @@
 //! In many sitations it is necessary to examine the next token without consuming it; i.e.,
 //! _peek_ at the next token. An example is reading an integer from a stream, in which one needs
 //! to peek at the next token to see if it is a digit. Consuming the token with `next` is not
-//! correct in this situation if the token is not a digit. The simplist way to peek is with
+//! correct in this situation if the token is not a digit. Peeking is done with
 //! the `peek` method.
-//! ```
-//! # use texlang_core::token::stream::VecStream;
-//! # use texlang_core::token::stream::Stream;
-//! # use texlang_core::token::Token;
-//! # use texlang_core::token::catcode::CatCode;
-//! let mut stream = VecStream::new(vec![
-//!     Token::new_letter('a'),
-//!     Token::new_letter('b'),
-//!     Token::new_letter('c'),
-//! ]);
 //!
-//! assert_eq!(stream.peek().unwrap(), Some(&Token::new_letter('a')));
-//! assert_eq!(stream.peek().unwrap(), Some(&Token::new_letter('a')));
-//! assert_eq!(stream.next().unwrap(), Some(Token::new_letter('a')));
-//! assert_eq!(stream.peek().unwrap(), Some(&Token::new_letter('b')));
-//! ```
 //! The `peek` method returns an immutable reference to the token: because the token is not
-//! being consumed, ownership cannot be transferred as in `next`.
+//! being consumed, ownership is transferred as in `next`.
 //!
 //! The `peek` method must be idempotent: consecutive calls to `peek` with no intervening
 //! change to the state or the stream must return the same result.
@@ -147,28 +117,4 @@ pub fn remove_tokens_from_stream(
         }
     }
     Ok(())
-}
-
-/// A `VecStream` is a stream consisting of a vector of tokens that are returned in order.
-#[derive(Debug)]
-pub struct VecStream {
-    data: Vec<Token>,
-}
-
-impl VecStream {
-    /// Returns a new `VecStream` consisting of the tokens in the provided vector.
-    pub fn new(mut vec: Vec<Token>) -> VecStream {
-        vec.reverse();
-        VecStream { data: vec }
-    }
-}
-
-impl Stream for VecStream {
-    fn next(&mut self) -> anyhow::Result<Option<Token>> {
-        Ok(self.data.pop())
-    }
-
-    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
-        Ok(self.data.last())
-    }
 }

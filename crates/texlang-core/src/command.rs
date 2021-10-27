@@ -1,6 +1,5 @@
 //! Texcraft commands API and primitives library.
 //!
-//!
 //! # Texcraft commands API
 //!
 //! One of the most important parts of any TeX engine is the primitives that it provides.
@@ -38,6 +37,7 @@
 
 use crate::driver;
 use crate::prelude::*;
+use crate::texmacro;
 use crate::token;
 use crate::variable;
 use std::any::TypeId;
@@ -45,10 +45,6 @@ use std::rc;
 
 pub use driver::ExecutionInput;
 pub use driver::ExpandedInput;
-
-use super::texmacro;
-
-pub mod tutorial;
 
 enum NullTypeIdType {}
 

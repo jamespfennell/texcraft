@@ -1,21 +1,17 @@
 # TODO
  
-Main thread:
-
-1. Make the input controller implementation simpler, no stack of stack of stacks.
-1. Reimplement macros again to take advantage of tokens being copyable
-1. Change the token type so that it is 8 bytes and see if this makes things more performant.
-1. Fix up the errors system which is now totally broken
-1. Have scratch space in the input controller for parsing stuff -> will grow but that's okay
-    We can have a token::HasScratchSpace trait and implement it
-1. Make commands smaller (two or three words?)
-1. Replace the groupingMap with a groupingVec
-
 Documentation:
 
 1. The input module and the input unit
 1. The primitives tutorial
 
+Turorial:
+
+//! 1. An IP address command.
+//! 1. A random number generator.
+//! 1. A new assignment operator.
+
+The Texcraft book?
 
 Conditionals
 
@@ -44,12 +40,9 @@ This is related to logging
 
 ## Low priority
 - show if conditional token in the error message
-- Cleanup the input controller, especailly the hacky use of the expansions stack for caching lexing results
 - Write a unit test to verify that TeX also does caching in the lexer ... or does it
 
 
 ## Optimization ideas:
-- Make the `Command` type flat/not nested and remove the docs so that it has better cache locality. Also maybe move
-  - out the type?
 - Lazily construct the KMP matcher for macros
 - Don't use a KMP matcher for small macros
