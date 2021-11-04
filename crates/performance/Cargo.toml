@@ -10,6 +10,7 @@ criterion = "0.3"
 [dependencies]
 texlang-core = { path = "../../crates/texlang-core", default-features = false }
 texlang-stdlib = { path = "../../crates/texlang-stdlib", default-features = false }
+rand = "0.8.4"
 
 [[bench]]
 name = "digits_of_pi"
@@ -18,3 +19,11 @@ harness = false
 [[bench]]
 name = "advance"
 harness = false
+
+[[bench]]
+name = "lexer_throughput"
+harness = false
+
+[[bin]]
+name = "randomtex"
+path = "bin/randomtex.rs"
