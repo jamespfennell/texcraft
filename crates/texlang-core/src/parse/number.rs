@@ -253,7 +253,7 @@ mod tests {
         ($input: expr, $number: expr) => {
             // TODO: replicate this for the relation tests and destroy the VecStream
             let mut execution_input = driver::ExecutionInput::new_with_str(
-                Base::<()>::new(catcode::tex_defaults(), ()),
+                Base::<()>::new(CatCodeMap::new_with_tex_defaults(), ()),
                 $input,
             );
             let result: i32 = parse_number(execution_input.regular()).unwrap();
@@ -367,8 +367,8 @@ mod tests {
 
     #[test]
     fn number_with_letter_catcode() {
-        let mut map = catcode::tex_defaults();
-        map.insert('1' as u32, catcode::CatCode::Letter);
+        let mut map = CatCodeMap::new_with_tex_defaults();
+        map.insert('1', catcode::CatCode::Letter);
         let mut input = driver::ExecutionInput::new_with_str(Base::<()>::new(map, ()), r"1");
         let result = parse_number::<(), i32>(input.regular());
         if let Ok(_) = result {

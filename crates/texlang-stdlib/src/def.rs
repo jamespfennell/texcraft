@@ -181,6 +181,7 @@ fn parse_replacement_text(
     opt_final_token: Option<Token>,
     num_parameters: usize,
 ) -> anyhow::Result<Vec<Replacement>> {
+    // TODO: could we use a pool of vectors to avoid some of the allocations here?
     let mut result = vec![];
     let mut scope_depth = 0;
     let push = |result: &mut Vec<Replacement>, token| match result.last_mut() {

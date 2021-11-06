@@ -18,11 +18,12 @@ use crate::error;
 use crate::state::InputRelatedState;
 use crate::token;
 use crate::token::catcode::CatCode;
+use crate::token::catcode::CatCodeMap;
 use crate::token::Token;
-use std::collections::HashMap;
 use std::fmt;
 use std::io;
-use std::rc::Rc;
+use std::iter::Peekable;
+use texcraft_stdext::str::OwningChars;
 
 const MALFORMED_CONTROL_SEQUENCE_ERROR_TITLE: &str = "Unexpected end of file";
 const MALFORMED_CONTROL_SEQUENCE_ERROR_HELP: &str =
@@ -53,14 +54,23 @@ impl From<io::Error> for LexerError {
 pub struct Lexer {
     raw_lexer: RawLexer,
     trim_next_whitespace: bool,
+    scratch_string: String,
 }
 
 impl Lexer {
+    pub fn new(file: Box<dyn io::BufRead>) -> Lexer {
+        Lexer {
+            raw_lexer: RawLexer::new(file),
+            trim_next_whitespace: false,
+            scratch_string: Default::default(),
+        }
+    }
+
     pub fn next(
         &mut self,
         input_related_state: &mut InputRelatedState,
     ) -> Result<Option<token::Token>, LexerError> {
-        while let Some(raw_token) = self.raw_lexer.next(input_related_state.cat_codes())? {
+        while let Some(raw_token) = self.raw_lexer.next(input_related_state.cat_codes()) {
             let c = raw_token.char;
             let value = match raw_token.code {
                 CatCode::Escape => Token::new_control_sequence(
@@ -68,7 +78,7 @@ impl Lexer {
                 ),
                 CatCode::EndOfLine | CatCode::Space => {
                     let num_consumed_new_lines = self
-                        .consume_whitespace(input_related_state.cat_codes())?
+                        .consume_whitespace(input_related_state.cat_codes())
                         + match raw_token.code == CatCode::EndOfLine {
                             true => 1, // we consumed an additional new line for the first token
                             false => 0,
@@ -97,7 +107,7 @@ impl Lexer {
                 CatCode::Active => Token::new_active_character(c),
                 CatCode::Comment => {
                     while let Some(next_raw_token) =
-                        self.raw_lexer.peek(input_related_state.cat_codes())?
+                        self.raw_lexer.peek(input_related_state.cat_codes())
                     {
                         if next_raw_token.code == CatCode::EndOfLine {
                             break;
@@ -118,9 +128,9 @@ impl Lexer {
         Ok(None)
     }
 
-    fn consume_whitespace(&mut self, map: &HashMap<u32, CatCode>) -> Result<usize, LexerError> {
+    fn consume_whitespace(&mut self, map: &CatCodeMap) -> usize {
         let mut num_new_lines: usize = 0;
-        while let Some(RawToken { code, .. }) = self.raw_lexer.peek(map)? {
+        while let Some(RawToken { code, .. }) = self.raw_lexer.peek(map) {
             num_new_lines += match code {
                 CatCode::EndOfLine => 1,
                 CatCode::Space => 0,
@@ -130,7 +140,7 @@ impl Lexer {
             };
             self.raw_lexer.advance();
         }
-        Ok(num_new_lines)
+        num_new_lines
     }
 
     fn read_control_sequence(
@@ -138,7 +148,8 @@ impl Lexer {
         raw_token: &RawToken,
         input_related_state: &mut InputRelatedState,
     ) -> Result<token::CsName, LexerError> {
-        let name = match self.raw_lexer.next(input_related_state.cat_codes())? {
+        self.scratch_string.clear();
+        match self.raw_lexer.next(input_related_state.cat_codes()) {
             None => {
                 return Err(LexerError::MalformedControlSequence(
                     error::TokenError::new(
@@ -154,41 +165,24 @@ impl Lexer {
                 code: CatCode::Letter,
                 ..
             }) => {
-                // _____  _____  ____   _____
-                //   |    |   |  |   \  |   |  | | |
-                //   |    |   |  |   |  |   |  | | |
-                //   |    |___|  |___/  |___|  o o o
-                //
-                // TODO: optimize this! We shouldn't allocate a string. Instead get the underlying &str
-                let mut name = String::new();
-                name.push(char);
+                self.scratch_string.push(char);
                 while let Some(RawToken {
                     char: subsequent_char,
                     code: CatCode::Letter,
                     ..
-                }) = self.raw_lexer.peek(input_related_state.cat_codes())?
+                }) = self.raw_lexer.peek(input_related_state.cat_codes())
                 {
                     self.raw_lexer.advance();
-                    name.push(subsequent_char);
+                    self.scratch_string.push(subsequent_char);
                 }
-                name
             }
-            Some(first_raw_token) => first_raw_token.char.to_string(),
+            Some(first_raw_token) => {
+                self.scratch_string.push(first_raw_token.char);
+            }
         };
         Ok(input_related_state
             .cs_name_interner_mut()
-            .get_or_intern(name))
-    }
-
-    pub fn last_non_empty_line(&self) -> Option<Rc<token::Line>> {
-        self.raw_lexer.last_non_empty_line.clone()
-    }
-
-    pub fn new(file: Box<dyn io::BufRead>) -> Lexer {
-        Lexer {
-            raw_lexer: RawLexer::new(file),
-            trim_next_whitespace: false,
-        }
+            .get_or_intern(&self.scratch_string))
     }
 }
 
@@ -198,75 +192,48 @@ struct RawToken {
 }
 
 struct RawLexer {
-    reader: Box<dyn io::BufRead>,
-    last_non_empty_line: Option<Rc<token::Line>>,
-    current_line: Rc<token::Line>,
-    current_line_as_chars: Vec<char>,
-    next_char_index: usize,
+    iter: Peekable<OwningChars>,
+    next_token_source: usize,
 }
 
 impl RawLexer {
-    fn next(&mut self, map: &HashMap<u32, CatCode>) -> Result<Option<RawToken>, LexerError> {
-        let result = self.peek(map);
-        self.advance();
-        result
+    pub fn new(mut file: Box<dyn io::BufRead>) -> RawLexer {
+        let mut s = Default::default();
+        file.read_to_string(&mut s)
+            .expect("failed to read buffer into string");
+
+        RawLexer {
+            iter: OwningChars::new(s).peekable(),
+            next_token_source: 0,
+        }
+    }
+
+    fn next(&mut self, map: &CatCodeMap) -> Option<RawToken> {
+        match self.iter.next() {
+            Some(c) => {
+                let code = *map.get(&c);
+                self.next_token_source += 1;
+                Some(RawToken { char: c, code })
+            }
+            None => None,
+        }
+    }
+
+    fn peek(&mut self, map: &CatCodeMap) -> Option<RawToken> {
+        match self.iter.peek() {
+            Some(c) => {
+                let c = *c;
+                let code = *map.get(&c);
+                self.next_token_source += 1;
+                Some(RawToken { char: c, code })
+            }
+            None => None,
+        }
     }
 
     fn advance(&mut self) {
-        self.next_char_index += 1;
-    }
-
-    fn peek(&mut self, map: &HashMap<u32, CatCode>) -> Result<Option<RawToken>, LexerError> {
-        self.fill_buffer()?;
-        Ok(self
-            .current_line_as_chars
-            .get(self.next_char_index)
-            .copied()
-            .map(|char| RawToken {
-                code: match map.get(&(char as u32)) {
-                    None => CatCode::Other,
-                    Some(&code) => code,
-                },
-                char,
-                /*
-                source: token::Source {
-                    line: self.current_line.clone(),
-                    position: self.next_char_index,
-                },
-                 */
-            }))
-    }
-
-    fn fill_buffer(&mut self) -> Result<(), LexerError> {
-        if self.next_char_index >= self.current_line_as_chars.len() {
-            let mut line = String::new();
-            self.reader.read_line(&mut line)?;
-            self.current_line_as_chars = line.chars().collect();
-            self.next_char_index = 0;
-            self.current_line = Rc::new(token::Line {
-                content: line,
-                line_number: self.current_line.line_number + 1,
-                file: self.current_line.file.clone(),
-            });
-            if self.last_non_empty_line.is_none() || !self.current_line.content.is_empty() {
-                self.last_non_empty_line = Some(self.current_line.clone());
-            };
-        }
-        Ok(())
-    }
-
-    pub fn new(file: Box<dyn io::BufRead>) -> RawLexer {
-        RawLexer {
-            reader: file,
-            current_line_as_chars: Vec::new(),
-            next_char_index: 0,
-            last_non_empty_line: None,
-            current_line: Rc::new(token::Line {
-                content: "".to_string(),
-                line_number: 0,
-                file: Rc::new("".to_string()),
-            }),
-        }
+        self.iter.next();
+        self.next_token_source += 1;
     }
 }
 
@@ -302,10 +269,10 @@ mod tests {
             fn $name() {
                 let f = Box::new(io::Cursor::new($input.to_string()));
                 let mut lexer = Lexer::new(f);
-                let mut map = catcode::tex_defaults();
-                map.insert('X' as u32, EndOfLine);
-                map.insert('Y' as u32, Space);
-                map.insert('Z' as u32, Ignored);
+                let mut map = CatCodeMap::new_with_tex_defaults();
+                map.insert('X', EndOfLine);
+                map.insert('Y', Space);
+                map.insert('Z', Ignored);
                 let mut input_related_state = InputRelatedState::new(map);
                 let mut actual = Vec::new();
                 while let Some(t) = lexer.next(&mut input_related_state).unwrap() {

@@ -8,13 +8,13 @@ macro_rules! expansion_test {
     ($name: ident, $lhs: expr, $rhs: expr, $setup_fn: ident) => {
         #[test]
         fn $name() {
-            let mut state_1 = Base::<State>::new(catcode::tex_defaults(), new_state());
+            let mut state_1 = Base::<State>::new(CatCodeMap::new_with_tex_defaults(), new_state());
             $setup_fn(&mut state_1);
             let mut execution_input_1 = driver::ExecutionInput::new_with_str(state_1, $lhs);
             let output_1 = driver::exec(&mut execution_input_1, false).unwrap();
             let state_1 = execution_input_1.take_base();
 
-            let mut state_2 = Base::<State>::new(catcode::tex_defaults(), new_state());
+            let mut state_2 = Base::<State>::new(CatCodeMap::new_with_tex_defaults(), new_state());
             $setup_fn(&mut state_2);
             let mut execution_input_2 = driver::ExecutionInput::new_with_str(state_2, $rhs);
             let output_2 = driver::exec(&mut execution_input_2, false).unwrap();
@@ -66,7 +66,7 @@ macro_rules! expansion_failure_test {
     ($name: ident, $input: expr) => {
         #[test]
         fn $name() {
-            let mut state = Base::<State>::new(catcode::tex_defaults(), new_state());
+            let mut state = Base::<State>::new(CatCodeMap::new_with_tex_defaults(), new_state());
             setup_expansion_test(&mut state);
             let mut execution_input = driver::ExecutionInput::new_with_str(state, $input);
             let result = driver::exec(&mut execution_input, false);

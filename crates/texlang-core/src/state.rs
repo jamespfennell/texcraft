@@ -115,7 +115,7 @@
 
 use crate::command;
 use crate::token;
-use crate::token::catcode::CatCode;
+use crate::token::catcode::CatCodeMap;
 use crate::token::CsNameInterner;
 use std::collections::HashMap;
 use texcraft_stdext::collections::groupingmap::GroupingVec;
@@ -138,7 +138,7 @@ pub struct Base<S> {
 /// Base state that every TeX state is expected to include using composition.
 impl<S> Base<S> {
     /// Create a new BaseState.
-    pub fn new(initial_cat_codes: HashMap<u32, CatCode>, state: S) -> Base<S> {
+    pub fn new(initial_cat_codes: CatCodeMap, state: S) -> Base<S> {
         Base {
             input_related: InputRelatedState::new(initial_cat_codes),
             primitives: Default::default(),
@@ -202,12 +202,12 @@ impl<S> Base<S> {
     }
 
     #[inline]
-    pub fn cat_codes(&self) -> &HashMap<u32, CatCode> {
+    pub fn cat_codes(&self) -> &CatCodeMap {
         &self.input_related.cat_codes
     }
 
     #[inline]
-    pub fn cat_codes_mut(&mut self) -> &mut HashMap<u32, CatCode> {
+    pub fn cat_codes_mut(&mut self) -> &mut CatCodeMap {
         &mut self.input_related.cat_codes
     }
 
@@ -226,11 +226,11 @@ impl<S> Base<S> {
 
 pub struct InputRelatedState {
     cs_name_interner: CsNameInterner,
-    cat_codes: HashMap<u32, CatCode>,
+    cat_codes: CatCodeMap,
 }
 
 impl InputRelatedState {
-    pub fn new(initial_cat_codes: HashMap<u32, CatCode>) -> InputRelatedState {
+    pub fn new(initial_cat_codes: CatCodeMap) -> InputRelatedState {
         InputRelatedState {
             cs_name_interner: Default::default(),
             cat_codes: initial_cat_codes,
@@ -238,7 +238,7 @@ impl InputRelatedState {
     }
 
     #[inline]
-    pub fn cat_codes(&self) -> &HashMap<u32, CatCode> {
+    pub fn cat_codes(&self) -> &CatCodeMap {
         &self.cat_codes
     }
 

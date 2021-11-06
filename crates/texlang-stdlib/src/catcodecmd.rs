@@ -20,14 +20,13 @@ fn catcode_fn<S>(
     Ok(Variable::CatCode(TypedVariable::new(
         |state: &Base<S>, addr: usize| -> &CatCode {
             let addr = u32::try_from(addr).unwrap();
-            state.cat_codes().get(&addr).unwrap_or(&CatCode::Other)
+            let addr = char::from_u32(addr).unwrap();
+            state.cat_codes().get(&addr)
         },
         |state: &mut Base<S>, addr: usize| -> &mut CatCode {
             let addr = u32::try_from(addr).unwrap();
-            state
-                .cat_codes_mut()
-                .entry(addr)
-                .or_insert_with(|| CatCode::Other)
+            let addr = char::from_u32(addr).unwrap();
+            state.cat_codes_mut().get_mut(&addr)
         },
         addr as usize,
     )))

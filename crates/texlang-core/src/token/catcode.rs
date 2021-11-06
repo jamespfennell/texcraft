@@ -127,82 +127,133 @@ impl std::fmt::Display for CatCode {
     }
 }
 
-pub fn tex_defaults() -> HashMap<u32, CatCode> {
-    let mut cat_code_map = HashMap::new();
-    set_tex_defaults(&mut cat_code_map);
-    cat_code_map
+pub struct CatCodeMap {
+    low: [CatCode; 128],
+    high: HashMap<char, CatCode>,
+    default: CatCode,
 }
 
-pub fn set_tex_defaults(cat_code_map: &mut HashMap<u32, CatCode>) {
-    cat_code_map.extend(std::array::IntoIter::new([
-        ('\\' as u32, Escape),
-        ('{' as u32, BeginGroup),
-        ('}' as u32, EndGroup),
-        ('$' as u32, MathShift),
-        ('&' as u32, AlignmentTab),
-        ('\n' as u32, EndOfLine),
-        ('#' as u32, Parameter),
-        ('^' as u32, Superscript),
-        ('_' as u32, Subscript),
-        ('~' as u32 as u32, Active),
-        ('%' as u32, Comment),
+impl CatCodeMap {
+    pub fn new() -> CatCodeMap {
+        CatCodeMap {
+            low: [Default::default(); 128],
+            high: HashMap::new(),
+            default: CatCode::default(),
+        }
+    }
+
+    pub fn new_with_tex_defaults() -> CatCodeMap {
+        let mut cat_code_map = CatCodeMap::new();
+        set_tex_defaults(&mut cat_code_map);
+        cat_code_map
+    }
+
+    #[inline]
+    pub fn get(&self, c: &char) -> &CatCode {
+        if (*c as u32) < 128 {
+            self.low.get(*c as usize).unwrap()
+        } else {
+            self.high.get(c).unwrap_or(&self.default)
+        }
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self, c: &char) -> &mut CatCode {
+        if (*c as u32) < 128 {
+            self.low.get_mut(*c as usize).unwrap()
+        } else {
+            self.high.entry(*c).or_insert_with(|| CatCode::Other)
+        }
+    }
+
+    pub fn insert(&mut self, c: char, code: CatCode) {
+        if (c as u32) < 128 {
+            self.low[c as usize] = code
+        } else {
+            self.high.insert(c, code);
+        }
+    }
+}
+
+impl Default for CatCodeMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn set_tex_defaults(cat_code_map: &mut CatCodeMap) {
+    let iter = std::array::IntoIter::new([
+        ('\\', Escape),
+        ('{', BeginGroup),
+        ('}', EndGroup),
+        ('$', MathShift),
+        ('&', AlignmentTab),
+        ('\n', EndOfLine),
+        ('#', Parameter),
+        ('^', Superscript),
+        ('_', Subscript),
+        ('~', Active),
+        ('%', Comment),
         //
-        (' ' as u32, Space),
+        (' ', Space),
         //
-        ('A' as u32, Letter),
-        ('B' as u32, Letter),
-        ('C' as u32, Letter),
-        ('D' as u32, Letter),
-        ('E' as u32, Letter),
-        ('F' as u32, Letter),
-        ('G' as u32, Letter),
-        ('H' as u32, Letter),
-        ('I' as u32, Letter),
-        ('J' as u32, Letter),
-        ('K' as u32, Letter),
-        ('L' as u32, Letter),
-        ('M' as u32, Letter),
-        ('N' as u32, Letter),
-        ('O' as u32, Letter),
-        ('P' as u32, Letter),
-        ('Q' as u32, Letter),
-        ('R' as u32, Letter),
-        ('S' as u32, Letter),
-        ('T' as u32, Letter),
-        ('U' as u32, Letter),
-        ('V' as u32, Letter),
-        ('W' as u32, Letter),
-        ('X' as u32, Letter),
-        ('Y' as u32, Letter),
-        ('Z' as u32, Letter),
+        ('A', Letter),
+        ('B', Letter),
+        ('C', Letter),
+        ('D', Letter),
+        ('E', Letter),
+        ('F', Letter),
+        ('G', Letter),
+        ('H', Letter),
+        ('I', Letter),
+        ('J', Letter),
+        ('K', Letter),
+        ('L', Letter),
+        ('M', Letter),
+        ('N', Letter),
+        ('O', Letter),
+        ('P', Letter),
+        ('Q', Letter),
+        ('R', Letter),
+        ('S', Letter),
+        ('T', Letter),
+        ('U', Letter),
+        ('V', Letter),
+        ('W', Letter),
+        ('X', Letter),
+        ('Y', Letter),
+        ('Z', Letter),
         //
-        ('a' as u32, Letter),
-        ('b' as u32, Letter),
-        ('c' as u32, Letter),
-        ('d' as u32, Letter),
-        ('e' as u32, Letter),
-        ('f' as u32, Letter),
-        ('g' as u32, Letter),
-        ('h' as u32, Letter),
-        ('i' as u32, Letter),
-        ('j' as u32, Letter),
-        ('k' as u32, Letter),
-        ('l' as u32, Letter),
-        ('m' as u32, Letter),
-        ('n' as u32, Letter),
-        ('o' as u32, Letter),
-        ('p' as u32, Letter),
-        ('q' as u32, Letter),
-        ('r' as u32, Letter),
-        ('s' as u32, Letter),
-        ('t' as u32, Letter),
-        ('u' as u32, Letter),
-        ('v' as u32, Letter),
-        ('w' as u32, Letter),
-        ('x' as u32, Letter),
-        ('y' as u32, Letter),
-        ('z' as u32, Letter),
-    ]))
+        ('a', Letter),
+        ('b', Letter),
+        ('c', Letter),
+        ('d', Letter),
+        ('e', Letter),
+        ('f', Letter),
+        ('g', Letter),
+        ('h', Letter),
+        ('i', Letter),
+        ('j', Letter),
+        ('k', Letter),
+        ('l', Letter),
+        ('m', Letter),
+        ('n', Letter),
+        ('o', Letter),
+        ('p', Letter),
+        ('q', Letter),
+        ('r', Letter),
+        ('s', Letter),
+        ('t', Letter),
+        ('u', Letter),
+        ('v', Letter),
+        ('w', Letter),
+        ('x', Letter),
+        ('y', Letter),
+        ('z', Letter),
+    ]);
+    for (c, code) in iter {
+        cat_code_map.insert(c, code);
+    }
 }
 
 #[cfg(test)]

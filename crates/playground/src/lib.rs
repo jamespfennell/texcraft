@@ -13,7 +13,6 @@ use texlang_stdlib::letassignment;
 use texlang_core::driver;
 use texlang_core::prelude::*;
 use texlang_core::token;
-use texlang_core::token::catcode;
 use texlang_stdlib::the;
 use texlang_stdlib::time;
 use texlang_stdlib::variableops;
@@ -75,7 +74,7 @@ fn init_state(
     year: i32,
 ) -> Base<PlaygroundState> {
     let mut s = Base::<PlaygroundState>::new(
-        catcode::tex_defaults(),
+        CatCodeMap::new_with_tex_defaults(),
         PlaygroundState {
             alloc: alloc::Component::new(),
             time: time::Component::new_with_values(minutes_since_midnight, day, month, year),

@@ -6,7 +6,7 @@ extern crate texcraft_stdext;
 extern crate texlang_core;
 
 use texlang_core::state::Base;
-use texlang_core::token::catcode;
+use texlang_core::token::catcode::CatCodeMap;
 
 pub mod alloc;
 pub mod catcodecmd;
@@ -32,7 +32,7 @@ pub struct StdLibState {
 impl StdLibState {
     pub fn new() -> Base<StdLibState> {
         let mut s = Base::<StdLibState>::new(
-            catcode::tex_defaults(),
+            CatCodeMap::new_with_tex_defaults(),
             StdLibState {
                 registers: registers::Component::new(),
                 time: time::Component::new(),

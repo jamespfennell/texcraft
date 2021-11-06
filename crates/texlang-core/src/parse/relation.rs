@@ -45,7 +45,7 @@ mod tests {
     #[test]
     fn less_than() {
         let mut input = driver::ExecutionInput::new_with_str(
-            Base::<()>::new(catcode::tex_defaults(), ()),
+            Base::<()>::new(CatCodeMap::new_with_tex_defaults(), ()),
             r"<a",
         );
         let result = parse_relation(input.regular()).unwrap();
@@ -56,7 +56,7 @@ mod tests {
     #[test]
     fn equals() {
         let mut input = driver::ExecutionInput::new_with_str(
-            Base::<()>::new(catcode::tex_defaults(), ()),
+            Base::<()>::new(CatCodeMap::new_with_tex_defaults(), ()),
             r"=a",
         );
         let result = parse_relation(input.regular()).unwrap();
@@ -67,7 +67,7 @@ mod tests {
     #[test]
     fn greater_than() {
         let mut input = driver::ExecutionInput::new_with_str(
-            Base::<()>::new(catcode::tex_defaults(), ()),
+            Base::<()>::new(CatCodeMap::new_with_tex_defaults(), ()),
             r">a",
         );
         let result = parse_relation(input.regular()).unwrap();
@@ -79,8 +79,8 @@ mod tests {
     fn invalid_inputs() {
         let inputs = vec![r"", r"a", r"\A", r"<"];
         for str in inputs {
-            let mut map = catcode::tex_defaults();
-            map.insert('<' as u32, catcode::CatCode::Letter);
+            let mut map = CatCodeMap::new_with_tex_defaults();
+            map.insert('<', catcode::CatCode::Letter);
             let mut input = driver::ExecutionInput::new_with_str(Base::<()>::new(map, ()), str);
             let result = parse_relation(input.regular());
             if let Ok(_) = result {

@@ -11,6 +11,7 @@ pub use crate::state::Base;
 pub use crate::token;
 pub use crate::token::catcode;
 pub use crate::token::catcode::CatCode;
+pub use crate::token::catcode::CatCodeMap;
 pub use crate::token::stream;
 pub use crate::token::stream::Stream;
 pub use crate::token::CsName;
