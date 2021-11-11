@@ -7,15 +7,16 @@ pub fn advance_bench(c: &mut Criterion) {
     let mut state = StdLibState::new();
     state.set_command("par", execwhitespace::get_par());
     state.set_command("newline", execwhitespace::get_newline());
-    let mut execution_input =
-        driver::ExecutionInput::new_with_str(state, r"\countdef\k 0 \def\a{\advance\k by 1}");
-    driver::exec(&mut execution_input, true).unwrap();
+    state.push_source(r"\countdef\k 0 \def\a{\advance\k by 1}".to_string());
+    let mut execution_input = runtime::ExecutionInput::new(state);
+    execwhitespace::exec(&mut execution_input, true).unwrap();
     let a_cs = Token::new_control_sequence(
         execution_input
-            .base()
+            .env()
             .cs_name_interner()
             .get("a")
             .expect("a should have been interned already"),
+        0,
     );
 
     let mut group = c.benchmark_group("advance");
@@ -25,9 +26,9 @@ pub fn advance_bench(c: &mut Criterion) {
         b.iter(|| {
             execution_input
                 .regular()
-                .controller_mut()
+                .unexpanded_stream()
                 .push_expansion(&expansion);
-            driver::exec(&mut execution_input, true).unwrap();
+            execwhitespace::exec(&mut execution_input, true).unwrap();
         })
     });
 }

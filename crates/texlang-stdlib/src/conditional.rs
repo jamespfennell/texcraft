@@ -3,9 +3,9 @@
 //! # Writing new conditional primitives
 
 use std::any;
-use texlang_core::driver::conditional::*;
 use texlang_core::parse;
 use texlang_core::prelude::*;
+use texlang_core::runtime::conditional::*;
 
 pub const ELSE_DOC: &str = "Start the else branch of a conditional or switch statement";
 pub const IFCASE_DOC: &str = "Begin a switch statement";
@@ -16,7 +16,7 @@ pub const IFFALSE_DOC: &str = "Evaluate the false branch";
 pub const FI_DOC: &str = "End a conditional or switch statement";
 pub const OR_DOC: &str = "Begin the next branch of a switch statement";
 
-fn branches<S>(input: &mut command::ExpandedInput<S>) -> &mut Vec<Branch> {
+fn branches<S>(input: &mut runtime::ExpandedInput<S>) -> &mut Vec<Branch> {
     &mut input.controller_mut().conditional.branches
 }
 
@@ -39,7 +39,7 @@ fn fi_id() -> any::TypeId {
 }
 
 // The `true_case` function is executed whenever a conditional evaluates to true.
-fn true_case<S>(token: Token, input: &mut command::ExpandedInput<S>) -> anyhow::Result<Vec<Token>> {
+fn true_case<S>(token: Token, input: &mut runtime::ExpandedInput<S>) -> anyhow::Result<Vec<Token>> {
     input.controller_mut().conditional.branches.push(Branch {
         _token: token,
         kind: BranchKind::True,
@@ -53,13 +53,13 @@ fn true_case<S>(token: Token, input: &mut command::ExpandedInput<S>) -> anyhow::
 // either a \else or \fi command.
 fn false_case<S>(
     original_token: Token,
-    input: &mut command::ExpandedInput<S>,
+    input: &mut runtime::ExpandedInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     let mut depth = 0;
     let mut last_token = None;
     while let Some(token) = input.unexpanded_stream().next()? {
         if let ControlSequence(name) = &token.value() {
-            if let Some(c) = input.base().get_command(name) {
+            if let Some(c) = input.base().commands_map.get(name) {
                 if c.id() == else_id() && depth == 0 {
                     // TODO: push the token
                     input.controller_mut().conditional.branches.push(Branch {
@@ -101,7 +101,7 @@ macro_rules! create_if_primitive {
     ($if_fn: ident, $if_primitive_fn: ident, $get_if: ident, $docs: expr) => {
         fn $if_primitive_fn<S>(
             token: Token,
-            input: &mut ExpandedInput<S>,
+            input: &mut runtime::ExpandedInput<S>,
         ) -> anyhow::Result<Vec<Token>> {
             match $if_fn(input)? {
                 true => true_case(token, input),
@@ -115,15 +115,15 @@ macro_rules! create_if_primitive {
     };
 }
 
-fn if_true<S>(_: &mut command::ExpandedInput<S>) -> anyhow::Result<bool> {
+fn if_true<S>(_: &mut runtime::ExpandedInput<S>) -> anyhow::Result<bool> {
     Ok(true)
 }
 
-fn if_false<S>(_: &mut command::ExpandedInput<S>) -> anyhow::Result<bool> {
+fn if_false<S>(_: &mut runtime::ExpandedInput<S>) -> anyhow::Result<bool> {
     Ok(false)
 }
 
-fn if_num<S>(stream: &mut command::ExpandedInput<S>) -> anyhow::Result<bool> {
+fn if_num<S>(stream: &mut runtime::ExpandedInput<S>) -> anyhow::Result<bool> {
     let a: i32 = parse::parse_number(stream)?;
     let r = parse::parse_relation(stream)?;
     let b: i32 = parse::parse_number(stream)?;
@@ -135,7 +135,7 @@ fn if_num<S>(stream: &mut command::ExpandedInput<S>) -> anyhow::Result<bool> {
     })
 }
 
-fn if_odd<S>(stream: &mut command::ExpandedInput<S>) -> anyhow::Result<bool> {
+fn if_odd<S>(stream: &mut runtime::ExpandedInput<S>) -> anyhow::Result<bool> {
     let n: i32 = parse::parse_number(stream)?;
     Ok((n % 2) == 1)
 }
@@ -147,7 +147,7 @@ create_if_primitive![if_odd, if_odd_primitive_fn, get_if_odd, IFODD_DOC];
 
 fn if_case_primitive_fn<S>(
     ifcase_token: Token,
-    input: &mut ExpandedInput<S>,
+    input: &mut runtime::ExpandedInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     // TODO: should we reading the number from the unexpanded stream? Probably!
     let mut cases_to_skip: i32 = parse::parse_number(input)?;
@@ -162,7 +162,7 @@ fn if_case_primitive_fn<S>(
     let mut last_token = None;
     while let Some(token) = input.unexpanded_stream().next()? {
         if let ControlSequence(name) = &token.value() {
-            if let Some(c) = input.base().get_command(name) {
+            if let Some(c) = input.base().commands_map.get(name) {
                 if c.id() == or_id() && depth == 0 {
                     cases_to_skip -= 1;
                     if cases_to_skip == 0 {
@@ -214,7 +214,7 @@ pub fn get_if_case<S>() -> command::ExpansionPrimitive<S> {
 
 fn or_primitive_fn<S>(
     ifcase_token: Token,
-    input: &mut ExpandedInput<S>,
+    input: &mut runtime::ExpandedInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     let branch = branches(input).pop();
     // For an or command to be valid, we must be in a switch statement
@@ -230,7 +230,7 @@ fn or_primitive_fn<S>(
     let mut last_token = None;
     while let Some(token) = input.unexpanded_stream().next()? {
         if let ControlSequence(name) = &token.value() {
-            if let Some(c) = input.base().get_command(name) {
+            if let Some(c) = input.base().commands_map.get(name) {
                 if c.id() == if_id() {
                     depth += 1;
                 }
@@ -270,7 +270,7 @@ pub fn get_or<S>() -> command::ExpansionPrimitive<S> {
 
 fn else_primitive_fn<S>(
     else_token: Token,
-    input: &mut command::ExpandedInput<S>,
+    input: &mut runtime::ExpandedInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     let branch = input.controller_mut().conditional.branches.pop();
     // For else token to be valid, we must be in the true branch of a conditional
@@ -287,7 +287,7 @@ fn else_primitive_fn<S>(
     let mut last_token = None;
     while let Some(token) = input.unexpanded_stream().next()? {
         if let ControlSequence(name) = &token.value() {
-            if let Some(c) = input.base().get_command(name) {
+            if let Some(c) = input.base().commands_map.get(name) {
                 if c.id() == if_id() {
                     depth += 1;
                 }
@@ -321,7 +321,10 @@ pub fn get_else<S>() -> command::ExpansionPrimitive<S> {
 }
 
 /// Get the `\fi` primitive.
-fn fi_primitive_fn<S>(token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<Vec<Token>> {
+fn fi_primitive_fn<S>(
+    token: Token,
+    input: &mut runtime::ExpandedInput<S>,
+) -> anyhow::Result<Vec<Token>> {
     let branch = input.controller_mut().conditional.branches.pop();
     // For a \fi primitive to be valid, we must be in a conditional.
     // Note that we could be in the false branch: \iftrue\else\fi
@@ -338,7 +341,7 @@ pub fn get_fi<S>() -> command::ExpansionPrimitive<S> {
 }
 
 /// Add all of the conditionals defined in this module to the provided state.
-pub fn add_all_conditionals<S>(s: &mut Base<S>) {
+pub fn add_all_conditionals<S>(s: &mut runtime::Env<S>) {
     s.set_command("iftrue", get_if_true());
     s.set_command("iffalse", get_if_false());
     s.set_command("ifnum", get_if_num());
@@ -352,16 +355,11 @@ pub fn add_all_conditionals<S>(s: &mut Base<S>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use texlang_core::driver;
-    use texlang_core::expansion_failure_test;
-    use texlang_core::expansion_test;
+    use crate::testutil::*;
 
-    struct State;
-    fn new_state() -> State {
-        State {}
-    }
+    type State = ();
 
-    fn setup_expansion_test(s: &mut Base<State>) {
+    fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
         add_all_conditionals(s);
     }
 

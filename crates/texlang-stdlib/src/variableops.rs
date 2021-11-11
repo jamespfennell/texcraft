@@ -39,7 +39,7 @@ macro_rules! create_arithmetic_primitive {
     ($prim_fn: ident, $arithmetic_op: ident) => {
         fn $prim_fn<S>(
             token: Token,
-            input: &mut ExecutionInput<S>,
+            input: &mut runtime::ExecutionInput<S>,
         ) -> anyhow::Result<()> {
             let variable = parse::parse_variable(&mut input.regular())?;
 
@@ -136,22 +136,24 @@ mod tests {
     use super::*;
     use crate::catcodecmd;
     use crate::registers;
+    use crate::testutil::*;
     use crate::the;
-    use texlang_core::expansion_failure_test;
-    use texlang_core::expansion_test;
+
+    #[derive(Default)]
     struct State {
         registers: registers::Component<256>,
     }
 
-    fn new_state() -> State {
-        State {
-            registers: registers::Component::new(),
+    impl registers::HasRegisters<256> for TestUtilState<State> {
+        fn registers(&self) -> &registers::Component<256> {
+            &self.inner.registers
+        }
+        fn registers_mut(&mut self) -> &mut registers::Component<256> {
+            &mut self.inner.registers
         }
     }
 
-    implement_has_registers![State, registers, 256];
-
-    fn setup_expansion_test(s: &mut Base<State>) {
+    fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
         s.set_command("the", the::get_the());
         s.set_command("advance", get_advance());
         s.set_command("advancechk", get_advancechk());

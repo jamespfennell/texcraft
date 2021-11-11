@@ -1,17 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use texlang_core::prelude::*;
-use texlang_stdlib::execwhitespace;
-use texlang_stdlib::StdLibState;
 
 const DIGITS_OF_PI_TEX: &'static str = include_str!("digits_of_pi.tex");
-
-fn digits_of_pi(tex_input: &str) -> () {
-    let mut state = StdLibState::new();
-    state.set_command("par", execwhitespace::get_par());
-    state.set_command("end", execwhitespace::get_newline());
-    let mut execution_input = driver::ExecutionInput::new_with_str(state, tex_input);
-    driver::exec(&mut execution_input, true).unwrap();
-}
 
 pub fn digits_of_pi_bench(c: &mut Criterion) {
     let n = match std::env::var("DIGITS_OF_PI_N") {
@@ -26,7 +15,7 @@ pub fn digits_of_pi_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("digits-of-pi");
 
     group.bench_function("digits_of_pi_texcraft", |b| {
-        b.iter(|| digits_of_pi(&tex_input))
+        b.iter(|| performance::run_in_texcraft(&tex_input))
     });
 
     if performance::host_has_pdftex() {

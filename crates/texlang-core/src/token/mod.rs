@@ -5,7 +5,6 @@ pub mod lexer;
 pub mod stream;
 
 use crate::token::catcode::CatCode;
-use std::rc::Rc;
 use string_interner::{DefaultSymbol, StringInterner, Symbol};
 
 pub struct CsNameInterner {
@@ -94,10 +93,12 @@ impl Value {
     }
 }
 
+pub type TracebackId = u32;
+
 #[derive(Debug, Eq, Clone, Copy)]
 pub struct Token {
     value: Value,
-    _source: u32,
+    traceback_id: TracebackId,
 }
 
 impl std::fmt::Display for Token {
@@ -120,10 +121,10 @@ impl PartialEq for Token {
 
 macro_rules! token_constructor {
     ($name: ident, $value: expr) => {
-        pub fn $name(c: char) -> Token {
+        pub fn $name(c: char, traceback_id: TracebackId) -> Token {
             Token {
                 value: $value(c),
-                _source: 4,
+                traceback_id,
             }
         }
     };
@@ -142,10 +143,10 @@ impl Token {
     token_constructor!(new_other, Value::Other);
     token_constructor!(new_active_character, Value::Active);
 
-    pub fn new_control_sequence(name: CsName) -> Token {
+    pub fn new_control_sequence(name: CsName, traceback_id: TracebackId) -> Token {
         Token {
             value: Value::ControlSequence(name),
-            _source: 3,
+            traceback_id,
         }
     }
 
@@ -154,8 +155,8 @@ impl Token {
         self.value
     }
 
-    pub fn source(&self) -> Option<&Source> {
-        None
+    pub fn traceback_id(&self) -> TracebackId {
+        self.traceback_id
     }
 
     pub fn char(&self) -> Option<char> {
@@ -174,19 +175,6 @@ impl Token {
             Value::ControlSequence(..) => None,
         }
     }
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct Line {
-    pub content: String,
-    pub line_number: usize,
-    pub file: Rc<String>,
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub struct Source {
-    pub line: Rc<Line>,
-    pub position: usize,
 }
 
 /// Write a collection of tokens to a string.

@@ -1,11 +1,9 @@
 //! Error types and error display logic.
 
-use crate::driver;
-use crate::state::Base;
+use crate::runtime;
 use crate::token;
 use crate::token::{Token, Value};
 use colored::*;
-use std::rc::Rc;
 use texcraft_stdext::algorithms::spellcheck;
 
 #[derive(Debug)]
@@ -19,21 +17,15 @@ struct Line {
 
 impl Line {
     fn new(token: &Token) -> Option<Line> {
-        let source = match token.source() {
-            None => {
-                return None;
-            }
-            Some(source) => source,
-        };
         Some(Line {
-            line: source.line.content.clone(),
-            line_number: source.line.line_number,
-            position: source.position,
+            line: "todo".to_string(),
+            line_number: 0,
+            position: 0,
             width: match token.value() {
                 Value::ControlSequence(_) => 100, // TODO + name.len(),
                 _ => 1,
             },
-            _file_description: source.line.file.to_string(),
+            _file_description: "todo".to_string(),
         })
     }
 }
@@ -115,9 +107,8 @@ pub struct TokenContext {
 /// Error that is returned when an unexpected token is encountered.
 #[derive(Debug)]
 pub struct TokenError {
-    line: Line,
-    s: String,
-    message: String,
+    _token: Token,
+    _message: String,
     notes: Vec<String>,
 }
 
@@ -125,6 +116,7 @@ impl std::error::Error for TokenError {}
 
 impl std::fmt::Display for TokenError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        /*
         let margin_width = self.line.line_number.to_string().len() + 1;
         print_error_header(f, &self.message)?;
         self.line.fmt(f, margin_width, &self.s)?;
@@ -134,46 +126,17 @@ impl std::fmt::Display for TokenError {
         for note in self.notes.iter() {
             print_line_with_note(f, 3, note)?;
         }
+        */
+        print_line_with_note(f, 3, "Token error")?;
         Ok(())
     }
 }
 
 impl TokenError {
     pub fn new<T: Into<String>>(token: Token, message: T) -> TokenError {
-        // TODO: better handling for no source case?
-        let source = match token.source() {
-            None => token::Source {
-                line: Rc::new(token::Line {
-                    content: "".to_string(),
-                    line_number: 0,
-                    file: Rc::new("".to_string()),
-                }),
-                position: 0,
-            },
-            Some(source) => source.clone(),
-        };
         TokenError {
-            line: Line {
-                line: source.line.content.clone(),
-                line_number: source.line.line_number,
-                position: source.position,
-                width: match token.value() {
-                    Value::ControlSequence(_) => 100, // TODO
-                    _ => 1,
-                },
-                _file_description: "".to_string(), // TODO token.source.line.file.bo).clone(),
-            },
-            s: "".to_string(),
-            /*
-            match token.value() {
-                Value::Character(_, cat_code) => {
-
-                    format!["catcode is {}", cat_code]
-                }
-                Value::ControlSequence(_, _) => "".to_string(),
-            },
-                */
-            message: T::into(message),
+            _token: token,
+            _message: T::into(message),
             notes: vec![],
         }
     }
@@ -226,7 +189,8 @@ impl EndOfInputError {
         anyhow::Error::from(self)
     }
 
-    pub fn add_context<S>(&mut self, execution_input: &driver::ExecutionInput<S>) {
+    pub fn add_context<S>(&mut self, _execution_input: &runtime::ExecutionInput<S>) {
+        /*
         if let Some(last_line) = execution_input.controller().last_non_empty_line() {
             self.last_line = Some(Line {
                 line: last_line.content.clone(),
@@ -236,6 +200,7 @@ impl EndOfInputError {
                 _file_description: String::clone(last_line.file.as_ref()),
             })
         }
+        */
     }
 }
 
@@ -262,13 +227,13 @@ impl std::fmt::Display for EndOfInputError {
     }
 }
 
-pub fn add_context<S>(error: &mut anyhow::Error, execution_input: &driver::ExecutionInput<S>) {
+pub fn add_context<S>(error: &mut anyhow::Error, execution_input: &runtime::ExecutionInput<S>) {
     if let Some(error) = error.downcast_mut::<EndOfInputError>() {
         error.add_context(execution_input);
     }
 }
 
-pub fn new_undefined_cs_error<S>(token: token::Token, state: &Base<S>) -> anyhow::Error {
+pub fn new_undefined_cs_error<S>(token: token::Token, state: &runtime::Env<S>) -> anyhow::Error {
     let a = "expected a control sequence".to_string();
     let name = match &token.value() {
         token::Value::ControlSequence(name) => state.cs_name_interner().resolve(name).expect(""),

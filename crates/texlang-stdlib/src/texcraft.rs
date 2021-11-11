@@ -8,33 +8,29 @@ pub fn get_texcraft<S>() -> command::ExpansionFn<S> {
 }
 
 pub fn texcraft_primitive_fn<S>(
-    _: Token,
-    _: &mut command::ExpandedInput<S>,
+    t: Token,
+    _: &mut runtime::ExpandedInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     Ok(vec![
-        Token::new_letter('T'),
-        Token::new_letter('e'),
-        Token::new_letter('x'),
-        Token::new_letter('c'),
-        Token::new_letter('r'),
-        Token::new_letter('a'),
-        Token::new_letter('f'),
-        Token::new_letter('t'),
+        Token::new_letter('T', t.traceback_id()),
+        Token::new_letter('e', t.traceback_id()),
+        Token::new_letter('x', t.traceback_id()),
+        Token::new_letter('c', t.traceback_id()),
+        Token::new_letter('r', t.traceback_id()),
+        Token::new_letter('a', t.traceback_id()),
+        Token::new_letter('f', t.traceback_id()),
+        Token::new_letter('t', t.traceback_id()),
     ])
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use texlang_core::driver;
-    use texlang_core::expansion_test;
+    use crate::testutil::*;
 
-    struct State;
-    fn new_state() -> State {
-        State {}
-    }
+    type State = ();
 
-    fn setup_expansion_test(s: &mut Base<State>) {
+    fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
         s.set_command("texcraft", get_texcraft());
     }
 

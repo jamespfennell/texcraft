@@ -7,7 +7,7 @@ use num_traits::PrimInt;
 /// The number may be octal, decimal, hexadecimal, cast from a character token, or read
 /// from an internal registers. The full definition of a number in the TeX grammer
 /// is given on page X of the TeXBook.
-pub fn parse_number<S, T: PrimInt>(stream: &mut ExpandedInput<S>) -> anyhow::Result<T> {
+pub fn parse_number<S, T: PrimInt>(stream: &mut runtime::ExpandedInput<S>) -> anyhow::Result<T> {
     let sign = parse_optional_signs(stream)?;
     let modulus: T = match stream.next()? {
         None => return Err(parse_number_error(None)),
@@ -26,7 +26,7 @@ pub fn parse_number<S, T: PrimInt>(stream: &mut ExpandedInput<S>) -> anyhow::Res
             Value::Other('"') => parse_hexadecimal(stream)?,
             Value::Other('`') => parse_character(stream)?,
             ControlSequence(name) => {
-                let cmd = stream.base().get_command(&name);
+                let cmd = stream.base().commands_map.get(&name);
                 if let Some(command::Command::Variable(cmd_ref)) = cmd {
                     // TODO: don't clone here, use the same trick as the driver?
                     let cmd = *cmd_ref;
@@ -90,7 +90,7 @@ fn parse_number_error(token: Option<Token>) -> anyhow::Error {
 
 fn read_number_from_address<S, T: PrimInt>(
     variable: variable::Variable<S>,
-    stream: &mut ExpandedInput<S>,
+    stream: &mut runtime::ExpandedInput<S>,
 ) -> anyhow::Result<T> {
     match variable {
         variable::Variable::Int(variable) => {
@@ -251,11 +251,9 @@ mod tests {
 
     macro_rules! parse_number_test {
         ($input: expr, $number: expr) => {
-            // TODO: replicate this for the relation tests and destroy the VecStream
-            let mut execution_input = driver::ExecutionInput::new_with_str(
-                Base::<()>::new(CatCodeMap::new_with_tex_defaults(), ()),
-                $input,
-            );
+            let mut env = runtime::Env::<()>::new(CatCodeMap::new_with_tex_defaults(), ());
+            env.push_source($input.to_string());
+            let mut execution_input = crate::runtime::ExecutionInput::new(env);
             let result: i32 = parse_number(execution_input.regular()).unwrap();
             assert_eq![result, $number];
         };
@@ -369,7 +367,9 @@ mod tests {
     fn number_with_letter_catcode() {
         let mut map = CatCodeMap::new_with_tex_defaults();
         map.insert('1', catcode::CatCode::Letter);
-        let mut input = driver::ExecutionInput::new_with_str(Base::<()>::new(map, ()), r"1");
+        let mut env = runtime::Env::<()>::new(map, ());
+        env.push_source(r"1".to_string());
+        let mut input = crate::runtime::ExecutionInput::new(env);
         let result = parse_number::<(), i32>(input.regular());
         if let Ok(_) = result {
             panic!["Parsed a relation from invalid input"];

@@ -192,20 +192,21 @@ pub fn get_newint<S: HasAlloc>() -> command::ExecutionFn<S> {
 
 fn newint_primitive_fn<S: HasAlloc>(
     newint_token: Token,
-    input: &mut command::ExecutionInput<S>,
+    input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let name =
         parse::parse_command_target("newint allocation", newint_token, input.unexpanded_stream())?;
     let addr = input.state_mut().alloc_mut().alloc_int();
     input
         .base_mut()
-        .set_command_using_csname(name, command::VariableCommand::new(singleton_fn, addr));
+        .commands_map
+        .insert(name, command::VariableCommand::new(singleton_fn, addr));
     Ok(())
 }
 
 fn singleton_fn<S: HasAlloc>(
     _: Token,
-    _: &mut command::ExpandedInput<S>,
+    _: &mut runtime::ExpandedInput<S>,
     addr: usize,
 ) -> anyhow::Result<Variable<S>> {
     Ok(Variable::Int(TypedVariable::new(
@@ -234,7 +235,7 @@ pub fn get_newarray<S: HasAlloc>() -> command::ExecutionFn<S> {
 
 fn newarray_primitive_fn<S: HasAlloc>(
     newarray_token: Token,
-    input: &mut command::ExecutionInput<S>,
+    input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let name = parse::parse_command_target(
         "newarray allocation",
@@ -245,7 +246,8 @@ fn newarray_primitive_fn<S: HasAlloc>(
     let addr = input.state_mut().alloc_mut().alloc_array(len);
     input
         .base_mut()
-        .set_command_using_csname(name, command::VariableCommand::new(array_fn, addr));
+        .commands_map
+        .insert(name, command::VariableCommand::new(array_fn, addr));
     // TODO: Return the arraydef version
     Ok(())
 }
@@ -253,7 +255,7 @@ fn newarray_primitive_fn<S: HasAlloc>(
 /// Variable command function for commands defined using \newarray.
 fn array_fn<S: HasAlloc>(
     array_token: Token,
-    input: &mut ExpandedInput<S>,
+    input: &mut runtime::ExpandedInput<S>,
     array_addr: usize,
 ) -> anyhow::Result<Variable<S>> {
     let array_index: usize = parse::parse_number(input)?;
@@ -290,36 +292,26 @@ fn array_element_mut_ref_fn<S: HasAlloc>(state: &mut S, addr: usize) -> &mut i32
 
 #[cfg(test)]
 mod test {
-
     use super::*;
+    use crate::testutil::*;
     use crate::the::get_the;
-    use texlang_core::driver;
-    use texlang_core::expansion_failure_test;
-    use texlang_core::expansion_test;
 
+    #[derive(Default)]
     struct State {
         alloc: Component,
     }
 
-    // impl_has_component[State,
-    // alloc::HasAlloc, alloc::Component, alloc, alloc_mut, self.alloc]
-    impl HasAlloc for State {
+    impl HasAlloc for TestUtilState<State> {
         fn alloc(&self) -> &Component {
-            &self.alloc
+            &self.inner.alloc
         }
 
         fn alloc_mut(&mut self) -> &mut Component {
-            &mut self.alloc
+            &mut self.inner.alloc
         }
     }
 
-    fn new_state() -> State {
-        State {
-            alloc: Component::new(),
-        }
-    }
-
-    fn setup_expansion_test(s: &mut Base<State>) {
+    fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
         s.set_command("newint", get_newint());
         s.set_command("newarray", get_newarray());
         s.set_command("the", get_the());

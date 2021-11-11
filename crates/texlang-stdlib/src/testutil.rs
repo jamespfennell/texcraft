@@ -1,5 +1,23 @@
 //! Utilities for writing unit tests
 
+use crate::execwhitespace;
+
+#[derive(Default)]
+pub struct TestUtilState<S> {
+    pub inner: S,
+    exec_component: execwhitespace::Component,
+}
+
+impl<S> execwhitespace::HasExec for TestUtilState<S> {
+    fn exec(&self) -> &execwhitespace::Component {
+        &self.exec_component
+    }
+
+    fn exec_mut(&mut self) -> &mut execwhitespace::Component {
+        &mut self.exec_component
+    }
+}
+
 #[macro_export]
 macro_rules! expansion_test {
     ($name: ident, $lhs: expr, $rhs: expr) => {
@@ -8,17 +26,27 @@ macro_rules! expansion_test {
     ($name: ident, $lhs: expr, $rhs: expr, $setup_fn: ident) => {
         #[test]
         fn $name() {
-            let mut state_1 = Base::<State>::new(CatCodeMap::new_with_tex_defaults(), new_state());
+            use crate::execwhitespace::exec;
+            use texlang_core::token;
+            let mut state_1 = runtime::Env::<TestUtilState<State>>::new(
+                CatCodeMap::new_with_tex_defaults(),
+                Default::default(),
+            );
             $setup_fn(&mut state_1);
-            let mut execution_input_1 = driver::ExecutionInput::new_with_str(state_1, $lhs);
-            let output_1 = driver::exec(&mut execution_input_1, false).unwrap();
-            let state_1 = execution_input_1.take_base();
+            state_1.push_source($lhs.to_string());
+            let mut execution_input_1 = runtime::ExecutionInput::new(state_1);
+            let output_1 = exec(&mut execution_input_1, false).unwrap();
+            let state_1 = execution_input_1.take_env();
 
-            let mut state_2 = Base::<State>::new(CatCodeMap::new_with_tex_defaults(), new_state());
+            let mut state_2 = runtime::Env::<TestUtilState<State>>::new(
+                CatCodeMap::new_with_tex_defaults(),
+                Default::default(),
+            );
             $setup_fn(&mut state_2);
-            let mut execution_input_2 = driver::ExecutionInput::new_with_str(state_2, $rhs);
-            let output_2 = driver::exec(&mut execution_input_2, false).unwrap();
-            let state_2 = execution_input_2.take_base();
+            state_2.push_source($lhs.to_string());
+            let mut execution_input_2 = runtime::ExecutionInput::new(state_2);
+            let output_2 = exec(&mut execution_input_2, false).unwrap();
+            let state_2 = execution_input_2.take_env();
 
             let equal = match output_1.len() == output_2.len() {
                 false => false,
@@ -66,11 +94,17 @@ macro_rules! expansion_failure_test {
     ($name: ident, $input: expr) => {
         #[test]
         fn $name() {
-            let mut state = Base::<State>::new(CatCodeMap::new_with_tex_defaults(), new_state());
+            use crate::execwhitespace::exec;
+            use texlang_core::token;
+            let mut state = runtime::Env::<TestUtilState<State>>::new(
+                CatCodeMap::new_with_tex_defaults(),
+                Default::default(),
+            );
             setup_expansion_test(&mut state);
-            let mut execution_input = driver::ExecutionInput::new_with_str(state, $input);
-            let result = driver::exec(&mut execution_input, false);
-            let state = execution_input.take_base();
+            state.push_source($input.to_string());
+            let mut execution_input = runtime::ExecutionInput::new(state);
+            let result = exec(&mut execution_input, false);
+            let state = execution_input.take_env();
             if let Ok(output) = result {
                 println!("Expansion succeeded:");
                 println!(
@@ -83,6 +117,7 @@ macro_rules! expansion_failure_test {
     };
 }
 
+/*
 use crate::token::stream;
 
 pub fn length(stream: &mut dyn stream::Stream) -> u64 {
@@ -92,3 +127,5 @@ pub fn length(stream: &mut dyn stream::Stream) -> u64 {
     }
     result
 }
+
+ */

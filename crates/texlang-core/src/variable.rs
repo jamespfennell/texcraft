@@ -169,20 +169,17 @@
 //!
 //!
 
-use crate::command;
 use crate::error;
 use crate::parse;
-use crate::state::Base;
+use crate::runtime;
 use crate::token;
 use crate::token::catcode::CatCode;
 
 /// Enum with a variant for each type of variable in TeX.
 pub enum Variable<S> {
     Int(TypedVariable<S, i32>),
-    BaseInt(TypedVariable<Base<S>, i32>),
-
-    /// CatCode variables can live in the Base, so the type is a little different here.
-    CatCode(TypedVariable<Base<S>, CatCode>),
+    BaseInt(TypedVariable<runtime::BaseState<S>, i32>),
+    CatCode(TypedVariable<runtime::BaseState<S>, CatCode>),
 }
 
 impl<S> Copy for Variable<S> {}
@@ -246,7 +243,7 @@ impl<S, T> TypedVariable<S, T> {
 pub fn set<S>(
     variable: Variable<S>,
     token: token::Token,
-    input: &mut command::ExecutionInput<S>,
+    input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     parse::parse_optional_equals(input)?;
     match variable {

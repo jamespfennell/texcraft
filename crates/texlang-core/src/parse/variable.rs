@@ -3,7 +3,7 @@ use crate::variable;
 
 /// Parses a variable.
 pub fn parse_variable<S>(
-    input: &mut command::ExpandedInput<S>,
+    input: &mut runtime::ExpandedInput<S>,
 ) -> anyhow::Result<variable::Variable<S>> {
     match input.next()? {
         None => Err(error::EndOfInputError::new(
@@ -11,7 +11,7 @@ pub fn parse_variable<S>(
         )
         .cast()),
         Some(token) => match token.value() {
-            ControlSequence(name) => match input.base().get_command(&name) {
+            ControlSequence(name) => match input.base().commands_map.get(&name) {
                 None => Err(error::TokenError::new(token, "Undefined control sequence").cast()),
                 Some(&command::Command::Variable(cmd)) => cmd.resolve(token, input),
                 Some(_) => Err(error::TokenError::new(

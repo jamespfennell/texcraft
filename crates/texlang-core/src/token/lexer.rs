@@ -15,15 +15,17 @@
 //! followed by the single letter token B.
 
 use crate::error;
-use crate::state::InputRelatedState;
 use crate::token;
 use crate::token::catcode::CatCode;
 use crate::token::catcode::CatCodeMap;
+use crate::token::CsNameInterner;
 use crate::token::Token;
 use std::fmt;
 use std::io;
 use std::iter::Peekable;
 use texcraft_stdext::str::OwningChars;
+
+use super::TracebackId;
 
 const MALFORMED_CONTROL_SEQUENCE_ERROR_TITLE: &str = "Unexpected end of file";
 const MALFORMED_CONTROL_SEQUENCE_ERROR_HELP: &str =
@@ -58,9 +60,9 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn new(file: Box<dyn io::BufRead>) -> Lexer {
+    pub fn new(source_code: String, next_free_traceback_id: TracebackId) -> Lexer {
         Lexer {
-            raw_lexer: RawLexer::new(file),
+            raw_lexer: RawLexer::new(source_code, next_free_traceback_id),
             trim_next_whitespace: false,
             scratch_string: Default::default(),
         }
@@ -68,17 +70,18 @@ impl Lexer {
 
     pub fn next(
         &mut self,
-        input_related_state: &mut InputRelatedState,
+        cat_code_map: &CatCodeMap,
+        cs_name_interner: &mut CsNameInterner,
     ) -> Result<Option<token::Token>, LexerError> {
-        while let Some(raw_token) = self.raw_lexer.next(input_related_state.cat_codes()) {
+        while let Some(raw_token) = self.raw_lexer.next(cat_code_map) {
             let c = raw_token.char;
             let value = match raw_token.code {
                 CatCode::Escape => Token::new_control_sequence(
-                    self.read_control_sequence(&raw_token, input_related_state)?,
+                    self.read_control_sequence(&raw_token, cat_code_map, cs_name_interner)?,
+                    raw_token.traceback_id,
                 ),
                 CatCode::EndOfLine | CatCode::Space => {
-                    let num_consumed_new_lines = self
-                        .consume_whitespace(input_related_state.cat_codes())
+                    let num_consumed_new_lines = self.consume_whitespace(cat_code_map)
                         + match raw_token.code == CatCode::EndOfLine {
                             true => 1, // we consumed an additional new line for the first token
                             false => 0,
@@ -87,28 +90,25 @@ impl Lexer {
                         (true, true) => {
                             continue;
                         }
-                        (true, false) => Token::new_space(raw_token.char),
+                        (true, false) => Token::new_space(raw_token.char, raw_token.traceback_id),
                         (false, _) => Token::new_control_sequence(
-                            input_related_state
-                                .cs_name_interner_mut()
-                                .get_or_intern("par"),
+                            cs_name_interner.get_or_intern("par"),
+                            raw_token.traceback_id,
                         ),
                     }
                 }
-                CatCode::BeginGroup => Token::new_begin_group(c),
-                CatCode::EndGroup => Token::new_end_group(c),
-                CatCode::MathShift => Token::new_math_shift(c),
-                CatCode::AlignmentTab => Token::new_alignment_tab(c),
-                CatCode::Parameter => Token::new_parameter(c),
-                CatCode::Superscript => Token::new_superscript(c),
-                CatCode::Subscript => Token::new_subscript(c),
-                CatCode::Letter => Token::new_letter(c),
-                CatCode::Other => Token::new_other(c),
-                CatCode::Active => Token::new_active_character(c),
+                CatCode::BeginGroup => Token::new_begin_group(c, raw_token.traceback_id),
+                CatCode::EndGroup => Token::new_end_group(c, raw_token.traceback_id),
+                CatCode::MathShift => Token::new_math_shift(c, raw_token.traceback_id),
+                CatCode::AlignmentTab => Token::new_alignment_tab(c, raw_token.traceback_id),
+                CatCode::Parameter => Token::new_parameter(c, raw_token.traceback_id),
+                CatCode::Superscript => Token::new_superscript(c, raw_token.traceback_id),
+                CatCode::Subscript => Token::new_subscript(c, raw_token.traceback_id),
+                CatCode::Letter => Token::new_letter(c, raw_token.traceback_id),
+                CatCode::Other => Token::new_other(c, raw_token.traceback_id),
+                CatCode::Active => Token::new_active_character(c, raw_token.traceback_id),
                 CatCode::Comment => {
-                    while let Some(next_raw_token) =
-                        self.raw_lexer.peek(input_related_state.cat_codes())
-                    {
+                    while let Some(next_raw_token) = self.raw_lexer.peek(cat_code_map) {
                         if next_raw_token.code == CatCode::EndOfLine {
                             break;
                         }
@@ -146,14 +146,16 @@ impl Lexer {
     fn read_control_sequence(
         &mut self,
         raw_token: &RawToken,
-        input_related_state: &mut InputRelatedState,
+        cat_code_map: &CatCodeMap,
+        cs_name_interner: &mut CsNameInterner,
     ) -> Result<token::CsName, LexerError> {
         self.scratch_string.clear();
-        match self.raw_lexer.next(input_related_state.cat_codes()) {
+        match self.raw_lexer.next(cat_code_map) {
             None => {
+                // TODO: this should be an end of input errro
                 return Err(LexerError::MalformedControlSequence(
                     error::TokenError::new(
-                        token::Token::new_other(raw_token.char),
+                        token::Token::new_other(raw_token.char, 0),
                         MALFORMED_CONTROL_SEQUENCE_ERROR_TITLE,
                     )
                     .add_note(MALFORMED_CONTROL_SEQUENCE_ERROR_HELP)
@@ -170,7 +172,7 @@ impl Lexer {
                     char: subsequent_char,
                     code: CatCode::Letter,
                     ..
-                }) = self.raw_lexer.peek(input_related_state.cat_codes())
+                }) = self.raw_lexer.peek(cat_code_map)
                 {
                     self.raw_lexer.advance();
                     self.scratch_string.push(subsequent_char);
@@ -180,31 +182,26 @@ impl Lexer {
                 self.scratch_string.push(first_raw_token.char);
             }
         };
-        Ok(input_related_state
-            .cs_name_interner_mut()
-            .get_or_intern(&self.scratch_string))
+        Ok(cs_name_interner.get_or_intern(&self.scratch_string))
     }
 }
 
 struct RawToken {
     code: CatCode,
     char: char,
+    traceback_id: TracebackId,
 }
 
 struct RawLexer {
     iter: Peekable<OwningChars>,
-    next_token_source: usize,
+    next_traceback_id: TracebackId,
 }
 
 impl RawLexer {
-    pub fn new(mut file: Box<dyn io::BufRead>) -> RawLexer {
-        let mut s = Default::default();
-        file.read_to_string(&mut s)
-            .expect("failed to read buffer into string");
-
+    pub fn new(source_code: String, next_free_traceback_id: TracebackId) -> RawLexer {
         RawLexer {
-            iter: OwningChars::new(s).peekable(),
-            next_token_source: 0,
+            iter: OwningChars::new(source_code).peekable(),
+            next_traceback_id: next_free_traceback_id,
         }
     }
 
@@ -212,8 +209,12 @@ impl RawLexer {
         match self.iter.next() {
             Some(c) => {
                 let code = *map.get(&c);
-                self.next_token_source += 1;
-                Some(RawToken { char: c, code })
+                self.next_traceback_id += 1;
+                Some(RawToken {
+                    char: c,
+                    code,
+                    traceback_id: self.next_traceback_id - 1,
+                })
             }
             None => None,
         }
@@ -224,8 +225,11 @@ impl RawLexer {
             Some(c) => {
                 let c = *c;
                 let code = *map.get(&c);
-                self.next_token_source += 1;
-                Some(RawToken { char: c, code })
+                Some(RawToken {
+                    char: c,
+                    code,
+                    traceback_id: self.next_traceback_id,
+                })
             }
             None => None,
         }
@@ -233,7 +237,7 @@ impl RawLexer {
 
     fn advance(&mut self) {
         self.iter.next();
-        self.next_token_source += 1;
+        self.next_traceback_id += 1;
     }
 }
 
@@ -267,18 +271,17 @@ mod tests {
         ( $name: ident, $input: expr, $ ( $expected_token : expr, ) * ) => {
             #[test]
             fn $name() {
-                let f = Box::new(io::Cursor::new($input.to_string()));
-                let mut lexer = Lexer::new(f);
+                let mut lexer = Lexer::new($input.to_string(), 0);
                 let mut map = CatCodeMap::new_with_tex_defaults();
                 map.insert('X', EndOfLine);
                 map.insert('Y', Space);
                 map.insert('Z', Ignored);
-                let mut input_related_state = InputRelatedState::new(map);
+                let mut cs_name_interner = CsNameInterner::new();
                 let mut actual = Vec::new();
-                while let Some(t) = lexer.next(&mut input_related_state).unwrap() {
+                while let Some(t) = lexer.next(&map, &mut cs_name_interner).unwrap() {
                     actual.push(t.value);
                 }
-                let expected: Vec<Value> = vec![$ ( $expected_token.convert(input_related_state.cs_name_interner_mut()) ) , * ];
+                let expected: Vec<Value> = vec![$ ( $expected_token.convert(&mut cs_name_interner) ) , * ];
                 assert_eq!(expected, actual);
             }
         };

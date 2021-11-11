@@ -1,16 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::SeedableRng;
-use texlang_core::prelude::*;
-use texlang_stdlib::execwhitespace;
-use texlang_stdlib::StdLibState;
-
-fn digits_of_pi(tex_input: &str) -> () {
-    let mut state = StdLibState::new();
-    state.set_command("par", execwhitespace::get_par());
-    state.set_command("end", execwhitespace::get_newline());
-    let mut execution_input = driver::ExecutionInput::new_with_str(state, tex_input);
-    driver::exec(&mut execution_input, true).unwrap();
-}
 
 pub fn lexer_throughput_bench(c: &mut Criterion) {
     let weights = Default::default();
@@ -21,7 +10,7 @@ pub fn lexer_throughput_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("lexer-throughput");
 
     group.bench_function("lexer_throughput_texcraft", |b| {
-        b.iter(|| digits_of_pi(&tex_input))
+        b.iter(|| performance::run_in_texcraft(&tex_input))
     });
 
     if performance::host_has_pdftex() {

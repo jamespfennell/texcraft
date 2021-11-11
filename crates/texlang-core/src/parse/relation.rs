@@ -39,40 +39,33 @@ fn parse_relation_error(token: Option<Token>) -> anyhow::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testutil;
     use crate::token::catcode;
 
     #[test]
     fn less_than() {
-        let mut input = driver::ExecutionInput::new_with_str(
-            Base::<()>::new(CatCodeMap::new_with_tex_defaults(), ()),
-            r"<a",
-        );
+        let mut env = runtime::Env::<()>::new(CatCodeMap::new_with_tex_defaults(), ());
+        env.push_source(r"<a".to_string());
+        let mut input = runtime::ExecutionInput::new(env);
         let result = parse_relation(input.regular()).unwrap();
         assert_eq![result, Relation::LessThan];
-        assert_eq![testutil::length(input.regular()), 1];
     }
 
     #[test]
     fn equals() {
-        let mut input = driver::ExecutionInput::new_with_str(
-            Base::<()>::new(CatCodeMap::new_with_tex_defaults(), ()),
-            r"=a",
-        );
+        let mut env = runtime::Env::<()>::new(CatCodeMap::new_with_tex_defaults(), ());
+        env.push_source(r"=a".to_string());
+        let mut input = runtime::ExecutionInput::new(env);
         let result = parse_relation(input.regular()).unwrap();
         assert_eq![result, Relation::Equal];
-        assert_eq![testutil::length(input.regular()), 1];
     }
 
     #[test]
     fn greater_than() {
-        let mut input = driver::ExecutionInput::new_with_str(
-            Base::<()>::new(CatCodeMap::new_with_tex_defaults(), ()),
-            r">a",
-        );
+        let mut env = runtime::Env::<()>::new(CatCodeMap::new_with_tex_defaults(), ());
+        env.push_source(r">a".to_string());
+        let mut input = runtime::ExecutionInput::new(env);
         let result = parse_relation(input.regular()).unwrap();
         assert_eq![result, Relation::GreaterThan];
-        assert_eq![testutil::length(input.regular()), 1];
     }
 
     #[test]
@@ -81,7 +74,9 @@ mod tests {
         for str in inputs {
             let mut map = CatCodeMap::new_with_tex_defaults();
             map.insert('<', catcode::CatCode::Letter);
-            let mut input = driver::ExecutionInput::new_with_str(Base::<()>::new(map, ()), str);
+            let mut env = runtime::Env::<()>::new(map, ());
+            env.push_source(str.to_string());
+            let mut input = runtime::ExecutionInput::new(env);
             let result = parse_relation(input.regular());
             if let Ok(_) = result {
                 panic!["Parsed a relation from invalid input"];

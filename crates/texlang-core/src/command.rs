@@ -35,16 +35,14 @@
 //! [^futurelet]: `\futurelet` is an example of an execution command that does this.
 //!
 
-use crate::driver;
 use crate::prelude::*;
 use crate::texmacro;
 use crate::token;
 use crate::variable;
 use std::any::TypeId;
+use std::collections::HashMap;
 use std::rc;
-
-pub use driver::ExecutionInput;
-pub use driver::ExpandedInput;
+use texcraft_stdext::collections::groupingmap::GroupingVec;
 
 enum NullTypeIdType {}
 
@@ -58,7 +56,7 @@ pub fn null_type_id() -> TypeId {
 
 /// The Rust type of expansion primitive functions.
 pub type ExpansionFn<S> =
-    fn(token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<Vec<Token>>;
+    fn(token: Token, input: &mut runtime::ExpandedInput<S>) -> anyhow::Result<Vec<Token>>;
 
 /// An expansion primitive in Texcraft.
 ///
@@ -82,7 +80,11 @@ impl<S> ExpansionPrimitive<S> {
         ExpansionPrimitive { call_fn, id }
     }
 
-    pub fn call(&self, token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<Vec<Token>> {
+    pub fn call(
+        &self,
+        token: Token,
+        input: &mut runtime::ExpandedInput<S>,
+    ) -> anyhow::Result<Vec<Token>> {
         (self.call_fn)(token, input)
     }
 
@@ -92,7 +94,8 @@ impl<S> ExpansionPrimitive<S> {
 }
 
 /// The Rust type of execution primitive functions.
-pub type ExecutionFn<S> = fn(token: Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()>;
+pub type ExecutionFn<S> =
+    fn(token: Token, input: &mut runtime::ExecutionInput<S>) -> anyhow::Result<()>;
 
 /// An execution primitive in Texcraft.
 ///
@@ -108,7 +111,7 @@ impl<S> ExecutionPrimitive<S> {
         ExecutionPrimitive { call_fn, id }
     }
 
-    pub fn call(&self, token: Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()> {
+    pub fn call(&self, token: Token, input: &mut runtime::ExecutionInput<S>) -> anyhow::Result<()> {
         (self.call_fn)(token, input)
     }
 
@@ -127,7 +130,7 @@ impl<S> Clone for ExecutionPrimitive<S> {
 
 pub type VariableFn<S> = fn(
     token: Token,
-    input: &mut ExpandedInput<S>,
+    input: &mut runtime::ExpandedInput<S>,
     addr: usize,
 ) -> anyhow::Result<variable::Variable<S>>;
 
@@ -150,7 +153,7 @@ impl<S> VariableCommand<S> {
     pub fn resolve(
         &self,
         token: token::Token,
-        input: &mut command::ExpandedInput<S>,
+        input: &mut runtime::ExpandedInput<S>,
     ) -> anyhow::Result<variable::Variable<S>> {
         (self.0)(token, input, self.1)
     }
@@ -256,6 +259,46 @@ impl<S> From<VariableFn<S>> for Command<S> {
 impl<S> From<VariableCommand<S>> for Command<S> {
     fn from(cmd: VariableCommand<S>) -> Self {
         Command::Variable(cmd)
+    }
+}
+
+pub struct CommandsMap<S> {
+    map: GroupingVec<command::Command<S>>,
+}
+
+impl<S> Default for CommandsMap<S> {
+    fn default() -> Self {
+        Self {
+            map: Default::default(),
+        }
+    }
+}
+
+impl<S> CommandsMap<S> {
+    #[inline]
+    pub fn get(&self, name: &token::CsName) -> Option<&command::Command<S>> {
+        self.map.get(&name.to_usize())
+    }
+
+    #[inline]
+    pub fn insert<B: Into<command::Command<S>>>(&mut self, name: token::CsName, cmd: B) {
+        self.map.insert(name.to_usize(), B::into(cmd))
+    }
+
+    pub fn to_hash_map(&self) -> HashMap<CsName, command::Command<S>> {
+        let mut result = HashMap::new();
+        for (key, value) in self.map.backing_container().iter().enumerate() {
+            let cmd = match value {
+                None => continue,
+                Some(cmd) => cmd.clone(),
+            };
+            let cs_name = match CsName::try_from_usize(key) {
+                None => continue,
+                Some(cs_name) => cs_name,
+            };
+            result.insert(cs_name, cmd);
+        }
+        result
     }
 }
 

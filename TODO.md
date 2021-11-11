@@ -1,11 +1,8 @@
 # TODO
- 
+
 Documentation:
 
-1. The input module and the input unit
-1. The primitives tutorial
-
-Turorial:
+Tutorial:
 
 //! 1. An IP address command.
 //! 1. A random number generator.

@@ -3,16 +3,15 @@
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
+use texlang_core::prelude::*;
+use texlang_core::token;
 use texlang_stdlib::alloc;
 use texlang_stdlib::catcodecmd;
 use texlang_stdlib::conditional;
 use texlang_stdlib::def;
 use texlang_stdlib::execwhitespace;
 use texlang_stdlib::letassignment;
-// use texlang_stdlib::registers;
-use texlang_core::driver;
-use texlang_core::prelude::*;
-use texlang_core::token;
+use texlang_stdlib::registers;
 use texlang_stdlib::the;
 use texlang_stdlib::time;
 use texlang_stdlib::variableops;
@@ -34,18 +33,19 @@ pub fn greet(
     month: i32,
     year: i32,
 ) -> String {
-    let mut execution_input = driver::ExecutionInput::new_with_str(
-        init_state(minutes_since_midnight, day, month, year),
-        input,
-    );
-    match driver::exec(&mut execution_input, true) {
-        Ok(tokens) => token::write_tokens(&tokens, execution_input.base().cs_name_interner()),
+    let mut env = init_state(minutes_since_midnight, day, month, year);
+    env.push_source(input);
+    let mut execution_input = runtime::ExecutionInput::new(env);
+    match execwhitespace::exec(&mut execution_input, true) {
+        Ok(tokens) => token::write_tokens(&tokens, execution_input.env().cs_name_interner()),
         Err(err) => format!["{}", err],
     }
 }
 
 struct PlaygroundState {
     alloc: alloc::Component,
+    exec: execwhitespace::Component,
+    registers: registers::Component<256>,
     time: time::Component,
 }
 
@@ -55,6 +55,24 @@ impl alloc::HasAlloc for PlaygroundState {
     }
     fn alloc_mut(&mut self) -> &mut alloc::Component {
         &mut self.alloc
+    }
+}
+
+impl execwhitespace::HasExec for PlaygroundState {
+    fn exec(&self) -> &execwhitespace::Component {
+        &self.exec
+    }
+    fn exec_mut(&mut self) -> &mut execwhitespace::Component {
+        &mut self.exec
+    }
+}
+
+impl registers::HasRegisters<256> for PlaygroundState {
+    fn registers(&self) -> &registers::Component<256> {
+        &self.registers
+    }
+    fn registers_mut(&mut self) -> &mut registers::Component<256> {
+        &mut self.registers
     }
 }
 
@@ -72,19 +90,21 @@ fn init_state(
     day: i32,
     month: i32,
     year: i32,
-) -> Base<PlaygroundState> {
-    let mut s = Base::<PlaygroundState>::new(
+) -> runtime::Env<PlaygroundState> {
+    let mut s = runtime::Env::<PlaygroundState>::new(
         CatCodeMap::new_with_tex_defaults(),
         PlaygroundState {
-            alloc: alloc::Component::new(),
+            alloc: Default::default(),
+            exec: Default::default(),
+            registers: Default::default(),
             time: time::Component::new_with_values(minutes_since_midnight, day, month, year),
         },
     );
     conditional::add_all_conditionals(&mut s);
     def::add_all_commands(&mut s);
     s.set_command("the", the::get_the());
-    //s.set_command("count", registers::get_count());
-    //s.set_command("countdef", registers::get_countdef());
+    s.set_command("count", registers::get_count());
+    s.set_command("countdef", registers::get_countdef());
     s.set_command("newint", alloc::get_newint());
     s.set_command("newarray", alloc::get_newarray());
     s.set_command("catcode", catcodecmd::get_catcode());
@@ -98,6 +118,6 @@ fn init_state(
     s.set_command("par", execwhitespace::get_par());
     s.set_command("let", letassignment::get_let());
     s.set_command("newline", execwhitespace::get_newline());
-    s.set_command("\\", command::Command::Character(Token::new_other('\\')));
+    s.set_command("\\", command::Command::Character(Token::new_other('\\', 0)));
     s
 }

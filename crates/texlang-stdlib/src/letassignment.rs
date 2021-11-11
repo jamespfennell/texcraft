@@ -10,7 +10,10 @@ pub fn get_let<S>() -> command::ExecutionFn<S> {
     let_primitive_fn
 }
 
-fn let_primitive_fn<S>(let_token: Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()> {
+fn let_primitive_fn<S>(
+    let_token: Token,
+    input: &mut runtime::ExecutionInput<S>,
+) -> anyhow::Result<()> {
     let name =
         parse::parse_command_target("\\let assignment", let_token, input.unexpanded_stream())?;
     parse::parse_optional_equals(input.unexpanded_stream())?;
@@ -21,14 +24,14 @@ fn let_primitive_fn<S>(let_token: Token, input: &mut ExecutionInput<S>) -> anyho
             )
             .cast()),
             Some(token) => match token.value() {
-                ControlSequence(name) => match input.base().get_command(&name) {
-                    None => return Err(error::new_undefined_cs_error(token, input.base())),
+                ControlSequence(name) => match input.base().commands_map.get(&name) {
+                    None => return Err(error::new_undefined_cs_error(token, input.env())),
                     Some(cmd) => cmd.clone(),
                 },
                 _ => command::Command::Character(token),
             },
         };
-    input.base_mut().set_command_using_csname(name, command);
+    input.base_mut().commands_map.insert(name, command);
     Ok(())
 }
 
@@ -36,15 +39,11 @@ fn let_primitive_fn<S>(let_token: Token, input: &mut ExecutionInput<S>) -> anyho
 mod test {
     use super::*;
     use crate::def;
-    use texlang_core::driver;
-    use texlang_core::expansion_test;
+    use crate::testutil::*;
 
-    struct State;
-    fn new_state() -> State {
-        State {}
-    }
+    type State = ();
 
-    fn setup_expansion_test(s: &mut Base<State>) {
+    fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
         def::add_all_commands(s);
         s.set_command("let", get_let());
     }

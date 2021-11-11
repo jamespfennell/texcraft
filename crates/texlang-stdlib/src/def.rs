@@ -17,7 +17,10 @@ pub fn get_def<S>() -> command::ExecutionFn<S> {
     def_primitive_fn
 }
 
-fn def_primitive_fn<S>(def_token: Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()> {
+fn def_primitive_fn<S>(
+    def_token: Token,
+    input: &mut runtime::ExecutionInput<S>,
+) -> anyhow::Result<()> {
     let name =
         parse::parse_command_target("macro definition", def_token, input.unexpanded_stream())?;
     let (prefix, raw_parameters, replacement_end_token) =
@@ -42,12 +45,13 @@ fn def_primitive_fn<S>(def_token: Token, input: &mut ExecutionInput<S>) -> anyho
     let user_defined_macro = unsafe { Macro::new_unchecked(prefix, parameters, replacement) };
     input
         .base_mut()
-        .set_command_using_csname(name, rc::Rc::new(user_defined_macro));
+        .commands_map
+        .insert(name, rc::Rc::new(user_defined_macro));
     Ok(())
 }
 
 /// Add all of the commands defined in this module to the provided state.
-pub fn add_all_commands<S>(s: &mut Base<S>) {
+pub fn add_all_commands<S>(s: &mut runtime::Env<S>) {
     s.set_command("def", get_def());
 }
 
@@ -284,16 +288,11 @@ fn parse_replacement_text(
 #[cfg(test)]
 mod test {
     use super::*;
-    use texlang_core::driver;
-    use texlang_core::expansion_failure_test;
-    use texlang_core::expansion_test;
+    use crate::testutil::*;
 
-    struct State;
-    fn new_state() -> State {
-        State {}
-    }
+    type State = ();
 
-    fn setup_expansion_test(s: &mut Base<State>) {
+    fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
         add_all_commands(s);
     }
 

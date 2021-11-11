@@ -13,20 +13,20 @@ pub fn get_catcode<S>() -> command::VariableFn<S> {
 
 fn catcode_fn<S>(
     _catcode_token: Token,
-    input: &mut command::ExpandedInput<S>,
+    input: &mut runtime::ExpandedInput<S>,
     _: usize,
 ) -> anyhow::Result<Variable<S>> {
     let addr: u32 = parse::parse_number(input)?;
     Ok(Variable::CatCode(TypedVariable::new(
-        |state: &Base<S>, addr: usize| -> &CatCode {
+        |state: &runtime::BaseState<S>, addr: usize| -> &CatCode {
             let addr = u32::try_from(addr).unwrap();
             let addr = char::from_u32(addr).unwrap();
-            state.cat_codes().get(&addr)
+            state.cat_code_map.get(&addr)
         },
-        |state: &mut Base<S>, addr: usize| -> &mut CatCode {
+        |state: &mut runtime::BaseState<S>, addr: usize| -> &mut CatCode {
             let addr = u32::try_from(addr).unwrap();
             let addr = char::from_u32(addr).unwrap();
-            state.cat_codes_mut().get_mut(&addr)
+            state.cat_code_map.get_mut(&addr)
         },
         addr as usize,
     )))
@@ -35,18 +35,13 @@ fn catcode_fn<S>(
 #[cfg(test)]
 mod tests {
     use crate::catcodecmd;
+    use crate::testutil::*;
     use crate::the;
-    use texlang_core::driver;
-    use texlang_core::expansion_failure_test;
-    use texlang_core::expansion_test;
     use texlang_core::prelude::*;
 
-    struct State;
-    fn new_state() -> State {
-        State {}
-    }
+    type State = ();
 
-    fn setup_expansion_test(s: &mut Base<State>) {
+    fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
         s.set_command("the", the::get_the());
         s.set_command("catcode", catcodecmd::get_catcode());
     }

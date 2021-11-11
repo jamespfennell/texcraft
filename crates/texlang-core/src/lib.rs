@@ -136,16 +136,11 @@
 
 extern crate texcraft_stdext;
 
-#[macro_use]
-// #[cfg(test)]
-pub mod testutil;
-
 pub mod command;
-pub mod driver;
 pub mod error;
 pub mod parse;
 pub mod prelude;
-pub mod state;
+pub mod runtime;
 pub mod texmacro;
 pub mod token;
 pub mod variable;

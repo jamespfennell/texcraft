@@ -36,7 +36,11 @@ pub enum Parameter {
 }
 
 impl Macro {
-    pub fn call<S>(&self, token: Token, input: &mut ExpandedInput<S>) -> anyhow::Result<()> {
+    pub fn call<S>(
+        &self,
+        token: Token,
+        input: &mut runtime::ExpandedInput<S>,
+    ) -> anyhow::Result<()> {
         stream::remove_tokens_from_stream(
             &self.prefix,
             input.unexpanded_stream(),
@@ -66,10 +70,10 @@ impl Macro {
             }
         }
 
-        let result = unexpanded_stream.controller_mut().expansions_mut();
+        let result = unexpanded_stream.expansions_mut();
         Macro::perform_replacement(&self.replacement_text, &arguments, result);
 
-        if unexpanded_stream.base().tracing_macros > 0 {
+        if unexpanded_stream.base().base_state.tracing_macros > 0 {
             println![" +---[ Tracing macro expansion of {} ]--+", token];
             for (i, argument) in arguments.iter().enumerate() {
                 println![

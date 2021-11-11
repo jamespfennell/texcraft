@@ -89,7 +89,7 @@ pub fn get_count<S: HasRegisters<N>, const N: usize>() -> command::VariableFn<S>
 
 fn count_fn<S: HasRegisters<N>, const N: usize>(
     count_token: Token,
-    input: &mut ExpandedInput<S>,
+    input: &mut runtime::ExpandedInput<S>,
     _: usize,
 ) -> anyhow::Result<Variable<S>> {
     let addr: usize = parse::parse_number(input)?;
@@ -114,7 +114,7 @@ pub fn get_countdef<S: HasRegisters<N>, const N: usize>() -> command::ExecutionF
 
 fn countdef_fn<S: HasRegisters<N>, const N: usize>(
     countdef_token: Token,
-    input: &mut command::ExecutionInput<S>,
+    input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let cs_name =
         parse::parse_command_target("countdef", countdef_token, input.unexpanded_stream())?;
@@ -128,13 +128,13 @@ fn countdef_fn<S: HasRegisters<N>, const N: usize>(
         ));
     }
     let new_cmd = command::VariableCommand::new(singleton_fn, addr);
-    input.base_mut().set_command_using_csname(cs_name, new_cmd);
+    input.base_mut().commands_map.insert(cs_name, new_cmd);
     Ok(())
 }
 
 fn singleton_fn<S: HasRegisters<N>, const N: usize>(
     _: Token,
-    _: &mut command::ExpandedInput<S>,
+    _: &mut runtime::ExpandedInput<S>,
     addr: usize,
 ) -> anyhow::Result<Variable<S>> {
     Ok(Variable::Int(TypedVariable::new(
@@ -169,25 +169,24 @@ fn integer_register_too_large_error(token: Token, addr: usize, num: usize) -> an
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::registers;
+    use crate::testutil::*;
     use crate::the;
-    use texlang_core::driver;
-    use texlang_core::expansion_failure_test;
-    use texlang_core::expansion_test;
 
+    #[derive(Default)]
     struct State {
         registers: Component<256>,
     }
 
-    fn new_state() -> State {
-        State {
-            registers: Component::new(),
+    impl HasRegisters<256> for TestUtilState<State> {
+        fn registers(&self) -> &Component<256> {
+            &self.inner.registers
+        }
+        fn registers_mut(&mut self) -> &mut Component<256> {
+            &mut self.inner.registers
         }
     }
 
-    implement_has_registers![State, registers, 256];
-
-    fn setup_expansion_test(s: &mut Base<State>) {
+    fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
         s.set_command("the", the::get_the());
         s.set_command("count", get_count());
         s.set_command("countdef", get_countdef());

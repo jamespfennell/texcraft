@@ -5,9 +5,11 @@
 extern crate texcraft_stdext;
 extern crate texlang_core;
 
-use texlang_core::state::Base;
+use texlang_core::runtime::Env;
 use texlang_core::token::catcode::CatCodeMap;
 
+#[macro_use]
+pub mod testutil;
 pub mod alloc;
 pub mod catcodecmd;
 pub mod conditional;
@@ -23,22 +25,18 @@ pub mod tracing;
 pub mod variableops;
 
 /// A state struct that is compatible with every primitive in the Texlang standard library.
+#[derive(Default)]
 pub struct StdLibState {
+    alloc: alloc::Component,
+    exec: execwhitespace::Component,
     registers: registers::Component<32768>,
     time: time::Component,
-    alloc: alloc::Component,
 }
 
 impl StdLibState {
-    pub fn new() -> Base<StdLibState> {
-        let mut s = Base::<StdLibState>::new(
-            CatCodeMap::new_with_tex_defaults(),
-            StdLibState {
-                registers: registers::Component::new(),
-                time: time::Component::new(),
-                alloc: alloc::Component::new(),
-            },
-        );
+    pub fn new() -> Env<StdLibState> {
+        let mut s =
+            Env::<StdLibState>::new(CatCodeMap::new_with_tex_defaults(), Default::default());
         conditional::add_all_conditionals(&mut s);
         def::add_all_commands(&mut s);
         s.set_command("the", the::get_the());
@@ -60,6 +58,24 @@ impl StdLibState {
     }
 }
 
+impl alloc::HasAlloc for StdLibState {
+    fn alloc(&self) -> &alloc::Component {
+        &self.alloc
+    }
+    fn alloc_mut(&mut self) -> &mut alloc::Component {
+        &mut self.alloc
+    }
+}
+
+impl execwhitespace::HasExec for StdLibState {
+    fn exec(&self) -> &execwhitespace::Component {
+        &self.exec
+    }
+    fn exec_mut(&mut self) -> &mut execwhitespace::Component {
+        &mut self.exec
+    }
+}
+
 implement_has_registers![StdLibState, registers, 32768];
 
 impl time::HasTime for StdLibState {
@@ -68,14 +84,5 @@ impl time::HasTime for StdLibState {
     }
     fn get_time_mut(&mut self) -> &mut time::Component {
         &mut self.time
-    }
-}
-
-impl alloc::HasAlloc for StdLibState {
-    fn alloc(&self) -> &alloc::Component {
-        &self.alloc
-    }
-    fn alloc_mut(&mut self) -> &mut alloc::Component {
-        &mut self.alloc
     }
 }
