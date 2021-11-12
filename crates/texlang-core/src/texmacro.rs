@@ -156,7 +156,7 @@ impl Macro {
 }
 
 impl Parameter {
-    pub fn parse_argument<S: Stream>(
+    pub fn parse_argument<S: TokenStream>(
         &self,
         macro_token: &Token,
         stream: &mut S,
@@ -180,7 +180,7 @@ impl Parameter {
 
     fn parse_delimited_argument(
         macro_token: &Token,
-        stream: &mut dyn Stream,
+        stream: &mut dyn TokenStream,
         matcher_factory: &KMPMatcherFactory<Token>,
         param_num: usize,
         result: &mut Vec<Token>,
@@ -259,7 +259,7 @@ impl Parameter {
         true
     }
 
-    fn parse_undelimited_argument<S: Stream>(
+    fn parse_undelimited_argument<S: TokenStream>(
         macro_token: &Token,
         stream: &mut S,
         param_num: usize,
@@ -381,7 +381,7 @@ pub fn pretty_print_replacement_text(replacements: &[Replacement]) -> String {
 /// Returns an error if the stream does not start with the tokens.
 pub fn remove_tokens_from_stream(
     tokens: &[Token],
-    stream: &mut dyn Stream,
+    stream: &mut dyn TokenStream,
     action: &str,
 ) -> anyhow::Result<()> {
     for prefix_token in tokens.iter() {

@@ -5,7 +5,7 @@
 pub use crate::command;
 pub use crate::error;
 pub use crate::runtime;
-pub use crate::runtime::Stream;
+pub use crate::runtime::TokenStream;
 pub use crate::token::catcode::CatCode;
 pub use crate::token::catcode::CatCodeMap;
 pub use crate::token::CsName;

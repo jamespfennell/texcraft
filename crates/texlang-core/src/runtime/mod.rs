@@ -1,19 +1,20 @@
 //! The Texlang runtime.
 //!
-//! This module contains the definition of the Texlang runtime environment,
+//! This module contains the definition of the runtime environment,
 //!     various input streams that wrap the environment,
 //!     and the main function that is used to run Texlang.
-//! See the Texlang runtime documentation for an introduction.
+//! See the runtime documentation in the Texlang book for full documentation.
 
 use super::token::CsName;
+use crate::command::Command;
 use crate::command::CommandsMap;
-use crate::command::{self, Command};
 use crate::error;
-use crate::prelude::*;
-use crate::token;
 use crate::token::catcode::CatCodeMap;
 use crate::token::lexer;
 use crate::token::CsNameInterner;
+use crate::token::Token;
+use crate::token::TracebackId;
+use crate::token::Value::ControlSequence;
 use crate::variable;
 use std::collections::HashMap;
 
@@ -21,13 +22,13 @@ pub mod conditional;
 mod streams;
 pub use streams::ExecutionInput;
 pub use streams::ExpandedInput;
-pub use streams::Stream;
+pub use streams::TokenStream;
 pub use streams::UnexpandedStream;
 
 pub fn run<S>(
     execution_input: &mut ExecutionInput<S>,
-    character_handler: fn(token::Token, &mut ExecutionInput<S>) -> anyhow::Result<()>,
-    undefined_cs_handler: fn(token::Token, &mut ExecutionInput<S>) -> anyhow::Result<()>,
+    character_handler: fn(Token, &mut ExecutionInput<S>) -> anyhow::Result<()>,
+    undefined_cs_handler: fn(Token, &mut ExecutionInput<S>) -> anyhow::Result<()>,
 ) -> anyhow::Result<()> {
     loop {
         let fully_expanded_token = execution_input.next();
@@ -79,7 +80,7 @@ pub fn run<S>(
 }
 
 pub fn default_undefined_cs_handler<S>(
-    token: token::Token,
+    token: Token,
     input: &mut streams::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     Err(error::new_undefined_cs_error(token, input.env()))
@@ -137,7 +138,7 @@ impl<S> Env<S> {
     }
 
     /// Set a command.
-    pub fn set_command<A: AsRef<str>, B: Into<command::Command<S>>>(&mut self, name: A, cmd: B) {
+    pub fn set_command<A: AsRef<str>, B: Into<Command<S>>>(&mut self, name: A, cmd: B) {
         self.base_state.commands_map.insert(
             self.internal.cs_name_interner.get_or_intern(name),
             B::into(cmd),
@@ -147,7 +148,7 @@ impl<S> Env<S> {
     /// Return a regular hash map with all the commands as they are currently defined.
     ///
     /// This function is extremely slow and is only intended to be invoked on error paths.
-    pub fn get_commands_as_map(&self) -> HashMap<String, command::Command<S>> {
+    pub fn get_commands_as_map(&self) -> HashMap<String, Command<S>> {
         let map_1: HashMap<CsName, Command<S>> = self.base_state.commands_map.to_hash_map();
         let mut map = HashMap::new();
         for (cs_name, cmd) in map_1 {
@@ -178,8 +179,8 @@ pub struct InternalEnv {
     sources: Vec<Source>,
 
     cs_name_interner: CsNameInterner,
-    traceback_checkpoints: HashMap<token::TracebackId, String>,
-    next_free_traceback_id: token::TracebackId,
+    traceback_checkpoints: HashMap<TracebackId, String>,
+    next_free_traceback_id: TracebackId,
 }
 
 impl InternalEnv {
@@ -188,20 +189,20 @@ impl InternalEnv {
             .insert(self.next_free_traceback_id, source_code.clone());
         let source_code_len = source_code.len();
         let mut new_source = Source::new(source_code, self.next_free_traceback_id);
-        self.next_free_traceback_id += token::TracebackId::try_from(source_code_len).unwrap();
+        self.next_free_traceback_id += TracebackId::try_from(source_code_len).unwrap();
         std::mem::swap(&mut new_source, &mut self.current_source);
         self.sources.push(new_source);
     }
 
     #[inline]
-    fn push_expansion(&mut self, expansion: &[token::Token]) {
+    fn push_expansion(&mut self, expansion: &[Token]) {
         self.current_source
             .expansions
             .extend(expansion.iter().rev());
     }
 
     #[inline]
-    fn expansions_mut(&mut self) -> &mut Vec<token::Token> {
+    fn expansions_mut(&mut self) -> &mut Vec<Token> {
         &mut self.current_source.expansions
     }
 
@@ -222,7 +223,7 @@ struct Source {
 }
 
 impl Source {
-    pub fn new(source_code: String, next_free_traceback_id: token::TracebackId) -> Source {
+    pub fn new(source_code: String, next_free_traceback_id: TracebackId) -> Source {
         Source {
             expansions: Vec::with_capacity(32),
             root: lexer::Lexer::new(source_code, next_free_traceback_id),

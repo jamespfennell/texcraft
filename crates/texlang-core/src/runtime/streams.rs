@@ -1,6 +1,7 @@
-use crate::prelude::*;
-use crate::token;
+use crate::command;
+use crate::runtime;
 use crate::token::Token;
+use crate::token::Value::ControlSequence;
 
 /// A source of tokens and read-only acccess to the environment.
 ///
@@ -55,7 +56,7 @@ use crate::token::Token;
 ///     or the following token in the remaining stream if the expansion returns no tokens.
 ///     This mutation is generally irreversable.
 ///
-pub trait Stream {
+pub trait TokenStream {
     /// Retrieves the next token in the stream.
     fn next(&mut self) -> anyhow::Result<Option<Token>>;
 
@@ -85,7 +86,7 @@ pub struct UnexpandedStream<S> {
     env: runtime::Env<S>,
 }
 
-impl<S> Stream for UnexpandedStream<S> {
+impl<S> TokenStream for UnexpandedStream<S> {
     #[inline]
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
         if let Some(token) = self.env.internal.current_source.expansions.pop() {
@@ -136,16 +137,16 @@ impl<S> UnexpandedStream<S> {
     }
 
     #[inline]
-    pub fn expansions_mut(&mut self) -> &mut Vec<token::Token> {
+    pub fn expansions_mut(&mut self) -> &mut Vec<Token> {
         self.env.internal.expansions_mut()
     }
 
     #[inline]
-    pub fn push_expansion(&mut self, expansion: &[token::Token]) {
+    pub fn push_expansion(&mut self, expansion: &[Token]) {
         self.env.internal.push_expansion(expansion)
     }
 
-    fn next_recurse(&mut self) -> anyhow::Result<Option<token::Token>> {
+    fn next_recurse(&mut self) -> anyhow::Result<Option<Token>> {
         if self.env.internal.pop_source() {
             self.next()
         } else {
@@ -153,7 +154,7 @@ impl<S> UnexpandedStream<S> {
         }
     }
 
-    fn peek_recurse(&mut self) -> anyhow::Result<Option<&token::Token>> {
+    fn peek_recurse(&mut self) -> anyhow::Result<Option<&Token>> {
         if self.env.internal.pop_source() {
             self.peek()
         } else {
@@ -172,7 +173,7 @@ pub struct ExpandedInput<S> {
     scratch_space: Vec<Token>,
 }
 
-impl<S> Stream for ExpandedInput<S> {
+impl<S> TokenStream for ExpandedInput<S> {
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
         let (token, command) = match self.raw_stream.next()? {
             None => return Ok(None),
@@ -312,7 +313,7 @@ pub struct ExecutionInput<S> {
     raw_stream: ExpandedInput<S>,
 }
 
-impl<S> Stream for ExecutionInput<S> {
+impl<S> TokenStream for ExecutionInput<S> {
     #[inline]
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
         self.raw_stream.next()
