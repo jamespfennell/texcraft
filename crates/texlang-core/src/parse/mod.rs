@@ -26,7 +26,7 @@ pub fn parse_optional_space<S>(input: &mut runtime::ExpandedInput<S>) -> anyhow:
 
 // TODO: take a &token instead
 // TODO: just take execution input as input
-pub fn parse_command_target<S: stream::Stream>(
+pub fn parse_command_target<S: Stream>(
     target_description: &str,
     token: Token,
     input: &mut S,
@@ -62,7 +62,7 @@ pub fn parse_command_target<S: stream::Stream>(
 /// Parses balanced tokens from the stream.
 ///
 /// Returns false if the input ended before balanced tokens completed.
-pub fn parse_balanced_tokens<S: stream::Stream>(
+pub fn parse_balanced_tokens<S: Stream>(
     stream: &mut S,
     result: &mut Vec<Token>,
 ) -> anyhow::Result<bool> {

@@ -1,6 +1,6 @@
 # The runtime environment
 
-This page mostly discussed code in Texlang's [runtime module](#todo).
+This page mostly discusses code in Texlang's [runtime module](#todo).
 
 ## Historical context
 

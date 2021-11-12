@@ -1,6 +1,8 @@
 use crate::token::Token;
-/// A component that is attached to the input unit for keeping track of conditional branches
-/// as they are expanded.
+
+/// A component used to keep track of conditional branches as they are expanded.
+///
+/// This component is attached to the input controller.
 pub struct Component {
     // branches is a stack where each element corresponds to a conditional that is currently
     // expanding. A nested conditional is further up the stack than the conditional it is
@@ -14,11 +16,11 @@ pub struct Component {
 
 #[derive(Debug)]
 pub enum BranchKind {
-    // The true branch of an if conditional.
+    /// The true branch of an if conditional.
     True,
-    // The false branch of an if conditional, or the default branch of a switch statement.
+    /// The false branch of an if conditional, or the default branch of a switch statement.
     Else,
-    // A regular case brach of a switch statement.
+    /// A regular case brach of a switch statement.
     Switch,
 }
 

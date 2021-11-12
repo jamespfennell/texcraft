@@ -1,4 +1,4 @@
-//! Texcraft variables system
+//! Texlang variables system
 //!
 //! # Variables in TeX
 //!
