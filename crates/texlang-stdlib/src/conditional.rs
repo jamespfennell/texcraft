@@ -5,7 +5,7 @@
 use std::any;
 use texlang_core::parse;
 use texlang_core::prelude::*;
-use texlang_core::runtime::conditional::*;
+use texlang_core::runtime::HasExpansionState;
 
 pub const ELSE_DOC: &str = "Start the else branch of a conditional or switch statement";
 pub const IFCASE_DOC: &str = "Begin a switch statement";
@@ -16,8 +16,59 @@ pub const IFFALSE_DOC: &str = "Evaluate the false branch";
 pub const FI_DOC: &str = "End a conditional or switch statement";
 pub const OR_DOC: &str = "Begin the next branch of a switch statement";
 
-fn branches<S>(input: &mut runtime::ExpandedInput<S>) -> &mut Vec<Branch> {
-    &mut input.controller_mut().conditional.branches
+/// A component that is attached to the input unit for keeping track of conditional branches
+/// as they are expanded.
+pub struct Component {
+    // branches is a stack where each element corresponds to a conditional that is currently
+    // expanding. A nested conditional is further up the stack than the conditional it is
+    // nested in.
+    //
+    // This stack is used to
+    // verify that \else and \fi tokens are valid; i.e., if a \else is encountered, the current
+    // conditional must be true otherwise the \else is invalid.
+    branches: Vec<Branch>,
+}
+
+#[derive(Debug)]
+enum BranchKind {
+    // The true branch of an if conditional.
+    True,
+    // The false branch of an if conditional, or the default branch of a switch statement.
+    Else,
+    // A regular case brach of a switch statement.
+    Switch,
+}
+
+#[derive(Debug)]
+struct Branch {
+    _token: Token,
+    kind: BranchKind,
+}
+
+impl Component {
+    pub fn new() -> Component {
+        Component {
+            branches: Vec::new(),
+        }
+    }
+}
+
+impl Default for Component {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub trait HasComponent {
+    fn conditional_mut(&mut self) -> &mut Component;
+}
+
+fn branches<S>(input: &mut runtime::ExpandedInput<S>) -> &mut Vec<Branch>
+where
+    S: HasExpansionState,
+    S::E: HasComponent,
+{
+    &mut input.expansion_state_mut().conditional_mut().branches
 }
 
 enum If {}
@@ -39,8 +90,12 @@ fn fi_id() -> any::TypeId {
 }
 
 // The `true_case` function is executed whenever a conditional evaluates to true.
-fn true_case<S>(token: Token, input: &mut runtime::ExpandedInput<S>) -> anyhow::Result<Vec<Token>> {
-    input.controller_mut().conditional.branches.push(Branch {
+fn true_case<S>(token: Token, input: &mut runtime::ExpandedInput<S>) -> anyhow::Result<Vec<Token>>
+where
+    S: HasExpansionState,
+    S::E: HasComponent,
+{
+    branches(input).push(Branch {
         _token: token,
         kind: BranchKind::True,
     });
@@ -54,15 +109,18 @@ fn true_case<S>(token: Token, input: &mut runtime::ExpandedInput<S>) -> anyhow::
 fn false_case<S>(
     original_token: Token,
     input: &mut runtime::ExpandedInput<S>,
-) -> anyhow::Result<Vec<Token>> {
+) -> anyhow::Result<Vec<Token>>
+where
+    S: HasExpansionState,
+    S::E: HasComponent,
+{
     let mut depth = 0;
     let mut last_token = None;
     while let Some(token) = input.unexpanded_stream().next()? {
         if let ControlSequence(name) = &token.value() {
             if let Some(c) = input.base().commands_map.get(name) {
                 if c.id() == else_id() && depth == 0 {
-                    // TODO: push the token
-                    input.controller_mut().conditional.branches.push(Branch {
+                    branches(input).push(Branch {
                         _token: original_token,
                         kind: BranchKind::Else,
                     });
@@ -85,7 +143,7 @@ fn false_case<S>(
         None => original_token,
         Some(token) => token,
     };
-    let branch = input.controller_mut().conditional.branches.pop();
+    let branch = branches(input).pop();
     Err(error::TokenError::new(
         token,
         "unexpected end of input while expanding an `if` command")
@@ -102,14 +160,22 @@ macro_rules! create_if_primitive {
         fn $if_primitive_fn<S>(
             token: Token,
             input: &mut runtime::ExpandedInput<S>,
-        ) -> anyhow::Result<Vec<Token>> {
+        ) -> anyhow::Result<Vec<Token>>
+        where
+            S: HasExpansionState,
+            S::E: HasComponent,
+        {
             match $if_fn(input)? {
                 true => true_case(token, input),
                 false => false_case(token, input),
             }
         }
 
-        pub fn $get_if<S>() -> command::ExpansionPrimitive<S> {
+        pub fn $get_if<S>() -> command::ExpansionPrimitive<S>
+        where
+            S: HasExpansionState,
+            S::E: HasComponent,
+        {
             command::ExpansionPrimitive::new($if_primitive_fn, if_id())
         }
     };
@@ -148,7 +214,11 @@ create_if_primitive![if_odd, if_odd_primitive_fn, get_if_odd, IFODD_DOC];
 fn if_case_primitive_fn<S>(
     ifcase_token: Token,
     input: &mut runtime::ExpandedInput<S>,
-) -> anyhow::Result<Vec<Token>> {
+) -> anyhow::Result<Vec<Token>>
+where
+    S: HasExpansionState,
+    S::E: HasComponent,
+{
     // TODO: should we reading the number from the unexpanded stream? Probably!
     let mut cases_to_skip: i32 = parse::parse_number(input)?;
     if cases_to_skip == 0 {
@@ -208,14 +278,22 @@ fn if_case_primitive_fn<S>(
 }
 
 /// Get the `\ifcase` primitive.
-pub fn get_if_case<S>() -> command::ExpansionPrimitive<S> {
+pub fn get_if_case<S>() -> command::ExpansionPrimitive<S>
+where
+    S: HasExpansionState,
+    S::E: HasComponent,
+{
     command::ExpansionPrimitive::new(if_case_primitive_fn, if_id())
 }
 
 fn or_primitive_fn<S>(
     ifcase_token: Token,
     input: &mut runtime::ExpandedInput<S>,
-) -> anyhow::Result<Vec<Token>> {
+) -> anyhow::Result<Vec<Token>>
+where
+    S: HasExpansionState,
+    S::E: HasComponent,
+{
     let branch = branches(input).pop();
     // For an or command to be valid, we must be in a switch statement
     let is_valid = match branch {
@@ -264,15 +342,23 @@ fn or_primitive_fn<S>(
 }
 
 /// Get the `\or` primitive.
-pub fn get_or<S>() -> command::ExpansionPrimitive<S> {
+pub fn get_or<S>() -> command::ExpansionPrimitive<S>
+where
+    S: HasExpansionState,
+    S::E: HasComponent,
+{
     command::ExpansionPrimitive::new(or_primitive_fn, or_id())
 }
 
 fn else_primitive_fn<S>(
     else_token: Token,
     input: &mut runtime::ExpandedInput<S>,
-) -> anyhow::Result<Vec<Token>> {
-    let branch = input.controller_mut().conditional.branches.pop();
+) -> anyhow::Result<Vec<Token>>
+where
+    S: HasExpansionState,
+    S::E: HasComponent,
+{
+    let branch = branches(input).pop();
     // For else token to be valid, we must be in the true branch of a conditional
     let is_valid = match branch {
         None => false,
@@ -316,7 +402,11 @@ fn else_primitive_fn<S>(
 }
 
 /// Get the `\else` primitive.
-pub fn get_else<S>() -> command::ExpansionPrimitive<S> {
+pub fn get_else<S>() -> command::ExpansionPrimitive<S>
+where
+    S: HasExpansionState,
+    S::E: HasComponent,
+{
     command::ExpansionPrimitive::new(else_primitive_fn, else_id())
 }
 
@@ -324,8 +414,12 @@ pub fn get_else<S>() -> command::ExpansionPrimitive<S> {
 fn fi_primitive_fn<S>(
     token: Token,
     input: &mut runtime::ExpandedInput<S>,
-) -> anyhow::Result<Vec<Token>> {
-    let branch = input.controller_mut().conditional.branches.pop();
+) -> anyhow::Result<Vec<Token>>
+where
+    S: HasExpansionState,
+    S::E: HasComponent,
+{
+    let branch = branches(input).pop();
     // For a \fi primitive to be valid, we must be in a conditional.
     // Note that we could be in the false branch: \iftrue\else\fi
     // Or in the true branch: \iftrue\fi
@@ -336,12 +430,20 @@ fn fi_primitive_fn<S>(
     Ok(Vec::new())
 }
 
-pub fn get_fi<S>() -> command::ExpansionPrimitive<S> {
+pub fn get_fi<S>() -> command::ExpansionPrimitive<S>
+where
+    S: HasExpansionState,
+    S::E: HasComponent,
+{
     command::ExpansionPrimitive::new(fi_primitive_fn, fi_id())
 }
 
 /// Add all of the conditionals defined in this module to the provided state.
-pub fn add_all_conditionals<S>(s: &mut runtime::Env<S>) {
+pub fn add_all_conditionals<S>(s: &mut runtime::Env<S>)
+where
+    S: HasExpansionState,
+    S::E: HasComponent,
+{
     s.set_command("iftrue", get_if_true());
     s.set_command("iffalse", get_if_false());
     s.set_command("ifnum", get_if_num());
@@ -357,7 +459,24 @@ mod tests {
     use super::*;
     use crate::testutil::*;
 
-    type State = ();
+    #[derive(Default)]
+    struct State {
+        conditional: Component,
+    }
+
+    impl HasComponent for State {
+        fn conditional_mut(&mut self) -> &mut Component {
+            &mut self.conditional
+        }
+    }
+
+    impl runtime::HasExpansionState for TestUtilState<State> {
+        type E = State;
+
+        fn expansion_state_mut(&mut self) -> &mut Self::E {
+            &mut self.inner
+        }
+    }
 
     fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
         add_all_conditionals(s);

@@ -73,14 +73,14 @@ impl Macro {
         let result = unexpanded_stream.expansions_mut();
         Macro::perform_replacement(&self.replacement_text, &arguments, result);
 
-        if unexpanded_stream.base().base_state.tracing_macros > 0 {
+        if unexpanded_stream.base().tracing_macros > 0 {
             println![" +---[ Tracing macro expansion of {} ]--+", token];
             for (i, argument) in arguments.iter().enumerate() {
                 println![
                     " | {}{}={}",
                     "#".bright_yellow().bold(),
                     (i + 1).to_string().bright_yellow().bold(),
-                    write_tokens(*argument, unexpanded_stream.base().cs_name_interner())
+                    write_tokens(*argument, unexpanded_stream.env().cs_name_interner())
                         .bright_yellow()
                 ]
             }

@@ -126,10 +126,10 @@ use crate::token::CsNameInterner;
 use crate::variable;
 use std::collections::HashMap;
 
-pub mod conditional;
 mod streams;
 pub use streams::ExecutionInput;
 pub use streams::ExpandedInput;
+pub use streams::HasExpansionState;
 pub use streams::UnexpandedStream;
 
 pub fn run<S>(
@@ -200,7 +200,6 @@ pub fn default_undefined_cs_handler<S>(
 pub struct Env<S> {
     pub base_state: BaseState<S>,
     pub custom_state: S,
-    pub expansion_controller: ExpansionController,
     pub internal: InternalEnv,
 }
 
@@ -227,7 +226,6 @@ impl<S> Env<S> {
         Env {
             custom_state: state,
             base_state: BaseState::new(initial_cat_codes),
-            expansion_controller: Default::default(),
             internal: Default::default(),
         }
     }
@@ -330,10 +328,4 @@ impl Default for Source {
     fn default() -> Self {
         Source::new("".to_string(), 0)
     }
-}
-
-/// Type used for managing input.
-#[derive(Default)]
-pub struct ExpansionController {
-    pub conditional: conditional::Component,
 }
