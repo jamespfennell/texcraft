@@ -6,6 +6,7 @@ extern crate texcraft_stdext;
 extern crate texlang_core;
 
 use texlang_core::runtime::Env;
+use texlang_core::runtime::HasExpansionState;
 use texlang_core::token::catcode::CatCodeMap;
 
 #[macro_use]
@@ -31,6 +32,12 @@ pub struct StdLibState {
     exec: execwhitespace::Component,
     registers: registers::Component<32768>,
     time: time::Component,
+    expansion_state: StdLibExpansionState,
+}
+
+#[derive(Default)]
+pub struct StdLibExpansionState {
+    conditional: conditional::Component,
 }
 
 impl StdLibState {
@@ -55,6 +62,14 @@ impl StdLibState {
         s.set_command("newint", alloc::get_newint());
         s.set_command("newarray", alloc::get_newarray());
         s
+    }
+}
+
+impl HasExpansionState for StdLibState {
+    type E = StdLibExpansionState;
+
+    fn expansion_state_mut(&mut self) -> &mut Self::E {
+        &mut self.expansion_state
     }
 }
 
@@ -84,5 +99,11 @@ impl time::HasTime for StdLibState {
     }
     fn get_time_mut(&mut self) -> &mut time::Component {
         &mut self.time
+    }
+}
+
+impl conditional::HasComponent for StdLibExpansionState {
+    fn conditional_mut(&mut self) -> &mut conditional::Component {
+        &mut self.conditional
     }
 }

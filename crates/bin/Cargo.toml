@@ -10,4 +10,4 @@ texlang-core = { path = "../texlang-core" }
 
 texlang-stdlib = { path = "../texlang-stdlib" }
 
-anyhow = {}
+anyhow = "1.0"

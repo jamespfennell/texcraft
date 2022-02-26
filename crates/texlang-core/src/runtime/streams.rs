@@ -86,6 +86,12 @@ pub struct UnexpandedStream<S> {
     env: runtime::Env<S>,
 }
 
+pub trait HasExpansionState {
+    type E;
+
+    fn expansion_state_mut(&mut self) -> &mut Self::E;
+}
+
 impl<S> TokenStream for UnexpandedStream<S> {
     #[inline]
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
@@ -117,6 +123,13 @@ impl<S> TokenStream for UnexpandedStream<S> {
     }
 }
 
+impl<S: HasExpansionState> UnexpandedStream<S> {
+    #[inline]
+    pub fn expansion_state_mut(&mut self) -> &mut S::E {
+        self.env.custom_state.expansion_state_mut()
+    }
+}
+
 impl<S> UnexpandedStream<S> {
     /// Returns a reference to the environment.
     #[inline]
@@ -128,12 +141,6 @@ impl<S> UnexpandedStream<S> {
     #[inline]
     pub fn base(&self) -> &runtime::BaseState<S> {
         &self.env.base_state
-    }
-
-    /// Returns a mutable reference to the input controller.
-    #[inline]
-    pub fn controller_mut(&mut self) -> &mut runtime::ExpansionController {
-        &mut self.env.expansion_controller
     }
 
     #[inline]
@@ -230,8 +237,15 @@ impl<S> TokenStream for ExpandedInput<S> {
     }
 }
 
+impl<S: HasExpansionState> ExpandedInput<S> {
+    #[inline]
+    pub fn expansion_state_mut(&mut self) -> &mut S::E {
+        self.raw_stream.env.custom_state.expansion_state_mut()
+    }
+}
+
 impl<S> ExpandedInput<S> {
-    /// Returns a reference to the base state.
+    /// Returns a reference to the environment.
     #[inline]
     pub fn env(&self) -> &runtime::Env<S> {
         &self.raw_stream.env
@@ -249,18 +263,6 @@ impl<S> ExpandedInput<S> {
     #[inline]
     pub fn state(&self) -> &S {
         &self.raw_stream.env.custom_state
-    }
-
-    /// Returns a reference to the input controller.
-    #[inline]
-    pub fn controller(&self) -> &runtime::ExpansionController {
-        &self.raw_stream.env.expansion_controller
-    }
-
-    /// Returns a mutable reference to the input controller.
-    #[inline]
-    pub fn controller_mut(&mut self) -> &mut runtime::ExpansionController {
-        &mut self.raw_stream.env.expansion_controller
     }
 
     /// Returns the unexpanded stream that backs this expanded input.
@@ -354,11 +356,6 @@ impl<S> ExecutionInput<S> {
     #[inline]
     pub fn state_mut(&mut self) -> &mut S {
         &mut self.raw_stream.raw_stream.env.custom_state
-    }
-
-    #[inline]
-    pub fn controller(&self) -> &runtime::ExpansionController {
-        &self.raw_stream.raw_stream.env.expansion_controller
     }
 
     #[inline]
