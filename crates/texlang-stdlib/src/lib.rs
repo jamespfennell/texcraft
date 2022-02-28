@@ -5,12 +5,11 @@
 extern crate texcraft_stdext;
 extern crate texlang_core;
 
+use texlang_core::runtime::implement_has_component;
 use texlang_core::runtime::Env;
 use texlang_core::runtime::HasExpansionState;
 use texlang_core::token::catcode::CatCodeMap;
 
-#[macro_use]
-pub mod testutil;
 pub mod alloc;
 pub mod catcodecmd;
 pub mod conditional;
@@ -19,6 +18,7 @@ pub mod execwhitespace;
 pub mod letassignment;
 #[macro_use]
 pub mod registers;
+pub mod testutil;
 pub mod texcraft;
 pub mod the;
 pub mod time;
@@ -73,37 +73,12 @@ impl HasExpansionState for StdLibState {
     }
 }
 
-impl alloc::HasAlloc for StdLibState {
-    fn alloc(&self) -> &alloc::Component {
-        &self.alloc
-    }
-    fn alloc_mut(&mut self) -> &mut alloc::Component {
-        &mut self.alloc
-    }
-}
+implement_has_component![
+    StdLibState,
+    (time::Component, time),
+    (execwhitespace::Component, exec),
+    (alloc::Component, alloc),
+    (registers::Component<32768>, registers),
+];
 
-impl execwhitespace::HasExec for StdLibState {
-    fn exec(&self) -> &execwhitespace::Component {
-        &self.exec
-    }
-    fn exec_mut(&mut self) -> &mut execwhitespace::Component {
-        &mut self.exec
-    }
-}
-
-implement_has_registers![StdLibState, registers, 32768];
-
-impl time::HasTime for StdLibState {
-    fn get_time(&self) -> &time::Component {
-        &self.time
-    }
-    fn get_time_mut(&mut self) -> &mut time::Component {
-        &mut self.time
-    }
-}
-
-impl conditional::HasComponent for StdLibExpansionState {
-    fn conditional_mut(&mut self) -> &mut conditional::Component {
-        &mut self.conditional
-    }
-}
+implement_has_component![StdLibExpansionState, (conditional::Component, conditional),];

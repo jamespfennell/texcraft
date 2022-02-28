@@ -2,33 +2,11 @@
 
 use texlang_core::parse;
 use texlang_core::prelude::*;
+use texlang_core::runtime::HasComponent;
 use texlang_core::variable::{TypedVariable, Variable};
 
 pub const COUNT_DOC: &str = "Get or set an integer register";
 pub const COUNTDEF_DOC: &str = "Bind an integer register to a control sequence";
-
-/// Trait for a state that has a registers component.
-pub trait HasRegisters<const N: usize> {
-    /// Get a reference to the registers component.
-    fn registers(&self) -> &Component<N>;
-
-    /// Get a mutable reference to the registers component.
-    fn registers_mut(&mut self) -> &mut Component<N>;
-}
-
-#[macro_export]
-macro_rules! implement_has_registers {
-    ( $type: ident, $field: ident, $n: expr ) => {
-        impl registers::HasRegisters<$n> for $type {
-            fn registers(&self) -> &registers::Component<$n> {
-                &self.$field
-            }
-            fn registers_mut(&mut self) -> &mut registers::Component<$n> {
-                &mut self.$field
-            }
-        }
-    };
-}
 
 struct Registers<T: Copy + Default, const N: usize> {
     values: [T; N],
@@ -83,11 +61,11 @@ impl<const N: usize> Default for Component<N> {
 }
 
 /// Get the `\count` command.
-pub fn get_count<S: HasRegisters<N>, const N: usize>() -> command::VariableFn<S> {
+pub fn get_count<S: HasComponent<Component<N>>, const N: usize>() -> command::VariableFn<S> {
     count_fn
 }
 
-fn count_fn<S: HasRegisters<N>, const N: usize>(
+fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
     count_token: Token,
     input: &mut runtime::ExpandedInput<S>,
     _: usize,
@@ -97,7 +75,7 @@ fn count_fn<S: HasRegisters<N>, const N: usize>(
         return Err(integer_register_too_large_error(
             count_token,
             addr,
-            input.state().registers().int_registers.num(),
+            input.state().component().int_registers.num(),
         ));
     }
     Ok(Variable::Int(TypedVariable::new(
@@ -108,11 +86,11 @@ fn count_fn<S: HasRegisters<N>, const N: usize>(
 }
 
 /// Get the `\countdef` command.
-pub fn get_countdef<S: HasRegisters<N>, const N: usize>() -> command::ExecutionFn<S> {
+pub fn get_countdef<S: HasComponent<Component<N>>, const N: usize>() -> command::ExecutionFn<S> {
     countdef_fn
 }
 
-fn countdef_fn<S: HasRegisters<N>, const N: usize>(
+fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
     countdef_token: Token,
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
@@ -120,11 +98,11 @@ fn countdef_fn<S: HasRegisters<N>, const N: usize>(
         parse::parse_command_target("countdef", countdef_token, input.unexpanded_stream())?;
     parse::parse_optional_equals(input.regular())?;
     let addr: usize = parse::parse_number(input.regular())?;
-    if addr >= input.state().registers().int_registers.num() {
+    if addr >= input.state().component().int_registers.num() {
         return Err(integer_register_too_large_error(
             countdef_token,
             addr,
-            input.state().registers().int_registers.num(),
+            input.state().component().int_registers.num(),
         ));
     }
     let new_cmd = command::VariableCommand::new(singleton_fn, addr);
@@ -132,7 +110,7 @@ fn countdef_fn<S: HasRegisters<N>, const N: usize>(
     Ok(())
 }
 
-fn singleton_fn<S: HasRegisters<N>, const N: usize>(
+fn singleton_fn<S: HasComponent<Component<N>>, const N: usize>(
     _: Token,
     _: &mut runtime::ExpandedInput<S>,
     addr: usize,
@@ -144,15 +122,18 @@ fn singleton_fn<S: HasRegisters<N>, const N: usize>(
     )))
 }
 
-fn int_register_ref_fn<S: HasRegisters<N>, const N: usize>(state: &S, addr: usize) -> &i32 {
-    state.registers().int_registers.read(addr)
+fn int_register_ref_fn<S: HasComponent<Component<N>>, const N: usize>(
+    state: &S,
+    addr: usize,
+) -> &i32 {
+    state.component().int_registers.read(addr)
 }
 
-fn int_register_mut_ref_fn<S: HasRegisters<N>, const N: usize>(
+fn int_register_mut_ref_fn<S: HasComponent<Component<N>>, const N: usize>(
     state: &mut S,
     addr: usize,
 ) -> &mut i32 {
-    state.registers_mut().int_registers.write(addr)
+    state.component_mut().int_registers.write(addr)
 }
 
 fn integer_register_too_large_error(token: Token, addr: usize, num: usize) -> anyhow::Error {
@@ -169,24 +150,24 @@ fn integer_register_too_large_error(token: Token, addr: usize, num: usize) -> an
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::execwhitespace;
     use crate::testutil::*;
     use crate::the;
+    use texlang_core::runtime::implement_has_component;
 
     #[derive(Default)]
     struct State {
         registers: Component<256>,
+        exec: execwhitespace::Component,
     }
 
-    impl HasRegisters<256> for TestUtilState<State> {
-        fn registers(&self) -> &Component<256> {
-            &self.inner.registers
-        }
-        fn registers_mut(&mut self) -> &mut Component<256> {
-            &mut self.inner.registers
-        }
-    }
+    implement_has_component![
+        State,
+        (Component<256>, registers),
+        (execwhitespace::Component, exec),
+    ];
 
-    fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
+    fn setup_expansion_test(s: &mut runtime::Env<State>) {
         s.set_command("the", the::get_the());
         s.set_command("count", get_count());
         s.set_command("countdef", get_countdef());

@@ -28,9 +28,7 @@ mod tests {
     use super::*;
     use crate::testutil::*;
 
-    type State = ();
-
-    fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
+    fn setup_expansion_test(s: &mut runtime::Env<State>) {
         s.set_command("texcraft", get_texcraft());
     }
 

@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use texlang_core::prelude::*;
-use texlang_core::runtime::HasExpansionState;
+use texlang_core::runtime::{implement_has_component, HasExpansionState};
 use texlang_core::token;
 use texlang_stdlib::alloc;
 use texlang_stdlib::catcodecmd;
@@ -60,41 +60,13 @@ impl HasExpansionState for PlaygroundState {
     }
 }
 
-impl alloc::HasAlloc for PlaygroundState {
-    fn alloc(&self) -> &alloc::Component {
-        &self.alloc
-    }
-    fn alloc_mut(&mut self) -> &mut alloc::Component {
-        &mut self.alloc
-    }
-}
-
-impl execwhitespace::HasExec for PlaygroundState {
-    fn exec(&self) -> &execwhitespace::Component {
-        &self.exec
-    }
-    fn exec_mut(&mut self) -> &mut execwhitespace::Component {
-        &mut self.exec
-    }
-}
-
-impl registers::HasRegisters<256> for PlaygroundState {
-    fn registers(&self) -> &registers::Component<256> {
-        &self.registers
-    }
-    fn registers_mut(&mut self) -> &mut registers::Component<256> {
-        &mut self.registers
-    }
-}
-
-impl time::HasTime for PlaygroundState {
-    fn get_time(&self) -> &time::Component {
-        &self.time
-    }
-    fn get_time_mut(&mut self) -> &mut time::Component {
-        &mut self.time
-    }
-}
+implement_has_component![
+    PlaygroundState,
+    (time::Component, time),
+    (execwhitespace::Component, exec),
+    (alloc::Component, alloc),
+    (registers::Component<256>, registers),
+];
 
 fn init_state(
     minutes_since_midnight: i32,

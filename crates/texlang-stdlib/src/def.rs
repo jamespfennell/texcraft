@@ -290,9 +290,7 @@ mod test {
     use super::*;
     use crate::testutil::*;
 
-    type State = ();
-
-    fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
+    fn setup_expansion_test(s: &mut runtime::Env<State>) {
         add_all_commands(s);
     }
 
