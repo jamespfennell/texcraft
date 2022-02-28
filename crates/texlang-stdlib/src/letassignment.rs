@@ -41,9 +41,7 @@ mod test {
     use crate::def;
     use crate::testutil::*;
 
-    type State = ();
-
-    fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
+    fn setup_expansion_test(s: &mut runtime::Env<State>) {
         def::add_all_commands(s);
         s.set_command("let", get_let());
     }

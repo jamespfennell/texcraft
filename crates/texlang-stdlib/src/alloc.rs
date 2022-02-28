@@ -8,6 +8,7 @@ use std::ops::Bound::Included;
 use texcraft_stdext::collections::nevec::Nevec;
 use texlang_core::parse;
 use texlang_core::prelude::*;
+use texlang_core::runtime::HasComponent;
 use texlang_core::variable::{TypedVariable, Variable};
 
 pub const NEWINT_DOC: &str = r"Allocate a new integer variable
@@ -105,15 +106,6 @@ struct Array {
     value: Vec<i32>,
 }
 
-/// Trait for a state that has an alloc component.
-pub trait HasAlloc {
-    /// Get a reference to the allocs component.
-    fn alloc(&self) -> &Component;
-
-    /// Get a mutable reference to the allocs component.
-    fn alloc_mut(&mut self) -> &mut Component;
-}
-
 impl Component {
     /// Create a new alloc component.
     pub fn new() -> Component {
@@ -186,17 +178,17 @@ impl Default for Component {
 }
 
 /// Get the `\newint` exeuction command.
-pub fn get_newint<S: HasAlloc>() -> command::ExecutionFn<S> {
+pub fn get_newint<S: HasComponent<Component>>() -> command::ExecutionFn<S> {
     newint_primitive_fn
 }
 
-fn newint_primitive_fn<S: HasAlloc>(
+fn newint_primitive_fn<S: HasComponent<Component>>(
     newint_token: Token,
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let name =
         parse::parse_command_target("newint allocation", newint_token, input.unexpanded_stream())?;
-    let addr = input.state_mut().alloc_mut().alloc_int();
+    let addr = input.state_mut().component_mut().alloc_int();
     input
         .base_mut()
         .commands_map
@@ -204,7 +196,7 @@ fn newint_primitive_fn<S: HasAlloc>(
     Ok(())
 }
 
-fn singleton_fn<S: HasAlloc>(
+fn singleton_fn<S: HasComponent<Component>>(
     _: Token,
     _: &mut runtime::ExpandedInput<S>,
     addr: usize,
@@ -216,24 +208,24 @@ fn singleton_fn<S: HasAlloc>(
     )))
 }
 
-fn singleton_ref_fn<S: HasAlloc>(state: &S, addr: usize) -> &i32 {
-    let a = state.alloc();
+fn singleton_ref_fn<S: HasComponent<Component>>(state: &S, addr: usize) -> &i32 {
+    let a = state.component();
     let (stack_i, inner_i) = a.singleton_addr_map[&addr];
     &a.stack.get(stack_i).unwrap().singletons[inner_i].value
 }
 
-fn singleton_mut_ref_fn<S: HasAlloc>(state: &mut S, addr: usize) -> &mut i32 {
-    let a = state.alloc_mut();
+fn singleton_mut_ref_fn<S: HasComponent<Component>>(state: &mut S, addr: usize) -> &mut i32 {
+    let a = state.component_mut();
     let (stack_i, inner_i) = a.singleton_addr_map[&addr];
     &mut a.stack.get_mut(stack_i).unwrap().singletons[inner_i].value
 }
 
 /// Get the `\newarray` execution command.
-pub fn get_newarray<S: HasAlloc>() -> command::ExecutionFn<S> {
+pub fn get_newarray<S: HasComponent<Component>>() -> command::ExecutionFn<S> {
     newarray_primitive_fn
 }
 
-fn newarray_primitive_fn<S: HasAlloc>(
+fn newarray_primitive_fn<S: HasComponent<Component>>(
     newarray_token: Token,
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
@@ -243,7 +235,7 @@ fn newarray_primitive_fn<S: HasAlloc>(
         input.unexpanded_stream(),
     )?;
     let len: usize = parse::parse_number(input.regular())?;
-    let addr = input.state_mut().alloc_mut().alloc_array(len);
+    let addr = input.state_mut().component_mut().alloc_array(len);
     input
         .base_mut()
         .commands_map
@@ -253,14 +245,14 @@ fn newarray_primitive_fn<S: HasAlloc>(
 }
 
 /// Variable command function for commands defined using \newarray.
-fn array_fn<S: HasAlloc>(
+fn array_fn<S: HasComponent<Component>>(
     array_token: Token,
     input: &mut runtime::ExpandedInput<S>,
     array_addr: usize,
 ) -> anyhow::Result<Variable<S>> {
     let array_index: usize = parse::parse_number(input)?;
-    let (stack_i, inner_i) = input.state().alloc().array_addr_map[&array_addr];
-    let array_len = input.state().alloc().stack[stack_i].arrays[inner_i]
+    let (stack_i, inner_i) = input.state().component().array_addr_map[&array_addr];
+    let array_len = input.state().component().stack[stack_i].arrays[inner_i]
         .value
         .len();
     if array_index >= array_len {
@@ -280,38 +272,32 @@ fn array_fn<S: HasAlloc>(
     )))
 }
 
-fn array_element_ref_fn<S: HasAlloc>(state: &S, addr: usize) -> &i32 {
-    let (addr_0, (stack_i, inner_i)) = state.alloc().find_array(addr);
-    &state.alloc().stack[stack_i].arrays[inner_i].value[addr - addr_0]
+fn array_element_ref_fn<S: HasComponent<Component>>(state: &S, addr: usize) -> &i32 {
+    let (addr_0, (stack_i, inner_i)) = state.component().find_array(addr);
+    &state.component().stack[stack_i].arrays[inner_i].value[addr - addr_0]
 }
 
-fn array_element_mut_ref_fn<S: HasAlloc>(state: &mut S, addr: usize) -> &mut i32 {
-    let (addr_0, (stack_i, inner_i)) = state.alloc().find_array(addr);
-    &mut state.alloc_mut().stack.get_mut(stack_i).unwrap().arrays[inner_i].value[addr - addr_0]
+fn array_element_mut_ref_fn<S: HasComponent<Component>>(state: &mut S, addr: usize) -> &mut i32 {
+    let (addr_0, (stack_i, inner_i)) = state.component().find_array(addr);
+    &mut state.component_mut().stack.get_mut(stack_i).unwrap().arrays[inner_i].value[addr - addr_0]
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::testutil::*;
     use crate::the::get_the;
+    use crate::{execwhitespace, testutil::*};
+    use texlang_core::runtime::implement_has_component;
 
     #[derive(Default)]
     struct State {
         alloc: Component,
+        exec: execwhitespace::Component,
     }
 
-    impl HasAlloc for TestUtilState<State> {
-        fn alloc(&self) -> &Component {
-            &self.inner.alloc
-        }
+    implement_has_component![State, (Component, alloc), (execwhitespace::Component, exec),];
 
-        fn alloc_mut(&mut self) -> &mut Component {
-            &mut self.inner.alloc
-        }
-    }
-
-    fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
+    fn setup_expansion_test(s: &mut runtime::Env<State>) {
         s.set_command("newint", get_newint());
         s.set_command("newarray", get_newarray());
         s.set_command("the", get_the());

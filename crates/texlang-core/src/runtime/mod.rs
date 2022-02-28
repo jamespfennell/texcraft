@@ -329,3 +329,123 @@ impl Default for Source {
         Source::new("".to_string(), 0)
     }
 }
+
+/// Helper trait for implementing the component pattern in Texlang.
+///
+/// With this pattern, a TeX command (like `\time`) can have a single implementation that
+///     is shared by many different pieces of software built with Texlang.
+/// Additionally, a specific TeX engine can compose many different
+///     TeX commands together without worrying about incompatibilities.
+/// In both cases the key is making the state associated with the command private.
+/// The state being private also means Texlang avoids the globally mutable state problem
+///     that is prevalent in the legacy TeX implemenations.
+/// 
+/// In the component pattern, the state
+///     needed by a specific command like `\count` is isolated in a component, which is a concrete
+///     Rust type like a struct. 
+/// This Rust type is the generic type `C` in the trait.
+/// The command (e.g. `\count`) is defined in the same Rust module as the component. 
+/// The internals of the component are private to the module it is defined in,
+///     meaning this piece of state can only be mutated by the command. 
+/// This makes the state highly local and easier to reason about.
+///
+/// In order to work the command needs to have access to an instance of the component in which
+///     the command will maintain its state. 
+/// The `HasComponent` trait enforces this.
+/// Any state
+///     that contains the component can implement the trait. 
+/// The Rust code defining the
+///     command specifies the trait in its trait bounds, and uses the trait to access the component.
+/// 
+/// The pattern enables composibility of Texlang code as follows.
+/// Different states can include the same component and thus reuse the same commands.
+/// Combining multiple commands into one state just involves having the
+///     state include all of the relevant components.
+///
+/// Notes:
+///
+/// - In general state is shared by multiple commands. Such commands must be defined in the
+///     same Rust module to support this.
+///     For example, `\countdef` shares state with `\count`,
+///     and they are implemented together.
+/// 
+/// - Commands don't necessarily have state: for example, `\def`, `\advance` and `\the`. 
+///     These commands
+///     are defined without trait bounds on the state, and work automatically with any TeX
+///     software built with Texlang. (Yay!)
+/// 
+/// - The easiest way to include a component in the state is to make it a direct field
+///     of the state.
+///     In this case the [implement_has_component] macro can be used to easily implement the
+///     trait.
+///     The Texlang standard library exemplifies this approach.
+pub trait HasComponent<C> {
+    // Returns a immutable reference to the component.
+    fn component(&self) -> &C;
+
+    // Returns a mutable reference to the component.
+    fn component_mut(&mut self) -> &mut C;
+}
+
+/// This macro is for implementing the [HasComponent] trait in the special (but common)
+///     case when the state is a struct and the component is a direct field of the struct.
+/// 
+/// ## Examples
+/// 
+/// Implementing a single component:
+/// 
+/// ```
+/// # mod mylibrary{
+/// #   pub struct Component;
+/// # }
+/// # use texlang_core::runtime::implement_has_component;
+/// #
+/// struct MyState {
+///     component: mylibrary::Component,
+/// }
+/// 
+/// implement_has_component![MyState, mylibrary::Component, component];
+/// ```
+/// 
+/// Implementing multiple components:
+/// 
+/// ```
+/// # mod mylibrary1{
+/// #   pub struct Component;
+/// # }
+/// # mod mylibrary2{
+/// #   pub struct Component;
+/// # }
+/// # use texlang_core::runtime::implement_has_component;
+/// #
+/// struct MyState {
+///     component_1: mylibrary1::Component,
+///     component_2: mylibrary2::Component,
+/// }
+/// 
+/// implement_has_component![
+///     MyState,
+///     (mylibrary1::Component, component_1),
+///     (mylibrary2::Component, component_2),
+/// ];
+/// ```
+#[macro_export]
+macro_rules! implement_has_component {
+    ( $type: path, $component: path, $field: ident ) => {
+        implement_has_component![$type, ($component, $field),];
+    };
+    ( $type: path, $(($component: path, $field: ident),)+) => {
+        $(
+            impl ::texlang_core::runtime::HasComponent<$component> for $type {
+                fn component(&self) -> &$component {
+                    &self.$field
+                }
+                fn component_mut(&mut self) -> &mut $component {
+                    &mut self.$field
+                }
+            }
+        )*
+    };
+}
+
+pub use implement_has_component;

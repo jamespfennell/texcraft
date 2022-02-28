@@ -12,9 +12,34 @@ pub struct UnexpandedStream<S> {
     env: runtime::Env<S>,
 }
 
+/// Trait indicating some part of the state is mutably accesible to expansion commands.
+/// 
+/// In general only execution commands can mutate the state.
+/// Expansion commands cannot.
+/// This is important for maintaining the rough invariant that commands either modify
+/// the state (execution) or modify the token stream (expansion)
+/// but not both.
+/// To enforce this, the [ExpandedInput] type does not have a way of returning a mutable
+/// reference to the state.
+/// 
+/// However, there are special situations in which expansion commands do need to maintain
+/// some mutable state.
+/// Currently, the only example is the collection of conditional commands 
+/// in the standard libary (`\ifodd`, `\else`, `\fi`, etc.).
+/// These commands maintain a record of the conditional brances that were taken
+///     and uses this for error reporting.
+/// 
+/// This trait enables this use case.
+/// The part of the state that can be mutated by expansion commands is called the expansion state.
+/// If the state implements this trait, a mutable reference to the expansion state
+/// can be obtained through the [ExpandedInput] type's [expansion_state_mut](ExpandedInput::expansion_state_mut) method.
+/// 
+/// The standard library's [texlang_stdlib::StdLibExpansionState] is an example of this pattern.
 pub trait HasExpansionState {
+    /// The type of the expansion state.
     type E;
 
+    /// Returns a mutable reference to the expansion state.
     fn expansion_state_mut(&mut self) -> &mut Self::E;
 }
 
@@ -50,6 +75,7 @@ impl<S> stream::Stream for UnexpandedStream<S> {
 }
 
 impl<S: HasExpansionState> UnexpandedStream<S> {
+    /// Returns a mutable reference to the expansion state.
     #[inline]
     pub fn expansion_state_mut(&mut self) -> &mut S::E {
         self.env.custom_state.expansion_state_mut()
@@ -69,11 +95,13 @@ impl<S> UnexpandedStream<S> {
         &self.env.base_state
     }
 
+    /// Returns a reference to the stack of expanded tokens for the current source.
     #[inline]
     pub fn expansions_mut(&mut self) -> &mut Vec<token::Token> {
         self.env.internal.expansions_mut()
     }
 
+    /// Pushs the references tokens to the top of the stack of expanded tokens for the current source.
     #[inline]
     pub fn push_expansion(&mut self, expansion: &[token::Token]) {
         self.env.internal.push_expansion(expansion)
@@ -96,7 +124,7 @@ impl<S> UnexpandedStream<S> {
     }
 }
 
-/// Type that provides access to the input stream (with or without expansion) and the state.
+/// Provides access to the input stream (with or without expansion) and the state.
 ///
 /// This type satisfies the [Stream](stream::Stream) trait. As a stream, it returns expanded tokens
 /// from the input. To read the input without performing expansion, use the

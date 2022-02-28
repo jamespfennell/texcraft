@@ -39,9 +39,7 @@ mod tests {
     use crate::the;
     use texlang_core::prelude::*;
 
-    type State = ();
-
-    fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
+    fn setup_expansion_test(s: &mut runtime::Env<State>) {
         s.set_command("the", the::get_the());
         s.set_command("catcode", catcodecmd::get_catcode());
     }

@@ -2,13 +2,7 @@
 
 #[cfg(feature = "time")]
 use chrono::prelude::*;
-use texlang_core::{command, variable};
-
-/// Trait for states that contain a [time Component](Component).
-pub trait HasTime {
-    fn get_time(&self) -> &Component;
-    fn get_time_mut(&mut self) -> &mut Component;
-}
+use texlang_core::{command, runtime::HasComponent, variable};
 
 /// Component for storing state related to the time commands.
 pub struct Component {
@@ -67,12 +61,12 @@ impl Default for Component {
 }
 
 /// Get the `\time` command.
-pub fn get_time<S: HasTime>() -> command::VariableFn<S> {
+pub fn get_time<S: HasComponent<Component>>() -> command::VariableFn<S> {
     |_, _, _| -> anyhow::Result<variable::Variable<S>> {
         Ok(variable::Variable::Int(variable::TypedVariable::new(
-            |state: &S, _: usize| -> &i32 { &state.get_time().minutes_since_midnight },
+            |state: &S, _: usize| -> &i32 { &state.component().minutes_since_midnight },
             |state: &mut S, _: usize| -> &mut i32 {
-                &mut state.get_time_mut().minutes_since_midnight
+                &mut state.component_mut().minutes_since_midnight
             },
             0,
         )))
@@ -80,33 +74,33 @@ pub fn get_time<S: HasTime>() -> command::VariableFn<S> {
 }
 
 /// Get the `\day` command.
-pub fn get_day<S: HasTime>() -> command::VariableFn<S> {
+pub fn get_day<S: HasComponent<Component>>() -> command::VariableFn<S> {
     |_, _, _| -> anyhow::Result<variable::Variable<S>> {
         Ok(variable::Variable::Int(variable::TypedVariable::new(
-            |state: &S, _: usize| -> &i32 { &state.get_time().day },
-            |state: &mut S, _: usize| -> &mut i32 { &mut state.get_time_mut().day },
+            |state: &S, _: usize| -> &i32 { &state.component().day },
+            |state: &mut S, _: usize| -> &mut i32 { &mut state.component_mut().day },
             0,
         )))
     }
 }
 
 /// Get the `\month` command.
-pub fn get_month<S: HasTime>() -> command::VariableFn<S> {
+pub fn get_month<S: HasComponent<Component>>() -> command::VariableFn<S> {
     |_, _, _| -> anyhow::Result<variable::Variable<S>> {
         Ok(variable::Variable::Int(variable::TypedVariable::new(
-            |state: &S, _: usize| -> &i32 { &state.get_time().month },
-            |state: &mut S, _: usize| -> &mut i32 { &mut state.get_time_mut().month },
+            |state: &S, _: usize| -> &i32 { &state.component().month },
+            |state: &mut S, _: usize| -> &mut i32 { &mut state.component_mut().month },
             0,
         )))
     }
 }
 
 /// Get the `\year` command.
-pub fn get_year<S: HasTime>() -> command::VariableFn<S> {
+pub fn get_year<S: HasComponent<Component>>() -> command::VariableFn<S> {
     |_, _, _| -> anyhow::Result<variable::Variable<S>> {
         Ok(variable::Variable::Int(variable::TypedVariable::new(
-            |state: &S, _: usize| -> &i32 { &state.get_time().year },
-            |state: &mut S, _: usize| -> &mut i32 { &mut state.get_time_mut().year },
+            |state: &S, _: usize| -> &i32 { &state.component().year },
+            |state: &mut S, _: usize| -> &mut i32 { &mut state.component_mut().year },
             0,
         )))
     }

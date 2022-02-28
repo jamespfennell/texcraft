@@ -135,25 +135,25 @@ create_arithmetic_primitive![divide_fn, divide];
 mod tests {
     use super::*;
     use crate::catcodecmd;
+    use crate::execwhitespace;
     use crate::registers;
     use crate::testutil::*;
     use crate::the;
+    use texlang_core::runtime::implement_has_component;
 
     #[derive(Default)]
     struct State {
         registers: registers::Component<256>,
+        exec: execwhitespace::Component,
     }
 
-    impl registers::HasRegisters<256> for TestUtilState<State> {
-        fn registers(&self) -> &registers::Component<256> {
-            &self.inner.registers
-        }
-        fn registers_mut(&mut self) -> &mut registers::Component<256> {
-            &mut self.inner.registers
-        }
-    }
+    implement_has_component![
+        State,
+        (registers::Component<256>, registers),
+        (execwhitespace::Component, exec),
+    ];
 
-    fn setup_expansion_test(s: &mut runtime::Env<TestUtilState<State>>) {
+    fn setup_expansion_test(s: &mut runtime::Env<State>) {
         s.set_command("the", the::get_the());
         s.set_command("advance", get_advance());
         s.set_command("advancechk", get_advancechk());

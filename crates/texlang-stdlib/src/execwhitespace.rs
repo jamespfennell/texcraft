@@ -1,5 +1,6 @@
 /// Commands for printing whitespace in exec mode
 use texlang_core::prelude::*;
+use texlang_core::runtime::HasComponent;
 
 #[derive(Default)]
 pub struct Component {
@@ -7,52 +8,58 @@ pub struct Component {
     num_trailing_newlines: usize,
 }
 
-/// Trait for states that contain a [time Component](Component).
-pub trait HasExec {
-    fn exec(&self) -> &Component;
-    fn exec_mut(&mut self) -> &mut Component;
-}
-
 /// Get the `\newline` command.
-pub fn get_newline<S: HasExec>() -> command::ExecutionFn<S> {
+pub fn get_newline<S: HasComponent<Component>>() -> command::ExecutionFn<S> {
     newline_primitive_fn
 }
 
-fn newline_primitive_fn<S: HasExec>(
+fn newline_primitive_fn<S: HasComponent<Component>>(
     t: Token,
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let newline_token = Token::new_space('\n', t.traceback_id());
-    input.state_mut().exec_mut().exec_output.push(newline_token);
-    input.state_mut().exec_mut().num_trailing_newlines += 1;
+    input
+        .state_mut()
+        .component_mut()
+        .exec_output
+        .push(newline_token);
+    input.state_mut().component_mut().num_trailing_newlines += 1;
     Ok(())
 }
 
 /// Get the `\par` command.
-pub fn get_par<S: HasExec>() -> command::ExecutionFn<S> {
+pub fn get_par<S: HasComponent<Component>>() -> command::ExecutionFn<S> {
     par_primitive_fn
 }
 
-fn par_primitive_fn<S: HasExec>(
+fn par_primitive_fn<S: HasComponent<Component>>(
     t: Token,
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    if input.state().exec().exec_output.is_empty()
-        || input.state().exec().num_trailing_newlines >= 2
+    if input.state().component().exec_output.is_empty()
+        || input.state().component().num_trailing_newlines >= 2
     {
         return Ok(());
     }
     let par_token = Token::new_space('\n', t.traceback_id());
-    if input.state().exec().num_trailing_newlines == 0 {
-        input.state_mut().exec_mut().exec_output.push(par_token);
-        input.state_mut().exec_mut().num_trailing_newlines += 1;
+    if input.state().component().num_trailing_newlines == 0 {
+        input
+            .state_mut()
+            .component_mut()
+            .exec_output
+            .push(par_token);
+        input.state_mut().component_mut().num_trailing_newlines += 1;
     }
-    input.state_mut().exec_mut().exec_output.push(par_token);
-    input.state_mut().exec_mut().num_trailing_newlines += 1;
+    input
+        .state_mut()
+        .component_mut()
+        .exec_output
+        .push(par_token);
+    input.state_mut().component_mut().num_trailing_newlines += 1;
     Ok(())
 }
 
-pub fn exec<S: HasExec>(
+pub fn exec<S: HasComponent<Component>>(
     execution_input: &mut runtime::ExecutionInput<S>,
     err_for_undefined_cs: bool,
 ) -> anyhow::Result<Vec<Token>> {
@@ -64,19 +71,19 @@ pub fn exec<S: HasExec>(
     let mut result = Vec::new();
     std::mem::swap(
         &mut result,
-        &mut execution_input.state_mut().exec_mut().exec_output,
+        &mut execution_input.state_mut().component_mut().exec_output,
     );
     Ok(result)
 }
 
-fn handle_character<S: HasExec>(
+fn handle_character<S: HasComponent<Component>>(
     mut token: Token,
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     if let Some('\n') = token.char() {
         token = Token::new_space(' ', token.traceback_id());
     }
-    input.state_mut().exec_mut().exec_output.push(token);
-    input.state_mut().exec_mut().num_trailing_newlines = 0;
+    input.state_mut().component_mut().exec_output.push(token);
+    input.state_mut().component_mut().num_trailing_newlines = 0;
     Ok(())
 }
