@@ -15,9 +15,11 @@ pub mod catcodecmd;
 pub mod conditional;
 pub mod def;
 pub mod execwhitespace;
+pub mod io;
 pub mod letassignment;
 #[macro_use]
 pub mod registers;
+#[cfg(test)]
 pub mod testutil;
 pub mod texcraft;
 pub mod the;
@@ -46,21 +48,31 @@ impl StdLibState {
             Env::<StdLibState>::new(CatCodeMap::new_with_tex_defaults(), Default::default());
         conditional::add_all_conditionals(&mut s);
         def::add_all_commands(&mut s);
-        s.set_command("the", the::get_the());
-        s.set_command("let", letassignment::get_let());
+        s.set_command("advance", variableops::get_advance());
+
+        s.set_command("catcode", catcodecmd::get_catcode());
         s.set_command("count", registers::get_count());
         s.set_command("countdef", registers::get_countdef());
-        s.set_command("catcode", catcodecmd::get_catcode());
-        s.set_command("advance", variableops::get_advance());
-        s.set_command("multiply", variableops::get_multiply());
-        s.set_command("divide", variableops::get_divide());
-        s.set_command("time", time::get_time());
+
         s.set_command("day", time::get_day());
+        s.set_command("divide", variableops::get_divide());
+
+        s.set_command("input", io::input::get_input());
+
+        s.set_command("let", letassignment::get_let());
+
         s.set_command("month", time::get_month());
-        s.set_command("year", time::get_year());
-        s.set_command("tracingmacros", tracing::get_tracingmacros());
+        s.set_command("multiply", variableops::get_multiply());
+
         s.set_command("newint", alloc::get_newint());
         s.set_command("newarray", alloc::get_newarray());
+
+        s.set_command("the", the::get_the());
+        s.set_command("time", time::get_time());
+        s.set_command("tracingmacros", tracing::get_tracingmacros());
+
+        s.set_command("year", time::get_year());
+
         s
     }
 }

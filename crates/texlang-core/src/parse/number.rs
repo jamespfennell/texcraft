@@ -247,13 +247,12 @@ fn add_lsd<T: PrimInt>(n: T, base: i32, lsd: i32) -> T {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parse::testutil;
     use crate::token::catcode;
 
     macro_rules! parse_number_test {
         ($input: expr, $number: expr) => {
-            let mut env = runtime::Env::<()>::new(CatCodeMap::new_with_tex_defaults(), ());
-            env.push_source($input.to_string());
-            let mut execution_input = crate::runtime::ExecutionInput::new(env);
+            let mut execution_input = testutil::new_execution_input($input);
             let result: i32 = parse_number(execution_input.regular()).unwrap();
             assert_eq![result, $number];
         };
@@ -368,7 +367,7 @@ mod tests {
         let mut map = CatCodeMap::new_with_tex_defaults();
         map.insert('1', catcode::CatCode::Letter);
         let mut env = runtime::Env::<()>::new(map, ());
-        env.push_source(r"1".to_string());
+        env.push_source(r"1".to_string()).unwrap();
         let mut input = crate::runtime::ExecutionInput::new(env);
         let result = parse_number::<(), i32>(input.regular());
         if let Ok(_) = result {

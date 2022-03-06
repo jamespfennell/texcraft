@@ -3,11 +3,15 @@
 #[macro_use]
 mod helpers;
 
+mod filelocation;
 mod keyword;
 mod number;
 mod relation;
+#[cfg(test)]
+mod testutil;
 mod variable;
 
+pub use filelocation::{parse_file_location, FileLocation};
 pub use keyword::parse_optional_by;
 pub use number::parse_number;
 pub use relation::parse_relation;

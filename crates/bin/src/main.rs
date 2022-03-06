@@ -39,7 +39,7 @@ fn main() {
 fn exec(file_name: &str) -> Result<(), anyhow::Error> {
     let source_code = fs::read_to_string(file_name)?;
     let mut env = init_state();
-    env.push_source(source_code);
+    env.push_source(source_code)?;
     let mut execution_input = runtime::ExecutionInput::new(env);
     let tokens = execwhitespace::exec(&mut execution_input, true)?;
     let s = execution_input.take_env();
