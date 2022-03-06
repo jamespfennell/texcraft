@@ -13,7 +13,7 @@ pub struct UnexpandedStream<S> {
 }
 
 /// Trait indicating some part of the state is mutably accesible to expansion commands.
-/// 
+///
 /// In general only execution commands can mutate the state.
 /// Expansion commands cannot.
 /// This is important for maintaining the rough invariant that commands either modify
@@ -21,19 +21,19 @@ pub struct UnexpandedStream<S> {
 /// but not both.
 /// To enforce this, the [ExpandedInput] type does not have a way of returning a mutable
 /// reference to the state.
-/// 
+///
 /// However, there are special situations in which expansion commands do need to maintain
 /// some mutable state.
-/// Currently, the only example is the collection of conditional commands 
+/// Currently, the only example is the collection of conditional commands
 /// in the standard libary (`\ifodd`, `\else`, `\fi`, etc.).
 /// These commands maintain a record of the conditional brances that were taken
 ///     and uses this for error reporting.
-/// 
+///
 /// This trait enables this use case.
 /// The part of the state that can be mutated by expansion commands is called the expansion state.
 /// If the state implements this trait, a mutable reference to the expansion state
 /// can be obtained through the [ExpandedInput] type's [expansion_state_mut](ExpandedInput::expansion_state_mut) method.
-/// 
+///
 /// The standard library's [texlang_stdlib::StdLibExpansionState] is an example of this pattern.
 pub trait HasExpansionState {
     /// The type of the expansion state.
@@ -203,6 +203,11 @@ impl<S> ExpandedInput<S> {
     #[inline]
     pub fn env(&self) -> &runtime::Env<S> {
         &self.raw_stream.env
+    }
+
+    /// Push source code
+    pub fn push_source(&mut self, source_code: String) -> anyhow::Result<()> {
+        self.raw_stream.env.push_source(source_code)
     }
 
     /// Returns a reference to the base state.

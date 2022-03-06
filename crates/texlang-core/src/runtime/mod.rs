@@ -201,6 +201,25 @@ pub struct Env<S> {
     pub base_state: BaseState<S>,
     pub custom_state: S,
     pub internal: InternalEnv,
+    pub file_system_ops: Box<dyn FileSystemOps>,
+}
+
+/// File system operations that TeX may need to perform.
+///
+/// These operations are extracted to a trait so that they be mocked out in unit testing.
+pub trait FileSystemOps {
+    /// Read the entire contents of a file into a string.
+    ///
+    /// This is implemented by [std::fs::read_to_string].
+    fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String>;
+}
+
+struct RealFileSystemOps;
+
+impl FileSystemOps for RealFileSystemOps {
+    fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String> {
+        std::fs::read_to_string(path)
+    }
 }
 
 /// Parts of the state that are required in every Texlang environment, such as the commands map.
@@ -208,6 +227,7 @@ pub struct BaseState<S> {
     pub cat_code_map: CatCodeMap,
     pub commands_map: CommandsMap<S>,
     pub tracing_macros: i32,
+    pub max_input_levels: i32,
 }
 
 impl<S> BaseState<S> {
@@ -216,6 +236,7 @@ impl<S> BaseState<S> {
             cat_code_map,
             commands_map: Default::default(),
             tracing_macros: 0,
+            max_input_levels: 500,
         }
     }
 }
@@ -227,11 +248,13 @@ impl<S> Env<S> {
             custom_state: state,
             base_state: BaseState::new(initial_cat_codes),
             internal: Default::default(),
+            file_system_ops: Box::new(RealFileSystemOps {}),
         }
     }
 
-    pub fn push_source(&mut self, source_code: String) {
-        self.internal.push_source(source_code);
+    pub fn push_source(&mut self, source_code: String) -> anyhow::Result<()> {
+        self.internal
+            .push_source(source_code, self.base_state.max_input_levels)
     }
 
     pub fn set_command<A: AsRef<str>, B: Into<command::Command<S>>>(&mut self, name: A, cmd: B) {
@@ -239,6 +262,11 @@ impl<S> Env<S> {
             self.internal.cs_name_interner.get_or_intern(name),
             B::into(cmd),
         )
+    }
+
+    /// Return the current working directory, or [None] if it could not be determined.
+    pub fn working_directory(&self) -> Option<&std::path::Path> {
+        self.internal.working_directory.as_deref()
     }
 
     /// Return a regular hash map with all the commands as they are currently defined.
@@ -264,20 +292,46 @@ impl<S> Env<S> {
 }
 
 /// Parts of the runtime environment that are only visible to the runtime itself.
-#[derive(Default)]
 pub struct InternalEnv {
     // The sources form a stack. We store the top element directly on the env
     // for performance reasons.
     current_source: Source,
     sources: Vec<Source>,
 
+    // The working directory is used as the root for relative file paths.
+    working_directory: Option<std::path::PathBuf>,
     cs_name_interner: CsNameInterner,
     traceback_checkpoints: HashMap<token::TracebackId, String>,
     next_free_traceback_id: token::TracebackId,
 }
 
+impl Default for InternalEnv {
+    fn default() -> Self {
+        InternalEnv {
+            current_source: Default::default(),
+            sources: Default::default(),
+            working_directory: match std::env::current_dir() {
+                Ok(path_buf) => Some(path_buf),
+                Err(err) => {
+                    print!("failed to determine the working directory: {}", err);
+                    None
+                }
+            },
+            cs_name_interner: Default::default(),
+            traceback_checkpoints: Default::default(),
+            next_free_traceback_id: Default::default(),
+        }
+    }
+}
+
 impl InternalEnv {
-    fn push_source(&mut self, source_code: String) {
+    fn push_source(&mut self, source_code: String, max_input_levels: i32) -> anyhow::Result<()> {
+        if self.sources.len() + 1 >= max_input_levels.try_into().unwrap() {
+            return Err(anyhow::anyhow!(
+                "maximum number of input levels ({}) exceeded",
+                max_input_levels
+            ));
+        }
         self.traceback_checkpoints
             .insert(self.next_free_traceback_id, source_code.clone());
         let source_code_len = source_code.len();
@@ -285,6 +339,7 @@ impl InternalEnv {
         self.next_free_traceback_id += token::TracebackId::try_from(source_code_len).unwrap();
         std::mem::swap(&mut new_source, &mut self.current_source);
         self.sources.push(new_source);
+        Ok(())
     }
 
     #[inline]
@@ -339,24 +394,24 @@ impl Default for Source {
 /// In both cases the key is making the state associated with the command private.
 /// The state being private also means Texlang avoids the globally mutable state problem
 ///     that is prevalent in the legacy TeX implemenations.
-/// 
+///
 /// In the component pattern, the state
 ///     needed by a specific command like `\count` is isolated in a component, which is a concrete
-///     Rust type like a struct. 
+///     Rust type like a struct.
 /// This Rust type is the generic type `C` in the trait.
-/// The command (e.g. `\count`) is defined in the same Rust module as the component. 
+/// The command (e.g. `\count`) is defined in the same Rust module as the component.
 /// The internals of the component are private to the module it is defined in,
-///     meaning this piece of state can only be mutated by the command. 
+///     meaning this piece of state can only be mutated by the command.
 /// This makes the state highly local and easier to reason about.
 ///
 /// In order to work the command needs to have access to an instance of the component in which
-///     the command will maintain its state. 
+///     the command will maintain its state.
 /// The `HasComponent` trait enforces this.
 /// Any state
-///     that contains the component can implement the trait. 
+///     that contains the component can implement the trait.
 /// The Rust code defining the
 ///     command specifies the trait in its trait bounds, and uses the trait to access the component.
-/// 
+///
 /// The pattern enables composibility of Texlang code as follows.
 /// Different states can include the same component and thus reuse the same commands.
 /// Combining multiple commands into one state just involves having the
@@ -368,12 +423,12 @@ impl Default for Source {
 ///     same Rust module to support this.
 ///     For example, `\countdef` shares state with `\count`,
 ///     and they are implemented together.
-/// 
-/// - Commands don't necessarily have state: for example, `\def`, `\advance` and `\the`. 
+///
+/// - Commands don't necessarily have state: for example, `\def`, `\advance` and `\the`.
 ///     These commands
 ///     are defined without trait bounds on the state, and work automatically with any TeX
 ///     software built with Texlang. (Yay!)
-/// 
+///
 /// - The easiest way to include a component in the state is to make it a direct field
 ///     of the state.
 ///     In this case the [implement_has_component] macro can be used to easily implement the
@@ -389,11 +444,11 @@ pub trait HasComponent<C> {
 
 /// This macro is for implementing the [HasComponent] trait in the special (but common)
 ///     case when the state is a struct and the component is a direct field of the struct.
-/// 
+///
 /// ## Examples
-/// 
+///
 /// Implementing a single component:
-/// 
+///
 /// ```
 /// # mod mylibrary{
 /// #   pub struct Component;
@@ -403,12 +458,12 @@ pub trait HasComponent<C> {
 /// struct MyState {
 ///     component: mylibrary::Component,
 /// }
-/// 
+///
 /// implement_has_component![MyState, mylibrary::Component, component];
 /// ```
-/// 
+///
 /// Implementing multiple components:
-/// 
+///
 /// ```
 /// # mod mylibrary1{
 /// #   pub struct Component;
@@ -422,7 +477,7 @@ pub trait HasComponent<C> {
 ///     component_1: mylibrary1::Component,
 ///     component_2: mylibrary2::Component,
 /// }
-/// 
+///
 /// implement_has_component![
 ///     MyState,
 ///     (mylibrary1::Component, component_1),

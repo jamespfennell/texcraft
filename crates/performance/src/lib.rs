@@ -10,7 +10,7 @@ pub fn run_in_texcraft(input: &str) {
     let mut state = StdLibState::new();
     state.set_command("par", execwhitespace::get_par());
     state.set_command("end", execwhitespace::get_newline());
-    state.push_source(input.to_string());
+    state.push_source(input.to_string()).unwrap();
     let mut execution_input = runtime::ExecutionInput::new(state);
     execwhitespace::exec(&mut execution_input, true).unwrap();
 }

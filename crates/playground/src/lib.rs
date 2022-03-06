@@ -36,7 +36,7 @@ pub fn greet(
     year: i32,
 ) -> String {
     let mut env = init_state(minutes_since_midnight, day, month, year);
-    env.push_source(input);
+    env.push_source(input).unwrap();
     let mut execution_input = runtime::ExecutionInput::new(env);
     match execwhitespace::exec(&mut execution_input, true) {
         Ok(tokens) => token::write_tokens(&tokens, execution_input.env().cs_name_interner()),

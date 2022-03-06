@@ -1,7 +1,10 @@
 //! Utilities for writing unit tests
 
+use std::collections::HashMap;
+
 use crate::execwhitespace;
 use anyhow::Result;
+use texlang_core::runtime;
 use texlang_core::runtime::implement_has_component;
 use texlang_core::runtime::Env;
 use texlang_core::runtime::HasComponent;
@@ -98,13 +101,38 @@ pub fn run<S: Default + HasComponent<execwhitespace::Component>>(
     setup_fn: fn(&mut Env<S>),
     source: String,
 ) -> (Result<Vec<token::Token>>, Env<S>) {
-    let mut env_1 = Env::<S>::new(
+    let mut env = Env::<S>::new(
         catcode::CatCodeMap::new_with_tex_defaults(),
         Default::default(),
     );
-    setup_fn(&mut env_1);
-    env_1.push_source(source);
-    let mut execution_input_1 = ::texlang_core::runtime::ExecutionInput::new(env_1);
-    let output_1 = execwhitespace::exec(&mut execution_input_1, false);
-    (output_1, execution_input_1.take_env())
+    setup_fn(&mut env);
+    env.push_source(source).unwrap();
+    let mut execution_input = ::texlang_core::runtime::ExecutionInput::new(env);
+    let output = execwhitespace::exec(&mut execution_input, false);
+    (output, execution_input.take_env())
+}
+
+/// In-memory filesystem for testing.
+#[derive(Default)]
+pub struct FileSystemOps {
+    files: HashMap<std::path::PathBuf, String>,
+}
+
+impl runtime::FileSystemOps for FileSystemOps {
+    fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String> {
+        match self.files.get(path) {
+            None => Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "not found",
+            )),
+            Some(content) => Ok(content.clone()),
+        }
+    }
+}
+
+impl FileSystemOps {
+    /// Add a file to the in-memory file system
+    pub fn add_file(&mut self, path: std::path::PathBuf, content: &str) {
+        self.files.insert(path, content.to_string());
+    }
 }

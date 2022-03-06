@@ -41,46 +41,42 @@ mod tests {
     use super::*;
     use crate::token::catcode;
 
-    #[test]
-    fn less_than() {
-        let mut env = runtime::Env::<()>::new(CatCodeMap::new_with_tex_defaults(), ());
-        env.push_source(r"<a".to_string());
-        let mut input = runtime::ExecutionInput::new(env);
-        let result = parse_relation(input.regular()).unwrap();
-        assert_eq![result, Relation::LessThan];
-    }
-
-    #[test]
-    fn equals() {
-        let mut env = runtime::Env::<()>::new(CatCodeMap::new_with_tex_defaults(), ());
-        env.push_source(r"=a".to_string());
-        let mut input = runtime::ExecutionInput::new(env);
-        let result = parse_relation(input.regular()).unwrap();
-        assert_eq![result, Relation::Equal];
-    }
-
-    #[test]
-    fn greater_than() {
-        let mut env = runtime::Env::<()>::new(CatCodeMap::new_with_tex_defaults(), ());
-        env.push_source(r">a".to_string());
-        let mut input = runtime::ExecutionInput::new(env);
-        let result = parse_relation(input.regular()).unwrap();
-        assert_eq![result, Relation::GreaterThan];
-    }
-
-    #[test]
-    fn invalid_inputs() {
-        let inputs = vec![r"", r"a", r"\A", r"<"];
-        for str in inputs {
-            let mut map = CatCodeMap::new_with_tex_defaults();
-            map.insert('<', catcode::CatCode::Letter);
-            let mut env = runtime::Env::<()>::new(map, ());
-            env.push_source(str.to_string());
-            let mut input = runtime::ExecutionInput::new(env);
-            let result = parse_relation(input.regular());
-            if let Ok(_) = result {
-                panic!["Parsed a relation from invalid input"];
+    macro_rules! relation_success_test {
+        ($name: ident, $input: expr, $expected: expr) => {
+            #[test]
+            fn $name() {
+                let mut env = runtime::Env::<()>::new(CatCodeMap::new_with_tex_defaults(), ());
+                env.push_source($input.to_string()).unwrap();
+                let mut input = runtime::ExecutionInput::new(env);
+                let result = parse_relation(input.regular()).unwrap();
+                assert_eq![result, $expected];
             }
-        }
+        };
     }
+
+    relation_success_test![less_than, r"<a", Relation::LessThan];
+    relation_success_test![equals, r"=a", Relation::Equal];
+    relation_success_test![greater_than, r">a", Relation::GreaterThan];
+
+    macro_rules! relation_failure_test {
+        ($name: ident, $input: expr) => {
+            #[test]
+            fn $name() {
+                let mut map = CatCodeMap::new_with_tex_defaults();
+                map.insert('<', catcode::CatCode::Letter);
+                let mut env = runtime::Env::<()>::new(map, ());
+                env.push_source($input.to_string()).unwrap();
+                let mut input = runtime::ExecutionInput::new(env);
+                let result = parse_relation(input.regular());
+                if let Ok(_) = result {
+                    panic!["Parsed a relation from invalid input"];
+                }
+            }
+        };
+    }
+
+    relation_failure_test![empty_input, ""];
+    relation_failure_test![letter, "a"];
+    relation_failure_test![control_sequence, r"\A"];
+    relation_failure_test![incorrect_catcode, "<"];
 }

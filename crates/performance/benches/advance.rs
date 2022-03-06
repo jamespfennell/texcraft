@@ -7,7 +7,9 @@ pub fn advance_bench(c: &mut Criterion) {
     let mut state = StdLibState::new();
     state.set_command("par", execwhitespace::get_par());
     state.set_command("newline", execwhitespace::get_newline());
-    state.push_source(r"\countdef\k 0 \def\a{\advance\k by 1}".to_string());
+    state
+        .push_source(r"\countdef\k 0 \def\a{\advance\k by 1}".to_string())
+        .unwrap();
     let mut execution_input = runtime::ExecutionInput::new(state);
     execwhitespace::exec(&mut execution_input, true).unwrap();
     let a_cs = Token::new_control_sequence(
