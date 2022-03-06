@@ -1,4 +1,7 @@
-# The runtime environment
+---
+title: Architecture of Texlang
+weight: 20
+---
 
 This page mostly discusses code in Texlang's [runtime module](#todo).
 

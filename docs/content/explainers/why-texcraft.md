@@ -1,4 +1,7 @@
-# How Texlang processes TeX
+---
+title: What Texcraft is trying to achieve
+weight: 10
+---
 
 This is a high-level overview of how Texlang executes TeX source code.
 
