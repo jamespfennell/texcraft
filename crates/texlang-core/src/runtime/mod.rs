@@ -208,6 +208,7 @@ pub struct InternalEnv {
     cs_name_interner: CsNameInterner,
     traceback_checkpoints: HashMap<TracebackId, String>,
     next_free_traceback_id: TracebackId,
+    scratch_space: Vec<Token>,
 }
 
 impl Default for InternalEnv {
@@ -225,6 +226,7 @@ impl Default for InternalEnv {
             cs_name_interner: Default::default(),
             traceback_checkpoints: Default::default(),
             next_free_traceback_id: Default::default(),
+            scratch_space: Default::default(),
         }
     }
 }

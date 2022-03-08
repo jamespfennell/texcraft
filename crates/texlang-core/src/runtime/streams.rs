@@ -205,7 +205,6 @@ impl<S> UnexpandedStream<S> {
 /// [unexpanded_stream](ExpandedInput::unexpanded_stream) method.
 pub struct ExpandedInput<S> {
     raw_stream: UnexpandedStream<S>,
-    scratch_space: Vec<Token>,
 }
 
 impl<S> TokenStream for ExpandedInput<S> {
@@ -307,8 +306,31 @@ impl<S> ExpandedInput<S> {
         &mut self.raw_stream
     }
 
-    pub fn unexpanded_and_scratch_space(&mut self) -> (&mut UnexpandedStream<S>, &mut Vec<Token>) {
-        (&mut self.raw_stream, &mut self.scratch_space)
+    /// Gets a vector of tokens that may be used as scratch space.
+    ///
+    /// By reusing the same vector of tokens for scratch space we can avoid allocating a new
+    /// vector each time we need it. This was originally created for the TeX macros system.
+    ///
+    /// When finished with the vector, return it using [return_scratch_space].
+    pub fn scratch_space(&mut self) -> Vec<Token> {
+        // Note: the scratch space system here makes the benchmarks about 3% slower versus the previous system.
+        // In the previous system a mutable reference to the scratch space was returned with the unexpanded
+        // stream and so no swapping occured. If 3% is a big deal, we can bring it back.
+        let mut s = Vec::new();
+        std::mem::swap(&mut s, &mut self.raw_stream.env.internal.scratch_space);
+        s
+    }
+
+    /// Return scratch space, allowing it to be reused.
+    pub fn return_scratch_space(&mut self, mut scratch_space: Vec<Token>) {
+        if scratch_space.len() < self.raw_stream.env.internal.scratch_space.len() {
+            return;
+        }
+        scratch_space.clear();
+        std::mem::swap(
+            &mut scratch_space,
+            &mut self.raw_stream.env.internal.scratch_space,
+        );
     }
 
     /// Expands the next token in the input stream.
@@ -410,7 +432,6 @@ impl<S> ExecutionInput<S> {
         ExecutionInput::<S> {
             raw_stream: ExpandedInput::<S> {
                 raw_stream: UnexpandedStream::<S> { env: state },
-                scratch_space: Vec::new(),
             },
         }
     }
