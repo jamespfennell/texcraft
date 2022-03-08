@@ -89,7 +89,7 @@ fn char_to_parameter_index(c: char) -> Option<usize> {
 }
 
 fn parse_prefix_and_parameters(
-    input: &mut dyn stream::Stream,
+    input: &mut dyn TokenStream,
 ) -> anyhow::Result<(Vec<Token>, Vec<RawParameter>, Option<Token>)> {
     let mut prefix = Vec::new();
     let mut parameters = Vec::new();
@@ -181,7 +181,7 @@ fn parse_prefix_and_parameters(
 }
 
 fn parse_replacement_text(
-    input: &mut dyn stream::Stream,
+    input: &mut dyn TokenStream,
     opt_final_token: Option<Token>,
     num_parameters: usize,
 ) -> anyhow::Result<Vec<Replacement>> {

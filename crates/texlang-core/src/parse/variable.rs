@@ -30,7 +30,7 @@ pub fn parse_variable<S>(
 }
 
 /// Parses an optional equal signs, and optional spaces on either side.
-pub fn parse_optional_equals<T: Stream>(input: &mut T) -> anyhow::Result<()> {
+pub fn parse_optional_equals<T: TokenStream>(input: &mut T) -> anyhow::Result<()> {
     while let Some(found_equals) = get_optional_element![
         input,
         Value::Other('=') => false,

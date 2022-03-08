@@ -14,7 +14,7 @@ pub enum Relation {
 ///
 /// A relation is defined on p209 of the TeXBook to be a character token with
 /// catcode 12 (other) and value <, = or >.
-pub fn parse_relation<T: stream::Stream>(stream: &mut T) -> anyhow::Result<Relation> {
+pub fn parse_relation<T: TokenStream>(stream: &mut T) -> anyhow::Result<Relation> {
     get_element![
         stream,
         parse_relation_error,
