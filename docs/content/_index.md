@@ -7,7 +7,7 @@ The high level motivation of the project is described in the explainer
     [what Texcraft is trying to achieve](explainers/why-texcraft.md).
 
 
-This website just hosts the documentation.
+This website largely just hosts the user-facing documentation.
 The [Github repository](https://github.com/jamespfennell/texcraft) has information on contributing to the project.
 The [Texcraft Playground](https://play.texcraft.dev) is example of what can be built with Texcraft.
 

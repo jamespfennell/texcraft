@@ -25,4 +25,4 @@ FROM nginx
 # Put it all together
 RUN rm -rf /usr/share/nginx/html
 COPY --from=hugo-builder /website/docs/public /usr/share/nginx/html
-COPY --from=rust-builder /rustdoc/target/doc /usr/share/nginx/html/rustdoc
+COPY --from=rust-builder /rustdoc/target/doc /usr/share/nginx/html/reference
