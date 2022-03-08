@@ -1,8 +1,82 @@
-//! Expansion and execution driver.
-
-use crate::prelude::*;
-use crate::token;
+use crate::command;
+use crate::runtime;
 use crate::token::Token;
+use crate::token::Value::ControlSequence;
+
+/// A source of tokens and read-only acccess to the environment.
+///
+/// The simplest example of a stream is a vector of tokens. However, streams are more general
+/// than this and can encompass situations in which the full contents cannot be determined in
+/// advance. The classic example of the latter kind of stream comes from the following LaTeX
+/// snippet:
+/// ```tex
+/// \makeatletter \do@
+/// ```
+/// Assuming the default TeX catcode map, if we were to parse this input all at once we would
+/// get three tokens: the control sequence `makeatletter`, the control sequence `do`, and a
+/// single character token with value `@` and catcode "other". This is not the correct result,
+/// though: the first control sequence changes the tokenization rules such that `@` is now
+/// an admissible character in the name of a control sequence. The correct input is thus
+/// the control sequence `makeatletter` followed by the control sequence `do@`.
+///
+/// This example demonstrates that one must be careful when processing streams. After reading
+/// a token, all possible side effects must take place before the next token is read.
+///
+/// # Getting the next token
+///
+/// Tokens are consume from a stream using the `next` method. This method is almost the same
+/// as the `next` method in Rust's iterator trait, except a stream can return an error.
+///
+/// As with iterators, a result of `Ok(None)` indicates that the stream is exhausted.
+///
+/// # Peeking at the next token
+///
+/// In many sitations it is necessary to examine the next token without consuming it; i.e.,
+/// _peek_ at the next token. An example is reading an integer from a stream, in which one needs
+/// to peek at the next token to see if it is a digit. Consuming the token with `next` is not
+/// correct in this situation if the token is not a digit. Peeking is done with
+/// the `peek` method.
+///
+/// The `peek` method returns an immutable reference to the token: because the token is not
+/// being consumed, ownership is transferred as in `next`.
+///
+/// The `peek` method must be idempotent: consecutive calls to `peek` with no intervening
+/// change to the state or the stream must return the same result.
+///
+/// For consumers, it is important to note that the peek method requires a mutable reference
+/// to the stream. This is because some mutable processing may be needed in order to determine
+/// what the next token is. For example:
+///
+/// 1. When reading tokens from a file, peeking at the next token may involve reading more bytes
+///     from the file and thus mutating the file pointer. This mutations is easy to undo in
+///     general.
+///
+/// 1. When performing expansion on a stream, the next token in the stream may need to be expanded
+///     rather than returned. The next token will be the first token in the expansion in this case,
+///     or the following token in the remaining stream if the expansion returns no tokens.
+///     This mutation is generally irreversable.
+///
+pub trait TokenStream {
+    /// Retrieves the next token in the stream.
+    fn next(&mut self) -> anyhow::Result<Option<Token>>;
+
+    /// Peeks at the next token in the stream.
+    ///
+    /// To peek using an immutable borrow of the stream, use the methods `prepare_imut_peek`
+    /// and `imut_peek`.
+    fn peek(&mut self) -> anyhow::Result<Option<&Token>>;
+
+    /// Consumes the next token in the stream without returning it.
+    ///
+    /// This method is mostly to make code self-documenting. It is typically used in
+    /// situations where a peek has already occurred, and the token itself is not needed.
+    fn consume(&mut self) -> anyhow::Result<()> {
+        self.next().map(|_| ())
+    }
+
+    // Returns a reference to the environment.
+    // pub fn env(&self) -> &runtime::Env<S>;
+}
 
 /// Stream that returns input tokens without performing expansion.
 ///
@@ -43,7 +117,7 @@ pub trait HasExpansionState {
     fn expansion_state_mut(&mut self) -> &mut Self::E;
 }
 
-impl<S> stream::Stream for UnexpandedStream<S> {
+impl<S> TokenStream for UnexpandedStream<S> {
     #[inline]
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
         if let Some(token) = self.env.internal.current_source.expansions.pop() {
@@ -97,17 +171,17 @@ impl<S> UnexpandedStream<S> {
 
     /// Returns a reference to the stack of expanded tokens for the current source.
     #[inline]
-    pub fn expansions_mut(&mut self) -> &mut Vec<token::Token> {
+    pub fn expansions_mut(&mut self) -> &mut Vec<Token> {
         self.env.internal.expansions_mut()
     }
 
     /// Pushs the references tokens to the top of the stack of expanded tokens for the current source.
     #[inline]
-    pub fn push_expansion(&mut self, expansion: &[token::Token]) {
+    pub fn push_expansion(&mut self, expansion: &[Token]) {
         self.env.internal.push_expansion(expansion)
     }
 
-    fn next_recurse(&mut self) -> anyhow::Result<Option<token::Token>> {
+    fn next_recurse(&mut self) -> anyhow::Result<Option<Token>> {
         if self.env.internal.pop_source() {
             self.next()
         } else {
@@ -115,7 +189,7 @@ impl<S> UnexpandedStream<S> {
         }
     }
 
-    fn peek_recurse(&mut self) -> anyhow::Result<Option<&token::Token>> {
+    fn peek_recurse(&mut self) -> anyhow::Result<Option<&Token>> {
         if self.env.internal.pop_source() {
             self.peek()
         } else {
@@ -134,7 +208,7 @@ pub struct ExpandedInput<S> {
     scratch_space: Vec<Token>,
 }
 
-impl<S> stream::Stream for ExpandedInput<S> {
+impl<S> TokenStream for ExpandedInput<S> {
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
         let (token, command) = match self.raw_stream.next()? {
             None => return Ok(None),
@@ -274,7 +348,7 @@ pub struct ExecutionInput<S> {
     raw_stream: ExpandedInput<S>,
 }
 
-impl<S> stream::Stream for ExecutionInput<S> {
+impl<S> TokenStream for ExecutionInput<S> {
     #[inline]
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
         self.raw_stream.next()

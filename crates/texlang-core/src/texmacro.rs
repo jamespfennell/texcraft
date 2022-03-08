@@ -1,9 +1,8 @@
-//! The TeX macro system.
+//! Implementation of TeX user defined macros.
 
 use crate::error;
 use crate::parse;
 use crate::prelude::*;
-use crate::token::stream;
 use crate::token::write_tokens;
 use crate::token::CsNameInterner;
 use crate::token::Token;
@@ -41,7 +40,7 @@ impl Macro {
         token: Token,
         input: &mut runtime::ExpandedInput<S>,
     ) -> anyhow::Result<()> {
-        stream::remove_tokens_from_stream(
+        remove_tokens_from_stream(
             &self.prefix,
             input.unexpanded_stream(),
             "matching the prefix for a user-defined macro",
@@ -157,7 +156,7 @@ impl Macro {
 }
 
 impl Parameter {
-    pub fn parse_argument<S: stream::Stream>(
+    pub fn parse_argument<S: TokenStream>(
         &self,
         macro_token: &Token,
         stream: &mut S,
@@ -181,7 +180,7 @@ impl Parameter {
 
     fn parse_delimited_argument(
         macro_token: &Token,
-        stream: &mut dyn stream::Stream,
+        stream: &mut dyn TokenStream,
         matcher_factory: &KMPMatcherFactory<Token>,
         param_num: usize,
         result: &mut Vec<Token>,
@@ -260,7 +259,7 @@ impl Parameter {
         true
     }
 
-    fn parse_undelimited_argument<S: stream::Stream>(
+    fn parse_undelimited_argument<S: TokenStream>(
         macro_token: &Token,
         stream: &mut S,
         param_num: usize,
@@ -375,4 +374,47 @@ pub fn pretty_print_replacement_text(replacements: &[Replacement]) -> String {
         }
     }
     b
+}
+
+/// Removes the provided vector of tokens from the front of the stream.
+///
+/// Returns an error if the stream does not start with the tokens.
+pub fn remove_tokens_from_stream(
+    tokens: &[Token],
+    stream: &mut dyn TokenStream,
+    action: &str,
+) -> anyhow::Result<()> {
+    for prefix_token in tokens.iter() {
+        let stream_token = match stream.next()? {
+            None => {
+                return Err(error::EndOfInputError::new(format![
+                    "unexpected end of input while {}",
+                    action
+                ])
+                .cast());
+            }
+            Some(token) => token,
+        };
+        if &stream_token != prefix_token {
+            /*
+            let note = match &prefix_token.value {
+                ControlSequence(_) => {
+                    format!["expected a control sequence token \\{}", "name"]
+                }
+                _ => format![ //Character(c, catcode) => format![
+                    "expected a character token with value 'todo' and catcode todo",
+                    //c, catcode
+                ],
+            };
+             */
+            let note = "todo";
+            return Err(error::TokenError::new(
+                stream_token,
+                format!["unexpected token while {}", action],
+            )
+            .add_note(note)
+            .cast());
+        }
+    }
+    Ok(())
 }
