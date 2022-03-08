@@ -1,4 +1,4 @@
-//! Texlang commands API
+//! Texcraft commands API and primitives library.
 //!
 //! # Texcraft commands API
 //!

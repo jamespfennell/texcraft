@@ -2,6 +2,7 @@
 
 pub mod catcode;
 pub mod lexer;
+pub mod stream;
 
 use crate::token::catcode::CatCode;
 use string_interner::{DefaultSymbol, StringInterner, Symbol};
