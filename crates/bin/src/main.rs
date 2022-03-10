@@ -40,10 +40,8 @@ fn exec(file_name: &str) -> Result<(), anyhow::Error> {
     let source_code = fs::read_to_string(file_name)?;
     let mut env = init_state();
     env.push_source(source_code)?;
-    let mut execution_input = runtime::ExecutionInput::new(env);
-    let tokens = execwhitespace::exec(&mut execution_input, true)?;
-    let s = execution_input.take_env();
-    let pretty = token::write_tokens(&tokens, s.cs_name_interner());
+    let tokens = execwhitespace::exec(&mut env, true)?;
+    let pretty = token::write_tokens(&tokens, env.cs_name_interner());
     print!("{}", pretty);
     Ok(())
 }

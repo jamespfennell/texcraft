@@ -6,10 +6,6 @@
 //!  This documentation describes the *Texcraft commands API*,
 //! which is the mechanism by which TeX engines add new primitives.
 //!
-//! This is a theoretical overview; for a more hands-on experience, see
-//! [the command API tutorial](tutorial) which walks through
-//! process of creating 3 new primitives.
-//!
 //! A note on terminology: *commands* can be categorized into primitives,
 //! which are implemented in the TeX engine, and user defined macros,
 //!  which are created in specific TeX documents using primitives like `\def`.
@@ -28,7 +24,6 @@
 //! Can read tokens from the input stream?     | Yes       | Yes
 //! Can add tokens to the input stream>        | Yes       | It’s possible, but the API discourages it.[^futurelet]
 //! Can make changes to the state?             | No        | Yes
-//! Can make changes to the input unit?        | Yes       | It’s possible, but the API discourages it.
 //! Is evaluated when tokens are only being expanded, like in `\edef` | Yes | No
 //!
 //!
@@ -150,12 +145,12 @@ impl<S> VariableCommand<S> {
     }
 
     /// Obtain the variable that this command refers to.
-    pub fn resolve(
+    pub fn resolve<I: AsMut<runtime::ExpandedInput<S>>>(
         &self,
         token: token::Token,
-        input: &mut runtime::ExpandedInput<S>,
+        input: &mut I,
     ) -> anyhow::Result<variable::Variable<S>> {
-        (self.0)(token, input, self.1)
+        (self.0)(token, input.as_mut(), self.1)
     }
 }
 

@@ -12,3 +12,6 @@ pub use crate::token::CsName;
 pub use crate::token::Token;
 pub use crate::token::Value;
 pub use crate::token::Value::ControlSequence;
+
+// Traits
+pub use crate::runtime::{ExpandedStream, HasEnv};

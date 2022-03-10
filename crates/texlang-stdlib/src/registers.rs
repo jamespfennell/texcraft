@@ -94,10 +94,9 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
     countdef_token: Token,
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    let cs_name =
-        parse::parse_command_target("countdef", countdef_token, input.unexpanded_stream())?;
-    parse::parse_optional_equals(input.regular())?;
-    let addr: usize = parse::parse_number(input.regular())?;
+    let cs_name = parse::parse_command_target("countdef", countdef_token, input.unexpanded())?;
+    parse::parse_optional_equals(input)?;
+    let addr: usize = parse::parse_number(input)?;
     if addr >= input.state().component().int_registers.num() {
         return Err(integer_register_too_large_error(
             countdef_token,

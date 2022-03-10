@@ -2,17 +2,15 @@ use rand::Rng;
 use std::io::Write;
 use std::process::Command;
 use std::process::Stdio;
-use texlang_core::prelude::*;
 use texlang_stdlib::execwhitespace;
 use texlang_stdlib::StdLibState;
 
 pub fn run_in_texcraft(input: &str) {
-    let mut state = StdLibState::new();
-    state.set_command("par", execwhitespace::get_par());
-    state.set_command("end", execwhitespace::get_newline());
-    state.push_source(input.to_string()).unwrap();
-    let mut execution_input = runtime::ExecutionInput::new(state);
-    execwhitespace::exec(&mut execution_input, true).unwrap();
+    let mut env = StdLibState::new();
+    env.set_command("par", execwhitespace::get_par());
+    env.set_command("end", execwhitespace::get_newline());
+    env.push_source(input.to_string()).unwrap();
+    execwhitespace::exec(&mut env, true).unwrap();
 }
 
 pub fn host_has_pdftex() -> bool {

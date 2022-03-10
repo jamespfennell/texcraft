@@ -19,17 +19,25 @@ use crate::variable;
 use std::collections::HashMap;
 
 mod streams;
-pub use streams::ExecutionInput;
+pub use streams::*;
+/*
+ExecutionInput;
 pub use streams::ExpandedInput;
 pub use streams::HasExpansionState;
 pub use streams::TokenStream;
 pub use streams::UnexpandedStream;
+*/
 
+/// Run the Texlang interpreter for the provided environment.
+///
+/// It is assumed that the environment has been preloaded with TeX source using the
+/// [Env::push_source] method.
 pub fn run<S>(
-    execution_input: &mut ExecutionInput<S>,
+    env: &mut Env<S>,
     character_handler: fn(Token, &mut ExecutionInput<S>) -> anyhow::Result<()>,
     undefined_cs_handler: fn(Token, &mut ExecutionInput<S>) -> anyhow::Result<()>,
 ) -> anyhow::Result<()> {
+    let execution_input = ExecutionInput::new(env);
     loop {
         let fully_expanded_token = execution_input.next();
         match fully_expanded_token {
@@ -54,7 +62,7 @@ pub fn run<S>(
                             }
                             Some(Command::Variable(cmd_ref)) => {
                                 let cmd = *cmd_ref;
-                                let var = cmd.resolve(token, execution_input.regular())?;
+                                let var = cmd.resolve(token, execution_input)?;
                                 variable::set(var, token, execution_input)?;
                             }
                             Some(Command::Character(token)) => {
@@ -79,6 +87,7 @@ pub fn run<S>(
     Ok(())
 }
 
+/// Handler that returns an error when a control sequence is undefined.
 pub fn default_undefined_cs_handler<S>(
     token: Token,
     input: &mut streams::ExecutionInput<S>,
@@ -94,8 +103,8 @@ pub fn default_undefined_cs_handler<S>(
 pub struct Env<S> {
     pub base_state: BaseState<S>,
     pub custom_state: S,
-    pub internal: InternalEnv,
     pub file_system_ops: Box<dyn FileSystemOps>,
+    internal: InternalEnv,
 }
 
 /// File system operations that TeX may need to perform.
@@ -187,7 +196,7 @@ impl<S> Env<S> {
         map
     }
 
-    /// Return a reference to the environment control sequence name string interner.
+    /// Return a reference to the control sequence name string interner.
     ///
     /// This interner can be used to resolve [CsName] types into regular strings.
     #[inline]
@@ -197,7 +206,7 @@ impl<S> Env<S> {
 }
 
 /// Parts of the runtime environment that are only visible to the runtime itself.
-pub struct InternalEnv {
+struct InternalEnv {
     // The sources form a stack. We store the top element directly on the env
     // for performance reasons.
     current_source: Source,

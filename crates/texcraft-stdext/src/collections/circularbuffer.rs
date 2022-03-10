@@ -1,29 +1,32 @@
 //! A circular buffer.
 //!
-//! A circular buffer is an ordered buffer with a fixed capacity and the property that if it is full
-//! and a new element is pushed to the front, the oldest element is deleted.
-//!
-//! The buffer is created using the [new](CircularBuffer::new) method, elements are pushed to the
-//! front using [push](CircularBuffer::push), and retrieved using [index](CircularBuffer::index).
-//!
-//! ```
-//! # use texcraft_stdext::collections::circularbuffer::CircularBuffer;
-//! # use std::ops::Index;
-//! let mut buf = CircularBuffer::new(3);
-//! buf.push(0);
-//! buf.push(1);
-//! assert_eq![buf.index(0), &1];
-//! assert_eq![buf.index(1), &0];
-//! buf.push(2);
-//! buf.push(3);
-//! assert_eq![buf.index(0), &3];
-//! assert_eq![buf.index(1), &2];
-//! assert_eq![buf.index(2), &1];
-//! ```
+//! See the documentation on the [CircularBuffer] type.
 
 use std::ops::IndexMut;
 
 /// A circular buffer.
+///
+/// A circular buffer is an ordered buffer with a fixed capacity and the property that if it is full
+/// and a new element is pushed to the front, the oldest element is deleted.
+///
+/// The buffer is created using the [new](CircularBuffer::new) method, elements are pushed to the
+/// front using [push](CircularBuffer::push), and retrieved using
+/// [std::ops::Index::index] trait method.
+///
+/// ```
+/// # use texcraft_stdext::collections::circularbuffer::CircularBuffer;
+/// # use std::ops::Index;
+/// let mut buf = CircularBuffer::new(3);
+/// buf.push(0);
+/// buf.push(1);
+/// assert_eq![buf.index(0), &1];
+/// assert_eq![buf.index(1), &0];
+/// buf.push(2);
+/// buf.push(3);
+/// assert_eq![buf.index(0), &3];
+/// assert_eq![buf.index(1), &2];
+/// assert_eq![buf.index(2), &1];
+/// ```
 pub struct CircularBuffer<T> {
     data: Vec<T>,
     head: usize,

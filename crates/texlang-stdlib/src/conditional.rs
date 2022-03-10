@@ -113,7 +113,7 @@ where
 {
     let mut depth = 0;
     let mut last_token = None;
-    while let Some(token) = input.unexpanded_stream().next()? {
+    while let Some(token) = input.unexpanded().next()? {
         if let ControlSequence(name) = &token.value() {
             if let Some(c) = input.base().commands_map.get(name) {
                 if c.id() == else_id() && depth == 0 {
@@ -227,7 +227,7 @@ where
     }
     let mut depth = 0;
     let mut last_token = None;
-    while let Some(token) = input.unexpanded_stream().next()? {
+    while let Some(token) = input.unexpanded().next()? {
         if let ControlSequence(name) = &token.value() {
             if let Some(c) = input.base().commands_map.get(name) {
                 if c.id() == or_id() && depth == 0 {
@@ -303,7 +303,7 @@ where
 
     let mut depth = 0;
     let mut last_token = None;
-    while let Some(token) = input.unexpanded_stream().next()? {
+    while let Some(token) = input.unexpanded().next()? {
         if let ControlSequence(name) = &token.value() {
             if let Some(c) = input.base().commands_map.get(name) {
                 if c.id() == if_id() {
@@ -368,7 +368,7 @@ where
     // Now consume all of the tokens until the next \fi
     let mut depth = 0;
     let mut last_token = None;
-    while let Some(token) = input.unexpanded_stream().next()? {
+    while let Some(token) = input.unexpanded().next()? {
         if let ControlSequence(name) = &token.value() {
             if let Some(c) = input.base().commands_map.get(name) {
                 if c.id() == if_id() {

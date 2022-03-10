@@ -3,6 +3,7 @@
 use crate::error;
 use crate::parse;
 use crate::prelude::*;
+use crate::runtime::HasEnv;
 use crate::token::write_tokens;
 use crate::token::CsNameInterner;
 use crate::token::Token;
@@ -42,12 +43,12 @@ impl Macro {
     ) -> anyhow::Result<()> {
         remove_tokens_from_stream(
             &self.prefix,
-            input.unexpanded_stream(),
+            input.unexpanded(),
             "matching the prefix for a user-defined macro",
         )?;
         let mut argument_indices: ArrayVec<(usize, usize), 9> = Default::default();
         let mut argument_tokens = input.scratch_space();
-        let unexpanded_stream = input.unexpanded_stream();
+        let unexpanded_stream = input.unexpanded();
         for (i, parameter) in self.parameters.iter().enumerate() {
             let start_index = argument_tokens.len();
             let trim_outer_braces =
@@ -68,18 +69,17 @@ impl Macro {
                 arguments.push(slice);
             }
 
-            let result = unexpanded_stream.expansions_mut();
+            let result = input.expansions_mut();
             Macro::perform_replacement(&self.replacement_text, &arguments, result);
 
-            if unexpanded_stream.base().tracing_macros > 0 {
+            if input.base().tracing_macros > 0 {
                 println![" +---[ Tracing macro expansion of {} ]--+", token];
                 for (i, argument) in arguments.iter().enumerate() {
                     println![
                         " | {}{}={}",
                         "#".bright_yellow().bold(),
                         (i + 1).to_string().bright_yellow().bold(),
-                        write_tokens(*argument, unexpanded_stream.env().cs_name_interner())
-                            .bright_yellow()
+                        write_tokens(*argument, input.env().cs_name_interner()).bright_yellow()
                     ]
                 }
                 println![

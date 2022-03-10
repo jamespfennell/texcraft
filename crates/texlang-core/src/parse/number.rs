@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::runtime::HasEnv;
 use crate::variable;
 use num_traits::PrimInt;
 
@@ -7,7 +8,16 @@ use num_traits::PrimInt;
 /// The number may be octal, decimal, hexadecimal, cast from a character token, or read
 /// from an internal registers. The full definition of a number in the TeX grammer
 /// is given on page X of the TeXBook.
-pub fn parse_number<S, T: PrimInt>(stream: &mut runtime::ExpandedInput<S>) -> anyhow::Result<T> {
+#[inline]
+pub fn parse_number<S, I: AsMut<runtime::ExpandedInput<S>>, T: PrimInt>(
+    stream: &mut I,
+) -> anyhow::Result<T> {
+    parse_number_internal(stream.as_mut())
+}
+
+fn parse_number_internal<S, T: PrimInt>(
+    stream: &mut runtime::ExpandedInput<S>,
+) -> anyhow::Result<T> {
     let sign = parse_optional_signs(stream)?;
     let modulus: T = match stream.next()? {
         None => return Err(parse_number_error(None)),
@@ -54,7 +64,9 @@ pub fn parse_number<S, T: PrimInt>(stream: &mut runtime::ExpandedInput<S>) -> an
 ///
 /// If the combination of the signs is positive, [None] is returned.
 /// Otherwise, the Token corresponding to the last negative sign is returned.
-fn parse_optional_signs<T: TokenStream>(stream: &mut T) -> anyhow::Result<Option<Token>> {
+fn parse_optional_signs<S>(
+    stream: &mut runtime::ExpandedInput<S>,
+) -> anyhow::Result<Option<Token>> {
     let mut result = None;
     while let Some((sign, token)) = get_optional_element_with_token![
         stream,
@@ -110,7 +122,7 @@ fn read_number_from_address<S, T: PrimInt>(
     }
 }
 
-fn parse_character<S: TokenStream, T: PrimInt>(stream: &mut S) -> anyhow::Result<T> {
+fn parse_character<S, T: PrimInt>(stream: &mut runtime::ExpandedInput<S>) -> anyhow::Result<T> {
     match stream.next()? {
         None => Err(error::EndOfInputError::new(
             "unexpected end of input while parsing a character token",
@@ -128,7 +140,7 @@ fn parse_character<S: TokenStream, T: PrimInt>(stream: &mut S) -> anyhow::Result
     }
 }
 
-fn parse_octal<S: TokenStream, T: PrimInt>(stream: &mut S) -> anyhow::Result<T> {
+fn parse_octal<S, T: PrimInt>(stream: &mut runtime::ExpandedInput<S>) -> anyhow::Result<T> {
     let mut n = num_traits::cast::cast(get_element![
         stream,
         parse_number_error,
@@ -158,7 +170,10 @@ fn parse_octal<S: TokenStream, T: PrimInt>(stream: &mut S) -> anyhow::Result<T> 
     Ok(n)
 }
 
-fn parse_decimal<S: TokenStream, T: PrimInt>(stream: &mut S, n_start: i8) -> anyhow::Result<T> {
+fn parse_decimal<S, T: PrimInt>(
+    stream: &mut runtime::ExpandedInput<S>,
+    n_start: i8,
+) -> anyhow::Result<T> {
     let mut n: T = num_traits::cast::cast(n_start).unwrap();
     while let Some(lsd) = get_optional_element![
         stream,
@@ -178,7 +193,7 @@ fn parse_decimal<S: TokenStream, T: PrimInt>(stream: &mut S, n_start: i8) -> any
     Ok(n)
 }
 
-fn parse_hexadecimal<S: TokenStream, T: PrimInt>(stream: &mut S) -> anyhow::Result<T> {
+fn parse_hexadecimal<S, T: PrimInt>(stream: &mut runtime::ExpandedInput<S>) -> anyhow::Result<T> {
     let mut n: T = num_traits::cast::cast(get_element![
         stream,
         parse_number_error,
@@ -252,8 +267,8 @@ mod tests {
 
     macro_rules! parse_number_test {
         ($input: expr, $number: expr) => {
-            let mut execution_input = testutil::new_execution_input($input);
-            let result: i32 = parse_number(execution_input.regular()).unwrap();
+            let mut env = testutil::new_env($input);
+            let result: i32 = parse_number(runtime::ExpandedInput::new(&mut env)).unwrap();
             assert_eq![result, $number];
         };
     }
@@ -368,8 +383,8 @@ mod tests {
         map.insert('1', catcode::CatCode::Letter);
         let mut env = runtime::Env::<()>::new(map, ());
         env.push_source(r"1".to_string()).unwrap();
-        let mut input = crate::runtime::ExecutionInput::new(env);
-        let result = parse_number::<(), i32>(input.regular());
+        let input = crate::runtime::ExecutionInput::new(&mut env);
+        let result: anyhow::Result<i32> = parse_number(input);
         if let Ok(_) = result {
             panic!["Parsed a relation from invalid input"];
         }

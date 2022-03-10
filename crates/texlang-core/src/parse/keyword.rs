@@ -1,21 +1,9 @@
 use crate::prelude::*;
 
-fn optional_by_error(token: Option<Token>) -> anyhow::Error {
-    match token {
-        None => {
-            error::EndOfInputError::new("unexpected end of input while parsing the `by` keyword")
-                .add_note("expected the letter `y` or `Y`")
-                .cast()
-        }
-        Some(token) => {
-            error::TokenError::new(token, "unexpected token while parsing the `by` keyword")
-                .add_note("expected the letter `y` or `Y`")
-                .cast()
-        }
-    }
-}
-
-pub fn parse_optional_by<S>(stream: &mut runtime::ExpandedInput<S>) -> anyhow::Result<()> {
+pub fn parse_optional_by<S, I: AsMut<runtime::ExpandedInput<S>>>(
+    stream: &mut I,
+) -> anyhow::Result<()> {
+    let stream = stream.as_mut();
     let next_is_b = get_optional_element![
         stream,
         Value::Letter('b') => (),
@@ -30,5 +18,20 @@ pub fn parse_optional_by<S>(stream: &mut runtime::ExpandedInput<S>) -> anyhow::R
         ]
     } else {
         Ok(())
+    }
+}
+
+fn optional_by_error(token: Option<Token>) -> anyhow::Error {
+    match token {
+        None => {
+            error::EndOfInputError::new("unexpected end of input while parsing the `by` keyword")
+                .add_note("expected the letter `y` or `Y`")
+                .cast()
+        }
+        Some(token) => {
+            error::TokenError::new(token, "unexpected token while parsing the `by` keyword")
+                .add_note("expected the letter `y` or `Y`")
+                .cast()
+        }
     }
 }

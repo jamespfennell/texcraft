@@ -125,7 +125,7 @@
 //!
 //! We mentioned that `\count<index>` and `\lastpenalty` are used in TeX to refer to variables;
 //!   the first a register; the second a parameter.
-//! In Texcraft, `\count` and `\lastpenalty` are implemented as  *variable commands* of type [Command].
+//! In Texcraft, `\count` and `\lastpenalty` are implemented as  *variable commands* of type [VariableCommand](super::command::VariableCommand).
 //!  In the Rust code, these commands can be *resolved* to yield a valid instance of [Variable].
 //!
 //! Note how these two commands are slightly different.
@@ -162,12 +162,7 @@
 //!
 //! ## Examples of Texcraft variables
 //!
-//! - The [registers module](super::command::library::registers) contains an implementation of
-//!     TeX registers.
-//! - The [time module](super::command::library::time) contains an implementation of the time parameters.
-//!
-//!
-//!
+//! See the registers and time module in the Texlang standard library.
 
 use crate::error;
 use crate::parse;
@@ -248,16 +243,16 @@ pub fn set<S>(
     parse::parse_optional_equals(input)?;
     match variable {
         Variable::Int(variable) => {
-            let val: i32 = parse::parse_number(input.regular())?;
+            let val: i32 = parse::parse_number(input)?;
             *variable.get_mut(input.state_mut()) = val;
         }
         Variable::BaseInt(variable) => {
-            let val: i32 = parse::parse_number(input.regular())?;
+            let val: i32 = parse::parse_number(input)?;
             *variable.get_mut(input.base_mut()) = val;
         }
         Variable::CatCode(variable) => {
             // TODO: don't use u8 here, use usize to get better error messages
-            let val: u8 = parse::parse_number(input.regular())?;
+            let val: u8 = parse::parse_number(input)?;
             match CatCode::from_int(val) {
                 None => {
                     return Err(error::TokenError::new(

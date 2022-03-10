@@ -60,18 +60,18 @@ fn par_primitive_fn<S: HasComponent<Component>>(
 }
 
 pub fn exec<S: HasComponent<Component>>(
-    execution_input: &mut runtime::ExecutionInput<S>,
+    env: &mut runtime::Env<S>,
     err_for_undefined_cs: bool,
 ) -> anyhow::Result<Vec<Token>> {
     let undefined_cs_handler = match err_for_undefined_cs {
         true => runtime::default_undefined_cs_handler,
         false => handle_character,
     };
-    runtime::run(execution_input, handle_character, undefined_cs_handler)?;
+    runtime::run(env, handle_character, undefined_cs_handler)?;
     let mut result = Vec::new();
     std::mem::swap(
         &mut result,
-        &mut execution_input.state_mut().component_mut().exec_output,
+        &mut env.custom_state.component_mut().exec_output,
     );
     Ok(result)
 }

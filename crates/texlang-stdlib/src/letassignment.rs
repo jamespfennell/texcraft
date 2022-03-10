@@ -14,11 +14,10 @@ fn let_primitive_fn<S>(
     let_token: Token,
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    let name =
-        parse::parse_command_target("\\let assignment", let_token, input.unexpanded_stream())?;
-    parse::parse_optional_equals(input.unexpanded_stream())?;
+    let name = parse::parse_command_target("\\let assignment", let_token, input.unexpanded())?;
+    parse::parse_optional_equals(input.unexpanded())?;
     let command =
-        match input.unexpanded_stream().next()? {
+        match input.unexpanded().next()? {
             None => return Err(error::EndOfInputError::new(
                 "unexpected end of input while reading the right hand side of a \\let assignment",
             )

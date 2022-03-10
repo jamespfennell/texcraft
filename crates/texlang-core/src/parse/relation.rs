@@ -14,9 +14,11 @@ pub enum Relation {
 ///
 /// A relation is defined on p209 of the TeXBook to be a character token with
 /// catcode 12 (other) and value <, = or >.
-pub fn parse_relation<T: TokenStream>(stream: &mut T) -> anyhow::Result<Relation> {
+pub fn parse_relation<S, I: AsMut<runtime::ExpandedInput<S>>>(
+    stream: &mut I,
+) -> anyhow::Result<Relation> {
     get_element![
-        stream,
+        stream.as_mut(),
         parse_relation_error,
         Value::Other('<') => Relation::LessThan,
         Value::Other('=') => Relation::Equal,
@@ -47,8 +49,8 @@ mod tests {
             fn $name() {
                 let mut env = runtime::Env::<()>::new(CatCodeMap::new_with_tex_defaults(), ());
                 env.push_source($input.to_string()).unwrap();
-                let mut input = runtime::ExecutionInput::new(env);
-                let result = parse_relation(input.regular()).unwrap();
+                let input = runtime::ExecutionInput::new(&mut env);
+                let result = parse_relation(input).unwrap();
                 assert_eq![result, $expected];
             }
         };
@@ -66,8 +68,8 @@ mod tests {
                 map.insert('<', catcode::CatCode::Letter);
                 let mut env = runtime::Env::<()>::new(map, ());
                 env.push_source($input.to_string()).unwrap();
-                let mut input = runtime::ExecutionInput::new(env);
-                let result = parse_relation(input.regular());
+                let input = runtime::ExecutionInput::new(&mut env);
+                let result = parse_relation(input);
                 if let Ok(_) = result {
                     panic!["Parsed a relation from invalid input"];
                 }

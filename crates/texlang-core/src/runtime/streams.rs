@@ -1,13 +1,21 @@
 use crate::command;
 use crate::runtime;
 use crate::token::Token;
-use crate::token::Value::ControlSequence;
 
-/// A source of tokens and read-only acccess to the environment.
+/// A stream of tokens generated on demand.
+///
+/// This trait describes a general stream of tokens where the front of the stream may
+/// retrieved using [TokenStream::next] or peeked at using [TokenStream::peek].
+/// In practice, all [TokenStreams](TokenStream) in Texlang
+/// are either [ExecutionInput], [ExpandedInput] or [UnexpandedStream]. We have a trait
+/// only to make handling of these types uniform.
+///
+/// # Note on lazy loading
 ///
 /// The simplest example of a stream is a vector of tokens. However, streams are more general
 /// than this and can encompass situations in which the full contents cannot be determined in
-/// advance. The classic example of the latter kind of stream comes from the following LaTeX
+/// advance. This can be thought of as "lazy loading" for the tokens.
+/// The classic example of this kind of stream comes from the following LaTeX
 /// snippet:
 /// ```tex
 /// \makeatletter \do@
@@ -18,52 +26,38 @@ use crate::token::Value::ControlSequence;
 /// though: the first control sequence changes the tokenization rules such that `@` is now
 /// an admissible character in the name of a control sequence. The correct input is thus
 /// the control sequence `makeatletter` followed by the control sequence `do@`.
-///
-/// This example demonstrates that one must be careful when processing streams. After reading
-/// a token, all possible side effects must take place before the next token is read.
-///
-/// # Getting the next token
-///
-/// Tokens are consume from a stream using the `next` method. This method is almost the same
-/// as the `next` method in Rust's iterator trait, except a stream can return an error.
-///
-/// As with iterators, a result of `Ok(None)` indicates that the stream is exhausted.
-///
-/// # Peeking at the next token
-///
-/// In many sitations it is necessary to examine the next token without consuming it; i.e.,
-/// _peek_ at the next token. An example is reading an integer from a stream, in which one needs
-/// to peek at the next token to see if it is a digit. Consuming the token with `next` is not
-/// correct in this situation if the token is not a digit. Peeking is done with
-/// the `peek` method.
-///
-/// The `peek` method returns an immutable reference to the token: because the token is not
-/// being consumed, ownership is transferred as in `next`.
-///
-/// The `peek` method must be idempotent: consecutive calls to `peek` with no intervening
-/// change to the state or the stream must return the same result.
-///
-/// For consumers, it is important to note that the peek method requires a mutable reference
-/// to the stream. This is because some mutable processing may be needed in order to determine
-/// what the next token is. For example:
-///
-/// 1. When reading tokens from a file, peeking at the next token may involve reading more bytes
-///     from the file and thus mutating the file pointer. This mutations is easy to undo in
-///     general.
-///
-/// 1. When performing expansion on a stream, the next token in the stream may need to be expanded
-///     rather than returned. The next token will be the first token in the expansion in this case,
-///     or the following token in the remaining stream if the expansion returns no tokens.
-///     This mutation is generally irreversable.
-///
 pub trait TokenStream {
-    /// Retrieves the next token in the stream.
+    /// Gets the next token in the stream.
+    ///
+    /// This method is almost the same
+    /// as the `next` method in Rust's iterator trait, except a stream can return an error.
+    ///
+    /// As with iterators, a result of `Ok(None)` indicates that the stream is exhausted.
     fn next(&mut self) -> anyhow::Result<Option<Token>>;
 
-    /// Peeks at the next token in the stream.
+    /// Peeks at the next token in the stream without removing it.
     ///
-    /// To peek using an immutable borrow of the stream, use the methods `prepare_imut_peek`
-    /// and `imut_peek`.
+    /// In many sitations it is necessary to examine the next token without consuming it.
+    /// For example when reading an integer from a stream, one needs to peek at the next token
+    /// to see if it is a digit and thus extends the currently parsed interger.
+    /// Consuming the token with [TokenStream::next] is not
+    /// correct in this situation if the token is not a digit.
+    ///
+    /// The [TokenStream::peek] method must be idempotent: consecutive calls to `peek` with no intervening
+    /// change to the state or the stream must return the same result.
+    ///
+    /// For consumers, it is important to note that the peek method requires a mutable reference
+    /// to the stream. This is because some mutable processing may be needed in order to determine
+    /// what the next token is. For example:
+    ///
+    /// 1. When reading tokens from a file, peeking at the next token may involve reading more bytes
+    ///     from the file and thus mutating the file pointer. This mutations is easy to undo in
+    ///     general.
+    ///
+    /// 1. When performing expansion on a stream, the next token in the stream may need to be expanded
+    ///     rather than returned. The next token will be the first token in the expansion in this case,
+    ///     or the following token in the remaining stream if the expansion returns no tokens.
+    ///     This mutation is generally irreversable.
     fn peek(&mut self) -> anyhow::Result<Option<&Token>>;
 
     /// Consumes the next token in the stream without returning it.
@@ -73,17 +67,59 @@ pub trait TokenStream {
     fn consume(&mut self) -> anyhow::Result<()> {
         self.next().map(|_| ())
     }
-
-    // Returns a reference to the environment.
-    // pub fn env(&self) -> &runtime::Env<S>;
 }
 
-/// Stream that returns input tokens without performing expansion.
+/// Trait indicating a type has read only access to the environment.
+pub trait HasEnv {
+    // The type of the custom state in the environment.
+    type S;
+
+    /// Returns a reference to the environment.
+    fn env(&self) -> &runtime::Env<Self::S>;
+
+    /// Returns a reference to the base state.
+    #[inline]
+    fn base(&self) -> &runtime::BaseState<Self::S> {
+        &self.env().base_state
+    }
+
+    // Returns a reference to the custom state.
+    #[inline]
+    fn state(&self) -> &Self::S {
+        &self.env().custom_state
+    }
+}
+
+/// A [TokenStream] that performs expansion.
 ///
-/// The unexpanded stream is used when reading tokens without performing expansion;
-/// e.g., when reading the replacement text for a macro defined using `\def`.
-pub struct UnexpandedStream<S> {
-    env: runtime::Env<S>,
+/// The unexpanded tokens are retrieved from the unexpanded stream returned by the
+/// [unexpanded](ExpandedStream::unexpanded) method.
+pub trait ExpandedStream {
+    /// The type of the state.
+    type S;
+
+    /// Returns the underlying unexpanded stream.
+    fn unexpanded(&mut self) -> &mut UnexpandedStream<Self::S>;
+
+    /// Expand the next token in the input.
+    ///
+    /// This method only expands a single token. If, after the expansion, the next token
+    /// is expandable it will not be expanded.
+    fn expand_once(&mut self) -> anyhow::Result<bool> {
+        stream::expand_once(&mut self.unexpanded().0)
+    }
+}
+
+impl<T: ExpandedStream> TokenStream for T {
+    #[inline]
+    fn next(&mut self) -> anyhow::Result<Option<Token>> {
+        stream::next_expanded(&mut self.unexpanded().0)
+    }
+
+    #[inline]
+    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
+        stream::peek_expanded(&mut self.unexpanded().0)
+    }
 }
 
 /// Trait indicating some part of the state is mutably accesible to expansion commands.
@@ -108,7 +144,7 @@ pub struct UnexpandedStream<S> {
 /// If the state implements this trait, a mutable reference to the expansion state
 /// can be obtained through the [ExpandedInput] type's [expansion_state_mut](ExpandedInput::expansion_state_mut) method.
 ///
-/// The standard library's [texlang_stdlib::StdLibExpansionState] is an example of this pattern.
+/// The standard library's `StdLibExpansionState` is an example of this pattern.
 pub trait HasExpansionState {
     /// The type of the expansion state.
     type E;
@@ -117,193 +153,116 @@ pub trait HasExpansionState {
     fn expansion_state_mut(&mut self) -> &mut Self::E;
 }
 
+/// Stream that returns input tokens without performing expansion.
+///
+/// The unexpanded stream is used when reading tokens without performing expansion;
+/// e.g., when reading the replacement text for a macro defined using `\def`.
+///
+/// It be obtained from either the [ExecutionInput] or the [ExpandedInput]
+/// using the [ExpandedStream] trait methods.
+#[repr(transparent)]
+pub struct UnexpandedStream<S>(runtime::Env<S>);
+
 impl<S> TokenStream for UnexpandedStream<S> {
     #[inline]
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
-        if let Some(token) = self.env.internal.current_source.expansions.pop() {
-            return Ok(Some(token));
-        }
-        if let Some(token) = self.env.internal.current_source.root.next(
-            &self.env.base_state.cat_code_map,
-            &mut self.env.internal.cs_name_interner,
-        )? {
-            return Ok(Some(token));
-        }
-        self.next_recurse()
+        stream::next_unexpanded(&mut self.0)
     }
 
     #[inline]
     fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
-        if let Some(token) = self.env.internal.current_source.expansions.last() {
-            return Ok(Some(unsafe { launder(token) }));
-        }
-        if let Some(token) = self.env.internal.current_source.root.next(
-            &self.env.base_state.cat_code_map,
-            &mut self.env.internal.cs_name_interner,
-        )? {
-            self.env.internal.current_source.expansions.push(token);
-            return Ok(self.env.internal.current_source.expansions.last());
-        }
-        self.peek_recurse()
+        stream::peek_unexpanded(&mut self.0)
     }
 }
 
-impl<S: HasExpansionState> UnexpandedStream<S> {
-    /// Returns a mutable reference to the expansion state.
-    #[inline]
-    pub fn expansion_state_mut(&mut self) -> &mut S::E {
-        self.env.custom_state.expansion_state_mut()
-    }
-}
-
-impl<S> UnexpandedStream<S> {
-    /// Returns a reference to the environment.
-    #[inline]
-    pub fn env(&self) -> &runtime::Env<S> {
-        &self.env
-    }
-
-    /// Returns a reference to the base state.
-    #[inline]
-    pub fn base(&self) -> &runtime::BaseState<S> {
-        &self.env.base_state
-    }
-
-    /// Returns a reference to the stack of expanded tokens for the current source.
-    #[inline]
-    pub fn expansions_mut(&mut self) -> &mut Vec<Token> {
-        self.env.internal.expansions_mut()
-    }
-
-    /// Pushs the references tokens to the top of the stack of expanded tokens for the current source.
-    #[inline]
-    pub fn push_expansion(&mut self, expansion: &[Token]) {
-        self.env.internal.push_expansion(expansion)
-    }
-
-    fn next_recurse(&mut self) -> anyhow::Result<Option<Token>> {
-        if self.env.internal.pop_source() {
-            self.next()
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn peek_recurse(&mut self) -> anyhow::Result<Option<&Token>> {
-        if self.env.internal.pop_source() {
-            self.peek()
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-/// Provides access to the input stream (with or without expansion) and the state.
+/// Input type for expansion primitives.
 ///
-/// This type satisfies the [Stream](stream::Stream) trait. As a stream, it returns expanded tokens
-/// from the input. To read the input without performing expansion, use the
-/// [unexpanded_stream](ExpandedInput::unexpanded_stream) method.
-pub struct ExpandedInput<S> {
-    raw_stream: UnexpandedStream<S>,
+/// This type provides:
+///
+/// - Access to the input stream (with or without expansion). Its implementation of the [TokenStream]
+///     trait returns expanded tokens.
+///     To read the input strean without performing expansion, use the
+///     [unexpanded](ExpandedStream::unexpanded) method.
+///
+/// - Read only access to the environment using the [HasEnv] trait.
+///
+/// - Mutable access to the expansion state if the underlying state has such a state.
+///     This is related to the [HasExpansionState] trait.
+///
+/// - The ability to push source code or token expansions to the front of the input stream.
+///     For source code use [ExpandedInput::push_source];
+///     for tokens use [ExpandedInput::push_expansion] or [ExpandedInput::expansions_mut].
+///
+/// - Access to scratch space using the [ExpandedInput::scratch_space] and
+///     [ExpandedInput::return_scratch_space] methods.
+///
+/// This type is also used in the parsing code for situations where both an
+/// [ExpandedInput] or [ExecutionInput] is accepted. We use this type because
+/// it has only read access to the env, and so casting does not escalate priviliges.
+#[repr(transparent)]
+pub struct ExpandedInput<S>(runtime::Env<S>);
+
+impl<S> HasEnv for ExpandedInput<S> {
+    type S = S;
+
+    #[inline]
+    fn env(&self) -> &runtime::Env<S> {
+        &self.0
+    }
 }
 
-impl<S> TokenStream for ExpandedInput<S> {
-    fn next(&mut self) -> anyhow::Result<Option<Token>> {
-        let (token, command) = match self.raw_stream.next()? {
-            None => return Ok(None),
-            Some(token) => match token.value() {
-                ControlSequence(name) => (token, self.base().commands_map.get(&name)),
-                _ => return Ok(Some(token)),
-            },
-        };
-        match command {
-            Some(command::Command::Expansion(command)) => {
-                let command = *command;
-                let output = command.call(token, self)?;
-                self.raw_stream.env.internal.push_expansion(&output);
-                self.next()
-            }
-            Some(command::Command::Macro(command)) => {
-                let command = command.clone();
-                command.call(token, self)?;
-                self.next()
-            }
-            _ => Ok(Some(token)),
-        }
-    }
+impl<S> ExpandedStream for ExpandedInput<S> {
+    type S = S;
 
-    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
-        let (token, command) = match self.raw_stream.peek()? {
-            None => return Ok(None),
-            Some(token) => match token.value() {
-                ControlSequence(name) => (
-                    unsafe { launder(token) },
-                    self.raw_stream.env.base_state.commands_map.get(&name),
-                ),
-                _ => return Ok(Some(unsafe { launder(token) })),
-            },
-        };
-        match command {
-            Some(command::Command::Expansion(command)) => {
-                let command = *command;
-                let token = *token;
-                let _ = self.raw_stream.next();
-                let output = command.call(token, self)?;
-                self.raw_stream.env.internal.push_expansion(&output);
-                self.peek()
-            }
-            Some(command::Command::Macro(command)) => {
-                let command = command.clone();
-                let token = *token;
-                let _ = self.raw_stream.next();
-                command.call(token, self)?;
-                self.peek()
-            }
-            _ => Ok(Some(unsafe { launder(token) })),
-        }
+    #[inline]
+    fn unexpanded(&mut self) -> &mut UnexpandedStream<S> {
+        unsafe { &mut *(self as *mut ExpandedInput<S> as *mut UnexpandedStream<S>) }
+    }
+}
+
+impl<S> std::convert::AsMut<ExpandedInput<S>> for ExpandedInput<S> {
+    fn as_mut(&mut self) -> &mut ExpandedInput<S> {
+        self
     }
 }
 
 impl<S: HasExpansionState> ExpandedInput<S> {
     #[inline]
     pub fn expansion_state_mut(&mut self) -> &mut S::E {
-        self.raw_stream.env.custom_state.expansion_state_mut()
+        self.0.custom_state.expansion_state_mut()
     }
 }
 
 impl<S> ExpandedInput<S> {
-    /// Returns a reference to the environment.
+    /// Creates a mutable reference to this type from the [Env](runtime::Env) type.
     #[inline]
-    pub fn env(&self) -> &runtime::Env<S> {
-        &self.raw_stream.env
+    pub fn new(env: &mut runtime::Env<S>) -> &mut ExpandedInput<S> {
+        unsafe { &mut *(env as *mut runtime::Env<S> as *mut ExpandedInput<S>) }
     }
 
-    /// Push source code
+    /// Push source code to the front of the input stream.
+    #[inline]
     pub fn push_source(&mut self, source_code: String) -> anyhow::Result<()> {
-        self.raw_stream.env.push_source(source_code)
+        self.0.push_source(source_code)
     }
 
-    /// Returns a reference to the base state.
-    #[inline]
-    pub fn base(&self) -> &runtime::BaseState<S> {
-        &self.raw_stream.env.base_state
-    }
-
-    /// Returns a reference to the state.
+    /// Push tokens to the front of the input stream.
     ///
-    /// For access to the base state, use [base](ExpandedInput::base) instead.
+    /// The first token in the provided slice will be the next token read.
     #[inline]
-    pub fn state(&self) -> &S {
-        &self.raw_stream.env.custom_state
+    pub fn push_expansion(&mut self, expansion: &[Token]) {
+        self.0.internal.push_expansion(expansion)
     }
 
-    /// Returns the unexpanded stream that backs this expanded input.
+    /// Returns a mutable reference to the expanded tokens stack for the current input source.
     ///
-    /// The unexpanded stream is used when reading tokens without performing expansion;
-    /// e.g., when reading the replacement text for a macro defined using `\def`.
+    /// The tokens are a stack, so the next token is the last token in the vector.
+    ///
+    /// Adding tokens to the front of the input using this method can be more efficient
+    /// than using [ExpandedInput::push_expansion] because an allocation is avoided.
     #[inline]
-    pub fn unexpanded_stream(&mut self) -> &mut UnexpandedStream<S> {
-        &mut self.raw_stream
+    pub fn expansions_mut(&mut self) -> &mut Vec<Token> {
+        self.0.internal.expansions_mut()
     }
 
     /// Gets a vector of tokens that may be used as scratch space.
@@ -311,129 +270,83 @@ impl<S> ExpandedInput<S> {
     /// By reusing the same vector of tokens for scratch space we can avoid allocating a new
     /// vector each time we need it. This was originally created for the TeX macros system.
     ///
-    /// When finished with the vector, return it using [return_scratch_space].
+    /// When finished with the vector, return it using [return_scratch_space](ExpandedInput::return_scratch_space).
     pub fn scratch_space(&mut self) -> Vec<Token> {
         // Note: the scratch space system here makes the benchmarks about 3% slower versus the previous system.
         // In the previous system a mutable reference to the scratch space was returned with the unexpanded
         // stream and so no swapping occured. If 3% is a big deal, we can bring it back.
         let mut s = Vec::new();
-        std::mem::swap(&mut s, &mut self.raw_stream.env.internal.scratch_space);
+        std::mem::swap(&mut s, &mut self.0.internal.scratch_space);
         s
     }
 
     /// Return scratch space, allowing it to be reused.
     pub fn return_scratch_space(&mut self, mut scratch_space: Vec<Token>) {
-        if scratch_space.len() < self.raw_stream.env.internal.scratch_space.len() {
+        if scratch_space.len() < self.0.internal.scratch_space.len() {
             return;
         }
         scratch_space.clear();
-        std::mem::swap(
-            &mut scratch_space,
-            &mut self.raw_stream.env.internal.scratch_space,
-        );
-    }
-
-    /// Expands the next token in the input stream.
-    ///
-    /// The return value is true if expansion occured, and false otherwise.
-    ///
-    /// This method is not recursive. Only a single expansion will be performed. The next
-    /// token may be expandable, and to expand it this function needs to be invoked again.
-    pub fn expand_next(&mut self) -> anyhow::Result<bool> {
-        let (token, command) = match self.raw_stream.peek()? {
-            None => return Ok(false),
-            Some(token) => match token.value() {
-                ControlSequence(name) => (*token, self.base().commands_map.get(&name)),
-                _ => return Ok(false),
-            },
-        };
-        match command {
-            Some(command::Command::Expansion(command)) => {
-                let command = *command;
-                let _ = self.raw_stream.next();
-                let output = command.call(token, self)?;
-                self.raw_stream.env.internal.push_expansion(&output);
-                Ok(true)
-            }
-            Some(command::Command::Macro(command)) => {
-                let command = command.clone();
-                let _ = self.raw_stream.next();
-                command.call(token, self)?;
-                Ok(true)
-            }
-            _ => Ok(false),
-        }
+        std::mem::swap(&mut scratch_space, &mut self.0.internal.scratch_space);
     }
 }
 
-pub struct ExecutionInput<S> {
-    raw_stream: ExpandedInput<S>,
+/// Input type for execution primitives.
+///
+/// This type provides:
+///
+/// - Access to the input stream (with or without expansion). Its implementation of the [TokenStream]
+///     trait returns expanded tokens.
+///     To read the input strean without performing expansion, use the
+///     [unexpanded](ExpandedStream::unexpanded) method.
+///
+/// - Read only access to the environment using the [HasEnv] trait.
+///
+/// - Mutable access to the base state and custom state using the [ExecutionInput::base]
+///     and [ExecutionInput::state] methods.
+#[repr(transparent)]
+pub struct ExecutionInput<S>(runtime::Env<S>);
+
+impl<S> HasEnv for ExecutionInput<S> {
+    type S = S;
+
+    #[inline]
+    fn env(&self) -> &runtime::Env<S> {
+        &self.0
+    }
 }
 
-impl<S> TokenStream for ExecutionInput<S> {
-    #[inline]
-    fn next(&mut self) -> anyhow::Result<Option<Token>> {
-        self.raw_stream.next()
-    }
+impl<S> ExpandedStream for ExecutionInput<S> {
+    type S = S;
 
     #[inline]
-    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
-        self.raw_stream.peek()
+    fn unexpanded(&mut self) -> &mut UnexpandedStream<S> {
+        unsafe { &mut *(self as *mut ExecutionInput<S> as *mut UnexpandedStream<S>) }
     }
 }
 
 impl<S> ExecutionInput<S> {
+    /// Creates a mutable reference to this type from the [Env](runtime::Env) type.
     #[inline]
-    pub fn env(&self) -> &runtime::Env<S> {
-        &self.raw_stream.raw_stream.env
+    pub fn new(state: &mut runtime::Env<S>) -> &mut ExecutionInput<S> {
+        unsafe { &mut *(state as *mut runtime::Env<S> as *mut ExecutionInput<S>) }
     }
 
-    #[inline]
-    pub fn take_env(self) -> runtime::Env<S> {
-        self.raw_stream.raw_stream.env
-    }
-
-    #[inline]
-    pub fn base(&self) -> &runtime::BaseState<S> {
-        &self.raw_stream.raw_stream.env.base_state
-    }
-
+    /// Returns a mutable reference to the base state.
     #[inline]
     pub fn base_mut(&mut self) -> &mut runtime::BaseState<S> {
-        &mut self.raw_stream.raw_stream.env.base_state
+        &mut self.0.base_state
     }
 
-    #[inline]
-    pub fn state(&self) -> &S {
-        &self.raw_stream.raw_stream.env.custom_state
-    }
-
+    /// Returns a mutable reference to the custom state.
     #[inline]
     pub fn state_mut(&mut self) -> &mut S {
-        &mut self.raw_stream.raw_stream.env.custom_state
+        &mut self.0.custom_state
     }
+}
 
-    #[inline]
-    pub fn unexpanded_stream(&mut self) -> &mut UnexpandedStream<S> {
-        &mut self.raw_stream.raw_stream
-    }
-
-    #[inline]
-    pub fn expand_next(&mut self) -> anyhow::Result<bool> {
-        self.raw_stream.expand_next()
-    }
-
-    #[inline]
-    pub fn regular(&mut self) -> &mut ExpandedInput<S> {
-        &mut self.raw_stream
-    }
-
-    pub fn new(state: runtime::Env<S>) -> ExecutionInput<S> {
-        ExecutionInput::<S> {
-            raw_stream: ExpandedInput::<S> {
-                raw_stream: UnexpandedStream::<S> { env: state },
-            },
-        }
+impl<S> std::convert::AsMut<ExpandedInput<S>> for ExecutionInput<S> {
+    fn as_mut(&mut self) -> &mut ExpandedInput<S> {
+        unsafe { &mut *(self as *mut ExecutionInput<S> as *mut ExpandedInput<S>) }
     }
 }
 
@@ -448,4 +361,140 @@ impl<S> ExecutionInput<S> {
 #[inline]
 unsafe fn launder<'a, 'b>(token: &'a Token) -> &'b Token {
     &*(token as *const Token)
+}
+
+mod stream {
+    use super::*;
+    use crate::token::Value::ControlSequence;
+
+    #[inline]
+    pub fn next_unexpanded<S>(env: &mut runtime::Env<S>) -> anyhow::Result<Option<Token>> {
+        if let Some(token) = env.internal.current_source.expansions.pop() {
+            return Ok(Some(token));
+        }
+        if let Some(token) = env.internal.current_source.root.next(
+            &env.base_state.cat_code_map,
+            &mut env.internal.cs_name_interner,
+        )? {
+            return Ok(Some(token));
+        }
+        next_unexpanded_recurse(env)
+    }
+
+    fn next_unexpanded_recurse<S>(env: &mut runtime::Env<S>) -> anyhow::Result<Option<Token>> {
+        if env.internal.pop_source() {
+            next_unexpanded(env)
+        } else {
+            Ok(None)
+        }
+    }
+
+    #[inline]
+    pub fn peek_unexpanded<S>(env: &mut runtime::Env<S>) -> anyhow::Result<Option<&Token>> {
+        if let Some(token) = env.internal.current_source.expansions.last() {
+            return Ok(Some(unsafe { launder(token) }));
+        }
+        if let Some(token) = env.internal.current_source.root.next(
+            &env.base_state.cat_code_map,
+            &mut env.internal.cs_name_interner,
+        )? {
+            env.internal.current_source.expansions.push(token);
+            return Ok(env.internal.current_source.expansions.last());
+        }
+        peek_unexpanded_recurse(env)
+    }
+
+    fn peek_unexpanded_recurse<S>(env: &mut runtime::Env<S>) -> anyhow::Result<Option<&Token>> {
+        if env.internal.pop_source() {
+            peek_unexpanded(env)
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn next_expanded<S>(env: &mut runtime::Env<S>) -> anyhow::Result<Option<Token>> {
+        let (token, command) = match next_unexpanded(env)? {
+            None => return Ok(None),
+            Some(token) => match token.value() {
+                ControlSequence(name) => (token, env.base_state.commands_map.get(&name)),
+                _ => return Ok(Some(token)),
+            },
+        };
+        match command {
+            Some(command::Command::Expansion(command)) => {
+                let command = *command;
+                let output = command.call(token, ExpandedInput::new(env))?;
+                env.internal.push_expansion(&output);
+                next_expanded(env)
+            }
+            Some(command::Command::Macro(command)) => {
+                let command = command.clone();
+                command.call(token, ExpandedInput::new(env))?;
+                next_expanded(env)
+            }
+            _ => Ok(Some(token)),
+        }
+    }
+
+    pub fn peek_expanded<S>(env: &mut runtime::Env<S>) -> anyhow::Result<Option<&Token>> {
+        let (token, command) = match peek_unexpanded(env)? {
+            None => return Ok(None),
+            Some(token) => match token.value() {
+                ControlSequence(name) => (
+                    unsafe { launder(token) },
+                    env.base_state.commands_map.get(&name),
+                ),
+                _ => return Ok(Some(unsafe { launder(token) })),
+            },
+        };
+        match command {
+            Some(command::Command::Expansion(command)) => {
+                let command = *command;
+                let token = *token;
+                let _ = next_unexpanded(env);
+                let output = command.call(token, ExpandedInput::new(env))?;
+                env.internal.push_expansion(&output);
+                peek_expanded(env)
+            }
+            Some(command::Command::Macro(command)) => {
+                let command = command.clone();
+                let token = *token;
+                let _ = next_unexpanded(env);
+                command.call(token, ExpandedInput::new(env))?;
+                peek_expanded(env)
+            }
+            _ => Ok(Some(unsafe { launder(token) })),
+        }
+    }
+
+    pub fn expand_once<S>(env: &mut runtime::Env<S>) -> anyhow::Result<bool> {
+        let (token, command) = match peek_unexpanded(env)? {
+            None => return Ok(false),
+            Some(token) => match token.value() {
+                ControlSequence(name) => (
+                    unsafe { launder(token) },
+                    env.base_state.commands_map.get(&name),
+                ),
+                _ => return Ok(false),
+            },
+        };
+        match command {
+            Some(command::Command::Expansion(command)) => {
+                let command = *command;
+                let token = *token;
+                let _ = next_unexpanded(env);
+                let output = command.call(token, ExpandedInput::new(env))?;
+                env.internal.push_expansion(&output);
+                Ok(true)
+            }
+            Some(command::Command::Macro(command)) => {
+                let command = command.clone();
+                let token = *token;
+                let _ = next_unexpanded(env);
+                command.call(token, ExpandedInput::new(env))?;
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
+    }
 }

@@ -107,9 +107,8 @@ pub fn run<S: Default + HasComponent<execwhitespace::Component>>(
     );
     setup_fn(&mut env);
     env.push_source(source).unwrap();
-    let mut execution_input = ::texlang_core::runtime::ExecutionInput::new(env);
-    let output = execwhitespace::exec(&mut execution_input, false);
-    (output, execution_input.take_env())
+    let output = execwhitespace::exec(&mut env, false);
+    (output, env)
 }
 
 /// In-memory filesystem for testing.

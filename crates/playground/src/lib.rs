@@ -37,9 +37,8 @@ pub fn greet(
 ) -> String {
     let mut env = init_state(minutes_since_midnight, day, month, year);
     env.push_source(input).unwrap();
-    let mut execution_input = runtime::ExecutionInput::new(env);
-    match execwhitespace::exec(&mut execution_input, true) {
-        Ok(tokens) => token::write_tokens(&tokens, execution_input.env().cs_name_interner()),
+    match execwhitespace::exec(&mut env, true) {
+        Ok(tokens) => token::write_tokens(&tokens, env.cs_name_interner()),
         Err(err) => format!["{}", err],
     }
 }

@@ -1,10 +1,12 @@
 use crate::prelude::*;
+use crate::runtime::HasEnv;
 use crate::variable;
 
 /// Parses a variable.
-pub fn parse_variable<S>(
-    input: &mut runtime::ExpandedInput<S>,
+pub fn parse_variable<S, I: AsMut<runtime::ExpandedInput<S>>>(
+    input: &mut I,
 ) -> anyhow::Result<variable::Variable<S>> {
+    let input = input.as_mut();
     match input.next()? {
         None => Err(error::EndOfInputError::new(
             "Unexpected end of input while reading in a variable",

@@ -21,10 +21,9 @@ fn def_primitive_fn<S>(
     def_token: Token,
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    let name =
-        parse::parse_command_target("macro definition", def_token, input.unexpanded_stream())?;
+    let name = parse::parse_command_target("macro definition", def_token, input.unexpanded())?;
     let (prefix, raw_parameters, replacement_end_token) =
-        parse_prefix_and_parameters(input.unexpanded_stream())?;
+        parse_prefix_and_parameters(input.unexpanded())?;
     let parameters: ArrayVec<Parameter, 9> = raw_parameters
         .into_iter()
         .map(|a| match a {
@@ -32,11 +31,8 @@ fn def_primitive_fn<S>(
             RawParameter::Delimited(vec) => Parameter::Delimited(KMPMatcherFactory::new(vec)),
         })
         .collect();
-    let mut replacement = parse_replacement_text(
-        input.unexpanded_stream(),
-        replacement_end_token,
-        parameters.len(),
-    )?;
+    let mut replacement =
+        parse_replacement_text(input.unexpanded(), replacement_end_token, parameters.len())?;
     for r in replacement.iter_mut() {
         if let Replacement::Tokens(tokens) = r {
             tokens.reverse();

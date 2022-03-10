@@ -186,8 +186,7 @@ fn newint_primitive_fn<S: HasComponent<Component>>(
     newint_token: Token,
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    let name =
-        parse::parse_command_target("newint allocation", newint_token, input.unexpanded_stream())?;
+    let name = parse::parse_command_target("newint allocation", newint_token, input.unexpanded())?;
     let addr = input.state_mut().component_mut().alloc_int();
     input
         .base_mut()
@@ -229,12 +228,9 @@ fn newarray_primitive_fn<S: HasComponent<Component>>(
     newarray_token: Token,
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    let name = parse::parse_command_target(
-        "newarray allocation",
-        newarray_token,
-        input.unexpanded_stream(),
-    )?;
-    let len: usize = parse::parse_number(input.regular())?;
+    let name =
+        parse::parse_command_target("newarray allocation", newarray_token, input.unexpanded())?;
+    let len: usize = parse::parse_number(input)?;
     let addr = input.state_mut().component_mut().alloc_array(len);
     input
         .base_mut()

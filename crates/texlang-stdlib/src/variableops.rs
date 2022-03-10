@@ -41,10 +41,10 @@ macro_rules! create_arithmetic_primitive {
             token: Token,
             input: &mut runtime::ExecutionInput<S>,
         ) -> anyhow::Result<()> {
-            let variable = parse::parse_variable(&mut input.regular())?;
+            let variable = parse::parse_variable(input)?;
 
-            parse::parse_optional_by(&mut input.regular())?;
-            let n: i32 = parse::parse_number(&mut input.regular())?;
+            parse::parse_optional_by(input)?;
+            let n: i32 = parse::parse_number(input)?;
             match variable {
                 Variable::Int(variable) => {
                     $arithmetic_op(token,  variable.get_mut(input.state_mut()), n)

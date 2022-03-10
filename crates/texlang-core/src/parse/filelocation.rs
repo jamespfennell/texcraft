@@ -60,8 +60,8 @@ mod tests {
         ($name: ident, $input: expr, $file_path: expr, ) => {
             #[test]
             fn $name() {
-                let mut execution_input = testutil::new_execution_input($input);
-                let result = parse_file_location(execution_input.regular()).unwrap();
+                let mut env = testutil::new_env($input);
+                let result = parse_file_location(runtime::ExpandedInput::new(&mut env)).unwrap();
                 assert_eq![result, $file_path];
             }
         };
