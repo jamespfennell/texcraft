@@ -39,7 +39,7 @@ impl Macro {
     pub fn call<S>(
         &self,
         token: Token,
-        input: &mut runtime::ExpandedInput<S>,
+        input: &mut runtime::ExpansionInput<S>,
     ) -> anyhow::Result<()> {
         remove_tokens_from_stream(
             &self.prefix,

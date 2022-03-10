@@ -67,7 +67,7 @@ pub fn get_count<S: HasComponent<Component<N>>, const N: usize>() -> command::Va
 
 fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
     count_token: Token,
-    input: &mut runtime::ExpandedInput<S>,
+    input: &mut runtime::ExpansionInput<S>,
     _: usize,
 ) -> anyhow::Result<Variable<S>> {
     let addr: usize = parse::parse_number(input)?;
@@ -111,7 +111,7 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
 
 fn singleton_fn<S: HasComponent<Component<N>>, const N: usize>(
     _: Token,
-    _: &mut runtime::ExpandedInput<S>,
+    _: &mut runtime::ExpansionInput<S>,
     addr: usize,
 ) -> anyhow::Result<Variable<S>> {
     Ok(Variable::Int(TypedVariable::new(

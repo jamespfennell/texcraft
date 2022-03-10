@@ -7,7 +7,7 @@ use crate::token::Token;
 /// This trait describes a general stream of tokens where the front of the stream may
 /// retrieved using [TokenStream::next] or peeked at using [TokenStream::peek].
 /// In practice, all [TokenStreams](TokenStream) in Texlang
-/// are either [ExecutionInput], [ExpandedInput] or [UnexpandedStream]. We have a trait
+/// are either [ExecutionInput], [ExpansionInput] or [UnexpandedStream]. We have a trait
 /// only to make handling of these types uniform.
 ///
 /// # Note on lazy loading
@@ -129,7 +129,7 @@ impl<T: ExpandedStream> TokenStream for T {
 /// This is important for maintaining the rough invariant that commands either modify
 /// the state (execution) or modify the token stream (expansion)
 /// but not both.
-/// To enforce this, the [ExpandedInput] type does not have a way of returning a mutable
+/// To enforce this, the [ExpansionInput] type does not have a way of returning a mutable
 /// reference to the state.
 ///
 /// However, there are special situations in which expansion commands do need to maintain
@@ -142,7 +142,7 @@ impl<T: ExpandedStream> TokenStream for T {
 /// This trait enables this use case.
 /// The part of the state that can be mutated by expansion commands is called the expansion state.
 /// If the state implements this trait, a mutable reference to the expansion state
-/// can be obtained through the [ExpandedInput] type's [expansion_state_mut](ExpandedInput::expansion_state_mut) method.
+/// can be obtained through the [ExpansionInput] type's [expansion_state_mut](ExpansionInput::expansion_state_mut) method.
 ///
 /// The standard library's `StdLibExpansionState` is an example of this pattern.
 pub trait HasExpansionState {
@@ -158,7 +158,7 @@ pub trait HasExpansionState {
 /// The unexpanded stream is used when reading tokens without performing expansion;
 /// e.g., when reading the replacement text for a macro defined using `\def`.
 ///
-/// It be obtained from either the [ExecutionInput] or the [ExpandedInput]
+/// It be obtained from either the [ExecutionInput] or the [ExpansionInput]
 /// using the [ExpandedStream] trait methods.
 #[repr(transparent)]
 pub struct UnexpandedStream<S>(runtime::Env<S>);
@@ -190,19 +190,19 @@ impl<S> TokenStream for UnexpandedStream<S> {
 ///     This is related to the [HasExpansionState] trait.
 ///
 /// - The ability to push source code or token expansions to the front of the input stream.
-///     For source code use [ExpandedInput::push_source];
-///     for tokens use [ExpandedInput::push_expansion] or [ExpandedInput::expansions_mut].
+///     For source code use [ExpansionInput::push_source];
+///     for tokens use [ExpansionInput::push_expansion] or [ExpansionInput::expansions_mut].
 ///
-/// - Access to scratch space using the [ExpandedInput::scratch_space] and
-///     [ExpandedInput::return_scratch_space] methods.
+/// - Access to scratch space using the [ExpansionInput::scratch_space] and
+///     [ExpansionInput::return_scratch_space] methods.
 ///
 /// This type is also used in the parsing code for situations where both an
-/// [ExpandedInput] or [ExecutionInput] is accepted. We use this type because
+/// [ExpansionInput] or [ExecutionInput] is accepted. We use this type because
 /// it has only read access to the env, and so casting does not escalate priviliges.
 #[repr(transparent)]
-pub struct ExpandedInput<S>(runtime::Env<S>);
+pub struct ExpansionInput<S>(runtime::Env<S>);
 
-impl<S> HasEnv for ExpandedInput<S> {
+impl<S> HasEnv for ExpansionInput<S> {
     type S = S;
 
     #[inline]
@@ -211,33 +211,33 @@ impl<S> HasEnv for ExpandedInput<S> {
     }
 }
 
-impl<S> ExpandedStream for ExpandedInput<S> {
+impl<S> ExpandedStream for ExpansionInput<S> {
     type S = S;
 
     #[inline]
     fn unexpanded(&mut self) -> &mut UnexpandedStream<S> {
-        unsafe { &mut *(self as *mut ExpandedInput<S> as *mut UnexpandedStream<S>) }
+        unsafe { &mut *(self as *mut ExpansionInput<S> as *mut UnexpandedStream<S>) }
     }
 }
 
-impl<S> std::convert::AsMut<ExpandedInput<S>> for ExpandedInput<S> {
-    fn as_mut(&mut self) -> &mut ExpandedInput<S> {
+impl<S> std::convert::AsMut<ExpansionInput<S>> for ExpansionInput<S> {
+    fn as_mut(&mut self) -> &mut ExpansionInput<S> {
         self
     }
 }
 
-impl<S: HasExpansionState> ExpandedInput<S> {
+impl<S: HasExpansionState> ExpansionInput<S> {
     #[inline]
     pub fn expansion_state_mut(&mut self) -> &mut S::E {
         self.0.custom_state.expansion_state_mut()
     }
 }
 
-impl<S> ExpandedInput<S> {
+impl<S> ExpansionInput<S> {
     /// Creates a mutable reference to this type from the [Env](runtime::Env) type.
     #[inline]
-    pub fn new(env: &mut runtime::Env<S>) -> &mut ExpandedInput<S> {
-        unsafe { &mut *(env as *mut runtime::Env<S> as *mut ExpandedInput<S>) }
+    pub fn new(env: &mut runtime::Env<S>) -> &mut ExpansionInput<S> {
+        unsafe { &mut *(env as *mut runtime::Env<S> as *mut ExpansionInput<S>) }
     }
 
     /// Push source code to the front of the input stream.
@@ -259,7 +259,7 @@ impl<S> ExpandedInput<S> {
     /// The tokens are a stack, so the next token is the last token in the vector.
     ///
     /// Adding tokens to the front of the input using this method can be more efficient
-    /// than using [ExpandedInput::push_expansion] because an allocation is avoided.
+    /// than using [ExpansionInput::push_expansion] because an allocation is avoided.
     #[inline]
     pub fn expansions_mut(&mut self) -> &mut Vec<Token> {
         self.0.internal.expansions_mut()
@@ -270,7 +270,7 @@ impl<S> ExpandedInput<S> {
     /// By reusing the same vector of tokens for scratch space we can avoid allocating a new
     /// vector each time we need it. This was originally created for the TeX macros system.
     ///
-    /// When finished with the vector, return it using [return_scratch_space](ExpandedInput::return_scratch_space).
+    /// When finished with the vector, return it using [return_scratch_space](ExpansionInput::return_scratch_space).
     pub fn scratch_space(&mut self) -> Vec<Token> {
         // Note: the scratch space system here makes the benchmarks about 3% slower versus the previous system.
         // In the previous system a mutable reference to the scratch space was returned with the unexpanded
@@ -344,9 +344,9 @@ impl<S> ExecutionInput<S> {
     }
 }
 
-impl<S> std::convert::AsMut<ExpandedInput<S>> for ExecutionInput<S> {
-    fn as_mut(&mut self) -> &mut ExpandedInput<S> {
-        unsafe { &mut *(self as *mut ExecutionInput<S> as *mut ExpandedInput<S>) }
+impl<S> std::convert::AsMut<ExpansionInput<S>> for ExecutionInput<S> {
+    fn as_mut(&mut self) -> &mut ExpansionInput<S> {
+        unsafe { &mut *(self as *mut ExecutionInput<S> as *mut ExpansionInput<S>) }
     }
 }
 
@@ -423,13 +423,13 @@ mod stream {
         match command {
             Some(command::Command::Expansion(command)) => {
                 let command = *command;
-                let output = command.call(token, ExpandedInput::new(env))?;
+                let output = command.call(token, ExpansionInput::new(env))?;
                 env.internal.push_expansion(&output);
                 next_expanded(env)
             }
             Some(command::Command::Macro(command)) => {
                 let command = command.clone();
-                command.call(token, ExpandedInput::new(env))?;
+                command.call(token, ExpansionInput::new(env))?;
                 next_expanded(env)
             }
             _ => Ok(Some(token)),
@@ -452,7 +452,7 @@ mod stream {
                 let command = *command;
                 let token = *token;
                 let _ = next_unexpanded(env);
-                let output = command.call(token, ExpandedInput::new(env))?;
+                let output = command.call(token, ExpansionInput::new(env))?;
                 env.internal.push_expansion(&output);
                 peek_expanded(env)
             }
@@ -460,7 +460,7 @@ mod stream {
                 let command = command.clone();
                 let token = *token;
                 let _ = next_unexpanded(env);
-                command.call(token, ExpandedInput::new(env))?;
+                command.call(token, ExpansionInput::new(env))?;
                 peek_expanded(env)
             }
             _ => Ok(Some(unsafe { launder(token) })),
@@ -483,7 +483,7 @@ mod stream {
                 let command = *command;
                 let token = *token;
                 let _ = next_unexpanded(env);
-                let output = command.call(token, ExpandedInput::new(env))?;
+                let output = command.call(token, ExpansionInput::new(env))?;
                 env.internal.push_expansion(&output);
                 Ok(true)
             }
@@ -491,7 +491,7 @@ mod stream {
                 let command = command.clone();
                 let token = *token;
                 let _ = next_unexpanded(env);
-                command.call(token, ExpandedInput::new(env))?;
+                command.call(token, ExpansionInput::new(env))?;
                 Ok(true)
             }
             _ => Ok(false),

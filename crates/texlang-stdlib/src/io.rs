@@ -15,7 +15,7 @@ pub mod input {
 
     fn input_fn<S>(
         input_token: Token,
-        input: &mut runtime::ExpandedInput<S>,
+        input: &mut runtime::ExpansionInput<S>,
     ) -> anyhow::Result<Vec<Token>> {
         let file_location = parse::parse_file_location(input)?;
         let source_code = read_file(input_token, input.env(), file_location, ".tex")?;

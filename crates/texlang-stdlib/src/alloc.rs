@@ -197,7 +197,7 @@ fn newint_primitive_fn<S: HasComponent<Component>>(
 
 fn singleton_fn<S: HasComponent<Component>>(
     _: Token,
-    _: &mut runtime::ExpandedInput<S>,
+    _: &mut runtime::ExpansionInput<S>,
     addr: usize,
 ) -> anyhow::Result<Variable<S>> {
     Ok(Variable::Int(TypedVariable::new(
@@ -243,7 +243,7 @@ fn newarray_primitive_fn<S: HasComponent<Component>>(
 /// Variable command function for commands defined using \newarray.
 fn array_fn<S: HasComponent<Component>>(
     array_token: Token,
-    input: &mut runtime::ExpandedInput<S>,
+    input: &mut runtime::ExpansionInput<S>,
     array_addr: usize,
 ) -> anyhow::Result<Variable<S>> {
     let array_index: usize = parse::parse_number(input)?;

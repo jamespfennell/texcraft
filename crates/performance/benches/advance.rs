@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use texlang_core::prelude::*;
-use texlang_core::runtime::ExpandedInput;
+use texlang_core::runtime::ExpansionInput;
 use texlang_stdlib::execwhitespace;
 use texlang_stdlib::StdLibState;
 
@@ -23,7 +23,7 @@ pub fn advance_bench(c: &mut Criterion) {
     let expansion = vec![a_cs; 1000];
     group.bench_function("advance", |b| {
         b.iter(|| {
-            ExpandedInput::new(&mut env).push_expansion(&expansion);
+            ExpansionInput::new(&mut env).push_expansion(&expansion);
             execwhitespace::exec(&mut env, true).unwrap();
         })
     });

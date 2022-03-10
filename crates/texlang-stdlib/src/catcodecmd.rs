@@ -13,7 +13,7 @@ pub fn get_catcode<S>() -> command::VariableFn<S> {
 
 fn catcode_fn<S>(
     _catcode_token: Token,
-    input: &mut runtime::ExpandedInput<S>,
+    input: &mut runtime::ExpansionInput<S>,
     _: usize,
 ) -> anyhow::Result<Variable<S>> {
     let addr: u32 = parse::parse_number(input)?;

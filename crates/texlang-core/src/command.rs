@@ -51,7 +51,7 @@ pub fn null_type_id() -> TypeId {
 
 /// The Rust type of expansion primitive functions.
 pub type ExpansionFn<S> =
-    fn(token: Token, input: &mut runtime::ExpandedInput<S>) -> anyhow::Result<Vec<Token>>;
+    fn(token: Token, input: &mut runtime::ExpansionInput<S>) -> anyhow::Result<Vec<Token>>;
 
 /// An expansion primitive in Texcraft.
 ///
@@ -78,7 +78,7 @@ impl<S> ExpansionPrimitive<S> {
     pub fn call(
         &self,
         token: Token,
-        input: &mut runtime::ExpandedInput<S>,
+        input: &mut runtime::ExpansionInput<S>,
     ) -> anyhow::Result<Vec<Token>> {
         (self.call_fn)(token, input)
     }
@@ -125,7 +125,7 @@ impl<S> Clone for ExecutionPrimitive<S> {
 
 pub type VariableFn<S> = fn(
     token: Token,
-    input: &mut runtime::ExpandedInput<S>,
+    input: &mut runtime::ExpansionInput<S>,
     addr: usize,
 ) -> anyhow::Result<variable::Variable<S>>;
 
@@ -145,7 +145,7 @@ impl<S> VariableCommand<S> {
     }
 
     /// Obtain the variable that this command refers to.
-    pub fn resolve<I: AsMut<runtime::ExpandedInput<S>>>(
+    pub fn resolve<I: AsMut<runtime::ExpansionInput<S>>>(
         &self,
         token: token::Token,
         input: &mut I,

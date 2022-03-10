@@ -60,7 +60,7 @@ impl Default for Component {
     }
 }
 
-fn branches<S>(input: &mut runtime::ExpandedInput<S>) -> &mut Vec<Branch>
+fn branches<S>(input: &mut runtime::ExpansionInput<S>) -> &mut Vec<Branch>
 where
     S: HasExpansionState,
     S::E: HasComponent<Component>,
@@ -87,7 +87,7 @@ fn fi_id() -> any::TypeId {
 }
 
 // The `true_case` function is executed whenever a conditional evaluates to true.
-fn true_case<S>(token: Token, input: &mut runtime::ExpandedInput<S>) -> anyhow::Result<Vec<Token>>
+fn true_case<S>(token: Token, input: &mut runtime::ExpansionInput<S>) -> anyhow::Result<Vec<Token>>
 where
     S: HasExpansionState,
     S::E: HasComponent<Component>,
@@ -105,7 +105,7 @@ where
 // either a \else or \fi command.
 fn false_case<S>(
     original_token: Token,
-    input: &mut runtime::ExpandedInput<S>,
+    input: &mut runtime::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<Token>>
 where
     S: HasExpansionState,
@@ -156,7 +156,7 @@ macro_rules! create_if_primitive {
     ($if_fn: ident, $if_primitive_fn: ident, $get_if: ident, $docs: expr) => {
         fn $if_primitive_fn<S>(
             token: Token,
-            input: &mut runtime::ExpandedInput<S>,
+            input: &mut runtime::ExpansionInput<S>,
         ) -> anyhow::Result<Vec<Token>>
         where
             S: HasExpansionState,
@@ -178,15 +178,15 @@ macro_rules! create_if_primitive {
     };
 }
 
-fn if_true<S>(_: &mut runtime::ExpandedInput<S>) -> anyhow::Result<bool> {
+fn if_true<S>(_: &mut runtime::ExpansionInput<S>) -> anyhow::Result<bool> {
     Ok(true)
 }
 
-fn if_false<S>(_: &mut runtime::ExpandedInput<S>) -> anyhow::Result<bool> {
+fn if_false<S>(_: &mut runtime::ExpansionInput<S>) -> anyhow::Result<bool> {
     Ok(false)
 }
 
-fn if_num<S>(stream: &mut runtime::ExpandedInput<S>) -> anyhow::Result<bool> {
+fn if_num<S>(stream: &mut runtime::ExpansionInput<S>) -> anyhow::Result<bool> {
     let a: i32 = parse::parse_number(stream)?;
     let r = parse::parse_relation(stream)?;
     let b: i32 = parse::parse_number(stream)?;
@@ -198,7 +198,7 @@ fn if_num<S>(stream: &mut runtime::ExpandedInput<S>) -> anyhow::Result<bool> {
     })
 }
 
-fn if_odd<S>(stream: &mut runtime::ExpandedInput<S>) -> anyhow::Result<bool> {
+fn if_odd<S>(stream: &mut runtime::ExpansionInput<S>) -> anyhow::Result<bool> {
     let n: i32 = parse::parse_number(stream)?;
     Ok((n % 2) == 1)
 }
@@ -210,7 +210,7 @@ create_if_primitive![if_odd, if_odd_primitive_fn, get_if_odd, IFODD_DOC];
 
 fn if_case_primitive_fn<S>(
     ifcase_token: Token,
-    input: &mut runtime::ExpandedInput<S>,
+    input: &mut runtime::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<Token>>
 where
     S: HasExpansionState,
@@ -285,7 +285,7 @@ where
 
 fn or_primitive_fn<S>(
     ifcase_token: Token,
-    input: &mut runtime::ExpandedInput<S>,
+    input: &mut runtime::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<Token>>
 where
     S: HasExpansionState,
@@ -349,7 +349,7 @@ where
 
 fn else_primitive_fn<S>(
     else_token: Token,
-    input: &mut runtime::ExpandedInput<S>,
+    input: &mut runtime::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<Token>>
 where
     S: HasExpansionState,
@@ -410,7 +410,7 @@ where
 /// Get the `\fi` primitive.
 fn fi_primitive_fn<S>(
     token: Token,
-    input: &mut runtime::ExpandedInput<S>,
+    input: &mut runtime::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<Token>>
 where
     S: HasExpansionState,

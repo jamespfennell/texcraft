@@ -3,7 +3,7 @@ use crate::runtime::HasEnv;
 use crate::variable;
 
 /// Parses a variable.
-pub fn parse_variable<S, I: AsMut<runtime::ExpandedInput<S>>>(
+pub fn parse_variable<S, I: AsMut<runtime::ExpansionInput<S>>>(
     input: &mut I,
 ) -> anyhow::Result<variable::Variable<S>> {
     let input = input.as_mut();
