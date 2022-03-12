@@ -42,7 +42,7 @@ fn exec(file_name: &str) -> Result<(), anyhow::Error> {
     env.push_source(source_code)?;
     let tokens = execwhitespace::exec(&mut env, true)?;
     let pretty = token::write_tokens(&tokens, env.cs_name_interner());
-    print!("{}", pretty);
+    println!("{}", pretty);
     Ok(())
 }
 

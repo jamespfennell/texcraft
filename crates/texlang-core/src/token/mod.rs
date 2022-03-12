@@ -176,32 +176,73 @@ impl Token {
     }
 }
 
+enum PendingWhitespace {
+    None,
+    Space,
+    Newlines(usize),
+}
+
+impl PendingWhitespace {
+    fn write_out(&mut self, s: &mut String) {
+        if !s.is_empty() {
+            match self {
+                PendingWhitespace::None => {}
+                PendingWhitespace::Space => {
+                    s.push(' ');
+                }
+                PendingWhitespace::Newlines(n) => {
+                    for _ in 0..*n {
+                        s.push('\n');
+                    }
+                }
+            }
+        }
+        *self = PendingWhitespace::None;
+    }
+
+    fn add_space(&mut self) {
+        *self = match self {
+            PendingWhitespace::None => PendingWhitespace::Space,
+            PendingWhitespace::Space => PendingWhitespace::Space,
+            PendingWhitespace::Newlines(n) => PendingWhitespace::Newlines(*n),
+        }
+    }
+
+    fn add_newline(&mut self) {
+        *self = match self {
+            PendingWhitespace::None => PendingWhitespace::Newlines(1),
+            PendingWhitespace::Space => PendingWhitespace::Newlines(1),
+            PendingWhitespace::Newlines(n) => PendingWhitespace::Newlines(*n + 1),
+        }
+    }
+}
+
 /// Write a collection of tokens to a string.
 pub fn write_tokens<'a, T>(tokens: T, interner: &CsNameInterner) -> String
 where
     T: IntoIterator<Item = &'a Token>,
 {
     let mut result: String = String::default();
-    let mut preceeding_space = true;
+    let mut pending_whitespace = PendingWhitespace::None;
     for token in tokens.into_iter() {
         match &token.value {
             Value::ControlSequence(s) => {
+                pending_whitespace.write_out(&mut result);
                 let name = interner.resolve(s).unwrap_or("invalidCsName");
                 result.push('\\');
                 result.push_str(name);
-                result.push(' ');
-                preceeding_space = false;
+                pending_whitespace.add_space();
             }
             Value::Space(c) => {
-                if preceeding_space && *c != '\n' {
-                    continue;
+                if *c == '\n' {
+                    pending_whitespace.add_newline();
+                } else {
+                    pending_whitespace.add_space();
                 }
-                result.push(*c);
-                preceeding_space = false;
             }
             _ => {
+                pending_whitespace.write_out(&mut result);
                 result.push(token.char().unwrap());
-                preceeding_space = false;
             }
         }
     }
