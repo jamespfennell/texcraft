@@ -1,7 +1,9 @@
 //! Operations on variables (add, multiply, divide)
 
+use crate::prefix;
 use texlang_core::parse;
 use texlang_core::prelude::*;
+use texlang_core::variable;
 use texlang_core::variable::Variable;
 
 pub const ADVANCE_DOC: &str = "Add an integer to a variable";
@@ -11,75 +13,86 @@ pub const MULTIPLYCHK_DOC: &str = "Multiply a variable by an integer and error o
 pub const DIVIDE_DOC: &str = "Divide a variable by an integer";
 
 /// Get the `\advance` command.
-pub fn get_advance<S>() -> command::ExecutionFn<S> {
-    advance_fn
+pub fn get_advance<S: HasComponent<prefix::Component>>() -> command::ExecutionPrimitive<S> {
+    command::ExecutionPrimitive::new(advance_fn, get_variable_op_id())
 }
 
 /// Get the `\advancechk` command.
-pub fn get_advancechk<S>() -> command::ExecutionFn<S> {
-    advancechk_fn
+pub fn get_advancechk<S: HasComponent<prefix::Component>>() -> command::ExecutionPrimitive<S> {
+    command::ExecutionPrimitive::new(advancechk_fn, get_variable_op_id())
 }
 
 /// Get the `\multiply` command.
-pub fn get_multiply<S>() -> command::ExecutionFn<S> {
-    multiply_fn
+pub fn get_multiply<S: HasComponent<prefix::Component>>() -> command::ExecutionPrimitive<S> {
+    command::ExecutionPrimitive::new(multiply_fn, get_variable_op_id())
 }
 
 /// Get the `\multiplychk` command.
-pub fn get_multiplychk<S>() -> command::ExecutionFn<S> {
-    multiplychk_fn
+pub fn get_multiplychk<S: HasComponent<prefix::Component>>() -> command::ExecutionPrimitive<S> {
+    command::ExecutionPrimitive::new(multiplychk_fn, get_variable_op_id())
 }
 
 /// Get the `\divide` command.
-pub fn get_divide<S>() -> command::ExecutionFn<S> {
-    divide_fn
+pub fn get_divide<S: HasComponent<prefix::Component>>() -> command::ExecutionPrimitive<S> {
+    command::ExecutionPrimitive::new(divide_fn, get_variable_op_id())
+}
+
+struct VariableOp;
+
+pub fn get_variable_op_id() -> std::any::TypeId {
+    std::any::TypeId::of::<VariableOp>()
 }
 
 macro_rules! create_arithmetic_primitive {
     ($prim_fn: ident, $arithmetic_op: ident) => {
-        fn $prim_fn<S>(
+        fn $prim_fn<S: HasComponent<prefix::Component>>(
             token: Token,
             input: &mut runtime::ExecutionInput<S>,
         ) -> anyhow::Result<()> {
+            let global = input.state_mut().component_mut().take_global();
             let variable = parse::parse_variable(input)?;
-
             parse::parse_optional_by(input)?;
             let n: i32 = parse::parse_number(input)?;
             match variable {
                 Variable::Int(variable) => {
-                    $arithmetic_op(token,  variable.get_mut(input.state_mut()), n)
+                    let result = $arithmetic_op(token, *variable.get(input.state()), n)?;
+                    variable::set_i32(variable, result, input, global);
+                    Ok(())
                 }
                 Variable::BaseInt(variable) => {
-                    $arithmetic_op(token,  variable.get_mut(input.base_mut()), n)
+                    let result = $arithmetic_op(token, *variable.get(input.base()), n)?;
+                    variable::set_base_i32(variable, result, input, global);
+                    Ok(())
                 }
-                Variable::CatCode(_) => Err(error::TokenError::new(
-                    token,
-                    "arithmetic commands cannot be applied to variables of type X",
-                )
-                .add_note(
-                    "airthmetic commands (\\advance, \\multiply, \\divide) can be applied to integer, dimension, glue and muglue variables",
-                )
-                .cast()),
+                Variable::CatCode(_) => invalid_variable_error(token),
             }
         }
     };
 }
 
-fn add(_: Token, lhs: &mut i32, rhs: i32) -> anyhow::Result<()> {
-    // Note: TeX explicitely permits overflow in \advance
-    *lhs = lhs.wrapping_add(rhs);
-    Ok(())
+fn invalid_variable_error(token: Token) -> anyhow::Result<()> {
+    Err(error::TokenError::new(
+        token,
+        "arithmetic commands cannot be applied to variables of type X",
+    )
+    .add_note(
+        "airthmetic commands (\\advance, \\multiply, \\divide) can be applied to integer, dimension, glue and muglue variables",
+    )
+    .cast())
 }
 
-fn checked_add(token: Token, lhs: &mut i32, rhs: i32) -> anyhow::Result<()> {
+#[inline]
+fn add(_: Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
+    // Note: TeX explicitely permits overflow in \advance
+    Ok(lhs.wrapping_add(rhs))
+}
+
+fn checked_add(token: Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
     match lhs.checked_add(rhs) {
-        Some(result) => {
-            *lhs = result;
-            Ok(())
-        }
+        Some(result) => Ok(result),
         None => Err(
             error::TokenError::new(token, "overflow in checked addition")
-                .add_note(format!["left hand side evaluated to {}", *lhs])
+                .add_note(format!["left hand side evaluated to {}", lhs])
                 .add_note(format!["right hand side evaluated {}", rhs])
                 .add_note(format![
                     "overflowed result would be {}",
@@ -91,21 +104,18 @@ fn checked_add(token: Token, lhs: &mut i32, rhs: i32) -> anyhow::Result<()> {
     }
 }
 
-fn multiply(_: Token, lhs: &mut i32, rhs: i32) -> anyhow::Result<()> {
+#[inline]
+fn multiply(_: Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
     // Note: TeX explicitely permits overflow in \multiply
-    *lhs = lhs.wrapping_mul(rhs);
-    Ok(())
+    Ok(lhs.wrapping_mul(rhs))
 }
 
-fn checked_multiply(token: Token, lhs: &mut i32, rhs: i32) -> anyhow::Result<()> {
+fn checked_multiply(token: Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
     match lhs.checked_mul(rhs) {
-        Some(result) => {
-            *lhs = result;
-            Ok(())
-        }
+        Some(result) => Ok(result),
         None => Err(
             error::TokenError::new(token, "overflow in checked multiplication")
-                .add_note(format!["left hand side evaluated to {}", *lhs])
+                .add_note(format!["left hand side evaluated to {}", lhs])
                 .add_note(format!["right hand side evaluated {}", rhs])
                 .add_note(format![
                     "overflowed result would be {}",
@@ -117,12 +127,12 @@ fn checked_multiply(token: Token, lhs: &mut i32, rhs: i32) -> anyhow::Result<()>
     }
 }
 
-fn divide(token: Token, lhs: &mut i32, rhs: i32) -> anyhow::Result<()> {
+#[inline]
+fn divide(token: Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
     if rhs == 0 {
         return Err(error::TokenError::new(token, "division by zero").cast());
     }
-    *lhs = lhs.wrapping_div(rhs);
-    Ok(())
+    Ok(lhs.wrapping_div(rhs))
 }
 
 create_arithmetic_primitive![advance_fn, add];
@@ -145,23 +155,27 @@ mod tests {
     struct State {
         registers: registers::Component<256>,
         exec: execwhitespace::Component,
+        prefix: prefix::Component,
     }
 
     implement_has_component![
         State,
         (registers::Component<256>, registers),
         (execwhitespace::Component, exec),
+        (prefix::Component, prefix),
     ];
 
     fn setup_expansion_test(s: &mut runtime::Env<State>) {
-        s.set_command("the", the::get_the());
         s.set_command("advance", get_advance());
         s.set_command("advancechk", get_advancechk());
         s.set_command("multiply", get_multiply());
         s.set_command("multiplychk", get_multiplychk());
         s.set_command("divide", get_divide());
-        s.set_command("count", registers::get_count());
+
         s.set_command("catcode", catcodecmd::get_catcode());
+        s.set_command("count", registers::get_count());
+        s.set_command("global", prefix::get_global());
+        s.set_command("the", the::get_the());
     }
 
     macro_rules! arithmetic_test {
@@ -224,6 +238,16 @@ mod tests {
     arithmetic_test![divide_neg_pos, r"\divide", "9", "-4", "-2"];
     arithmetic_test![divide_neg_neg, r"\divide", "-9", "-4", "2"];
     arithmetic_test![divide_exact, r"\divide", "100", "10", "10"];
+    expansion_test![
+        local_advance,
+        r"\count 1 5{\advance\count 1 8}\the\count 1",
+        "5"
+    ];
+    expansion_test![
+        global_advance,
+        r"\count 1 5{\global\advance\count 1 8}\the\count 1",
+        "13"
+    ];
 
     expansion_failure_test![divide_by_zero, r"\divide\count 1 by 0"];
 }

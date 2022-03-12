@@ -128,15 +128,18 @@ impl std::fmt::Display for TokenError {
         }
         */
         print_line_with_note(f, 3, "Token error")?;
+        println!["Error: {}", self._message];
         Ok(())
     }
 }
 
 impl TokenError {
     pub fn new<T: Into<String>>(token: Token, message: T) -> TokenError {
+        let message = T::into(message);
+        println!["ERROR token: {:?}, message: {}", token, &message];
         TokenError {
             _token: token,
-            _message: T::into(message),
+            _message: message,
             notes: vec![],
         }
     }

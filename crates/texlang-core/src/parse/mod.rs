@@ -13,6 +13,7 @@ mod variable;
 
 pub use filelocation::{parse_file_location, FileLocation};
 pub use keyword::parse_optional_by;
+pub use number::parse_catcode;
 pub use number::parse_number;
 pub use relation::parse_relation;
 pub use relation::Relation;

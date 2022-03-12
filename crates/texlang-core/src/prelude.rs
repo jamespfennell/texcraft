@@ -14,4 +14,5 @@ pub use crate::token::Value;
 pub use crate::token::Value::ControlSequence;
 
 // Traits
+pub use crate::runtime::HasComponent;
 pub use crate::runtime::{ExpandedStream, HasEnv};

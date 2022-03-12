@@ -17,7 +17,7 @@ pub mod def;
 pub mod execwhitespace;
 pub mod io;
 pub mod letassignment;
-#[macro_use]
+pub mod prefix;
 pub mod registers;
 #[cfg(test)]
 pub mod testutil;
@@ -33,6 +33,7 @@ pub struct StdLibState {
     alloc: alloc::Component,
     exec: execwhitespace::Component,
     registers: registers::Component<32768>,
+    prefix: prefix::Component,
     time: time::Component,
     expansion_state: StdLibExpansionState,
 }
@@ -47,7 +48,7 @@ impl StdLibState {
         let mut s =
             Env::<StdLibState>::new(CatCodeMap::new_with_tex_defaults(), Default::default());
         conditional::add_all_conditionals(&mut s);
-        def::add_all_commands(&mut s);
+
         s.set_command("advance", variableops::get_advance());
 
         s.set_command("catcode", catcodecmd::get_catcode());
@@ -55,7 +56,11 @@ impl StdLibState {
         s.set_command("countdef", registers::get_countdef());
 
         s.set_command("day", time::get_day());
+        s.set_command("def", def::get_def());
         s.set_command("divide", variableops::get_divide());
+
+        s.set_command("gdef", def::get_gdef());
+        s.set_command("global", prefix::get_global());
 
         s.set_command("input", io::input::get_input());
 
@@ -87,10 +92,11 @@ impl HasExpansionState for StdLibState {
 
 implement_has_component![
     StdLibState,
-    (time::Component, time),
-    (execwhitespace::Component, exec),
     (alloc::Component, alloc),
+    (execwhitespace::Component, exec),
     (registers::Component<32768>, registers),
+    (prefix::Component, prefix),
+    (time::Component, time),
 ];
 
 implement_has_component![StdLibExpansionState, (conditional::Component, conditional),];

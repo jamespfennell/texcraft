@@ -280,6 +280,11 @@ impl<S> CommandsMap<S> {
         self.map.insert(name.to_usize(), B::into(cmd))
     }
 
+    #[inline]
+    pub fn insert_global<B: Into<command::Command<S>>>(&mut self, name: token::CsName, cmd: B) {
+        self.map.insert_global(name.to_usize(), B::into(cmd))
+    }
+
     pub fn to_hash_map(&self) -> HashMap<CsName, command::Command<S>> {
         let mut result = HashMap::new();
         for (key, value) in self.map.backing_container().iter().enumerate() {
@@ -294,6 +299,14 @@ impl<S> CommandsMap<S> {
             result.insert(cs_name, cmd);
         }
         result
+    }
+
+    pub fn begin_group(&mut self) {
+        self.map.begin_group()
+    }
+
+    pub fn end_group(&mut self) -> bool {
+        self.map.end_group()
     }
 }
 

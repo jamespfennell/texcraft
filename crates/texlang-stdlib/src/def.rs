@@ -1,5 +1,6 @@
 //! Primitives for creating user-defined macros (`\def` and friends).
 
+use crate::prefix;
 use arrayvec::ArrayVec;
 use std::rc;
 use texcraft_stdext::algorithms::substringsearch::KMPMatcherFactory;
@@ -13,14 +14,41 @@ use texlang_core::texmacro::*;
 pub const DEF_DOC: &str = "Define a custom macro";
 
 /// Get the `\def` command.
-pub fn get_def<S>() -> command::ExecutionFn<S> {
-    def_primitive_fn
+pub fn get_def<S: HasComponent<prefix::Component>>() -> command::ExecutionPrimitive<S> {
+    command::ExecutionPrimitive::new(def_primitive_fn, def_id())
 }
 
-fn def_primitive_fn<S>(
+/// Get the `\gdef` command.
+pub fn get_gdef<S: HasComponent<prefix::Component>>() -> command::ExecutionPrimitive<S> {
+    command::ExecutionPrimitive::new(gdef_primitive_fn, def_id())
+}
+
+struct Def;
+
+pub fn def_id() -> std::any::TypeId {
+    std::any::TypeId::of::<Def>()
+}
+
+fn def_primitive_fn<S: HasComponent<prefix::Component>>(
     def_token: Token,
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
+    parse_and_set_macro(def_token, input, false)
+}
+
+fn gdef_primitive_fn<S: HasComponent<prefix::Component>>(
+    def_token: Token,
+    input: &mut runtime::ExecutionInput<S>,
+) -> anyhow::Result<()> {
+    parse_and_set_macro(def_token, input, true)
+}
+
+fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
+    def_token: Token,
+    input: &mut runtime::ExecutionInput<S>,
+    set_globally_override: bool,
+) -> anyhow::Result<()> {
+    let set_globally = input.state_mut().component_mut().take_global() || set_globally_override;
     let name = parse::parse_command_target("macro definition", def_token, input.unexpanded())?;
     let (prefix, raw_parameters, replacement_end_token) =
         parse_prefix_and_parameters(input.unexpanded())?;
@@ -39,16 +67,13 @@ fn def_primitive_fn<S>(
         }
     }
     let user_defined_macro = unsafe { Macro::new_unchecked(prefix, parameters, replacement) };
-    input
-        .base_mut()
-        .commands_map
-        .insert(name, rc::Rc::new(user_defined_macro));
+    let commands_map = &mut input.base_mut().commands_map;
+    if set_globally {
+        commands_map.insert_global(name, rc::Rc::new(user_defined_macro));
+    } else {
+        commands_map.insert(name, rc::Rc::new(user_defined_macro));
+    }
     Ok(())
-}
-
-/// Add all of the commands defined in this module to the provided state.
-pub fn add_all_commands<S>(s: &mut runtime::Env<S>) {
-    s.set_command("def", get_def());
 }
 
 enum RawParameter {
@@ -287,7 +312,10 @@ mod test {
     use crate::testutil::*;
 
     fn setup_expansion_test(s: &mut runtime::Env<State>) {
-        add_all_commands(s);
+        s.set_command("def", get_def());
+        s.set_command("gdef", get_gdef());
+        s.set_command("global", prefix::get_global());
+        s.set_command("assertGlobalIsFalse", prefix::get_assert_global_is_false());
     }
 
     expansion_test![def_parsed_succesfully, "\\def\\A{abc}", ""];
@@ -379,6 +407,42 @@ mod test {
         parameter_brace_special_case,
         r"\def\A #{Mint says }\A{hello}",
         "Mint says {hello}"
+    ];
+
+    expansion_test![
+        grouping,
+        r"\def\A{Hello}\A{\def\A{World}\A}\A",
+        r"HelloWorldHello"
+    ];
+
+    expansion_test![
+        grouping_global,
+        r"\def\A{Hello}\A{\global\def\A{World}\A}\A",
+        r"HelloWorldWorld"
+    ];
+
+    expansion_test![
+        gdef,
+        r"\def\A{Hello}\A{\gdef\A{World}\A}\A",
+        r"HelloWorldWorld"
+    ];
+
+    expansion_test![
+        gdef_global,
+        r"\def\A{Hello}\A{\global\gdef\A{World}\A}\A",
+        r"HelloWorldWorld"
+    ];
+
+    expansion_test![
+        def_takes_global,
+        r"\global\def\A{Hello}\assertGlobalIsFalse",
+        r""
+    ];
+
+    expansion_test![
+        gdef_takes_global,
+        r"\global\gdef\A{Hello}\assertGlobalIsFalse",
+        r""
     ];
 
     expansion_test![

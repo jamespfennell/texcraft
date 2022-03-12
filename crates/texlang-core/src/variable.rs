@@ -164,10 +164,11 @@
 //!
 //! See the registers and time module in the Texlang standard library.
 
-use crate::error;
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+
 use crate::parse;
-use crate::runtime;
-use crate::token;
+use crate::runtime::{self, BaseState, ExecutionInput};
 use crate::token::catcode::CatCode;
 
 /// Enum with a variant for each type of variable in TeX.
@@ -192,6 +193,27 @@ pub struct TypedVariable<S, T> {
     ref_fn: fn(state: &S, i: usize) -> &T,
     ref_mut_fn: fn(state: &mut S, i: usize) -> &mut T,
     addr: usize,
+}
+
+impl<S, T> PartialEq for TypedVariable<S, T> {
+    fn eq(&self, rhs: &TypedVariable<S, T>) -> bool {
+        (self.ref_fn as usize) == (rhs.ref_fn as usize)
+            && (self.ref_mut_fn as usize == rhs.ref_mut_fn as usize)
+            && (self.addr == rhs.addr)
+    }
+}
+
+impl<S, T> Eq for TypedVariable<S, T> {}
+
+impl<S, T> Hash for TypedVariable<S, T> {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        (self.ref_fn as usize).hash(state);
+        (self.ref_mut_fn as usize).hash(state);
+        self.addr.hash(state);
+    }
 }
 
 impl<S, T> Copy for TypedVariable<S, T> {}
@@ -224,49 +246,137 @@ impl<S, T> TypedVariable<S, T> {
     }
 
     /// Gets a mutable reference to the variable.
-    pub fn get_mut<'a>(&'a self, state: &'a mut S) -> &'a mut T {
+    fn get_mut<'a>(&'a self, state: &'a mut S) -> &'a mut T {
         (self.ref_mut_fn)(state, self.addr)
-    }
-
-    /// Get the address field of the variable.
-    pub fn addr(&self) -> usize {
-        self.addr
     }
 }
 
-/// Execution command that sets the value of the variable this command refers to.
-pub fn set<S>(
+/// Sets the value of a variable using the expanded token stream.
+pub fn set_using_input<S>(
     variable: Variable<S>,
-    token: token::Token,
     input: &mut runtime::ExecutionInput<S>,
+    global: bool,
 ) -> anyhow::Result<()> {
     parse::parse_optional_equals(input)?;
     match variable {
         Variable::Int(variable) => {
-            let val: i32 = parse::parse_number(input)?;
-            *variable.get_mut(input.state_mut()) = val;
+            let value: i32 = parse::parse_number(input)?;
+            set_i32(variable, value, input, global)
         }
         Variable::BaseInt(variable) => {
-            let val: i32 = parse::parse_number(input)?;
-            *variable.get_mut(input.base_mut()) = val;
+            let value: i32 = parse::parse_number(input)?;
+            set_base_i32(variable, value, input, global)
         }
         Variable::CatCode(variable) => {
-            // TODO: don't use u8 here, use usize to get better error messages
-            let val: u8 = parse::parse_number(input)?;
-            match CatCode::from_int(val) {
-                None => {
-                    return Err(error::TokenError::new(
-                        token,
-                        format!["the number {} is not a valid category code", val],
-                    )
-                    .add_note("category codes must be between 0 and 15 inclusive")
-                    .cast())
-                }
-                Some(cat_code) => {
-                    *variable.get_mut(input.base_mut()) = cat_code;
-                }
-            }
+            let value = parse::parse_catcode(input)?;
+            set_base_catcode(variable, value, input, global)
         }
     }
     Ok(())
+}
+
+macro_rules! make_setter {
+    ($fn_name: ident, $type: ident, $map_name: ident, $state_getter: ident, $t: path, $doc: expr) => {
+        #[inline]
+        #[doc = $doc]
+        pub fn $fn_name<S>(
+            variable: TypedVariable<$t, $type>,
+            mut value: $type,
+            input: &mut ExecutionInput<S>,
+            global: bool,
+        ) {
+            std::mem::swap(&mut value, variable.get_mut(input.$state_getter()));
+            if global {
+                for group in input.groups() {
+                    group.$map_name.remove(&variable);
+                }
+            } else {
+                if let Some((group, _, _)) = input.current_group_mut() {
+                    group.$map_name.save(variable, value);
+                }
+            }
+        }
+    };
+}
+
+macro_rules! make_state_setter {
+    (
+    #[doc = $doc:expr]
+    fn $fn_name:ident(value: $type:ident) {}
+  ) => {
+        make_setter![$fn_name, $type, $type, state_mut, S, $doc];
+    };
+}
+
+macro_rules! make_base_setter {
+    (
+    #[doc = $doc:expr, field=$field:ident]
+    fn $fn_name:ident(value: $type:ident) {}
+  ) => {
+        make_setter![$fn_name, $type, $field, base_mut, BaseState<S>, $doc];
+    };
+}
+
+make_state_setter![
+    #[doc = "Set the value of a custom state variable of type [i32]"]
+    fn set_i32(value: i32) {}
+];
+
+make_base_setter![
+    #[doc = "Set the value of a base state variable of type [i32]", field=i32_base]
+    fn set_base_i32(value: i32) {}
+];
+
+make_base_setter![
+    #[doc = "Set the value of a base state variable of type [CatCode]", field=catcode_base]
+    fn set_base_catcode(value: CatCode) {}
+];
+
+/// The variable values that are to be restored when a group ends.
+pub struct RestoreValues<S> {
+    i32: RestoreMap<S, i32>,
+    i32_base: RestoreMap<runtime::BaseState<S>, i32>,
+    catcode_base: RestoreMap<runtime::BaseState<S>, CatCode>,
+}
+
+impl<S> Default for RestoreValues<S> {
+    fn default() -> Self {
+        Self {
+            i32: Default::default(),
+            i32_base: Default::default(),
+            catcode_base: Default::default(),
+        }
+    }
+}
+
+impl<S> RestoreValues<S> {
+    pub fn restore(self, base: &mut runtime::BaseState<S>, state: &mut S) {
+        self.i32.restore(state);
+        self.i32_base.restore(base);
+        self.catcode_base.restore(base);
+    }
+}
+
+struct RestoreMap<S, T>(HashMap<TypedVariable<S, T>, T>);
+
+impl<S, T> Default for RestoreMap<S, T> {
+    fn default() -> Self {
+        Self(HashMap::new())
+    }
+}
+
+impl<S, T> RestoreMap<S, T> {
+    fn save(&mut self, variable: TypedVariable<S, T>, val: T) {
+        self.0.entry(variable).or_insert(val);
+    }
+
+    fn remove(&mut self, variable: &TypedVariable<S, T>) {
+        self.0.remove(variable);
+    }
+
+    fn restore(self, state: &mut S) {
+        for (v, restored_value) in self.0 {
+            *v.get_mut(state) = restored_value;
+        }
+    }
 }

@@ -9,6 +9,7 @@ use super::token::CsName;
 use crate::command::Command;
 use crate::command::CommandsMap;
 use crate::error;
+use crate::token;
 use crate::token::catcode::CatCodeMap;
 use crate::token::lexer;
 use crate::token::CsNameInterner;
@@ -63,7 +64,7 @@ pub fn run<S>(
                             Some(Command::Variable(cmd_ref)) => {
                                 let cmd = *cmd_ref;
                                 let var = cmd.resolve(token, execution_input)?;
-                                variable::set(var, token, execution_input)?;
+                                variable::set_using_input(var, execution_input, false)?;
                             }
                             Some(Command::Character(token)) => {
                                 character_handler(*token, execution_input)?;
@@ -72,6 +73,12 @@ pub fn run<S>(
                                 undefined_cs_handler(token, execution_input)?;
                             }
                         }
+                    }
+                    token::Value::BeginGroup(_) => {
+                        execution_input.begin_group();
+                    }
+                    token::Value::EndGroup(_) => {
+                        execution_input.end_group();
                     }
                     _ => {
                         character_handler(token, execution_input)?;
@@ -104,7 +111,7 @@ pub struct Env<S> {
     pub base_state: BaseState<S>,
     pub custom_state: S,
     pub file_system_ops: Box<dyn FileSystemOps>,
-    internal: InternalEnv,
+    internal: InternalEnv<S>,
 }
 
 /// File system operations that TeX may need to perform.
@@ -203,10 +210,22 @@ impl<S> Env<S> {
     pub fn cs_name_interner(&self) -> &CsNameInterner {
         &self.internal.cs_name_interner
     }
+
+    fn begin_group(&mut self) {
+        self.base_state.commands_map.begin_group();
+        self.internal.groups.push(Default::default());
+    }
+
+    fn end_group(&mut self) {
+        if let Some(group) = self.internal.groups.pop() {
+            assert![self.base_state.commands_map.end_group()];
+            group.restore(&mut self.base_state, &mut self.custom_state);
+        }
+    }
 }
 
 /// Parts of the runtime environment that are only visible to the runtime itself.
-struct InternalEnv {
+struct InternalEnv<S> {
     // The sources form a stack. We store the top element directly on the env
     // for performance reasons.
     current_source: Source,
@@ -218,9 +237,11 @@ struct InternalEnv {
     traceback_checkpoints: HashMap<TracebackId, String>,
     next_free_traceback_id: TracebackId,
     scratch_space: Vec<Token>,
+
+    groups: Vec<variable::RestoreValues<S>>,
 }
 
-impl Default for InternalEnv {
+impl<S> Default for InternalEnv<S> {
     fn default() -> Self {
         InternalEnv {
             current_source: Default::default(),
@@ -236,11 +257,12 @@ impl Default for InternalEnv {
             traceback_checkpoints: Default::default(),
             next_free_traceback_id: Default::default(),
             scratch_space: Default::default(),
+            groups: Default::default(),
         }
     }
 }
 
-impl InternalEnv {
+impl<S> InternalEnv<S> {
     fn push_source(&mut self, source_code: String, max_input_levels: i32) -> anyhow::Result<()> {
         if self.sources.len() + 1 >= max_input_levels.try_into().unwrap() {
             return Err(anyhow::anyhow!(

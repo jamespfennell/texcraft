@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use crate::runtime::HasEnv;
+use crate::token::catcode::CatCode;
 use crate::variable;
 use num_traits::PrimInt;
 
@@ -58,6 +59,27 @@ fn parse_number_internal<S, T: PrimInt>(
             Some(sign) => Ok(sign * modulus),
         },
     }
+}
+
+#[inline]
+pub fn parse_catcode<S, I: AsMut<runtime::ExpansionInput<S>>>(
+    stream: &mut I,
+) -> anyhow::Result<CatCode> {
+    parse_catcode_internal(stream.as_mut())
+}
+
+fn parse_catcode_internal<S>(stream: &mut runtime::ExpansionInput<S>) -> anyhow::Result<CatCode> {
+    let val: usize = parse_number(stream)?;
+    if let Ok(val_u8) = u8::try_from(val) {
+        if let Some(cat_code) = CatCode::from_int(val_u8) {
+            return Ok(cat_code);
+        }
+    }
+    // TODO: this should be a token error with the last digit as the token
+    Err(anyhow::anyhow!(
+        "the number {} is not a valid category code",
+        val
+    ))
 }
 
 /// Parses optional signs and spaces.

@@ -12,6 +12,7 @@ use texlang_stdlib::conditional;
 use texlang_stdlib::def;
 use texlang_stdlib::execwhitespace;
 use texlang_stdlib::letassignment;
+use texlang_stdlib::prefix;
 use texlang_stdlib::registers;
 use texlang_stdlib::the;
 use texlang_stdlib::time;
@@ -28,13 +29,7 @@ pub fn main_js() -> Result<(), JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn greet(
-    input: String,
-    minutes_since_midnight: i32,
-    day: i32,
-    month: i32,
-    year: i32,
-) -> String {
+pub fn run(input: String, minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> String {
     let mut env = init_state(minutes_since_midnight, day, month, year);
     env.push_source(input).unwrap();
     match execwhitespace::exec(&mut env, true) {
@@ -47,6 +42,7 @@ struct PlaygroundState {
     alloc: alloc::Component,
     exec: execwhitespace::Component,
     registers: registers::Component<256>,
+    prefix: prefix::Component,
     time: time::Component,
     expansion_state: StdLibExpansionState,
 }
@@ -61,10 +57,11 @@ impl HasExpansionState for PlaygroundState {
 
 implement_has_component![
     PlaygroundState,
-    (time::Component, time),
-    (execwhitespace::Component, exec),
     (alloc::Component, alloc),
+    (execwhitespace::Component, exec),
     (registers::Component<256>, registers),
+    (prefix::Component, prefix),
+    (time::Component, time),
 ];
 
 fn init_state(
@@ -79,28 +76,43 @@ fn init_state(
             alloc: Default::default(),
             exec: Default::default(),
             registers: Default::default(),
+            prefix: Default::default(),
             time: time::Component::new_with_values(minutes_since_midnight, day, month, year),
             expansion_state: Default::default(),
         },
     );
     conditional::add_all_conditionals(&mut s);
-    def::add_all_commands(&mut s);
-    s.set_command("the", the::get_the());
+
+    s.set_command("\\", command::Command::Character(Token::new_other('\\', 0)));
+
+    s.set_command("advance", variableops::get_advance());
+
+    s.set_command("catcode", catcodecmd::get_catcode());
     s.set_command("count", registers::get_count());
     s.set_command("countdef", registers::get_countdef());
-    s.set_command("newint", alloc::get_newint());
-    s.set_command("newarray", alloc::get_newarray());
-    s.set_command("catcode", catcodecmd::get_catcode());
-    s.set_command("advance", variableops::get_advance());
-    s.set_command("multiply", variableops::get_multiply());
-    s.set_command("divide", variableops::get_divide());
-    s.set_command("time", time::get_time());
+
     s.set_command("day", time::get_day());
-    s.set_command("month", time::get_month());
-    s.set_command("year", time::get_year());
-    s.set_command("par", execwhitespace::get_par());
+    s.set_command("def", def::get_def());
+    s.set_command("divide", variableops::get_divide());
+
+    s.set_command("gdef", def::get_gdef());
+    s.set_command("global", prefix::get_global());
+
     s.set_command("let", letassignment::get_let());
+
+    s.set_command("month", time::get_month());
+    s.set_command("multiply", variableops::get_multiply());
+
+    s.set_command("newarray", alloc::get_newarray());
+    s.set_command("newint", alloc::get_newint());
     s.set_command("newline", execwhitespace::get_newline());
-    s.set_command("\\", command::Command::Character(Token::new_other('\\', 0)));
+
+    s.set_command("par", execwhitespace::get_par());
+
+    s.set_command("the", the::get_the());
+    s.set_command("time", time::get_time());
+
+    s.set_command("year", time::get_year());
+
     s
 }

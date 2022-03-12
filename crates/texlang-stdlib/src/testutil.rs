@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use crate::execwhitespace;
+use crate::prefix;
 use anyhow::Result;
 use texlang_core::runtime;
 use texlang_core::runtime::implement_has_component;
@@ -14,9 +15,14 @@ use texlang_core::token::catcode;
 #[derive(Default)]
 pub struct State {
     exec: execwhitespace::Component,
+    prefix: prefix::Component,
 }
 
-implement_has_component![State, execwhitespace::Component, exec];
+implement_has_component![
+    State,
+    (execwhitespace::Component, exec),
+    (prefix::Component, prefix),
+];
 
 #[macro_export]
 macro_rules! expansion_test {
@@ -134,4 +140,26 @@ impl FileSystemOps {
     pub fn add_file(&mut self, path: std::path::PathBuf, content: &str) {
         self.files.insert(path, content.to_string());
     }
+}
+
+/// Gets an expansion command which does noting and always succeeds.
+pub fn get_noop_expansion_cmd<S>() -> texlang_core::command::ExpansionFn<S> {
+    fn noop_expansion_cmd_fn<S>(
+        _: token::Token,
+        _: &mut runtime::ExpansionInput<S>,
+    ) -> anyhow::Result<Vec<token::Token>> {
+        Ok(Vec::new())
+    }
+    noop_expansion_cmd_fn
+}
+
+/// Gets an execution command which does noting and always succeeds.
+pub fn get_noop_execution_cmd<S>() -> texlang_core::command::ExecutionFn<S> {
+    fn noop_execution_cmd_fn<S>(
+        _: token::Token,
+        _: &mut runtime::ExecutionInput<S>,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
+    noop_execution_cmd_fn
 }

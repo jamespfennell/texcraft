@@ -1,6 +1,9 @@
 use crate::command;
 use crate::runtime;
 use crate::token::Token;
+use crate::variable;
+
+use super::BaseState;
 
 /// A stream of tokens generated on demand.
 ///
@@ -341,6 +344,29 @@ impl<S> ExecutionInput<S> {
     #[inline]
     pub fn state_mut(&mut self) -> &mut S {
         &mut self.0.custom_state
+    }
+
+    // TODO: pass in the token and keep it as a reference
+    pub fn begin_group(&mut self) {
+        self.0.begin_group()
+    }
+
+    // TODO: error if there is not active group
+    pub fn end_group(&mut self) {
+        self.0.end_group()
+    }
+
+    pub fn groups(&mut self) -> &mut [variable::RestoreValues<S>] {
+        &mut self.0.internal.groups
+    }
+
+    pub fn current_group_mut(
+        &mut self,
+    ) -> Option<(&mut variable::RestoreValues<S>, &BaseState<S>, &S)> {
+        match self.0.internal.groups.last_mut() {
+            None => None,
+            Some(g) => Some((g, &self.0.base_state, &self.0.custom_state)),
+        }
     }
 }
 
