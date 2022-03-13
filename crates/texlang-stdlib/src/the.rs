@@ -49,7 +49,7 @@ fn the_primitive_fn<S>(
 
 fn int_to_tokens(the_token: Token, mut i: i32) -> Vec<Token> {
     if i == 0 {
-        return vec![Token::new_other('0', the_token.traceback_id())];
+        return vec![Token::new_other('0', the_token.trace_key())];
     }
     let negative = i < 0;
     // TODO: allocate the capacity precisely?
@@ -58,12 +58,12 @@ fn int_to_tokens(the_token: Token, mut i: i32) -> Vec<Token> {
         let digit = (i % 10).abs();
         tokens.push(Token::new_other(
             char::from_digit(digit.try_into().unwrap(), 10).unwrap(),
-            the_token.traceback_id(),
+            the_token.trace_key(),
         ));
         i /= 10;
     }
     if negative {
-        tokens.push(Token::new_other('-', the_token.traceback_id()));
+        tokens.push(Token::new_other('-', the_token.trace_key()));
     }
     tokens.reverse();
     tokens

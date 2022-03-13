@@ -8,14 +8,17 @@ pub fn advance_bench(c: &mut Criterion) {
     let mut env = StdLibState::new();
     env.set_command("par", execwhitespace::get_par());
     env.set_command("newline", execwhitespace::get_newline());
-    env.push_source(r"\countdef\k 0 \def\a{\advance\k by 1}".to_string())
-        .unwrap();
+    env.push_source(
+        "".to_string(),
+        r"\countdef\k 0 \def\a{\advance\k by 1}".to_string(),
+    )
+    .unwrap();
     execwhitespace::exec(&mut env, true).unwrap();
     let a_cs = Token::new_control_sequence(
         env.cs_name_interner()
             .get("a")
             .expect("a should have been interned already"),
-        0,
+        trace::Key::dummy(),
     );
 
     let mut group = c.benchmark_group("advance");

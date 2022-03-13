@@ -2,70 +2,71 @@
 
 use crate::runtime;
 use crate::token;
+use crate::token::trace;
 use crate::token::{Token, Value};
 use colored::*;
+use runtime::HasEnv;
 use texcraft_stdext::algorithms::spellcheck;
 
 #[derive(Debug)]
-struct Line {
-    line: String,
+struct TokenInSource {
+    line_content: String,
     line_number: usize,
     position: usize,
     width: usize,
-    _file_description: String,
+    file_name: String,
 }
 
-impl Line {
-    fn new(token: &Token) -> Option<Line> {
-        Some(Line {
-            line: "todo".to_string(),
+impl TokenInSource {
+    fn new(token: &Token) -> Option<TokenInSource> {
+        Some(TokenInSource {
+            line_content: "todo".to_string(),
             line_number: 0,
             position: 0,
             width: match token.value() {
                 Value::ControlSequence(_) => 100, // TODO + name.len(),
                 _ => 1,
             },
-            _file_description: "todo".to_string(),
+            file_name: "todo".to_string(),
         })
     }
 }
 
-impl Line {
-    fn fmt(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-        margin_width: usize,
-        annotation: &str,
-    ) -> std::fmt::Result {
-        let _prefix = " ".repeat(margin_width);
-        writeln!(
-            f,
-            "{}{} foo.tex:{}:{}",
-            " ".repeat(margin_width - 1),
-            ">>>".bright_yellow().bold(),
-            self.line_number,
-            self.position
-        )?;
-        print_line_with_bar(f, margin_width)?;
-        writeln!(
-            f,
-            "{}{} {} {}",
-            " ".repeat(margin_width - self.line_number.to_string().len() - 1),
-            self.line_number.to_string().bright_yellow(),
-            bar(),
-            self.line.trim_end()
-        )?;
-        writeln!(
-            f,
-            "{}{} {}{} {}",
-            " ".repeat(margin_width),
-            bar(),
-            " ".repeat(self.position),
-            "^".repeat(self.width).bright_red().bold(),
-            annotation.bright_red(),
-        )?;
-        Ok(())
-    }
+fn fmt_traceback_result(
+    tr: &trace::Trace,
+    f: &mut std::fmt::Formatter<'_>,
+    margin_width: usize,
+    annotation: &str,
+) -> std::fmt::Result {
+    let _prefix = " ".repeat(margin_width);
+    writeln!(
+        f,
+        "{}{} {}:{}:{}",
+        " ".repeat(margin_width - 1),
+        ">>>".bright_yellow().bold(),
+        tr.file_name,
+        tr.line_number,
+        tr.index + 1
+    )?;
+    print_line_with_bar(f, margin_width)?;
+    writeln!(
+        f,
+        "{}{} {} {}",
+        " ".repeat(margin_width - tr.line_number.to_string().len() - 1),
+        tr.line_number.to_string().bright_yellow(),
+        bar(),
+        tr.line_content.trim_end()
+    )?;
+    writeln!(
+        f,
+        "{}{} {}{} {}",
+        " ".repeat(margin_width),
+        bar(),
+        " ".repeat(tr.index),
+        "^".repeat(tr.width).bright_red().bold(),
+        annotation.bright_red(),
+    )?;
+    Ok(())
 }
 
 fn bar() -> ColoredString {
@@ -101,34 +102,41 @@ fn print_error_header(f: &mut std::fmt::Formatter<'_>, message: &str) -> std::fm
 #[derive(Debug)]
 pub struct TokenContext {
     note: String,
-    line: Line,
+    line: TokenInSource,
 }
 
 /// Error that is returned when an unexpected token is encountered.
 #[derive(Debug)]
 pub struct TokenError {
-    _token: Token,
-    _message: String,
+    token: Token,
+    message: String,
     notes: Vec<String>,
+    traceback_result: Option<trace::Trace>,
 }
 
 impl std::error::Error for TokenError {}
 
 impl std::fmt::Display for TokenError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        /*
-        let margin_width = self.line.line_number.to_string().len() + 1;
+        let tr = match &self.traceback_result {
+            None => {
+                println!["Token error: {}", self.message];
+                println!["This error does not have any context because `texcraft_core::error::add_context` was not called"];
+                return Ok(());
+            }
+            Some(tr) => tr,
+        };
+
+        let margin_width = tr.line_number.to_string().len() + 1;
         print_error_header(f, &self.message)?;
-        self.line.fmt(f, margin_width, &self.s)?;
+        // TODO: support adding an annotation to the token
+        fmt_traceback_result(tr, f, margin_width, "")?;
         if !self.notes.is_empty() {
-            print_line_with_bar(f, 3)?;
+            print_line_with_bar(f, margin_width)?;
         }
         for note in self.notes.iter() {
-            print_line_with_note(f, 3, note)?;
+            print_line_with_note(f, margin_width, note)?;
         }
-        */
-        print_line_with_note(f, 3, "Token error")?;
-        println!["Error: {}", self._message];
         Ok(())
     }
 }
@@ -136,11 +144,11 @@ impl std::fmt::Display for TokenError {
 impl TokenError {
     pub fn new<T: Into<String>>(token: Token, message: T) -> TokenError {
         let message = T::into(message);
-        println!["ERROR token: {:?}, message: {}", token, &message];
         TokenError {
-            _token: token,
-            _message: message,
+            token,
+            message,
             notes: vec![],
+            traceback_result: None,
         }
     }
 
@@ -152,13 +160,17 @@ impl TokenError {
     pub fn cast(self) -> anyhow::Error {
         anyhow::Error::from(self)
     }
+
+    fn add_context<S>(&mut self, execution_input: &runtime::ExecutionInput<S>) {
+        self.traceback_result = Some(execution_input.trace(self.token))
+    }
 }
 
 /// Error that is returned with the input file ends unexpectedly.
 #[derive(Debug)]
 pub struct EndOfInputError {
     title: String,
-    last_line: Option<Line>,
+    last_line: Option<TokenInSource>,
     notes: Vec<String>,
     contexts: Vec<TokenContext>,
 }
@@ -179,7 +191,7 @@ impl EndOfInputError {
     }
 
     pub fn add_token_context<T: Into<String>>(mut self, token: &Token, note: T) -> EndOfInputError {
-        if let Some(line) = Line::new(token) {
+        if let Some(line) = TokenInSource::new(token) {
             self.contexts.push(TokenContext {
                 note: T::into(note),
                 line,
@@ -192,19 +204,7 @@ impl EndOfInputError {
         anyhow::Error::from(self)
     }
 
-    pub fn add_context<S>(&mut self, _execution_input: &runtime::ExecutionInput<S>) {
-        /*
-        if let Some(last_line) = execution_input.controller().last_non_empty_line() {
-            self.last_line = Some(Line {
-                line: last_line.content.clone(),
-                line_number: last_line.line_number,
-                position: last_line.content.trim_end().len(),
-                width: 1,
-                _file_description: String::clone(last_line.file.as_ref()),
-            })
-        }
-        */
-    }
+    pub fn add_context<S>(&mut self, _execution_input: &runtime::ExecutionInput<S>) {}
 }
 
 impl std::error::Error for EndOfInputError {}
@@ -212,9 +212,6 @@ impl std::error::Error for EndOfInputError {}
 impl std::fmt::Display for EndOfInputError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         print_error_header(f, &self.title)?;
-        if let Some(last_line) = &self.last_line {
-            last_line.fmt(f, 3, "input ended here")?;
-        }
         if !self.notes.is_empty() {
             print_line_with_bar(f, 3)?;
         }
@@ -224,7 +221,7 @@ impl std::fmt::Display for EndOfInputError {
         for context in self.contexts.iter() {
             writeln!(f)?;
             print_error_header(f, &context.note)?;
-            context.line.fmt(f, 3, "")?;
+            // context.line.fmt(f, 3, "")?;
         }
         Ok(())
     }
@@ -232,6 +229,9 @@ impl std::fmt::Display for EndOfInputError {
 
 pub fn add_context<S>(error: &mut anyhow::Error, execution_input: &runtime::ExecutionInput<S>) {
     if let Some(error) = error.downcast_mut::<EndOfInputError>() {
+        error.add_context(execution_input);
+    }
+    if let Some(error) = error.downcast_mut::<TokenError>() {
         error.add_context(execution_input);
     }
 }
@@ -249,13 +249,12 @@ pub fn new_undefined_cs_error<S>(token: token::Token, state: &runtime::Env<S>) -
     }
 
     let close_cs_name = spellcheck::find_close_words(cs_names, name);
-    let title = format!["undefined control sequence {}", &token];
+    let title = format!["undefined control sequence \\{}", &name];
     let mut err = TokenError::new(token, title);
 
     err = err.add_note(format![
-        "did you mean to write \\{}? (diff: \\{})\n",
+        "did you mean \\{}?\n",
         close_cs_name[0].right().bold(),
-        close_cs_name[0].colored()
     ]);
 
     err.cast()

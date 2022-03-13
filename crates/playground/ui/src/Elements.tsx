@@ -75,7 +75,7 @@ function TexcraftExecRaw(props: TexcraftExecProps) {
     var midnight = new Date(date);
     const minutes_since_midnight = (date.getTime() - midnight.setHours(0, 0, 0, 0)) / 60000;
     console.log("Running Texcraft");
-    var output = Texcraft.run(props.inputFile.content, minutes_since_midnight, day, month, year);
+    var output = Texcraft.run(props.inputFile.filename, props.inputFile.content, minutes_since_midnight, day, month, year);
     return (
       <Element header={"$ texcraft exec " + props.inputFile.filename}>
         <div id="output" className="monospace">{output}</div>

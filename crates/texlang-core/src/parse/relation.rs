@@ -48,7 +48,7 @@ mod tests {
             #[test]
             fn $name() {
                 let mut env = runtime::Env::<()>::new(CatCodeMap::new_with_tex_defaults(), ());
-                env.push_source($input.to_string()).unwrap();
+                env.push_source("".to_string(), $input.to_string()).unwrap();
                 let input = runtime::ExecutionInput::new(&mut env);
                 let result = parse_relation(input).unwrap();
                 assert_eq![result, $expected];
@@ -67,7 +67,7 @@ mod tests {
                 let mut map = CatCodeMap::new_with_tex_defaults();
                 map.insert('<', catcode::CatCode::Letter);
                 let mut env = runtime::Env::<()>::new(map, ());
-                env.push_source($input.to_string()).unwrap();
+                env.push_source("".to_string(), $input.to_string()).unwrap();
                 let input = runtime::ExecutionInput::new(&mut env);
                 let result = parse_relation(input);
                 if let Ok(_) = result {

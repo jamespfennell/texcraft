@@ -29,9 +29,16 @@ pub fn main_js() -> Result<(), JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn run(input: String, minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> String {
+pub fn run(
+    file_name: String,
+    input: String,
+    minutes_since_midnight: i32,
+    day: i32,
+    month: i32,
+    year: i32,
+) -> String {
     let mut env = init_state(minutes_since_midnight, day, month, year);
-    env.push_source(input).unwrap();
+    env.push_source(file_name, input).unwrap();
     match execwhitespace::exec(&mut env, true) {
         Ok(tokens) => token::write_tokens(&tokens, env.cs_name_interner()),
         Err(err) => format!["{}", err],
@@ -83,7 +90,7 @@ fn init_state(
     );
     conditional::add_all_conditionals(&mut s);
 
-    s.set_command("\\", command::Command::Character(Token::new_other('\\', 0)));
+    s.set_command("\\", command::Command::Character(Value::Other('\\')));
 
     s.set_command("advance", variableops::get_advance());
 

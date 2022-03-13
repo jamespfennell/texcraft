@@ -2,6 +2,7 @@
 
 pub mod catcode;
 pub mod lexer;
+pub mod trace;
 
 use crate::token::catcode::CatCode;
 use string_interner::{DefaultSymbol, StringInterner, Symbol};
@@ -92,12 +93,10 @@ impl Value {
     }
 }
 
-pub type TracebackId = u32;
-
 #[derive(Debug, Eq, Clone, Copy)]
 pub struct Token {
     value: Value,
-    traceback_id: TracebackId,
+    trace_key: trace::Key,
 }
 
 impl std::fmt::Display for Token {
@@ -120,10 +119,10 @@ impl PartialEq for Token {
 
 macro_rules! token_constructor {
     ($name: ident, $value: expr) => {
-        pub fn $name(c: char, traceback_id: TracebackId) -> Token {
+        pub fn $name(c: char, trace_key: trace::Key) -> Token {
             Token {
                 value: $value(c),
-                traceback_id,
+                trace_key,
             }
         }
     };
@@ -142,11 +141,15 @@ impl Token {
     token_constructor!(new_other, Value::Other);
     token_constructor!(new_active_character, Value::Active);
 
-    pub fn new_control_sequence(name: CsName, traceback_id: TracebackId) -> Token {
+    pub fn new_control_sequence(name: CsName, trace_key: trace::Key) -> Token {
         Token {
             value: Value::ControlSequence(name),
-            traceback_id,
+            trace_key,
         }
+    }
+
+    pub fn new_from_value(value: Value, trace_key: trace::Key) -> Token {
+        Token { value, trace_key }
     }
 
     #[inline]
@@ -154,8 +157,8 @@ impl Token {
         self.value
     }
 
-    pub fn traceback_id(&self) -> TracebackId {
-        self.traceback_id
+    pub fn trace_key(&self) -> trace::Key {
+        self.trace_key
     }
 
     pub fn char(&self) -> Option<char> {

@@ -18,8 +18,8 @@ pub mod input {
         input: &mut runtime::ExpansionInput<S>,
     ) -> anyhow::Result<Vec<Token>> {
         let file_location = parse::parse_file_location(input)?;
-        let source_code = read_file(input_token, input.env(), file_location, ".tex")?;
-        input.push_source(source_code)?;
+        let (file_path, source_code) = read_file(input_token, input.env(), file_location, ".tex")?;
+        input.push_source(file_path, source_code)?;
         Ok(Vec::new())
     }
 
@@ -66,7 +66,7 @@ fn read_file<S>(
     env: &runtime::Env<S>,
     file_location: parse::FileLocation,
     default_extension: &str,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<(String, String)> {
     let raw_file_path = format![
         "{}{}",
         &file_location.path,
@@ -97,7 +97,7 @@ fn read_file<S>(
     };
 
     match env.file_system_ops.read_to_string(&file_path) {
-        Ok(s) => Ok(s),
+        Ok(s) => Ok((raw_file_path, s)),
         Err(err) => Err(
             error::TokenError::new(t, format!("could not read from {:?}", &file_path))
                 .add_note(format!("underlying filesystem error: {}", err))

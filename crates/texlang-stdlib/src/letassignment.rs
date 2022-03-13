@@ -35,7 +35,7 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
                     None => return Err(error::new_undefined_cs_error(token, input.env())),
                     Some(cmd) => cmd.clone(),
                 },
-                _ => command::Command::Character(token),
+                _ => command::Command::Character(token.value()),
             },
         };
     let commands_map = &mut input.base_mut().commands_map;

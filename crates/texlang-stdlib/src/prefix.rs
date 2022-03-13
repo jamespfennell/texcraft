@@ -199,16 +199,19 @@ fn process_prefixes<S: HasComponent<Component>>(
                     {
                         // TODO: add the outer token to the error
                         if prefix.outer.is_some() {
+                            let cs_name = input.env().cs_name_interner().resolve(&name).unwrap();
                             Err(error::TokenError::new(
                                 t,
-                                r"this command cannot be prefixed with \outer",
+                                format![r"the command \{} cannot be prefixed with \outer", cs_name],
                             )
                             .cast())
                         } else if prefix.long.is_some() {
-                            Err(
-                                error::TokenError::new(t, r"unexpected target of \long command")
-                                    .cast(),
+                            let cs_name = input.env().cs_name_interner().resolve(&name).unwrap();
+                            Err(error::TokenError::new(
+                                t,
+                                format![r"the command \{} cannot be prefixed with \long", cs_name],
                             )
+                            .cast())
                         } else {
                             input.state_mut().component_mut().global = prefix.global.is_some();
                             Ok(())

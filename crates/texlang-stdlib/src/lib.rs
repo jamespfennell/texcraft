@@ -65,12 +65,15 @@ impl StdLibState {
         s.set_command("input", io::input::get_input());
 
         s.set_command("let", letassignment::get_let());
+        s.set_command("long", prefix::get_long());
 
         s.set_command("month", time::get_month());
         s.set_command("multiply", variableops::get_multiply());
 
         s.set_command("newint", alloc::get_newint());
         s.set_command("newarray", alloc::get_newarray());
+
+        s.set_command("outer", prefix::get_outer());
 
         s.set_command("the", the::get_the());
         s.set_command("time", time::get_time());

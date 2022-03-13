@@ -404,7 +404,7 @@ mod tests {
         let mut map = CatCodeMap::new_with_tex_defaults();
         map.insert('1', catcode::CatCode::Letter);
         let mut env = runtime::Env::<()>::new(map, ());
-        env.push_source(r"1".to_string()).unwrap();
+        env.push_source("".to_string(), r"1".to_string()).unwrap();
         let input = crate::runtime::ExecutionInput::new(&mut env);
         let result: anyhow::Result<i32> = parse_number(input);
         if let Ok(_) = result {

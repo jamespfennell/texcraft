@@ -18,7 +18,7 @@ fn newline_primitive_fn<S: HasComponent<Component>>(
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let c = input.state_mut().component_mut();
-    let newline_token = Token::new_space('\n', t.traceback_id());
+    let newline_token = Token::new_space('\n', t.trace_key());
     c.exec_output.push(newline_token);
     c.num_trailing_newlines += 1;
     Ok(())
@@ -37,7 +37,7 @@ fn par_primitive_fn<S: HasComponent<Component>>(
     if c.exec_output.is_empty() {
         return Ok(());
     }
-    let par_token = Token::new_space('\n', t.traceback_id());
+    let par_token = Token::new_space('\n', t.trace_key());
     match c.num_trailing_newlines {
         0 => {
             c.exec_output.push(par_token);
@@ -76,7 +76,7 @@ fn handle_character<S: HasComponent<Component>>(
 ) -> anyhow::Result<()> {
     let c = input.state_mut().component_mut();
     if let Some('\n') = token.char() {
-        token = Token::new_space(' ', token.traceback_id());
+        token = Token::new_space(' ', token.trace_key());
     }
     c.exec_output.push(token);
     c.num_trailing_newlines = 0;

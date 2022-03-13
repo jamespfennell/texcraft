@@ -12,14 +12,14 @@ pub fn texcraft_primitive_fn<S>(
     _: &mut runtime::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     Ok(vec![
-        Token::new_letter('T', t.traceback_id()),
-        Token::new_letter('e', t.traceback_id()),
-        Token::new_letter('x', t.traceback_id()),
-        Token::new_letter('c', t.traceback_id()),
-        Token::new_letter('r', t.traceback_id()),
-        Token::new_letter('a', t.traceback_id()),
-        Token::new_letter('f', t.traceback_id()),
-        Token::new_letter('t', t.traceback_id()),
+        Token::new_letter('T', t.trace_key()),
+        Token::new_letter('e', t.trace_key()),
+        Token::new_letter('x', t.trace_key()),
+        Token::new_letter('c', t.trace_key()),
+        Token::new_letter('r', t.trace_key()),
+        Token::new_letter('a', t.trace_key()),
+        Token::new_letter('f', t.trace_key()),
+        Token::new_letter('t', t.trace_key()),
     ])
 }
 

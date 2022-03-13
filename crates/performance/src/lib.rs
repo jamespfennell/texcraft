@@ -9,7 +9,7 @@ pub fn run_in_texcraft(input: &str) {
     let mut env = StdLibState::new();
     env.set_command("par", execwhitespace::get_par());
     env.set_command("end", execwhitespace::get_newline());
-    env.push_source(input.to_string()).unwrap();
+    env.push_source("".to_string(), input.to_string()).unwrap();
     execwhitespace::exec(&mut env, true).unwrap();
 }
 

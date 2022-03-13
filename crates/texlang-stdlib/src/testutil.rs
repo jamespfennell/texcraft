@@ -112,7 +112,7 @@ pub fn run<S: Default + HasComponent<execwhitespace::Component>>(
         Default::default(),
     );
     setup_fn(&mut env);
-    env.push_source(source).unwrap();
+    env.push_source("testutil.tex".to_string(), source).unwrap();
     let output = execwhitespace::exec(&mut env, false);
     (output, env)
 }

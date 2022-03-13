@@ -174,7 +174,7 @@ pub enum Command<S> {
     /// Depending on the context in which this command appears it may behave like a
     ///   character (when typesetting) or like an unexpandable command (when parsing integers).
     /// Created using `\let\cmd=<character>`.
-    Character(token::Token),
+    Character(token::Value),
 }
 
 impl<S> Command<S> {

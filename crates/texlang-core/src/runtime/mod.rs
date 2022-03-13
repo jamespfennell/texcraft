@@ -12,9 +12,9 @@ use crate::error;
 use crate::token;
 use crate::token::catcode::CatCodeMap;
 use crate::token::lexer;
+use crate::token::trace;
 use crate::token::CsNameInterner;
 use crate::token::Token;
-use crate::token::TracebackId;
 use crate::token::Value::ControlSequence;
 use crate::variable;
 use std::collections::HashMap;
@@ -41,7 +41,7 @@ pub fn run<S>(
     let execution_input = ExecutionInput::new(env);
     loop {
         let fully_expanded_token = execution_input.next();
-        match fully_expanded_token {
+        let result = match fully_expanded_token {
             Ok(token) => match token {
                 None => {
                     break;
@@ -59,37 +59,39 @@ pub fn run<S>(
                                 // could also imagine implementing an \undef command that would result in the
                                 // reference becoming null during the execution.
                                 let cmd = *cmd_ref;
-                                cmd.call(token, execution_input)?;
+                                cmd.call(token, execution_input)
                             }
                             Some(Command::Variable(cmd_ref)) => {
                                 let cmd = *cmd_ref;
                                 let var = cmd.resolve(token, execution_input)?;
-                                variable::set_using_input(var, execution_input, false)?;
+                                variable::set_using_input(var, execution_input, false)
                             }
-                            Some(Command::Character(token)) => {
-                                character_handler(*token, execution_input)?;
-                            }
+                            Some(Command::Character(token_value)) => character_handler(
+                                Token::new_from_value(*token_value, token.trace_key()),
+                                execution_input,
+                            ),
                             None | Some(Command::Expansion(_)) | Some(Command::Macro(_)) => {
-                                undefined_cs_handler(token, execution_input)?;
+                                undefined_cs_handler(token, execution_input)
                             }
                         }
                     }
                     token::Value::BeginGroup(_) => {
                         execution_input.begin_group();
+                        Ok(())
                     }
                     token::Value::EndGroup(_) => {
                         execution_input.end_group();
+                        Ok(())
                     }
-                    _ => {
-                        character_handler(token, execution_input)?;
-                    }
+                    _ => character_handler(token, execution_input),
                 },
             },
-            Err(mut error) => {
-                error::add_context(&mut error, execution_input);
-                return Err(error);
-            }
+            Err(err) => Err(err),
         };
+        if let Err(mut err) = result {
+            error::add_context(&mut err, execution_input);
+            return Err(err);
+        }
     }
     Ok(())
 }
@@ -169,9 +171,9 @@ impl<S> Env<S> {
     ///
     /// TeX input source code is organized as a stack.
     /// Pushing source code onto the stack will mean it is executed first.
-    pub fn push_source(&mut self, source_code: String) -> anyhow::Result<()> {
+    pub fn push_source(&mut self, file_name: String, source_code: String) -> anyhow::Result<()> {
         self.internal
-            .push_source(source_code, self.base_state.max_input_levels)
+            .push_source(file_name, source_code, self.base_state.max_input_levels)
     }
 
     /// Set a command.
@@ -234,8 +236,9 @@ struct InternalEnv<S> {
     // The working directory is used as the root for relative file paths.
     working_directory: Option<std::path::PathBuf>,
     cs_name_interner: CsNameInterner,
-    traceback_checkpoints: HashMap<TracebackId, String>,
-    next_free_traceback_id: TracebackId,
+
+    tracer: trace::Tracer,
+
     scratch_space: Vec<Token>,
 
     groups: Vec<variable::RestoreValues<S>>,
@@ -254,8 +257,7 @@ impl<S> Default for InternalEnv<S> {
                 }
             },
             cs_name_interner: Default::default(),
-            traceback_checkpoints: Default::default(),
-            next_free_traceback_id: Default::default(),
+            tracer: Default::default(),
             scratch_space: Default::default(),
             groups: Default::default(),
         }
@@ -263,18 +265,20 @@ impl<S> Default for InternalEnv<S> {
 }
 
 impl<S> InternalEnv<S> {
-    fn push_source(&mut self, source_code: String, max_input_levels: i32) -> anyhow::Result<()> {
+    fn push_source(
+        &mut self,
+        file_name: String,
+        source_code: String,
+        max_input_levels: i32,
+    ) -> anyhow::Result<()> {
         if self.sources.len() + 1 >= max_input_levels.try_into().unwrap() {
             return Err(anyhow::anyhow!(
                 "maximum number of input levels ({}) exceeded",
                 max_input_levels
             ));
         }
-        self.traceback_checkpoints
-            .insert(self.next_free_traceback_id, source_code.clone());
-        let source_code_len = source_code.len();
-        let mut new_source = Source::new(source_code, self.next_free_traceback_id);
-        self.next_free_traceback_id += TracebackId::try_from(source_code_len).unwrap();
+        let trace_key_range = self.tracer.register_source_code(file_name, &source_code);
+        let mut new_source = Source::new(source_code, trace_key_range);
         std::mem::swap(&mut new_source, &mut self.current_source);
         self.sources.push(new_source);
         Ok(())
@@ -309,17 +313,17 @@ struct Source {
 }
 
 impl Source {
-    pub fn new(source_code: String, next_free_traceback_id: TracebackId) -> Source {
+    pub fn new(source_code: String, trace_key_range: trace::KeyRange) -> Source {
         Source {
             expansions: Vec::with_capacity(32),
-            root: lexer::Lexer::new(source_code, next_free_traceback_id),
+            root: lexer::Lexer::new(source_code, trace_key_range),
         }
     }
 }
 
 impl Default for Source {
     fn default() -> Self {
-        Source::new("".to_string(), 0)
+        Source::new("".to_string(), trace::KeyRange::empty())
     }
 }
 
