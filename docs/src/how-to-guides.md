@@ -1,0 +1,1 @@
+# Implementing the component pattern

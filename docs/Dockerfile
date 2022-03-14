@@ -1,16 +1,4 @@
-FROM golang:1.16 AS hugo-builder
-
-# Install Hugo
-WORKDIR /usr/bin
-RUN curl -L -o hugo.tar.gz https://github.com/gohugoio/hugo/releases/download/v0.87.0/hugo_extended_0.87.0_Linux-64bit.tar.gz
-RUN tar -zxvf hugo.tar.gz
-
-# Build the Hugo HTML files
-WORKDIR /website
-COPY . .
-RUN cd docs && hugo
-
-FROM rust:1.56 AS rust-builder
+FROM rust:1.56 AS builder
 
 # Build the Rustdoc HTML files
 WORKDIR /rustdoc
@@ -20,9 +8,16 @@ COPY crates crates
 RUN cargo fetch
 RUN cargo doc --no-deps --lib
 
-FROM nginx
+# Build the MD Book
+WORKDIR /mddoc
+COPY docs .
+RUN curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.15/mdbook-v0.4.15-x86_64-unknown-linux-gnu.tar.gz | tar -xz --directory=/usr/bin
+RUN ls -lah
+RUN mdbook build
 
 # Put it all together
+FROM nginx
 RUN rm -rf /usr/share/nginx/html
-COPY --from=hugo-builder /website/docs/public /usr/share/nginx/html
-COPY --from=rust-builder /rustdoc/target/doc /usr/share/nginx/html/reference
+COPY --from=builder /mddoc/book /usr/share/nginx/html
+COPY --from=builder /rustdoc/target/doc /usr/share/nginx/html/reference
+RUN ls -lah /usr/share/nginx/html/reference

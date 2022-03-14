@@ -1,0 +1,11 @@
+[book]
+authors = ["James Fennell"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Texcraft"
+
+[output.html]
+no-section-label = true
+git-repository-url = "https://github.com/jamespfennell/texcraft"
+edit-url-template = "https://github.com/jamespfennell/texcraft/edit/main/docs/{path}"

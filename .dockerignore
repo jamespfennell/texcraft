@@ -21,7 +21,5 @@
 !crates/playground/go.sum
 !crates/playground/*.go
 
-!docs/config.toml
-!docs/content/*
-!docs/layouts/*
-!docs/themes/*
+!docs/book.toml
+!docs/src/*
