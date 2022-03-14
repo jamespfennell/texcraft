@@ -13,7 +13,7 @@ pub fn get_catcode<S>() -> command::VariableFn<S> {
 
 fn catcode_fn<S>(
     _catcode_token: Token,
-    input: &mut runtime::ExpandedInput<S>,
+    input: &mut runtime::ExpansionInput<S>,
     _: usize,
 ) -> anyhow::Result<Variable<S>> {
     let addr: u32 = parse::parse_number(input)?;
@@ -45,6 +45,11 @@ mod tests {
     }
 
     expansion_test![catcode_base_case, r"\catcode 48 11 \the\catcode 48", r"11"];
+    expansion_test![
+        grouping,
+        r"{\catcode 48 11 \the\catcode 48}\the\catcode 48",
+        r"1112"
+    ];
     expansion_test![catcode_default, r"\the\catcode 48", r"12"];
     expansion_failure_test![catcode_value_too_large, r"\catcode 48 16"];
     expansion_failure_test![catcode_value_is_negative_large, r"\catcode 48 -1"];

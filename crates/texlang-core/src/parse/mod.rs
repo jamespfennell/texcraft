@@ -13,6 +13,7 @@ mod variable;
 
 pub use filelocation::{parse_file_location, FileLocation};
 pub use keyword::parse_optional_by;
+pub use number::parse_catcode;
 pub use number::parse_number;
 pub use relation::parse_relation;
 pub use relation::Relation;
@@ -23,7 +24,7 @@ use crate::prelude::*;
 
 use super::token::CsName;
 
-pub fn parse_optional_space<S>(input: &mut runtime::ExpandedInput<S>) -> anyhow::Result<()> {
+pub fn parse_optional_space<S>(input: &mut runtime::ExpansionInput<S>) -> anyhow::Result<()> {
     get_optional_element![input, Value::Space(_) => (),];
     Ok(())
 }

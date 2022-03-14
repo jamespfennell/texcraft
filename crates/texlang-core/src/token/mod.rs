@@ -2,6 +2,7 @@
 
 pub mod catcode;
 pub mod lexer;
+pub mod trace;
 
 use crate::token::catcode::CatCode;
 use string_interner::{DefaultSymbol, StringInterner, Symbol};
@@ -92,12 +93,10 @@ impl Value {
     }
 }
 
-pub type TracebackId = u32;
-
 #[derive(Debug, Eq, Clone, Copy)]
 pub struct Token {
     value: Value,
-    traceback_id: TracebackId,
+    trace_key: trace::Key,
 }
 
 impl std::fmt::Display for Token {
@@ -120,10 +119,10 @@ impl PartialEq for Token {
 
 macro_rules! token_constructor {
     ($name: ident, $value: expr) => {
-        pub fn $name(c: char, traceback_id: TracebackId) -> Token {
+        pub fn $name(c: char, trace_key: trace::Key) -> Token {
             Token {
                 value: $value(c),
-                traceback_id,
+                trace_key,
             }
         }
     };
@@ -142,11 +141,15 @@ impl Token {
     token_constructor!(new_other, Value::Other);
     token_constructor!(new_active_character, Value::Active);
 
-    pub fn new_control_sequence(name: CsName, traceback_id: TracebackId) -> Token {
+    pub fn new_control_sequence(name: CsName, trace_key: trace::Key) -> Token {
         Token {
             value: Value::ControlSequence(name),
-            traceback_id,
+            trace_key,
         }
+    }
+
+    pub fn new_from_value(value: Value, trace_key: trace::Key) -> Token {
+        Token { value, trace_key }
     }
 
     #[inline]
@@ -154,8 +157,8 @@ impl Token {
         self.value
     }
 
-    pub fn traceback_id(&self) -> TracebackId {
-        self.traceback_id
+    pub fn trace_key(&self) -> trace::Key {
+        self.trace_key
     }
 
     pub fn char(&self) -> Option<char> {
@@ -176,32 +179,73 @@ impl Token {
     }
 }
 
+enum PendingWhitespace {
+    None,
+    Space,
+    Newlines(usize),
+}
+
+impl PendingWhitespace {
+    fn write_out(&mut self, s: &mut String) {
+        if !s.is_empty() {
+            match self {
+                PendingWhitespace::None => {}
+                PendingWhitespace::Space => {
+                    s.push(' ');
+                }
+                PendingWhitespace::Newlines(n) => {
+                    for _ in 0..*n {
+                        s.push('\n');
+                    }
+                }
+            }
+        }
+        *self = PendingWhitespace::None;
+    }
+
+    fn add_space(&mut self) {
+        *self = match self {
+            PendingWhitespace::None => PendingWhitespace::Space,
+            PendingWhitespace::Space => PendingWhitespace::Space,
+            PendingWhitespace::Newlines(n) => PendingWhitespace::Newlines(*n),
+        }
+    }
+
+    fn add_newline(&mut self) {
+        *self = match self {
+            PendingWhitespace::None => PendingWhitespace::Newlines(1),
+            PendingWhitespace::Space => PendingWhitespace::Newlines(1),
+            PendingWhitespace::Newlines(n) => PendingWhitespace::Newlines(*n + 1),
+        }
+    }
+}
+
 /// Write a collection of tokens to a string.
 pub fn write_tokens<'a, T>(tokens: T, interner: &CsNameInterner) -> String
 where
     T: IntoIterator<Item = &'a Token>,
 {
     let mut result: String = String::default();
-    let mut preceeding_space = true;
+    let mut pending_whitespace = PendingWhitespace::None;
     for token in tokens.into_iter() {
         match &token.value {
             Value::ControlSequence(s) => {
+                pending_whitespace.write_out(&mut result);
                 let name = interner.resolve(s).unwrap_or("invalidCsName");
                 result.push('\\');
                 result.push_str(name);
-                result.push(' ');
-                preceeding_space = false;
+                pending_whitespace.add_space();
             }
             Value::Space(c) => {
-                if preceeding_space && *c != '\n' {
-                    continue;
+                if *c == '\n' {
+                    pending_whitespace.add_newline();
+                } else {
+                    pending_whitespace.add_space();
                 }
-                result.push(*c);
-                preceeding_space = false;
             }
             _ => {
+                pending_whitespace.write_out(&mut result);
                 result.push(token.char().unwrap());
-                preceeding_space = false;
             }
         }
     }

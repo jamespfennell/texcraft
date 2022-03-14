@@ -18,14 +18,13 @@ use crate::error;
 use crate::token;
 use crate::token::catcode::CatCode;
 use crate::token::catcode::CatCodeMap;
+use crate::token::trace;
 use crate::token::CsNameInterner;
 use crate::token::Token;
 use std::fmt;
 use std::io;
 use std::iter::Peekable;
 use texcraft_stdext::str::OwningChars;
-
-use super::TracebackId;
 
 const MALFORMED_CONTROL_SEQUENCE_ERROR_TITLE: &str = "Unexpected end of file";
 const MALFORMED_CONTROL_SEQUENCE_ERROR_HELP: &str =
@@ -60,9 +59,9 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn new(source_code: String, next_free_traceback_id: TracebackId) -> Lexer {
+    pub fn new(source_code: String, trace_key_range: trace::KeyRange) -> Lexer {
         Lexer {
-            raw_lexer: RawLexer::new(source_code, next_free_traceback_id),
+            raw_lexer: RawLexer::new(source_code, trace_key_range),
             trim_next_whitespace: false,
             scratch_string: Default::default(),
         }
@@ -78,7 +77,7 @@ impl Lexer {
             let value = match raw_token.code {
                 CatCode::Escape => Token::new_control_sequence(
                     self.read_control_sequence(&raw_token, cat_code_map, cs_name_interner)?,
-                    raw_token.traceback_id,
+                    raw_token.trace_key,
                 ),
                 CatCode::EndOfLine | CatCode::Space => {
                     let num_consumed_new_lines = self.consume_whitespace(cat_code_map)
@@ -90,23 +89,23 @@ impl Lexer {
                         (true, true) => {
                             continue;
                         }
-                        (true, false) => Token::new_space(raw_token.char, raw_token.traceback_id),
+                        (true, false) => Token::new_space(raw_token.char, raw_token.trace_key),
                         (false, _) => Token::new_control_sequence(
                             cs_name_interner.get_or_intern("par"),
-                            raw_token.traceback_id,
+                            raw_token.trace_key,
                         ),
                     }
                 }
-                CatCode::BeginGroup => Token::new_begin_group(c, raw_token.traceback_id),
-                CatCode::EndGroup => Token::new_end_group(c, raw_token.traceback_id),
-                CatCode::MathShift => Token::new_math_shift(c, raw_token.traceback_id),
-                CatCode::AlignmentTab => Token::new_alignment_tab(c, raw_token.traceback_id),
-                CatCode::Parameter => Token::new_parameter(c, raw_token.traceback_id),
-                CatCode::Superscript => Token::new_superscript(c, raw_token.traceback_id),
-                CatCode::Subscript => Token::new_subscript(c, raw_token.traceback_id),
-                CatCode::Letter => Token::new_letter(c, raw_token.traceback_id),
-                CatCode::Other => Token::new_other(c, raw_token.traceback_id),
-                CatCode::Active => Token::new_active_character(c, raw_token.traceback_id),
+                CatCode::BeginGroup => Token::new_begin_group(c, raw_token.trace_key),
+                CatCode::EndGroup => Token::new_end_group(c, raw_token.trace_key),
+                CatCode::MathShift => Token::new_math_shift(c, raw_token.trace_key),
+                CatCode::AlignmentTab => Token::new_alignment_tab(c, raw_token.trace_key),
+                CatCode::Parameter => Token::new_parameter(c, raw_token.trace_key),
+                CatCode::Superscript => Token::new_superscript(c, raw_token.trace_key),
+                CatCode::Subscript => Token::new_subscript(c, raw_token.trace_key),
+                CatCode::Letter => Token::new_letter(c, raw_token.trace_key),
+                CatCode::Other => Token::new_other(c, raw_token.trace_key),
+                CatCode::Active => Token::new_active_character(c, raw_token.trace_key),
                 CatCode::Comment => {
                     while let Some(next_raw_token) = self.raw_lexer.peek(cat_code_map) {
                         if next_raw_token.code == CatCode::EndOfLine {
@@ -155,7 +154,7 @@ impl Lexer {
                 // TODO: this should be an end of input errro
                 return Err(LexerError::MalformedControlSequence(
                     error::TokenError::new(
-                        token::Token::new_other(raw_token.char, 0),
+                        token::Token::new_other(raw_token.char, raw_token.trace_key),
                         MALFORMED_CONTROL_SEQUENCE_ERROR_TITLE,
                     )
                     .add_note(MALFORMED_CONTROL_SEQUENCE_ERROR_HELP)
@@ -189,19 +188,19 @@ impl Lexer {
 struct RawToken {
     code: CatCode,
     char: char,
-    traceback_id: TracebackId,
+    trace_key: trace::Key,
 }
 
 struct RawLexer {
     iter: Peekable<OwningChars>,
-    next_traceback_id: TracebackId,
+    trace_key_range: trace::KeyRange,
 }
 
 impl RawLexer {
-    pub fn new(source_code: String, next_free_traceback_id: TracebackId) -> RawLexer {
+    pub fn new(source_code: String, trace_key_range: trace::KeyRange) -> RawLexer {
         RawLexer {
             iter: OwningChars::new(source_code).peekable(),
-            next_traceback_id: next_free_traceback_id,
+            trace_key_range,
         }
     }
 
@@ -209,11 +208,10 @@ impl RawLexer {
         match self.iter.next() {
             Some(c) => {
                 let code = *map.get(&c);
-                self.next_traceback_id += 1;
                 Some(RawToken {
                     char: c,
                     code,
-                    traceback_id: self.next_traceback_id - 1,
+                    trace_key: self.trace_key_range.next(),
                 })
             }
             None => None,
@@ -228,7 +226,7 @@ impl RawLexer {
                 Some(RawToken {
                     char: c,
                     code,
-                    traceback_id: self.next_traceback_id,
+                    trace_key: self.trace_key_range.peek(),
                 })
             }
             None => None,
@@ -237,7 +235,7 @@ impl RawLexer {
 
     fn advance(&mut self) {
         self.iter.next();
-        self.next_traceback_id += 1;
+        self.trace_key_range.next();
     }
 }
 
@@ -271,7 +269,7 @@ mod tests {
         ( $name: ident, $input: expr, $ ( $expected_token : expr, ) * ) => {
             #[test]
             fn $name() {
-                let mut lexer = Lexer::new($input.to_string(), 0);
+                let mut lexer = Lexer::new($input.to_string(), trace::KeyRange::for_testing());
                 let mut map = CatCodeMap::new_with_tex_defaults();
                 map.insert('X', EndOfLine);
                 map.insert('Y', Space);

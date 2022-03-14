@@ -29,7 +29,7 @@ fn main() {
     match opts.subcmd {
         SubCommand::Exec(e) => {
             if let Err(err) = exec(&e.file_path) {
-                print!("Error: {}", err);
+                print!("{}", err);
                 std::process::exit(1);
             }
         }
@@ -39,12 +39,10 @@ fn main() {
 fn exec(file_name: &str) -> Result<(), anyhow::Error> {
     let source_code = fs::read_to_string(file_name)?;
     let mut env = init_state();
-    env.push_source(source_code)?;
-    let mut execution_input = runtime::ExecutionInput::new(env);
-    let tokens = execwhitespace::exec(&mut execution_input, true)?;
-    let s = execution_input.take_env();
-    let pretty = token::write_tokens(&tokens, s.cs_name_interner());
-    print!("{}", pretty);
+    env.push_source(file_name.to_string(), source_code)?;
+    let tokens = execwhitespace::exec(&mut env, true)?;
+    let pretty = token::write_tokens(&tokens, env.cs_name_interner());
+    println!("{}", pretty);
     Ok(())
 }
 
@@ -101,6 +99,6 @@ fn init_state() -> runtime::Env<StdLibState> {
     let mut s = StdLibState::new();
     s.set_command("par", execwhitespace::get_par());
     s.set_command("newline", execwhitespace::get_newline());
-    s.set_command("\\", command::Command::Character(Token::new_other('\\', 0)));
+    s.set_command("\\", command::Command::Character(Value::Other('\\')));
     s
 }

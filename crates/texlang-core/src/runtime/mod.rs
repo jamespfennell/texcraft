@@ -9,30 +9,39 @@ use super::token::CsName;
 use crate::command::Command;
 use crate::command::CommandsMap;
 use crate::error;
+use crate::token;
 use crate::token::catcode::CatCodeMap;
 use crate::token::lexer;
+use crate::token::trace;
 use crate::token::CsNameInterner;
 use crate::token::Token;
-use crate::token::TracebackId;
 use crate::token::Value::ControlSequence;
 use crate::variable;
 use std::collections::HashMap;
 
 mod streams;
-pub use streams::ExecutionInput;
+pub use streams::*;
+/*
+ExecutionInput;
 pub use streams::ExpandedInput;
 pub use streams::HasExpansionState;
 pub use streams::TokenStream;
 pub use streams::UnexpandedStream;
+*/
 
+/// Run the Texlang interpreter for the provided environment.
+///
+/// It is assumed that the environment has been preloaded with TeX source using the
+/// [Env::push_source] method.
 pub fn run<S>(
-    execution_input: &mut ExecutionInput<S>,
+    env: &mut Env<S>,
     character_handler: fn(Token, &mut ExecutionInput<S>) -> anyhow::Result<()>,
     undefined_cs_handler: fn(Token, &mut ExecutionInput<S>) -> anyhow::Result<()>,
 ) -> anyhow::Result<()> {
+    let execution_input = ExecutionInput::new(env);
     loop {
         let fully_expanded_token = execution_input.next();
-        match fully_expanded_token {
+        let result = match fully_expanded_token {
             Ok(token) => match token {
                 None => {
                     break;
@@ -50,35 +59,44 @@ pub fn run<S>(
                                 // could also imagine implementing an \undef command that would result in the
                                 // reference becoming null during the execution.
                                 let cmd = *cmd_ref;
-                                cmd.call(token, execution_input)?;
+                                cmd.call(token, execution_input)
                             }
                             Some(Command::Variable(cmd_ref)) => {
                                 let cmd = *cmd_ref;
-                                let var = cmd.resolve(token, execution_input.regular())?;
-                                variable::set(var, token, execution_input)?;
+                                let var = cmd.resolve(token, execution_input)?;
+                                variable::set_using_input(var, execution_input, false)
                             }
-                            Some(Command::Character(token)) => {
-                                character_handler(*token, execution_input)?;
-                            }
+                            Some(Command::Character(token_value)) => character_handler(
+                                Token::new_from_value(*token_value, token.trace_key()),
+                                execution_input,
+                            ),
                             None | Some(Command::Expansion(_)) | Some(Command::Macro(_)) => {
-                                undefined_cs_handler(token, execution_input)?;
+                                undefined_cs_handler(token, execution_input)
                             }
                         }
                     }
-                    _ => {
-                        character_handler(token, execution_input)?;
+                    token::Value::BeginGroup(_) => {
+                        execution_input.begin_group();
+                        Ok(())
                     }
+                    token::Value::EndGroup(_) => {
+                        execution_input.end_group();
+                        Ok(())
+                    }
+                    _ => character_handler(token, execution_input),
                 },
             },
-            Err(mut error) => {
-                error::add_context(&mut error, execution_input);
-                return Err(error);
-            }
+            Err(err) => Err(err),
         };
+        if let Err(mut err) = result {
+            error::add_context(&mut err, execution_input);
+            return Err(err);
+        }
     }
     Ok(())
 }
 
+/// Handler that returns an error when a control sequence is undefined.
 pub fn default_undefined_cs_handler<S>(
     token: Token,
     input: &mut streams::ExecutionInput<S>,
@@ -94,8 +112,8 @@ pub fn default_undefined_cs_handler<S>(
 pub struct Env<S> {
     pub base_state: BaseState<S>,
     pub custom_state: S,
-    pub internal: InternalEnv,
     pub file_system_ops: Box<dyn FileSystemOps>,
+    internal: InternalEnv<S>,
 }
 
 /// File system operations that TeX may need to perform.
@@ -153,9 +171,9 @@ impl<S> Env<S> {
     ///
     /// TeX input source code is organized as a stack.
     /// Pushing source code onto the stack will mean it is executed first.
-    pub fn push_source(&mut self, source_code: String) -> anyhow::Result<()> {
+    pub fn push_source(&mut self, file_name: String, source_code: String) -> anyhow::Result<()> {
         self.internal
-            .push_source(source_code, self.base_state.max_input_levels)
+            .push_source(file_name, source_code, self.base_state.max_input_levels)
     }
 
     /// Set a command.
@@ -187,17 +205,29 @@ impl<S> Env<S> {
         map
     }
 
-    /// Return a reference to the environment control sequence name string interner.
+    /// Return a reference to the control sequence name string interner.
     ///
     /// This interner can be used to resolve [CsName] types into regular strings.
     #[inline]
     pub fn cs_name_interner(&self) -> &CsNameInterner {
         &self.internal.cs_name_interner
     }
+
+    fn begin_group(&mut self) {
+        self.base_state.commands_map.begin_group();
+        self.internal.groups.push(Default::default());
+    }
+
+    fn end_group(&mut self) {
+        if let Some(group) = self.internal.groups.pop() {
+            assert![self.base_state.commands_map.end_group()];
+            group.restore(&mut self.base_state, &mut self.custom_state);
+        }
+    }
 }
 
 /// Parts of the runtime environment that are only visible to the runtime itself.
-pub struct InternalEnv {
+struct InternalEnv<S> {
     // The sources form a stack. We store the top element directly on the env
     // for performance reasons.
     current_source: Source,
@@ -206,11 +236,15 @@ pub struct InternalEnv {
     // The working directory is used as the root for relative file paths.
     working_directory: Option<std::path::PathBuf>,
     cs_name_interner: CsNameInterner,
-    traceback_checkpoints: HashMap<TracebackId, String>,
-    next_free_traceback_id: TracebackId,
+
+    tracer: trace::Tracer,
+
+    scratch_space: Vec<Token>,
+
+    groups: Vec<variable::RestoreValues<S>>,
 }
 
-impl Default for InternalEnv {
+impl<S> Default for InternalEnv<S> {
     fn default() -> Self {
         InternalEnv {
             current_source: Default::default(),
@@ -223,25 +257,28 @@ impl Default for InternalEnv {
                 }
             },
             cs_name_interner: Default::default(),
-            traceback_checkpoints: Default::default(),
-            next_free_traceback_id: Default::default(),
+            tracer: Default::default(),
+            scratch_space: Default::default(),
+            groups: Default::default(),
         }
     }
 }
 
-impl InternalEnv {
-    fn push_source(&mut self, source_code: String, max_input_levels: i32) -> anyhow::Result<()> {
+impl<S> InternalEnv<S> {
+    fn push_source(
+        &mut self,
+        file_name: String,
+        source_code: String,
+        max_input_levels: i32,
+    ) -> anyhow::Result<()> {
         if self.sources.len() + 1 >= max_input_levels.try_into().unwrap() {
             return Err(anyhow::anyhow!(
                 "maximum number of input levels ({}) exceeded",
                 max_input_levels
             ));
         }
-        self.traceback_checkpoints
-            .insert(self.next_free_traceback_id, source_code.clone());
-        let source_code_len = source_code.len();
-        let mut new_source = Source::new(source_code, self.next_free_traceback_id);
-        self.next_free_traceback_id += TracebackId::try_from(source_code_len).unwrap();
+        let trace_key_range = self.tracer.register_source_code(file_name, &source_code);
+        let mut new_source = Source::new(source_code, trace_key_range);
         std::mem::swap(&mut new_source, &mut self.current_source);
         self.sources.push(new_source);
         Ok(())
@@ -276,17 +313,17 @@ struct Source {
 }
 
 impl Source {
-    pub fn new(source_code: String, next_free_traceback_id: TracebackId) -> Source {
+    pub fn new(source_code: String, trace_key_range: trace::KeyRange) -> Source {
         Source {
             expansions: Vec::with_capacity(32),
-            root: lexer::Lexer::new(source_code, next_free_traceback_id),
+            root: lexer::Lexer::new(source_code, trace_key_range),
         }
     }
 }
 
 impl Default for Source {
     fn default() -> Self {
-        Source::new("".to_string(), 0)
+        Source::new("".to_string(), trace::KeyRange::empty())
     }
 }
 

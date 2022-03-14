@@ -3,6 +3,7 @@
 use crate::error;
 use crate::parse;
 use crate::prelude::*;
+use crate::runtime::HasEnv;
 use crate::token::write_tokens;
 use crate::token::CsNameInterner;
 use crate::token::Token;
@@ -38,57 +39,58 @@ impl Macro {
     pub fn call<S>(
         &self,
         token: Token,
-        input: &mut runtime::ExpandedInput<S>,
+        input: &mut runtime::ExpansionInput<S>,
     ) -> anyhow::Result<()> {
         remove_tokens_from_stream(
             &self.prefix,
-            input.unexpanded_stream(),
+            input.unexpanded(),
             "matching the prefix for a user-defined macro",
         )?;
         let mut argument_indices: ArrayVec<(usize, usize), 9> = Default::default();
-        let (unexpanded_stream, argument_tokens) = input.unexpanded_and_scratch_space();
-        argument_tokens.clear();
+        let mut argument_tokens = input.scratch_space();
+        let unexpanded_stream = input.unexpanded();
         for (i, parameter) in self.parameters.iter().enumerate() {
             let start_index = argument_tokens.len();
             let trim_outer_braces =
-                parameter.parse_argument(&token, unexpanded_stream, i, argument_tokens)?;
+                parameter.parse_argument(&token, unexpanded_stream, i, &mut argument_tokens)?;
             let element = match trim_outer_braces {
                 true => (start_index + 1, argument_tokens.len() - 1),
                 false => (start_index, argument_tokens.len()),
             };
-            unsafe {
-                argument_indices.push_unchecked(element);
-            }
+            argument_indices.push(element);
         }
 
-        let mut arguments: ArrayVec<&[Token], 9> = Default::default();
-        for (i, j) in &argument_indices {
-            let slice = unsafe { argument_tokens.get_unchecked(*i..*j) };
-            unsafe {
-                arguments.push_unchecked(slice);
+        // We need a block here to make the borrow checker happy about the lifetimes on the
+        // `arguments` and `argument_tokens` variables.
+        {
+            let mut arguments: ArrayVec<&[Token], 9> = Default::default();
+            for (i, j) in &argument_indices {
+                let slice = argument_tokens.get(*i..*j).unwrap();
+                arguments.push(slice);
             }
-        }
 
-        let result = unexpanded_stream.expansions_mut();
-        Macro::perform_replacement(&self.replacement_text, &arguments, result);
+            let result = input.expansions_mut();
+            Macro::perform_replacement(&self.replacement_text, &arguments, result);
 
-        if unexpanded_stream.base().tracing_macros > 0 {
-            println![" +---[ Tracing macro expansion of {} ]--+", token];
-            for (i, argument) in arguments.iter().enumerate() {
+            if input.base().tracing_macros > 0 {
+                println![" +---[ Tracing macro expansion of {} ]--+", token];
+                for (i, argument) in arguments.iter().enumerate() {
+                    println![
+                        " | {}{}={}",
+                        "#".bright_yellow().bold(),
+                        (i + 1).to_string().bright_yellow().bold(),
+                        write_tokens(*argument, input.env().cs_name_interner()).bright_yellow()
+                    ]
+                }
                 println![
-                    " | {}{}={}",
-                    "#".bright_yellow().bold(),
-                    (i + 1).to_string().bright_yellow().bold(),
-                    write_tokens(*argument, unexpanded_stream.env().cs_name_interner())
-                        .bright_yellow()
-                ]
+                    " | Expansion:\n | ```\n | todo: renable this\n | ```",
+                    // write_tokens(result.iter(), &input.base().cs_names)
+                ];
+                println![" +--------------------------------+\n"];
             }
-            println![
-                " | Expansion:\n | ```\n | todo: renable this\n | ```",
-                // write_tokens(result.iter(), &input.base().cs_names)
-            ];
-            println![" +--------------------------------+\n"];
         }
+
+        input.return_scratch_space(argument_tokens);
         Ok(())
     }
 
@@ -138,7 +140,7 @@ impl Macro {
         for replacement in replacements.iter() {
             output_size += match replacement {
                 Replacement::Tokens(tokens) => tokens.len(),
-                Replacement::Parameter(i) => unsafe { arguments.get_unchecked(*i) }.len(),
+                Replacement::Parameter(i) => arguments.get(*i).unwrap().len(),
             };
         }
         result.reserve(output_size);
@@ -148,7 +150,7 @@ impl Macro {
                     result.extend(tokens);
                 }
                 Replacement::Parameter(i) => {
-                    result.extend(unsafe { arguments.get_unchecked(*i) }.iter().rev().copied());
+                    result.extend(arguments.get(*i).unwrap().iter().rev().copied());
                 }
             }
         }

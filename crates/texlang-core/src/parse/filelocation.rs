@@ -13,7 +13,7 @@ pub struct FileLocation {
 }
 
 pub fn parse_file_location<S>(
-    stream: &mut runtime::ExpandedInput<S>,
+    stream: &mut runtime::ExpansionInput<S>,
 ) -> anyhow::Result<FileLocation> {
     let mut raw_string = String::new();
     let mut area_delimiter = None;
@@ -60,8 +60,8 @@ mod tests {
         ($name: ident, $input: expr, $file_path: expr, ) => {
             #[test]
             fn $name() {
-                let mut execution_input = testutil::new_execution_input($input);
-                let result = parse_file_location(execution_input.regular()).unwrap();
+                let mut env = testutil::new_env($input);
+                let result = parse_file_location(runtime::ExpansionInput::new(&mut env)).unwrap();
                 assert_eq![result, $file_path];
             }
         };

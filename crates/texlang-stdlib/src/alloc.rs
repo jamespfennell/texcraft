@@ -186,8 +186,7 @@ fn newint_primitive_fn<S: HasComponent<Component>>(
     newint_token: Token,
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    let name =
-        parse::parse_command_target("newint allocation", newint_token, input.unexpanded_stream())?;
+    let name = parse::parse_command_target("newint allocation", newint_token, input.unexpanded())?;
     let addr = input.state_mut().component_mut().alloc_int();
     input
         .base_mut()
@@ -198,7 +197,7 @@ fn newint_primitive_fn<S: HasComponent<Component>>(
 
 fn singleton_fn<S: HasComponent<Component>>(
     _: Token,
-    _: &mut runtime::ExpandedInput<S>,
+    _: &mut runtime::ExpansionInput<S>,
     addr: usize,
 ) -> anyhow::Result<Variable<S>> {
     Ok(Variable::Int(TypedVariable::new(
@@ -229,12 +228,9 @@ fn newarray_primitive_fn<S: HasComponent<Component>>(
     newarray_token: Token,
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    let name = parse::parse_command_target(
-        "newarray allocation",
-        newarray_token,
-        input.unexpanded_stream(),
-    )?;
-    let len: usize = parse::parse_number(input.regular())?;
+    let name =
+        parse::parse_command_target("newarray allocation", newarray_token, input.unexpanded())?;
+    let len: usize = parse::parse_number(input)?;
     let addr = input.state_mut().component_mut().alloc_array(len);
     input
         .base_mut()
@@ -247,7 +243,7 @@ fn newarray_primitive_fn<S: HasComponent<Component>>(
 /// Variable command function for commands defined using \newarray.
 fn array_fn<S: HasComponent<Component>>(
     array_token: Token,
-    input: &mut runtime::ExpandedInput<S>,
+    input: &mut runtime::ExpansionInput<S>,
     array_addr: usize,
 ) -> anyhow::Result<Variable<S>> {
     let array_index: usize = parse::parse_number(input)?;
