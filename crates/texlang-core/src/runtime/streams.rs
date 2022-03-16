@@ -99,6 +99,10 @@ pub trait HasEnv {
             .tracer
             .trace(token, &self.env().internal.cs_name_interner)
     }
+
+    fn trace_end_of_input(&self) -> trace::Trace {
+        self.env().internal.tracer.trace_end_of_input()
+    }
 }
 
 /// A [TokenStream] that performs expansion.
@@ -253,8 +257,18 @@ impl<S> ExpansionInput<S> {
 
     /// Push source code to the front of the input stream.
     #[inline]
-    pub fn push_source(&mut self, file_name: String, source_code: String) -> anyhow::Result<()> {
-        self.0.push_source(file_name, source_code)
+    pub fn push_source(
+        &mut self,
+        token: Token,
+        file_name: String,
+        source_code: String,
+    ) -> anyhow::Result<()> {
+        self.0.internal.push_source(
+            Some(token),
+            file_name,
+            source_code,
+            self.0.base_state.max_input_levels,
+        )
     }
 
     /// Push tokens to the front of the input stream.

@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::execwhitespace;
+use crate::script;
 use crate::prefix;
 use anyhow::Result;
 use texlang_core::runtime;
@@ -14,13 +14,13 @@ use texlang_core::token::catcode;
 
 #[derive(Default)]
 pub struct State {
-    exec: execwhitespace::Component,
+    exec: script::Component,
     prefix: prefix::Component,
 }
 
 implement_has_component![
     State,
-    (execwhitespace::Component, exec),
+    (script::Component, exec),
     (prefix::Component, prefix),
 ];
 
@@ -103,7 +103,7 @@ macro_rules! expansion_failure_test {
 
 pub use expansion_failure_test;
 
-pub fn run<S: Default + HasComponent<execwhitespace::Component>>(
+pub fn run<S: Default + HasComponent<script::Component>>(
     setup_fn: fn(&mut Env<S>),
     source: String,
 ) -> (Result<Vec<token::Token>>, Env<S>) {
@@ -113,7 +113,7 @@ pub fn run<S: Default + HasComponent<execwhitespace::Component>>(
     );
     setup_fn(&mut env);
     env.push_source("testutil.tex".to_string(), source).unwrap();
-    let output = execwhitespace::exec(&mut env, false);
+    let output = script::run(&mut env, false);
     (output, env)
 }
 

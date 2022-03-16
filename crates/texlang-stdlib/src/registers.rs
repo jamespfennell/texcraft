@@ -149,7 +149,7 @@ fn integer_register_too_large_error(token: Token, addr: usize, num: usize) -> an
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::execwhitespace;
+    use crate::script;
     use crate::testutil::*;
     use crate::the;
     use texlang_core::runtime::implement_has_component;
@@ -157,13 +157,13 @@ mod tests {
     #[derive(Default)]
     struct State {
         registers: Component<256>,
-        exec: execwhitespace::Component,
+        exec: script::Component,
     }
 
     implement_has_component![
         State,
         (Component<256>, registers),
-        (execwhitespace::Component, exec),
+        (script::Component, exec),
     ];
 
     fn setup_expansion_test(s: &mut runtime::Env<State>) {

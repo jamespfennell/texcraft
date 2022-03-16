@@ -145,7 +145,7 @@ create_arithmetic_primitive![divide_fn, divide];
 mod tests {
     use super::*;
     use crate::catcodecmd;
-    use crate::execwhitespace;
+    use crate::script;
     use crate::registers;
     use crate::testutil::*;
     use crate::the;
@@ -154,14 +154,14 @@ mod tests {
     #[derive(Default)]
     struct State {
         registers: registers::Component<256>,
-        exec: execwhitespace::Component,
+        exec: script::Component,
         prefix: prefix::Component,
     }
 
     implement_has_component![
         State,
         (registers::Component<256>, registers),
-        (execwhitespace::Component, exec),
+        (script::Component, exec),
         (prefix::Component, prefix),
     ];
 

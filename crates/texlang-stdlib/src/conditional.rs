@@ -454,19 +454,19 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{execwhitespace, testutil::*};
+    use crate::{script, testutil::*};
     use texlang_core::runtime::implement_has_component;
 
     #[derive(Default)]
     struct State {
         conditional: Component,
-        exec: execwhitespace::Component,
+        exec: script::Component,
     }
 
     implement_has_component![
         State,
         (Component, conditional),
-        (execwhitespace::Component, exec),
+        (script::Component, exec),
     ];
 
     impl runtime::HasExpansionState for State {

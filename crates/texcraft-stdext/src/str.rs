@@ -15,10 +15,21 @@ impl OwningChars {
     pub fn take_string(self) -> String {
         self.s
     }
+
+    pub fn str(&self) -> &str {
+        &self.s
+    }
+
+    #[inline]
+    pub fn peek(&self) -> Option<char> {
+        self.s[self.pos..].chars().next()
+    }
 }
 
 impl std::iter::Iterator for OwningChars {
     type Item = char;
+
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let c_opt = self.s[self.pos..].chars().next();
         if let Some(c) = c_opt {

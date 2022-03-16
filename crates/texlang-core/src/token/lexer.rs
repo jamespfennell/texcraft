@@ -22,8 +22,6 @@ use crate::token::trace;
 use crate::token::CsNameInterner;
 use crate::token::Token;
 use std::fmt;
-use std::io;
-use std::iter::Peekable;
 use texcraft_stdext::str::OwningChars;
 
 const MALFORMED_CONTROL_SEQUENCE_ERROR_TITLE: &str = "Unexpected end of file";
@@ -34,7 +32,6 @@ const MALFORMED_CONTROL_SEQUENCE_ERROR_HELP: &str =
 pub enum LexerError {
     MalformedControlSequence(anyhow::Error),
     InvalidToken,
-    IO(io::Error),
 }
 
 impl fmt::Display for LexerError {
@@ -45,13 +42,7 @@ impl fmt::Display for LexerError {
 
 impl std::error::Error for LexerError {}
 
-impl From<io::Error> for LexerError {
-    fn from(io_error: std::io::Error) -> Self {
-        LexerError::IO(io_error)
-    }
-}
-
-/// The Lexer...
+/// The Texlang lexer
 pub struct Lexer {
     raw_lexer: RawLexer,
     trim_next_whitespace: bool,
@@ -183,6 +174,10 @@ impl Lexer {
         };
         Ok(cs_name_interner.get_or_intern(&self.scratch_string))
     }
+
+    pub fn source_code(&self) -> &str {
+        self.raw_lexer.iter.str()
+    }
 }
 
 struct RawToken {
@@ -192,14 +187,14 @@ struct RawToken {
 }
 
 struct RawLexer {
-    iter: Peekable<OwningChars>,
+    iter: OwningChars,
     trace_key_range: trace::KeyRange,
 }
 
 impl RawLexer {
     pub fn new(source_code: String, trace_key_range: trace::KeyRange) -> RawLexer {
         RawLexer {
-            iter: OwningChars::new(source_code).peekable(),
+            iter: OwningChars::new(source_code),
             trace_key_range,
         }
     }
@@ -221,7 +216,6 @@ impl RawLexer {
     fn peek(&mut self, map: &CatCodeMap) -> Option<RawToken> {
         match self.iter.peek() {
             Some(c) => {
-                let c = *c;
                 let code = *map.get(&c);
                 Some(RawToken {
                     char: c,

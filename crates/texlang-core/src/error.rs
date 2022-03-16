@@ -8,6 +8,50 @@ use colored::*;
 use runtime::HasEnv;
 use texcraft_stdext::algorithms::spellcheck;
 
+pub struct DisplayBuilder<'a> {
+    token: &'a trace::Trace,
+    title: String,
+    annotation: String,
+    notes: Vec<String>,
+}
+
+impl<'a> DisplayBuilder<'a> {
+    pub fn new<T: Into<String>>(token: &'a trace::Trace, title: T) -> DisplayBuilder<'a> {
+        DisplayBuilder {
+            token,
+            title: T::into(title),
+            annotation: String::new(),
+            notes: Vec::new(),
+        }
+    }
+
+    pub fn set_annotation<T: Into<String>>(mut self, annotation: T) -> DisplayBuilder<'a> {
+        self.annotation = T::into(annotation);
+        self
+    }
+
+    pub fn add_note<T: Into<String>>(mut self, note: T) -> DisplayBuilder<'a> {
+        self.notes.push(T::into(note));
+        self
+    }
+}
+
+impl<'a> std::fmt::Display for DisplayBuilder<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let margin_width = self.token.line_number.to_string().len() + 1;
+        print_error_header(f, &self.title)?;
+        // TODO: support adding an annotation to the token
+        fmt_traceback_result(self.token, f, margin_width, &self.annotation)?;
+        if !self.notes.is_empty() {
+            print_line_with_bar(f, margin_width)?;
+        }
+        for note in self.notes.iter() {
+            print_line_with_note(f, margin_width, note)?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 struct TokenInSource {
     line_content: String,
@@ -63,7 +107,7 @@ fn fmt_traceback_result(
         " ".repeat(margin_width),
         bar(),
         " ".repeat(tr.index),
-        "^".repeat(tr.width).bright_red().bold(),
+        "^".repeat(tr.value.len()).bright_red().bold(),
         annotation.bright_red(),
     )?;
     Ok(())

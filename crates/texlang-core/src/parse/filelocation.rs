@@ -19,27 +19,30 @@ pub fn parse_file_location<S>(
     let mut area_delimiter = None;
     let mut ext_delimiter = None;
     loop {
-        match stream.peek()? {
+        let t = match stream.peek()? {
             None => break,
-            Some(t) => match t.char() {
-                None => break,
-                Some(c) => {
-                    let _ = stream.consume();
-                    match c {
-                        ' ' => break,
-                        '>' | ':' => {
-                            area_delimiter = Some(raw_string.len() + 1);
-                            ext_delimiter = None;
-                        }
-                        '.' => {
-                            ext_delimiter = Some(raw_string.len());
-                        }
-                        _ => (),
-                    }
-                    raw_string.push(c);
-                }
-            },
+            Some(t) => t,
+        };
+        if let Value::Space(_) = t.value() {
+            let _ = stream.consume();
+            break;
         }
+        let c = match t.char() {
+            None => break,
+            Some(c) => c,
+        };
+        let _ = stream.consume();
+        match c {
+            '>' | ':' => {
+                area_delimiter = Some(raw_string.len() + 1);
+                ext_delimiter = None;
+            }
+            '.' => {
+                ext_delimiter = Some(raw_string.len());
+            }
+            _ => (),
+        }
+        raw_string.push(c);
     }
 
     Ok(FileLocation {
@@ -70,6 +73,16 @@ mod tests {
     parse_file_path_test![
         path_only,
         "path/to/file",
+        FileLocation {
+            path: "path/to/file".to_string(),
+            extension: None,
+            area: None,
+        },
+    ];
+
+    parse_file_path_test![
+        path_only_newline,
+        "path/to/file\n",
         FileLocation {
             path: "path/to/file".to_string(),
             extension: None,

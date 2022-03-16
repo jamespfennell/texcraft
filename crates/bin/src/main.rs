@@ -2,7 +2,7 @@ use clap::Parser;
 use std::fs;
 use texlang_core::prelude::*;
 use texlang_core::token;
-use texlang_stdlib::execwhitespace;
+use texlang_stdlib::script;
 use texlang_stdlib::StdLibState;
 
 /// Texcraft
@@ -40,7 +40,7 @@ fn exec(file_name: &str) -> Result<(), anyhow::Error> {
     let source_code = fs::read_to_string(file_name)?;
     let mut env = init_state();
     env.push_source(file_name.to_string(), source_code)?;
-    let tokens = execwhitespace::exec(&mut env, true)?;
+    let tokens = script::run(&mut env, true)?;
     let pretty = token::write_tokens(&tokens, env.cs_name_interner());
     println!("{}", pretty);
     Ok(())
@@ -97,8 +97,8 @@ fn docs(cs_name: &str, optional_file_name: Option<&String>) -> Result<(), anyhow
 
 fn init_state() -> runtime::Env<StdLibState> {
     let mut s = StdLibState::new();
-    s.set_command("par", execwhitespace::get_par());
-    s.set_command("newline", execwhitespace::get_newline());
+    s.set_command("par", script::get_par());
+    s.set_command("newline", script::get_newline());
     s.set_command("\\", command::Command::Character(Value::Other('\\')));
     s
 }

@@ -14,7 +14,7 @@ pub mod alloc;
 pub mod catcodecmd;
 pub mod conditional;
 pub mod def;
-pub mod execwhitespace;
+pub mod script;
 pub mod io;
 pub mod letassignment;
 pub mod prefix;
@@ -31,7 +31,7 @@ pub mod variableops;
 #[derive(Default)]
 pub struct StdLibState {
     alloc: alloc::Component,
-    exec: execwhitespace::Component,
+    exec: script::Component,
     registers: registers::Component<32768>,
     prefix: prefix::Component,
     time: time::Component,
@@ -96,7 +96,7 @@ impl HasExpansionState for StdLibState {
 implement_has_component![
     StdLibState,
     (alloc::Component, alloc),
-    (execwhitespace::Component, exec),
+    (script::Component, exec),
     (registers::Component<32768>, registers),
     (prefix::Component, prefix),
     (time::Component, time),
