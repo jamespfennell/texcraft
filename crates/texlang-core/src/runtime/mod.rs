@@ -172,8 +172,12 @@ impl<S> Env<S> {
     /// TeX input source code is organized as a stack.
     /// Pushing source code onto the stack will mean it is executed first.
     pub fn push_source(&mut self, file_name: String, source_code: String) -> anyhow::Result<()> {
-        self.internal
-            .push_source(file_name, source_code, self.base_state.max_input_levels)
+        self.internal.push_source(
+            None,
+            file_name,
+            source_code,
+            self.base_state.max_input_levels,
+        )
     }
 
     /// Set a command.
@@ -267,6 +271,7 @@ impl<S> Default for InternalEnv<S> {
 impl<S> InternalEnv<S> {
     fn push_source(
         &mut self,
+        token: Option<Token>,
         file_name: String,
         source_code: String,
         max_input_levels: i32,
@@ -277,7 +282,9 @@ impl<S> InternalEnv<S> {
                 max_input_levels
             ));
         }
-        let trace_key_range = self.tracer.register_source_code(file_name, &source_code);
+        let trace_key_range = self
+            .tracer
+            .register_source_code(token, file_name, &source_code);
         let mut new_source = Source::new(source_code, trace_key_range);
         std::mem::swap(&mut new_source, &mut self.current_source);
         self.sources.push(new_source);

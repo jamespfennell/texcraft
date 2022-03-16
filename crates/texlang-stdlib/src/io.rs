@@ -19,7 +19,7 @@ pub mod input {
     ) -> anyhow::Result<Vec<Token>> {
         let file_location = parse::parse_file_location(input)?;
         let (file_path, source_code) = read_file(input_token, input.env(), file_location, ".tex")?;
-        input.push_source(file_path, source_code)?;
+        input.push_source(input_token, file_path, source_code)?;
         Ok(Vec::new())
     }
 

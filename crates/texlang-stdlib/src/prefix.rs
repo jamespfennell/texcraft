@@ -94,6 +94,20 @@ struct Prefix {
     outer: Option<Token>,
 }
 
+impl Prefix {
+    fn get_one(&self) -> (Token, Kind) {
+        if let Some(global_token) = self.global {
+            (global_token, Kind::Global)
+        } else if let Some(long_token) = self.long {
+            (long_token, Kind::Long)
+        } else if let Some(outer_token) = self.outer {
+            (outer_token, Kind::Outer)
+        } else {
+            panic!("")
+        }
+    }
+}
+
 /// Get the `\global` command.
 pub fn get_global<S: HasComponent<Component>>() -> command::ExecutionPrimitive<S> {
     command::ExecutionPrimitive::new(global_primitive_fn, global_id())
@@ -175,11 +189,18 @@ fn process_prefixes<S: HasComponent<Component>>(
 ) -> anyhow::Result<()> {
     complete_prefix(&mut prefix, input)?;
     match input.peek()? {
-        None => Err(error::EndOfInputError::new("").cast()),
+        None => {
+            let (prefix_token, prefix_kind) = prefix.get_one();
+            Err(Error::EndOfInputAfterPrefix {
+                end_of_input: input.trace_end_of_input(),
+                prefix_token: input.trace(prefix_token),
+                prefix_kind,
+            }.into())
+        }
         Some(&t) => match t.value() {
             Value::ControlSequence(name) => match input.base().commands_map.get(&name) {
                 Some(command::Command::Variable(cmd_ref)) => {
-                    // TODO: error if \long or \outer is set, like we do below
+                    check_only_global(t, prefix, input)?;
                     let cmd = *cmd_ref;
                     input.consume()?;
                     let var = cmd.resolve(t, input)?;
@@ -197,41 +218,38 @@ fn process_prefixes<S: HasComponent<Component>>(
                         .prefixable_with_global
                         .contains(&cmd_id)
                     {
-                        // TODO: add the outer token to the error
-                        if prefix.outer.is_some() {
-                            let cs_name = input.env().cs_name_interner().resolve(&name).unwrap();
-                            Err(error::TokenError::new(
-                                t,
-                                format![r"the command \{} cannot be prefixed with \outer", cs_name],
-                            )
-                            .cast())
-                        } else if prefix.long.is_some() {
-                            let cs_name = input.env().cs_name_interner().resolve(&name).unwrap();
-                            Err(error::TokenError::new(
-                                t,
-                                format![r"the command \{} cannot be prefixed with \long", cs_name],
-                            )
-                            .cast())
-                        } else {
-                            input.state_mut().component_mut().global = prefix.global.is_some();
-                            Ok(())
-                        }
+                        check_only_global(t, prefix, input)?;
+                        input.state_mut().component_mut().global = prefix.global.is_some();
+                        Ok(())
                     } else {
-                        Err(
-                            error::TokenError::new(t, r"unexpected target of \global command 2")
-                                .cast(),
-                        )
+                        let (prefix_token, prefix_kind) = prefix.get_one();
+                        Err(Error::CommandCannotBePrefixed {
+                            command_token: input.trace(t),
+                            prefix_token: input.trace(prefix_token),
+                            prefix_kind,
+                        }
+                        .into())
                     }
                 }
                 _ => {
-                    Err(error::TokenError::new(t, r"unexpected target of \global command 3").cast())
+                    let (prefix_token, prefix_kind) = prefix.get_one();
+                    Err(Error::CommandCannotBePrefixed {
+                        command_token: input.trace(t),
+                        prefix_token: input.trace(prefix_token),
+                        prefix_kind,
+                    }
+                    .into())
                 }
             },
-            _ => Err(error::TokenError::new(
-                t,
-                format![r"unexpected target of \global command 4 {:?}", t],
-            )
-            .cast()),
+            _ => {
+                let (prefix_token, prefix_kind) = prefix.get_one();
+                Err(Error::TokenCannotBePrefixed {
+                    token: input.trace(t),
+                    prefix_token: input.trace(prefix_token),
+                    prefix_kind,
+                }
+                .into())
+            }
         },
     }
 }
@@ -275,6 +293,115 @@ fn complete_prefix<S>(
     input.consume()?;
     complete_prefix(prefix, input)
 }
+
+fn check_only_global<S>(
+    token: Token,
+    prefix: Prefix,
+    input: &runtime::ExecutionInput<S>,
+) -> anyhow::Result<()> {
+    if let Some(outer_token) = prefix.outer {
+        Err(Error::CommandCannotBePrefixed {
+            command_token: input.trace(token),
+            prefix_token: input.trace(outer_token),
+            prefix_kind: Kind::Outer,
+        }
+        .into())
+    } else if let Some(long_token) = prefix.long {
+        Err(Error::CommandCannotBePrefixed {
+            command_token: input.trace(token),
+            prefix_token: input.trace(long_token),
+            prefix_kind: Kind::Long,
+        }
+        .into())
+    } else {
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Kind {
+    Global,
+    Long,
+    Outer,
+}
+
+/// Error type for the prefix commands.
+#[derive(Debug)]
+pub enum Error {
+    CommandCannotBePrefixed {
+        command_token: trace::Trace,
+        prefix_token: trace::Trace,
+        prefix_kind: Kind,
+    },
+    TokenCannotBePrefixed {
+        token: trace::Trace,
+        prefix_token: trace::Trace,
+        prefix_kind: Kind,
+    },
+    EndOfInputAfterPrefix {
+        end_of_input: trace::Trace,
+        prefix_token: trace::Trace,
+        prefix_kind: Kind,
+    },
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::CommandCannotBePrefixed {
+                command_token,
+                prefix_token,
+                prefix_kind,
+            } => {
+                error::DisplayBuilder::new(
+                    command_token,
+                    format!(
+                        "the command {} cannot be prefixed with {}",
+                        command_token, prefix_token
+                    ),
+                ).add_note(match prefix_kind {
+                    Kind::Global => {
+                        r"see the documention for \global for the list of commands this prefix can be used with"
+                    }
+                    Kind::Long => {
+                        r"the \long prefix can only be used with \def, \gdef, \edef and \xdef (or their aliases)"
+                    }
+                    Kind::Outer => {
+                        r"the \outer prefix can only be used with \def, \gdef, \edef and \xdef (or their aliases)"
+                    }
+                }).fmt(f)
+            }
+            Error::TokenCannotBePrefixed {
+                token,
+                prefix_token,
+                prefix_kind: _,
+            } => {
+                error::DisplayBuilder::new(
+                    token,
+                    format!(
+                        "character tokens cannot be prefixed with {}",
+                        prefix_token
+                    ),
+                ).fmt(f)
+            }
+            Error::EndOfInputAfterPrefix {
+                end_of_input,
+                prefix_token,
+                prefix_kind: _,
+            } => {
+                error::DisplayBuilder::new(
+                    end_of_input,
+                    format!(
+                        "end of input after prefix command {}",
+                        prefix_token
+                    ),
+                ).add_note(r"prefix commands must be followed by a valid prefix target like \def").fmt(f)
+            },
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 /// Get an execution command that checks that the global flag is off.
 ///
