@@ -10,7 +10,7 @@ use texlang_stdlib::alloc;
 use texlang_stdlib::catcodecmd;
 use texlang_stdlib::conditional;
 use texlang_stdlib::def;
-use texlang_stdlib::execwhitespace;
+use texlang_stdlib::script;
 use texlang_stdlib::letassignment;
 use texlang_stdlib::prefix;
 use texlang_stdlib::registers;
@@ -39,7 +39,7 @@ pub fn run(
 ) -> String {
     let mut env = init_state(minutes_since_midnight, day, month, year);
     env.push_source(file_name, input).unwrap();
-    match execwhitespace::exec(&mut env, true) {
+    match script::run(&mut env, true) {
         Ok(tokens) => token::write_tokens(&tokens, env.cs_name_interner()),
         Err(err) => format!["{}", err],
     }
@@ -47,7 +47,7 @@ pub fn run(
 
 struct PlaygroundState {
     alloc: alloc::Component,
-    exec: execwhitespace::Component,
+    exec: script::Component,
     registers: registers::Component<256>,
     prefix: prefix::Component,
     time: time::Component,
@@ -65,7 +65,7 @@ impl HasExpansionState for PlaygroundState {
 implement_has_component![
     PlaygroundState,
     (alloc::Component, alloc),
-    (execwhitespace::Component, exec),
+    (script::Component, exec),
     (registers::Component<256>, registers),
     (prefix::Component, prefix),
     (time::Component, time),
@@ -112,9 +112,9 @@ fn init_state(
 
     s.set_command("newarray", alloc::get_newarray());
     s.set_command("newint", alloc::get_newint());
-    s.set_command("newline", execwhitespace::get_newline());
+    s.set_command("newline", script::get_newline());
 
-    s.set_command("par", execwhitespace::get_par());
+    s.set_command("par", script::get_par());
 
     s.set_command("the", the::get_the());
     s.set_command("time", time::get_time());

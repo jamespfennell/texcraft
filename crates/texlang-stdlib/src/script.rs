@@ -1,4 +1,9 @@
-/// Commands for printing whitespace in exec mode
+/// TeX as a scripting language
+/// 
+/// This module enables using TeX as a scripting language.
+/// TeX files are processed using the usual TeX semantics, but instead
+/// of typesetting the result and outputing it to PDF (say), the output is returned as a list of tokens.
+/// These can be easily converted to a string using [texlang_core::token::write_tokens].
 use texlang_core::prelude::*;
 use texlang_core::runtime::HasComponent;
 
@@ -9,6 +14,8 @@ pub struct Component {
 }
 
 /// Get the `\newline` command.
+/// 
+/// This adds a newline to the output.
 pub fn get_newline<S: HasComponent<Component>>() -> command::ExecutionFn<S> {
     newline_primitive_fn
 }
@@ -25,6 +32,9 @@ fn newline_primitive_fn<S: HasComponent<Component>>(
 }
 
 /// Get the `\par` command.
+/// 
+/// The `\par` command adds two newlines to the output.
+/// Consecutive `\par` commands are treated as one.
 pub fn get_par<S: HasComponent<Component>>() -> command::ExecutionFn<S> {
     par_primitive_fn
 }
@@ -53,7 +63,8 @@ fn par_primitive_fn<S: HasComponent<Component>>(
     Ok(())
 }
 
-pub fn exec<S: HasComponent<Component>>(
+/// Run the Texlang interpreter for the provided environment and return the result as list of tokens.
+pub fn run<S: HasComponent<Component>>(
     env: &mut runtime::Env<S>,
     err_for_undefined_cs: bool,
 ) -> anyhow::Result<Vec<Token>> {

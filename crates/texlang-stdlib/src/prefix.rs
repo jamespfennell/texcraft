@@ -430,7 +430,7 @@ pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::Exec
 mod test {
     use super::*;
     use crate::{
-        execwhitespace,
+        script,
         testutil::{self, *},
         the,
     };
@@ -438,14 +438,14 @@ mod test {
 
     #[derive(Default)]
     struct State {
-        exec: execwhitespace::Component,
+        exec: script::Component,
         prefix: Component,
         integer: i32,
     }
 
     implement_has_component![
         State,
-        (execwhitespace::Component, exec),
+        (script::Component, exec),
         (Component, prefix),
     ];
 

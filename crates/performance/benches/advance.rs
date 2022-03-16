@@ -1,19 +1,19 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use texlang_core::prelude::*;
 use texlang_core::runtime::ExpansionInput;
-use texlang_stdlib::execwhitespace;
+use texlang_stdlib::script;
 use texlang_stdlib::StdLibState;
 
 pub fn advance_bench(c: &mut Criterion) {
     let mut env = StdLibState::new();
-    env.set_command("par", execwhitespace::get_par());
-    env.set_command("newline", execwhitespace::get_newline());
+    env.set_command("par", script::get_par());
+    env.set_command("newline", script::get_newline());
     env.push_source(
         "".to_string(),
         r"\countdef\k 0 \def\a{\advance\k by 1}".to_string(),
     )
     .unwrap();
-    execwhitespace::exec(&mut env, true).unwrap();
+    script::run(&mut env, true).unwrap();
     let a_cs = Token::new_control_sequence(
         env.cs_name_interner()
             .get("a")
@@ -27,7 +27,7 @@ pub fn advance_bench(c: &mut Criterion) {
     group.bench_function("advance", |b| {
         b.iter(|| {
             ExpansionInput::new(&mut env).push_expansion(&expansion);
-            execwhitespace::exec(&mut env, true).unwrap();
+            script::run(&mut env, true).unwrap();
         })
     });
 }

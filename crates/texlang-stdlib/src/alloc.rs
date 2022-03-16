@@ -282,16 +282,16 @@ fn array_element_mut_ref_fn<S: HasComponent<Component>>(state: &mut S, addr: usi
 mod test {
     use super::*;
     use crate::the::get_the;
-    use crate::{execwhitespace, testutil::*};
+    use crate::{script, testutil::*};
     use texlang_core::runtime::implement_has_component;
 
     #[derive(Default)]
     struct State {
         alloc: Component,
-        exec: execwhitespace::Component,
+        exec: script::Component,
     }
 
-    implement_has_component![State, (Component, alloc), (execwhitespace::Component, exec),];
+    implement_has_component![State, (Component, alloc), (script::Component, exec),];
 
     fn setup_expansion_test(s: &mut runtime::Env<State>) {
         s.set_command("newint", get_newint());
