@@ -12,7 +12,7 @@ The big picture goals are:
     to create both the 256 registers of TeX82 and the 32768 registers of pdfTeX.
 
 - Directly integrating TeX engines with IDEs, webservices, and JavaScript/WASM 
-    (see the [Texcraft playground](https://play.texcraft.dev)).
+    (see the [Texcraft playground](https://play.texcraft.dev) for an example of the latter).
 
 - Providing a framework for building new TeX engines with novel features like new page
     breaking algorithms, support for different font formats, etc.
@@ -38,14 +38,18 @@ The Texcraft binary also has a REPL for writing TeX interactively:
 cargo run --bin texcraft repl
 ```
 
+These all work with the limited subset of TeX commands that have been implemented.
+
 In general, though, the point of Texcraft is to be used a library for building
-    the TeX software you want to build.
-The documentation website has beginner-friendly tutorials on working with the libraries.
+    the TeX software you want to build, and eventually we hope if can be used to build
+    real TeX typesetting engines.
+The [documentation website](https://texcraft.dev) has beginner-friendly tutorials on 
+    working with Texcraft as a library.
 
 ## Getting involved
 
 There is a lot of low hanging fruit that is intentionally left unpicked so
-    people who want to contribute have a good starting point.
+    people who want to contribute to Texcraft have a good starting point.
 See the X tag in the GitHub issues.
 Right now the main focus is on completing the Texlang standard library, which is a collection
     of non-typesetting TeX commands like `\def` that every TeX distribution includes.
