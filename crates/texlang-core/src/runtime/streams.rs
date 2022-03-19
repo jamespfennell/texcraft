@@ -499,7 +499,7 @@ mod stream {
             Some(command::Command::Expansion(command)) => {
                 let command = *command;
                 let token = *token;
-                let _ = next_unexpanded(env);
+                consume_peek(env);
                 let output = command.call(token, ExpansionInput::new(env))?;
                 env.internal.push_expansion(&output);
                 peek_expanded(env)
@@ -507,7 +507,7 @@ mod stream {
             Some(command::Command::Macro(command)) => {
                 let command = command.clone();
                 let token = *token;
-                let _ = next_unexpanded(env);
+                consume_peek(env);
                 command.call(token, ExpansionInput::new(env))?;
                 peek_expanded(env)
             }
@@ -530,7 +530,7 @@ mod stream {
             Some(command::Command::Expansion(command)) => {
                 let command = *command;
                 let token = *token;
-                let _ = next_unexpanded(env);
+                consume_peek(env);
                 let output = command.call(token, ExpansionInput::new(env))?;
                 env.internal.push_expansion(&output);
                 Ok(true)
@@ -538,11 +538,18 @@ mod stream {
             Some(command::Command::Macro(command)) => {
                 let command = command.clone();
                 let token = *token;
-                let _ = next_unexpanded(env);
+                consume_peek(env);
                 command.call(token, ExpansionInput::new(env))?;
                 Ok(true)
             }
             _ => Ok(false),
         }
+    }
+
+    #[inline]
+    pub fn consume_peek<S>(env: &mut runtime::Env<S>) {
+        // When we peek at a token, it is placed on top of the expansions stack.
+        // So to consume the token, we just need to remove it from the stack.
+        env.internal.current_source.expansions.pop();
     }
 }

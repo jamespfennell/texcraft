@@ -145,8 +145,8 @@ create_arithmetic_primitive![divide_fn, divide];
 mod tests {
     use super::*;
     use crate::catcodecmd;
-    use crate::script;
     use crate::registers;
+    use crate::script;
     use crate::testutil::*;
     use crate::the;
     use texlang_core::runtime::implement_has_component;

@@ -14,11 +14,11 @@ pub mod alloc;
 pub mod catcodecmd;
 pub mod conditional;
 pub mod def;
-pub mod script;
 pub mod io;
 pub mod letassignment;
 pub mod prefix;
 pub mod registers;
+pub mod script;
 #[cfg(test)]
 pub mod testutil;
 pub mod texcraft;

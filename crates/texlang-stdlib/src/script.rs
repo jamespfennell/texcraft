@@ -1,5 +1,5 @@
 /// TeX as a scripting language
-/// 
+///
 /// This module enables using TeX as a scripting language.
 /// TeX files are processed using the usual TeX semantics, but instead
 /// of typesetting the result and outputing it to PDF (say), the output is returned as a list of tokens.
@@ -14,7 +14,7 @@ pub struct Component {
 }
 
 /// Get the `\newline` command.
-/// 
+///
 /// This adds a newline to the output.
 pub fn get_newline<S: HasComponent<Component>>() -> command::ExecutionFn<S> {
     newline_primitive_fn
@@ -32,7 +32,7 @@ fn newline_primitive_fn<S: HasComponent<Component>>(
 }
 
 /// Get the `\par` command.
-/// 
+///
 /// The `\par` command adds two newlines to the output.
 /// Consecutive `\par` commands are treated as one.
 pub fn get_par<S: HasComponent<Component>>() -> command::ExecutionFn<S> {

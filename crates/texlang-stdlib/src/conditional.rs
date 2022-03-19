@@ -463,11 +463,7 @@ mod tests {
         exec: script::Component,
     }
 
-    implement_has_component![
-        State,
-        (Component, conditional),
-        (script::Component, exec),
-    ];
+    implement_has_component![State, (Component, conditional), (script::Component, exec),];
 
     impl runtime::HasExpansionState for State {
         type E = State;

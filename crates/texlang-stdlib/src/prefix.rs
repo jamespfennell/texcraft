@@ -195,7 +195,8 @@ fn process_prefixes<S: HasComponent<Component>>(
                 end_of_input: input.trace_end_of_input(),
                 prefix_token: input.trace(prefix_token),
                 prefix_kind,
-            }.into())
+            }
+            .into())
         }
         Some(&t) => match t.value() {
             Value::ControlSequence(name) => match input.base().commands_map.get(&name) {
@@ -443,11 +444,7 @@ mod test {
         integer: i32,
     }
 
-    implement_has_component![
-        State,
-        (script::Component, exec),
-        (Component, prefix),
-    ];
+    implement_has_component![State, (script::Component, exec), (Component, prefix),];
 
     fn setup_expansion_test(s: &mut runtime::Env<State>) {
         s.set_command("global", get_global());
