@@ -8,6 +8,7 @@
 use super::token::CsName;
 use crate::command::Command;
 use crate::command::CommandsMap;
+use crate::command::Definition;
 use crate::error;
 use crate::token;
 use crate::token::catcode::CatCodeMap;
@@ -47,34 +48,21 @@ pub fn run<S>(
                     break;
                 }
                 Some(token) => match token.value() {
-                    ControlSequence(name) => {
-                        match execution_input.base().commands_map.get(&name) {
-                            Some(Command::Execution(cmd_ref)) => {
-                                // We need to copy the command to avoid a borrow checker error. This is because
-                                // `cmd_ref` keeps an immutable reference to the state alive, but in the `call`
-                                // invocation below we pass in a mutable reference to the state. The borrow
-                                // checker is actually surfacing a genuine TeX edge case here: if you input
-                                // something like \let\let=\def then the reference to the command \let in the
-                                // commands map is overwritten at some point during the execution of \let. You
-                                // could also imagine implementing an \undef command that would result in the
-                                // reference becoming null during the execution.
-                                let cmd = *cmd_ref;
-                                cmd.call(token, execution_input)
-                            }
-                            Some(Command::Variable(cmd_ref)) => {
-                                let cmd = *cmd_ref;
-                                let var = cmd.resolve(token, execution_input)?;
-                                variable::set_using_input(var, execution_input, false)
-                            }
-                            Some(Command::Character(token_value)) => character_handler(
-                                Token::new_from_value(*token_value, token.trace_key()),
-                                execution_input,
-                            ),
-                            None | Some(Command::Expansion(_)) | Some(Command::Macro(_)) => {
-                                undefined_cs_handler(token, execution_input)
-                            }
+                    ControlSequence(name) => match execution_input.base().commands_map.get(&name) {
+                        Some(Command::Execution(cmd)) => cmd(token, execution_input),
+                        Some(Command::Variable(cmd_ref)) => {
+                            let cmd = *cmd_ref;
+                            let var = cmd.resolve(token, execution_input)?;
+                            variable::set_using_input(var, execution_input, false)
                         }
-                    }
+                        Some(Command::Character(token_value)) => character_handler(
+                            Token::new_from_value(*token_value, token.trace_key()),
+                            execution_input,
+                        ),
+                        None | Some(Command::Expansion(_)) | Some(Command::Macro(_)) => {
+                            undefined_cs_handler(token, execution_input)
+                        }
+                    },
                     token::Value::BeginGroup(_) => {
                         execution_input.begin_group();
                         Ok(())
@@ -181,7 +169,7 @@ impl<S> Env<S> {
     }
 
     /// Set a command.
-    pub fn set_command<A: AsRef<str>, B: Into<Command<S>>>(&mut self, name: A, cmd: B) {
+    pub fn set_command<A: AsRef<str>, B: Into<Definition<S>>>(&mut self, name: A, cmd: B) {
         self.base_state.commands_map.insert(
             self.internal.cs_name_interner.get_or_intern(name),
             B::into(cmd),

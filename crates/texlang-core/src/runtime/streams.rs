@@ -471,7 +471,7 @@ mod stream {
         match command {
             Some(command::Command::Expansion(command)) => {
                 let command = *command;
-                let output = command.call(token, ExpansionInput::new(env))?;
+                let output = command(token, ExpansionInput::new(env))?;
                 env.internal.push_expansion(&output);
                 next_expanded(env)
             }
@@ -500,7 +500,7 @@ mod stream {
                 let command = *command;
                 let token = *token;
                 consume_peek(env);
-                let output = command.call(token, ExpansionInput::new(env))?;
+                let output = command(token, ExpansionInput::new(env))?;
                 env.internal.push_expansion(&output);
                 peek_expanded(env)
             }
@@ -531,7 +531,7 @@ mod stream {
                 let command = *command;
                 let token = *token;
                 consume_peek(env);
-                let output = command.call(token, ExpansionInput::new(env))?;
+                let output = command(token, ExpansionInput::new(env))?;
                 env.internal.push_expansion(&output);
                 Ok(true)
             }

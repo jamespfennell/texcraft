@@ -258,6 +258,7 @@ mod tests {
 
     #[test]
     fn token_size() {
+        assert_eq!(std::mem::size_of::<Value>(), 8);
         assert_eq!(std::mem::size_of::<Token>(), 12);
         assert_eq!(std::mem::size_of::<Result<Token, ()>>(), 12);
         assert_eq!(std::mem::size_of::<Result<Option<Token>, ()>>(), 12);

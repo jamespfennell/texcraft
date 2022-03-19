@@ -49,79 +49,13 @@ pub fn null_type_id() -> TypeId {
     std::any::TypeId::of::<NullTypeIdType>()
 }
 
-/// The Rust type of expansion primitive functions.
+/// The Rust type of expansion primitives.
 pub type ExpansionFn<S> =
     fn(token: Token, input: &mut runtime::ExpansionInput<S>) -> anyhow::Result<Vec<Token>>;
-
-/// An expansion primitive in Texcraft.
-///
-/// This type bundles together an [ExpansionFn] and a [TypeId] that can be used to classify the
-/// primitive.
-pub struct ExpansionPrimitive<S> {
-    call_fn: ExpansionFn<S>,
-    id: TypeId,
-}
-
-impl<S> Copy for ExpansionPrimitive<S> {}
-
-impl<S> Clone for ExpansionPrimitive<S> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<S> ExpansionPrimitive<S> {
-    pub fn new(call_fn: ExpansionFn<S>, id: TypeId) -> ExpansionPrimitive<S> {
-        ExpansionPrimitive { call_fn, id }
-    }
-
-    pub fn call(
-        &self,
-        token: Token,
-        input: &mut runtime::ExpansionInput<S>,
-    ) -> anyhow::Result<Vec<Token>> {
-        (self.call_fn)(token, input)
-    }
-
-    pub fn id(&self) -> TypeId {
-        self.id
-    }
-}
 
 /// The Rust type of execution primitive functions.
 pub type ExecutionFn<S> =
     fn(token: Token, input: &mut runtime::ExecutionInput<S>) -> anyhow::Result<()>;
-
-/// An execution primitive in Texcraft.
-///
-/// This type bundles together an [ExecutionFn] and a [TypeId] that can be used to classify the
-/// primitive.
-pub struct ExecutionPrimitive<S> {
-    call_fn: ExecutionFn<S>,
-    id: TypeId,
-}
-
-impl<S> ExecutionPrimitive<S> {
-    pub fn new(call_fn: ExecutionFn<S>, id: TypeId) -> ExecutionPrimitive<S> {
-        ExecutionPrimitive { call_fn, id }
-    }
-
-    pub fn call(&self, token: Token, input: &mut runtime::ExecutionInput<S>) -> anyhow::Result<()> {
-        (self.call_fn)(token, input)
-    }
-
-    pub fn id(&self) -> TypeId {
-        self.id
-    }
-}
-
-impl<S> Copy for ExecutionPrimitive<S> {}
-
-impl<S> Clone for ExecutionPrimitive<S> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
 
 pub type VariableFn<S> = fn(
     token: Token,
@@ -157,14 +91,14 @@ impl<S> VariableCommand<S> {
 /// A TeX command in Texcraft.
 pub enum Command<S> {
     /// An expansion command that is implemented in the engine. Examples: `\the`, `\ifnum`.
-    Expansion(ExpansionPrimitive<S>),
+    Expansion(ExpansionFn<S>),
 
     /// A user defined macro.
     /// Examples: `\newcommand` and `\include` in LaTeX.
     Macro(rc::Rc<texmacro::Macro>),
 
     /// A non-expandable command that performs operations on the state. Examples: `\def`, `\par`.
-    Execution(ExecutionPrimitive<S>),
+    Execution(ExecutionFn<S>),
 
     /// A command that is used to reference a variable, like a parameter or a register.
     /// Such a command is *resolved* to get the variable using the function pointer it holds.
@@ -177,15 +111,34 @@ pub enum Command<S> {
     Character(token::Value),
 }
 
-impl<S> Command<S> {
-    pub fn id(&self) -> TypeId {
-        match self {
-            Command::Expansion(cmd) => cmd.id(),
-            Command::Macro(_) => null_type_id(),
-            Command::Execution(cmd) => cmd.id(),
-            Command::Variable(_) => null_type_id(),
-            Command::Character(_) => null_type_id(),
-        }
+// TODO: renamd Defintion
+pub struct Definition<S> {
+    command: Command<S>,
+    id: std::any::TypeId,
+    doc: &'static str,
+}
+
+impl<S> Definition<S> {
+    /// Create a new expansion command definition.
+    pub fn new_expansion(t: ExpansionFn<S>) -> Definition<S> {
+        t.into()
+    }
+
+    /// Create a new expansion command definition.
+    pub fn new_execution(t: ExecutionFn<S>) -> Definition<S> {
+        t.into()
+    }
+
+    /// Set the ID for this command definition.
+    pub fn with_id(mut self, id: std::any::TypeId) -> Definition<S> {
+        self.id = id;
+        self
+    }
+
+    // Set the doc for this command definition.
+    pub fn with_doc(mut self, doc: &'static str) -> Definition<S> {
+        self.doc = doc;
+        self
     }
 }
 
@@ -209,62 +162,58 @@ impl<S> Clone for Command<S> {
     }
 }
 
-impl<S> From<ExpansionFn<S>> for Command<S> {
+impl<S> From<ExpansionFn<S>> for Definition<S> {
     fn from(cmd: ExpansionFn<S>) -> Self {
-        Command::Expansion(ExpansionPrimitive {
-            call_fn: cmd,
-            id: null_type_id(),
-        })
+        Command::Expansion(cmd).into()
     }
 }
 
-impl<S> From<ExpansionPrimitive<S>> for Command<S> {
-    fn from(cmd: ExpansionPrimitive<S>) -> Self {
-        Command::Expansion(cmd)
-    }
-}
-
-impl<S> From<rc::Rc<texmacro::Macro>> for Command<S> {
+impl<S> From<rc::Rc<texmacro::Macro>> for Definition<S> {
     fn from(cmd: rc::Rc<texmacro::Macro>) -> Self {
-        Command::Macro(cmd)
+        Command::Macro(cmd).into()
     }
 }
 
-impl<S> From<ExecutionFn<S>> for Command<S> {
+impl<S> From<ExecutionFn<S>> for Definition<S> {
     fn from(cmd: ExecutionFn<S>) -> Self {
-        Command::Execution(ExecutionPrimitive {
-            call_fn: cmd,
-            id: null_type_id(),
-        })
+        Command::Execution(cmd).into()
     }
 }
 
-impl<S> From<ExecutionPrimitive<S>> for Command<S> {
-    fn from(cmd: ExecutionPrimitive<S>) -> Self {
-        Command::Execution(cmd)
-    }
-}
-
-impl<S> From<VariableFn<S>> for Command<S> {
+impl<S> From<VariableFn<S>> for Definition<S> {
     fn from(f: VariableFn<S>) -> Self {
-        Command::Variable(VariableCommand(f, 0))
+        Command::Variable(VariableCommand(f, 0)).into()
     }
 }
 
-impl<S> From<VariableCommand<S>> for Command<S> {
+impl<S> From<VariableCommand<S>> for Definition<S> {
     fn from(cmd: VariableCommand<S>) -> Self {
-        Command::Variable(cmd)
+        Command::Variable(cmd).into()
+    }
+}
+
+impl<S> From<Command<S>> for Definition<S> {
+    fn from(cmd: Command<S>) -> Self {
+        Definition {
+            command: cmd,
+            id: null_type_id(),
+            doc: "",
+        }
     }
 }
 
 pub struct CommandsMap<S> {
     map: GroupingVec<command::Command<S>>,
+    id_map: GroupingVec<std::any::TypeId>,
+    doc_map: HashMap<CsName, &'static str>,
 }
 
 impl<S> Default for CommandsMap<S> {
     fn default() -> Self {
         Self {
             map: Default::default(),
+            id_map: Default::default(),
+            doc_map: Default::default(),
         }
     }
 }
@@ -276,13 +225,41 @@ impl<S> CommandsMap<S> {
     }
 
     #[inline]
-    pub fn insert<B: Into<command::Command<S>>>(&mut self, name: token::CsName, cmd: B) {
-        self.map.insert(name.to_usize(), B::into(cmd))
+    pub fn get_id(&self, name: &token::CsName) -> std::any::TypeId {
+        self.id_map
+            .get(&name.to_usize())
+            .copied()
+            .unwrap_or_else(null_type_id)
+    }
+
+    pub fn get_doc(&self, name: &token::CsName) -> Option<&'static str> {
+        match self.doc_map.get(name) {
+            None => None,
+            Some(s) => {
+                let t = s.trim();
+                if t.is_empty() {
+                    // TODO: we should distinguish between no docs vs no command
+                    None
+                } else {
+                    Some(t)
+                }
+            }
+        }
     }
 
     #[inline]
-    pub fn insert_global<B: Into<command::Command<S>>>(&mut self, name: token::CsName, cmd: B) {
-        self.map.insert_global(name.to_usize(), B::into(cmd))
+    pub fn insert<B: Into<command::Definition<S>>>(&mut self, name: token::CsName, cmd: B) {
+        let cmd = B::into(cmd);
+        self.id_map.insert(name.to_usize(), cmd.id);
+        self.doc_map.insert(name, cmd.doc);
+        self.map.insert(name.to_usize(), cmd.command);
+    }
+
+    #[inline]
+    pub fn insert_global<B: Into<command::Definition<S>>>(&mut self, name: token::CsName, cmd: B) {
+        let cmd = B::into(cmd);
+        self.id_map.insert_global(name.to_usize(), cmd.id);
+        self.map.insert_global(name.to_usize(), cmd.command);
     }
 
     pub fn to_hash_map(&self) -> HashMap<CsName, command::Command<S>> {
@@ -302,11 +279,12 @@ impl<S> CommandsMap<S> {
     }
 
     pub fn begin_group(&mut self) {
-        self.map.begin_group()
+        self.map.begin_group();
+        self.id_map.begin_group();
     }
 
     pub fn end_group(&mut self) -> bool {
-        self.map.end_group()
+        self.map.end_group() && self.id_map.end_group()
     }
 }
 

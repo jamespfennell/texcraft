@@ -11,3 +11,5 @@ texlang-core = { path = "../texlang-core" }
 texlang-stdlib = { path = "../texlang-stdlib" }
 
 anyhow = "1.0"
+
+colored = "2"

@@ -115,22 +115,21 @@ where
     let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
         if let ControlSequence(name) = &token.value() {
-            if let Some(c) = input.base().commands_map.get(name) {
-                if c.id() == else_id() && depth == 0 {
-                    branches(input).push(Branch {
-                        _token: original_token,
-                        kind: BranchKind::Else,
-                    });
+            let id = input.base().commands_map.get_id(name);
+            if id == else_id() && depth == 0 {
+                branches(input).push(Branch {
+                    _token: original_token,
+                    kind: BranchKind::Else,
+                });
+                return Ok(Vec::new());
+            }
+            if id == if_id() {
+                depth += 1;
+            }
+            if id == fi_id() {
+                depth -= 1;
+                if depth < 0 {
                     return Ok(Vec::new());
-                }
-                if c.id() == if_id() {
-                    depth += 1;
-                }
-                if c.id() == fi_id() {
-                    depth -= 1;
-                    if depth < 0 {
-                        return Ok(Vec::new());
-                    }
                 }
             }
         }
@@ -168,12 +167,12 @@ macro_rules! create_if_primitive {
             }
         }
 
-        pub fn $get_if<S>() -> command::ExpansionPrimitive<S>
+        pub fn $get_if<S>() -> command::Definition<S>
         where
             S: HasExpansionState,
             S::E: HasComponent<Component>,
         {
-            command::ExpansionPrimitive::new($if_primitive_fn, if_id())
+            command::Definition::new_expansion($if_primitive_fn).with_id(if_id())
         }
     };
 }
@@ -229,32 +228,31 @@ where
     let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
         if let ControlSequence(name) = &token.value() {
-            if let Some(c) = input.base().commands_map.get(name) {
-                if c.id() == or_id() && depth == 0 {
-                    cases_to_skip -= 1;
-                    if cases_to_skip == 0 {
-                        branches(input).push(Branch {
-                            _token: ifcase_token,
-                            kind: BranchKind::Switch,
-                        });
-                        return Ok(Vec::new());
-                    }
-                }
-                if c.id() == else_id() && depth == 0 {
+            let id = input.base().commands_map.get_id(name);
+            if id == or_id() && depth == 0 {
+                cases_to_skip -= 1;
+                if cases_to_skip == 0 {
                     branches(input).push(Branch {
                         _token: ifcase_token,
-                        kind: BranchKind::Else,
+                        kind: BranchKind::Switch,
                     });
                     return Ok(Vec::new());
                 }
-                if c.id() == if_id() {
-                    depth += 1;
-                }
-                if c.id() == fi_id() {
-                    depth -= 1;
-                    if depth < 0 {
-                        return Ok(Vec::new());
-                    }
+            }
+            if id == else_id() && depth == 0 {
+                branches(input).push(Branch {
+                    _token: ifcase_token,
+                    kind: BranchKind::Else,
+                });
+                return Ok(Vec::new());
+            }
+            if id == if_id() {
+                depth += 1;
+            }
+            if id == fi_id() {
+                depth -= 1;
+                if depth < 0 {
+                    return Ok(Vec::new());
                 }
             }
         }
@@ -275,12 +273,12 @@ where
 }
 
 /// Get the `\ifcase` primitive.
-pub fn get_if_case<S>() -> command::ExpansionPrimitive<S>
+pub fn get_if_case<S>() -> command::Definition<S>
 where
     S: HasExpansionState,
     S::E: HasComponent<Component>,
 {
-    command::ExpansionPrimitive::new(if_case_primitive_fn, if_id())
+    command::Definition::new_expansion(if_case_primitive_fn).with_id(if_id())
 }
 
 fn or_primitive_fn<S>(
@@ -305,15 +303,14 @@ where
     let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
         if let ControlSequence(name) = &token.value() {
-            if let Some(c) = input.base().commands_map.get(name) {
-                if c.id() == if_id() {
-                    depth += 1;
-                }
-                if c.id() == fi_id() {
-                    depth -= 1;
-                    if depth < 0 {
-                        return Ok(Vec::new());
-                    }
+            let id = input.base().commands_map.get_id(name);
+            if id == if_id() {
+                depth += 1;
+            }
+            if id == fi_id() {
+                depth -= 1;
+                if depth < 0 {
+                    return Ok(Vec::new());
                 }
             }
         }
@@ -339,12 +336,12 @@ where
 }
 
 /// Get the `\or` primitive.
-pub fn get_or<S>() -> command::ExpansionPrimitive<S>
+pub fn get_or<S>() -> command::Definition<S>
 where
     S: HasExpansionState,
     S::E: HasComponent<Component>,
 {
-    command::ExpansionPrimitive::new(or_primitive_fn, or_id())
+    command::Definition::new_expansion(or_primitive_fn).with_id(or_id())
 }
 
 fn else_primitive_fn<S>(
@@ -370,15 +367,14 @@ where
     let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
         if let ControlSequence(name) = &token.value() {
-            if let Some(c) = input.base().commands_map.get(name) {
-                if c.id() == if_id() {
-                    depth += 1;
-                }
-                if c.id() == fi_id() {
-                    depth -= 1;
-                    if depth < 0 {
-                        return Ok(Vec::new());
-                    }
+            let id = input.base().commands_map.get_id(name);
+            if id == if_id() {
+                depth += 1;
+            }
+            if id == fi_id() {
+                depth -= 1;
+                if depth < 0 {
+                    return Ok(Vec::new());
                 }
             }
         }
@@ -399,12 +395,12 @@ where
 }
 
 /// Get the `\else` primitive.
-pub fn get_else<S>() -> command::ExpansionPrimitive<S>
+pub fn get_else<S>() -> command::Definition<S>
 where
     S: HasExpansionState,
     S::E: HasComponent<Component>,
 {
-    command::ExpansionPrimitive::new(else_primitive_fn, else_id())
+    command::Definition::new_expansion(else_primitive_fn).with_id(else_id())
 }
 
 /// Get the `\fi` primitive.
@@ -427,12 +423,12 @@ where
     Ok(Vec::new())
 }
 
-pub fn get_fi<S>() -> command::ExpansionPrimitive<S>
+pub fn get_fi<S>() -> command::Definition<S>
 where
     S: HasExpansionState,
     S::E: HasComponent<Component>,
 {
-    command::ExpansionPrimitive::new(fi_primitive_fn, fi_id())
+    command::Definition::new_expansion(fi_primitive_fn).with_id(fi_id())
 }
 
 /// Add all of the conditionals defined in this module to the provided state.

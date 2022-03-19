@@ -7,8 +7,10 @@ use texlang_core::prelude::*;
 pub const LET_DOC: &str = "Assign a command or character to a control sequence";
 
 /// Get the `\let` command.
-pub fn get_let<S: HasComponent<prefix::Component>>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive::new(let_primitive_fn, let_id())
+pub fn get_let<S: HasComponent<prefix::Component>>() -> command::Definition<S> {
+    command::Definition::new_execution(let_primitive_fn)
+        .with_id(let_id())
+        .with_doc(LET_DOC)
 }
 
 struct Let;

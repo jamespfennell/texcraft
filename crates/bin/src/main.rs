@@ -1,4 +1,5 @@
 use clap::Parser;
+use colored::Colorize;
 use std::fs;
 use texlang_core::prelude::*;
 use texlang_core::token;
@@ -14,7 +15,15 @@ struct Opts {
 
 #[derive(Parser)]
 enum SubCommand {
+    Doc(Doc),
     Exec(Exec),
+}
+
+/// Get docs on a TeX command
+#[derive(Parser)]
+struct Doc {
+    /// Name of the control sequence
+    name: Option<String>,
 }
 
 /// Execute a TeX file as a script
@@ -33,6 +42,9 @@ fn main() {
                 std::process::exit(1);
             }
         }
+        SubCommand::Doc(d) => {
+            doc(d.name).unwrap();
+        }
     }
 }
 
@@ -46,54 +58,50 @@ fn exec(file_name: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/*
-fn docs(cs_name: &str, optional_file_name: Option<&String>) -> Result<(), anyhow::Error> {
-    let s = match optional_file_name {
-        None => init_state(),
-        Some(file_name) => {
-            let mut execution_input = driver::ExecutionInput::new_with_source(
-                init_state(),
-                Box::new(io::BufReader::new(fs::File::open(file_name)?)),
-            );
-            driver::exec(&mut execution_input, true)?;
-            execution_input.take_base()
-        }
-    };
+fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
+    let env = init_state();
 
-    if cs_name == "list" {
-        let mut cs_names = Vec::new();
-        let commands = s.get_commands_as_map();
-        for cs_name in commands.keys() {
-            cs_names.push(cs_name);
-        }
-        cs_names.sort();
-        let mut last_prefix = None;
-        for cs_name in cs_names.into_iter() {
-            let _cmd = commands.get(cs_name);
-            let new_last_prefix = cs_name.chars().next();
-            if last_prefix != new_last_prefix {
-                last_prefix = new_last_prefix;
-            }
-            let doc = "todo".to_string();
-            let first_line = doc.split('\n').next().unwrap_or("");
-            println!["\\{}  {}", cs_name.bold(), first_line];
-        }
-        return Ok(());
-    }
-
-    /* todo: reenable
-    match s.get_command(&token::CsName::from(cs_name)) {
+    match cs_name {
         None => {
-            println!("Unknown command \\{}", cs_name);
-            process::exit(1);
+            let mut cs_names = Vec::new();
+            let commands = env.get_commands_as_map();
+            for cs_name in commands.keys() {
+                cs_names.push(cs_name);
+            }
+            cs_names.sort();
+            let mut last_prefix = None;
+            for cs_name in cs_names.into_iter() {
+                let _cmd = commands.get(cs_name);
+                let new_last_prefix = cs_name.chars().next();
+                if last_prefix != new_last_prefix {
+                    last_prefix = new_last_prefix;
+                }
+                let doc = "todo".to_string();
+                let first_line = doc.split('\n').next().unwrap_or("");
+                println!["\\{}  {}", cs_name.bold(), first_line];
+            }
+            return Ok(());
         }
-        Some(command) => {
-            println!("{}", command.doc());
+        Some(cs_name) => {
+            let cs_name_s = match env.cs_name_interner().get(cs_name.clone()) {
+                None => {
+                    print!("undefined command");
+                    std::process::exit(1);
+                }
+                Some(s) => s,
+            };
+            let doc = match env.base_state.commands_map.get_doc(&cs_name_s) {
+                None => {
+                    print!("undefined command");
+                    std::process::exit(1);
+                }
+                Some(d) => d,
+            };
+            println!["\\{}  {}", cs_name.bold(), doc];
         }
     }
-     */
     Ok(())
-}*/
+}
 
 fn init_state() -> runtime::Env<StdLibState> {
     let mut s = StdLibState::new();

@@ -14,13 +14,13 @@ use texlang_core::texmacro::*;
 pub const DEF_DOC: &str = "Define a custom macro";
 
 /// Get the `\def` command.
-pub fn get_def<S: HasComponent<prefix::Component>>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive::new(def_primitive_fn, def_id())
+pub fn get_def<S: HasComponent<prefix::Component>>() -> command::Definition<S> {
+    command::Definition::new_execution(def_primitive_fn).with_id(def_id())
 }
 
 /// Get the `\gdef` command.
-pub fn get_gdef<S: HasComponent<prefix::Component>>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive::new(gdef_primitive_fn, def_id())
+pub fn get_gdef<S: HasComponent<prefix::Component>>() -> command::Definition<S> {
+    command::Definition::new_execution(gdef_primitive_fn).with_id(def_id())
 }
 
 struct Def;

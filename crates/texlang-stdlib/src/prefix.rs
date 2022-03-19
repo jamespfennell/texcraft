@@ -109,8 +109,8 @@ impl Prefix {
 }
 
 /// Get the `\global` command.
-pub fn get_global<S: HasComponent<Component>>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive::new(global_primitive_fn, global_id())
+pub fn get_global<S: HasComponent<Component>>() -> command::Definition<S> {
+    command::Definition::new_execution(global_primitive_fn).with_id(global_id())
 }
 
 struct Global;
@@ -120,8 +120,8 @@ fn global_id() -> std::any::TypeId {
 }
 
 /// Get the `\long` command.
-pub fn get_long<S: HasComponent<Component>>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive::new(long_primitive_fn, long_id())
+pub fn get_long<S: HasComponent<Component>>() -> command::Definition<S> {
+    command::Definition::new_execution(long_primitive_fn).with_id(long_id())
 }
 
 struct Long;
@@ -131,8 +131,8 @@ fn long_id() -> std::any::TypeId {
 }
 
 /// Get the `\outer` command.
-pub fn get_outer<S: HasComponent<Component>>() -> command::ExecutionPrimitive<S> {
-    command::ExecutionPrimitive::new(outer_primitive_fn, outer_id())
+pub fn get_outer<S: HasComponent<Component>>() -> command::Definition<S> {
+    command::Definition::new_execution(outer_primitive_fn).with_id(outer_id())
 }
 
 struct Outer;
@@ -199,40 +199,31 @@ fn process_prefixes<S: HasComponent<Component>>(
             .into())
         }
         Some(&t) => match t.value() {
-            Value::ControlSequence(name) => match input.base().commands_map.get(&name) {
-                Some(command::Command::Variable(cmd_ref)) => {
+            Value::ControlSequence(name) => {
+                if let Some(command::Command::Variable(cmd_ref)) =
+                    input.base().commands_map.get(&name)
+                {
                     check_only_global(t, prefix, input)?;
                     let cmd = *cmd_ref;
                     input.consume()?;
                     let var = cmd.resolve(t, input)?;
                     variable::set_using_input(var, input, prefix.global.is_some())?;
+                    return Ok(());
+                }
+                let cmd_id = input.base().commands_map.get_id(&name);
+                if cmd_id == def::def_id() {
+                    input.state_mut().component_mut().global = prefix.global.is_some();
                     Ok(())
-                }
-                Some(command::Command::Execution(cmd_ref)) => {
-                    let cmd_id = cmd_ref.id();
-                    if cmd_id == def::def_id() {
-                        input.state_mut().component_mut().global = prefix.global.is_some();
-                        Ok(())
-                    } else if input
-                        .state()
-                        .component()
-                        .prefixable_with_global
-                        .contains(&cmd_id)
-                    {
-                        check_only_global(t, prefix, input)?;
-                        input.state_mut().component_mut().global = prefix.global.is_some();
-                        Ok(())
-                    } else {
-                        let (prefix_token, prefix_kind) = prefix.get_one();
-                        Err(Error::CommandCannotBePrefixed {
-                            command_token: input.trace(t),
-                            prefix_token: input.trace(prefix_token),
-                            prefix_kind,
-                        }
-                        .into())
-                    }
-                }
-                _ => {
+                } else if input
+                    .state()
+                    .component()
+                    .prefixable_with_global
+                    .contains(&cmd_id)
+                {
+                    check_only_global(t, prefix, input)?;
+                    input.state_mut().component_mut().global = prefix.global.is_some();
+                    Ok(())
+                } else {
                     let (prefix_token, prefix_kind) = prefix.get_one();
                     Err(Error::CommandCannotBePrefixed {
                         command_token: input.trace(t),
@@ -241,7 +232,7 @@ fn process_prefixes<S: HasComponent<Component>>(
                     }
                     .into())
                 }
-            },
+            }
             _ => {
                 let (prefix_token, prefix_kind) = prefix.get_one();
                 Err(Error::TokenCannotBePrefixed {
@@ -263,28 +254,25 @@ fn complete_prefix<S>(
     let found_prefix = match input.peek()? {
         None => false,
         Some(&t) => match t.value() {
-            Value::ControlSequence(name) => match input.base().commands_map.get(&name) {
-                Some(command::Command::Execution(cmd_ref)) => {
-                    let global_id = global_id();
-                    let outer_id = outer_id();
-                    let long_id = long_id();
-                    let cmd_id = cmd_ref.id();
-                    // For some reason a match statement doesn't work here.
-                    if cmd_id == global_id {
-                        prefix.global = Some(t);
-                        true
-                    } else if cmd_id == outer_id {
-                        prefix.outer = Some(t);
-                        true
-                    } else if cmd_id == long_id {
-                        prefix.long = Some(t);
-                        true
-                    } else {
-                        false
-                    }
+            Value::ControlSequence(name) => {
+                let cmd_id = input.base().commands_map.get_id(&name);
+                let global_id = global_id();
+                let outer_id = outer_id();
+                let long_id = long_id();
+                // For some reason a match statement doesn't work here.
+                if cmd_id == global_id {
+                    prefix.global = Some(t);
+                    true
+                } else if cmd_id == outer_id {
+                    prefix.outer = Some(t);
+                    true
+                } else if cmd_id == long_id {
+                    prefix.long = Some(t);
+                    true
+                } else {
+                    false
                 }
-                _ => false,
-            },
+            }
             _ => false,
         },
     };
