@@ -18,6 +18,8 @@ pub mod io;
 pub mod letassignment;
 pub mod prefix;
 pub mod registers;
+#[cfg(feature = "repl")]
+pub mod repl;
 pub mod script;
 #[cfg(test)]
 pub mod testutil;

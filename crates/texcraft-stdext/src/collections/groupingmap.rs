@@ -168,33 +168,46 @@ enum EndOfGroupAction<V> {
 
 impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V, T> {
     /// Inserts the key, value pair.
-    pub fn insert(&mut self, key: K, mut val: V) {
+    pub fn insert(&mut self, key: K, mut val: V) -> bool {
         match (self.backing_container.get_mut(&key), self.groups.last_mut()) {
             (None, None) => {
                 self.backing_container.insert(key, val);
+                false
             }
             (None, Some(group)) => {
                 group.insert(key.clone(), EndOfGroupAction::Delete);
                 self.backing_container.insert(key, val);
+                false
             }
             (Some(val_ref), None) => {
                 *val_ref = val;
+                true
             }
             (Some(val_ref), Some(group)) => {
                 std::mem::swap(&mut val, val_ref);
                 if let Entry::Vacant(vac) = group.entry(key) {
                     vac.insert(EndOfGroupAction::Revert(val));
                 };
+                true
             }
         }
     }
 
     /// Inserts the key, value pair in the global group.
-    pub fn insert_global(&mut self, key: K, val: V) {
+    pub fn insert_global(&mut self, key: K, val: V) -> bool {
         for group in &mut self.groups {
             group.remove(&key);
         }
-        self.backing_container.insert(key, val);
+        match self.backing_container.get_mut(&key) {
+            None => {
+                self.backing_container.insert(key, val);
+                false
+            }
+            Some(val_ref) => {
+                *val_ref = val;
+                true
+            }
+        }
     }
 
     /// Retrieves the value at the provided key.

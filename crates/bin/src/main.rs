@@ -3,6 +3,7 @@ use colored::Colorize;
 use std::fs;
 use texlang_core::prelude::*;
 use texlang_core::token;
+use texlang_stdlib::repl;
 use texlang_stdlib::script;
 use texlang_stdlib::StdLibState;
 
@@ -16,7 +17,9 @@ struct Opts {
 #[derive(Parser)]
 enum SubCommand {
     Doc(Doc),
-    Exec(Exec),
+    /// Start an interactive TeX terminal
+    Repl,
+    Run(Run),
 }
 
 /// Get docs on a TeX command
@@ -28,7 +31,7 @@ struct Doc {
 
 /// Execute a TeX file as a script
 #[derive(Parser)]
-struct Exec {
+struct Run {
     /// Path to the TeX file to execute
     file_path: String,
 }
@@ -36,21 +39,22 @@ struct Exec {
 fn main() {
     let opts: Opts = Opts::parse();
     match opts.subcmd {
-        SubCommand::Exec(e) => {
+        SubCommand::Doc(d) => {
+            doc(d.name).unwrap();
+        }
+        SubCommand::Repl => repl(),
+        SubCommand::Run(e) => {
             if let Err(err) = exec(&e.file_path) {
                 print!("{}", err);
                 std::process::exit(1);
             }
-        }
-        SubCommand::Doc(d) => {
-            doc(d.name).unwrap();
         }
     }
 }
 
 fn exec(file_name: &str) -> Result<(), anyhow::Error> {
     let source_code = fs::read_to_string(file_name)?;
-    let mut env = init_state();
+    let mut env = new_env();
     env.push_source(file_name.to_string(), source_code)?;
     let tokens = script::run(&mut env, true)?;
     let pretty = token::write_tokens(&tokens, env.cs_name_interner());
@@ -58,8 +62,54 @@ fn exec(file_name: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn repl() {
+    println!("{}\n", REPL_START.trim());
+    let mut env = new_env();
+    env.set_command("doc", repl::get_doc());
+    env.set_command("help", repl::get_help());
+    env.set_command("exit", repl::get_exit());
+    env.set_command("quit", repl::get_exit());
+    env.set_command("q", repl::get_exit());
+    repl::run(
+        &mut env,
+        repl::RunOptions {
+            prompt: "tex> ",
+            help: REPL_HELP,
+        },
+    )
+}
+
+const REPL_START: &str = r"
+Texcraft interactive TeX terminal
+* Type \exit or \quit or \q or ctrl+d to exit. 
+* Type \help for help and tips.
+";
+
+const REPL_HELP: &str = r"
+Texcraft interactive TeX terminal
+
+This is a REPL for running TeX. No better way to get started than defining a macro:
+
+tex> \def\hello{Hello, World}
+
+and then running it:
+
+tex> \hello
+Hello, World
+
+TeX supports variables (see the \count and \countdef commands), math (\advance, \multiple, \divide),
+and conditional control flow (\if, \else, \fi). You can input external TeX scripts using \input.
+
+Tips
+
+* The terminal includes tab autocompletion for TeX commands. Type \<tab><tab> to see all commands.
+* Type \doc \command to read the documentation for a TeX command.
+
+Website: https://texcraft.dev
+";
+
 fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
-    let env = init_state();
+    let env = new_env();
 
     match cs_name {
         None => {
@@ -103,7 +153,7 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn init_state() -> runtime::Env<StdLibState> {
+fn new_env() -> runtime::Env<StdLibState> {
     let mut s = StdLibState::new();
     s.set_command("par", script::get_par());
     s.set_command("newline", script::get_newline());

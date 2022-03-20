@@ -196,6 +196,7 @@ impl<S> From<Command<S>> for Definition<S> {
 
 pub struct CommandsMap<S> {
     map: GroupingVec<command::Command<S>>,
+    len: usize,
     id_map: GroupingVec<std::any::TypeId>,
     doc_map: HashMap<CsName, &'static str>,
 }
@@ -204,6 +205,7 @@ impl<S> Default for CommandsMap<S> {
     fn default() -> Self {
         Self {
             map: Default::default(),
+            len: 0,
             id_map: Default::default(),
             doc_map: Default::default(),
         }
@@ -216,7 +218,6 @@ impl<S> CommandsMap<S> {
         self.map.get(&name.to_usize())
     }
 
-    #[inline]
     pub fn get_id(&self, name: &token::CsName) -> std::any::TypeId {
         self.id_map
             .get(&name.to_usize())
@@ -240,18 +241,30 @@ impl<S> CommandsMap<S> {
     }
 
     #[inline]
-    pub fn insert<B: Into<command::Definition<S>>>(&mut self, name: token::CsName, cmd: B) {
+    pub fn insert<B: Into<command::Definition<S>>>(&mut self, name: token::CsName, cmd: B) -> bool {
         let cmd = B::into(cmd);
         self.id_map.insert(name.to_usize(), cmd.id);
         self.doc_map.insert(name, cmd.doc);
-        self.map.insert(name.to_usize(), cmd.command);
+        let existed = self.map.insert(name.to_usize(), cmd.command);
+        if !existed {
+            self.len += 1;
+        }
+        existed
     }
 
     #[inline]
-    pub fn insert_global<B: Into<command::Definition<S>>>(&mut self, name: token::CsName, cmd: B) {
+    pub fn insert_global<B: Into<command::Definition<S>>>(
+        &mut self,
+        name: token::CsName,
+        cmd: B,
+    ) -> bool {
         let cmd = B::into(cmd);
         self.id_map.insert_global(name.to_usize(), cmd.id);
-        self.map.insert_global(name.to_usize(), cmd.command);
+        let existed = self.map.insert_global(name.to_usize(), cmd.command);
+        if !existed {
+            self.len += 1;
+        }
+        existed
     }
 
     pub fn to_hash_map(&self) -> HashMap<CsName, command::Command<S>> {
@@ -277,6 +290,14 @@ impl<S> CommandsMap<S> {
 
     pub fn end_group(&mut self) -> bool {
         self.map.end_group() && self.id_map.end_group()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
     }
 }
 

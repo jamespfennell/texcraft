@@ -5,7 +5,6 @@
 /// of typesetting the result and outputing it to PDF (say), the output is returned as a list of tokens.
 /// These can be easily converted to a string using [texlang_core::token::write_tokens].
 use texlang_core::prelude::*;
-use texlang_core::runtime::HasComponent;
 
 #[derive(Default)]
 pub struct Component {

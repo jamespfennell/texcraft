@@ -1,35 +1,57 @@
 # Texcraft
 
-Texcraft is a project to create an LLVM-style infrastructure for building TeX engines and distributions.
-Goals:
+Texcraft is a project to create a composible, LLVM-style infrastructure for building TeX engines and distributions.
+
+The big picture goals are:
 
 - Creating modern reimplementations of existing TeX distributions (TeX, pdfTeX, XeTeX, etc.)
     with a focus on modularity and code reuse.
+    For example, 
+    [the single Texcraft implementation of TeX registers](https://texcraft.dev/rustdoc/texlang_stdlib/registers/index.html) 
+    can be used to create both the 256 registers of TeX82 and the 32768 registers of pdfTeX.
 
-- Enabling direct integration of TeX engines with IDEs, webservices, and JavaScript (using WASM).
+- Directly integrating TeX engines with IDEs, webservices, and JavaScript/WASM 
+    (see the [Texcraft playground](https://play.texcraft.dev) for an example of the latter).
 
-- Providing a framework for building new TeX engines with novel features (new page
-    breaking algorithms, support for different font formats, etc.).
+- Providing a framework for building new TeX engines with novel features like new page
+    breaking algorithms, support for different font formats, etc.
 
-Initial implemention work has focused on the core internal APIs (commands, variables, state),
-    expansion primitives, and performance.
-
+Initial work has focused on building a [fast](https://github.com/jamespfennell/texcraft/tree/main/crates/performance)
+  TeX language interpreter called Texlang,
+  and [writing documentation](https://texcraft.dev) on how to use it.
 
 ## Trying it out
 
-Try it out in the [Texcraft playground](https://play.texcraft.dev)!
+No typesetting work has been done yet, but Texcraft can already be used to run TeX scripts.
 
+The [Texcraft playground](https://play.texcraft.dev) does this in the browser - no downloads needed.
 
-## Performance
+Locally, with the Git repo checked out,
+    the Texcraft binary can be used to run TeX scripts; e.g.,
 
-One of the hardest parts of implementing a TeX engine is matching the
-  performance of Knuth's original implementation.
-The Texcraft project maintains benchmarks in `crates/performance` for measuring performance
-  and comparing them to pdfTeX.
-At time of writing these report that Texcraft is about 15% faster,
-  though we expect this will regress as more features are added.
-For context, when the first benchmark was created
-  Texcraft was over *seven times slower* than pdfTeX!
+```
+cargo run --bin texcraft run crates/performance/benches/digits_of_pi.tex
+```
+
+The Texcraft binary also has a REPL for writing TeX interactively:
+```
+cargo run --bin texcraft repl
+```
+
+These all work with the limited subset of TeX commands that have been implemented.
+Run `cargo run --bin texcraft doc` for a list of available commands.
+
+Note the main point of Texcraft is not to produce specific binaries, but rather to be 
+    a library for building TeX software.
+The [documentation website](https://texcraft.dev) has beginner-friendly tutorials on 
+    working with Texcraft as a library.
+
+## Getting involved
+
+There is a lot of low hanging fruit that is intentionally left unpicked so
+    people who want to contribute to Texcraft have a good starting point.
+Right now the main focus is on completing the Texlang standard library, which is a collection
+    of non-typesetting TeX commands like `\def` that every TeX distribution includes.
 
 ## See also
 

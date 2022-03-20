@@ -173,7 +173,7 @@ impl<S> Env<S> {
         self.base_state.commands_map.insert(
             self.internal.cs_name_interner.get_or_intern(name),
             B::into(cmd),
-        )
+        );
     }
 
     /// Return the current working directory, or [None] if it could not be determined.
