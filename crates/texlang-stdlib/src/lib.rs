@@ -14,11 +14,13 @@ pub mod alloc;
 pub mod catcodecmd;
 pub mod conditional;
 pub mod def;
-pub mod script;
 pub mod io;
 pub mod letassignment;
 pub mod prefix;
 pub mod registers;
+#[cfg(feature = "repl")]
+pub mod repl;
+pub mod script;
 #[cfg(test)]
 pub mod testutil;
 pub mod texcraft;

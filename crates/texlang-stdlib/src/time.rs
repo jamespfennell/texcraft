@@ -64,8 +64,8 @@ impl Default for Component {
 pub fn get_time<S: HasComponent<Component>>() -> command::VariableFn<S> {
     |_, _, _| -> anyhow::Result<variable::Variable<S>> {
         Ok(variable::Variable::Int(variable::TypedVariable::new(
-            |state: &S, _: usize| -> &i32 { &state.component().minutes_since_midnight },
-            |state: &mut S, _: usize| -> &mut i32 {
+            |state: &S, _: u32| -> &i32 { &state.component().minutes_since_midnight },
+            |state: &mut S, _: u32| -> &mut i32 {
                 &mut state.component_mut().minutes_since_midnight
             },
             0,
@@ -77,8 +77,8 @@ pub fn get_time<S: HasComponent<Component>>() -> command::VariableFn<S> {
 pub fn get_day<S: HasComponent<Component>>() -> command::VariableFn<S> {
     |_, _, _| -> anyhow::Result<variable::Variable<S>> {
         Ok(variable::Variable::Int(variable::TypedVariable::new(
-            |state: &S, _: usize| -> &i32 { &state.component().day },
-            |state: &mut S, _: usize| -> &mut i32 { &mut state.component_mut().day },
+            |state: &S, _: u32| -> &i32 { &state.component().day },
+            |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().day },
             0,
         )))
     }
@@ -88,8 +88,8 @@ pub fn get_day<S: HasComponent<Component>>() -> command::VariableFn<S> {
 pub fn get_month<S: HasComponent<Component>>() -> command::VariableFn<S> {
     |_, _, _| -> anyhow::Result<variable::Variable<S>> {
         Ok(variable::Variable::Int(variable::TypedVariable::new(
-            |state: &S, _: usize| -> &i32 { &state.component().month },
-            |state: &mut S, _: usize| -> &mut i32 { &mut state.component_mut().month },
+            |state: &S, _: u32| -> &i32 { &state.component().month },
+            |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().month },
             0,
         )))
     }
@@ -99,8 +99,8 @@ pub fn get_month<S: HasComponent<Component>>() -> command::VariableFn<S> {
 pub fn get_year<S: HasComponent<Component>>() -> command::VariableFn<S> {
     |_, _, _| -> anyhow::Result<variable::Variable<S>> {
         Ok(variable::Variable::Int(variable::TypedVariable::new(
-            |state: &S, _: usize| -> &i32 { &state.component().year },
-            |state: &mut S, _: usize| -> &mut i32 { &mut state.component_mut().year },
+            |state: &S, _: u32| -> &i32 { &state.component().year },
+            |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().year },
             0,
         )))
     }

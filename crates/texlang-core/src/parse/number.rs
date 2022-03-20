@@ -38,10 +38,8 @@ fn parse_number_internal<S, T: PrimInt>(
             Value::Other('`') => parse_character(stream)?,
             ControlSequence(name) => {
                 let cmd = stream.base().commands_map.get(&name);
-                if let Some(command::Command::Variable(cmd_ref)) = cmd {
-                    // TODO: don't clone here, use the same trick as the driver?
-                    let cmd = *cmd_ref;
-                    let variable = cmd.resolve(token, stream)?;
+                if let Some(command::Command::Variable(cmd, addr)) = cmd {
+                    let variable = command::resolve(*cmd, *addr, token, stream)?;
                     read_number_from_address(variable, stream)?
                 } else {
                     println!("Command: {:?}", cmd);

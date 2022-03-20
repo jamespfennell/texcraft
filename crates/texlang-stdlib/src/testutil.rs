@@ -2,8 +2,8 @@
 
 use std::collections::HashMap;
 
-use crate::script;
 use crate::prefix;
+use crate::script;
 use anyhow::Result;
 use texlang_core::runtime;
 use texlang_core::runtime::implement_has_component;

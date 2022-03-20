@@ -29,8 +29,8 @@ pub fn parse_optional_space<S>(input: &mut runtime::ExpansionInput<S>) -> anyhow
     Ok(())
 }
 
-// TODO: take a &token instead
-// TODO: just take execution input as input
+// TODO: just take execution input as input - this shouldn't be called with expanded input!!!!!!!
+// TODO: destroy the target description?
 pub fn parse_command_target<S: TokenStream>(
     target_description: &str,
     token: Token,

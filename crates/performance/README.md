@@ -1,8 +1,13 @@
 # Texcraft performance
 
 This directory contains performance benchmarks for Texcraft.
-By default the benchmarks are also run for pdfTeX so that comparative analysis can be done.
-The general goal of Texcraft to be as fast as than the original implementions of TeX.
+By default the benchmarks are also run for pdfTeX so that performance can be compared.
+The general goal of Texcraft to be about as fast as than the original implementions of TeX.
+
+At time of writing (March 2022) Texcraft performs a little bit better than pdfTeX.
+But, we suspect this will regress as Texcraft becomes more feature complete.
+Right now it seems some of the good performance is due to CPU caching effects and
+  Rust compiler inlining decisions, which will change as the binary gets bigger.
 
 ## Benchmarks
 
@@ -17,17 +22,6 @@ It uses an O(n^2) algorithm that is somewhat slow and involves a ton of TeX macr
   and variable lookups, making it a good script for exercising Texlang.
 
 Use the environment variable `DIGITS_OF_PI_N` to customize the `n` when running using `cargo bench`.
-
-These performance numbers were obtained on 
-    [a machine running an 8-core Ryzen 7 CPU](https://pcpartpicker.com/list/Y3FbBc).
-
-| n    | pdfTeX | Texcraft | Multiplier (lower is better, target is <1)
-|------|--------|----------|----
-| 250  | 487ms  | 405ms    | 0.83
-| 1000 | 7.60s  | 6.48s    | 0.85
-| 2500 | \*     | 48s      | N/A
-
-\*pdfTeX cannot execute the script for higher values of n as it runs out of stack space.
 
 ### Lexer throughput
 

@@ -1,6 +1,6 @@
 # Texcraft
 
-Texcraft is a project to create a highly-composible, LLVM-style infrastructure for building TeX engines and distributions.
+Texcraft is a project to create a composible, LLVM-style infrastructure for building TeX engines and distributions.
 
 The big picture goals are:
 
@@ -8,8 +8,7 @@ The big picture goals are:
     with a focus on modularity and code reuse.
     For example, 
     [the single Texcraft implementation of TeX registers](https://texcraft.dev/rustdoc/texlang_stdlib/registers/index.html) 
-    can be used 
-    to create both the 256 registers of TeX82 and the 32768 registers of pdfTeX.
+    can be used to create both the 256 registers of TeX82 and the 32768 registers of pdfTeX.
 
 - Directly integrating TeX engines with IDEs, webservices, and JavaScript/WASM 
     (see the [Texcraft playground](https://play.texcraft.dev) for an example of the latter).
@@ -23,8 +22,9 @@ Initial work has focused on building a [fast](https://github.com/jamespfennell/t
 
 ## Trying it out
 
-The [Texcraft playground](https://play.texcraft.dev) is an example of 
-    Texcraft-built software running in the browser.
+No typesetting work has been done yet, but Texcraft can already be used to run TeX scripts.
+
+The [Texcraft playground](https://play.texcraft.dev) does this in the browser - no downloads needed.
 
 Locally, with the Git repo checked out,
     the Texcraft binary can be used to run TeX scripts; e.g.,
@@ -39,10 +39,10 @@ cargo run --bin texcraft repl
 ```
 
 These all work with the limited subset of TeX commands that have been implemented.
+Run `cargo run --bin texcraft doc` for a list of available commands.
 
-In general, though, the point of Texcraft is to be used a library for building
-    the TeX software you want to build, and eventually we hope if can be used to build
-    real TeX typesetting engines.
+Note the main point of Texcraft is not to produce specific binaries, but rather to be 
+    a library for building TeX software.
 The [documentation website](https://texcraft.dev) has beginner-friendly tutorials on 
     working with Texcraft as a library.
 
@@ -50,10 +50,8 @@ The [documentation website](https://texcraft.dev) has beginner-friendly tutorial
 
 There is a lot of low hanging fruit that is intentionally left unpicked so
     people who want to contribute to Texcraft have a good starting point.
-See the X tag in the GitHub issues.
 Right now the main focus is on completing the Texlang standard library, which is a collection
     of non-typesetting TeX commands like `\def` that every TeX distribution includes.
-
 
 ## See also
 

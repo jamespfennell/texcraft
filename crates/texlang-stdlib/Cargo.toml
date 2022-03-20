@@ -10,6 +10,8 @@ edition = "2021"
 # In the time module for getting the current time on startup.
 chrono = {version="0.4.19", default-features = false, features = ["clock"], optional = true}
 
+linefeed = {version = "0.6", optional = true}
+
 texcraft-stdext = { path = "../texcraft-stdext" }
 texlang-core = { path = "../texlang-core" }
 
@@ -24,4 +26,4 @@ arrayvec = "0.7.1"
 [features]
 default = ["time"]
 time = ["chrono"]
-
+repl = ["linefeed"]

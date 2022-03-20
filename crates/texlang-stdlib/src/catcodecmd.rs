@@ -2,8 +2,6 @@ use texlang_core::parse;
 use texlang_core::prelude::*;
 use texlang_core::variable::{TypedVariable, Variable};
 
-use std::convert::TryFrom;
-
 pub const CATCODE_DOC: &str = "Get or set a catcode register";
 
 /// Get the `\catcode` command.
@@ -14,21 +12,19 @@ pub fn get_catcode<S>() -> command::VariableFn<S> {
 fn catcode_fn<S>(
     _catcode_token: Token,
     input: &mut runtime::ExpansionInput<S>,
-    _: usize,
+    _: u32,
 ) -> anyhow::Result<Variable<S>> {
     let addr: u32 = parse::parse_number(input)?;
     Ok(Variable::CatCode(TypedVariable::new(
-        |state: &runtime::BaseState<S>, addr: usize| -> &CatCode {
-            let addr = u32::try_from(addr).unwrap();
+        |state: &runtime::BaseState<S>, addr: u32| -> &CatCode {
             let addr = char::from_u32(addr).unwrap();
             state.cat_code_map.get(&addr)
         },
-        |state: &mut runtime::BaseState<S>, addr: usize| -> &mut CatCode {
-            let addr = u32::try_from(addr).unwrap();
+        |state: &mut runtime::BaseState<S>, addr: u32| -> &mut CatCode {
             let addr = char::from_u32(addr).unwrap();
             state.cat_code_map.get_mut(&addr)
         },
-        addr as usize,
+        addr,
     )))
 }
 
