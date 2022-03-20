@@ -72,24 +72,25 @@ then the variable is never deallocated.
 
 /// Component required for the alloc commands.
 pub struct Component {
-    stack: Nevec<Stack>,
+    allocations: Nevec<GroupAllocations>,
 
-    // Map from addr to (stack index, stack.singletons index)
-    singleton_addr_map: HashMap<usize, (usize, usize)>,
-    next_singleton_addr: usize,
+    // Map from addr to (group allocations index, allocations.singletons index)
+    singleton_addr_map: HashMap<u32, (usize, usize)>,
+    next_singleton_addr: u32,
 
-    // Map from addr to (stack index, stack.singletons index)
+    // Map from addr to (group allocations index, gallocations.singletons index)
     //
     // Note that addr points to the first element of the array; when
     // we add a new array, addr is incremented by the size of the array.
     // addr + i then references the ith element of the array, for
     // appropriate i. We use a BTreeMap to make it fast to obtain the
     // indices from addr + i for any i.
-    array_addr_map: BTreeMap<usize, (usize, usize)>,
-    next_array_addr: usize,
+    array_addr_map: BTreeMap<u32, (usize, usize)>,
+    next_array_addr: u32,
 }
 
-struct Stack {
+/// Contains all the allocations for a single group.
+struct GroupAllocations {
     // TODO: rather than using a Vec of Vecs it may be more efficient
     // to use a single global Vec and a single non-global Vec.
     singletons: Vec<Singleton>,
@@ -97,12 +98,12 @@ struct Stack {
 }
 
 struct Singleton {
-    addr: usize,
+    addr: u32,
     value: i32,
 }
 
 struct Array {
-    addr: usize,
+    addr: u32,
     value: Vec<i32>,
 }
 
@@ -110,7 +111,7 @@ impl Component {
     /// Create a new alloc component.
     pub fn new() -> Component {
         Component {
-            stack: Nevec::new(Stack {
+            allocations: Nevec::new(GroupAllocations {
                 singletons: vec![],
                 arrays: vec![],
             }),
@@ -121,9 +122,12 @@ impl Component {
         }
     }
 
-    fn alloc_int(&mut self) -> usize {
-        let i = (self.stack.len() - 1, self.stack.last().singletons.len());
-        self.stack.last_mut().singletons.push(Singleton {
+    fn alloc_int(&mut self) -> u32 {
+        let i = (
+            self.allocations.len() - 1,
+            self.allocations.last().singletons.len(),
+        );
+        self.allocations.last_mut().singletons.push(Singleton {
             addr: self.next_singleton_addr,
             value: 0,
         });
@@ -132,18 +136,21 @@ impl Component {
         self.next_singleton_addr - 1
     }
 
-    fn alloc_array(&mut self, len: usize) -> usize {
-        let i = (self.stack.len() - 1, self.stack.last().arrays.len());
-        self.stack.last_mut().arrays.push(Array {
+    fn alloc_array(&mut self, len: u32) -> u32 {
+        let i = (
+            self.allocations.len() - 1,
+            self.allocations.last().arrays.len(),
+        );
+        self.allocations.last_mut().arrays.push(Array {
             addr: self.next_array_addr,
-            value: vec![0; len],
+            value: vec![0; len as usize],
         });
         self.array_addr_map.insert(self.next_array_addr, i);
         self.next_array_addr += len;
         self.next_array_addr - len
     }
 
-    fn find_array(&self, elem_addr: usize) -> (usize, (usize, usize)) {
+    fn find_array(&self, elem_addr: u32) -> (u32, (usize, usize)) {
         let (a, (b, c)) = self
             .array_addr_map
             .range((Included(&0), Included(&elem_addr)))
@@ -154,20 +161,24 @@ impl Component {
     }
 
     pub fn begin_group(&mut self) {
-        self.stack.push(Stack {
+        self.allocations.push(GroupAllocations {
             singletons: vec![],
             arrays: vec![],
         });
     }
 
-    pub fn end_group(&mut self) {
-        let stack = self.stack.pop_from_tail().unwrap();
-        for singleton in &stack.singletons {
+    pub fn end_group(&mut self) -> bool {
+        let allocations = match self.allocations.pop_from_tail() {
+            None => return false,
+            Some(allocations) => allocations,
+        };
+        for singleton in &allocations.singletons {
             self.singleton_addr_map.remove(&singleton.addr);
         }
-        for array in &stack.arrays {
+        for array in &allocations.arrays {
             self.array_addr_map.remove(&array.addr);
         }
+        true
     }
 }
 
@@ -188,17 +199,17 @@ fn newint_primitive_fn<S: HasComponent<Component>>(
 ) -> anyhow::Result<()> {
     let name = parse::parse_command_target("newint allocation", newint_token, input.unexpanded())?;
     let addr = input.state_mut().component_mut().alloc_int();
-    input
-        .base_mut()
-        .commands_map
-        .insert(name, command::VariableCommand::new(singleton_fn, addr));
+    input.base_mut().commands_map.insert(
+        name,
+        command::Definition::new_variable(singleton_fn).with_addr(addr),
+    );
     Ok(())
 }
 
 fn singleton_fn<S: HasComponent<Component>>(
     _: Token,
     _: &mut runtime::ExpansionInput<S>,
-    addr: usize,
+    addr: u32,
 ) -> anyhow::Result<Variable<S>> {
     Ok(Variable::Int(TypedVariable::new(
         singleton_ref_fn,
@@ -207,16 +218,16 @@ fn singleton_fn<S: HasComponent<Component>>(
     )))
 }
 
-fn singleton_ref_fn<S: HasComponent<Component>>(state: &S, addr: usize) -> &i32 {
+fn singleton_ref_fn<S: HasComponent<Component>>(state: &S, addr: u32) -> &i32 {
     let a = state.component();
-    let (stack_i, inner_i) = a.singleton_addr_map[&addr];
-    &a.stack.get(stack_i).unwrap().singletons[inner_i].value
+    let (allocations_i, inner_i) = a.singleton_addr_map[&addr];
+    &a.allocations.get(allocations_i).unwrap().singletons[inner_i].value
 }
 
-fn singleton_mut_ref_fn<S: HasComponent<Component>>(state: &mut S, addr: usize) -> &mut i32 {
+fn singleton_mut_ref_fn<S: HasComponent<Component>>(state: &mut S, addr: u32) -> &mut i32 {
     let a = state.component_mut();
-    let (stack_i, inner_i) = a.singleton_addr_map[&addr];
-    &mut a.stack.get_mut(stack_i).unwrap().singletons[inner_i].value
+    let (allocations_i, inner_i) = a.singleton_addr_map[&addr];
+    &mut a.allocations.get_mut(allocations_i).unwrap().singletons[inner_i].value
 }
 
 /// Get the `\newarray` execution command.
@@ -230,12 +241,12 @@ fn newarray_primitive_fn<S: HasComponent<Component>>(
 ) -> anyhow::Result<()> {
     let name =
         parse::parse_command_target("newarray allocation", newarray_token, input.unexpanded())?;
-    let len: usize = parse::parse_number(input)?;
+    let len: u32 = parse::parse_number(input)?;
     let addr = input.state_mut().component_mut().alloc_array(len);
-    input
-        .base_mut()
-        .commands_map
-        .insert(name, command::VariableCommand::new(array_fn, addr));
+    input.base_mut().commands_map.insert(
+        name,
+        command::Definition::new_variable(array_fn).with_addr(addr),
+    );
     // TODO: Return the arraydef version
     Ok(())
 }
@@ -244,14 +255,14 @@ fn newarray_primitive_fn<S: HasComponent<Component>>(
 fn array_fn<S: HasComponent<Component>>(
     array_token: Token,
     input: &mut runtime::ExpansionInput<S>,
-    array_addr: usize,
+    array_addr: u32,
 ) -> anyhow::Result<Variable<S>> {
-    let array_index: usize = parse::parse_number(input)?;
-    let (stack_i, inner_i) = input.state().component().array_addr_map[&array_addr];
-    let array_len = input.state().component().stack[stack_i].arrays[inner_i]
+    let array_index: u32 = parse::parse_number(input)?;
+    let (allocations_i, inner_i) = input.state().component().array_addr_map[&array_addr];
+    let array_len = input.state().component().allocations[allocations_i].arrays[inner_i]
         .value
         .len();
-    if array_index >= array_len {
+    if (array_index as usize) >= array_len {
         return Err(error::TokenError::new(
             array_token,
             format![
@@ -268,14 +279,20 @@ fn array_fn<S: HasComponent<Component>>(
     )))
 }
 
-fn array_element_ref_fn<S: HasComponent<Component>>(state: &S, addr: usize) -> &i32 {
-    let (addr_0, (stack_i, inner_i)) = state.component().find_array(addr);
-    &state.component().stack[stack_i].arrays[inner_i].value[addr - addr_0]
+fn array_element_ref_fn<S: HasComponent<Component>>(state: &S, addr: u32) -> &i32 {
+    let (addr_0, (allocations_i, inner_i)) = state.component().find_array(addr);
+    &state.component().allocations[allocations_i].arrays[inner_i].value[(addr - addr_0) as usize]
 }
 
-fn array_element_mut_ref_fn<S: HasComponent<Component>>(state: &mut S, addr: usize) -> &mut i32 {
-    let (addr_0, (stack_i, inner_i)) = state.component().find_array(addr);
-    &mut state.component_mut().stack.get_mut(stack_i).unwrap().arrays[inner_i].value[addr - addr_0]
+fn array_element_mut_ref_fn<S: HasComponent<Component>>(state: &mut S, addr: u32) -> &mut i32 {
+    let (addr_0, (allocations_i, inner_i)) = state.component().find_array(addr);
+    &mut state
+        .component_mut()
+        .allocations
+        .get_mut(allocations_i)
+        .unwrap()
+        .arrays[inner_i]
+        .value[(addr - addr_0) as usize]
 }
 
 #[cfg(test)]

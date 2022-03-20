@@ -6,6 +6,7 @@
 //! See the runtime documentation in the Texlang book for full documentation.
 
 use super::token::CsName;
+use crate::command;
 use crate::command::Command;
 use crate::command::CommandsMap;
 use crate::command::Definition;
@@ -50,9 +51,8 @@ pub fn run<S>(
                 Some(token) => match token.value() {
                     ControlSequence(name) => match execution_input.base().commands_map.get(&name) {
                         Some(Command::Execution(cmd)) => cmd(token, execution_input),
-                        Some(Command::Variable(cmd_ref)) => {
-                            let cmd = *cmd_ref;
-                            let var = cmd.resolve(token, execution_input)?;
+                        Some(Command::Variable(cmd, addr)) => {
+                            let var = command::resolve(*cmd, *addr, token, execution_input)?;
                             variable::set_using_input(var, execution_input, false)
                         }
                         Some(Command::Character(token_value)) => character_handler(

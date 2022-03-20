@@ -60,32 +60,17 @@ pub type ExecutionFn<S> =
 pub type VariableFn<S> = fn(
     token: Token,
     input: &mut runtime::ExpansionInput<S>,
-    addr: usize,
+    addr: u32,
 ) -> anyhow::Result<variable::Variable<S>>;
 
-pub struct VariableCommand<S>(VariableFn<S>, usize);
-
-impl<S> Copy for VariableCommand<S> {}
-
-impl<S> Clone for VariableCommand<S> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<S> VariableCommand<S> {
-    pub fn new(call_fn: VariableFn<S>, addr: usize) -> VariableCommand<S> {
-        VariableCommand(call_fn, addr)
-    }
-
-    /// Obtain the variable that this command refers to.
-    pub fn resolve<I: AsMut<runtime::ExpansionInput<S>>>(
-        &self,
-        token: token::Token,
-        input: &mut I,
-    ) -> anyhow::Result<variable::Variable<S>> {
-        (self.0)(token, input.as_mut(), self.1)
-    }
+/// Obtain the variable that the command refers to.
+pub fn resolve<S, I: AsMut<runtime::ExpansionInput<S>>>(
+    variable_fn: VariableFn<S>,
+    addr: u32,
+    token: token::Token,
+    input: &mut I,
+) -> anyhow::Result<variable::Variable<S>> {
+    variable_fn(token, input.as_mut(), addr)
 }
 
 /// A TeX command in Texcraft.
@@ -102,7 +87,7 @@ pub enum Command<S> {
 
     /// A command that is used to reference a variable, like a parameter or a register.
     /// Such a command is *resolved* to get the variable using the function pointer it holds.
-    Variable(VariableCommand<S>),
+    Variable(VariableFn<S>, u32),
 
     /// A command that aliases a character.
     /// Depending on the context in which this command appears it may behave like a
@@ -111,7 +96,6 @@ pub enum Command<S> {
     Character(token::Value),
 }
 
-// TODO: renamd Defintion
 pub struct Definition<S> {
     command: Command<S>,
     id: std::any::TypeId,
@@ -129,6 +113,11 @@ impl<S> Definition<S> {
         t.into()
     }
 
+    /// Create a new variable command definition.
+    pub fn new_variable(t: VariableFn<S>) -> Definition<S> {
+        t.into()
+    }
+
     /// Set the ID for this command definition.
     pub fn with_id(mut self, id: std::any::TypeId) -> Definition<S> {
         self.id = id;
@@ -138,6 +127,15 @@ impl<S> Definition<S> {
     // Set the doc for this command definition.
     pub fn with_doc(mut self, doc: &'static str) -> Definition<S> {
         self.doc = doc;
+        self
+    }
+
+    pub fn with_addr(mut self, addr: u32) -> Definition<S> {
+        if let Command::Variable(_, old_addr) = &mut self.command {
+            *old_addr = addr;
+        } else {
+            panic!("cannot set the address of a non-variable command");
+        }
         self
     }
 }
@@ -156,7 +154,7 @@ impl<S> Clone for Command<S> {
             Command::Expansion(e) => Command::Expansion::<S>(*e),
             Command::Macro(m) => Command::Macro(m.clone()),
             Command::Execution(e) => Command::Execution(*e),
-            Command::Variable(v) => Command::Variable(*v),
+            Command::Variable(v, a) => Command::Variable(*v, *a),
             Command::Character(tv) => Command::Character(*tv),
         }
     }
@@ -182,13 +180,7 @@ impl<S> From<ExecutionFn<S>> for Definition<S> {
 
 impl<S> From<VariableFn<S>> for Definition<S> {
     fn from(f: VariableFn<S>) -> Self {
-        Command::Variable(VariableCommand(f, 0)).into()
-    }
-}
-
-impl<S> From<VariableCommand<S>> for Definition<S> {
-    fn from(cmd: VariableCommand<S>) -> Self {
-        Command::Variable(cmd).into()
+        Command::Variable(f, 0).into()
     }
 }
 
@@ -294,6 +286,6 @@ mod tests {
 
     #[test]
     fn command_size() {
-        assert_eq!(std::mem::size_of::<Command<()>>(), 24);
+        assert_eq!(std::mem::size_of::<Command<()>>(), 16);
     }
 }

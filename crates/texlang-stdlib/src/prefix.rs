@@ -200,13 +200,13 @@ fn process_prefixes<S: HasComponent<Component>>(
         }
         Some(&t) => match t.value() {
             Value::ControlSequence(name) => {
-                if let Some(command::Command::Variable(cmd_ref)) =
+                if let Some(command::Command::Variable(cmd, addr)) =
                     input.base().commands_map.get(&name)
                 {
                     check_only_global(t, prefix, input)?;
-                    let cmd = *cmd_ref;
+                    let (cmd, addr) = (*cmd, *addr);
                     input.consume()?;
-                    let var = cmd.resolve(t, input)?;
+                    let var = command::resolve(cmd, addr, t, input)?;
                     variable::set_using_input(var, input, prefix.global.is_some())?;
                     return Ok(());
                 }
@@ -449,8 +449,8 @@ mod test {
     fn get_integer() -> command::VariableFn<State> {
         |_, _, _| -> anyhow::Result<variable::Variable<State>> {
             Ok(variable::Variable::Int(variable::TypedVariable::new(
-                |state: &State, _: usize| -> &i32 { &state.integer },
-                |state: &mut State, _: usize| -> &mut i32 { &mut state.integer },
+                |state: &State, _: u32| -> &i32 { &state.integer },
+                |state: &mut State, _: u32| -> &mut i32 { &mut state.integer },
                 0,
             )))
         }

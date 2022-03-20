@@ -23,9 +23,10 @@ fn the_primitive_fn<S>(
     };
     Ok(match &token.value() {
         ControlSequence(name) => {
-            if let Some(command::Command::Variable(cmd_ref)) = input.base().commands_map.get(name) {
-                let cmd = *cmd_ref;
-                let variable = cmd.resolve(token, input)?;
+            if let Some(command::Command::Variable(cmd, addr)) = input.base().commands_map.get(name)
+            {
+                let (cmd, addr) = (*cmd, *addr);
+                let variable = command::resolve(cmd, addr, token, input)?;
                 match variable {
                     variable::Variable::Int(variable) => {
                         let value = *variable.get(input.state());

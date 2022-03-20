@@ -21,15 +21,15 @@ impl<T: Copy + Default, const N: usize> Registers<T, N> {
         }
     }
 
-    fn read(&self, addr: usize) -> &T {
-        match self.values.get(addr) {
+    fn read(&self, addr: u32) -> &T {
+        match self.values.get(addr as usize) {
             None => &self.fallback,
             Some(value) => value,
         }
     }
 
-    fn write(&mut self, addr: usize) -> &mut T {
-        match self.values.get_mut(addr) {
+    fn write(&mut self, addr: u32) -> &mut T {
+        match self.values.get_mut(addr as usize) {
             None => &mut self.fallback,
             Some(r) => r,
         }
@@ -68,10 +68,10 @@ pub fn get_count<S: HasComponent<Component<N>>, const N: usize>() -> command::Va
 fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
     count_token: Token,
     input: &mut runtime::ExpansionInput<S>,
-    _: usize,
+    _: u32,
 ) -> anyhow::Result<Variable<S>> {
-    let addr: usize = parse::parse_number(input)?;
-    if addr >= N {
+    let addr: u32 = parse::parse_number(input)?;
+    if (addr as usize) >= N {
         return Err(integer_register_too_large_error(
             count_token,
             addr,
@@ -96,15 +96,15 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
 ) -> anyhow::Result<()> {
     let cs_name = parse::parse_command_target("countdef", countdef_token, input.unexpanded())?;
     parse::parse_optional_equals(input)?;
-    let addr: usize = parse::parse_number(input)?;
-    if addr >= input.state().component().int_registers.num() {
+    let addr: u32 = parse::parse_number(input)?;
+    if (addr as usize) >= input.state().component().int_registers.num() {
         return Err(integer_register_too_large_error(
             countdef_token,
             addr,
             input.state().component().int_registers.num(),
         ));
     }
-    let new_cmd = command::VariableCommand::new(singleton_fn, addr);
+    let new_cmd = command::Definition::new_variable(singleton_fn).with_addr(addr);
     input.base_mut().commands_map.insert(cs_name, new_cmd);
     Ok(())
 }
@@ -112,7 +112,7 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
 fn singleton_fn<S: HasComponent<Component<N>>, const N: usize>(
     _: Token,
     _: &mut runtime::ExpansionInput<S>,
-    addr: usize,
+    addr: u32,
 ) -> anyhow::Result<Variable<S>> {
     Ok(Variable::Int(TypedVariable::new(
         int_register_ref_fn,
@@ -123,19 +123,19 @@ fn singleton_fn<S: HasComponent<Component<N>>, const N: usize>(
 
 fn int_register_ref_fn<S: HasComponent<Component<N>>, const N: usize>(
     state: &S,
-    addr: usize,
+    addr: u32,
 ) -> &i32 {
     state.component().int_registers.read(addr)
 }
 
 fn int_register_mut_ref_fn<S: HasComponent<Component<N>>, const N: usize>(
     state: &mut S,
-    addr: usize,
+    addr: u32,
 ) -> &mut i32 {
     state.component_mut().int_registers.write(addr)
 }
 
-fn integer_register_too_large_error(token: Token, addr: usize, num: usize) -> anyhow::Error {
+fn integer_register_too_large_error(token: Token, addr: u32, num: usize) -> anyhow::Error {
     error::TokenError::new(
         token,
         format![

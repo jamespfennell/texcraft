@@ -43,10 +43,10 @@
 //!     year: i32
 //! }
 //!
-//! fn get_year(state: &S, addr: usize) -> &i32 {
+//! fn get_year(state: &S, _: u32) -> &i32 {
 //!     &state.year
 //! }
-//! # fn get_mut_year(state: &mut S, addr: usize) -> &mut i32 {
+//! # fn get_mut_year(state: &mut S, _: u32) -> &mut i32 {
 //! #    &mut state.year
 //! # }
 //! # use texlang_core::variable;
@@ -60,10 +60,10 @@
 //! #     year: i32
 //! # }
 //! #
-//! # fn get_year(state: &S, addr: usize) -> &i32 {
+//! # fn get_year(state: &S, _: u32) -> &i32 {
 //! #    &state.year
 //! # }
-//! fn get_mut_year(state: &mut S, addr: usize) -> &mut i32 {
+//! fn get_mut_year(state: &mut S, _: u32) -> &mut i32 {
 //!    &mut state.year
 //! }
 //! # use texlang_core::variable;
@@ -84,11 +84,11 @@
 //!     scratch_space: Vec<i32>
 //! }
 //!
-//! fn get_scratch_space(state: &S, addr: usize) -> &i32 {
-//!     &state.scratch_space[addr]
+//! fn get_scratch_space(state: &S, addr: u32) -> &i32 {
+//!     &state.scratch_space[addr as usize]
 //! }
-//! # fn get_mut_scratch_space(state: &mut S, addr: usize) -> &mut i32 {
-//! #    &mut state.scratch_space[addr]
+//! # fn get_mut_scratch_space(state: &mut S, addr: u32) -> &mut i32 {
+//! #    &mut state.scratch_space[addr as usize]
 //! # }
 //! # use texlang_core::variable;
 //! # variable::Variable::Int(variable::TypedVariable::new(get_scratch_space, get_mut_scratch_space, 0));
@@ -101,11 +101,11 @@
 //! #     scratch_space: Vec<i32>
 //! # }
 //!
-//! # fn get_scratch_space(state: &S, addr: usize) -> &i32 {
-//! #     &state.scratch_space[addr]
+//! # fn get_scratch_space(state: &S, addr: u32) -> &i32 {
+//! #     &state.scratch_space[addr as usize]
 //! # }
-//! fn get_mut_scratch_space(state: &mut S, addr: usize) -> &mut i32 {
-//!     &mut state.scratch_space[addr]
+//! fn get_mut_scratch_space(state: &mut S, addr: u32) -> &mut i32 {
+//!     &mut state.scratch_space[addr as usize]
 //! }
 //! # use texlang_core::variable;
 //! # variable::Variable::Int(variable::TypedVariable::new(get_scratch_space, get_mut_scratch_space, 0));
@@ -190,9 +190,9 @@ impl<S> Clone for Variable<S> {
 ///
 /// See the module documentation for information about this type.
 pub struct TypedVariable<S, T> {
-    ref_fn: fn(state: &S, i: usize) -> &T,
-    ref_mut_fn: fn(state: &mut S, i: usize) -> &mut T,
-    addr: usize,
+    ref_fn: fn(state: &S, i: u32) -> &T,
+    ref_mut_fn: fn(state: &mut S, i: u32) -> &mut T,
+    addr: u32,
 }
 
 impl<S, T> PartialEq for TypedVariable<S, T> {
@@ -229,9 +229,9 @@ impl<S, T> TypedVariable<S, T> {
     ///
     /// See the module documentation for information on the parameters.
     pub fn new(
-        ref_fn: fn(state: &S, i: usize) -> &T,
-        ref_mut_fn: fn(state: &mut S, i: usize) -> &mut T,
-        addr: usize,
+        ref_fn: fn(state: &S, i: u32) -> &T,
+        ref_mut_fn: fn(state: &mut S, i: u32) -> &mut T,
+        addr: u32,
     ) -> TypedVariable<S, T> {
         TypedVariable {
             ref_fn,
