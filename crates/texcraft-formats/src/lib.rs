@@ -4,60 +4,295 @@ pub fn read(b: &[u8]) {
     if b.len() <= 24 {
         panic!["file too small"]
     }
-    let lf = read_u16(&b[0..]);
-    let lh = read_u16(&b[2..]);
-    let bc = read_u16(&b[4..]);
-    let ec = read_u16(&b[6..]);
-    let nw = read_u16(&b[8..]);
-    let nh = read_u16(&b[10..]);
-    let nd = read_u16(&b[12..]);
-    let ni = read_u16(&b[14..]);
-    let nl = read_u16(&b[16..]);
-    let nk = read_u16(&b[18..]);
-    let ne = read_u16(&b[20..]);
-    let np = read_u16(&b[22..]);
-    if b.len() < lf {
+    let mut word_stream = WordStream { b };
+    let (lf, lh) = word_stream.read_u16s();
+    let (bc, ec) = word_stream.read_u16s();
+    let (nw, nh) = word_stream.read_u16s();
+    let (nd, ni) = word_stream.read_u16s();
+    let (nl, nk) = word_stream.read_u16s();
+    let (ne, np) = word_stream.read_u16s();
+    if word_stream.len() * 4 < (lf as usize) {
         panic!["file size doesn't match"]
     }
-    if lf != 24 + lh + (ec - bc + 4) + nw + nh + nd + ni + nl + nk + ne + np {
+    if lf != 6 + lh + (ec - bc + 1) + nw + nh + nd + ni + nl + nk + ne + np {
         panic!["inconsistent tfm file"]
     }
-    let mut offset = 24;
-    let header = &b[offset..offset + lh];
+    let header = {
+        let mut raw = word_stream.head(lh);
+        Header::deserialize_tfm(&mut raw)
+    };
+    println!("{:?}", header);
 
-    let a: [u8; 4] = [0, 0, 0, 1];
-    let f = FixWord::new(&a);
-    println!("fix word of 1: {}", f);
+    let char_info_raw = word_stream.head(ec - bc + 4);
+    let widths =  {
+        let mut raw = word_stream.head(nw);
+        Vec::<FixWord>::deserialize_tfm(&mut raw)
+    };
+    let heights ={
+        let mut raw = word_stream.head(nh);
+        Vec::<FixWord>::deserialize_tfm(&mut raw)
+    };
+    let depths ={
+        let mut raw = word_stream.head(nd);
+        Vec::<FixWord>::deserialize_tfm(&mut raw)
+    } ;
+    let italic_corrections ={
+        let mut raw = word_stream.head(nd);
+        Vec::<FixWord>::deserialize_tfm(&mut raw)
+    };
+    //let design_size = FixWord::new(&header[4..]);
+    //println!("Design size: {}", design_size);
 
-    let design_size = FixWord::new(&header[4..]);
-    println!("Design size: {}", design_size);
-
-    offset += lh;
-    let char_info = &b[offset..offset + ec - bc + 4];
-    offset += ec - bc + 4;
-    let width = &b[offset..offset + nw];
-
-    println!("num char info: {:?}", char_info.len() / 4);
-    parse_char_info(char_info, width);
+    // println!("num char info: {:?}", char_info.len() / 4);
+    // parse_char_info(char_info, width);
 }
 
-fn read_u16(i: &[u8]) -> usize {
-    (((i[0] as usize) << 8) + (i[1] as usize)) * 4
+#[derive(Debug)]
+pub struct Header {
+    pub checksum: u32,
+    pub design_size: FixWord,
+    pub character_coding_scheme: Option<String>,
+    pub font_family: Option<String>,
+    pub seven_bit_safe: Option<bool>,
+    pub face: Option<Face>,
+    pub trailing_words: Vec<u32>,
+}
+
+impl DeserializeTfm for Header {
+    fn deserialize_tfm<'a, 'b>(tfm_stream: &'b mut WordStream<'a>) -> Self {
+        // todo: check for size and error
+        let checksum = tfm_stream.read_u32();
+        let design_size = FixWord::deserialize_tfm(tfm_stream);
+        let character_coding_scheme = {
+            let mut raw = tfm_stream.head(10_usize);
+            match raw.len() == 10 {
+                true => Some(String::deserialize_tfm(&mut raw)),
+                false => None,
+            }
+        };
+        let font_family = {
+            let mut raw = tfm_stream.head(5_usize);
+            match raw.len() == 5 {
+                true => Some(String::deserialize_tfm(&mut raw)),
+                false => None,
+            }
+        };
+        let (seven_bit_safe, face) = if tfm_stream.empty() {
+            (None, None)
+        } else {
+            let (seven_bit_safe_raw, _, _, face_raw) = tfm_stream.read_u8s();
+            (Some(seven_bit_safe_raw >= 128), Face::deserialize(face_raw))
+        };
+        let trailing_words = Vec::<u32>::deserialize_tfm(tfm_stream);
+        Header {
+            checksum,
+            design_size,
+            character_coding_scheme,
+            font_family,
+            seven_bit_safe,
+            face,
+            trailing_words,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum Weight {
+    Medium,
+    Bold,
+    Light,
+}
+
+#[derive(Debug)]
+pub enum Slope {
+    Roman,
+    Italic,
+}
+
+#[derive(Debug)]
+pub enum Expansion {
+    Regular,
+    Condensed,
+    Expanded,
+}
+
+#[derive(Debug)]
+pub struct Face {
+    pub weight: Weight,
+    pub slope: Slope,
+    pub expansion: Expansion,
+}
+
+impl Face {
+    fn deserialize(mut raw: u8) -> Option<Face> {
+        if raw < 18 {
+            None
+        } else {
+            let slope = if raw % 2 == 0 {
+                Slope::Roman
+            } else {
+                Slope::Italic
+            };
+            raw /= 2;
+            let weight = match raw % 3 {
+                0 => Weight::Medium,
+                1 => Weight::Bold,
+                _ => Weight::Light,
+            };
+            raw /= 3;
+            let expansion = match raw % 3 {
+                0 => Expansion::Regular,
+                1 => Expansion::Condensed,
+                _ => Expansion::Expanded,
+            };
+            Some(Face {
+                weight,
+                slope,
+                expansion,
+            })
+        }
+    }
 }
 
 pub struct File {
-    checksum: u32,
+    header: Header,
     char_infos: Vec<CharInfo>,
+}
+
+impl DeserializeTfm for String {
+    fn deserialize_tfm<'a, 'b>(word_stream: &'b mut WordStream<'a>) -> Self {
+        let (mut len, b, c, d) = word_stream.read_u8s();
+        // todo validate len
+        let mut stack = vec![d, c, b];
+        let mut s = String::new();
+        while len > 0 {
+            let raw_char = match stack.pop() {
+                None => {
+                    let (a, b, c, d) = word_stream.read_u8s();
+                    stack.push(d);
+                    stack.push(c);
+                    stack.push(b);
+                    a
+                }
+                Some(b) => b,
+            };
+            // todo error if not ascii
+            s.push(raw_char.try_into().unwrap());
+            len -= 1;
+        }
+        s
+    }
+}
+
+impl<T: DeserializeTfm> DeserializeTfm for Vec<T> {
+    fn deserialize_tfm<'a, 'b>(word_stream: &'b mut WordStream<'a>) -> Self {
+        let mut fix_words = Vec::with_capacity(word_stream.len());
+        while !word_stream.empty() {
+            fix_words.push(T::deserialize_tfm(word_stream));
+        }
+        fix_words
+    }
+}
+
+impl DeserializeTfm for u32 {
+    fn deserialize_tfm<'a, 'b>(word_stream: &'b mut WordStream<'a>) -> Self {
+        word_stream.read_u32()
+    }
+}
+
+struct WordStream<'a> {
+    b: &'a [u8],
+}
+
+impl<'a> WordStream<'a> {
+    fn read_u32(&mut self) -> u32 {
+        if self.b.len() < 4 {
+            0
+        } else {
+            let s = ((self.b[0] as u32) << 24)
+                + ((self.b[1] as u32) << 16)
+                + ((self.b[2] as u32) << 8)
+                + ((self.b[3] as u32) << 0);
+            self.b = &self.b[4..];
+            s
+        }
+    }
+
+    fn read_u16s(&mut self) -> (u16, u16) {
+        if self.b.len() < 4 {
+            (0, 0)
+        } else {
+            let s = (
+                ((self.b[0] as u16) << 8) + ((self.b[1] as u16) << 0),
+                ((self.b[2] as u16) << 8) + ((self.b[3] as u16) << 0),
+            );
+            self.b = &self.b[4..];
+            s
+        }
+    }
+
+    fn read_u8s(&mut self) -> (u8, u8, u8, u8) {
+        if self.b.len() < 4 {
+            (0, 0, 0, 0)
+        } else {
+            let s = (self.b[0], self.b[1], self.b[2], self.b[3]);
+            self.b = &self.b[4..];
+            s
+        }
+    }
+
+    fn head<T: Into<usize>>(&mut self, num_words: T) -> WordStream<'a> {
+        let num_words = T::into(num_words);
+        if self.len() < num_words {
+            let slice = WordStream { b: self.b };
+            self.b = &[];
+            slice
+        } else {
+            let slice = WordStream {
+                b: &self.b[..num_words * 4],
+            };
+            self.b = &self.b[num_words * 4..];
+            slice
+        }
+    }
+
+    fn empty(&self) -> bool {
+        self.len() == 0
+    }
+    fn len(&self) -> usize {
+        self.b.len() / 4
+    }
+}
+
+trait DeserializeTfm {
+    fn deserialize_tfm<'a, 'b>(word_stream: &'b mut WordStream<'a>) -> Self;
+}
+
+trait SerializePl {
+    fn serialize_pl(&self);
+}
+
+trait DeserializePl {
+    fn deserialize_pl();
 }
 
 pub struct CharInfo {}
 
 #[derive(PartialEq, Eq, Debug)]
-struct FixWord(i32);
+pub struct FixWord(i32);
+
+impl DeserializeTfm for FixWord {
+    fn deserialize_tfm<'a, 'b>(tfm_stream: &'b mut WordStream<'a>) -> Self {
+        FixWord(tfm_stream.read_u32() as i32)
+    }
+}
 
 impl FixWord {
     const UNITY: i32 = 1 << 20;
 
+    // serialize_from_tfm()
+    // serialize_from_pl()
+    // deserialize_to_pl()
     fn new(b: &[u8]) -> FixWord {
         FixWord(
             ((b[0] as i32) << 24)
@@ -282,26 +517,10 @@ mod tests {
         max: i32::MAX,
     );
 
-    #[test]
-    fn all() {
-        for value in 0..(2 << 20) { //i32::MAX {
-            let start = FixWord(value);
-            let s = format!("{}", start);
-            let finish = FixWord::from_str(&s);
-            assert_eq!(
-                start, finish,
-                "{} ({}) != {} ({}) = FixWord::from_str({})",
-                start.0, start, finish, finish.0, s
-            );
-
-            let start = FixWord(value.wrapping_mul(-1));
-            let s = format!("{}", start);
-            let finish = FixWord::from_str(&s);
-            assert_eq!(start, finish);
-        }
-    }
-
     static CMR10_TFM: &'static [u8] = include_bytes!("cmr10.tfm");
     #[test]
-    fn t() {}
+    fn t() {
+        super::read(CMR10_TFM);
+        assert_eq!(1, 2);
+    }
 }
