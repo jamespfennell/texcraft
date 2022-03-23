@@ -1022,6 +1022,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "texcraft-formats"
+version = "0.1.0"
+
+[[package]]
 name = "texcraft-playground"
 version = "0.0.0"
 dependencies = [
