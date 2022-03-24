@@ -84,8 +84,7 @@ impl<'a> Input<'a> {
         }
     }
 
-    // TODO: can we return &mut?
-    fn head<T: Into<usize>>(&mut self, num_words: T) -> Input<'a> {
+    fn slice<T: Into<usize>>(&mut self, num_words: T) -> Input<'a> {
         let num_words = T::into(num_words);
         if self.len() < num_words {
             let slice = Input { b: self.b };
@@ -152,14 +151,14 @@ impl DeserializeTfm for Header {
         let checksum = input.read_u32();
         let design_size = FixWord::deserialize_tfm(input);
         let character_coding_scheme = {
-            let mut raw = input.head(10_usize);
+            let mut raw = input.slice(10_usize);
             match raw.len() == 10 {
                 true => Some(String::deserialize_tfm(&mut raw)),
                 false => None,
             }
         };
         let font_family = {
-            let mut raw = input.head(5_usize);
+            let mut raw = input.slice(5_usize);
             match raw.len() == 5 {
                 true => Some(String::deserialize_tfm(&mut raw)),
                 false => None,
@@ -378,48 +377,24 @@ impl DeserializeTfm for RawFile {
         if lf != 6 + lh + (ec - bc + 1) + nw + nh + nd + ni + nl + nk + ne + np {
             panic!["inconsistent tfm file"]
         }
+
+        fn deserialize_from_slice<T: DeserializeTfm>(input: &mut Input, num_words: u16) -> T {
+            let mut raw = input.slice(num_words);
+            T::deserialize_tfm(&mut raw)
+        }
+
         RawFile {
-            header: {
-                let mut raw = input.head(lh);
-                Header::deserialize_tfm(&mut raw)
-            },
+            header: deserialize_from_slice(input, lh),
             first_char: bc,
-            raw_char_info: {
-                let mut raw = input.head(ec - bc + 1);
-                Vec::<RawCharInfo>::deserialize_tfm(&mut raw)
-            },
-            widths: {
-                let mut raw = input.head(nw);
-                Vec::<FixWord>::deserialize_tfm(&mut raw)
-            },
-            heights: {
-                let mut raw = input.head(nh);
-                Vec::<FixWord>::deserialize_tfm(&mut raw)
-            },
-            depths: {
-                let mut raw = input.head(nd);
-                Vec::<FixWord>::deserialize_tfm(&mut raw)
-            },
-            italic_corrections: {
-                let mut raw = input.head(ni);
-                Vec::<FixWord>::deserialize_tfm(&mut raw)
-            },
-            lig_kerns: {
-                let mut raw = input.head(nl);
-                Vec::<RawLigKern>::deserialize_tfm(&mut raw)
-            },
-            kerns: {
-                let mut raw = input.head(nk);
-                Vec::<FixWord>::deserialize_tfm(&mut raw)
-            },
-            extensible_chars: {
-                let mut raw = input.head(ne);
-                Vec::<ExtensibleChar>::deserialize_tfm(&mut raw)
-            },
-            params: {
-                let mut raw = input.head(np);
-                Params::deserialize_tfm(&mut raw)
-            },
+            raw_char_info: deserialize_from_slice(input, ec - bc + 1),
+            widths: deserialize_from_slice(input, nw),
+            heights: deserialize_from_slice(input, nh),
+            depths: deserialize_from_slice(input, nd),
+            italic_corrections: deserialize_from_slice(input, ni),
+            lig_kerns: deserialize_from_slice(input, nl),
+            kerns: deserialize_from_slice(input, nk),
+            extensible_chars: deserialize_from_slice(input, ne),
+            params: deserialize_from_slice(input, np),
         }
     }
 }
