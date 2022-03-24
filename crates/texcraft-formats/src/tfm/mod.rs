@@ -50,8 +50,26 @@ pub struct Face {
 }
 
 impl Face {
+    fn serialize(&self) -> u8 {
+        let a = match self.slope {
+            Slope::Roman => 0_u8,
+            Slope::Italic => 1_u8,
+        };
+        let b = match self.weight {
+            Weight::Medium => 0_u8,
+            Weight::Bold => 2_u8,
+            Weight::Light => 4_u8,
+        };
+        let c = match self.expansion {
+            Expansion::Regular => 0_u8,
+            Expansion::Condensed => 6_u8,
+            Expansion::Expanded => 12_u8,
+        };
+        a + b + c
+    }
+
     fn deserialize(mut raw: u8) -> Option<Face> {
-        if raw < 18 {
+        if raw >= 18 {
             None
         } else {
             let slope = if raw % 2 == 0 {
@@ -115,7 +133,6 @@ pub struct Params {
 
 pub struct CharInfo {
     width: (u32, FixWord),
-
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -350,11 +367,4 @@ mod tests {
         min: i32::MIN,
         max: i32::MAX,
     );
-
-    static CMR10_TFM: &'static [u8] = include_bytes!("cmr10.tfm");
-    #[test]
-    fn t() {
-        super::deserialize_tfm(CMR10_TFM);
-        assert_eq!(1, 2);
-    }
 }
