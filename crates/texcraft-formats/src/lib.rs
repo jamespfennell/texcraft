@@ -23,26 +23,28 @@ pub fn read(b: &[u8]) {
     };
     println!("{:?}", header);
 
-    let char_info_raw = word_stream.head(ec - bc + 4);
-    let widths =  {
+    let raw_char_info = {
+        let mut raw = word_stream.head(ec - bc + 4);
+        Vec::<RawCharInfo>::deserialize_tfm(&mut raw)
+    };
+    let widths = {
         let mut raw = word_stream.head(nw);
         Vec::<FixWord>::deserialize_tfm(&mut raw)
     };
-    let heights ={
+    let heights = {
         let mut raw = word_stream.head(nh);
         Vec::<FixWord>::deserialize_tfm(&mut raw)
     };
-    let depths ={
-        let mut raw = word_stream.head(nd);
-        Vec::<FixWord>::deserialize_tfm(&mut raw)
-    } ;
-    let italic_corrections ={
+    let depths = {
         let mut raw = word_stream.head(nd);
         Vec::<FixWord>::deserialize_tfm(&mut raw)
     };
-    //let design_size = FixWord::new(&header[4..]);
-    //println!("Design size: {}", design_size);
+    let italic_corrections = {
+        let mut raw = word_stream.head(nd);
+        Vec::<FixWord>::deserialize_tfm(&mut raw)
+    };
 
+    println!("{:?}", raw_char_info);
     // println!("num char info: {:?}", char_info.len() / 4);
     // parse_char_info(char_info, width);
 }
@@ -92,6 +94,41 @@ impl DeserializeTfm for Header {
             seven_bit_safe,
             face,
             trailing_words,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct RawCharInfo {
+    width_index: usize,
+    height_index: usize,
+    depth_index: usize,
+    italic_index: usize,
+    tag: Tag,
+}
+
+#[derive(Debug)]
+enum Tag {
+    None,
+    Ligature(usize),
+    List(usize),
+    Extension(usize),
+}
+
+impl DeserializeTfm for RawCharInfo {
+    fn deserialize_tfm<'a, 'b>(word_stream: &'b mut WordStream<'a>) -> Self {
+        let (width_index, a, b, remainder) = word_stream.read_u8s();
+        RawCharInfo {
+            width_index: width_index as usize,
+            height_index: (a as usize) / (1 << 4),
+            depth_index: (a as usize) % (1 << 4),
+            italic_index: (b as usize) / (1 << 2),
+            tag: match b % (1 << 2) {
+                0 => Tag::None,
+                1 => Tag::Ligature(remainder as usize),
+                2 => Tag::List(remainder as usize),
+                _ => Tag::Extension(remainder as usize),
+            },
         }
     }
 }
