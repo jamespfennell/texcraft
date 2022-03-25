@@ -1,5 +1,5 @@
 use std::panic;
-mod pl;
+pub mod pl;
 mod tfm;
 
 pub use tfm::deserialize_tfm_bla;

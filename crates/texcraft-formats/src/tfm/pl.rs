@@ -1,4 +1,263 @@
 use super::*;
+use std::{
+    fmt::Debug,
+    iter::{Iterator, Peekable},
+};
+
+pub fn run<'a>(pl_source: &'a str) {
+    let lexer = Lexer {
+        s: pl_source,
+        pos_b: 0,
+    };
+    let root = Vec::<PlElem>::parse(&mut lexer.peekable()).unwrap();
+
+    let mut o = PlOutput {
+      indent: 3,
+      extra_indent_close: true,
+        buffer: String::new(),
+        current_indent: 0,
+        after_word: false,
+    };
+    o.write_list(&root);
+    print!["{}", o.buffer];
+}
+
+struct Lexer<'a> {
+    s: &'a str,
+    pos_b: usize,
+}
+
+impl<'a> Iterator for Lexer<'a> {
+    type Item = (TokenType, Word<'a>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut tail = self.s[self.pos_b..].chars().peekable();
+        while let Some(next) = tail.peek() {
+            if !next.is_whitespace() {
+                break;
+            }
+            self.pos_b += next.len_utf8();
+            tail.next();
+        }
+        let token = match tail.next() {
+            None => None,
+            Some('(') => Some((
+                TokenType::Open,
+                Word {
+                    file: self.s,
+                    start: self.pos_b,
+                    end: self.pos_b + 1,
+                },
+            )),
+            Some(')') => Some((
+                TokenType::Close,
+                Word {
+                    file: self.s,
+                    start: self.pos_b,
+                    end: self.pos_b + 1,
+                },
+            )),
+            Some(c) => {
+                let mut end = self.pos_b + c.len_utf8();
+                while let Some(next) = tail.peek() {
+                    if next.is_whitespace() {
+                        break;
+                    }
+                    if *next == ')' || *next == '(' {
+                        break;
+                    }
+                    end += next.len_utf8();
+                    tail.next();
+                }
+                Some((
+                    TokenType::Word,
+                    Word {
+                        file: self.s,
+                        start: self.pos_b,
+                        end,
+                    },
+                ))
+            }
+        };
+        if let Some((_, word)) = &token {
+            self.pos_b = word.end;
+        }
+        token
+    }
+}
+
+#[derive(Debug)]
+enum TokenType {
+    Open,
+    Close,
+    Word,
+}
+
+#[derive(Clone, Copy)]
+struct Word<'a> {
+    file: &'a str,
+    start: usize,
+    end: usize,
+}
+
+impl<'a> Word<'a> {
+    fn value(&self) -> &str {
+        &self.file[self.start..self.end]
+    }
+}
+
+impl<'a> Debug for Word<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value())
+    }
+}
+
+#[derive(Debug)]
+enum ParseError<'a> {
+    WordWhileOpeningElem(Word<'a>),
+    EndWhileClosingElem,
+    OpenWhileClosingElem(Word<'a>),
+    WordWhileClosingElem(Word<'a>),
+    EndWhileParsingWord,
+    OpenWhileParsingWord(Word<'a>),
+}
+
+trait Parse<'a> {
+    fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<'a>>
+    where
+        Self: Sized;
+}
+
+#[derive(Debug)]
+struct PlElem<'a> {
+    open: Word<'a>,
+    key: Word<'a>,
+    value: (Vec<Word<'a>>, Vec<PlElem<'a>>),
+    close: Word<'a>,
+}
+
+impl<'a> Parse<'a> for Option<PlElem<'a>> {
+    fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<'a>> {
+        let open = match lexer.peek() {
+            None => return Ok(None),
+            Some((TokenType::Open, open)) => {
+                let open = *open;
+                lexer.next();
+                open
+            }
+            Some((TokenType::Close, _)) => return Ok(None),
+            Some((TokenType::Word, word)) => return Err(ParseError::WordWhileOpeningElem(*word)),
+        };
+        let key = Word::parse(lexer)?;
+        let value = (Vec::<Word>::parse(lexer)?, Vec::<PlElem>::parse(lexer)?);
+        let close = match lexer.next() {
+            None => return Err(ParseError::EndWhileClosingElem),
+            Some((TokenType::Open, open)) => return Err(ParseError::OpenWhileClosingElem(open)),
+            Some((TokenType::Close, close)) => close,
+            Some((TokenType::Word, word)) => return Err(ParseError::WordWhileClosingElem(word)),
+        };
+        Ok(Some(PlElem {
+            open,
+            key,
+            value,
+            close,
+        }))
+    }
+}
+
+impl<'a> Parse<'a> for Word<'a> {
+    fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<'a>> {
+        match lexer.next() {
+            None => Err(ParseError::EndWhileParsingWord),
+            Some((TokenType::Open, open)) => Err(ParseError::OpenWhileParsingWord(open)),
+            Some((TokenType::Close, close)) => Err(ParseError::OpenWhileParsingWord(close)),
+            Some((TokenType::Word, word)) => Ok(word),
+        }
+    }
+}
+
+impl<'a> Parse<'a> for Option<Word<'a>> {
+    fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<'a>> {
+        match lexer.peek() {
+            Some((TokenType::Word, word)) => {
+                let word = *word;
+                lexer.next();
+                Ok(Some(word))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+impl<'a, T> Parse<'a> for Vec<T>
+where
+    Option<T>: Parse<'a>,
+{
+    fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<'a>> {
+        let mut result = vec![];
+        while let Some(t) = Option::<T>::parse(lexer)? {
+            result.push(t);
+        }
+        Ok(result)
+    }
+}
+
+struct PlOutput {
+  indent: usize,
+  extra_indent_close: bool,
+
+    buffer: String,
+    current_indent: usize,
+    after_word: bool,
+}
+
+impl PlOutput {
+    fn write_word(&mut self, word: &Word) {
+        if self.after_word {
+            self.buffer.push(' ');
+        }
+        self.buffer.push_str(word.value());
+        self.after_word = true;
+    }
+
+    fn write_list(&mut self, list: &[PlElem]) {
+        for elem in list {
+            self.write_elem(elem);
+        }
+    }
+
+    fn write_elem(&mut self, elem: &PlElem) {
+        for _ in 0..self.current_indent {
+            self.buffer.push(' ');
+        }
+        self.buffer.push('(');
+        self.after_word = false;
+        self.write_word(&elem.key);
+        for word in &elem.value.0 {
+            self.write_word(word);
+        }
+        if elem.value.1.is_empty() {
+            self.buffer.push(')');
+            self.buffer.push('\n');
+        } else {
+            self.buffer.push('\n');
+            self.current_indent += self.indent;
+            self.write_list(&elem.value.1);
+            self.current_indent -= self.indent;
+            let indent = if self.extra_indent_close {
+              self.current_indent + self.indent
+            } else {
+              self.current_indent
+            };
+            for _ in 0..indent {
+                self.buffer.push(' ');
+            }
+            self.buffer.push(')');
+            self.buffer.push('\n');
+        }
+        self.after_word = false;
+    }
+}
 
 pub trait SerializePl {
     fn serialize_pl(&self, output: &mut Output);
@@ -89,7 +348,7 @@ impl SerializePl for FixWord {
 }
 
 impl DeserializePl for FixWord {
-    fn deserialize_pl(input: & mut Input) -> Self {
+    fn deserialize_pl(input: &mut Input) -> Self {
         enum Char {
             Digit(i32),
             Other(char),
