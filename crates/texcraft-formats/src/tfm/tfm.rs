@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn deserialize_tfm(b: &[u8]) -> File {
+pub fn deserialize_tfm_bla(b: &[u8]) -> File {
     let mut input = Input { b };
     let raw_file = RawFile::deserialize_tfm(&mut input);
     println!("{:?}", raw_file);
@@ -11,7 +11,13 @@ pub fn deserialize_tfm(b: &[u8]) -> File {
 }
 
 trait SerializeTfm {
-    fn serialize_tfm<'a, 'b>(&self, output: &mut Output);
+    fn serialize_tfm(&self, output: &mut Output);
+}
+
+fn serialize_tfm<T: SerializeTfm>(t: &T) -> Vec<u8> {
+    let mut output = Output { b: Vec::new() };
+    t.serialize_tfm(&mut output);
+    output.b
 }
 
 struct Output {
@@ -40,7 +46,12 @@ impl Output {
 }
 
 trait DeserializeTfm {
-    fn deserialize_tfm<'a, 'b>(input: &'b mut Input<'a>) -> Self;
+    fn deserialize_tfm(input: &mut Input) -> Self;
+}
+
+fn deserialize_tfm<T: DeserializeTfm>(b: &[u8]) -> T {
+    let mut input = Input { b };
+    T::deserialize_tfm(&mut input)
 }
 
 struct Input<'a> {
@@ -55,7 +66,7 @@ impl<'a> Input<'a> {
             let s = ((self.b[0] as u32) << 24)
                 + ((self.b[1] as u32) << 16)
                 + ((self.b[2] as u32) << 8)
-                + ((self.b[3] as u32) << 0);
+                + (self.b[3] as u32);
             self.b = &self.b[4..];
             s
         }
@@ -66,8 +77,8 @@ impl<'a> Input<'a> {
             (0, 0)
         } else {
             let s = (
-                ((self.b[0] as u16) << 8) + ((self.b[1] as u16) << 0),
-                ((self.b[2] as u16) << 8) + ((self.b[3] as u16) << 0),
+                ((self.b[0] as u16) << 8) + (self.b[1] as u16),
+                ((self.b[2] as u16) << 8) + (self.b[3] as u16),
             );
             self.b = &self.b[4..];
             s
@@ -146,7 +157,7 @@ impl SerializeTfm for Header {
 }
 
 impl DeserializeTfm for Header {
-    fn deserialize_tfm<'a, 'b>(input: &'b mut Input<'a>) -> Self {
+    fn deserialize_tfm(input: &mut Input) -> Self {
         // todo: check for size and error
         let checksum = input.read_u32();
         let design_size = FixWord::deserialize_tfm(input);
@@ -184,13 +195,13 @@ impl DeserializeTfm for Header {
 }
 
 impl SerializeTfm for FixWord {
-    fn serialize_tfm<'a, 'b>(&self, output: &mut Output) {
+    fn serialize_tfm(&self, output: &mut Output) {
         output.write_u32(self.0 as u32);
     }
 }
 
 impl DeserializeTfm for FixWord {
-    fn deserialize_tfm<'a, 'b>(input: &'b mut Input<'a>) -> Self {
+    fn deserialize_tfm(input: &mut Input) -> Self {
         FixWord(input.read_u32() as i32)
     }
 }
@@ -202,7 +213,7 @@ impl SerializeTfm for ExtensibleChar {
 }
 
 impl DeserializeTfm for ExtensibleChar {
-    fn deserialize_tfm<'a, 'b>(input: &'b mut Input<'a>) -> Self {
+    fn deserialize_tfm(input: &mut Input) -> Self {
         let (top, middle, bottom, rep) = input.read_u8s();
         ExtensibleChar {
             top,
@@ -231,7 +242,7 @@ impl SerializeTfm for Params {
 }
 
 impl DeserializeTfm for Params {
-    fn deserialize_tfm<'a, 'b>(input: &'b mut Input<'a>) -> Self {
+    fn deserialize_tfm(input: &mut Input) -> Self {
         Params {
             slant: FixWord::deserialize_tfm(input),
             space: FixWord::deserialize_tfm(input),
@@ -254,7 +265,7 @@ impl<T: SerializeTfm> SerializeTfm for Vec<T> {
 }
 
 impl<T: DeserializeTfm> DeserializeTfm for Vec<T> {
-    fn deserialize_tfm<'a, 'b>(input: &'b mut Input<'a>) -> Self {
+    fn deserialize_tfm(input: &mut Input) -> Self {
         let mut fix_words = Vec::with_capacity(input.len());
         while !input.empty() {
             fix_words.push(T::deserialize_tfm(input));
@@ -270,15 +281,14 @@ impl SerializeTfm for u32 {
 }
 
 impl DeserializeTfm for u32 {
-    fn deserialize_tfm<'a, 'b>(input: &'b mut Input<'a>) -> Self {
+    fn deserialize_tfm(input: &mut Input) -> Self {
         input.read_u32()
     }
 }
 
 impl SerializeTfm for String {
     fn serialize_tfm(&self, output: &mut Output) {
-        let mut hopper = Vec::new();
-        hopper.push(self.len().try_into().unwrap());
+        let mut hopper = vec![self.len().try_into().unwrap()];
         for b in self.as_bytes() {
             hopper.push(*b);
             if hopper.len() == 4 {
@@ -297,7 +307,7 @@ impl SerializeTfm for String {
 }
 
 impl DeserializeTfm for String {
-    fn deserialize_tfm<'a, 'b>(input: &'b mut Input<'a>) -> Self {
+    fn deserialize_tfm(input: &mut Input) -> Self {
         let (mut len, b, c, d) = input.read_u8s();
         // todo validate len
         let mut stack = vec![d, c, b];
@@ -385,7 +395,7 @@ fn len_u16<T>(v: &[T]) -> u16 {
 }
 
 impl DeserializeTfm for RawFile {
-    fn deserialize_tfm<'a, 'b>(input: &'b mut Input<'a>) -> Self {
+    fn deserialize_tfm(input: &mut Input) -> Self {
         let (lf, lh) = input.read_u16s();
         let (bc, ec) = input.read_u16s();
         let (nw, nh) = input.read_u16s();
@@ -454,7 +464,7 @@ impl SerializeTfm for RawCharInfo {
 }
 
 impl DeserializeTfm for RawCharInfo {
-    fn deserialize_tfm<'a, 'b>(input: &'b mut Input<'a>) -> Self {
+    fn deserialize_tfm(input: &mut Input) -> Self {
         let (width_index, a, b, remainder) = input.read_u8s();
         RawCharInfo {
             width_index: width_index as usize,
@@ -521,7 +531,7 @@ impl SerializeTfm for RawLigKern {
 }
 
 impl DeserializeTfm for RawLigKern {
-    fn deserialize_tfm<'a, 'b>(input: &'b mut Input<'a>) -> Self {
+    fn deserialize_tfm(input: &mut Input) -> Self {
         let (skip_byte, next_char, op_byte, remainder) = input.read_u8s();
         RawLigKern {
             next_raw_lig_kern: if skip_byte < 128 {
@@ -561,14 +571,12 @@ mod tests {
                 let serialized: &[u8] = $serialized;
                 let deserialized = $deserialized;
 
-                let mut output = Output{b: vec![]};
-                deserialized.serialize_tfm(&mut output);
-                assert_eq!(serialized, &output.b);
+                let got_serialized = serialize_tfm(&deserialized);
+                assert_eq!(serialized, got_serialized);
 
-                let mut input = Input{b: serialized};
                 // This is a hack to avoid having to provide a type hint to DeserializeTfm::deserialize_tfm
                 let mut v = vec![deserialized];
-                v.push(DeserializeTfm::deserialize_tfm(&mut input));
+                v.push(deserialize_tfm(&serialized));
                 assert_eq!(v[0], v[1]);
             }
         )*
@@ -627,7 +635,7 @@ mod tests {
                     FixWord(16)
                 ),
                 lig_kerns: vec!(),
-                kerns: vec!(),
+                kerns: vec!(FixWord(31)),
                 extensible_chars: vec!(),
                 params: Params {
                     slant: FixWord(51),
@@ -641,11 +649,11 @@ mod tests {
                 }
             },
             &[
-                0, 30, 0, 2, 0, 3, 0, 3, 0, 2, 0, 3, 0, 4, 0, 5, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0,
+                0, 31, 0, 2, 0, 3, 0, 3, 0, 2, 0, 3, 0, 4, 0, 5, 0, 0, 0, 1, 0, 0, 0, 7, 0, 0, 0,
                 1, 0, 0, 0, 2, 201, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 6, 0, 0,
                 0, 7, 0, 0, 0, 8, 0, 0, 0, 9, 0, 0, 0, 10, 0, 0, 0, 11, 0, 0, 0, 12, 0, 0, 0, 13,
-                0, 0, 0, 14, 0, 0, 0, 15, 0, 0, 0, 16, 0, 0, 0, 51, 0, 0, 0, 52, 0, 0, 0, 53, 0, 0,
-                0, 54, 0, 0, 0, 55, 0, 0, 0, 56, 0, 0, 0, 57,
+                0, 0, 0, 14, 0, 0, 0, 15, 0, 0, 0, 16, 0, 0, 0, 31, 0, 0, 0, 51, 0, 0, 0, 52, 0, 0,
+                0, 53, 0, 0, 0, 54, 0, 0, 0, 55, 0, 0, 0, 56, 0, 0, 0, 57,
             ]
         ),
     );
