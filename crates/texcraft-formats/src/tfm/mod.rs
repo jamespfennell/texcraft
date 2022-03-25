@@ -125,7 +125,7 @@ pub struct Params {
 }
 
 pub struct CharInfo {
-    width: (u32, FixWord),
+    pub width: (u32, FixWord),
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -133,14 +133,6 @@ pub struct FixWord(i32);
 
 impl FixWord {
     const UNITY: i32 = 1 << 20;
-    fn new(b: &[u8]) -> FixWord {
-        FixWord(
-            ((b[0] as i32) << 24)
-                + ((b[1] as i32) << 16)
-                + ((b[2] as i32) << 8)
-                + ((b[3] as i32) << 0),
-        )
-    }
 }
 
 impl std::fmt::Display for FixWord {

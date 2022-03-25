@@ -660,9 +660,8 @@ mod tests {
 
     #[test]
     fn raw_deserialize_serialize_round_trip() {
-        let raw_file = RawFile::deserialize_tfm(&mut Input { b: CMR10_TFM });
-        let mut output = Output { b: vec![] };
-        raw_file.serialize_tfm(&mut output);
-        assert_eq!(CMR10_TFM, output.b);
+        let deserialized = deserialize_tfm::<RawFile>(CMR10_TFM);
+        let reserialized = serialize_tfm(&deserialized);
+        assert_eq!(CMR10_TFM, reserialized);
     }
 }

@@ -89,7 +89,7 @@ impl SerializePl for FixWord {
 }
 
 impl DeserializePl for FixWord {
-    fn deserialize_pl<'a, 'b>(input: &'b mut Input<'a>) -> Self {
+    fn deserialize_pl(input: & mut Input) -> Self {
         enum Char {
             Digit(i32),
             Other(char),
