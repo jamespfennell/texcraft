@@ -206,11 +206,11 @@ pub struct WordDiff {
 
 impl WordDiff {
     pub fn left(&self) -> String {
-        self.ops.iter().map(DiffOp::left).flatten().collect()
+        self.ops.iter().filter_map(DiffOp::left).collect()
     }
 
     pub fn right(&self) -> String {
-        self.ops.iter().map(DiffOp::right).flatten().collect()
+        self.ops.iter().filter_map(DiffOp::right).collect()
     }
 
     pub fn colored(&self) -> String {

@@ -3,7 +3,7 @@
 use crate::runtime;
 use crate::token;
 use crate::token::trace;
-use crate::token::{Token, Value};
+use crate::token::Token;
 use colored::*;
 use runtime::HasEnv;
 use texcraft_stdext::algorithms::spellcheck;
@@ -49,30 +49,6 @@ impl<'a> std::fmt::Display for DisplayBuilder<'a> {
             print_line_with_note(f, margin_width, note)?;
         }
         Ok(())
-    }
-}
-
-#[derive(Debug)]
-struct TokenInSource {
-    line_content: String,
-    line_number: usize,
-    position: usize,
-    width: usize,
-    file_name: String,
-}
-
-impl TokenInSource {
-    fn new(token: &Token) -> Option<TokenInSource> {
-        Some(TokenInSource {
-            line_content: "todo".to_string(),
-            line_number: 0,
-            position: 0,
-            width: match token.value() {
-                Value::ControlSequence(_) => 100, // TODO + name.len(),
-                _ => 1,
-            },
-            file_name: "todo".to_string(),
-        })
     }
 }
 
@@ -146,7 +122,6 @@ fn print_error_header(f: &mut std::fmt::Formatter<'_>, message: &str) -> std::fm
 #[derive(Debug)]
 pub struct TokenContext {
     note: String,
-    line: TokenInSource,
 }
 
 /// Error that is returned when an unexpected token is encountered.
@@ -214,7 +189,6 @@ impl TokenError {
 #[derive(Debug)]
 pub struct EndOfInputError {
     title: String,
-    last_line: Option<TokenInSource>,
     notes: Vec<String>,
     contexts: Vec<TokenContext>,
 }
@@ -223,7 +197,6 @@ impl EndOfInputError {
     pub fn new<T: Into<String>>(title: T) -> EndOfInputError {
         EndOfInputError {
             title: T::into(title),
-            last_line: None,
             notes: vec![],
             contexts: vec![],
         }
@@ -234,13 +207,7 @@ impl EndOfInputError {
         self
     }
 
-    pub fn add_token_context<T: Into<String>>(mut self, token: &Token, note: T) -> EndOfInputError {
-        if let Some(line) = TokenInSource::new(token) {
-            self.contexts.push(TokenContext {
-                note: T::into(note),
-                line,
-            });
-        }
+    pub fn add_token_context<T: Into<String>>(self, _token: &Token, _note: T) -> EndOfInputError {
         self
     }
 

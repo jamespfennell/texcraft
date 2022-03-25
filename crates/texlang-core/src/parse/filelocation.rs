@@ -46,8 +46,7 @@ pub fn parse_file_location<S>(
     }
 
     Ok(FileLocation {
-        path: raw_string
-            [area_delimiter.unwrap_or(0)..ext_delimiter.unwrap_or_else(|| raw_string.len())]
+        path: raw_string[area_delimiter.unwrap_or(0)..ext_delimiter.unwrap_or(raw_string.len())]
             .into(),
         extension: ext_delimiter.map(|j| raw_string[j..].into()),
         area: area_delimiter.map(|i| raw_string[..i].into()),
