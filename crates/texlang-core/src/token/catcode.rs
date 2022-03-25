@@ -182,7 +182,7 @@ impl Default for CatCodeMap {
 }
 
 fn set_tex_defaults(cat_code_map: &mut CatCodeMap) {
-    let iter = std::array::IntoIter::new([
+    let iter = [
         ('\\', Escape),
         ('{', BeginGroup),
         ('}', EndGroup),
@@ -250,7 +250,8 @@ fn set_tex_defaults(cat_code_map: &mut CatCodeMap) {
         ('x', Letter),
         ('y', Letter),
         ('z', Letter),
-    ]);
+    ]
+    .into_iter();
     for (c, code) in iter {
         cat_code_map.insert(c, code);
     }
