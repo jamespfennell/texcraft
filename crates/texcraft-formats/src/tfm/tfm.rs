@@ -356,6 +356,8 @@ impl SerializeTfm for RawFile {
         self.heights.serialize_tfm(output);
         self.depths.serialize_tfm(output);
         self.italic_corrections.serialize_tfm(output);
+        self.lig_kerns.serialize_tfm(output);
+        self.kerns.serialize_tfm(output);
     }
 }
 
@@ -466,6 +468,37 @@ enum RawLigKernOp {
         delete_next: bool,
         skip: u8,
     },
+}
+
+impl SerializeTfm for RawLigKern {
+    fn serialize_tfm(&self, output: &mut Output) {
+        let next_raw_lig_kern = match self.next_raw_lig_kern {
+            None => 128,
+            Some(n) => n.try_into().unwrap_or(u8::MAX),
+        };
+        match self.op {
+            RawLigKernOp::Kern(k) => {
+                let remainder = (k % (1 << 8)).try_into().unwrap_or(u8::MAX);
+                let op_byte = (k >> 8).try_into().unwrap_or(u8::MAX) + 128;
+                output.write_u8s((next_raw_lig_kern, self.next_char, op_byte, remainder));
+            }
+            RawLigKernOp::Ligature {
+                insert_char,
+                delete_current,
+                delete_next,
+                skip,
+            } => {
+                let mut op_byte = skip << 2;
+                if delete_next {
+                    op_byte += 1;
+                }
+                if delete_current {
+                    op_byte += 2;
+                }
+                output.write_u8s((next_raw_lig_kern, self.next_char, op_byte, insert_char));
+            }
+        }
+    }
 }
 
 impl DeserializeTfm for RawLigKern {
