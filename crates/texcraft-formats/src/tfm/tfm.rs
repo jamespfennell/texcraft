@@ -321,7 +321,7 @@ impl DeserializeTfm for String {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct RawFile {
     header: Header,
     first_char: u16,
@@ -420,7 +420,7 @@ impl DeserializeTfm for RawFile {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct RawCharInfo {
     width_index: usize,
     height_index: usize,
@@ -471,14 +471,14 @@ impl DeserializeTfm for RawCharInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct RawLigKern {
     next_raw_lig_kern: Option<usize>,
     next_char: u8,
     op: RawLigKernOp,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum RawLigKernOp {
     Kern(usize),
     Ligature {
@@ -552,6 +552,103 @@ mod tests {
     use super::*;
 
     static CMR10_TFM: &'static [u8] = include_bytes!("cmr10.tfm");
+
+    macro_rules! serialize_deserialize_tests {
+        ($(($name:ident, $deserialized:expr, $serialized: expr),)*) => {
+        $(
+            #[test]
+            fn $name() {
+                let serialized: &[u8] = $serialized;
+                let deserialized = $deserialized;
+
+                let mut output = Output{b: vec![]};
+                deserialized.serialize_tfm(&mut output);
+                assert_eq!(serialized, &output.b);
+
+                let mut input = Input{b: serialized};
+                // This is a hack to avoid having to provide a type hint to DeserializeTfm::deserialize_tfm
+                let mut v = vec![deserialized];
+                v.push(DeserializeTfm::deserialize_tfm(&mut input));
+                assert_eq!(v[0], v[1]);
+            }
+        )*
+        }
+    }
+
+    serialize_deserialize_tests!(
+        (fix_word_0, FixWord(0), &[0, 0, 0, 0]),
+        (fix_word_1, FixWord(1), &[0, 0, 0, 1]),
+        (fix_word_2, FixWord(-2), &[255, 255, 255, 254]),
+        (
+            header,
+            Header {
+                checksum: 1,
+                design_size: FixWord(2),
+                character_coding_scheme: Some("a".to_string()),
+                font_family: Some("b".to_string()),
+                seven_bit_safe: Some(true),
+                face: None,
+                trailing_words: vec![],
+            },
+            &[
+                0, 0, 0, 1, 0, 0, 0, 2, 1, 97, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 98, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 234
+            ]
+        ),
+        (
+            raw_file,
+            RawFile {
+                header: Header {
+                    checksum: 1,
+                    design_size: FixWord(2),
+                    character_coding_scheme: None,
+                    font_family: None,
+                    seven_bit_safe: None,
+                    face: None,
+                    trailing_words: vec![],
+                },
+                first_char: 3,
+                raw_char_info: vec!(RawCharInfo {
+                    width_index: 201,
+                    height_index: 0,
+                    depth_index: 0,
+                    italic_index: 0,
+                    tag: Tag::None,
+                }),
+                widths: vec!(FixWord(3), FixWord(4)),
+                heights: vec!(FixWord(5), FixWord(6), FixWord(7)),
+                depths: vec!(FixWord(8), FixWord(9), FixWord(10), FixWord(11)),
+                italic_corrections: vec!(
+                    FixWord(12),
+                    FixWord(13),
+                    FixWord(14),
+                    FixWord(15),
+                    FixWord(16)
+                ),
+                lig_kerns: vec!(),
+                kerns: vec!(),
+                extensible_chars: vec!(),
+                params: Params {
+                    slant: FixWord(51),
+                    space: FixWord(52),
+                    space_stretch: FixWord(53),
+                    space_shrink: FixWord(54),
+                    x_height: FixWord(55),
+                    quad: FixWord(56),
+                    extra_space: FixWord(57),
+                    additional_params: vec!(),
+                }
+            },
+            &[
+                0, 30, 0, 2, 0, 3, 0, 3, 0, 2, 0, 3, 0, 4, 0, 5, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0,
+                1, 0, 0, 0, 2, 201, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 6, 0, 0,
+                0, 7, 0, 0, 0, 8, 0, 0, 0, 9, 0, 0, 0, 10, 0, 0, 0, 11, 0, 0, 0, 12, 0, 0, 0, 13,
+                0, 0, 0, 14, 0, 0, 0, 15, 0, 0, 0, 16, 0, 0, 0, 51, 0, 0, 0, 52, 0, 0, 0, 53, 0, 0,
+                0, 54, 0, 0, 0, 55, 0, 0, 0, 56, 0, 0, 0, 57,
+            ]
+        ),
+    );
 
     #[test]
     fn raw_deserialize_serialize_round_trip() {

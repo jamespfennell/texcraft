@@ -3,7 +3,7 @@ mod tfm;
 
 pub use tfm::deserialize_tfm;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Header {
     pub checksum: u32,
     pub design_size: FixWord,
@@ -14,7 +14,7 @@ pub struct Header {
     pub trailing_words: Vec<u32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum Tag {
     None,
     Ligature(usize),
@@ -22,27 +22,27 @@ enum Tag {
     Extension(usize),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Weight {
     Medium,
     Bold,
     Light,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Slope {
     Roman,
     Italic,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Expansion {
     Regular,
     Condensed,
     Expanded,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Face {
     pub weight: Weight,
     pub slope: Slope,
@@ -111,7 +111,7 @@ trait DeserializePl {
     fn deserialize_pl();
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ExtensibleChar {
     top: u8,
     middle: u8,
@@ -119,7 +119,7 @@ pub struct ExtensibleChar {
     rep: u8,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Params {
     slant: FixWord,
     space: FixWord,
