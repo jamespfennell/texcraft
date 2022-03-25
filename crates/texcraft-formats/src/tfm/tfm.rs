@@ -213,6 +213,23 @@ impl DeserializeTfm for ExtensibleChar {
     }
 }
 
+impl SerializeTfm for Params {
+    fn serialize_tfm(&self, output: &mut Output) {
+        for fix_word in [
+            &self.slant,
+            &self.space,
+            &self.space_stretch,
+            &self.space_shrink,
+            &self.x_height,
+            &self.quad,
+            &self.extra_space,
+        ] {
+            fix_word.serialize_tfm(output);
+        }
+        self.additional_params.serialize_tfm(output);
+    }
+}
+
 impl DeserializeTfm for Params {
     fn deserialize_tfm<'a, 'b>(input: &'b mut Input<'a>) -> Self {
         Params {
@@ -358,6 +375,8 @@ impl SerializeTfm for RawFile {
         self.italic_corrections.serialize_tfm(output);
         self.lig_kerns.serialize_tfm(output);
         self.kerns.serialize_tfm(output);
+        self.extensible_chars.serialize_tfm(output);
+        self.params.serialize_tfm(output);
     }
 }
 
@@ -539,6 +558,6 @@ mod tests {
         let raw_file = RawFile::deserialize_tfm(&mut Input { b: CMR10_TFM });
         let mut output = Output { b: vec![] };
         raw_file.serialize_tfm(&mut output);
-        assert_eq!(CMR10_TFM[0..output.b.len()], output.b);
+        assert_eq!(CMR10_TFM, output.b);
     }
 }
