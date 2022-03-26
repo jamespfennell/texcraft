@@ -99,6 +99,48 @@ impl Face {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct RawFile {
+    header: Header,
+    first_char: u16,
+    raw_char_info: Vec<RawCharInfo>,
+    widths: Vec<FixWord>,
+    heights: Vec<FixWord>,
+    depths: Vec<FixWord>,
+    italic_corrections: Vec<FixWord>,
+    lig_kerns: Vec<RawLigKern>,
+    kerns: Vec<FixWord>,
+    extensible_chars: Vec<ExtensibleChar>,
+    params: Params,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct RawCharInfo {
+    width_index: usize,
+    height_index: usize,
+    depth_index: usize,
+    italic_index: usize,
+    tag: Tag,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct RawLigKern {
+    next_raw_lig_kern: Option<usize>,
+    next_char: u8,
+    op: RawLigKernOp,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum RawLigKernOp {
+    Kern(usize),
+    Ligature {
+        insert_char: u8,
+        delete_current: bool,
+        delete_next: bool,
+        skip: u8,
+    },
+}
+
 pub struct File {
     pub header: Header,
     pub char_infos: Vec<CharInfo>,

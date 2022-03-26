@@ -1,13 +1,8 @@
 use super::*;
 
-pub fn deserialize_tfm_bla(b: &[u8]) -> File {
+pub fn deserialize_tfm_bla(b: &[u8]) -> RawFile {
     let mut input = Input { b };
-    let raw_file = RawFile::deserialize_tfm(&mut input);
-    println!("{:?}", raw_file);
-    File {
-        header: raw_file.header,
-        char_infos: vec![],
-    }
+    RawFile::deserialize_tfm(&mut input)
 }
 
 trait SerializeTfm {
@@ -331,21 +326,6 @@ impl DeserializeTfm for String {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct RawFile {
-    header: Header,
-    first_char: u16,
-    raw_char_info: Vec<RawCharInfo>,
-    widths: Vec<FixWord>,
-    heights: Vec<FixWord>,
-    depths: Vec<FixWord>,
-    italic_corrections: Vec<FixWord>,
-    lig_kerns: Vec<RawLigKern>,
-    kerns: Vec<FixWord>,
-    extensible_chars: Vec<ExtensibleChar>,
-    params: Params,
-}
-
 impl SerializeTfm for RawFile {
     fn serialize_tfm(&self, output: &mut Output) {
         let mut lh = 2_u16;
@@ -430,15 +410,6 @@ impl DeserializeTfm for RawFile {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct RawCharInfo {
-    width_index: usize,
-    height_index: usize,
-    depth_index: usize,
-    italic_index: usize,
-    tag: Tag,
-}
-
 impl SerializeTfm for RawCharInfo {
     fn serialize_tfm(&self, output: &mut Output) {
         let a = self.width_index.try_into().unwrap_or(u8::MAX);
@@ -479,24 +450,6 @@ impl DeserializeTfm for RawCharInfo {
             },
         }
     }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-struct RawLigKern {
-    next_raw_lig_kern: Option<usize>,
-    next_char: u8,
-    op: RawLigKernOp,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum RawLigKernOp {
-    Kern(usize),
-    Ligature {
-        insert_char: u8,
-        delete_current: bool,
-        delete_next: bool,
-        skip: u8,
-    },
 }
 
 impl SerializeTfm for RawLigKern {

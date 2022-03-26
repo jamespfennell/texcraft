@@ -12,14 +12,43 @@ pub fn run<'a>(pl_source: &'a str) {
     let root = Vec::<PlElem>::parse(&mut lexer.peekable()).unwrap();
 
     let mut o = PlOutput {
-      indent: 3,
-      extra_indent_close: true,
+        indent: 3,
+        extra_indent_close: true,
         buffer: String::new(),
         current_indent: 0,
         after_word: false,
     };
     o.write_list(&root);
     print!["{}", o.buffer];
+}
+
+pub fn serialize(raw_file: &RawFile) -> String {
+    let mut root = Vec::<PlElem>::new();
+    if let Some(font_family) = &raw_file.header.font_family {
+        root.push(PlElem {
+            open: w(""),
+            key: w("FAMILY"),
+            value: (vec![w(font_family)], vec![]),
+            close: w(""),
+        })
+    }
+    let mut o = PlOutput {
+        indent: 3,
+        extra_indent_close: true,
+        buffer: String::new(),
+        current_indent: 0,
+        after_word: false,
+    };
+    o.write_list(&root);
+    o.buffer
+}
+
+fn w<'a>(s: &'a str) -> Word<'a> {
+    Word {
+        file: s,
+        start: 0,
+        end: s.len(),
+    }
 }
 
 struct Lexer<'a> {
@@ -203,8 +232,8 @@ where
 }
 
 struct PlOutput {
-  indent: usize,
-  extra_indent_close: bool,
+    indent: usize,
+    extra_indent_close: bool,
 
     buffer: String,
     current_indent: usize,
@@ -245,9 +274,9 @@ impl PlOutput {
             self.write_list(&elem.value.1);
             self.current_indent -= self.indent;
             let indent = if self.extra_indent_close {
-              self.current_indent + self.indent
+                self.current_indent + self.indent
             } else {
-              self.current_indent
+                self.current_indent
             };
             for _ in 0..indent {
                 self.buffer.push(' ');
