@@ -11,4 +11,13 @@ path = "bin/tftopl.rs"
 name = "pltotf"
 path = "bin/pltotf.rs"
 
+[[bin]]
+name = "plfmt"
+path = "bin/plfmt.rs"
+required-features = ["binary"] 
+
 [dependencies]
+clap = { version = "3.0", features = ["derive"], optional = true }
+
+[features]
+binary = ["clap"]
