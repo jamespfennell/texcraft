@@ -1,30 +1,31 @@
+//! Parser and writer for the property list (.pl) text format
 use super::*;
 use std::{
     fmt::Debug,
     iter::{Iterator, Peekable},
 };
 
-pub fn run<'a>(pl_source: &'a str) {
-    let lexer = Lexer {
-        s: pl_source,
-        pos_b: 0,
-    };
+pub fn format(input: &str, style: &PlStyle) -> String {
+    let lexer = Lexer { s: input, pos_b: 0 };
     let root = Vec::<PlElem>::parse(&mut lexer.peekable()).unwrap();
 
     let mut o = PlOutput {
-        indent: 3,
-        extra_indent_close: true,
+        style,
         buffer: String::new(),
         current_indent: 0,
         after_word: false,
     };
     o.write_list(&root);
-    print!["{}", o.buffer];
+    o.buffer
 }
 
-pub fn serialize(raw_file: &RawFile) -> String {
+pub fn parse(b: &str) -> File {
+    todo!()
+}
+
+pub fn serialize(file: &File) -> String {
     let mut root = Vec::<PlElem>::new();
-    if let Some(font_family) = &raw_file.header.font_family {
+    if let Some(font_family) = &file.header.font_family {
         root.push(PlElem {
             open: w(""),
             key: w("FAMILY"),
@@ -32,9 +33,9 @@ pub fn serialize(raw_file: &RawFile) -> String {
             close: w(""),
         })
     }
+    let style = PlStyle::default();
     let mut o = PlOutput {
-        indent: 3,
-        extra_indent_close: true,
+        style: &style,
         buffer: String::new(),
         current_indent: 0,
         after_word: false,
@@ -231,16 +232,15 @@ where
     }
 }
 
-struct PlOutput {
-    indent: usize,
-    extra_indent_close: bool,
+struct PlOutput<'a> {
+    style: &'a PlStyle,
 
     buffer: String,
     current_indent: usize,
     after_word: bool,
 }
 
-impl PlOutput {
+impl<'a> PlOutput<'a> {
     fn write_word(&mut self, word: &Word) {
         if self.after_word {
             self.buffer.push(' ');
@@ -270,11 +270,12 @@ impl PlOutput {
             self.buffer.push('\n');
         } else {
             self.buffer.push('\n');
-            self.current_indent += self.indent;
+            self.current_indent += self.style.indent;
             self.write_list(&elem.value.1);
-            self.current_indent -= self.indent;
-            let indent = if self.extra_indent_close {
-                self.current_indent + self.indent
+            self.current_indent -= self.style.indent;
+
+            let indent = if self.style.closing_brace_style == ClosingBraceStyle::ExtraIndent {
+                self.current_indent + self.style.indent
             } else {
                 self.current_indent
             };
@@ -460,7 +461,7 @@ impl DeserializePl for FixWord {
             }
             panic![""]
         }
-        let mut result = integer * FixWord::UNITY + fraction;
+        let mut result = integer * FixWord::UNITY.0 + fraction;
         if negative {
             result *= -1;
         }

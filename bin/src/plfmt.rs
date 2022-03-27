@@ -1,5 +1,3 @@
-use std::os;
-
 use clap::{ArgEnum, Parser};
 
 /// Format a property list (.pl) file
@@ -19,13 +17,13 @@ struct Cli {
 
     /// Style to apply to the closing parentheses of property lists
     #[clap(short, long, arg_enum)]
-    closing_style: Option<ClosingStyle>,
+    closing_brace_style: Option<ClosingBraceStyle>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, ArgEnum)]
-enum ClosingStyle {
+enum ClosingBraceStyle {
     SameLine,
-    Balanced,
+    MatchingOpening,
     ExtraIndent,
 }
 
@@ -38,13 +36,22 @@ fn main() {
     } else {
         args.pl_path
     };
-    let pl_contents = match std::fs::read(&pl_path) {
+    let input = match std::fs::read_to_string(&pl_path) {
         Ok(pl_contents) => pl_contents,
         Err(err) => {
             println!("Failed to open {:?}: {}", pl_path, err);
             std::process::exit(1);
         }
     };
-    let indent = args.indent.unwrap_or(3);
-    let closing_style = args.closing_style.unwrap_or(ClosingStyle::ExtraIndent);
+    let style = tfm::PlStyle {
+        indent: args.indent.unwrap_or(3),
+        closing_brace_style: match args.closing_brace_style {
+            None => Default::default(),
+            Some(ClosingBraceStyle::SameLine) => tfm::ClosingBraceStyle::SameLine,
+            Some(ClosingBraceStyle::MatchingOpening) => tfm::ClosingBraceStyle::MatchingOpening,
+            Some(ClosingBraceStyle::ExtraIndent) => tfm::ClosingBraceStyle::ExtraIndent,
+        },
+    };
+    let formatted = tfm::format_pl(&input, &style);
+    println!["{}", formatted];
 }

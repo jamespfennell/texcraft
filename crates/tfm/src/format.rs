@@ -1,8 +1,44 @@
+//! Parser and serializer for the TeX font metric (.tfm) binary format.
 use super::*;
 
-pub fn deserialize_tfm_bla(b: &[u8]) -> RawFile {
-    let mut input = Input { b };
-    RawFile::deserialize_tfm(&mut input)
+pub fn parse(b: &[u8]) -> File {
+    RawFile::into(RawFile::deserialize_tfm(&mut Input { b }))
+}
+
+pub fn serialize(file: &File) -> Vec<u8> {
+    let raw_file: RawFile = RawFile::from(file);
+    serialize_tfm(&raw_file)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct RawFile {
+    header: Header,
+    first_char: u16,
+    raw_char_info: Vec<RawCharInfo>,
+    widths: Vec<FixWord>,
+    heights: Vec<FixWord>,
+    depths: Vec<FixWord>,
+    italic_corrections: Vec<FixWord>,
+    lig_kerns: Vec<RawLigKern>,
+    kerns: Vec<FixWord>,
+    extensible_chars: Vec<ExtensibleChar>,
+    params: Params,
+}
+
+impl Into<File> for RawFile {
+    fn into(self) -> File {
+        File {
+            header: self.header,
+            char_infos: HashMap::new(),
+            params: self.params,
+        }
+    }
+}
+
+impl From<&File> for RawFile {
+    fn from(file: &File) -> Self {
+        todo!()
+    }
 }
 
 trait SerializeTfm {
@@ -144,10 +180,10 @@ impl SerializeTfm for Header {
         };
         let face_raw = match &self.face {
             None => 234_u8, // TODO: wtf?
-            Some(face) => face.serialize(),
+            Some(face) => face.to_u8(),
         };
         output.write_u8s((seven_bit_safe_raw, 0, 0, face_raw));
-        self.trailing_words.serialize_tfm(output);
+        self.additional_data.serialize_tfm(output);
     }
 }
 
@@ -174,7 +210,7 @@ impl DeserializeTfm for Header {
             (None, None)
         } else {
             let (seven_bit_safe_raw, _, _, face_raw) = input.read_u8s();
-            (Some(seven_bit_safe_raw >= 128), Face::deserialize(face_raw))
+            (Some(seven_bit_safe_raw >= 128), Face::from_u8(face_raw))
         };
         let trailing_words = Vec::<u32>::deserialize_tfm(input);
         Header {
@@ -184,7 +220,7 @@ impl DeserializeTfm for Header {
             font_family,
             seven_bit_safe,
             face,
-            trailing_words,
+            additional_data: trailing_words,
         }
     }
 }
@@ -338,7 +374,7 @@ impl SerializeTfm for RawFile {
         if self.header.seven_bit_safe.is_some() {
             lh += 1;
         }
-        lh += len_u16(&self.header.trailing_words);
+        lh += len_u16(&self.header.additional_data);
         let bc = self.first_char;
         let ec = len_u16(&self.raw_char_info) + bc - 1;
         let nw = len_u16(&self.widths);
@@ -549,7 +585,7 @@ mod tests {
                 font_family: Some("b".to_string()),
                 seven_bit_safe: Some(true),
                 face: None,
-                trailing_words: vec![],
+                additional_data: vec![],
             },
             &[
                 0, 0, 0, 1, 0, 0, 0, 2, 1, 97, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -567,7 +603,7 @@ mod tests {
                     font_family: None,
                     seven_bit_safe: None,
                     face: None,
-                    trailing_words: vec![],
+                    additional_data: vec![],
                 },
                 first_char: 3,
                 raw_char_info: vec!(RawCharInfo {
