@@ -1,15 +1,21 @@
 use clap::Parser;
 use colored::Colorize;
 use std::fs;
+use std::path::PathBuf;
 use texlang_core::prelude::*;
 use texlang_core::token;
 use texlang_stdlib::repl;
 use texlang_stdlib::script;
 use texlang_stdlib::StdLibState;
 
-/// Texcraft
+/// This is a "portfolio binary" that demonstrates some of the features of the
+///   Texcraft project.
+/// See the subcommands for things it can do.
+///
+/// Website: https://texcraft.dev.
 #[derive(Parser)]
-struct Opts {
+#[clap(version)]
+struct Cli {
     #[clap(subcommand)]
     subcmd: SubCommand,
 }
@@ -22,40 +28,49 @@ enum SubCommand {
     Run(Run),
 }
 
-/// Get docs on a TeX command
+/// Print documentation for a TeX command
 #[derive(Parser)]
 struct Doc {
     /// Name of the control sequence
     name: Option<String>,
 }
 
-/// Execute a TeX file as a script
+/// Run a TeX file as a script
 #[derive(Parser)]
 struct Run {
-    /// Path to the TeX file to execute
-    file_path: String,
+    /// Path to the TeX file to run
+    file_path: PathBuf,
 }
 
 fn main() {
-    let opts: Opts = Opts::parse();
-    match opts.subcmd {
-        SubCommand::Doc(d) => {
-            doc(d.name).unwrap();
+    let args: Cli = Cli::parse();
+    let result = match args.subcmd {
+        SubCommand::Doc(d) => doc(d.name),
+        SubCommand::Repl => {
+            repl();
+            Ok(())
         }
-        SubCommand::Repl => repl(),
-        SubCommand::Run(e) => {
-            if let Err(err) = exec(&e.file_path) {
-                print!("{}", err);
-                std::process::exit(1);
-            }
-        }
+        SubCommand::Run(run_args) => run(run_args.file_path),
+    };
+    if let Err(err) = result {
+        println!["{}", err];
+        std::process::exit(1);
     }
 }
 
-fn exec(file_name: &str) -> Result<(), anyhow::Error> {
-    let source_code = fs::read_to_string(file_name)?;
+fn run(mut path: PathBuf) -> Result<(), anyhow::Error> {
+    if path.extension().is_none() {
+        path.set_extension("tex");
+    }
+    let source_code = match fs::read_to_string(&path) {
+        Ok(source_code) => source_code,
+        Err(err) => {
+            return Err(anyhow::anyhow!["Failed to open file {:?}: {}", &path, err]);
+        }
+    };
     let mut env = new_env();
-    env.push_source(file_name.to_string(), source_code)?;
+    // The only error possible is input stack size exceeded, which can't be hit.
+    let _ = env.push_source(path.to_string_lossy().to_string(), source_code);
     let tokens = script::run(&mut env, true)?;
     let pretty = token::write_tokens(&tokens, env.cs_name_interner());
     println!("{}", pretty);
@@ -130,27 +145,25 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
                 let first_line = doc.split('\n').next().unwrap_or("");
                 println!["\\{}  {}", cs_name.bold(), first_line];
             }
-            return Ok(());
+            Ok(())
         }
         Some(cs_name) => {
             let cs_name_s = match env.cs_name_interner().get(cs_name.clone()) {
                 None => {
-                    print!("undefined command");
-                    std::process::exit(1);
+                    return Err(anyhow::anyhow!("Unknown command \\{}", cs_name));
                 }
                 Some(s) => s,
             };
             let doc = match env.base_state.commands_map.get_doc(&cs_name_s) {
                 None => {
-                    print!("undefined command");
-                    std::process::exit(1);
+                    return Err(anyhow::anyhow!("Unknown command \\{}", cs_name));
                 }
                 Some(d) => d,
             };
             println!["\\{}  {}", cs_name.bold(), doc];
+            Ok(())
         }
     }
-    Ok(())
 }
 
 fn new_env() -> runtime::Env<StdLibState> {

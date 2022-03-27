@@ -16,6 +16,9 @@ FROM rust:1.59 AS rust-builder
 WORKDIR /rustdoc
 COPY Cargo.lock .
 COPY Cargo.toml .
+COPY bin bin
+COPY performance performance
+COPY playground playground
 COPY crates crates
 RUN cargo fetch
 RUN cargo doc --no-deps --lib

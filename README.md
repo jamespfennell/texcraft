@@ -16,7 +16,7 @@ The big picture goals are:
 - Providing a framework for building new TeX engines with novel features like new page
     breaking algorithms, support for different font formats, etc.
 
-Initial work has focused on building a [fast](https://github.com/jamespfennell/texcraft/tree/main/crates/performance)
+Initial work has focused on building a [fast](https://github.com/jamespfennell/texcraft/tree/main/performance)
   TeX language interpreter called Texlang,
   and [writing documentation](https://texcraft.dev) on how to use it.
 
@@ -30,7 +30,7 @@ Locally, with the Git repo checked out,
     the Texcraft binary can be used to run TeX scripts; e.g.,
 
 ```
-cargo run --bin texcraft run crates/performance/benches/digits_of_pi.tex
+cargo run --bin texcraft run performance/benches/digits_of_pi.tex
 ```
 
 The Texcraft binary also has a REPL for writing TeX interactively:

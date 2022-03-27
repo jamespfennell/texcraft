@@ -23,6 +23,12 @@ jobs:
           profile: minimal
           override: true
 
+      - name: Build the binaries
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --bins
+
       - name: Run the tests
         uses: actions-rs/cargo@v1
         with:
@@ -104,6 +110,6 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           tags: jamespfennell/play.texcraft.dev:latest
-          file: ./crates/playground/Dockerfile
+          file: ./playground/Dockerfile
           # Only push to Docker Hub if this workflow is a push to main
           push: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
