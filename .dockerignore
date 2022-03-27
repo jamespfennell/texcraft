@@ -3,23 +3,28 @@
 
 !Cargo.toml
 !Cargo.lock
-!benches
+
+!bin
+!performance
 !crates/texlang-core
 !crates/texlang-stdlib
 !crates/texcraft-stdext
 
-!crates/playground/Cargo.toml
-!crates/playground/src
+# Playground Rust files
+!playground/Cargo.toml
+!playground/src
 
-!crates/playground/ui/src
-!crates/playground/ui/static
-!crates/playground/ui/*.json
-!crates/playground/ui/.babelrc
-!crates/playground/ui/webpack.config.js
+# Playground Javascript
+!playground/ui/src
+!playground/ui/static
+!playground/ui/*.json
+!playground/ui/.babelrc
+!playground/ui/webpack.config.js
 
-!crates/playground/go.mod
-!crates/playground/go.sum
-!crates/playground/*.go
+# Playground Go
+!playground/go.mod
+!playground/go.sum
+!playground/*.go
 
 !docs/config.toml
 !docs/content/*
