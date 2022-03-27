@@ -1,6 +1,6 @@
 use std::os;
 
-use clap::{Parser, ArgEnum};
+use clap::{ArgEnum, Parser};
 
 /// Format a property list (.pl) file
 #[derive(Debug, Parser)]
@@ -39,7 +39,7 @@ fn main() {
         args.pl_path
     };
     let pl_contents = match std::fs::read(&pl_path) {
-        Ok(pl_contents ) => pl_contents,
+        Ok(pl_contents) => pl_contents,
         Err(err) => {
             println!("Failed to open {:?}: {}", pl_path, err);
             std::process::exit(1);
