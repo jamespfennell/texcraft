@@ -5,9 +5,14 @@ use std::{
     iter::{Iterator, Peekable},
 };
 
+const CHECKSUM: &str = "CHECKSUM";
+const CODING_SCHEME: &str = "CODINGSCHEME";
+const FAMILY: &str = "FAMILY";
+const HEADER: &str = "HEADER";
+
 pub fn format(input: &str, style: &PlStyle) -> String {
     let lexer = Lexer { s: input, pos_b: 0 };
-    let root = Vec::<PlElem>::parse(&mut lexer.peekable()).unwrap();
+    let root = Vec::<AstNode>::parse(&mut lexer.peekable()).unwrap();
 
     let mut o = PlOutput {
         style,
@@ -24,14 +29,17 @@ pub fn parse(b: &str) -> File {
 }
 
 pub fn serialize(file: &File) -> String {
-    let mut root = Vec::<PlElem>::new();
+    let mut root = Vec::<AstNode>::new();
+    // root.push(PlElem::new(CHECKSUM, ))
     if let Some(font_family) = &file.header.font_family {
-        root.push(PlElem {
-            open: w(""),
-            key: w("FAMILY"),
-            value: (vec![w(font_family)], vec![]),
-            close: w(""),
-        })
+        root.push(AstNode::new(FAMILY, &[font_family], vec![]));
+    }
+    for word in &file.header.additional_data {
+        let value = format!("{:o}", word);
+        // root.push(AstNode::new(HEADER, &["O", &value], vec![]));
+    }
+    if let Some(coding_scheme) = &file.header.character_coding_scheme {
+        root.push(AstNode::new(CODING_SCHEME, &[coding_scheme], vec![]));
     }
     let style = PlStyle::default();
     let mut o = PlOutput {
@@ -42,14 +50,6 @@ pub fn serialize(file: &File) -> String {
     };
     o.write_list(&root);
     o.buffer
-}
-
-fn w<'a>(s: &'a str) -> Word<'a> {
-    Word {
-        file: s,
-        start: 0,
-        end: s.len(),
-    }
 }
 
 struct Lexer<'a> {
@@ -131,6 +131,14 @@ struct Word<'a> {
 }
 
 impl<'a> Word<'a> {
+    fn new(s: &'a str) -> Word<'a> {
+        Word {
+            file: s,
+            start: 0,
+            end: s.len(),
+        }
+    }
+
     fn value(&self) -> &str {
         &self.file[self.start..self.end]
     }
@@ -159,14 +167,28 @@ trait Parse<'a> {
 }
 
 #[derive(Debug)]
-struct PlElem<'a> {
+struct AstNode<'a> {
     open: Word<'a>,
     key: Word<'a>,
-    value: (Vec<Word<'a>>, Vec<PlElem<'a>>),
+    value: (Vec<Word<'a>>, Vec<AstNode<'a>>),
     close: Word<'a>,
 }
 
-impl<'a> Parse<'a> for Option<PlElem<'a>> {
+impl<'a> AstNode<'a> {
+    fn new(key: &'a str, word_values: &[&'a str], elem_values: Vec<AstNode<'a>>) -> AstNode<'a> {
+        AstNode {
+            open: Word::new("("),
+            key: Word::new(key),
+            value: (
+                word_values.into_iter().map(|s| Word::new(*s)).collect(),
+                elem_values,
+            ),
+            close: Word::new(")"),
+        }
+    }
+}
+
+impl<'a> Parse<'a> for Option<AstNode<'a>> {
     fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<'a>> {
         let open = match lexer.peek() {
             None => return Ok(None),
@@ -179,14 +201,14 @@ impl<'a> Parse<'a> for Option<PlElem<'a>> {
             Some((TokenType::Word, word)) => return Err(ParseError::WordWhileOpeningElem(*word)),
         };
         let key = Word::parse(lexer)?;
-        let value = (Vec::<Word>::parse(lexer)?, Vec::<PlElem>::parse(lexer)?);
+        let value = (Vec::<Word>::parse(lexer)?, Vec::<AstNode>::parse(lexer)?);
         let close = match lexer.next() {
             None => return Err(ParseError::EndWhileClosingElem),
             Some((TokenType::Open, open)) => return Err(ParseError::OpenWhileClosingElem(open)),
             Some((TokenType::Close, close)) => close,
             Some((TokenType::Word, word)) => return Err(ParseError::WordWhileClosingElem(word)),
         };
-        Ok(Some(PlElem {
+        Ok(Some(AstNode {
             open,
             key,
             value,
@@ -249,13 +271,13 @@ impl<'a> PlOutput<'a> {
         self.after_word = true;
     }
 
-    fn write_list(&mut self, list: &[PlElem]) {
+    fn write_list(&mut self, list: &[AstNode]) {
         for elem in list {
             self.write_elem(elem);
         }
     }
 
-    fn write_elem(&mut self, elem: &PlElem) {
+    fn write_elem(&mut self, elem: &AstNode) {
         for _ in 0..self.current_indent {
             self.buffer.push(' ');
         }
@@ -361,7 +383,6 @@ impl SerializePl for FixWord {
         output.write('.');
         let mut delta = 10;
         let mut fraction = abs % (1 << 20);
-        println!("fraction={}, modulus={}", fraction, abs);
         fraction = fraction * 10 + 5;
         loop {
             if delta > (1 << 20) {
