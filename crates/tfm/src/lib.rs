@@ -51,7 +51,7 @@ impl FixWord {
 
 impl std::fmt::Display for FixWord {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", pl::serialize_pl(self))
+        write!(f, "{}", pl::write_fix_word(self))
     }
 }
 
