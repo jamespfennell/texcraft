@@ -122,8 +122,10 @@ enum TokenType {
     Word,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum Word<'a> {
+    Ref(&'a str),
+    Owned(String),
     FromFile {
         file: &'a str,
         start: usize,
@@ -133,19 +135,17 @@ pub enum Word<'a> {
 
 impl<'a> Word<'a> {
     fn new(s: &'a str) -> Word<'a> {
-        Word::FromFile {
-            file: s,
-            start: 0,
-            end: s.len(),
-        }
+        Word::Ref(s)
     }
 
     fn value(&self) -> &str {
         match self {
+            Word::Ref(s) => s,
+            Word::Owned(s) => &s,
             Word::FromFile {
-                file: file,
-                end: end,
-                start: start,
+                file,
+                end,
+                start,
             } => &file[*start..*end],
         }
     }
@@ -168,12 +168,12 @@ impl<'a> Parse<'a> for Option<Node<'a>> {
         let open = match lexer.peek() {
             None => return Ok(None),
             Some((TokenType::Open, open)) => {
-                let open = *open;
+                let open = open.clone();
                 lexer.next();
                 open
             }
             Some((TokenType::Close, _)) => return Ok(None),
-            Some((TokenType::Word, word)) => return Err(ParseError::WordWhileOpeningElem(*word)),
+            Some((TokenType::Word, word)) => return Err(ParseError::WordWhileOpeningElem(word.clone())),
         };
         let key = Word::parse(lexer)?;
         let value = (Vec::<Word>::parse(lexer)?, Vec::<Node>::parse(lexer)?);
@@ -207,7 +207,7 @@ impl<'a> Parse<'a> for Option<Word<'a>> {
     fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<'a>> {
         match lexer.peek() {
             Some((TokenType::Word, word)) => {
-                let word = *word;
+                let word = word.clone();
                 lexer.next();
                 Ok(Some(word))
             }
