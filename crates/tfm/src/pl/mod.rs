@@ -10,8 +10,11 @@ mod ast;
 
 const CHECKSUM: &str = "CHECKSUM";
 const CODING_SCHEME: &str = "CODINGSCHEME";
+const COMMENT: &str = "COMMENT";
+const DESIGNSIZE: &str = "DESIGNSIZE";
 const FAMILY: &str = "FAMILY";
 const HEADER: &str = "HEADER";
+const SEVENBITSAFEFLAG: &str = "SEVENBITSAFEFLAG";
 
 pub fn format(input: &str, style: &PlStyle) -> String {
     let tree = ast::parse(input).unwrap();
@@ -24,16 +27,36 @@ pub fn parse(b: &str) -> File {
 
 pub fn serialize(file: &File) -> String {
     let mut root = Vec::<ast::Node>::new();
-    // root.push(PlElem::new(CHECKSUM, ))
     if let Some(font_family) = &file.header.font_family {
-        root.push(ast::Node::new(FAMILY, &[font_family], vec![]));
+        root.push(ast::Node::new(FAMILY).with_word(font_family));
     }
     for word in &file.header.additional_data {
         let value = format!("{:o}", word);
-        // root.push(ast::Node::new(HEADER, &["O", &value], vec![]));
+        root.push(ast::Node::new(HEADER).with_word("O").with_word_owned(value));
     }
     if let Some(coding_scheme) = &file.header.character_coding_scheme {
-        root.push(ast::Node::new(CODING_SCHEME, &[coding_scheme], vec![]));
+        root.push(ast::Node::new(CODING_SCHEME).with_word(coding_scheme));
+    }
+    root.push(
+        ast::Node::new(DESIGNSIZE)
+            .with_word("R")
+            .with_word_owned(write_fix_word(&file.header.design_size)),
+    );
+    root.push(ast::Node::new(COMMENT).with_word("DESIGNSIZE IS IN POINTS"));
+    root.push(ast::Node::new(COMMENT).with_word("OTHER SIZES ARE MULTIPLES OF DESIGNSIZE"));
+    root.push(
+        ast::Node::new(CHECKSUM)
+            .with_word("O")
+            .with_word_owned(format!("{:o}", &file.header.checksum)),
+    );
+    if let Some(seven_bit_safe) = file.header.seven_bit_safe {
+        root.push(
+            ast::Node::new(SEVENBITSAFEFLAG).with_word(if seven_bit_safe {
+                "TRUE"
+            } else {
+                "FALSE"
+            }),
+        );
     }
     let style = PlStyle::default();
     ast::write(&root, &style)

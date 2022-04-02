@@ -23,23 +23,37 @@ pub enum ParseError<'a> {
 /// A node in the PL abstract syntax tree.
 #[derive(Debug)]
 pub struct Node<'a> {
-    pub open: Word<'a>,
-    pub key: Word<'a>,
-    pub value: (Vec<Word<'a>>, Vec<Node<'a>>),
-    pub close: Word<'a>,
+    open: Word<'a>,
+    key: Word<'a>,
+    value: (Vec<Word<'a>>, Vec<Node<'a>>),
+    close: Word<'a>,
 }
 
 impl<'a> Node<'a> {
-    pub fn new(key: &'a str, word_values: &[&'a str], elem_values: Vec<Node<'a>>) -> Node<'a> {
+    pub fn new(key: &'a str) -> Node<'a> {
         Node {
             open: Word::new("("),
             key: Word::new(key),
-            value: (
-                word_values.iter().map(|s| Word::new(*s)).collect(),
-                elem_values,
-            ),
+            value: (Vec::new(), Vec::new()),
             close: Word::new(")"),
         }
+    }
+
+    pub fn with_word(mut self, s: &'a str) -> Node<'a> {
+        self.value.0.push(Word::new(s));
+        self
+    }
+
+    pub fn with_words(mut self, s: &'a [&'a str]) -> Node<'a> {
+        for s in s {
+            self.value.0.push(Word::new(s));
+        }
+        self
+    }
+
+    pub fn with_word_owned(mut self, s: String) -> Node<'a> {
+        self.value.0.push(Word::Owned(s));
+        self
     }
 }
 
@@ -142,11 +156,7 @@ impl<'a> Word<'a> {
         match self {
             Word::Ref(s) => s,
             Word::Owned(s) => s,
-            Word::FromFile {
-                file,
-                end,
-                start,
-            } => &file[*start..*end],
+            Word::FromFile { file, end, start } => &file[*start..*end],
         }
     }
 }
@@ -173,7 +183,9 @@ impl<'a> Parse<'a> for Option<Node<'a>> {
                 open
             }
             Some((TokenType::Close, _)) => return Ok(None),
-            Some((TokenType::Word, word)) => return Err(ParseError::WordWhileOpeningElem(word.clone())),
+            Some((TokenType::Word, word)) => {
+                return Err(ParseError::WordWhileOpeningElem(word.clone()))
+            }
         };
         let key = Word::parse(lexer)?;
         let value = (Vec::<Word>::parse(lexer)?, Vec::<Node>::parse(lexer)?);
