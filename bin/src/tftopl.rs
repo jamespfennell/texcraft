@@ -1,4 +1,4 @@
-use clap::{ArgEnum, Parser};
+use clap::Parser;
 
 #[derive(Parser)]
 #[clap(version, name = "tftopl")]

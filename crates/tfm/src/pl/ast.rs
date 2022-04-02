@@ -35,7 +35,7 @@ impl<'a> Node<'a> {
             open: Word::new("("),
             key: Word::new(key),
             value: (
-                word_values.into_iter().map(|s| Word::new(*s)).collect(),
+                word_values.iter().map(|s| Word::new(*s)).collect(),
                 elem_values,
             ),
             close: Word::new(")"),
@@ -103,9 +103,9 @@ impl<'a> Iterator for Lexer<'a> {
         if let Some((
             _,
             Word::FromFile {
-                file: file,
-                end: end,
-                start: start,
+                file: _,
+                end,
+                start: _,
             },
         )) = &token
         {
@@ -141,7 +141,7 @@ impl<'a> Word<'a> {
     fn value(&self) -> &str {
         match self {
             Word::Ref(s) => s,
-            Word::Owned(s) => &s,
+            Word::Owned(s) => s,
             Word::FromFile {
                 file,
                 end,
@@ -229,14 +229,14 @@ where
     }
 }
 
-pub fn write(tree: &Vec<Node>, style: &PlStyle) -> String {
+pub fn write(tree: &[Node], style: &PlStyle) -> String {
     let mut o = Writer {
         style,
         buffer: String::new(),
         current_indent: 0,
         after_word: false,
     };
-    o.write_list(&tree);
+    o.write_list(tree);
     o.buffer
 }
 

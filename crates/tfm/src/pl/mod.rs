@@ -39,44 +39,6 @@ pub fn serialize(file: &File) -> String {
     ast::write(&root, &style)
 }
 
-pub trait SerializePl {
-    fn serialize_pl(&self, output: &mut Output);
-}
-
-pub fn serialize_pl<T: SerializePl>(t: &T) -> String {
-    let mut output = Output { s: String::new() };
-    t.serialize_pl(&mut output);
-    output.s
-}
-
-pub struct Output {
-    s: String,
-}
-
-impl Output {
-    fn write(&mut self, c: char) {
-        self.s.push(c)
-    }
-
-    fn write_str(&mut self, s: &str) {
-        self.s.push_str(s)
-    }
-}
-
-trait DeserializePl {
-    fn deserialize_pl(input: &mut Input) -> Self;
-}
-
-struct Input<'a> {
-    c: std::str::Chars<'a>,
-}
-
-impl<'a> Input<'a> {
-    fn next(&mut self) -> Option<char> {
-        self.c.next()
-    }
-}
-
 pub fn write_fix_word(fix_word: &FixWord) -> String {
     let mut output = String::new();
     let abs: u32 = if fix_word.0 < 0 {
@@ -151,7 +113,7 @@ fn parse_fix_word(input: &str) -> FixWord {
 
     let mut negative = false;
     let mut integer = None;
-    while let Some(c) = input.next() {
+    for c in input.by_ref() {
         match Char::new(c) {
             Char::Other('+') | Char::Other(' ') => (),
             Char::Other('-') => {
@@ -170,7 +132,7 @@ fn parse_fix_word(input: &str) -> FixWord {
         None => panic![""],
         Some(integer) => integer,
     };
-    while let Some(c) = input.next() {
+    for c in input.by_ref() {
         match Char::new(c) {
             Char::Digit(d) => {
                 integer = integer * 10 + d;
@@ -186,7 +148,7 @@ fn parse_fix_word(input: &str) -> FixWord {
 
     let mut num_fractional_digits = 0;
     let mut fraction_digits = [0; 7];
-    while let Some(c) = input.next() {
+    for c in input.by_ref() {
         match Char::new(c) {
             Char::Digit(d) => {
                 if num_fractional_digits < 7 {
