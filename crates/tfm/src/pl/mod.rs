@@ -28,41 +28,35 @@ pub fn parse(b: &str) -> File {
 pub fn serialize(file: &File) -> String {
     let mut root = Vec::<ast::Node>::new();
     if let Some(font_family) = &file.header.font_family {
-        root.push(ast::Node::new(FAMILY).with_word(font_family));
+        root.push(ast::Node::new(FAMILY).with_str(font_family));
     }
     for word in &file.header.additional_data {
-        let value = format!("{:o}", word);
-        root.push(ast::Node::new(HEADER).with_word("O").with_word_owned(value));
+        root.push(ast::Node::new(HEADER).with_octal(*word));
     }
     if let Some(coding_scheme) = &file.header.character_coding_scheme {
-        root.push(ast::Node::new(CODING_SCHEME).with_word(coding_scheme));
+        root.push(ast::Node::new(CODING_SCHEME).with_str(coding_scheme));
     }
-    root.push(
-        ast::Node::new(DESIGNSIZE)
-            .with_word("R")
-            .with_word_owned(write_fix_word(&file.header.design_size)),
-    );
-    root.push(ast::Node::new(COMMENT).with_word("DESIGNSIZE IS IN POINTS"));
-    root.push(ast::Node::new(COMMENT).with_word("OTHER SIZES ARE MULTIPLES OF DESIGNSIZE"));
-    root.push(
-        ast::Node::new(CHECKSUM)
-            .with_word("O")
-            .with_word_owned(format!("{:o}", &file.header.checksum)),
-    );
+    root.push(ast::Node::new(DESIGNSIZE).with_fix_word(file.header.design_size));
+    root.push(ast::Node::new(COMMENT).with_str("DESIGNSIZE IS IN POINTS"));
+    root.push(ast::Node::new(COMMENT).with_str("OTHER SIZES ARE MULTIPLES OF DESIGNSIZE"));
+    root.push(ast::Node::new(CHECKSUM).with_octal(file.header.checksum));
     if let Some(seven_bit_safe) = file.header.seven_bit_safe {
         root.push(
-            ast::Node::new(SEVENBITSAFEFLAG).with_word(if seven_bit_safe {
+            ast::Node::new(SEVENBITSAFEFLAG).with_str(if seven_bit_safe {
                 "TRUE"
             } else {
                 "FALSE"
             }),
         );
     }
+    for ch in &file.char_infos {
+        println!["{:?}", ch];
+    }
     let style = PlStyle::default();
     ast::write(&root, &style)
 }
 
-pub fn write_fix_word(fix_word: &FixWord) -> String {
+pub fn write_fix_word(fix_word: FixWord) -> String {
     let mut output = String::new();
     let abs: u32 = if fix_word.0 < 0 {
         if fix_word.0 == i32::MIN {

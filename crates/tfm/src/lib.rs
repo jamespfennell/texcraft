@@ -41,29 +41,33 @@ pub struct Header {
 ///   with up to 6 digits after the decimal point.
 /// This is a non-lossy representation
 ///   because 10^(-6) is larger than 2^(-20).
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub struct FixWord(i32);
 
 impl FixWord {
+    /// Representation of the number 0 as a [FixWord].
+    pub const ZERO: FixWord = FixWord(0);
+
     /// Representation of the number 1 as a [FixWord].
     pub const UNITY: FixWord = FixWord(1 << 20);
 }
 
 impl std::fmt::Display for FixWord {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", pl::write_fix_word(self))
+        write!(f, "{}", pl::write_fix_word(*self))
     }
 }
 
 /// Information about a character.
+#[derive(Debug)]
 pub struct CharInfo {
-    /// The width of the character.
+    /// Width of the character.
     pub width: FixWord,
-    /// The height of the character.
+    /// Height of the character.
     pub height: FixWord,
-    /// The depth of the character.
+    /// Depth of the character.
     pub depth: FixWord,
-
+    /// Italic correction of the character.
     pub italic_correction: FixWord,
 }
 

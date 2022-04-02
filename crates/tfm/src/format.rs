@@ -13,7 +13,7 @@ pub fn serialize(file: &File) -> Vec<u8> {
 #[derive(Debug, PartialEq, Eq)]
 struct RawFile {
     header: Header,
-    first_char: u16,
+    first_char: u8,
     raw_char_info: Vec<RawCharInfo>,
     widths: Vec<FixWord>,
     heights: Vec<FixWord>,
@@ -27,9 +27,39 @@ struct RawFile {
 
 impl Into<File> for RawFile {
     fn into(self) -> File {
+        let mut char_infos = HashMap::new();
+        let mut char_id = self.first_char;
+        for raw_char_info in &self.raw_char_info {
+            char_infos.insert(
+                char_id,
+                CharInfo {
+                    width: self
+                        .widths
+                        .get(raw_char_info.width_index)
+                        .copied()
+                        .unwrap_or(FixWord::ZERO),
+                    height: self
+                        .heights
+                        .get(raw_char_info.height_index)
+                        .copied()
+                        .unwrap_or(FixWord::ZERO),
+                    depth: self
+                        .depths
+                        .get(raw_char_info.depth_index)
+                        .copied()
+                        .unwrap_or(FixWord::ZERO),
+                    italic_correction: self
+                        .italic_corrections
+                        .get(raw_char_info.italic_index)
+                        .copied()
+                        .unwrap_or(FixWord::ZERO),
+                },
+            );
+            char_id += 1;
+        }
         File {
             header: self.header,
-            char_infos: HashMap::new(),
+            char_infos,
             params: self.params,
         }
     }
@@ -375,7 +405,7 @@ impl SerializeTfm for RawFile {
             lh += 1;
         }
         lh += len_u16(&self.header.additional_data);
-        let bc = self.first_char;
+        let bc = self.first_char as u16;
         let ec = len_u16(&self.raw_char_info) + bc - 1;
         let nw = len_u16(&self.widths);
         let nh = len_u16(&self.heights);
@@ -432,7 +462,10 @@ impl DeserializeTfm for RawFile {
 
         RawFile {
             header: deserialize_from_slice(input, lh),
-            first_char: bc,
+            first_char:  match bc.try_into() {
+                Ok(bc) => bc,
+                Err(_) => panic!["bc is too big"],
+            },
             raw_char_info: deserialize_from_slice(input, ec - bc + 1),
             widths: deserialize_from_slice(input, nw),
             heights: deserialize_from_slice(input, nh),

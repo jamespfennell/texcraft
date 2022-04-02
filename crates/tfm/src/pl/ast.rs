@@ -1,3 +1,4 @@
+use super::*;
 use crate::{ClosingBraceStyle, PlStyle};
 use std::{
     fmt::Debug,
@@ -39,21 +40,22 @@ impl<'a> Node<'a> {
         }
     }
 
-    pub fn with_word(mut self, s: &'a str) -> Node<'a> {
+    pub fn with_str(mut self, s: &'a str) -> Node<'a> {
         self.value.0.push(Word::new(s));
         self
     }
 
-    pub fn with_words(mut self, s: &'a [&'a str]) -> Node<'a> {
-        for s in s {
-            self.value.0.push(Word::new(s));
-        }
+    pub fn with_string(mut self, s: String) -> Node<'a> {
+        self.value.0.push(Word::Owned(s));
         self
     }
 
-    pub fn with_word_owned(mut self, s: String) -> Node<'a> {
-        self.value.0.push(Word::Owned(s));
-        self
+    pub fn with_octal(mut self, u: u32) -> Node<'a> {
+        self.with_str("O").with_string(format!("{:o}", u))
+    }
+
+    pub fn with_fix_word(mut self, u: FixWord) -> Node<'a> {
+        self.with_str("R").with_string(write_fix_word(u))
     }
 }
 
