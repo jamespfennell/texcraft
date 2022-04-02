@@ -125,7 +125,8 @@ pub fn write_fix_word(fix_word: &FixWord) -> String {
     output
 }
 
-fn parse_fix_word(input: &mut Input) -> FixWord {
+fn parse_fix_word(input: &str) -> FixWord {
+    let mut input = input.chars();
     enum Char {
         Digit(i32),
         Other(char),
@@ -193,7 +194,7 @@ fn parse_fix_word(input: &mut Input) -> FixWord {
                     num_fractional_digits += 1;
                 }
             }
-            Char::Other(_) => break,
+            Char::Other(other) => panic!["unexpected char {}", other],
         }
     }
     let mut fraction = 0;
@@ -229,15 +230,13 @@ mod tests {
                 let start = FixWord(value);
                 let output = write_fix_word(&start);
 
-                let mut input = Input {c: output.chars() };
-                let finish = parse_fix_word(&mut input);
+                let finish = parse_fix_word(&output);
                 assert_eq!(start, finish);
 
                 let start = FixWord(value.wrapping_mul(-1));
                 let output = write_fix_word(&start);
 
-                let mut input = Input {c: output.chars() };
-                let finish = parse_fix_word(&mut input);
+                let finish = parse_fix_word(&output);
                 assert_eq!(start, finish);
             }
         )*
