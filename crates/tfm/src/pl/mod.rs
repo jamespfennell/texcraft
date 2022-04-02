@@ -4,7 +4,6 @@ use std::{
     fmt::Debug,
     iter::{Iterator, Peekable},
 };
-// use std::fmt::Writer;
 
 mod ast;
 
@@ -21,6 +20,15 @@ const FAMILY: &str = "FAMILY";
 const HEADER: &str = "HEADER";
 const SEVENBITSAFEFLAG: &str = "SEVENBITSAFEFLAG";
 
+const FONT_DIMENSIONS: &str = "FONTDIMEN";
+const SLANT: &str = "SLANT";
+const SPACE: &str = "SPACE";
+const STRETCH: &str = "STRETCH";
+const SHRINK: &str = "SHRINK";
+const XHEIGHT: &str = "XHEIGHT";
+const QUAD: &str = "QUAD";
+const EXTRA_SPACE: &str = "EXTRASPACE";
+
 pub fn format(input: &str, style: &PlStyle) -> String {
     let tree = ast::parse(input).unwrap();
     ast::write(&tree, style)
@@ -36,6 +44,7 @@ pub fn serialize(file: &File) -> String {
         root.push(ast::Node::new(FAMILY).with_str(font_family));
     }
     for word in &file.header.additional_data {
+        // TODO: this is not quite right
         root.push(ast::Node::new(HEADER).with_octal(*word));
     }
     if let Some(coding_scheme) = &file.header.character_coding_scheme {

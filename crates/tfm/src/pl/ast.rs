@@ -58,6 +58,10 @@ impl<'a> Node<'a> {
         self.with_str("R").with_string(write_fix_word(u))
     }
 
+    pub fn with_integer(mut self, i: u8) -> Node<'a> {
+        self.with_str("D").with_string(format!["{}", i])
+    }
+
     pub fn with_character(mut self, r: u8) -> Node<'a> {
         let c = match char::try_from(r) {
             Ok(c) => if c.is_alphanumeric() {
