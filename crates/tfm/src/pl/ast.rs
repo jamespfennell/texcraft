@@ -64,7 +64,7 @@ impl<'a> Iterator for Lexer<'a> {
             None => None,
             Some('(') => Some((
                 TokenType::Open,
-                Word {
+                Word::FromFile {
                     file: self.s,
                     start: self.pos_b,
                     end: self.pos_b + 1,
@@ -72,7 +72,7 @@ impl<'a> Iterator for Lexer<'a> {
             )),
             Some(')') => Some((
                 TokenType::Close,
-                Word {
+                Word::FromFile {
                     file: self.s,
                     start: self.pos_b,
                     end: self.pos_b + 1,
@@ -92,7 +92,7 @@ impl<'a> Iterator for Lexer<'a> {
                 }
                 Some((
                     TokenType::Word,
-                    Word {
+                    Word::FromFile {
                         file: self.s,
                         start: self.pos_b,
                         end,
@@ -100,8 +100,16 @@ impl<'a> Iterator for Lexer<'a> {
                 ))
             }
         };
-        if let Some((_, word)) = &token {
-            self.pos_b = word.end;
+        if let Some((
+            _,
+            Word::FromFile {
+                file: file,
+                end: end,
+                start: start,
+            },
+        )) = &token
+        {
+            self.pos_b = *end;
         }
         token
     }
@@ -115,15 +123,17 @@ enum TokenType {
 }
 
 #[derive(Clone, Copy)]
-pub struct Word<'a> {
-    file: &'a str,
-    start: usize,
-    end: usize,
+pub enum Word<'a> {
+    FromFile {
+        file: &'a str,
+        start: usize,
+        end: usize,
+    },
 }
 
 impl<'a> Word<'a> {
     fn new(s: &'a str) -> Word<'a> {
-        Word {
+        Word::FromFile {
             file: s,
             start: 0,
             end: s.len(),
@@ -131,7 +141,13 @@ impl<'a> Word<'a> {
     }
 
     fn value(&self) -> &str {
-        &self.file[self.start..self.end]
+        match self {
+            Word::FromFile {
+                file: file,
+                end: end,
+                start: start,
+            } => &file[*start..*end],
+        }
     }
 }
 
