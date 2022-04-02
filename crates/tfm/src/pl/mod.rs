@@ -8,6 +8,11 @@ use std::{
 
 mod ast;
 
+const CHARACTER: &str = "CHARACTER";
+const CHARACTER_WIDTH: &str = "CHARWD";
+const CHARACTER_HEIGHT: &str = "CHARHT";
+const CHARACTER_DEPTH: &str = "CHARDP";
+const CHARACTER_ITALIC: &str = "CHARIT";
 const CHECKSUM: &str = "CHECKSUM";
 const CODING_SCHEME: &str = "CODINGSCHEME";
 const COMMENT: &str = "COMMENT";
@@ -49,8 +54,26 @@ pub fn serialize(file: &File) -> String {
             }),
         );
     }
-    for ch in &file.char_infos {
-        println!["{:?}", ch];
+    for char_info in &file.char_infos {
+        let mut char_tree = Vec::<ast::Node>::new();
+        if char_info.width != FixWord::ZERO {
+            char_tree.push(ast::Node::new(CHARACTER_WIDTH).with_fix_word(char_info.width));
+        }
+        if char_info.height != FixWord::ZERO {
+            char_tree.push(ast::Node::new(CHARACTER_HEIGHT).with_fix_word(char_info.height));
+        }
+        if char_info.depth != FixWord::ZERO {
+            char_tree.push(ast::Node::new(CHARACTER_DEPTH).with_fix_word(char_info.depth));
+        }
+        if char_info.italic_correction != FixWord::ZERO {
+            char_tree
+                .push(ast::Node::new(CHARACTER_ITALIC).with_fix_word(char_info.italic_correction));
+        }
+        root.push(
+            ast::Node::new(CHARACTER)
+                .with_character(char_info.id)
+                .with_tree(char_tree),
+        )
     }
     let style = PlStyle::default();
     ast::write(&root, &style)

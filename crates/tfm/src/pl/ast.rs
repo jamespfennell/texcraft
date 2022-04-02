@@ -57,6 +57,26 @@ impl<'a> Node<'a> {
     pub fn with_fix_word(mut self, u: FixWord) -> Node<'a> {
         self.with_str("R").with_string(write_fix_word(u))
     }
+
+    pub fn with_character(mut self, r: u8) -> Node<'a> {
+        let c = match char::try_from(r) {
+            Ok(c) => if c.is_alphanumeric() {
+                Some(c)
+            } else {
+                None
+            },
+            Err(_) => None
+        };
+        match c {
+            None => self.with_octal(r as u32),
+            Some(c)  => self.with_string(format!["C {}", c]),
+        }
+    }
+
+    pub fn with_tree(mut self, t: Vec<Node<'a>>) -> Node<'a> {
+        self.value.1 = t;
+        self
+    }
 }
 
 struct Lexer<'a> {

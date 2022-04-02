@@ -27,34 +27,32 @@ struct RawFile {
 
 impl Into<File> for RawFile {
     fn into(self) -> File {
-        let mut char_infos = HashMap::new();
+        let mut char_infos = Vec::new();
         let mut char_id = self.first_char;
         for raw_char_info in &self.raw_char_info {
-            char_infos.insert(
-                char_id,
-                CharInfo {
-                    width: self
-                        .widths
-                        .get(raw_char_info.width_index)
-                        .copied()
-                        .unwrap_or(FixWord::ZERO),
-                    height: self
-                        .heights
-                        .get(raw_char_info.height_index)
-                        .copied()
-                        .unwrap_or(FixWord::ZERO),
-                    depth: self
-                        .depths
-                        .get(raw_char_info.depth_index)
-                        .copied()
-                        .unwrap_or(FixWord::ZERO),
-                    italic_correction: self
-                        .italic_corrections
-                        .get(raw_char_info.italic_index)
-                        .copied()
-                        .unwrap_or(FixWord::ZERO),
-                },
-            );
+            char_infos.push(CharInfo {
+                id: char_id,
+                width: self
+                    .widths
+                    .get(raw_char_info.width_index)
+                    .copied()
+                    .unwrap_or(FixWord::ZERO),
+                height: self
+                    .heights
+                    .get(raw_char_info.height_index)
+                    .copied()
+                    .unwrap_or(FixWord::ZERO),
+                depth: self
+                    .depths
+                    .get(raw_char_info.depth_index)
+                    .copied()
+                    .unwrap_or(FixWord::ZERO),
+                italic_correction: self
+                    .italic_corrections
+                    .get(raw_char_info.italic_index)
+                    .copied()
+                    .unwrap_or(FixWord::ZERO),
+            });
             char_id += 1;
         }
         File {
@@ -462,7 +460,7 @@ impl DeserializeTfm for RawFile {
 
         RawFile {
             header: deserialize_from_slice(input, lh),
-            first_char:  match bc.try_into() {
+            first_char: match bc.try_into() {
                 Ok(bc) => bc,
                 Err(_) => panic!["bc is too big"],
             },

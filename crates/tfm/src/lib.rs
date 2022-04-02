@@ -9,9 +9,8 @@ pub struct File {
     /// The file header.
     pub header: Header,
 
-    /// Map from character code to the character information for that character.
-    // TODO: maybe a vector based map?
-    pub char_infos: HashMap<u8, CharInfo>,
+    /// Ordered list of character information
+    pub char_infos: Vec<CharInfo>,
 
     // TODO lig_kerns and extensible characters
     /// Additional parameters contained in the file.
@@ -61,6 +60,7 @@ impl std::fmt::Display for FixWord {
 /// Information about a character.
 #[derive(Debug)]
 pub struct CharInfo {
+    pub id: u8,
     /// Width of the character.
     pub width: FixWord,
     /// Height of the character.
