@@ -125,96 +125,94 @@ pub fn write_fix_word(fix_word: &FixWord) -> String {
     output
 }
 
-impl DeserializePl for FixWord {
-    fn deserialize_pl(input: &mut Input) -> Self {
-        enum Char {
-            Digit(i32),
-            Other(char),
-        }
-        impl Char {
-            fn new(c: char) -> Char {
-                match c {
-                    '0' => Char::Digit(0),
-                    '1' => Char::Digit(1),
-                    '2' => Char::Digit(2),
-                    '3' => Char::Digit(3),
-                    '4' => Char::Digit(4),
-                    '5' => Char::Digit(5),
-                    '6' => Char::Digit(6),
-                    '7' => Char::Digit(7),
-                    '8' => Char::Digit(8),
-                    '9' => Char::Digit(9),
-                    other => Char::Other(other),
-                }
-            }
-        }
-
-        let mut negative = false;
-        let mut integer = None;
-        while let Some(c) = input.next() {
-            match Char::new(c) {
-                Char::Other('+') | Char::Other(' ') => (),
-                Char::Other('-') => {
-                    negative = !negative;
-                }
-                Char::Digit(d) => {
-                    integer = Some(d);
-                    break;
-                }
-                Char::Other(_) => panic![""],
-            }
-        }
-        let negative = negative;
-
-        let mut integer = match integer {
-            None => panic![""],
-            Some(integer) => integer,
-        };
-        while let Some(c) = input.next() {
-            match Char::new(c) {
-                Char::Digit(d) => {
-                    integer = integer * 10 + d;
-                    if integer >= 2048 {
-                        panic!("integer too big")
-                    }
-                }
-                Char::Other('.') => break,
-                Char::Other(other) => panic!["unexpected char {}", other],
-            }
-        }
-        let integer = integer;
-
-        let mut num_fractional_digits = 0;
-        let mut fraction_digits = [0; 7];
-        while let Some(c) = input.next() {
-            match Char::new(c) {
-                Char::Digit(d) => {
-                    if num_fractional_digits < 7 {
-                        fraction_digits[num_fractional_digits] = d * (1 << 21);
-                        num_fractional_digits += 1;
-                    }
-                }
-                Char::Other(_) => break,
-            }
-        }
-        let mut fraction = 0;
-        for i in (0..num_fractional_digits).rev() {
-            fraction = fraction_digits[i] + fraction / 10;
-        }
-        let fraction = (fraction + 10) / 20;
-
-        if integer == 2047 && fraction >= (1 << 20) {
-            if negative {
-                return FixWord(i32::MIN);
-            }
-            panic![""]
-        }
-        let mut result = integer * FixWord::UNITY.0 + fraction;
-        if negative {
-            result *= -1;
-        }
-        FixWord(result)
+fn parse_fix_word(input: &mut Input) -> FixWord {
+    enum Char {
+        Digit(i32),
+        Other(char),
     }
+    impl Char {
+        fn new(c: char) -> Char {
+            match c {
+                '0' => Char::Digit(0),
+                '1' => Char::Digit(1),
+                '2' => Char::Digit(2),
+                '3' => Char::Digit(3),
+                '4' => Char::Digit(4),
+                '5' => Char::Digit(5),
+                '6' => Char::Digit(6),
+                '7' => Char::Digit(7),
+                '8' => Char::Digit(8),
+                '9' => Char::Digit(9),
+                other => Char::Other(other),
+            }
+        }
+    }
+
+    let mut negative = false;
+    let mut integer = None;
+    while let Some(c) = input.next() {
+        match Char::new(c) {
+            Char::Other('+') | Char::Other(' ') => (),
+            Char::Other('-') => {
+                negative = !negative;
+            }
+            Char::Digit(d) => {
+                integer = Some(d);
+                break;
+            }
+            Char::Other(_) => panic![""],
+        }
+    }
+    let negative = negative;
+
+    let mut integer = match integer {
+        None => panic![""],
+        Some(integer) => integer,
+    };
+    while let Some(c) = input.next() {
+        match Char::new(c) {
+            Char::Digit(d) => {
+                integer = integer * 10 + d;
+                if integer >= 2048 {
+                    panic!("integer too big")
+                }
+            }
+            Char::Other('.') => break,
+            Char::Other(other) => panic!["unexpected char {}", other],
+        }
+    }
+    let integer = integer;
+
+    let mut num_fractional_digits = 0;
+    let mut fraction_digits = [0; 7];
+    while let Some(c) = input.next() {
+        match Char::new(c) {
+            Char::Digit(d) => {
+                if num_fractional_digits < 7 {
+                    fraction_digits[num_fractional_digits] = d * (1 << 21);
+                    num_fractional_digits += 1;
+                }
+            }
+            Char::Other(_) => break,
+        }
+    }
+    let mut fraction = 0;
+    for i in (0..num_fractional_digits).rev() {
+        fraction = fraction_digits[i] + fraction / 10;
+    }
+    let fraction = (fraction + 10) / 20;
+
+    if integer == 2047 && fraction >= (1 << 20) {
+        if negative {
+            return FixWord(i32::MIN);
+        }
+        panic![""]
+    }
+    let mut result = integer * FixWord::UNITY.0 + fraction;
+    if negative {
+        result *= -1;
+    }
+    FixWord(result)
 }
 
 #[cfg(test)]
@@ -232,14 +230,14 @@ mod tests {
                 let output = write_fix_word(&start);
 
                 let mut input = Input {c: output.chars() };
-                let finish = FixWord::deserialize_pl(&mut input);
+                let finish = parse_fix_word(&mut input);
                 assert_eq!(start, finish);
 
                 let start = FixWord(value.wrapping_mul(-1));
                 let output = write_fix_word(&start);
 
                 let mut input = Input {c: output.chars() };
-                let finish = FixWord::deserialize_pl(&mut input);
+                let finish = parse_fix_word(&mut input);
                 assert_eq!(start, finish);
             }
         )*
