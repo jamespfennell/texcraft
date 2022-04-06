@@ -5,6 +5,7 @@ mod format;
 mod pl;
 
 /// Complete contents of a TeX font metric (.tfm) or property list (.pl) file.
+#[derive(Default)]
 pub struct File {
     /// The file header.
     pub header: Header,
@@ -18,7 +19,7 @@ pub struct File {
 }
 
 /// The TFM header, which contains metadata about the file.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct Header {
     pub checksum: u32,
     pub design_size: FixWord,
@@ -40,7 +41,7 @@ pub struct Header {
 ///   with up to 6 digits after the decimal point.
 /// This is a non-lossy representation
 ///   because 10^(-6) is larger than 2^(-20).
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+#[derive(Default, PartialEq, Eq, Debug, Copy, Clone)]
 pub struct FixWord(i32);
 
 impl FixWord {
@@ -82,7 +83,7 @@ pub fn serialize_tfm(file: &File) -> Vec<u8> {
 }
 
 /// Parse property list (.pl) data.
-pub fn parse_pl(input: &str) -> File {
+pub fn parse_pl<'a>(input: &'a str) -> Result<File, pl::ParseError<'a>> {
     pl::parse(input)
 }
 
@@ -101,6 +102,7 @@ pub fn serialize_pl(file: &File, style: PlStyle) -> String {
 pub fn format_pl(input: &str, style: &PlStyle) -> String {
     pl::format(input, style)
 }
+
 
 #[derive(Debug)]
 pub struct PlStyle {
@@ -249,7 +251,7 @@ pub struct ExtensibleChar {
     rep: u8,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct Params {
     slant: FixWord,
     space: FixWord,

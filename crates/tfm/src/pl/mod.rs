@@ -34,8 +34,40 @@ pub fn format(input: &str, style: &PlStyle) -> String {
     ast::write(&tree, style)
 }
 
-pub fn parse(b: &str) -> File {
-    todo!()
+pub fn parse<'a>(input: &'a str) -> Result<File, ParseError<'a>> {
+    let tree = ast::parse(input)?;
+    let mut file: File = Default::default();
+    file.header.design_size = FixWord(FixWord::UNITY.0 * 10);
+    for node in tree {
+        match node.key() {
+            COMMENT => {}
+            FAMILY => {
+                file.header.font_family = Some("hello".to_string());
+            }
+
+            other => {
+                return Err(ParseError::InvalidKey(node.key));
+            }
+        }
+    }
+
+    let output = serialize(&file);
+    println!["{}", output];
+
+    Ok(file)
+}
+
+#[derive(Debug)]
+pub enum ParseError<'a> {
+    Parse(ast::ParseError<'a>),
+    ConversionError(ast::ConversionError<'a>),
+    InvalidKey(ast::Word<'a>),
+}
+
+impl<'a> From<ast::ParseError<'a>> for ParseError<'a> {
+    fn from(err: ast::ParseError<'a>) -> Self { 
+        ParseError::Parse(err)
+    }
 }
 
 pub fn serialize(file: &File) -> String {
@@ -136,7 +168,7 @@ pub fn write_fix_word(fix_word: FixWord) -> String {
     output
 }
 
-fn parse_fix_word(input: &str) -> FixWord {
+fn parse_fix_word(input: &str) -> Result<FixWord, String> {
     let mut input = input.chars();
     enum Char {
         Digit(i32),
@@ -172,7 +204,7 @@ fn parse_fix_word(input: &str) -> FixWord {
                 integer = Some(d);
                 break;
             }
-            Char::Other(_) => panic![""],
+            Char::Other(other) => return Err(format!["unexpected character {}", other]),
         }
     }
     let negative = negative;
@@ -186,11 +218,11 @@ fn parse_fix_word(input: &str) -> FixWord {
             Char::Digit(d) => {
                 integer = integer * 10 + d;
                 if integer >= 2048 {
-                    panic!("integer too big")
+                    return Err(format!["real numbers must be in the range [-2048,2048]"]);
                 }
             }
             Char::Other('.') => break,
-            Char::Other(other) => panic!["unexpected char {}", other],
+            Char::Other(other) => return Err(format!["unexpected character {}", other]),
         }
     }
     let integer = integer;
@@ -205,7 +237,7 @@ fn parse_fix_word(input: &str) -> FixWord {
                     num_fractional_digits += 1;
                 }
             }
-            Char::Other(other) => panic!["unexpected char {}", other],
+            Char::Other(other) => return Err(format!["unexpected character {}", other]),
         }
     }
     let mut fraction = 0;
@@ -216,15 +248,15 @@ fn parse_fix_word(input: &str) -> FixWord {
 
     if integer == 2047 && fraction >= (1 << 20) {
         if negative {
-            return FixWord(i32::MIN);
+            return Ok(FixWord(i32::MIN));
         }
-        panic![""]
+        return Err(format!["real numbers must be in the range [-2048,2048]"]);
     }
     let mut result = integer * FixWord::UNITY.0 + fraction;
     if negative {
         result *= -1;
     }
-    FixWord(result)
+    Ok(FixWord(result))
 }
 
 #[cfg(test)]
@@ -239,15 +271,15 @@ mod tests {
                 let value: i32 = $value;
 
                 let start = FixWord(value);
-                let output = write_fix_word(&start);
+                let output = write_fix_word(start);
 
-                let finish = parse_fix_word(&output);
+                let finish = parse_fix_word(&output).unwrap();
                 assert_eq!(start, finish);
 
                 let start = FixWord(value.wrapping_mul(-1));
-                let output = write_fix_word(&start);
+                let output = write_fix_word(start);
 
-                let finish = parse_fix_word(&output);
+                let finish = parse_fix_word(&output).unwrap();
                 assert_eq!(start, finish);
             }
         )*

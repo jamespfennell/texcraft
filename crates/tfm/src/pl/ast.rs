@@ -21,11 +21,21 @@ pub enum ParseError<'a> {
     OpenWhileParsingWord(Word<'a>),
 }
 
+#[derive(Debug)]
+pub enum ConversionError<'a> {
+    RealNumberUnexpectedList(&'a Word<'a>),
+    RealNumberNotEnoughWords(&'a Word<'a>),
+    RealNumberInvalidPrefix(&'a Word<'a>),
+    /// The provided string could not be parsed as a real number
+    RealNumberInvalidValue(&'a Word<'a>, String),
+    RealNumberExtraWord(&'a Word<'a>),
+}
+
 /// A node in the PL abstract syntax tree.
 #[derive(Debug)]
 pub struct Node<'a> {
     open: Word<'a>,
-    key: Word<'a>,
+    pub key: Word<'a>,
     value: (Vec<Word<'a>>, Vec<Node<'a>>),
     close: Word<'a>,
 }
@@ -64,22 +74,50 @@ impl<'a> Node<'a> {
 
     pub fn with_character(mut self, r: u8) -> Node<'a> {
         let c = match char::try_from(r) {
-            Ok(c) => if c.is_alphanumeric() {
-                Some(c)
-            } else {
-                None
-            },
-            Err(_) => None
+            Ok(c) => {
+                if c.is_alphanumeric() {
+                    Some(c)
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
         };
         match c {
             None => self.with_octal(r as u32),
-            Some(c)  => self.with_string(format!["C {}", c]),
+            Some(c) => self.with_string(format!["C {}", c]),
         }
     }
 
     pub fn with_tree(mut self, t: Vec<Node<'a>>) -> Node<'a> {
         self.value.1 = t;
         self
+    }
+
+    pub fn key(&self) -> &str {
+        self.key.value()
+    }
+
+    pub fn into_fix_word(&self) -> Result<FixWord, ConversionError> {
+        if let Some(node) = self.value.1.first() {
+            return Err(ConversionError::RealNumberUnexpectedList(&node.open));
+        }
+        match self.value.0.len() {
+            0 | 1 => Err(ConversionError::RealNumberNotEnoughWords(&self.close)),
+            2 => {
+                if self.value.0[0].value() != "R" {
+                    return Err(ConversionError::RealNumberInvalidPrefix(&self.value.0[0]));
+                }
+                let word = &self.value.0[1];
+                match parse_fix_word(word.value()) {
+                    Ok(fix_word) => Ok(fix_word),
+                    Err(explanation) => {
+                        Err(ConversionError::RealNumberInvalidValue(word, explanation))
+                    }
+                }
+            }
+            _ => Err(ConversionError::RealNumberExtraWord(&self.value.0[2])),
+        }
     }
 }
 

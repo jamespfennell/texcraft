@@ -11,6 +11,10 @@ struct Cli {
     #[clap(short, long)]
     overwrite: bool,
 
+    /// Check that the file is a valid propertly list file
+    #[clap(short, long)]
+    validate: bool,
+
     /// Number of spaces to indent property lists by (default 3)
     #[clap(short, long)]
     indent: Option<usize>,
@@ -43,6 +47,12 @@ fn main() {
             std::process::exit(1);
         }
     };
+    if args.validate {
+        if let Err(err) = tfm::parse_pl(&input) {
+            println!["{:?}", err];
+            std::process::exit(1);
+        }
+    }
     let style = tfm::PlStyle {
         indent: args.indent.unwrap_or(3),
         closing_brace_style: match args.closing_brace_style {
