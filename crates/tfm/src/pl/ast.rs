@@ -6,9 +6,9 @@ use std::{
 };
 
 /// Parses a property list file into the PL abstract syntax tree.
-pub fn parse(input: &str) -> Result<Vec<Node>, ParseError> {
+pub fn parse(input: &str) -> Result<Vec<Node<Word>>, ParseError> {
     let lexer = Lexer { s: input, pos_b: 0 };
-    Vec::<Node>::parse(&mut lexer.peekable())
+    Vec::<Node<Word>>::parse(&mut lexer.peekable())
 }
 
 #[derive(Debug)]
@@ -22,57 +22,58 @@ pub enum ParseError<'a> {
 }
 
 #[derive(Debug)]
-pub enum ConversionError<'a> {
-    RealNumberUnexpectedList(&'a Word<'a>),
-    RealNumberNotEnoughWords(&'a Word<'a>),
-    RealNumberInvalidPrefix(&'a Word<'a>),
+pub enum ConversionError<T> {
+    RealNumberUnexpectedList(T),
+    RealNumberNotEnoughWords(T),
+    RealNumberInvalidPrefix(T),
     /// The provided string could not be parsed as a real number
-    RealNumberInvalidValue(&'a Word<'a>, String),
-    RealNumberExtraWord(&'a Word<'a>),
+    RealNumberInvalidValue(T, String),
+    RealNumberExtraWord(T),
 }
 
 /// A node in the PL abstract syntax tree.
 #[derive(Debug)]
-pub struct Node<'a> {
-    open: Word<'a>,
-    pub key: Word<'a>,
-    value: (Vec<Word<'a>>, Vec<Node<'a>>),
-    close: Word<'a>,
+pub struct Node<T> {
+    open: T,
+    pub key: T,
+    value: (Vec<T>, Vec<Node<T>>),
+    close: T,
 }
 
-impl<'a> Node<'a> {
-    pub fn new(key: &'a str) -> Node<'a> {
+// TODO: move most of this to builder
+impl Node<String> {
+    pub fn new(key: &str) -> Node<String> {
         Node {
-            open: Word::new("("),
-            key: Word::new(key),
+            open: "(".to_string(),
+            key: key.to_string(),
             value: (Vec::new(), Vec::new()),
-            close: Word::new(")"),
+            close: ")".to_string(),
         }
     }
 
-    pub fn with_str(mut self, s: &'a str) -> Node<'a> {
-        self.value.0.push(Word::new(s));
+    pub fn with_str(mut self, s: &str) -> Node<String> {
+        self.value.0.push(s.to_string());
         self
     }
 
-    pub fn with_string(mut self, s: String) -> Node<'a> {
-        self.value.0.push(Word::Owned(s));
+    pub fn with_string(mut self, s: String) -> Node<String> {
+        self.value.0.push(s);
         self
     }
 
-    pub fn with_octal(mut self, u: u32) -> Node<'a> {
+    pub fn with_octal(mut self, u: u32) -> Node<String> {
         self.with_str("O").with_string(format!("{:o}", u))
     }
 
-    pub fn with_fix_word(mut self, u: FixWord) -> Node<'a> {
+    pub fn with_fix_word(mut self, u: FixWord) -> Node<String> {
         self.with_str("R").with_string(write_fix_word(u))
     }
 
-    pub fn with_integer(mut self, i: u8) -> Node<'a> {
+    pub fn with_integer(mut self, i: u8) -> Node<String> {
         self.with_str("D").with_string(format!["{}", i])
     }
 
-    pub fn with_character(mut self, r: u8) -> Node<'a> {
+    pub fn with_character(mut self, r: u8) -> Node<String> {
         let c = match char::try_from(r) {
             Ok(c) => {
                 if c.is_alphanumeric() {
@@ -89,34 +90,43 @@ impl<'a> Node<'a> {
         }
     }
 
-    pub fn with_tree(mut self, t: Vec<Node<'a>>) -> Node<'a> {
+    pub fn with_tree(mut self, t: Vec<Node<String>>) -> Node<String> {
         self.value.1 = t;
         self
     }
+}
 
+impl<T: AsRef<str> + Clone> Node<T> {
     pub fn key(&self) -> &str {
-        self.key.value()
+        self.key.as_ref()
     }
 
-    pub fn into_fix_word(&self) -> Result<FixWord, ConversionError> {
+    pub fn into_fix_word(&self) -> Result<FixWord, ConversionError<T>> {
         if let Some(node) = self.value.1.first() {
-            return Err(ConversionError::RealNumberUnexpectedList(&node.open));
+            return Err(ConversionError::RealNumberUnexpectedList(node.open.clone()));
         }
         match self.value.0.len() {
-            0 | 1 => Err(ConversionError::RealNumberNotEnoughWords(&self.close)),
+            0 | 1 => Err(ConversionError::RealNumberNotEnoughWords(
+                self.close.clone(),
+            )),
             2 => {
-                if self.value.0[0].value() != "R" {
-                    return Err(ConversionError::RealNumberInvalidPrefix(&self.value.0[0]));
+                if self.value.0[0].as_ref() != "R" {
+                    return Err(ConversionError::RealNumberInvalidPrefix(
+                        self.value.0[0].clone(),
+                    ));
                 }
                 let word = &self.value.0[1];
-                match parse_fix_word(word.value()) {
+                match parse_fix_word(word.as_ref()) {
                     Ok(fix_word) => Ok(fix_word),
-                    Err(explanation) => {
-                        Err(ConversionError::RealNumberInvalidValue(word, explanation))
-                    }
+                    Err(explanation) => Err(ConversionError::RealNumberInvalidValue(
+                        word.clone(),
+                        explanation,
+                    )),
                 }
             }
-            _ => Err(ConversionError::RealNumberExtraWord(&self.value.0[2])),
+            _ => Err(ConversionError::RealNumberExtraWord(
+                self.value.0[2].clone(),
+            )),
         }
     }
 }
@@ -225,6 +235,12 @@ impl<'a> Word<'a> {
     }
 }
 
+impl<'a> AsRef<str> for Word<'a> {
+    fn as_ref(&self) -> &str {
+        self.value()
+    }
+}
+
 impl<'a> Debug for Word<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value())
@@ -237,7 +253,7 @@ trait Parse<'a> {
         Self: Sized;
 }
 
-impl<'a> Parse<'a> for Option<Node<'a>> {
+impl<'a> Parse<'a> for Option<Node<Word<'a>>> {
     fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<'a>> {
         let open = match lexer.peek() {
             None => return Ok(None),
@@ -252,7 +268,10 @@ impl<'a> Parse<'a> for Option<Node<'a>> {
             }
         };
         let key = Word::parse(lexer)?;
-        let value = (Vec::<Word>::parse(lexer)?, Vec::<Node>::parse(lexer)?);
+        let value = (
+            Vec::<Word>::parse(lexer)?,
+            Vec::<Node<Word<'a>>>::parse(lexer)?,
+        );
         let close = match lexer.next() {
             None => return Err(ParseError::EndWhileClosingElem),
             Some((TokenType::Open, open)) => return Err(ParseError::OpenWhileClosingElem(open)),
@@ -305,7 +324,7 @@ where
     }
 }
 
-pub fn write(tree: &[Node], style: &PlStyle) -> String {
+pub fn write<T: AsRef<str>>(tree: &[Node<T>], style: &PlStyle) -> String {
     let mut o = Writer {
         style,
         buffer: String::new(),
@@ -325,21 +344,21 @@ struct Writer<'a> {
 }
 
 impl<'a> Writer<'a> {
-    fn write_word(&mut self, word: &Word) {
+    fn write_word<T: AsRef<str>>(&mut self, word: T) {
         if self.after_word {
             self.buffer.push(' ');
         }
-        self.buffer.push_str(word.value());
+        self.buffer.push_str(word.as_ref());
         self.after_word = true;
     }
 
-    fn write_list(&mut self, list: &[Node]) {
+    fn write_list<T: AsRef<str>>(&mut self, list: &[Node<T>]) {
         for elem in list {
             self.write_elem(elem);
         }
     }
 
-    fn write_elem(&mut self, elem: &Node) {
+    fn write_elem<T: AsRef<str>>(&mut self, elem: &Node<T>) {
         for _ in 0..self.current_indent {
             self.buffer.push(' ');
         }

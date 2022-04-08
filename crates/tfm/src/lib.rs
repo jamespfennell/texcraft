@@ -103,7 +103,6 @@ pub fn format_pl(input: &str, style: &PlStyle) -> String {
     pl::format(input, style)
 }
 
-
 #[derive(Debug)]
 pub struct PlStyle {
     pub indent: usize,

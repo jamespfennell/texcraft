@@ -60,18 +60,18 @@ pub fn parse<'a>(input: &'a str) -> Result<File, ParseError<'a>> {
 #[derive(Debug)]
 pub enum ParseError<'a> {
     Parse(ast::ParseError<'a>),
-    ConversionError(ast::ConversionError<'a>),
+    ConversionError(ast::ConversionError<ast::Word<'a>>),
     InvalidKey(ast::Word<'a>),
 }
 
 impl<'a> From<ast::ParseError<'a>> for ParseError<'a> {
-    fn from(err: ast::ParseError<'a>) -> Self { 
+    fn from(err: ast::ParseError<'a>) -> Self {
         ParseError::Parse(err)
     }
 }
 
 pub fn serialize(file: &File) -> String {
-    let mut root = Vec::<ast::Node>::new();
+    let mut root = Vec::<ast::Node<String>>::new();
     if let Some(font_family) = &file.header.font_family {
         root.push(ast::Node::new(FAMILY).with_str(font_family));
     }
@@ -96,7 +96,7 @@ pub fn serialize(file: &File) -> String {
         );
     }
     for char_info in &file.char_infos {
-        let mut char_tree = Vec::<ast::Node>::new();
+        let mut char_tree = Vec::<ast::Node<String>>::new();
         if char_info.width != FixWord::ZERO {
             char_tree.push(ast::Node::new(CHARACTER_WIDTH).with_fix_word(char_info.width));
         }
