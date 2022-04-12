@@ -111,7 +111,7 @@ impl Builder {
     }
 
     pub fn with_fix_word(&mut self, u: FixWord) -> &mut Builder {
-        self.with_str("R").with_string(write_fix_word(u))
+        self.with_str("R").with_string(format!("{}", u))
     }
 
     pub fn with_integer(&mut self, i: u8) -> &mut Builder {

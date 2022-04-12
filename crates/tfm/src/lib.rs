@@ -54,7 +54,51 @@ impl FixWord {
 
 impl std::fmt::Display for FixWord {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", pl::write_fix_word(*self))
+        let mut output = String::new();
+        let abs: u32 = if self.0 < 0 {
+            if self.0 == i32::MIN {
+                return write!(f, "-2047.9999999");
+            } else {
+                output.push('-');
+                self.0.abs() as u32
+            }
+        } else {
+            self.0 as u32
+        };
+        let mut integer = abs / (1 << 20);
+
+        // The integer part is at most 2^11 < 10^4, so there are at most 4 decimal digits.
+        let mut integer_digits = [0; 4];
+        let mut i = 4;
+        loop {
+            integer_digits[i - 1] = integer % 10;
+            integer /= 10;
+            i -= 1;
+            if integer == 0 {
+                break;
+            }
+        }
+        while i < 4 {
+            output.push(std::char::from_digit(integer_digits[i], 10).unwrap());
+            i += 1;
+        }
+
+        output.push('.');
+        let mut delta = 10;
+        let mut fraction = abs % (1 << 20);
+        fraction = fraction * 10 + 5;
+        loop {
+            if delta > (1 << 20) {
+                fraction = fraction + (1 << 19) - (delta / 2);
+            }
+            output.push(std::char::from_digit(fraction / (1 << 20), 10).unwrap());
+            fraction = (fraction % (1 << 20)) * 10;
+            delta *= 10;
+            if fraction <= delta {
+                break;
+            }
+        }
+        write!(f, "{}", output)
     }
 }
 
