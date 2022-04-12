@@ -151,9 +151,12 @@ impl<T: AsRef<str> + Clone> Node<T> {
     pub fn key(&self) -> &str {
         self.key.as_ref()
     }
+}
 
-    // TODO: try into?
-    pub fn into_fix_word(&self) -> Result<FixWord, ConversionError<T>> {
+impl<T: AsRef<str> + Clone> TryInto<FixWord> for &Node<T> {
+    type Error = ConversionError<T>;
+
+    fn try_into(self) -> Result<FixWord, Self::Error> {
         if let Some(node) = self.value.1.first() {
             return Err(ConversionError::RealNumberUnexpectedList(node.open.clone()));
         }
@@ -168,7 +171,7 @@ impl<T: AsRef<str> + Clone> Node<T> {
                     ));
                 }
                 let word = &self.value.0[1];
-                match parse_fix_word(word.as_ref()) {
+                match word.as_ref().try_into() {
                     Ok(fix_word) => Ok(fix_word),
                     Err(explanation) => Err(ConversionError::RealNumberInvalidValue(
                         word.clone(),

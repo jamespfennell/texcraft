@@ -239,10 +239,6 @@ pub fn write(file: &File, style: Style) -> String {
     ast::write(tree.nodes(), &style)
 }
 
-fn parse_fix_word(input: &str) -> Result<FixWord, String> {
-    input.try_into()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -256,14 +252,14 @@ mod tests {
 
                 let start = FixWord(value);
                 let output = format!("{}", start);
-
-                let finish = parse_fix_word(&output).unwrap();
+                let output_ref: &str = &output;
+                let finish: FixWord = output_ref.try_into().unwrap();
                 assert_eq!(start, finish);
 
                 let start = FixWord(value.wrapping_mul(-1));
                 let output = format!("{}", start);
-
-                let finish = parse_fix_word(&output).unwrap();
+                let output_ref: &str = &output;
+                let finish: FixWord = output_ref.try_into().unwrap();
                 assert_eq!(start, finish);
             }
         )*
