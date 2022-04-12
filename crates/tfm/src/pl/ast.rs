@@ -7,6 +7,39 @@ use std::{
     iter::{Iterator, Peekable},
 };
 
+pub struct Tree<T>(Vec<Node<T>>);
+
+impl Tree<String> {
+    pub fn builder() -> TreeBuilder {
+        TreeBuilder(Vec::new())
+    }
+}
+
+impl<T> Tree<T> {
+    pub fn nodes(&self) -> &[Node<T>] {
+        &self.0
+    }
+}
+
+pub struct TreeBuilder(Vec<Builder>);
+
+impl TreeBuilder {
+    pub fn add(&mut self, key: &str) -> &mut Builder {
+        self.0.push(Node::new(key));
+        self.0.last_mut().unwrap()
+    }
+}
+
+impl From<TreeBuilder> for Tree<String> {
+    fn from(builder: TreeBuilder) -> Self {
+        let mut nodes = Vec::with_capacity(builder.0.len());
+        for b in builder.0 {
+            nodes.push(b.into());
+        }
+        Tree(nodes)
+    }
+}
+
 /// Parse property list data into an abstract syntax tree.
 pub fn parse<'a>(
     file_name: &'a str,
@@ -63,29 +96,29 @@ impl Node<String> {
 pub struct Builder(Node<String>);
 
 impl Builder {
-    pub fn with_str(mut self, s: &str) -> Builder {
+    pub fn with_str(&mut self, s: &str) -> &mut Builder {
         self.0.value.0.push(s.to_string());
         self
     }
 
-    pub fn with_string(mut self, s: String) -> Builder {
+    pub fn with_string(&mut self, s: String) -> &mut Builder {
         self.0.value.0.push(s);
         self
     }
 
-    pub fn with_octal(self, u: u32) -> Builder {
+    pub fn with_octal(&mut self, u: u32) -> &mut Builder {
         self.with_str("O").with_string(format!("{:o}", u))
     }
 
-    pub fn with_fix_word(self, u: FixWord) -> Builder {
+    pub fn with_fix_word(&mut self, u: FixWord) -> &mut Builder {
         self.with_str("R").with_string(write_fix_word(u))
     }
 
-    pub fn with_integer(self, i: u8) -> Builder {
+    pub fn with_integer(&mut self, i: u8) -> &mut Builder {
         self.with_str("D").with_string(format!["{}", i])
     }
 
-    pub fn with_character(self, r: u8) -> Builder {
+    pub fn with_character(&mut self, r: u8) -> &mut Builder {
         let c = match char::try_from(r) {
             Ok(c) => {
                 if c.is_alphanumeric() {
@@ -102,8 +135,8 @@ impl Builder {
         }
     }
 
-    pub fn with_tree(mut self, t: Vec<Node<String>>) -> Builder {
-        self.0.value.1 = t;
+    pub fn with_tree(&mut self, t: Tree<String>) -> &mut Builder {
+        self.0.value.1 = t.0;
         self
     }
 }

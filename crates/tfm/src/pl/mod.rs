@@ -183,83 +183,60 @@ impl<T> From<ast::ParseError<T>> for ParseError<T> {
 
 /// Write a [File] in property list format.
 pub fn write(file: &File, style: Style) -> String {
-    let mut root = Vec::<ast::Node<String>>::new();
+    let mut builder = ast::Tree::builder();
     if let Some(font_family) = &file.header.font_family {
-        root.push(ast::Node::new(FAMILY).with_str(font_family).into());
+        builder.add(FAMILY).with_str(font_family);
     }
     for word in &file.header.additional_data {
         // TODO: this is not quite right
-        root.push(ast::Node::new(HEADER).with_octal(*word).into());
+        builder.add(HEADER).with_octal(*word);
     }
     if let Some(coding_scheme) = &file.header.character_coding_scheme {
-        root.push(ast::Node::new(CODING_SCHEME).with_str(coding_scheme).into());
+        builder.add(CODING_SCHEME).with_str(coding_scheme);
     }
-    root.push(
-        ast::Node::new(DESIGNSIZE)
-            .with_fix_word(file.header.design_size)
-            .into(),
-    );
-    root.push(
-        ast::Node::new(COMMENT)
-            .with_str("DESIGNSIZE IS IN POINTS")
-            .into(),
-    );
-    root.push(
-        ast::Node::new(COMMENT)
-            .with_str("OTHER SIZES ARE MULTIPLES OF DESIGNSIZE")
-            .into(),
-    );
-    root.push(
-        ast::Node::new(CHECKSUM)
-            .with_octal(file.header.checksum)
-            .into(),
-    );
+    builder
+        .add(DESIGNSIZE)
+        .with_fix_word(file.header.design_size);
+    builder.add(COMMENT).with_str("DESIGNSIZE IS IN POINTS");
+    builder
+        .add(COMMENT)
+        .with_str("OTHER SIZES ARE MULTIPLES OF DESIGNSIZE");
+    builder.add(CHECKSUM).with_octal(file.header.checksum);
     if let Some(seven_bit_safe) = file.header.seven_bit_safe {
-        root.push(
-            ast::Node::new(SEVENBITSAFEFLAG)
-                .with_str(if seven_bit_safe { "TRUE" } else { "FALSE" })
-                .into(),
-        );
+        builder
+            .add(SEVENBITSAFEFLAG)
+            .with_str(if seven_bit_safe { "TRUE" } else { "FALSE" });
     }
     for char_info in &file.char_infos {
-        let mut char_tree = Vec::<ast::Node<String>>::new();
+        let mut char_tree = ast::Tree::builder();
         if char_info.width != FixWord::ZERO {
-            char_tree.push(
-                ast::Node::new(CHARACTER_WIDTH)
-                    .with_fix_word(char_info.width)
-                    .into(),
-            );
+            char_tree
+                .add(CHARACTER_WIDTH)
+                .with_fix_word(char_info.width);
         }
         if char_info.height != FixWord::ZERO {
-            char_tree.push(
-                ast::Node::new(CHARACTER_HEIGHT)
-                    .with_fix_word(char_info.height)
-                    .into(),
-            );
+            char_tree
+                .add(CHARACTER_HEIGHT)
+                .with_fix_word(char_info.height);
         }
         if char_info.depth != FixWord::ZERO {
-            char_tree.push(
-                ast::Node::new(CHARACTER_DEPTH)
-                    .with_fix_word(char_info.depth)
-                    .into(),
-            );
+            char_tree
+                .add(CHARACTER_DEPTH)
+                .with_fix_word(char_info.depth);
         }
         if char_info.italic_correction != FixWord::ZERO {
-            char_tree.push(
-                ast::Node::new(CHARACTER_ITALIC)
-                    .with_fix_word(char_info.italic_correction)
-                    .into(),
-            );
+            char_tree
+                .add(CHARACTER_ITALIC)
+                .with_fix_word(char_info.italic_correction);
         }
-        root.push(
-            ast::Node::new(CHARACTER)
-                .with_character(char_info.id)
-                .with_tree(char_tree)
-                .into(),
-        )
+        builder
+            .add(CHARACTER)
+            .with_character(char_info.id)
+            .with_tree(char_tree.into());
     }
+    let tree: ast::Tree<String> = builder.into();
     let style = Style::default();
-    ast::write(&root, &style)
+    ast::write(tree.nodes(), &style)
 }
 
 pub fn write_fix_word(fix_word: FixWord) -> String {
