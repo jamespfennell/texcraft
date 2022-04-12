@@ -1,6 +1,6 @@
 //! Crate for working with TeX font metric (.tfm) and property list (.pl) formats
 
-use std::{collections::HashMap, panic};
+use std::{panic};
 mod format;
 mod pl;
 
@@ -91,7 +91,7 @@ pub fn parse_pl<'a>(
 }
 
 /// Serialize a [File] to property list (.pl) format.
-pub fn serialize_pl(file: &File, style: PlStyle) -> String {
+pub fn serialize_pl(file: &File, _style: PlStyle) -> String {
     pl::serialize(file)
 }
 

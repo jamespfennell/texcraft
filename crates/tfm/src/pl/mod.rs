@@ -2,7 +2,7 @@
 use super::*;
 use std::{
     fmt::{Debug, Display},
-    iter::{Iterator, Peekable},
+    iter::{Iterator},
 };
 
 pub mod ast;
@@ -67,7 +67,7 @@ pub enum ParseError<T> {
 impl<T: Display + AsRef<str>> Display for ParseError<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParseError::Parse(err) => todo!(),
+            ParseError::Parse(_err) => todo!(),
             ParseError::ConversionError(_) => todo!(),
             ParseError::InvalidKey(key) => write!(f, "invalid key '{}'\n{}", key.as_ref(), key),
         }

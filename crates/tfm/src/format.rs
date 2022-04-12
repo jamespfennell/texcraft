@@ -64,7 +64,7 @@ impl Into<File> for RawFile {
 }
 
 impl From<&File> for RawFile {
-    fn from(file: &File) -> Self {
+    fn from(_file: &File) -> Self {
         todo!()
     }
 }

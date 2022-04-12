@@ -68,19 +68,19 @@ impl Node<String> {
         self
     }
 
-    pub fn with_octal(mut self, u: u32) -> Node<String> {
+    pub fn with_octal(self, u: u32) -> Node<String> {
         self.with_str("O").with_string(format!("{:o}", u))
     }
 
-    pub fn with_fix_word(mut self, u: FixWord) -> Node<String> {
+    pub fn with_fix_word(self, u: FixWord) -> Node<String> {
         self.with_str("R").with_string(write_fix_word(u))
     }
 
-    pub fn with_integer(mut self, i: u8) -> Node<String> {
+    pub fn with_integer(self, i: u8) -> Node<String> {
         self.with_str("D").with_string(format!["{}", i])
     }
 
-    pub fn with_character(mut self, r: u8) -> Node<String> {
+    pub fn with_character(self, r: u8) -> Node<String> {
         let c = match char::try_from(r) {
             Ok(c) => {
                 if c.is_alphanumeric() {
@@ -203,7 +203,7 @@ impl<'a> Iterator for Lexer<'a> {
         if let Some((
             _,
             Word {
-                file_name,
+                file_name: _,
                 file: _,
                 end,
                 start: _,
