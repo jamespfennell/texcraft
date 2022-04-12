@@ -299,7 +299,7 @@ where
     }
 }
 
-pub fn write<T: AsRef<str>>(tree: &[Node<T>], style: &PlStyle) -> String {
+pub fn write<T: AsRef<str>>(tree: &[Node<T>], style: &Style) -> String {
     let mut o = Writer {
         style,
         buffer: String::new(),
@@ -311,7 +311,7 @@ pub fn write<T: AsRef<str>>(tree: &[Node<T>], style: &PlStyle) -> String {
 }
 
 struct Writer<'a> {
-    style: &'a PlStyle,
+    style: &'a Style,
 
     buffer: String,
     current_indent: usize,

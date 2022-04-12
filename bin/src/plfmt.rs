@@ -57,7 +57,7 @@ fn main() {
             std::process::exit(1);
         }
     }
-    let style = tfm::pl::PlStyle {
+    let style = tfm::pl::Style {
         indent: args.indent.unwrap_or(3),
         closing_brace_style: match args.closing_brace_style {
             None => Default::default(),

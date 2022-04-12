@@ -36,7 +36,7 @@ const EXTRA_SPACE: &str = "EXTRASPACE";
 /// It basically only requires that the PL file balances parentheses correctly.
 /// Internally, it constructs the crate's abstract syntax tree for the PL input and then writes it out
 ///   *before* reading and validating the font metric data.
-pub fn format(file_name: &str, input: &str, style: &PlStyle) -> String {
+pub fn format(file_name: &str, input: &str, style: &Style) -> String {
     let tree = ast::parse(file_name, input).unwrap();
     ast::write(&tree, style)
 }
@@ -59,20 +59,23 @@ pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<
         }
     }
 
-    let output = write(&file, PlStyle::default());
+    let output = write(&file, Style::default());
     println!["{}", output];
 
     Ok(file)
 }
 
 
+/// Style to apply when writing property list data.
 #[derive(Debug)]
-pub struct PlStyle {
+pub struct Style {
+    /// Number of additional spaces to indent in each nested block.
     pub indent: usize,
+    /// Closing brace style.
     pub closing_brace_style: ClosingBraceStyle,
 }
 
-impl Default for PlStyle {
+impl Default for Style {
     fn default() -> Self {
         Self {
             indent: 3,
@@ -81,17 +84,21 @@ impl Default for PlStyle {
     }
 }
 
+/// Style of closing braces when writing property list data.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ClosingBraceStyle {
+    /// Place closing braces on the same line.
+    SameLine,
+    /// Place closing bracess on a new line with the same indentation as the matching opening brace.
+    MatchingOpening,
+    /// Place closing bracess on a new line with one extra indent compared to the matching opening brace.
+    ExtraIndent,
+}
+
 impl Default for ClosingBraceStyle {
     fn default() -> Self {
         ClosingBraceStyle::ExtraIndent
     }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum ClosingBraceStyle {
-    SameLine,
-    MatchingOpening,
-    ExtraIndent,
 }
 
 /// A word in a property list file.
@@ -176,7 +183,7 @@ impl<T> From<ast::ParseError<T>> for ParseError<T> {
 }
 
 /// Write a [File] in property list format.
-pub fn write(file: &File, style: PlStyle) -> String {
+pub fn write(file: &File, style: Style) -> String {
     let mut root = Vec::<ast::Node<String>>::new();
     if let Some(font_family) = &file.header.font_family {
         root.push(ast::Node::new(FAMILY).with_str(font_family));
@@ -222,7 +229,7 @@ pub fn write(file: &File, style: PlStyle) -> String {
                 .with_tree(char_tree),
         )
     }
-    let style = PlStyle::default();
+    let style = Style::default();
     ast::write(&root, &style)
 }
 
