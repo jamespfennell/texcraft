@@ -83,7 +83,7 @@ pub fn serialize_tfm(file: &File) -> Vec<u8> {
 }
 
 /// Parse property list (.pl) data.
-pub fn parse_pl<'a>(input: &'a str) -> Result<File, pl::ParseError<'a>> {
+pub fn parse_pl<'a>(input: &'a str) -> Result<File, pl::ParseError<pl::ast::Word<'a>>> {
     pl::parse(input)
 }
 

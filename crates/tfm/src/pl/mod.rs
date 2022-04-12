@@ -1,11 +1,11 @@
 //! Parser and writer for the property list (.pl) text format
 use super::*;
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Display},
     iter::{Iterator, Peekable},
 };
 
-mod ast;
+pub mod ast;
 
 const CHARACTER: &str = "CHARACTER";
 const CHARACTER_WIDTH: &str = "CHARWD";
@@ -34,7 +34,7 @@ pub fn format(input: &str, style: &PlStyle) -> String {
     ast::write(&tree, style)
 }
 
-pub fn parse<'a>(input: &'a str) -> Result<File, ParseError<'a>> {
+pub fn parse<'a>(input: &'a str) -> Result<File, ParseError<ast::Word<'a>>> {
     let tree = ast::parse(input)?;
     let mut file: File = Default::default();
     file.header.design_size = FixWord(FixWord::UNITY.0 * 10);
@@ -58,14 +58,83 @@ pub fn parse<'a>(input: &'a str) -> Result<File, ParseError<'a>> {
 }
 
 #[derive(Debug)]
-pub enum ParseError<'a> {
-    Parse(ast::ParseError<'a>),
-    ConversionError(ast::ConversionError<ast::Word<'a>>),
-    InvalidKey(ast::Word<'a>),
+pub enum ParseError<T> {
+    Parse(ast::ParseError<T>),
+    ConversionError(ast::ConversionError<T>),
+    InvalidKey(T),
 }
 
-impl<'a> From<ast::ParseError<'a>> for ParseError<'a> {
-    fn from(err: ast::ParseError<'a>) -> Self {
+trait PrintError {
+    fn print(&self, f: &mut std::fmt::Formatter<'_>, message: String) -> std::fmt::Result;
+}
+
+impl <'a> PrintError for ast::Word<'a> {
+    fn print(&self, f: &mut std::fmt::Formatter<'_>, message: String) -> std::fmt::Result {
+        let tb = WordTraceback::new(self.clone());
+        let line_number = format!["{}", tb.line_number];
+        let padding = " ".repeat(line_number.len());
+        write!(f, "{}\n", message)?;
+        write!(f, "{}--> file.pl:{}:{}\n", padding, tb.line_number, tb.word_in_line.0+1)?;
+        write!(f, "{} |\n", padding)?;
+        write!(f, "{} | {}\n", tb.line_number, tb.line)?;
+        write!(f, "{} | {}{}\n", padding, " ".repeat(tb.word_in_line.0), "^".repeat(tb.word_in_line.1))?;
+        Ok(())
+    }
+}
+
+struct WordTraceback<'a> {
+    line_number: usize,
+    line: &'a str,
+    // TODO: position and word length
+    word_in_line: (usize, usize),
+}
+
+impl<'a> WordTraceback<'a> {
+    fn new(word: ast::Word<'a>) -> WordTraceback<'a> {
+        match word {
+            ast::Word::Ref(_) => todo!(),
+            ast::Word::Owned(_) => todo!(),
+            ast::Word::FromFile { file, start, end } => {
+                let mut line_number = 1;
+                let mut line_start = 0;
+                for (position, char) in file.char_indices() {
+                    if char == '\n' {
+                        line_number += 1;
+                        line_start = position+1;
+                    }
+                    if position == start {
+                        let tail = &file[line_start..];
+                        let line = match tail.find('\n') {
+                            None => tail,
+                            Some(end) => &tail[..end],
+                        };
+                        return WordTraceback {
+                            line_number,
+                            line,
+                            word_in_line: (position - line_start, (end - start)),
+                        };
+                    }
+                }
+                todo!()
+            },
+        }
+    }
+}
+
+impl<T: PrintError + AsRef<str>> Display for ParseError<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParseError::Parse(err) => todo!(),
+            ParseError::ConversionError(_) => todo!(),
+            ParseError::InvalidKey(key) => {
+                key.print(f, format!("invalid key '{}'", key.as_ref()))
+            }
+        }
+    }
+}
+
+impl<T> From<ast::ParseError<T>> for ParseError<T> {
+    fn from(err: ast::ParseError<T>) -> Self {
         ParseError::Parse(err)
     }
 }

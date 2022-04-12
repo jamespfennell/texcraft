@@ -6,19 +6,19 @@ use std::{
 };
 
 /// Parses a property list file into the PL abstract syntax tree.
-pub fn parse(input: &str) -> Result<Vec<Node<Word>>, ParseError> {
+pub fn parse(input: &str) -> Result<Vec<Node<Word>>, ParseError<Word>> {
     let lexer = Lexer { s: input, pos_b: 0 };
     Vec::<Node<Word>>::parse(&mut lexer.peekable())
 }
 
 #[derive(Debug)]
-pub enum ParseError<'a> {
-    WordWhileOpeningElem(Word<'a>),
+pub enum ParseError<T> {
+    WordWhileOpeningElem(T),
     EndWhileClosingElem,
-    OpenWhileClosingElem(Word<'a>),
-    WordWhileClosingElem(Word<'a>),
+    OpenWhileClosingElem(T),
+    WordWhileClosingElem(T),
     EndWhileParsingWord,
-    OpenWhileParsingWord(Word<'a>),
+    OpenWhileParsingWord(T),
 }
 
 #[derive(Debug)]
@@ -248,13 +248,13 @@ impl<'a> Debug for Word<'a> {
 }
 
 trait Parse<'a> {
-    fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<'a>>
+    fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<Word<'a>>>
     where
         Self: Sized;
 }
 
 impl<'a> Parse<'a> for Option<Node<Word<'a>>> {
-    fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<'a>> {
+    fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<Word<'a>>> {
         let open = match lexer.peek() {
             None => return Ok(None),
             Some((TokenType::Open, open)) => {
@@ -288,7 +288,7 @@ impl<'a> Parse<'a> for Option<Node<Word<'a>>> {
 }
 
 impl<'a> Parse<'a> for Word<'a> {
-    fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<'a>> {
+    fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<Word<'a>>> {
         match lexer.next() {
             None => Err(ParseError::EndWhileParsingWord),
             Some((TokenType::Open, open)) => Err(ParseError::OpenWhileParsingWord(open)),
@@ -299,7 +299,7 @@ impl<'a> Parse<'a> for Word<'a> {
 }
 
 impl<'a> Parse<'a> for Option<Word<'a>> {
-    fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<'a>> {
+    fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<Word<'a>>> {
         match lexer.peek() {
             Some((TokenType::Word, word)) => {
                 let word = word.clone();
@@ -315,7 +315,7 @@ impl<'a, T> Parse<'a> for Vec<T>
 where
     Option<T>: Parse<'a>,
 {
-    fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<'a>> {
+    fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<Word<'a>>> {
         let mut result = vec![];
         while let Some(t) = Option::<T>::parse(lexer)? {
             result.push(t);

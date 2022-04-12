@@ -49,7 +49,7 @@ fn main() {
     };
     if args.validate {
         if let Err(err) = tfm::parse_pl(&input) {
-            println!["{:?}", err];
+            println!["{}", err];
             std::process::exit(1);
         }
     }
