@@ -64,63 +64,12 @@ pub enum ParseError<T> {
     InvalidKey(T),
 }
 
-trait PrintError {
-    fn print(&self, f: &mut std::fmt::Formatter<'_>, message: String) -> std::fmt::Result;
-}
-
-impl<'a> PrintError for ast::Word<'a> {
-    fn print(&self, f: &mut std::fmt::Formatter<'_>, message: String) -> std::fmt::Result {
-        let (line_number, line, word_start) = {
-            let mut line_number = 1;
-            let mut line_start = 0;
-            for (position, char) in self.file[..self.start].char_indices() {
-                if char == '\n' {
-                    line_number += 1;
-                    line_start = position + 1;
-                }
-            }
-            let tail = &self.file[line_start..];
-            let line = match tail.find('\n') {
-                None => tail,
-                Some(end) => &tail[..end],
-            };
-            (
-                line_number,
-                line,
-                self.start - line_start,
-            )
-        };
-
-        let line_number_str = format!["{}", line_number];
-        let padding = " ".repeat(line_number_str.len());
-        write!(f, "{}\n", message)?;
-        write!(
-            f,
-            "{}--> {}:{}:{}\n",
-            padding,
-            self.file_name,
-            line_number,
-            word_start + 1,
-        )?;
-        write!(f, "{} |\n", padding)?;
-        write!(f, "{} | {}\n", line_number, line)?;
-        write!(
-            f,
-            "{} | {}{}\n",
-            padding,
-            " ".repeat(word_start),
-            "^".repeat(self.end - self.start),
-        )?;
-        Ok(())
-    }
-}
-
-impl<T: PrintError + AsRef<str>> Display for ParseError<T> {
+impl<T: Display + AsRef<str>> Display for ParseError<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ParseError::Parse(err) => todo!(),
             ParseError::ConversionError(_) => todo!(),
-            ParseError::InvalidKey(key) => key.print(f, format!("invalid key '{}'", key.as_ref())),
+            ParseError::InvalidKey(key) => write!(f, "invalid key '{}'\n{}", key.as_ref(), key),
         }
     }
 }
