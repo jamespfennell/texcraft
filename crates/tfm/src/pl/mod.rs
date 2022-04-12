@@ -70,61 +70,48 @@ trait PrintError {
 
 impl<'a> PrintError for ast::Word<'a> {
     fn print(&self, f: &mut std::fmt::Formatter<'_>, message: String) -> std::fmt::Result {
-        let tb = WordTraceback::new(self.clone());
-        let line_number = format!["{}", tb.line_number];
-        let padding = " ".repeat(line_number.len());
+        let (line_number, line, word_start) = {
+            let mut line_number = 1;
+            let mut line_start = 0;
+            for (position, char) in self.file[..self.start].char_indices() {
+                if char == '\n' {
+                    line_number += 1;
+                    line_start = position + 1;
+                }
+            }
+            let tail = &self.file[line_start..];
+            let line = match tail.find('\n') {
+                None => tail,
+                Some(end) => &tail[..end],
+            };
+            (
+                line_number,
+                line,
+                self.start - line_start,
+            )
+        };
+
+        let line_number_str = format!["{}", line_number];
+        let padding = " ".repeat(line_number_str.len());
         write!(f, "{}\n", message)?;
         write!(
             f,
             "{}--> {}:{}:{}\n",
             padding,
             self.file_name,
-            tb.line_number,
-            tb.word_in_line.0 + 1
+            line_number,
+            word_start + 1,
         )?;
         write!(f, "{} |\n", padding)?;
-        write!(f, "{} | {}\n", tb.line_number, tb.line)?;
+        write!(f, "{} | {}\n", line_number, line)?;
         write!(
             f,
             "{} | {}{}\n",
             padding,
-            " ".repeat(tb.word_in_line.0),
-            "^".repeat(tb.word_in_line.1)
+            " ".repeat(word_start),
+            "^".repeat(self.end - self.start),
         )?;
         Ok(())
-    }
-}
-
-struct WordTraceback<'a> {
-    line_number: usize,
-    line: &'a str,
-    // TODO: position and word length
-    word_in_line: (usize, usize),
-}
-
-impl<'a> WordTraceback<'a> {
-    fn new(word: ast::Word<'a>) -> WordTraceback<'a> {
-        let mut line_number = 1;
-        let mut line_start = 0;
-        for (position, char) in word.file.char_indices() {
-            if char == '\n' {
-                line_number += 1;
-                line_start = position + 1;
-            }
-            if position == word.start {
-                let tail = &word.file[line_start..];
-                let line = match tail.find('\n') {
-                    None => tail,
-                    Some(end) => &tail[..end],
-                };
-                return WordTraceback {
-                    line_number,
-                    line,
-                    word_in_line: (position - line_start, (word.end - word.start)),
-                };
-            }
-        }
-        todo!()
     }
 }
 

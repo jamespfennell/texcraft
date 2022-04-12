@@ -249,6 +249,12 @@ impl<'a> Debug for Word<'a> {
     }
 }
 
+impl<'a> Display for Word<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value())
+    }
+}
+
 trait Parse<'a> {
     fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<Word<'a>>>
     where
