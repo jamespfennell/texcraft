@@ -6,8 +6,15 @@ use std::{
 };
 
 /// Parses a property list file into the PL abstract syntax tree.
-pub fn parse(input: &str) -> Result<Vec<Node<Word>>, ParseError<Word>> {
-    let lexer = Lexer { s: input, pos_b: 0 };
+pub fn parse<'a>(
+    file_name: &'a str,
+    input: &'a str,
+) -> Result<Vec<Node<Word<'a>>>, ParseError<Word<'a>>> {
+    let lexer = Lexer {
+        file_name,
+        s: input,
+        pos_b: 0,
+    };
     Vec::<Node<Word>>::parse(&mut lexer.peekable())
 }
 
@@ -132,6 +139,7 @@ impl<T: AsRef<str> + Clone> Node<T> {
 }
 
 struct Lexer<'a> {
+    file_name: &'a str,
     s: &'a str,
     pos_b: usize,
 }
@@ -140,6 +148,7 @@ impl<'a> Iterator for Lexer<'a> {
     type Item = (TokenType, Word<'a>);
 
     fn next(&mut self) -> Option<Self::Item> {
+        let file_name = self.file_name;
         let mut tail = self.s[self.pos_b..].chars().peekable();
         while let Some(next) = tail.peek() {
             if !next.is_whitespace() {
@@ -153,6 +162,7 @@ impl<'a> Iterator for Lexer<'a> {
             Some('(') => Some((
                 TokenType::Open,
                 Word {
+                    file_name,
                     file: self.s,
                     start: self.pos_b,
                     end: self.pos_b + 1,
@@ -161,6 +171,7 @@ impl<'a> Iterator for Lexer<'a> {
             Some(')') => Some((
                 TokenType::Close,
                 Word {
+                    file_name,
                     file: self.s,
                     start: self.pos_b,
                     end: self.pos_b + 1,
@@ -181,6 +192,7 @@ impl<'a> Iterator for Lexer<'a> {
                 Some((
                     TokenType::Word,
                     Word {
+                        file_name,
                         file: self.s,
                         start: self.pos_b,
                         end,
@@ -191,6 +203,7 @@ impl<'a> Iterator for Lexer<'a> {
         if let Some((
             _,
             Word {
+                file_name,
                 file: _,
                 end,
                 start: _,
@@ -212,6 +225,7 @@ enum TokenType {
 
 #[derive(Clone)]
 pub struct Word<'a> {
+    pub file_name: &'a str,
     pub file: &'a str,
     pub start: usize,
     pub end: usize,

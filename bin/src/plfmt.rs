@@ -47,8 +47,12 @@ fn main() {
             std::process::exit(1);
         }
     };
+    let file_name = match pl_path.to_str() {
+        None => "",
+        Some(s) => s,
+    };
     if args.validate {
-        if let Err(err) = tfm::parse_pl(&input) {
+        if let Err(err) = tfm::parse_pl(file_name, &input) {
             println!["{}", err];
             std::process::exit(1);
         }
@@ -62,6 +66,6 @@ fn main() {
             Some(ClosingBraceStyle::ExtraIndent) => tfm::ClosingBraceStyle::ExtraIndent,
         },
     };
-    let formatted = tfm::format_pl(&input, &style);
+    let formatted = tfm::format_pl(file_name, &input, &style);
     println!["{}", formatted];
 }

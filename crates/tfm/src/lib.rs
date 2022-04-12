@@ -83,8 +83,11 @@ pub fn serialize_tfm(file: &File) -> Vec<u8> {
 }
 
 /// Parse property list (.pl) data.
-pub fn parse_pl<'a>(input: &'a str) -> Result<File, pl::ParseError<pl::ast::Word<'a>>> {
-    pl::parse(input)
+pub fn parse_pl<'a>(
+    file_name: &'a str,
+    input: &'a str,
+) -> Result<File, pl::ParseError<pl::ast::Word<'a>>> {
+    pl::parse(file_name, input)
 }
 
 /// Serialize a [File] to property list (.pl) format.
@@ -99,8 +102,8 @@ pub fn serialize_pl(file: &File, style: PlStyle) -> String {
 /// It basically only requires the the PL file balances parentheses correctly.
 /// Internally, it constructs the crate's abstract syntax tree for the PL input and then writes it out
 ///   *before* reading and validating the font metric data within.
-pub fn format_pl(input: &str, style: &PlStyle) -> String {
-    pl::format(input, style)
+pub fn format_pl(file_name: &str, input: &str, style: &PlStyle) -> String {
+    pl::format(file_name, input, style)
 }
 
 #[derive(Debug)]

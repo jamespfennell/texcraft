@@ -29,13 +29,13 @@ const XHEIGHT: &str = "XHEIGHT";
 const QUAD: &str = "QUAD";
 const EXTRA_SPACE: &str = "EXTRASPACE";
 
-pub fn format(input: &str, style: &PlStyle) -> String {
-    let tree = ast::parse(input).unwrap();
+pub fn format(file_name: &str, input: &str, style: &PlStyle) -> String {
+    let tree = ast::parse(file_name, input).unwrap();
     ast::write(&tree, style)
 }
 
-pub fn parse<'a>(input: &'a str) -> Result<File, ParseError<ast::Word<'a>>> {
-    let tree = ast::parse(input)?;
+pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<ast::Word<'a>>> {
+    let tree = ast::parse(file_name, input)?;
     let mut file: File = Default::default();
     file.header.design_size = FixWord(FixWord::UNITY.0 * 10);
     for node in tree {
@@ -45,7 +45,7 @@ pub fn parse<'a>(input: &'a str) -> Result<File, ParseError<ast::Word<'a>>> {
                 file.header.font_family = Some("hello".to_string());
             }
 
-            other => {
+            _ => {
                 return Err(ParseError::InvalidKey(node.key));
             }
         }
@@ -76,8 +76,9 @@ impl<'a> PrintError for ast::Word<'a> {
         write!(f, "{}\n", message)?;
         write!(
             f,
-            "{}--> file.pl:{}:{}\n",
+            "{}--> {}:{}:{}\n",
             padding,
+            self.file_name,
             tb.line_number,
             tb.word_in_line.0 + 1
         )?;
