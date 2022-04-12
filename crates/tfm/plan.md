@@ -1,0 +1,4 @@
+- Fully implement the write PL function
+- Then finish the TFM -> PL converter (i.e., TFM deserialize). Run this over all of the test data and ensure it matches
+- Implement the parse PL function
+- Then finish the PL -> TFM converter

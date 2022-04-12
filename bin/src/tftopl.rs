@@ -24,7 +24,7 @@ fn main() {
             std::process::exit(1);
         }
     };
-    let file = tfm::parse_tfm(&tfm_bytes);
+    let file = tfm::format::deserialize(&tfm_bytes);
     let pl_str = tfm::pl::write(&file, tfm::pl::Style::default());
     println!("{}", pl_str);
 }

@@ -1,9 +1,6 @@
 //! Parser and writer for the property list (.pl) text format
 use super::*;
-use std::{
-    fmt::{Debug, Display},
-    iter::Iterator,
-};
+use std::fmt::{Debug, Display};
 
 pub mod ast;
 
@@ -36,7 +33,7 @@ const EXTRA_SPACE: &str = "EXTRASPACE";
 /// It basically only requires that the PL file balances parentheses correctly.
 /// Internally, it constructs the crate's abstract syntax tree for the PL input and then writes it out
 ///   *before* reading and validating the font metric data.
-pub fn format(file_name: &str, input: &str, style: &Style) -> String {
+pub fn format(file_name: &str, input: &str, style: Style) -> String {
     let tree = ast::parse(file_name, input).unwrap();
     ast::write(&tree, style)
 }
@@ -235,8 +232,7 @@ pub fn write(file: &File, style: Style) -> String {
             .with_tree(char_tree.into());
     }
     let tree: ast::Tree<String> = builder.into();
-    let style = Style::default();
-    ast::write(tree.nodes(), &style)
+    ast::write(tree.nodes(), style)
 }
 
 #[cfg(test)]

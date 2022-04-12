@@ -1,10 +1,12 @@
-//! Parser and serializer for the TeX font metric (.tfm) binary format.
+//! Serializer and deserializer for the TeX font metric (.tfm) binary format.
 use super::*;
 
-pub fn parse(b: &[u8]) -> File {
+/// Deserialize TeX font metric (.tfm) data.
+pub fn deserialize(b: &[u8]) -> File {
     RawFile::into(RawFile::deserialize_tfm(&mut Input { b }))
 }
 
+/// Serialize a [File] to TeX font metric (.tfm) format.
 pub fn serialize(file: &File) -> Vec<u8> {
     let raw_file: RawFile = RawFile::from(file);
     serialize_tfm(&raw_file)
@@ -106,11 +108,6 @@ impl Output {
 
 trait DeserializeTfm {
     fn deserialize_tfm(input: &mut Input) -> Self;
-}
-
-fn deserialize_tfm<T: DeserializeTfm>(b: &[u8]) -> T {
-    let mut input = Input { b };
-    T::deserialize_tfm(&mut input)
 }
 
 struct Input<'a> {
@@ -582,6 +579,11 @@ mod tests {
     use super::*;
 
     static CMR10_TFM: &'static [u8] = include_bytes!("cmr10.tfm");
+
+    fn deserialize_tfm<T: DeserializeTfm>(b: &[u8]) -> T {
+        let mut input = Input { b };
+        T::deserialize_tfm(&mut input)
+    }
 
     macro_rules! serialize_deserialize_tests {
         ($(($name:ident, $deserialized:expr, $serialized: expr),)*) => {

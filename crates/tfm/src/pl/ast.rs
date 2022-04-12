@@ -348,9 +348,9 @@ where
     }
 }
 
-pub fn write<T: AsRef<str>>(tree: &[Node<T>], style: &Style) -> String {
+pub fn write<T: AsRef<str>>(tree: &[Node<T>], style: Style) -> String {
     let mut o = Writer {
-        style,
+        style: &style,
         buffer: String::new(),
         current_indent: 0,
         after_word: false,

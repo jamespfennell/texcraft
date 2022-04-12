@@ -1,7 +1,7 @@
 //! Crate for working with TeX font metric (.tfm) and property list (.pl) formats
 
 use std::panic;
-mod format;
+pub mod format;
 pub mod pl;
 
 /// Complete contents of a TeX font metric (.tfm) or property list (.pl) file.
@@ -78,7 +78,7 @@ impl TryFrom<&str> for FixWord {
                 }
             }
         }
-    
+
         let mut negative = false;
         let mut integer = None;
         for c in input.by_ref() {
@@ -95,7 +95,7 @@ impl TryFrom<&str> for FixWord {
             }
         }
         let negative = negative;
-    
+
         let mut integer = match integer {
             None => panic![""],
             Some(integer) => integer,
@@ -113,7 +113,7 @@ impl TryFrom<&str> for FixWord {
             }
         }
         let integer = integer;
-    
+
         let mut num_fractional_digits = 0;
         let mut fraction_digits = [0; 7];
         for c in input.by_ref() {
@@ -132,7 +132,7 @@ impl TryFrom<&str> for FixWord {
             fraction = fraction_digits[i] + fraction / 10;
         }
         let fraction = (fraction + 10) / 20;
-    
+
         if integer == 2047 && fraction >= (1 << 20) {
             if negative {
                 return Ok(FixWord(i32::MIN));
@@ -209,16 +209,6 @@ pub struct CharInfo {
     pub depth: FixWord,
     /// Italic correction of the character.
     pub italic_correction: FixWord,
-}
-
-/// Parse TeX font metric (.tfm) data.
-pub fn parse_tfm(input: &[u8]) -> File {
-    format::parse(input)
-}
-
-/// Serialize a [File] to TeX font metric (.tfm) format.
-pub fn serialize_tfm(file: &File) -> Vec<u8> {
-    format::serialize(file)
 }
 
 #[derive(Debug, PartialEq, Eq)]

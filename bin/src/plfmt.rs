@@ -66,6 +66,6 @@ fn main() {
             Some(ClosingBraceStyle::ExtraIndent) => tfm::pl::ClosingBraceStyle::ExtraIndent,
         },
     };
-    let formatted = tfm::pl::format(file_name, &input, &style);
+    let formatted = tfm::pl::format(file_name, &input, style);
     println!["{}", formatted];
 }
