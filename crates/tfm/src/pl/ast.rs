@@ -1,5 +1,4 @@
 use super::*;
-use crate::{ClosingBraceStyle, PlStyle};
 use std::{
     fmt::Debug,
     iter::{Iterator, Peekable},

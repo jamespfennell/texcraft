@@ -82,57 +82,7 @@ pub fn serialize_tfm(file: &File) -> Vec<u8> {
     format::serialize(file)
 }
 
-/// Parse property list (.pl) data.
-pub fn parse_pl<'a>(
-    file_name: &'a str,
-    input: &'a str,
-) -> Result<File, pl::ParseError<pl::Word<'a>>> {
-    pl::parse(file_name, input)
-}
 
-/// Serialize a [File] to property list (.pl) format.
-pub fn serialize_pl(file: &File, _style: PlStyle) -> String {
-    pl::write(file)
-}
-
-/// Format property list (.pl) data
-///
-/// This function is sort of equivalent to parsing the PL file and then serializing it again,
-///   except PL files with invalid keywords and values are accepted.
-/// It basically only requires the the PL file balances parentheses correctly.
-/// Internally, it constructs the crate's abstract syntax tree for the PL input and then writes it out
-///   *before* reading and validating the font metric data within.
-pub fn format_pl(file_name: &str, input: &str, style: &PlStyle) -> String {
-    pl::format(file_name, input, style)
-}
-
-#[derive(Debug)]
-pub struct PlStyle {
-    pub indent: usize,
-    pub closing_brace_style: ClosingBraceStyle,
-}
-
-impl Default for PlStyle {
-    fn default() -> Self {
-        Self {
-            indent: 3,
-            closing_brace_style: Default::default(),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum ClosingBraceStyle {
-    SameLine,
-    MatchingOpening,
-    ExtraIndent,
-}
-
-impl Default for ClosingBraceStyle {
-    fn default() -> Self {
-        ClosingBraceStyle::ExtraIndent
-    }
-}
 
 #[derive(Debug, PartialEq, Eq)]
 enum Tag {

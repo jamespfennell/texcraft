@@ -25,6 +25,6 @@ fn main() {
         }
     };
     let file = tfm::parse_tfm(&tfm_bytes);
-    let pl_str = tfm::serialize_pl(&file, tfm::PlStyle::default());
+    let pl_str = tfm::pl::write(&file, tfm::pl::PlStyle::default());
     println!("{}", pl_str);
 }

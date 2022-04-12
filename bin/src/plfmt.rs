@@ -52,20 +52,20 @@ fn main() {
         Some(s) => s,
     };
     if args.validate {
-        if let Err(err) = tfm::parse_pl(file_name, &input) {
+        if let Err(err) = tfm::pl::parse(file_name, &input) {
             println!["{}", err];
             std::process::exit(1);
         }
     }
-    let style = tfm::PlStyle {
+    let style = tfm::pl::PlStyle {
         indent: args.indent.unwrap_or(3),
         closing_brace_style: match args.closing_brace_style {
             None => Default::default(),
-            Some(ClosingBraceStyle::SameLine) => tfm::ClosingBraceStyle::SameLine,
-            Some(ClosingBraceStyle::MatchingOpening) => tfm::ClosingBraceStyle::MatchingOpening,
-            Some(ClosingBraceStyle::ExtraIndent) => tfm::ClosingBraceStyle::ExtraIndent,
+            Some(ClosingBraceStyle::SameLine) => tfm::pl::ClosingBraceStyle::SameLine,
+            Some(ClosingBraceStyle::MatchingOpening) => tfm::pl::ClosingBraceStyle::MatchingOpening,
+            Some(ClosingBraceStyle::ExtraIndent) => tfm::pl::ClosingBraceStyle::ExtraIndent,
         },
     };
-    let formatted = tfm::format_pl(file_name, &input, &style);
+    let formatted = tfm::pl::format(file_name, &input, &style);
     println!["{}", formatted];
 }

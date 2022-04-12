@@ -29,13 +29,19 @@ const XHEIGHT: &str = "XHEIGHT";
 const QUAD: &str = "QUAD";
 const EXTRA_SPACE: &str = "EXTRASPACE";
 
-/// Format a property list file.
+/// Format property list data.
+///
+/// This function is sort of equivalent to parsing the PL file and then serializing it again,
+///   except PL files with invalid keywords and values are accepted.
+/// It basically only requires that the PL file balances parentheses correctly.
+/// Internally, it constructs the crate's abstract syntax tree for the PL input and then writes it out
+///   *before* reading and validating the font metric data.
 pub fn format(file_name: &str, input: &str, style: &PlStyle) -> String {
     let tree = ast::parse(file_name, input).unwrap();
     ast::write(&tree, style)
 }
 
-/// Parse a property list file.
+/// Parse property list data.
 pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<Word<'a>>> {
     let tree = ast::parse(file_name, input)?;
     let mut file: File = Default::default();
@@ -53,10 +59,39 @@ pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<
         }
     }
 
-    let output = write(&file);
+    let output = write(&file, PlStyle::default());
     println!["{}", output];
 
     Ok(file)
+}
+
+
+#[derive(Debug)]
+pub struct PlStyle {
+    pub indent: usize,
+    pub closing_brace_style: ClosingBraceStyle,
+}
+
+impl Default for PlStyle {
+    fn default() -> Self {
+        Self {
+            indent: 3,
+            closing_brace_style: Default::default(),
+        }
+    }
+}
+
+impl Default for ClosingBraceStyle {
+    fn default() -> Self {
+        ClosingBraceStyle::ExtraIndent
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ClosingBraceStyle {
+    SameLine,
+    MatchingOpening,
+    ExtraIndent,
 }
 
 /// A word in a property list file.
@@ -141,7 +176,7 @@ impl<T> From<ast::ParseError<T>> for ParseError<T> {
 }
 
 /// Write a [File] in property list format.
-pub fn write(file: &File) -> String {
+pub fn write(file: &File, style: PlStyle) -> String {
     let mut root = Vec::<ast::Node<String>>::new();
     if let Some(font_family) = &file.header.font_family {
         root.push(ast::Node::new(FAMILY).with_str(font_family));
