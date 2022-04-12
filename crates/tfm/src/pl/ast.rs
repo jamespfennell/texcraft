@@ -1,10 +1,13 @@
+//! Abstract syntax tree for the property list format [advanced].
+//!
+
 use super::*;
 use std::{
     fmt::Debug,
     iter::{Iterator, Peekable},
 };
 
-/// Parses a property list file into the PL abstract syntax tree.
+/// Parse property list data into an abstract syntax tree.
 pub fn parse<'a>(
     file_name: &'a str,
     input: &'a str,
@@ -46,40 +49,43 @@ pub struct Node<T> {
     close: T,
 }
 
-// TODO: move most of this to builder
 impl Node<String> {
-    pub fn new(key: &str) -> Node<String> {
-        Node {
+    pub fn new(key: &str) -> Builder {
+        Builder(Node {
             open: "(".to_string(),
             key: key.to_string(),
             value: (Vec::new(), Vec::new()),
             close: ")".to_string(),
-        }
+        })
     }
+}
 
-    pub fn with_str(mut self, s: &str) -> Node<String> {
-        self.value.0.push(s.to_string());
+pub struct Builder(Node<String>);
+
+impl Builder {
+    pub fn with_str(mut self, s: &str) -> Builder {
+        self.0.value.0.push(s.to_string());
         self
     }
 
-    pub fn with_string(mut self, s: String) -> Node<String> {
-        self.value.0.push(s);
+    pub fn with_string(mut self, s: String) -> Builder {
+        self.0.value.0.push(s);
         self
     }
 
-    pub fn with_octal(self, u: u32) -> Node<String> {
+    pub fn with_octal(self, u: u32) -> Builder {
         self.with_str("O").with_string(format!("{:o}", u))
     }
 
-    pub fn with_fix_word(self, u: FixWord) -> Node<String> {
+    pub fn with_fix_word(self, u: FixWord) -> Builder {
         self.with_str("R").with_string(write_fix_word(u))
     }
 
-    pub fn with_integer(self, i: u8) -> Node<String> {
+    pub fn with_integer(self, i: u8) -> Builder {
         self.with_str("D").with_string(format!["{}", i])
     }
 
-    pub fn with_character(self, r: u8) -> Node<String> {
+    pub fn with_character(self, r: u8) -> Builder {
         let c = match char::try_from(r) {
             Ok(c) => {
                 if c.is_alphanumeric() {
@@ -96,9 +102,15 @@ impl Node<String> {
         }
     }
 
-    pub fn with_tree(mut self, t: Vec<Node<String>>) -> Node<String> {
-        self.value.1 = t;
+    pub fn with_tree(mut self, t: Vec<Node<String>>) -> Builder {
+        self.0.value.1 = t;
         self
+    }
+}
+
+impl From<Builder> for Node<String> {
+    fn from(builder: Builder) -> Self {
+        builder.0
     }
 }
 
@@ -107,6 +119,7 @@ impl<T: AsRef<str> + Clone> Node<T> {
         self.key.as_ref()
     }
 
+    // TODO: try into?
     pub fn into_fix_word(&self) -> Result<FixWord, ConversionError<T>> {
         if let Some(node) = self.value.1.first() {
             return Err(ConversionError::RealNumberUnexpectedList(node.open.clone()));

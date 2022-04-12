@@ -1,6 +1,6 @@
 //! Crate for working with TeX font metric (.tfm) and property list (.pl) formats
 
-use std::{panic};
+use std::panic;
 mod format;
 pub mod pl;
 
@@ -81,8 +81,6 @@ pub fn parse_tfm(input: &[u8]) -> File {
 pub fn serialize_tfm(file: &File) -> Vec<u8> {
     format::serialize(file)
 }
-
-
 
 #[derive(Debug, PartialEq, Eq)]
 enum Tag {
