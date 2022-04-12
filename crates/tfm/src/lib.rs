@@ -2,7 +2,7 @@
 
 use std::{panic};
 mod format;
-mod pl;
+pub mod pl;
 
 /// Complete contents of a TeX font metric (.tfm) or property list (.pl) file.
 #[derive(Default)]
@@ -86,13 +86,13 @@ pub fn serialize_tfm(file: &File) -> Vec<u8> {
 pub fn parse_pl<'a>(
     file_name: &'a str,
     input: &'a str,
-) -> Result<File, pl::ParseError<pl::ast::Word<'a>>> {
+) -> Result<File, pl::ParseError<pl::Word<'a>>> {
     pl::parse(file_name, input)
 }
 
 /// Serialize a [File] to property list (.pl) format.
 pub fn serialize_pl(file: &File, _style: PlStyle) -> String {
-    pl::serialize(file)
+    pl::write(file)
 }
 
 /// Format property list (.pl) data

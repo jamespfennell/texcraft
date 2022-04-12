@@ -223,68 +223,6 @@ enum TokenType {
     Word,
 }
 
-#[derive(Clone, Debug)]
-pub struct Word<'a> {
-    pub file_name: &'a str,
-    pub file: &'a str,
-    pub start: usize,
-    pub end: usize,
-}
-
-impl<'a> Word<'a> {
-    fn value(&self) -> &str {
-        &self.file[self.start..self.end]
-    }
-}
-
-impl<'a> AsRef<str> for Word<'a> {
-    fn as_ref(&self) -> &str {
-        self.value()
-    }
-}
-
-impl<'a> Display for Word<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (line_number, line, word_start) = {
-            let mut line_number = 1;
-            let mut line_start = 0;
-            for (position, char) in self.file[..self.start].char_indices() {
-                if char == '\n' {
-                    line_number += 1;
-                    line_start = position + 1;
-                }
-            }
-            let tail = &self.file[line_start..];
-            let line = match tail.find('\n') {
-                None => tail,
-                Some(end) => &tail[..end],
-            };
-            (line_number, line, self.start - line_start)
-        };
-
-        let line_number_str = format!["{}", line_number];
-        let padding = " ".repeat(line_number_str.len());
-        write!(
-            f,
-            "{}--> {}:{}:{}\n",
-            padding,
-            self.file_name,
-            line_number,
-            word_start + 1,
-        )?;
-        write!(f, "{} |\n", padding)?;
-        write!(f, "{} | {}\n", line_number, line)?;
-        write!(
-            f,
-            "{} | {}{}\n",
-            padding,
-            " ".repeat(word_start),
-            "^".repeat(self.end - self.start),
-        )?;
-        Ok(())
-    }
-}
-
 trait Parse<'a> {
     fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<Word<'a>>>
     where

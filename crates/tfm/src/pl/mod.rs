@@ -29,12 +29,14 @@ const XHEIGHT: &str = "XHEIGHT";
 const QUAD: &str = "QUAD";
 const EXTRA_SPACE: &str = "EXTRASPACE";
 
+/// Format a property list file.
 pub fn format(file_name: &str, input: &str, style: &PlStyle) -> String {
     let tree = ast::parse(file_name, input).unwrap();
     ast::write(&tree, style)
 }
 
-pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<ast::Word<'a>>> {
+/// Parse a property list file.
+pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<Word<'a>>> {
     let tree = ast::parse(file_name, input)?;
     let mut file: File = Default::default();
     file.header.design_size = FixWord(FixWord::UNITY.0 * 10);
@@ -51,12 +53,70 @@ pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<
         }
     }
 
-    let output = serialize(&file);
+    let output = write(&file);
     println!["{}", output];
 
     Ok(file)
 }
 
+/// A word in a property list file.
+#[derive(Clone, Debug)]
+pub struct Word<'a> {
+    pub file_name: &'a str,
+    pub file: &'a str,
+    pub start: usize,
+    pub end: usize,
+}
+
+impl<'a> AsRef<str> for Word<'a> {
+    fn as_ref(&self) -> &str {
+        &self.file[self.start..self.end]
+    }
+}
+
+impl<'a> Display for Word<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (line_number, line, word_start) = {
+            let mut line_number = 1;
+            let mut line_start = 0;
+            for (position, char) in self.file[..self.start].char_indices() {
+                if char == '\n' {
+                    line_number += 1;
+                    line_start = position + 1;
+                }
+            }
+            let tail = &self.file[line_start..];
+            let line = match tail.find('\n') {
+                None => tail,
+                Some(end) => &tail[..end],
+            };
+            (line_number, line, self.start - line_start)
+        };
+
+        let line_number_str = format!["{}", line_number];
+        let padding = " ".repeat(line_number_str.len());
+        write!(
+            f,
+            "{}--> {}:{}:{}\n",
+            padding,
+            self.file_name,
+            line_number,
+            word_start + 1,
+        )?;
+        write!(f, "{} |\n", padding)?;
+        write!(f, "{} | {}\n", line_number, line)?;
+        write!(
+            f,
+            "{} | {}{}\n",
+            padding,
+            " ".repeat(word_start),
+            "^".repeat(self.end - self.start),
+        )?;
+        Ok(())
+    }
+}
+
+/// Error type for property list parsing.
 #[derive(Debug)]
 pub enum ParseError<T> {
     Parse(ast::ParseError<T>),
@@ -80,7 +140,8 @@ impl<T> From<ast::ParseError<T>> for ParseError<T> {
     }
 }
 
-pub fn serialize(file: &File) -> String {
+/// Write a [File] in property list format.
+pub fn write(file: &File) -> String {
     let mut root = Vec::<ast::Node<String>>::new();
     if let Some(font_family) = &file.header.font_family {
         root.push(ast::Node::new(FAMILY).with_str(font_family));
