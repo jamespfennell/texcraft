@@ -152,7 +152,7 @@ impl<'a> Iterator for Lexer<'a> {
             None => None,
             Some('(') => Some((
                 TokenType::Open,
-                Word::FromFile {
+                Word {
                     file: self.s,
                     start: self.pos_b,
                     end: self.pos_b + 1,
@@ -160,7 +160,7 @@ impl<'a> Iterator for Lexer<'a> {
             )),
             Some(')') => Some((
                 TokenType::Close,
-                Word::FromFile {
+                Word {
                     file: self.s,
                     start: self.pos_b,
                     end: self.pos_b + 1,
@@ -180,7 +180,7 @@ impl<'a> Iterator for Lexer<'a> {
                 }
                 Some((
                     TokenType::Word,
-                    Word::FromFile {
+                    Word {
                         file: self.s,
                         start: self.pos_b,
                         end,
@@ -190,7 +190,7 @@ impl<'a> Iterator for Lexer<'a> {
         };
         if let Some((
             _,
-            Word::FromFile {
+            Word {
                 file: _,
                 end,
                 start: _,
@@ -211,27 +211,15 @@ enum TokenType {
 }
 
 #[derive(Clone)]
-pub enum Word<'a> {
-    Ref(&'a str),
-    Owned(String),
-    FromFile {
-        file: &'a str,
-        start: usize,
-        end: usize,
-    },
+pub struct Word<'a> {
+    pub file: &'a str,
+    pub start: usize,
+    pub end: usize,
 }
 
 impl<'a> Word<'a> {
-    fn new(s: &'a str) -> Word<'a> {
-        Word::Ref(s)
-    }
-
     fn value(&self) -> &str {
-        match self {
-            Word::Ref(s) => s,
-            Word::Owned(s) => s,
-            Word::FromFile { file, end, start } => &file[*start..*end],
-        }
+        &self.file[self.start..self.end]
     }
 }
 

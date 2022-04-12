@@ -68,16 +68,28 @@ trait PrintError {
     fn print(&self, f: &mut std::fmt::Formatter<'_>, message: String) -> std::fmt::Result;
 }
 
-impl <'a> PrintError for ast::Word<'a> {
+impl<'a> PrintError for ast::Word<'a> {
     fn print(&self, f: &mut std::fmt::Formatter<'_>, message: String) -> std::fmt::Result {
         let tb = WordTraceback::new(self.clone());
         let line_number = format!["{}", tb.line_number];
         let padding = " ".repeat(line_number.len());
         write!(f, "{}\n", message)?;
-        write!(f, "{}--> file.pl:{}:{}\n", padding, tb.line_number, tb.word_in_line.0+1)?;
+        write!(
+            f,
+            "{}--> file.pl:{}:{}\n",
+            padding,
+            tb.line_number,
+            tb.word_in_line.0 + 1
+        )?;
         write!(f, "{} |\n", padding)?;
         write!(f, "{} | {}\n", tb.line_number, tb.line)?;
-        write!(f, "{} | {}{}\n", padding, " ".repeat(tb.word_in_line.0), "^".repeat(tb.word_in_line.1))?;
+        write!(
+            f,
+            "{} | {}{}\n",
+            padding,
+            " ".repeat(tb.word_in_line.0),
+            "^".repeat(tb.word_in_line.1)
+        )?;
         Ok(())
     }
 }
@@ -91,33 +103,27 @@ struct WordTraceback<'a> {
 
 impl<'a> WordTraceback<'a> {
     fn new(word: ast::Word<'a>) -> WordTraceback<'a> {
-        match word {
-            ast::Word::Ref(_) => todo!(),
-            ast::Word::Owned(_) => todo!(),
-            ast::Word::FromFile { file, start, end } => {
-                let mut line_number = 1;
-                let mut line_start = 0;
-                for (position, char) in file.char_indices() {
-                    if char == '\n' {
-                        line_number += 1;
-                        line_start = position+1;
-                    }
-                    if position == start {
-                        let tail = &file[line_start..];
-                        let line = match tail.find('\n') {
-                            None => tail,
-                            Some(end) => &tail[..end],
-                        };
-                        return WordTraceback {
-                            line_number,
-                            line,
-                            word_in_line: (position - line_start, (end - start)),
-                        };
-                    }
-                }
-                todo!()
-            },
+        let mut line_number = 1;
+        let mut line_start = 0;
+        for (position, char) in word.file.char_indices() {
+            if char == '\n' {
+                line_number += 1;
+                line_start = position + 1;
+            }
+            if position == word.start {
+                let tail = &word.file[line_start..];
+                let line = match tail.find('\n') {
+                    None => tail,
+                    Some(end) => &tail[..end],
+                };
+                return WordTraceback {
+                    line_number,
+                    line,
+                    word_in_line: (position - line_start, (word.end - word.start)),
+                };
+            }
         }
+        todo!()
     }
 }
 
@@ -126,9 +132,7 @@ impl<T: PrintError + AsRef<str>> Display for ParseError<T> {
         match self {
             ParseError::Parse(err) => todo!(),
             ParseError::ConversionError(_) => todo!(),
-            ParseError::InvalidKey(key) => {
-                key.print(f, format!("invalid key '{}'", key.as_ref()))
-            }
+            ParseError::InvalidKey(key) => key.print(f, format!("invalid key '{}'", key.as_ref())),
         }
     }
 }
