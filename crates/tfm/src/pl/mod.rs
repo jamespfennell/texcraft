@@ -13,6 +13,7 @@ const CHECKSUM: &str = "CHECKSUM";
 const CODING_SCHEME: &str = "CODINGSCHEME";
 const COMMENT: &str = "COMMENT";
 const DESIGNSIZE: &str = "DESIGNSIZE";
+const FACE: &str = "FACE";
 const FAMILY: &str = "FAMILY";
 const HEADER: &str = "HEADER";
 const SEVENBITSAFEFLAG: &str = "SEVENBITSAFEFLAG";
@@ -184,8 +185,18 @@ pub fn write(file: &File, style: Style) -> String {
     if let Some(font_family) = &file.header.font_family {
         builder.add(FAMILY).with_str(font_family);
     }
+    if let Some(face) = file.header.face {
+        match face.try_into() {
+            Ok::<String, _>(s) => {
+                builder.add(FACE).with_str("F").with_string(s);
+            }
+            Err(_) => {
+                builder.add(FACE).with_octal(face.0 as u32);
+            }
+        }
+    }
     for word in &file.header.additional_data {
-        // TODO: this is not quite right
+        // TODO: this is not quite right, the header needs to have indices also? ie.e HEADER O 23 O <word>
         builder.add(HEADER).with_octal(*word);
     }
     if let Some(coding_scheme) = &file.header.character_coding_scheme {

@@ -203,11 +203,7 @@ impl SerializeTfm for Header {
             Some(true) => 128_u8,
             Some(false) => 0_u8,
         };
-        let face_raw = match &self.face {
-            None => 234_u8, // TODO: wtf?
-            Some(face) => face.to_u8(),
-        };
-        output.write_u8s((seven_bit_safe_raw, 0, 0, face_raw));
+        output.write_u8s((seven_bit_safe_raw, 0, 0, self.face.unwrap_or(Face(0)).0));
         self.additional_data.serialize_tfm(output);
     }
 }
@@ -235,7 +231,7 @@ impl DeserializeTfm for Header {
             (None, None)
         } else {
             let (seven_bit_safe_raw, _, _, face_raw) = input.read_u8s();
-            (Some(seven_bit_safe_raw >= 128), Face::from_u8(face_raw))
+            (Some(seven_bit_safe_raw >= 128), Some(Face(face_raw)))
         };
         let trailing_words = Vec::<u32>::deserialize_tfm(input);
         Header {
@@ -617,7 +613,7 @@ mod tests {
                 character_coding_scheme: Some("a".to_string()),
                 font_family: Some("b".to_string()),
                 seven_bit_safe: Some(true),
-                face: None,
+                face: Some(Face(234)),
                 additional_data: vec![],
             },
             &[

@@ -23,12 +23,13 @@ pub struct File {
 pub struct Header {
     pub checksum: u32,
     pub design_size: FixWord,
+    // TODO: these all have defaults so probably should not be optional
     pub character_coding_scheme: Option<String>,
     pub font_family: Option<String>,
     pub seven_bit_safe: Option<bool>,
     pub face: Option<Face>,
 
-    /// The TFM format allows the header have arbitrary additional data in the header.
+    /// The TFM format allows the header to contain arbitrary additional data.
     pub additional_data: Vec<u32>,
 }
 
@@ -239,59 +240,67 @@ pub enum Expansion {
     Expanded,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Face {
-    pub weight: Weight,
-    pub slope: Slope,
-    pub expansion: Expansion,
-}
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub struct Face(pub u8);
 
-impl Face {
-    fn to_u8(&self) -> u8 {
-        let a = match self.slope {
-            Slope::Roman => 0_u8,
-            Slope::Italic => 1_u8,
-        };
-        let b = match self.weight {
-            Weight::Medium => 0_u8,
-            Weight::Bold => 2_u8,
-            Weight::Light => 4_u8,
-        };
-        let c = match self.expansion {
-            Expansion::Regular => 0_u8,
-            Expansion::Condensed => 6_u8,
-            Expansion::Expanded => 12_u8,
-        };
-        a + b + c
-    }
+impl TryFrom<Face> for String {
+    type Error = ();
 
-    fn from_u8(mut raw: u8) -> Option<Face> {
+    fn try_from(value: Face) -> Result<Self, Self::Error> {
+        let mut raw = value.0;
         if raw >= 18 {
-            None
+            Err(())
         } else {
-            let slope = if raw % 2 == 0 {
-                Slope::Roman
-            } else {
-                Slope::Italic
-            };
+            let slope = if raw % 2 == 0 { 'R' } else { 'I' };
             raw /= 2;
             let weight = match raw % 3 {
-                0 => Weight::Medium,
-                1 => Weight::Bold,
-                _ => Weight::Light,
+                0 => 'M',
+                1 => 'B',
+                _ => 'L',
             };
             raw /= 3;
             let expansion = match raw % 3 {
-                0 => Expansion::Regular,
-                1 => Expansion::Condensed,
-                _ => Expansion::Expanded,
+                0 => 'R',
+                1 => 'C',
+                _ => 'E',
             };
-            Some(Face {
-                weight,
-                slope,
-                expansion,
-            })
+            Ok(format!["{}{}{}", weight, slope, expansion])
         }
+    }
+}
+
+impl TryFrom<&str> for Face {
+    type Error = &'static str;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let chars: Vec<char> = value.chars().collect();
+        if chars.len() != 3 {
+            return Err("face string must have exactly 3 characters");
+        }
+        let a = match chars[0] {
+            'M' => 0_u8,
+            'B' => 2_u8,
+            'L' => 4_u8,
+            _ => {
+                return Err("the first character must be either M, B or L");
+            }
+        };
+        let b = match chars[1] {
+            'R' => 0_u8,
+            'I' => 1_u8,
+            _ => {
+                return Err("the second character must be either R or I");
+            }
+        };
+        let c = match chars[2] {
+            'R' => 0_u8,
+            'C' => 6_u8,
+            'E' => 12_u8,
+            _ => {
+                return Err("the third character must be either R, C or E");
+            }
+        };
+        Ok(Face(a + b + c))
     }
 }
 
@@ -340,4 +349,29 @@ pub struct Params {
     quad: FixWord,
     extra_space: FixWord,
     additional_params: Vec<u32>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn face_to_string_round_trip() {
+        for i in 0_u8..=17_u8 {
+            let f1 = Face(i);
+            let s: String = f1.try_into().unwrap();
+            let s_ref: &str = &s;
+            let f2: Face = s_ref.try_into().unwrap();
+            assert_eq!(f1, f2)
+        }
+    }
+
+    #[test]
+    fn face_to_string_impossible() {
+        for i in 18_u8..=255_u8 {
+            let f1 = Face(i);
+            let s: Result<String, ()> = f1.try_into();
+            assert_eq![s, Err(())];
+        }
+    }
 }

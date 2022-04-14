@@ -1,4 +1,5 @@
-- Fully implement the write PL function
+- Fix the Face type to support arbitrary u8s - just make it a u8 with TryFrom<String> and TryInto<String>
+- Fully implement the write PL function - check code in p218 of tfToPl
 - Then finish the TFM -> PL converter (i.e., TFM deserialize). Run this over all of the test data and ensure it matches
 - Implement the parse PL function
 - Then finish the PL -> TFM converter
