@@ -220,26 +220,6 @@ enum Tag {
     Extension(usize),
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum Weight {
-    Medium,
-    Bold,
-    Light,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum Slope {
-    Roman,
-    Italic,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum Expansion {
-    Regular,
-    Condensed,
-    Expanded,
-}
-
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub struct Face(pub u8);
 
@@ -348,7 +328,40 @@ pub struct Params {
     x_height: FixWord,
     quad: FixWord,
     extra_space: FixWord,
+    math_params: MathParams,
     additional_params: Vec<u32>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum MathParams {
+    None,
+    Sy {
+        num_1: FixWord,
+        num_2: FixWord,
+        num_3: FixWord,
+        denom_1: FixWord,
+        denom_2: FixWord,
+        sup_1: FixWord,
+        sup_2: FixWord,
+        sup_3: FixWord,
+        sub_1: FixWord,
+        sub_2: FixWord,
+        sup_drop: FixWord,
+        sub_drop: FixWord,
+        delim_1: FixWord,
+        delim_2: FixWord,
+        axis_height: FixWord,
+    },
+    Ex {
+        default_thickness: FixWord,
+        big_op_spacing: [FixWord; 5],
+    },
+}
+
+impl Default for MathParams {
+    fn default() -> Self {
+        MathParams::None
+    }
 }
 
 #[cfg(test)]

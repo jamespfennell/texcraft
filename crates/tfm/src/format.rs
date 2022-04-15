@@ -303,6 +303,7 @@ impl DeserializeTfm for Params {
             x_height: FixWord::deserialize_tfm(input),
             quad: FixWord::deserialize_tfm(input),
             extra_space: FixWord::deserialize_tfm(input),
+            math_params: MathParams::None,
             additional_params: Vec::<u32>::deserialize_tfm(input),
         }
     }
@@ -663,6 +664,7 @@ mod tests {
                     x_height: FixWord(55),
                     quad: FixWord(56),
                     extra_space: FixWord(57),
+                    math_params: MathParams::None,
                     additional_params: vec!(),
                 }
             },

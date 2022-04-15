@@ -216,21 +216,9 @@ pub fn write(file: &File, style: Style) -> String {
 
     {
         let mut params_tree = ast::Tree::builder();
-        params_tree.add("SLANT").with_fix_word(file.params.slant);
-        params_tree.add("SPACE ").with_fix_word(file.params.space);
-        params_tree
-            .add("STRETCH ")
-            .with_fix_word(file.params.space_stretch);
-        params_tree
-            .add("SHRINK")
-            .with_fix_word(file.params.space_shrink);
-        params_tree
-            .add("XHEIGHT")
-            .with_fix_word(file.params.x_height);
-        params_tree.add("QUAD").with_fix_word(file.params.quad);
-        params_tree
-            .add("EXTRASPACE ")
-            .with_fix_word(file.params.extra_space);
+        for (key, value) in convert_params(&file.params) {
+            params_tree.add(key).with_fix_word(value);
+        }
         builder.add(FONT_DIMENSIONS).with_tree(params_tree.into());
     }
 
@@ -263,6 +251,72 @@ pub fn write(file: &File, style: Style) -> String {
     }
     let tree: ast::Tree<String> = builder.into();
     ast::write(tree.nodes(), style)
+}
+
+const DEFAULT_THICKNESS: &str = "DEFAULTRULETHICKNESS";
+const NUM_1: &str = "NUM1";
+const num_2: &str = "NUM2";
+const num_3: &str = "NUM3";
+const denom_1: &str = "DENOM1";
+const denom_2: &str = "DENOM2";
+const sup_1: &str = "SUP1";
+const sup_2: &str = "SUP2";
+const sup_3: &str = "SUP3";
+const sub_1: &str = "SUB1";
+const sub_2: &str = "SUB2";
+const sup_drop: &str = "SUPDROP";
+const sub_drop: &str = "SUBDROP";
+const delim_1: &str = "DELIM1";
+const delim_2: &str = "DELIM2";
+const axis_height: &str = "AXISHEIGHT";
+const BIG_OP_SPACING_1: &str = "BIGOPSPACING1";
+const BIG_OP_SPACING_2: &str = "BIGOPSPACING2";
+const BIG_OP_SPACING_3: &str = "BIGOPSPACING3";
+const BIG_OP_SPACING_4: &str = "BIGOPSPACING4";
+const BIG_OP_SPACING_5: &str = "BIGOPSPACING5";
+
+fn convert_params(params: &Params) -> Vec<(&'static str, FixWord)> {
+    let v = vec![
+        (SLANT, params.slant),
+        (SPACE, params.space),
+        (STRETCH, params.space_stretch),
+        (SHRINK, params.space_shrink),
+        (XHEIGHT, params.x_height),
+        (QUAD, params.quad),
+        (EXTRA_SPACE, params.extra_space),
+    ];
+    match params.math_params {
+        MathParams::None => vec![],
+        MathParams::Sy {
+            num_1,
+            num_2,
+            num_3,
+            denom_1,
+            denom_2,
+            sup_1,
+            sup_2,
+            sup_3,
+            sub_1,
+            sub_2,
+            sup_drop,
+            sub_drop,
+            delim_1,
+            delim_2,
+            axis_height,
+        } => todo!(),
+        MathParams::Ex {
+            default_thickness,
+            big_op_spacing,
+        } => vec![
+            (DEFAULT_THICKNESS, default_thickness),
+            (BIG_OP_SPACING_1, big_op_spacing[0]),
+            (BIG_OP_SPACING_2, big_op_spacing[1]),
+            (BIG_OP_SPACING_3, big_op_spacing[2]),
+            (BIG_OP_SPACING_4, big_op_spacing[3]),
+            (BIG_OP_SPACING_5, big_op_spacing[4]),
+        ],
+    };
+    v
 }
 
 #[cfg(test)]
