@@ -210,11 +210,30 @@ pub fn write(file: &File, style: Style) -> String {
         .add(COMMENT)
         .with_str("OTHER SIZES ARE MULTIPLES OF DESIGNSIZE");
     builder.add(CHECKSUM).with_octal(file.header.checksum);
-    if let Some(seven_bit_safe) = file.header.seven_bit_safe {
-        builder
-            .add(SEVENBITSAFEFLAG)
-            .with_str(if seven_bit_safe { "TRUE" } else { "FALSE" });
+    if file.header.seven_bit_safe == Some(true) {
+        builder.add(SEVENBITSAFEFLAG).with_str("TRUE");
     }
+
+    {
+        let mut params_tree = ast::Tree::builder();
+        params_tree.add("SLANT").with_fix_word(file.params.slant);
+        params_tree.add("SPACE ").with_fix_word(file.params.space);
+        params_tree
+            .add("STRETCH ")
+            .with_fix_word(file.params.space_stretch);
+        params_tree
+            .add("SHRINK")
+            .with_fix_word(file.params.space_shrink);
+        params_tree
+            .add("XHEIGHT")
+            .with_fix_word(file.params.x_height);
+        params_tree.add("QUAD").with_fix_word(file.params.quad);
+        params_tree
+            .add("EXTRASPACE ")
+            .with_fix_word(file.params.extra_space);
+        builder.add(FONT_DIMENSIONS).with_tree(params_tree.into());
+    }
+
     for char_info in &file.char_infos {
         let mut char_tree = ast::Tree::builder();
         if char_info.width != FixWord::ZERO {
