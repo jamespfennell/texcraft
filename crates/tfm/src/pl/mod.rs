@@ -288,21 +288,7 @@ fn convert_params(params: &Params) -> Vec<(&'static str, FixWord)> {
     match params.math_params {
         MathParams::None => vec![],
         MathParams::Sy {
-            num_1,
-            num_2,
-            num_3,
-            denom_1,
-            denom_2,
-            sup_1,
-            sup_2,
-            sup_3,
-            sub_1,
-            sub_2,
-            sup_drop,
-            sub_drop,
-            delim_1,
-            delim_2,
-            axis_height,
+     ..
         } => todo!(),
         MathParams::Ex {
             default_thickness,
