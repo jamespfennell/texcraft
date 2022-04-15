@@ -288,7 +288,7 @@ fn convert_params(params: &Params) -> Vec<(String, FixWord)> {
     ];
     let v2 = match params.math_params {
         MathParams::None => vec![],
-        MathParams::Sy {
+        MathParams::Symbols {
             num_1,
             num_2,
             num_3,
@@ -321,7 +321,7 @@ fn convert_params(params: &Params) -> Vec<(String, FixWord)> {
             (DELIM_2, delim_2),
             (AXIS_HEIGHT, axis_height),
         ],
-        MathParams::Ex {
+        MathParams::Extension {
             default_thickness,
             big_op_spacing,
         } => vec![

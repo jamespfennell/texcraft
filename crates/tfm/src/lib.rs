@@ -335,7 +335,7 @@ pub struct Params {
 #[derive(Debug, PartialEq, Eq)]
 pub enum MathParams {
     None,
-    Sy {
+    Symbols {
         num_1: FixWord,
         num_2: FixWord,
         num_3: FixWord,
@@ -352,7 +352,7 @@ pub enum MathParams {
         delim_2: FixWord,
         axis_height: FixWord,
     },
-    Ex {
+    Extension {
         default_thickness: FixWord,
         big_op_spacing: [FixWord; 5],
     },
@@ -362,6 +362,50 @@ impl Default for MathParams {
     fn default() -> Self {
         MathParams::None
     }
+}
+
+impl Params {
+    pub fn set(&mut self, i: usize, value: FixWord) {
+        let f = match (i, &mut self.math_params) {
+            (0, _) => &mut self.slant,
+            (1, _) => &mut self.space,
+            (2, _) => &mut self.space_stretch,
+            (3, _) => &mut self.space_shrink,
+            (4, _) => &mut self.x_height,
+            (5, _) => &mut self.quad,
+            (6, _) => &mut self.extra_space,
+
+            (i, MathParams::None) => {
+                get_additional_param(&mut self.additional_params, i- 7)
+            },
+
+            (7, MathParams::Symbols {num_1, ..}) => num_1,
+            (8, MathParams::Symbols {num_2, ..}) => num_2,
+            // TODO
+            (i, MathParams::Symbols{..}) => {
+                get_additional_param(&mut self.additional_params, i- 22)
+            },
+
+            (7, MathParams::Extension {default_thickness, ..}) => default_thickness,
+            (8, MathParams::Extension {big_op_spacing,..}) => &mut big_op_spacing[0],
+            (9, MathParams::Extension {big_op_spacing,..}) => &mut big_op_spacing[1],
+            (10, MathParams::Extension {big_op_spacing,..}) => &mut big_op_spacing[2],
+            (11, MathParams::Extension {big_op_spacing,..}) => &mut big_op_spacing[3],
+            (12, MathParams::Extension {big_op_spacing,..}) => &mut big_op_spacing[4],
+            (i, MathParams::Extension{..}) => {
+                get_additional_param(&mut self.additional_params, i- 13)
+            },
+
+        };
+        *f = value;
+    }
+}
+
+fn get_additional_param(additional_params: &mut Vec<FixWord>, i: usize) -> &mut FixWord{
+    if additional_params.len() <= i {
+    additional_params.resize_with(i+1, Default::default);
+    }
+    additional_params.get_mut(i).unwrap()
 }
 
 #[cfg(test)]
