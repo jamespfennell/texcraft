@@ -329,7 +329,7 @@ pub struct Params {
     quad: FixWord,
     extra_space: FixWord,
     math_params: MathParams,
-    additional_params: Vec<u32>,
+    additional_params: Vec<FixWord>,
 }
 
 #[derive(Debug, PartialEq, Eq)]

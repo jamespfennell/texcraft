@@ -304,7 +304,7 @@ impl DeserializeTfm for Params {
             quad: FixWord::deserialize_tfm(input),
             extra_space: FixWord::deserialize_tfm(input),
             math_params: MathParams::None,
-            additional_params: Vec::<u32>::deserialize_tfm(input),
+            additional_params: Vec::<FixWord>::deserialize_tfm(input),
         }
     }
 }
