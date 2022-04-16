@@ -24,7 +24,7 @@ struct RawFile {
     lig_kerns: Vec<RawLigKern>,
     kerns: Vec<FixWord>,
     extensible_chars: Vec<ExtensibleChar>,
-    params: Params,
+    params: Vec<FixWord>,
 }
 
 impl Into<File> for RawFile {
@@ -57,10 +57,42 @@ impl Into<File> for RawFile {
             });
             char_id += 1;
         }
+        let mut params = Params::default();
+        if let Some(coding_scheme) = &self.header.character_coding_scheme {
+            let coding_scheme = coding_scheme.to_uppercase();
+            if coding_scheme.starts_with("TEX MATH SY") {
+                params.math_params = MathParams::Symbols {
+                    num_1: FixWord::default(),
+                    num_2: FixWord::default(),
+                    num_3: FixWord::default(),
+                    denom_1: FixWord::default(),
+                    denom_2: FixWord::default(),
+                    sup_1: FixWord::default(),
+                    sup_2: FixWord::default(),
+                    sup_3: FixWord::default(),
+                    sub_1: FixWord::default(),
+                    sub_2: FixWord::default(),
+                    sup_drop: FixWord::default(),
+                    sub_drop: FixWord::default(),
+                    delim_1: FixWord::default(),
+                    delim_2: FixWord::default(),
+                    axis_height: FixWord::default(),
+                }
+            }
+            if coding_scheme.starts_with("TEX MATH EX") {
+                params.math_params = MathParams::Extension {
+                    default_thickness: FixWord::default(),
+                    big_op_spacing: [FixWord::default(); 5],
+                }
+            }
+        }
+        for (i, value) in self.params.iter().enumerate() {
+            params.set(i, *value);
+        }
         File {
             header: self.header,
             char_infos,
-            params: self.params,
+            params,
         }
     }
 }
@@ -406,7 +438,7 @@ impl SerializeTfm for RawFile {
         let nl = len_u16(&self.lig_kerns);
         let nk = len_u16(&self.kerns);
         let ne = len_u16(&self.extensible_chars);
-        let np = 7 + len_u16(&self.params.additional_params);
+        let np = len_u16(&self.params);
         let lf = 6 + lh + (ec - bc + 1) + nw + nh + nd + ni + nl + nk + ne + np;
         output.write_u16s((lf, lh));
         output.write_u16s((bc, ec));
@@ -656,17 +688,15 @@ mod tests {
                 lig_kerns: vec!(),
                 kerns: vec!(FixWord(31)),
                 extensible_chars: vec!(),
-                params: Params {
-                    slant: FixWord(51),
-                    space: FixWord(52),
-                    space_stretch: FixWord(53),
-                    space_shrink: FixWord(54),
-                    x_height: FixWord(55),
-                    quad: FixWord(56),
-                    extra_space: FixWord(57),
-                    math_params: MathParams::None,
-                    additional_params: vec!(),
-                }
+                params: vec!(
+                    FixWord(51),
+                    FixWord(52),
+                    FixWord(53),
+                    FixWord(54),
+                    FixWord(55),
+                    FixWord(56),
+                    FixWord(57),
+                )
             },
             &[
                 0, 31, 0, 2, 0, 3, 0, 3, 0, 2, 0, 3, 0, 4, 0, 5, 0, 0, 0, 1, 0, 0, 0, 7, 0, 0, 0,

@@ -375,35 +375,49 @@ impl Params {
             (5, _) => &mut self.quad,
             (6, _) => &mut self.extra_space,
 
-            (i, MathParams::None) => {
-                get_additional_param(&mut self.additional_params, i- 7)
-            },
+            (i, MathParams::None) => get_additional_param(&mut self.additional_params, i - 7),
 
-            (7, MathParams::Symbols {num_1, ..}) => num_1,
-            (8, MathParams::Symbols {num_2, ..}) => num_2,
-            // TODO
-            (i, MathParams::Symbols{..}) => {
-                get_additional_param(&mut self.additional_params, i- 22)
-            },
+            (7, MathParams::Symbols { num_1, .. }) => num_1,
+            (8, MathParams::Symbols { num_2, .. }) => num_2,
+            (9, MathParams::Symbols { num_3, .. }) => num_3,
+            (10, MathParams::Symbols { denom_1, .. }) => denom_1,
+            (11, MathParams::Symbols { denom_2, .. }) => denom_2,
+            (12, MathParams::Symbols { sup_1, .. }) => sup_1,
+            (13, MathParams::Symbols { sup_2, .. }) => sup_2,
+            (14, MathParams::Symbols { sup_3, .. }) => sup_3,
+            (15, MathParams::Symbols { sub_1, .. }) => sub_1,
+            (16, MathParams::Symbols { sub_2, .. }) => sub_2,
+            (17, MathParams::Symbols { sup_drop, .. }) => sup_drop,
+            (18, MathParams::Symbols { sub_drop, .. }) => sub_drop,
+            (19, MathParams::Symbols { delim_1, .. }) => delim_1,
+            (20, MathParams::Symbols { delim_2, .. }) => delim_2,
+            (21, MathParams::Symbols { axis_height, .. }) => axis_height,
+            (i, MathParams::Symbols { .. }) => {
+                get_additional_param(&mut self.additional_params, i - 22)
+            }
 
-            (7, MathParams::Extension {default_thickness, ..}) => default_thickness,
-            (8, MathParams::Extension {big_op_spacing,..}) => &mut big_op_spacing[0],
-            (9, MathParams::Extension {big_op_spacing,..}) => &mut big_op_spacing[1],
-            (10, MathParams::Extension {big_op_spacing,..}) => &mut big_op_spacing[2],
-            (11, MathParams::Extension {big_op_spacing,..}) => &mut big_op_spacing[3],
-            (12, MathParams::Extension {big_op_spacing,..}) => &mut big_op_spacing[4],
-            (i, MathParams::Extension{..}) => {
-                get_additional_param(&mut self.additional_params, i- 13)
-            },
-
+            (
+                7,
+                MathParams::Extension {
+                    default_thickness, ..
+                },
+            ) => default_thickness,
+            (8, MathParams::Extension { big_op_spacing, .. }) => &mut big_op_spacing[0],
+            (9, MathParams::Extension { big_op_spacing, .. }) => &mut big_op_spacing[1],
+            (10, MathParams::Extension { big_op_spacing, .. }) => &mut big_op_spacing[2],
+            (11, MathParams::Extension { big_op_spacing, .. }) => &mut big_op_spacing[3],
+            (12, MathParams::Extension { big_op_spacing, .. }) => &mut big_op_spacing[4],
+            (i, MathParams::Extension { .. }) => {
+                get_additional_param(&mut self.additional_params, i - 13)
+            }
         };
         *f = value;
     }
 }
 
-fn get_additional_param(additional_params: &mut Vec<FixWord>, i: usize) -> &mut FixWord{
+fn get_additional_param(additional_params: &mut Vec<FixWord>, i: usize) -> &mut FixWord {
     if additional_params.len() <= i {
-    additional_params.resize_with(i+1, Default::default);
+        additional_params.resize_with(i + 1, Default::default);
     }
     additional_params.get_mut(i).unwrap()
 }
