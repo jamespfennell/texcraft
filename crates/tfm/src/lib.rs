@@ -364,6 +364,35 @@ impl Default for MathParams {
     }
 }
 
+impl MathParams {
+    fn symbols_default() -> MathParams {
+        MathParams::Symbols {
+            num_1: FixWord::default(),
+            num_2: FixWord::default(),
+            num_3: FixWord::default(),
+            denom_1: FixWord::default(),
+            denom_2: FixWord::default(),
+            sup_1: FixWord::default(),
+            sup_2: FixWord::default(),
+            sup_3: FixWord::default(),
+            sub_1: FixWord::default(),
+            sub_2: FixWord::default(),
+            sup_drop: FixWord::default(),
+            sub_drop: FixWord::default(),
+            delim_1: FixWord::default(),
+            delim_2: FixWord::default(),
+            axis_height: FixWord::default(),
+        }
+    }
+
+    fn extension_default() -> MathParams {
+        MathParams::Extension {
+            default_thickness: FixWord::default(),
+            big_op_spacing: [FixWord::default(); 5],
+        }
+    }
+}
+
 impl Params {
     pub fn set(&mut self, i: usize, value: FixWord) {
         let f = match (i, &mut self.math_params) {

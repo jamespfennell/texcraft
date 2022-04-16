@@ -1,4 +1,4 @@
-- Support deserializing to MathParams::Symbol etc
+- All pl->pl round trip tests will all of the cases
 - Fully implement the write PL function - check code in p218 of tfToPl
 - Then finish the TFM -> PL converter (i.e., TFM deserialize). Run this over all of the test data and ensure it matches
 - Implement the parse PL function

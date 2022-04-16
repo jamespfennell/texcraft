@@ -58,34 +58,19 @@ impl Into<File> for RawFile {
             char_id += 1;
         }
         let mut params = Params::default();
-        if let Some(coding_scheme) = &self.header.character_coding_scheme {
-            let coding_scheme = coding_scheme.to_uppercase();
-            if coding_scheme.starts_with("TEX MATH SY") {
-                params.math_params = MathParams::Symbols {
-                    num_1: FixWord::default(),
-                    num_2: FixWord::default(),
-                    num_3: FixWord::default(),
-                    denom_1: FixWord::default(),
-                    denom_2: FixWord::default(),
-                    sup_1: FixWord::default(),
-                    sup_2: FixWord::default(),
-                    sup_3: FixWord::default(),
-                    sub_1: FixWord::default(),
-                    sub_2: FixWord::default(),
-                    sup_drop: FixWord::default(),
-                    sub_drop: FixWord::default(),
-                    delim_1: FixWord::default(),
-                    delim_2: FixWord::default(),
-                    axis_height: FixWord::default(),
+        params.math_params = match &self.header.character_coding_scheme {
+            None => MathParams::default(),
+            Some(coding_scheme) => {
+                let coding_scheme = coding_scheme.to_uppercase();
+                if coding_scheme.starts_with("TEX MATH SY") {
+                    MathParams::symbols_default()
+                } else if coding_scheme.starts_with("TEX MATH EX") {
+                    MathParams::extension_default()
+                } else {
+                    MathParams::default()
                 }
             }
-            if coding_scheme.starts_with("TEX MATH EX") {
-                params.math_params = MathParams::Extension {
-                    default_thickness: FixWord::default(),
-                    big_op_spacing: [FixWord::default(); 5],
-                }
-            }
-        }
+        };
         for (i, value) in self.params.iter().enumerate() {
             params.set(i, *value);
         }
