@@ -27,29 +27,29 @@ struct RawFile {
     params: Vec<FixWord>,
 }
 
-impl Into<File> for RawFile {
-    fn into(self) -> File {
+impl From<RawFile> for File {
+    fn from(raw: RawFile) -> Self {
         let mut char_infos = Vec::new();
-        let mut char_id = self.first_char;
-        for raw_char_info in &self.raw_char_info {
+        let mut char_id = raw.first_char;
+        for raw_char_info in &raw.raw_char_info {
             char_infos.push(CharInfo {
                 id: char_id,
-                width: self
+                width: raw
                     .widths
                     .get(raw_char_info.width_index)
                     .copied()
                     .unwrap_or(FixWord::ZERO),
-                height: self
+                height: raw
                     .heights
                     .get(raw_char_info.height_index)
                     .copied()
                     .unwrap_or(FixWord::ZERO),
-                depth: self
+                depth: raw
                     .depths
                     .get(raw_char_info.depth_index)
                     .copied()
                     .unwrap_or(FixWord::ZERO),
-                italic_correction: self
+                italic_correction: raw
                     .italic_corrections
                     .get(raw_char_info.italic_index)
                     .copied()
@@ -57,25 +57,27 @@ impl Into<File> for RawFile {
             });
             char_id += 1;
         }
-        let mut params = Params::default();
-        params.math_params = match &self.header.character_coding_scheme {
-            None => MathParams::default(),
-            Some(coding_scheme) => {
-                let coding_scheme = coding_scheme.to_uppercase();
-                if coding_scheme.starts_with("TEX MATH SY") {
-                    MathParams::symbols_default()
-                } else if coding_scheme.starts_with("TEX MATH EX") {
-                    MathParams::extension_default()
-                } else {
-                    MathParams::default()
+        let mut params = Params {
+            math_params: match &raw.header.character_coding_scheme {
+                None => MathParams::default(),
+                Some(coding_scheme) => {
+                    let coding_scheme = coding_scheme.to_uppercase();
+                    if coding_scheme.starts_with("TEX MATH SY") {
+                        MathParams::symbols_default()
+                    } else if coding_scheme.starts_with("TEX MATH EX") {
+                        MathParams::extension_default()
+                    } else {
+                        MathParams::default()
+                    }
                 }
-            }
+            },
+            ..Default::default()
         };
-        for (i, value) in self.params.iter().enumerate() {
+        for (i, value) in raw.params.iter().enumerate() {
             params.set(i, *value);
         }
         File {
-            header: self.header,
+            header: raw.header,
             char_infos,
             params,
         }
@@ -307,22 +309,6 @@ impl SerializeTfm for Params {
             fix_word.serialize_tfm(output);
         }
         self.additional_params.serialize_tfm(output);
-    }
-}
-
-impl DeserializeTfm for Params {
-    fn deserialize_tfm(input: &mut Input) -> Self {
-        Params {
-            slant: FixWord::deserialize_tfm(input),
-            space: FixWord::deserialize_tfm(input),
-            space_stretch: FixWord::deserialize_tfm(input),
-            space_shrink: FixWord::deserialize_tfm(input),
-            x_height: FixWord::deserialize_tfm(input),
-            quad: FixWord::deserialize_tfm(input),
-            extra_space: FixWord::deserialize_tfm(input),
-            math_params: MathParams::None,
-            additional_params: Vec::<FixWord>::deserialize_tfm(input),
-        }
     }
 }
 

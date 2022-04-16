@@ -106,7 +106,7 @@ impl TryFrom<&str> for FixWord {
                 Char::Digit(d) => {
                     integer = integer * 10 + d;
                     if integer >= 2048 {
-                        return Err(format!["real numbers must be in the range [-2048,2048]"]);
+                        return Err("real numbers must be in the range [-2048,2048]".to_string());
                     }
                 }
                 Char::Other('.') => break,
@@ -138,7 +138,7 @@ impl TryFrom<&str> for FixWord {
             if negative {
                 return Ok(FixWord(i32::MIN));
             }
-            return Err(format!["real numbers must be in the range [-2048,2048]"]);
+            return Err("real numbers must be in the range [-2048,2048]".to_string());
         }
         let mut result = integer * FixWord::UNITY.0 + fraction;
         if negative {

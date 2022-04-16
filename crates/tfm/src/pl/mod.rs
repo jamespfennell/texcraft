@@ -157,19 +157,19 @@ impl<'a> Display for Word<'a> {
 
         let line_number_str = format!["{}", line_number];
         let padding = " ".repeat(line_number_str.len());
-        write!(
+        writeln!(
             f,
-            "{}--> {}:{}:{}\n",
+            "{}--> {}:{}:{}",
             padding,
             self.file_name,
             line_number,
             word_start + 1,
         )?;
-        write!(f, "{} |\n", padding)?;
-        write!(f, "{} | {}\n", line_number, line)?;
-        write!(
+        writeln!(f, "{} |", padding)?;
+        writeln!(f, "{} | {}", line_number, line)?;
+        writeln!(
             f,
-            "{} | {}{}\n",
+            "{} | {}{}",
             padding,
             " ".repeat(word_start),
             "^".repeat(self.end - self.start),

@@ -25,7 +25,7 @@ pub struct TreeBuilder(Vec<Builder>);
 
 impl TreeBuilder {
     pub fn add(&mut self, key: &str) -> &mut Builder {
-        self.0.push(Node::new(key));
+        self.0.push(Node::builder(key));
         self.0.last_mut().unwrap()
     }
 }
@@ -83,7 +83,7 @@ pub struct Node<T> {
 }
 
 impl Node<String> {
-    pub fn new(key: &str) -> Builder {
+    pub fn builder(key: &str) -> Builder {
         Builder(Node {
             open: "(".to_string(),
             key: key.to_string(),
