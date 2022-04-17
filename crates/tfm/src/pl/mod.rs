@@ -300,7 +300,7 @@ pub fn to_ast(file: &File) -> ast::Tree<String> {
     {
         let mut params_tree = ast::Tree::builder();
         for (key, parameter_index, value) in convert_params(&file.params) {
-            let elem = params_tree.add(&key);
+            let elem = params_tree.add(key);
             if let Some(parameter_index) = parameter_index {
                 elem.with_integer(parameter_index);
             }
