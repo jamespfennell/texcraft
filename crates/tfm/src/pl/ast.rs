@@ -30,7 +30,6 @@ impl<T: AsRef<str>> Tree<T> {
     }
 }
 
-
 pub struct TreeBuilder(Vec<Builder>);
 
 impl TreeBuilder {
@@ -60,10 +59,10 @@ pub fn parse<'a>(
         s: input,
         pos_b: 0,
     };
-        match Vec::<Node<Word>>::parse(&mut lexer.peekable()) {
-            Ok(v) => Ok(Tree(v)),
-            Err(e) => Err(e),
-        }
+    match Vec::<Node<Word>>::parse(&mut lexer.peekable()) {
+        Ok(v) => Ok(Tree(v)),
+        Err(e) => Err(e),
+    }
 }
 
 #[derive(Debug)]
@@ -78,12 +77,17 @@ pub enum ParseError<T> {
 
 #[derive(Debug)]
 pub enum ConversionError<T> {
-    RealNumberUnexpectedList(T),
-    RealNumberNotEnoughWords(T),
-    RealNumberInvalidPrefix(T),
+    NumberUnexpectedList(T),
+    NumberNotEnoughWords(T),
+    NumberInvalidPrefix(T),
     /// The provided string could not be parsed as a real number
     RealNumberInvalidValue(T, String),
     RealNumberExtraWord(T),
+
+    InvalidCharacter(T),
+    NumberInvalidOctal(T),
+    NumberInvalidDecimal(T),
+    NumberInvalidHexadcimal(T),
 
     StringUnexpectedList(T),
 }
@@ -172,11 +176,44 @@ impl<T: AsRef<str>> Node<T> {
         for word in &self.value.0 {
             words.push(word.as_ref().to_string())
         }
-        Node { open:
-            self.open.as_ref().to_string(), key: 
-            self.key.as_ref().to_string(), 
+        Node {
+            open: self.open.as_ref().to_string(),
+            key: self.key.as_ref().to_string(),
             value: (words, self.value.1.into_string_tree()),
-            close: self.close.as_ref().to_string() }
+            close: self.close.as_ref().to_string(),
+        }
+    }
+}
+
+impl<T: AsRef<str> + Clone> TryInto<u8> for &Node<T> {
+    type Error = ConversionError<T>;
+
+    fn try_into(self) -> Result<u8, Self::Error> {
+        // TODO: this is too magic - extract to a function
+        if let Some(node) = self.value.1 .0.first() {
+            return Err(ConversionError::NumberUnexpectedList(node.open.clone()));
+        }
+        let (prefix, value) = match self.value.0.len() {
+            0 | 1 => return Err(ConversionError::NumberNotEnoughWords(self.close.clone())),
+            2 => (&self.value.0[0], &self.value.0[1]),
+            _ => {
+                return Err(ConversionError::RealNumberExtraWord(
+                    self.value.0[2].clone(),
+                ))
+            }
+        };
+        match prefix.as_ref() {
+            "C" => {
+                Ok(0)
+            }
+            "O" => {
+              match u8::from_str_radix(value.as_ref(), 8) {
+                Ok(u) => Ok(u),
+                Err(_) => Err(ConversionError::NumberInvalidOctal(value.clone())),
+              }
+            }
+            _ => Err(ConversionError::NumberInvalidPrefix(prefix.clone())),
+        }
     }
 }
 
@@ -184,7 +221,7 @@ impl<T: AsRef<str> + Clone> TryInto<String> for &Node<T> {
     type Error = ConversionError<T>;
 
     fn try_into(self) -> Result<String, Self::Error> {
-        if let Some(node) = self.value.1.0.first() {
+        if let Some(node) = self.value.1 .0.first() {
             return Err(ConversionError::StringUnexpectedList(node.open.clone()));
         }
         let mut s = String::new();
@@ -202,16 +239,14 @@ impl<T: AsRef<str> + Clone> TryInto<FixWord> for &Node<T> {
     type Error = ConversionError<T>;
 
     fn try_into(self) -> Result<FixWord, Self::Error> {
-        if let Some(node) = self.value.1.0.first() {
-            return Err(ConversionError::RealNumberUnexpectedList(node.open.clone()));
+        if let Some(node) = self.value.1 .0.first() {
+            return Err(ConversionError::NumberUnexpectedList(node.open.clone()));
         }
         match self.value.0.len() {
-            0 | 1 => Err(ConversionError::RealNumberNotEnoughWords(
-                self.close.clone(),
-            )),
+            0 | 1 => Err(ConversionError::NumberNotEnoughWords(self.close.clone())),
             2 => {
                 if self.value.0[0].as_ref() != "R" {
-                    return Err(ConversionError::RealNumberInvalidPrefix(
+                    return Err(ConversionError::NumberInvalidPrefix(
                         self.value.0[0].clone(),
                     ));
                 }
@@ -437,13 +472,13 @@ impl<'a> Writer<'a> {
         for word in &elem.value.0 {
             self.write_word(word);
         }
-        if elem.value.1.0.is_empty() {
+        if elem.value.1 .0.is_empty() {
             self.buffer.push(')');
             self.buffer.push('\n');
         } else {
             self.buffer.push('\n');
             self.current_indent += self.style.indent;
-            self.write_list(&elem.value.1.0);
+            self.write_list(&elem.value.1 .0);
             self.current_indent -= self.style.indent;
 
             let indent = if self.style.closing_brace_style == ClosingBraceStyle::ExtraIndent {

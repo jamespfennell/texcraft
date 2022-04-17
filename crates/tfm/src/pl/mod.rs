@@ -12,7 +12,7 @@ const CHARACTER_ITALIC: &str = "CHARIT";
 const CHECKSUM: &str = "CHECKSUM";
 const CODING_SCHEME: &str = "CODINGSCHEME";
 const COMMENT: &str = "COMMENT";
-const DESIGNSIZE: &str = "DESIGNSIZE";
+const DESIGN_SIZE: &str = "DESIGNSIZE";
 const FACE: &str = "FACE";
 const FAMILY: &str = "FAMILY";
 const HEADER: &str = "HEADER";
@@ -69,12 +69,18 @@ pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<
     // file.header.design_size = FixWord(FixWord::UNITY.0 * 10);
     for node in tree.nodes() {
         match node.key() {
-            COMMENT => {}
-            FAMILY => {
-                file.header.font_family = Some(node.try_into()?);
+            CHECKSUM => {
+                file.header.checksum = 0; //node.try_into()?;
             }
             CODING_SCHEME => {
-                file.header.character_coding_scheme = Some(node.try_into()?);   
+                file.header.character_coding_scheme = Some(node.try_into()?);
+            }
+            COMMENT => {}
+            DESIGN_SIZE => {
+                file.header.design_size = node.try_into()?;
+            }
+            FAMILY => {
+                file.header.font_family = Some(node.try_into()?);
             }
             _ => {
                 return Err(ParseError::InvalidKey(node.key));
@@ -212,7 +218,6 @@ impl<T> From<ast::ConversionError<T>> for ParseError<T> {
 
 /// Convert a [File] to a PL AST.
 pub fn to_ast(file: &File) -> ast::Tree<String> {
-
     let mut builder = ast::Tree::builder();
     if let Some(font_family) = &file.header.font_family {
         builder.add(FAMILY).with_str(font_family);
@@ -235,7 +240,7 @@ pub fn to_ast(file: &File) -> ast::Tree<String> {
         builder.add(CODING_SCHEME).with_str(coding_scheme);
     }
     builder
-        .add(DESIGNSIZE)
+        .add(DESIGN_SIZE)
         .with_fix_word(file.header.design_size);
     builder.add(COMMENT).with_str("DESIGNSIZE IS IN POINTS");
     builder
@@ -281,7 +286,7 @@ pub fn to_ast(file: &File) -> ast::Tree<String> {
             .with_character(char_info.id)
             .with_tree(char_tree.into());
     }
-     builder.into()
+    builder.into()
 }
 
 /// Write a [File] in property list format.
