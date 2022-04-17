@@ -68,6 +68,7 @@ pub fn format(file_name: &str, input: &str, style: Style) -> String {
 pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<Word<'a>>> {
     let tree = ast::parse(file_name, input)?;
     let mut file: File = Default::default();
+    file.header.design_size = FixWord((1 << 20) * 10);
     for node in tree.nodes() {
         match node.key() {
             CHECKSUM => {
@@ -126,7 +127,8 @@ fn parse_font_dimensions<'a>(
             // Other cases
             COMMENT => continue,
             PARAMETER => {
-                // Read a u8 and a FixWord
+                let (i, fix_word) = node.try_into()?;
+                params.set(i as usize, fix_word);
                 continue;
             }
             _ => {
@@ -297,8 +299,12 @@ pub fn to_ast(file: &File) -> ast::Tree<String> {
 
     {
         let mut params_tree = ast::Tree::builder();
-        for (key, value) in convert_params(&file.params) {
-            params_tree.add(&key).with_fix_word(value);
+        for (key, parameter_index, value) in convert_params(&file.params) {
+            let elem = params_tree.add(&key);
+            if let Some(parameter_index) = parameter_index {
+                elem.with_integer(parameter_index);
+            }
+            elem .with_fix_word(value);
         }
         builder.add(FONT_DIMENSIONS).with_tree(params_tree.into());
     }
@@ -339,7 +345,7 @@ pub fn write(file: &File, style: Style) -> String {
     ast::write(&tree, style)
 }
 
-fn convert_params(params: &Params) -> Vec<(String, FixWord)> {
+fn convert_params(params: &Params) -> Vec<(&'static str, Option<u8>, FixWord)> {
     let v1 = vec![
         (SLANT, params.slant),
         (SPACE, params.space),
@@ -398,14 +404,17 @@ fn convert_params(params: &Params) -> Vec<(String, FixWord)> {
     };
     let mut v = vec![];
     for (key, value) in v1 {
-        v.push((key.to_string(), value));
+        v.push((key, None, value));
     }
     for (key, value) in v2 {
-        v.push((key.to_string(), value));
+        v.push((key, None, value));
     }
     for additional_param in &params.additional_params {
-        let key = format!["PARAMETER D {}", v.len() + 1];
-        v.push((key, *additional_param))
+        let index: u8 = match (v.len() + 1).try_into() {
+            Ok(u) => u,
+            Err(_) => u8::MAX,
+        };
+        v.push((PARAMETER, Some(index), *additional_param))
     }
     v
 }
@@ -460,13 +469,27 @@ mod tests {
         max: i32::MAX,
     );
 
-    #[test]
-    fn a() {
-        let input = "
+    macro_rules! pl_round_trip_test {
+        ($name: ident, $input: expr, $output: expr,) => {
+            #[test]
+            fn $name() {
+                let data = parse("", &$input).unwrap();
+                assert_eq!($output, data);
+
+                let ast_1 = ast::parse("", &$input).unwrap().into_string_tree();
+                let ast_2 = to_ast(&data);
+                assert_eq!(ast_1, ast_2);
+            }
+        };
+    }
+
+    pl_round_trip_test![
+        header,
+        "
 (FAMILY CMR)
 (FACE O 352)
 (CODINGSCHEME TEX TEXT)
-(DESIGNSIZE R 10.0)
+(DESIGNSIZE R 11.0)
 (COMMENT DESIGNSIZE IS IN POINTS)
 (COMMENT OTHER SIZES ARE MULTIPLES OF DESIGNSIZE)
 (CHECKSUM O 77)
@@ -480,11 +503,11 @@ mod tests {
    (QUAD R 0.0)
    (EXTRASPACE R 0.0)
    )
-";
-        let output = File {
+",
+        File {
             header: Header {
                 checksum: 0o77,
-                design_size: FixWord((1 << 20) * 10),
+                design_size: FixWord((1 << 20) * 11),
                 character_coding_scheme: Some("TEX TEXT".to_string()),
                 font_family: Some("CMR".to_string()),
                 seven_bit_safe: Some(true),
@@ -493,13 +516,49 @@ mod tests {
             },
             char_infos: vec![],
             params: Params::default(),
-        };
+        },
+    ];
 
-        let data = parse("", &input).unwrap();
-        assert_eq!(output, data);
-
-        let ast_1 = ast::parse("", &input).unwrap().into_string_tree();
-        let ast_2 = to_ast(&data);
-        assert_eq!(ast_1, ast_2);
-    }
+    pl_round_trip_test![
+        params_basic,
+        "
+(DESIGNSIZE R 10.0)
+(COMMENT DESIGNSIZE IS IN POINTS)
+(COMMENT OTHER SIZES ARE MULTIPLES OF DESIGNSIZE)
+(CHECKSUM O 0)
+(FONTDIMEN
+   (SLANT R 1.0)
+   (SPACE R 2.0)
+   (STRETCH R 3.0)
+   (SHRINK R 4.0)
+   (XHEIGHT R 5.0)
+   (QUAD R 6.0)
+   (EXTRASPACE R 7.0)
+   (PARAMETER D 8 R 8.0)
+   )
+",
+        File {
+            header: Header {
+                checksum: 0,
+                design_size: FixWord((1 << 20) * 10),
+                character_coding_scheme: None,
+                font_family: None,
+                seven_bit_safe: None,
+                face: None,
+                additional_data: vec![],
+            },
+            char_infos: vec![],
+            params: Params {
+                slant: FixWord(1 * FixWord::UNITY.0),
+                space: FixWord(2 * FixWord::UNITY.0),
+                space_stretch: FixWord(3 * FixWord::UNITY.0),
+                space_shrink: FixWord(4 * FixWord::UNITY.0),
+                x_height: FixWord(5 * FixWord::UNITY.0),
+                quad: FixWord(6 * FixWord::UNITY.0),
+                extra_space: FixWord(7 * FixWord::UNITY.0),
+                math_params: MathParams::None,
+                additional_params: vec![FixWord(8 * FixWord::UNITY.0),],
+            },
+        },
+    ];
 }

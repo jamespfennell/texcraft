@@ -83,6 +83,9 @@ pub enum ConversionError<T> {
     /// The provided string could not be parsed as a real number
     RealNumberInvalidValue(T, String),
     NumberExtraWord(T),
+    ParameterIndexIsZero(T),
+    ParameterExtraWord(T),
+    ParameterNotEnoughWords(T),
 
     InvalidBoolean(T),
     InvalidCharacter(T),
@@ -244,44 +247,31 @@ fn ensure_no_list<T: Clone>(node: &Node<T>) -> Result<(), ConversionError<T>> {
     }
 }
 
+impl<T: AsRef<str> + Clone> TryInto<(u8, FixWord)> for &Node<T> {
+    type Error = ConversionError<T>;
+
+    fn try_into(self) -> Result<(u8, FixWord), Self::Error> {
+        let words = match self.value.0.len() {
+            0..=3 => Err(ConversionError::ParameterNotEnoughWords(self.close.clone())),
+            4 => Ok(&self.value.0[0..4]),
+            _ => Err(ConversionError::ParameterExtraWord(self.value.0[2].clone())),
+        }?;
+        let i = into_u8(&words[0], &words[1])?;
+        if i == 0 {
+            Err(ConversionError::ParameterIndexIsZero(words[1].clone()))
+        } else {
+            let fix_word = into_fix_word(&words[2], &words[3])?;
+            Ok((i - 1, fix_word))
+        }
+    }
+}
+
 impl<T: AsRef<str> + Clone> TryInto<u8> for &Node<T> {
     type Error = ConversionError<T>;
 
     fn try_into(self) -> Result<u8, Self::Error> {
         let (prefix, value) = prefix_and_value_for_number(self)?;
-        match prefix.as_ref() {
-            "C" => {
-                if value.as_ref().len() != 1 {
-                    Err(ConversionError::InvalidCharacter(value.clone()))
-                } else {
-                    let c: char = value.as_ref().chars().next().unwrap();
-                    match c.try_into() {
-                        Ok(u) => Ok(u),
-                        Err(_) => Err(ConversionError::InvalidCharacter(value.clone())),
-                    }
-                }
-            }
-            "O" => match u8::from_str_radix(value.as_ref(), 8) {
-                Ok(u) => Ok(u),
-                Err(_) => Err(ConversionError::NumberInvalidOctal(value.clone())),
-            },
-            "D" => match value.as_ref().parse::<u8>() {
-                Ok(u) => Ok(u),
-                Err(_) => Err(ConversionError::NumberInvalidDecimal(value.clone())),
-            },
-            "H" => match u8::from_str_radix(value.as_ref(), 16) {
-                Ok(u) => Ok(u),
-                Err(_) => Err(ConversionError::NumberInvalidHexadcimal(value.clone())),
-            },
-            "F" => match Face::try_from(value.as_ref()) {
-                Ok(face) => Ok(face.0),
-                Err(explanation) => Err(ConversionError::NumberInvalidFace(
-                    value.clone(),
-                    explanation,
-                )),
-            },
-            _ => Err(ConversionError::NumberInvalidPrefix(prefix.clone())),
-        }
+        into_u8(prefix, value)
     }
 }
 
@@ -289,9 +279,7 @@ impl<T: AsRef<str> + Clone> TryInto<String> for &Node<T> {
     type Error = ConversionError<T>;
 
     fn try_into(self) -> Result<String, Self::Error> {
-        if let Some(node) = self.value.1 .0.first() {
-            return Err(ConversionError::StringUnexpectedList(node.open.clone()));
-        }
+        ensure_no_list(self)?;
         let mut s = String::new();
         for word in &self.value.0 {
             if !s.is_empty() {
@@ -308,18 +296,59 @@ impl<T: AsRef<str> + Clone> TryInto<FixWord> for &Node<T> {
 
     fn try_into(self) -> Result<FixWord, Self::Error> {
         let (prefix, value) = prefix_and_value_for_number(self)?;
-        if prefix.as_ref() != "R" {
-            return Err(ConversionError::NumberInvalidPrefix(
-                self.value.0[0].clone(),
-            ));
+        into_fix_word(prefix, value)
+    }
+}
+
+fn into_u8<T: AsRef<str> + Clone>(prefix: &T, value: &T) -> Result<u8, ConversionError<T>> {
+    match prefix.as_ref() {
+        "C" => {
+            if value.as_ref().len() != 1 {
+                Err(ConversionError::InvalidCharacter(value.clone()))
+            } else {
+                let c: char = value.as_ref().chars().next().unwrap();
+                match c.try_into() {
+                    Ok(u) => Ok(u),
+                    Err(_) => Err(ConversionError::InvalidCharacter(value.clone())),
+                }
+            }
         }
-        match value.as_ref().try_into() {
-            Ok(fix_word) => Ok(fix_word),
-            Err(explanation) => Err(ConversionError::RealNumberInvalidValue(
+        "O" => match u8::from_str_radix(value.as_ref(), 8) {
+            Ok(u) => Ok(u),
+            Err(_) => Err(ConversionError::NumberInvalidOctal(value.clone())),
+        },
+        "D" => match value.as_ref().parse::<u8>() {
+            Ok(u) => Ok(u),
+            Err(_) => Err(ConversionError::NumberInvalidDecimal(value.clone())),
+        },
+        "H" => match u8::from_str_radix(value.as_ref(), 16) {
+            Ok(u) => Ok(u),
+            Err(_) => Err(ConversionError::NumberInvalidHexadcimal(value.clone())),
+        },
+        "F" => match Face::try_from(value.as_ref()) {
+            Ok(face) => Ok(face.0),
+            Err(explanation) => Err(ConversionError::NumberInvalidFace(
                 value.clone(),
                 explanation,
             )),
-        }
+        },
+        _ => Err(ConversionError::NumberInvalidPrefix(prefix.clone())),
+    }
+}
+
+fn into_fix_word<T: AsRef<str> + Clone>(
+    prefix: &T,
+    value: &T,
+) -> Result<FixWord, ConversionError<T>> {
+    if prefix.as_ref() != "R" {
+        return Err(ConversionError::NumberInvalidPrefix(prefix.clone()));
+    }
+    match value.as_ref().try_into() {
+        Ok(fix_word) => Ok(fix_word),
+        Err(explanation) => Err(ConversionError::RealNumberInvalidValue(
+            value.clone(),
+            explanation,
+        )),
     }
 }
 
