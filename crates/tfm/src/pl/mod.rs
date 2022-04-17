@@ -79,6 +79,9 @@ pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<
             DESIGN_SIZE => {
                 file.header.design_size = node.try_into()?;
             }
+            FACE => {
+              file.header.face = Some(Face(node.try_into()?));
+            }
             FAMILY => {
                 file.header.font_family = Some(node.try_into()?);
             }

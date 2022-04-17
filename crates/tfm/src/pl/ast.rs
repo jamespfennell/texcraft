@@ -88,6 +88,7 @@ pub enum ConversionError<T> {
     NumberInvalidOctal(T),
     NumberInvalidDecimal(T),
     NumberInvalidHexadcimal(T),
+    NumberInvalidFace(T, &'static str),
 
     StringUnexpectedList(T),
 }
@@ -204,14 +205,35 @@ impl<T: AsRef<str> + Clone> TryInto<u8> for &Node<T> {
         };
         match prefix.as_ref() {
             "C" => {
-                Ok(0)
+                if value.as_ref().len() != 1 {
+                    Err(ConversionError::InvalidCharacter(value.clone()))
+                } else {
+                    let c: char = value.as_ref().chars().nth(0).unwrap();
+                    match c.try_into() {
+                        Ok(u) => Ok(u),
+                        Err(_) => Err(ConversionError::InvalidCharacter(value.clone())),
+                    }
+                }
             }
-            "O" => {
-              match u8::from_str_radix(value.as_ref(), 8) {
+            "O" => match u8::from_str_radix(value.as_ref(), 8) {
                 Ok(u) => Ok(u),
                 Err(_) => Err(ConversionError::NumberInvalidOctal(value.clone())),
-              }
-            }
+            },
+            "D" => match u8::from_str_radix(value.as_ref(), 10) {
+                Ok(u) => Ok(u),
+                Err(_) => Err(ConversionError::NumberInvalidDecimal(value.clone())),
+            },
+            "H" => match u8::from_str_radix(value.as_ref(), 16) {
+                Ok(u) => Ok(u),
+                Err(_) => Err(ConversionError::NumberInvalidHexadcimal(value.clone())),
+            },
+            "F" => match Face::try_from(value.as_ref()) {
+                Ok(face) => Ok(face.0),
+                Err(explanation) => Err(ConversionError::NumberInvalidFace(
+                    value.clone(),
+                    explanation,
+                )),
+            },
             _ => Err(ConversionError::NumberInvalidPrefix(prefix.clone())),
         }
     }
