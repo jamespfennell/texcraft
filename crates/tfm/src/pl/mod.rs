@@ -66,14 +66,16 @@ pub fn format(file_name: &str, input: &str, style: Style) -> String {
 pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<Word<'a>>> {
     let tree = ast::parse(file_name, input)?;
     let mut file: File = Default::default();
-    file.header.design_size = FixWord(FixWord::UNITY.0 * 10);
+    // file.header.design_size = FixWord(FixWord::UNITY.0 * 10);
     for node in tree.nodes() {
         match node.key() {
             COMMENT => {}
             FAMILY => {
-                file.header.font_family = Some("hello".to_string());
+                file.header.font_family = Some(node.try_into()?);
             }
-
+            CODING_SCHEME => {
+                file.header.character_coding_scheme = Some(node.try_into()?);   
+            }
             _ => {
                 return Err(ParseError::InvalidKey(node.key));
             }
@@ -199,6 +201,12 @@ impl<T: Display + AsRef<str>> Display for ParseError<T> {
 impl<T> From<ast::ParseError<T>> for ParseError<T> {
     fn from(err: ast::ParseError<T>) -> Self {
         ParseError::Parse(err)
+    }
+}
+
+impl<T> From<ast::ConversionError<T>> for ParseError<T> {
+    fn from(err: ast::ConversionError<T>) -> Self {
+        ParseError::ConversionError(err)
     }
 }
 

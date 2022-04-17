@@ -84,6 +84,8 @@ pub enum ConversionError<T> {
     /// The provided string could not be parsed as a real number
     RealNumberInvalidValue(T, String),
     RealNumberExtraWord(T),
+
+    StringUnexpectedList(T),
 }
 
 /// A node in the PL abstract syntax tree.
@@ -176,9 +178,23 @@ impl<T: AsRef<str>> Node<T> {
             value: (words, self.value.1.into_string_tree()),
             close: self.close.as_ref().to_string() }
     }
+}
 
-    pub fn read_string(&self) -> Result<String, ()>  {
-        Err(())
+impl<T: AsRef<str> + Clone> TryInto<String> for &Node<T> {
+    type Error = ConversionError<T>;
+
+    fn try_into(self) -> Result<String, Self::Error> {
+        if let Some(node) = self.value.1.0.first() {
+            return Err(ConversionError::StringUnexpectedList(node.open.clone()));
+        }
+        let mut s = String::new();
+        for word in &self.value.0 {
+            if !s.is_empty() {
+                s.push(' ');
+            }
+            s.push_str(word.as_ref());
+        }
+        Ok(s)
     }
 }
 
