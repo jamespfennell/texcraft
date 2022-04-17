@@ -251,7 +251,7 @@ impl<T: AsRef<str> + Clone> TryInto<u8> for &Node<T> {
                 if value.as_ref().len() != 1 {
                     Err(ConversionError::InvalidCharacter(value.clone()))
                 } else {
-                    let c: char = value.as_ref().chars().nth(0).unwrap();
+                    let c: char = value.as_ref().chars().next().unwrap();
                     match c.try_into() {
                         Ok(u) => Ok(u),
                         Err(_) => Err(ConversionError::InvalidCharacter(value.clone())),
@@ -262,7 +262,7 @@ impl<T: AsRef<str> + Clone> TryInto<u8> for &Node<T> {
                 Ok(u) => Ok(u),
                 Err(_) => Err(ConversionError::NumberInvalidOctal(value.clone())),
             },
-            "D" => match u8::from_str_radix(value.as_ref(), 10) {
+            "D" => match value.as_ref().parse::<u8>() {
                 Ok(u) => Ok(u),
                 Err(_) => Err(ConversionError::NumberInvalidDecimal(value.clone())),
             },
@@ -305,16 +305,15 @@ impl<T: AsRef<str> + Clone> TryInto<FixWord> for &Node<T> {
 
     fn try_into(self) -> Result<FixWord, Self::Error> {
         let (prefix, value) = prefix_and_value_for_number(self)?;
-        if self.value.0[0].as_ref() != "R" {
+        if prefix.as_ref() != "R" {
             return Err(ConversionError::NumberInvalidPrefix(
                 self.value.0[0].clone(),
             ));
         }
-        let word = &self.value.0[1];
-        match word.as_ref().try_into() {
+        match value.as_ref().try_into() {
             Ok(fix_word) => Ok(fix_word),
             Err(explanation) => Err(ConversionError::RealNumberInvalidValue(
-                word.clone(),
+                value.clone(),
                 explanation,
             )),
         }
@@ -417,14 +416,12 @@ impl<'a> Parse<'a> for Option<Node<Word<'a>>> {
         let open = match lexer.peek() {
             None => return Ok(None),
             Some((TokenType::Open, open)) => {
-                let open = open.clone();
+                let open = *open;
                 lexer.next();
                 open
             }
             Some((TokenType::Close, _)) => return Ok(None),
-            Some((TokenType::Word, word)) => {
-                return Err(ParseError::WordWhileOpeningElem(word.clone()))
-            }
+            Some((TokenType::Word, word)) => return Err(ParseError::WordWhileOpeningElem(*word)),
         };
         let key = Word::parse(lexer)?;
         let value = (
@@ -461,7 +458,7 @@ impl<'a> Parse<'a> for Option<Word<'a>> {
     fn parse(lexer: &mut Peekable<Lexer<'a>>) -> Result<Self, ParseError<Word<'a>>> {
         match lexer.peek() {
             Some((TokenType::Word, word)) => {
-                let word = word.clone();
+                let word = *word;
                 lexer.next();
                 Ok(Some(word))
             }
