@@ -118,7 +118,10 @@ pub struct Builder(Node<String>);
 
 impl Builder {
     pub fn with_str(&mut self, s: &str) -> &mut Builder {
-        self.0.value.0.push(s.to_string());
+        // TODO: need to replace non-ASCII with ? and () with an error or something
+        for w in s.split_whitespace() {
+            self.0.value.0.push(w.to_string());
+        }
         self
     }
 

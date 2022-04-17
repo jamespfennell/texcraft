@@ -128,7 +128,7 @@ fn parse_font_dimensions<'a>(
             PARAMETER => {
                 // Read a u8 and a FixWord
                 continue;
-            },
+            }
             _ => {
                 return Err(ParseError::InvalidKey(node.key));
             }
