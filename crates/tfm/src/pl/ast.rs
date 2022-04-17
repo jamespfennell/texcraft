@@ -82,7 +82,7 @@ pub enum ConversionError<T> {
     NumberInvalidPrefix(T),
     /// The provided string could not be parsed as a real number
     RealNumberInvalidValue(T, String),
-    RealNumberExtraWord(T),
+    NumberExtraWord(T),
 
     InvalidCharacter(T),
     NumberInvalidOctal(T),
@@ -186,23 +186,41 @@ impl<T: AsRef<str>> Node<T> {
     }
 }
 
+impl<T: AsRef<str> + Clone> TryInto<u32> for &Node<T> {
+    type Error = ConversionError<T>;
+
+    fn try_into(self) -> Result<u32, Self::Error> {
+        let (prefix, value) = prefix_and_value_for_number(self)?;
+        match prefix.as_ref() {
+            "O" => match u32::from_str_radix(value.as_ref(), 8) {
+                Ok(u) => Ok(u),
+                Err(_) => Err(ConversionError::NumberInvalidOctal(value.clone())),
+            },
+            "H" => match u32::from_str_radix(value.as_ref(), 16) {
+                Ok(u) => Ok(u),
+                Err(_) => Err(ConversionError::NumberInvalidHexadcimal(value.clone())),
+            },
+            _ => Err(ConversionError::NumberInvalidPrefix(prefix.clone())),
+        }
+    }
+}
+
+fn prefix_and_value_for_number<T: Clone>(node: &Node<T>) -> Result<(&T, &T), ConversionError<T>> {
+    if let Some(node) = node.value.1 .0.first() {
+        return Err(ConversionError::NumberUnexpectedList(node.open.clone()));
+    }
+    match node.value.0.len() {
+        0 | 1 => Err(ConversionError::NumberNotEnoughWords(node.close.clone())),
+        2 => Ok((&node.value.0[0], &node.value.0[1])),
+        _ => Err(ConversionError::NumberExtraWord(node.value.0[2].clone())),
+    }
+}
+
 impl<T: AsRef<str> + Clone> TryInto<u8> for &Node<T> {
     type Error = ConversionError<T>;
 
     fn try_into(self) -> Result<u8, Self::Error> {
-        // TODO: this is too magic - extract to a function
-        if let Some(node) = self.value.1 .0.first() {
-            return Err(ConversionError::NumberUnexpectedList(node.open.clone()));
-        }
-        let (prefix, value) = match self.value.0.len() {
-            0 | 1 => return Err(ConversionError::NumberNotEnoughWords(self.close.clone())),
-            2 => (&self.value.0[0], &self.value.0[1]),
-            _ => {
-                return Err(ConversionError::RealNumberExtraWord(
-                    self.value.0[2].clone(),
-                ))
-            }
-        };
+        let (prefix, value) = prefix_and_value_for_number(self)?;
         match prefix.as_ref() {
             "C" => {
                 if value.as_ref().len() != 1 {
@@ -261,28 +279,18 @@ impl<T: AsRef<str> + Clone> TryInto<FixWord> for &Node<T> {
     type Error = ConversionError<T>;
 
     fn try_into(self) -> Result<FixWord, Self::Error> {
-        if let Some(node) = self.value.1 .0.first() {
-            return Err(ConversionError::NumberUnexpectedList(node.open.clone()));
+        let (prefix, value) = prefix_and_value_for_number(self)?;
+        if self.value.0[0].as_ref() != "R" {
+            return Err(ConversionError::NumberInvalidPrefix(
+                self.value.0[0].clone(),
+            ));
         }
-        match self.value.0.len() {
-            0 | 1 => Err(ConversionError::NumberNotEnoughWords(self.close.clone())),
-            2 => {
-                if self.value.0[0].as_ref() != "R" {
-                    return Err(ConversionError::NumberInvalidPrefix(
-                        self.value.0[0].clone(),
-                    ));
-                }
-                let word = &self.value.0[1];
-                match word.as_ref().try_into() {
-                    Ok(fix_word) => Ok(fix_word),
-                    Err(explanation) => Err(ConversionError::RealNumberInvalidValue(
-                        word.clone(),
-                        explanation,
-                    )),
-                }
-            }
-            _ => Err(ConversionError::RealNumberExtraWord(
-                self.value.0[2].clone(),
+        let word = &self.value.0[1];
+        match word.as_ref().try_into() {
+            Ok(fix_word) => Ok(fix_word),
+            Err(explanation) => Err(ConversionError::RealNumberInvalidValue(
+                word.clone(),
+                explanation,
             )),
         }
     }

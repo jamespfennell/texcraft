@@ -66,11 +66,10 @@ pub fn format(file_name: &str, input: &str, style: Style) -> String {
 pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<Word<'a>>> {
     let tree = ast::parse(file_name, input)?;
     let mut file: File = Default::default();
-    // file.header.design_size = FixWord(FixWord::UNITY.0 * 10);
     for node in tree.nodes() {
         match node.key() {
             CHECKSUM => {
-                file.header.checksum = 0; //node.try_into()?;
+                file.header.checksum = node.try_into()?;
             }
             CODING_SCHEME => {
                 file.header.character_coding_scheme = Some(node.try_into()?);
@@ -80,7 +79,7 @@ pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<
                 file.header.design_size = node.try_into()?;
             }
             FACE => {
-              file.header.face = Some(Face(node.try_into()?));
+                file.header.face = Some(Face(node.try_into()?));
             }
             FAMILY => {
                 file.header.font_family = Some(node.try_into()?);
