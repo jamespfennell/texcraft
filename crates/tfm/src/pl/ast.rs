@@ -7,6 +7,7 @@ use std::{
     iter::{Iterator, Peekable},
 };
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Tree<T>(Vec<Node<T>>);
 
 impl Tree<String> {
@@ -15,11 +16,20 @@ impl Tree<String> {
     }
 }
 
-impl<T> Tree<T> {
+impl<T: AsRef<str>> Tree<T> {
     pub fn nodes(&self) -> &[Node<T>] {
         &self.0
     }
+
+    pub fn into_string_tree(&self) -> Tree<String> {
+        let mut b = Tree(vec![]);
+        for elem in self.nodes() {
+            b.0.push(elem.into_string_elem())
+        }
+        b
+    }
 }
+
 
 pub struct TreeBuilder(Vec<Builder>);
 
@@ -44,13 +54,16 @@ impl From<TreeBuilder> for Tree<String> {
 pub fn parse<'a>(
     file_name: &'a str,
     input: &'a str,
-) -> Result<Vec<Node<Word<'a>>>, ParseError<Word<'a>>> {
+) -> Result<Tree<Word<'a>>, ParseError<Word<'a>>> {
     let lexer = Lexer {
         file_name,
         s: input,
         pos_b: 0,
     };
-    Vec::<Node<Word>>::parse(&mut lexer.peekable())
+        match Vec::<Node<Word>>::parse(&mut lexer.peekable()) {
+            Ok(v) => Ok(Tree(v)),
+            Err(e) => Err(e),
+        }
 }
 
 #[derive(Debug)]
@@ -74,11 +87,11 @@ pub enum ConversionError<T> {
 }
 
 /// A node in the PL abstract syntax tree.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Node<T> {
     open: T,
     pub key: T,
-    value: (Vec<T>, Vec<Node<T>>),
+    value: (Vec<T>, Tree<T>),
     close: T,
 }
 
@@ -87,7 +100,7 @@ impl Node<String> {
         Builder(Node {
             open: "(".to_string(),
             key: key.to_string(),
-            value: (Vec::new(), Vec::new()),
+            value: (Vec::new(), Tree(vec![])),
             close: ")".to_string(),
         })
     }
@@ -136,7 +149,7 @@ impl Builder {
     }
 
     pub fn with_tree(&mut self, t: Tree<String>) -> &mut Builder {
-        self.0.value.1 = t.0;
+        self.0.value.1 = t;
         self
     }
 }
@@ -147,9 +160,25 @@ impl From<Builder> for Node<String> {
     }
 }
 
-impl<T: AsRef<str> + Clone> Node<T> {
+impl<T: AsRef<str>> Node<T> {
     pub fn key(&self) -> &str {
         self.key.as_ref()
+    }
+
+    pub fn into_string_elem(&self) -> Node<String> {
+        let mut words = vec![];
+        for word in &self.value.0 {
+            words.push(word.as_ref().to_string())
+        }
+        Node { open:
+            self.open.as_ref().to_string(), key: 
+            self.key.as_ref().to_string(), 
+            value: (words, self.value.1.into_string_tree()),
+            close: self.close.as_ref().to_string() }
+    }
+
+    pub fn read_string(&self) -> Result<String, ()>  {
+        Err(())
     }
 }
 
@@ -157,7 +186,7 @@ impl<T: AsRef<str> + Clone> TryInto<FixWord> for &Node<T> {
     type Error = ConversionError<T>;
 
     fn try_into(self) -> Result<FixWord, Self::Error> {
-        if let Some(node) = self.value.1.first() {
+        if let Some(node) = self.value.1.0.first() {
             return Err(ConversionError::RealNumberUnexpectedList(node.open.clone()));
         }
         match self.value.0.len() {
@@ -294,7 +323,7 @@ impl<'a> Parse<'a> for Option<Node<Word<'a>>> {
         let key = Word::parse(lexer)?;
         let value = (
             Vec::<Word>::parse(lexer)?,
-            Vec::<Node<Word<'a>>>::parse(lexer)?,
+            Tree(Vec::<Node<Word<'a>>>::parse(lexer)?),
         );
         let close = match lexer.next() {
             None => return Err(ParseError::EndWhileClosingElem),
@@ -348,14 +377,14 @@ where
     }
 }
 
-pub fn write<T: AsRef<str>>(tree: &[Node<T>], style: Style) -> String {
+pub fn write<T: AsRef<str>>(tree: &Tree<T>, style: Style) -> String {
     let mut o = Writer {
         style: &style,
         buffer: String::new(),
         current_indent: 0,
         after_word: false,
     };
-    o.write_list(tree);
+    o.write_list(tree.nodes());
     o.buffer
 }
 
@@ -392,13 +421,13 @@ impl<'a> Writer<'a> {
         for word in &elem.value.0 {
             self.write_word(word);
         }
-        if elem.value.1.is_empty() {
+        if elem.value.1.0.is_empty() {
             self.buffer.push(')');
             self.buffer.push('\n');
         } else {
             self.buffer.push('\n');
             self.current_indent += self.style.indent;
-            self.write_list(&elem.value.1);
+            self.write_list(&elem.value.1.0);
             self.current_indent -= self.style.indent;
 
             let indent = if self.style.closing_brace_style == ClosingBraceStyle::ExtraIndent {

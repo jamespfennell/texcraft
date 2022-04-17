@@ -67,7 +67,7 @@ pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<
     let tree = ast::parse(file_name, input)?;
     let mut file: File = Default::default();
     file.header.design_size = FixWord(FixWord::UNITY.0 * 10);
-    for node in tree {
+    for node in tree.nodes() {
         match node.key() {
             COMMENT => {}
             FAMILY => {
@@ -122,7 +122,7 @@ impl Default for ClosingBraceStyle {
 }
 
 /// A word in a property list file.
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct Word<'a> {
     pub file_name: &'a str,
     pub file: &'a str,
@@ -202,8 +202,9 @@ impl<T> From<ast::ParseError<T>> for ParseError<T> {
     }
 }
 
-/// Write a [File] in property list format.
-pub fn write(file: &File, style: Style) -> String {
+/// Convert a [File] to a PL AST.
+pub fn to_ast(file: &File) -> ast::Tree<String> {
+
     let mut builder = ast::Tree::builder();
     if let Some(font_family) = &file.header.font_family {
         builder.add(FAMILY).with_str(font_family);
@@ -272,8 +273,13 @@ pub fn write(file: &File, style: Style) -> String {
             .with_character(char_info.id)
             .with_tree(char_tree.into());
     }
-    let tree: ast::Tree<String> = builder.into();
-    ast::write(tree.nodes(), style)
+     builder.into()
+}
+
+/// Write a [File] in property list format.
+pub fn write(file: &File, style: Style) -> String {
+    let tree: ast::Tree<String> = to_ast(file);
+    ast::write(&tree, style)
 }
 
 fn convert_params(params: &Params) -> Vec<(String, FixWord)> {
@@ -351,7 +357,7 @@ fn convert_params(params: &Params) -> Vec<(String, FixWord)> {
 mod tests {
     use super::*;
 
-    macro_rules! round_trip_tests {
+    macro_rules! fix_word_round_trip_tests {
         ($($name:ident: $value:expr,)*) => {
         $(
             #[test]
@@ -374,7 +380,7 @@ mod tests {
         }
     }
 
-    round_trip_tests!(
+    fix_word_round_trip_tests!(
         zero: 0,
         one: 1,
         two: 2,
@@ -396,4 +402,38 @@ mod tests {
         min: i32::MIN,
         max: i32::MAX,
     );
+
+    #[test]
+    fn a() {
+        let input = "
+(FAMILY CMR)
+(FACE O 352)
+(CODINGSCHEME TEX TEXT)
+(DESIGNSIZE R 10.0)
+(COMMENT DESIGNSIZE IS IN POINTS)
+(COMMENT OTHER SIZES ARE MULTIPLES OF DESIGNSIZE)
+(CHECKSUM O 77)
+(SEVENBITSAFEFLAG TRUE)
+";
+        let output = File {
+            header: Header {
+                checksum: 0o77,
+                design_size: FixWord((1 << 20) * 10),
+                character_coding_scheme: Some("TEX TEXT".to_string()),
+                font_family: Some("CMR".to_string()),
+                seven_bit_safe: Some(true),
+                face: Some(Face(0o352)),
+                additional_data: vec![],
+            },
+            char_infos: vec![],
+            params: Params::default(),
+        };
+
+        let data = parse("", &input).unwrap();
+        assert_eq!(output, data);
+
+        let ast_1 = ast::parse("", &input).unwrap().into_string_tree();
+        let ast_2 = to_ast(&data);
+        assert_eq!(ast_1, ast_2);
+    }
 }

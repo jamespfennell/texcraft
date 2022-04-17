@@ -5,7 +5,7 @@ pub mod format;
 pub mod pl;
 
 /// Complete contents of a TeX font metric (.tfm) or property list (.pl) file.
-#[derive(Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct File {
     /// The file header.
     pub header: Header,
@@ -199,7 +199,7 @@ impl std::fmt::Display for FixWord {
 }
 
 /// Information about a character.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct CharInfo {
     pub id: u8,
     /// Width of the character.
