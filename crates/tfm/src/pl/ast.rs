@@ -99,7 +99,7 @@ pub enum ConversionError<T> {
 pub struct Node<T> {
     open: T,
     pub key: T,
-    value: (Vec<T>, Tree<T>),
+    pub value: (Vec<T>, Tree<T>),
     close: T,
 }
 

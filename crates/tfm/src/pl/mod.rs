@@ -16,7 +16,7 @@ const DESIGN_SIZE: &str = "DESIGNSIZE";
 const FACE: &str = "FACE";
 const FAMILY: &str = "FAMILY";
 const HEADER: &str = "HEADER";
-const SEVENBITSAFEFLAG: &str = "SEVENBITSAFEFLAG";
+const SEVEN_BIT_SAFE: &str = "SEVENBITSAFEFLAG";
 
 const FONT_DIMENSIONS: &str = "FONTDIMEN";
 const SLANT: &str = "SLANT";
@@ -49,6 +49,8 @@ const BIG_OP_SPACING_2: &str = "BIGOPSPACING2";
 const BIG_OP_SPACING_3: &str = "BIGOPSPACING3";
 const BIG_OP_SPACING_4: &str = "BIGOPSPACING4";
 const BIG_OP_SPACING_5: &str = "BIGOPSPACING5";
+
+const PARAMETER: &str = "PARAMETER";
 
 /// Format property list data.
 ///
@@ -84,7 +86,10 @@ pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<
             FAMILY => {
                 file.header.font_family = Some(node.try_into()?);
             }
-            SEVENBITSAFEFLAG => {
+            FONT_DIMENSIONS => {
+                parse_font_dimensions(node, &mut file.params)?;
+            }
+            SEVEN_BIT_SAFE => {
                 file.header.seven_bit_safe = Some(node.try_into()?);
             }
             _ => {
@@ -97,6 +102,40 @@ pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<
     println!["{}", output];
 
     Ok(file)
+}
+
+fn parse_font_dimensions<'a>(
+    node: &ast::Node<Word<'a>>,
+    params: &mut Params,
+) -> Result<(), ParseError<Word<'a>>> {
+    for node in node.value.1.nodes() {
+        let i: usize = match node.key() {
+            // Names for any font
+            SLANT => 0,
+            SPACE => 1,
+            STRETCH => 2,
+            SHRINK => 3,
+            XHEIGHT => 4,
+            QUAD => 5,
+            EXTRA_SPACE => 6,
+
+            // Name for TeX math symbol fonts
+
+            // Name for TeX math extension fonts
+
+            // Other cases
+            COMMENT => continue,
+            PARAMETER => {
+                // Read a u8 and a FixWord
+                continue;
+            },
+            _ => {
+                return Err(ParseError::InvalidKey(node.key));
+            }
+        };
+        params.set(i, node.try_into()?);
+    }
+    Ok(())
 }
 
 /// Style to apply when writing property list data.
@@ -253,7 +292,7 @@ pub fn to_ast(file: &File) -> ast::Tree<String> {
         .with_str("OTHER SIZES ARE MULTIPLES OF DESIGNSIZE");
     builder.add(CHECKSUM).with_octal(file.header.checksum);
     if file.header.seven_bit_safe == Some(true) {
-        builder.add(SEVENBITSAFEFLAG).with_str("TRUE");
+        builder.add(SEVEN_BIT_SAFE).with_str("TRUE");
     }
 
     {
@@ -432,6 +471,15 @@ mod tests {
 (COMMENT OTHER SIZES ARE MULTIPLES OF DESIGNSIZE)
 (CHECKSUM O 77)
 (SEVENBITSAFEFLAG TRUE)
+(FONTDIMEN
+   (SLANT R 0.0)
+   (SPACE R 0.0)
+   (STRETCH R 0.0)
+   (SHRINK R 0.0)
+   (XHEIGHT R 0.0)
+   (QUAD R 0.0)
+   (EXTRASPACE R 0.0)
+   )
 ";
         let output = File {
             header: Header {
