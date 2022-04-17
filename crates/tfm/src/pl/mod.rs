@@ -84,6 +84,9 @@ pub fn parse<'a>(file_name: &'a str, input: &'a str) -> Result<File, ParseError<
             FAMILY => {
                 file.header.font_family = Some(node.try_into()?);
             }
+            SEVENBITSAFEFLAG => {
+                file.header.seven_bit_safe = Some(node.try_into()?);
+            }
             _ => {
                 return Err(ParseError::InvalidKey(node.key));
             }

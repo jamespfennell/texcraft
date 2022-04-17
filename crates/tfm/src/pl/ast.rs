@@ -84,6 +84,7 @@ pub enum ConversionError<T> {
     RealNumberInvalidValue(T, String),
     NumberExtraWord(T),
 
+    InvalidBoolean(T),
     InvalidCharacter(T),
     NumberInvalidOctal(T),
     NumberInvalidDecimal(T),
@@ -186,6 +187,24 @@ impl<T: AsRef<str>> Node<T> {
     }
 }
 
+impl<T: AsRef<str> + Clone> TryInto<bool> for &Node<T> {
+    type Error = ConversionError<T>;
+
+    fn try_into(self) -> Result<bool, Self::Error> {
+        ensure_no_list(self)?;
+        let value = match self.value.0.len() {
+            0 => Err(ConversionError::NumberNotEnoughWords(self.close.clone())),
+            1 => Ok(&self.value.0[0]),
+            _ => Err(ConversionError::NumberExtraWord(self.value.0[1].clone())),
+        }?;
+        match value.as_ref() {
+            "TRUE" => Ok(true),
+            "FALSE" => Ok(false),
+            _ => Err(ConversionError::InvalidBoolean(value.clone())),
+        }
+    }
+}
+
 impl<T: AsRef<str> + Clone> TryInto<u32> for &Node<T> {
     type Error = ConversionError<T>;
 
@@ -206,13 +225,19 @@ impl<T: AsRef<str> + Clone> TryInto<u32> for &Node<T> {
 }
 
 fn prefix_and_value_for_number<T: Clone>(node: &Node<T>) -> Result<(&T, &T), ConversionError<T>> {
-    if let Some(node) = node.value.1 .0.first() {
-        return Err(ConversionError::NumberUnexpectedList(node.open.clone()));
-    }
+    ensure_no_list(node)?;
     match node.value.0.len() {
         0 | 1 => Err(ConversionError::NumberNotEnoughWords(node.close.clone())),
         2 => Ok((&node.value.0[0], &node.value.0[1])),
         _ => Err(ConversionError::NumberExtraWord(node.value.0[2].clone())),
+    }
+}
+
+fn ensure_no_list<T: Clone>(node: &Node<T>) -> Result<(), ConversionError<T>> {
+    if let Some(node) = node.value.1 .0.first() {
+        Err(ConversionError::NumberUnexpectedList(node.open.clone()))
+    } else {
+        Ok(())
     }
 }
 
