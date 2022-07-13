@@ -1,9 +1,12 @@
-FROM rust:1.56 AS builder
+FROM rust:1.59 AS builder
 
 # Build the Rustdoc HTML files
 WORKDIR /rustdoc
 COPY Cargo.lock .
 COPY Cargo.toml .
+COPY bin bin
+COPY performance performance
+COPY playground playground
 COPY crates crates
 RUN cargo fetch
 RUN cargo doc --no-deps --lib

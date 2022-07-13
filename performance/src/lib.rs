@@ -72,26 +72,42 @@ impl Default for Weights {
 pub fn generate_random_tex_document(
     rng: &mut rand::prelude::StdRng,
     num_lines: usize,
-    macro_num_lines_bounds: (usize, usize),
+    macro_length_bounds: (usize, usize),
     line_length_bounds: (usize, usize),
     weights: &Weights,
 ) -> String {
     let mut result = String::new();
-    result.push_str("% This TeX document was randomly genenerated by randomtex, a binary of the Texcraft project.\n");
+    result.push_str("% This TeX document was randomly genenerated by randtex, a program of the Texcraft project.\n");
     result.push_str(
         "% Running the document is a no-op except that \\macro will be defined at the end.\n",
     );
 
-    let mut num_lines_generated = 0;
-    while num_lines_generated < num_lines {
-        let macro_num_lines = rng.gen_range(macro_num_lines_bounds.0..macro_num_lines_bounds.1);
+    // 2 lines of commments and the final \end are always included
+    let mut num_lines_generated: usize = 3;
+    loop {
+        let range = if macro_length_bounds.1 < macro_length_bounds.0 {
+            macro_length_bounds.1..macro_length_bounds.1 + 1
+        } else {
+            macro_length_bounds.0..macro_length_bounds.1 + 1
+        };
+        // There is a risk that we generate too many lines.
+        let range = if num_lines_generated + macro_length_bounds.1 + 2 > num_lines {
+            if num_lines_generated + macro_length_bounds.0 + 2 >= num_lines {
+                break;
+            }
+            // The range is non empty because of the inverse of the previous conditional.
+            macro_length_bounds.0..num_lines - num_lines_generated - 2
+        } else {
+            range
+        };
+        let macro_length = rng.gen_range(range);
         result.push_str(&generate_random_tex_macro(
             rng,
             line_length_bounds,
-            macro_num_lines,
+            macro_length,
             weights,
         ));
-        num_lines_generated += macro_num_lines + 2;
+        num_lines_generated += macro_length + 2;
     }
     result.push_str("\\end\n");
     result
@@ -121,7 +137,11 @@ pub fn generate_random_tex_macro(
         result.push_str("  ");
         let mut commenting = false;
         let mut group_depth: u32 = 0;
-        let line_length = rng.gen_range(line_length_bounds.0..line_length_bounds.1);
+        let line_length = if line_length_bounds.1 <= line_length_bounds.0 {
+            line_length_bounds.1
+        } else {
+            rng.gen_range(line_length_bounds.0..line_length_bounds.1 + 1)
+        };
         let mut i = 0;
         while i < line_length {
             let temp;
