@@ -27,7 +27,7 @@ pub fn run<S: HasComponent<script::Component>>(env: &mut runtime::Env<S>, opts: 
     while let ReadResult::Input(input) = reader.read_line().unwrap() {
         reader.add_history(input.clone());
 
-        // TODO: need to clear input in the env
+        env.clear_sources();
         env.push_source("".to_string(), input).unwrap();
         let tokens = match script::run(env, true) {
             Ok(s) => s,

@@ -168,6 +168,11 @@ impl<S> Env<S> {
         )
     }
 
+    /// Clear all source code from the environment.
+    pub fn clear_sources(&mut self) {
+        self.internal.clear_sources()
+    }
+
     /// Set a command.
     pub fn set_command<A: AsRef<str>, B: Into<Definition<S>>>(&mut self, name: A, cmd: B) {
         self.base_state.commands_map.insert(
@@ -277,6 +282,11 @@ impl<S> InternalEnv<S> {
         std::mem::swap(&mut new_source, &mut self.current_source);
         self.sources.push(new_source);
         Ok(())
+    }
+
+    fn clear_sources(&mut self) {
+        self.current_source = Default::default();
+        self.sources.clear();
     }
 
     #[inline]
