@@ -37,8 +37,8 @@ pub use streams::UnexpandedStream;
 /// [Env::push_source] method.
 pub fn run<S>(
     env: &mut Env<S>,
-    character_handler: fn(Token, &mut ExecutionInput<S>) -> anyhow::Result<()>,
-    undefined_cs_handler: fn(Token, &mut ExecutionInput<S>) -> anyhow::Result<()>,
+    character_handler: command::ExecutionFn<S>,
+    undefined_cs_handler: command::ExecutionFn<S>,
 ) -> anyhow::Result<()> {
     let execution_input = ExecutionInput::new(env);
     loop {
