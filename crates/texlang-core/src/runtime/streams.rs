@@ -373,9 +373,8 @@ impl<S> ExecutionInput<S> {
         self.0.begin_group()
     }
 
-    // TODO: error if there is not active group
-    pub fn end_group(&mut self) {
-        self.0.end_group()
+    pub fn end_group(&mut self, token: Token) -> anyhow::Result<()> {
+        self.0.end_group(token)
     }
 
     pub fn groups(&mut self) -> &mut [variable::RestoreValues<S>] {

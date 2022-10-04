@@ -69,10 +69,7 @@ pub fn run<S>(
                         execution_input.begin_group();
                         Ok(())
                     }
-                    token::Value::EndGroup(_) => {
-                        execution_input.end_group();
-                        Ok(())
-                    }
+                    token::Value::EndGroup(_) => execution_input.end_group(token),
                     _ => character_handler(token, execution_input),
                 },
             },
@@ -217,10 +214,14 @@ impl<S> Env<S> {
         self.internal.groups.push(Default::default());
     }
 
-    fn end_group(&mut self) {
-        if let Some(group) = self.internal.groups.pop() {
-            assert![self.base_state.commands_map.end_group()];
-            group.restore(&mut self.base_state, &mut self.custom_state);
+    fn end_group(&mut self, token: Token) -> anyhow::Result<()> {
+        match self.internal.groups.pop() {
+            None => Err(error::TokenError::new(token, "unexpected end of group").into()),
+            Some(group) => {
+                assert![self.base_state.commands_map.end_group()];
+                group.restore(&mut self.base_state, &mut self.custom_state);
+                Ok(())
+            }
         }
     }
 }
