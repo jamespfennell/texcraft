@@ -13,28 +13,28 @@ pub const MULTIPLYCHK_DOC: &str = "Multiply a variable by an integer and error o
 pub const DIVIDE_DOC: &str = "Divide a variable by an integer";
 
 /// Get the `\advance` command.
-pub fn get_advance<S: HasComponent<prefix::Component>>() -> command::Definition<S> {
-    command::Definition::new_execution(advance_fn).with_id(get_variable_op_id())
+pub fn get_advance<S: HasComponent<prefix::Component>>() -> command::Command<S> {
+    command::Command::new_execution(advance_fn).with_id(get_variable_op_id())
 }
 
 /// Get the `\advancechk` command.
-pub fn get_advancechk<S: HasComponent<prefix::Component>>() -> command::Definition<S> {
-    command::Definition::new_execution(advancechk_fn).with_id(get_variable_op_id())
+pub fn get_advancechk<S: HasComponent<prefix::Component>>() -> command::Command<S> {
+    command::Command::new_execution(advancechk_fn).with_id(get_variable_op_id())
 }
 
 /// Get the `\multiply` command.
-pub fn get_multiply<S: HasComponent<prefix::Component>>() -> command::Definition<S> {
-    command::Definition::new_execution(multiply_fn).with_id(get_variable_op_id())
+pub fn get_multiply<S: HasComponent<prefix::Component>>() -> command::Command<S> {
+    command::Command::new_execution(multiply_fn).with_id(get_variable_op_id())
 }
 
 /// Get the `\multiplychk` command.
-pub fn get_multiplychk<S: HasComponent<prefix::Component>>() -> command::Definition<S> {
-    command::Definition::new_execution(multiplychk_fn).with_id(get_variable_op_id())
+pub fn get_multiplychk<S: HasComponent<prefix::Component>>() -> command::Command<S> {
+    command::Command::new_execution(multiplychk_fn).with_id(get_variable_op_id())
 }
 
 /// Get the `\divide` command.
-pub fn get_divide<S: HasComponent<prefix::Component>>() -> command::Definition<S> {
-    command::Definition::new_execution(divide_fn).with_id(get_variable_op_id())
+pub fn get_divide<S: HasComponent<prefix::Component>>() -> command::Command<S> {
+    command::Command::new_execution(divide_fn).with_id(get_variable_op_id())
 }
 struct VariableOp;
 
@@ -48,7 +48,7 @@ macro_rules! create_arithmetic_primitive {
             token: Token,
             input: &mut runtime::ExecutionInput<S>,
         ) -> anyhow::Result<()> {
-            let global = input.state_mut().component_mut().take_global();
+            let global = input.state_mut().component_mut().read_and_reset_global();
             let variable = parse::parse_variable(input)?;
             parse::parse_optional_by(input)?;
             let n: i32 = parse::parse_number(input)?;

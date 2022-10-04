@@ -167,12 +167,12 @@ macro_rules! create_if_primitive {
             }
         }
 
-        pub fn $get_if<S>() -> command::Definition<S>
+        pub fn $get_if<S>() -> command::Command<S>
         where
             S: HasExpansionState,
             S::E: HasComponent<Component>,
         {
-            command::Definition::new_expansion($if_primitive_fn).with_id(if_id())
+            command::Command::new_expansion($if_primitive_fn).with_id(if_id())
         }
     };
 }
@@ -273,12 +273,12 @@ where
 }
 
 /// Get the `\ifcase` primitive.
-pub fn get_if_case<S>() -> command::Definition<S>
+pub fn get_if_case<S>() -> command::Command<S>
 where
     S: HasExpansionState,
     S::E: HasComponent<Component>,
 {
-    command::Definition::new_expansion(if_case_primitive_fn).with_id(if_id())
+    command::Command::new_expansion(if_case_primitive_fn).with_id(if_id())
 }
 
 fn or_primitive_fn<S>(
@@ -336,12 +336,12 @@ where
 }
 
 /// Get the `\or` primitive.
-pub fn get_or<S>() -> command::Definition<S>
+pub fn get_or<S>() -> command::Command<S>
 where
     S: HasExpansionState,
     S::E: HasComponent<Component>,
 {
-    command::Definition::new_expansion(or_primitive_fn).with_id(or_id())
+    command::Command::new_expansion(or_primitive_fn).with_id(or_id())
 }
 
 fn else_primitive_fn<S>(
@@ -395,12 +395,12 @@ where
 }
 
 /// Get the `\else` primitive.
-pub fn get_else<S>() -> command::Definition<S>
+pub fn get_else<S>() -> command::Command<S>
 where
     S: HasExpansionState,
     S::E: HasComponent<Component>,
 {
-    command::Definition::new_expansion(else_primitive_fn).with_id(else_id())
+    command::Command::new_expansion(else_primitive_fn).with_id(else_id())
 }
 
 /// Get the `\fi` primitive.
@@ -423,12 +423,12 @@ where
     Ok(Vec::new())
 }
 
-pub fn get_fi<S>() -> command::Definition<S>
+pub fn get_fi<S>() -> command::Command<S>
 where
     S: HasExpansionState,
     S::E: HasComponent<Component>,
 {
-    command::Definition::new_expansion(fi_primitive_fn).with_id(fi_id())
+    command::Command::new_expansion(fi_primitive_fn).with_id(fi_id())
 }
 
 /// Add all of the conditionals defined in this module to the provided state.

@@ -255,7 +255,7 @@ pub fn new_undefined_cs_error<S>(token: token::Token, state: &runtime::Env<S>) -
     };
 
     let mut cs_names = Vec::<String>::new();
-    for (cs_name, _) in state.get_commands_as_map().into_iter() {
+    for (cs_name, _) in state.get_commands_as_map_slow().into_iter() {
         cs_names.push(cs_name);
     }
 

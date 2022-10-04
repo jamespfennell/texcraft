@@ -104,7 +104,7 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
             input.state().component().int_registers.num(),
         ));
     }
-    let new_cmd = command::Definition::new_variable(singleton_fn).with_addr(addr);
+    let new_cmd = command::Command::new_variable(singleton_fn, addr);
     input.base_mut().commands_map.insert(cs_name, new_cmd);
     Ok(())
 }

@@ -14,13 +14,13 @@ use texlang_core::texmacro::*;
 pub const DEF_DOC: &str = "Define a custom macro";
 
 /// Get the `\def` command.
-pub fn get_def<S: HasComponent<prefix::Component>>() -> command::Definition<S> {
-    command::Definition::new_execution(def_primitive_fn).with_id(def_id())
+pub fn get_def<S: HasComponent<prefix::Component>>() -> command::Command<S> {
+    command::Command::new_execution(def_primitive_fn).with_id(def_id())
 }
 
 /// Get the `\gdef` command.
-pub fn get_gdef<S: HasComponent<prefix::Component>>() -> command::Definition<S> {
-    command::Definition::new_execution(gdef_primitive_fn).with_id(def_id())
+pub fn get_gdef<S: HasComponent<prefix::Component>>() -> command::Command<S> {
+    command::Command::new_execution(gdef_primitive_fn).with_id(def_id())
 }
 
 struct Def;
@@ -48,7 +48,8 @@ fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
     input: &mut runtime::ExecutionInput<S>,
     set_globally_override: bool,
 ) -> anyhow::Result<()> {
-    let set_globally = input.state_mut().component_mut().take_global() || set_globally_override;
+    let set_globally =
+        input.state_mut().component_mut().read_and_reset_global() || set_globally_override;
     let name = parse::parse_command_target("macro definition", def_token, input.unexpanded())?;
     let (prefix, raw_parameters, replacement_end_token) =
         parse_prefix_and_parameters(input.unexpanded())?;

@@ -199,10 +199,10 @@ fn newint_primitive_fn<S: HasComponent<Component>>(
 ) -> anyhow::Result<()> {
     let name = parse::parse_command_target("newint allocation", newint_token, input.unexpanded())?;
     let addr = input.state_mut().component_mut().alloc_int();
-    input.base_mut().commands_map.insert(
-        name,
-        command::Definition::new_variable(singleton_fn).with_addr(addr),
-    );
+    input
+        .base_mut()
+        .commands_map
+        .insert(name, command::Command::new_variable(singleton_fn, addr));
     Ok(())
 }
 
@@ -243,10 +243,10 @@ fn newarray_primitive_fn<S: HasComponent<Component>>(
         parse::parse_command_target("newarray allocation", newarray_token, input.unexpanded())?;
     let len: u32 = parse::parse_number(input)?;
     let addr = input.state_mut().component_mut().alloc_array(len);
-    input.base_mut().commands_map.insert(
-        name,
-        command::Definition::new_variable(array_fn).with_addr(addr),
-    );
+    input
+        .base_mut()
+        .commands_map
+        .insert(name, command::Command::new_variable(array_fn, addr));
     // TODO: Return the arraydef version
     Ok(())
 }

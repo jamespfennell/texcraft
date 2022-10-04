@@ -3,18 +3,17 @@
 //! The `\long` and `\outer` commands are designed to place restrictions on macros
 //!    to avoid performance problems.
 //! These restrictions are described in the TeXBook.
-//! Texlang does not currently impose these restrictions because computers are much
-//!   faster than in the 1970s,
-//!   and keeping code complexity down is more important than stopping TeX users
+//! Texlang does not currently impose these restrictions because hardware is much better than in the 70s,
+//!   and minimizing the complexity of Texlang's code is more important than stopping TeX users
 //!   from writing slow TeX code.
-//! However, Texlang does enforce that these prefix commands can only come before
+//! However, Texlang does enforce the rule that these prefix commands can only come before
 //!  `\def`, `\gdef`, `\edef` and `\xdef`.
 //!
-//! # Developer notes
+//! # Developer notes on `\global`
 //!
 //! The `\global` command here is pretty much a nightmare to implement.
-//! Texlang is all about removing global state, but `\global` makes this
-//!   really hard.
+//! One of the core principles of the Texlang implentation is to remove global state,
+//!   but `\global` makes this really hard.
 //! The reason is that it changes the behavior, at run time, of a bunch of
 //!   other commands like `\def` and `\advance`, and it also changes the semantics
 //!   of variable assignment.
@@ -22,7 +21,7 @@
 //!
 //! The approach here has two parts.
 //!
-//! First, for variable assignment, we just reimplement what happens in the runtime
+//! First, for variable assignment, we just reimplement what happens in the VM
 //! except we pass a flag that makes the assignment global. This is not too bad
 //! as it's only a few lines of code.
 //!
@@ -33,21 +32,23 @@
 //! The problem is that we need the global flag to be reset to false
 //!   at some point; otherwise, `\global` would make *all* subsequent assignments global.
 //! To do this we introduce a convention: any command which can be prefixed
-//!   by `\global` reads the flag a single time using the [Component::take_global]
+//!   by `\global` reads the flag a single time using the [Component::read_and_reset_global]
 //!   method.
 //! This method returns the flag value and resets the flag to false.
 //!
 //! In order for the convention to work correctly it is essential that *all* code
-//!   paths within the command call [take_global](Component::take_global) -
+//!   paths within the command call [read_and_reset_global](Component::read_and_reset_global) -
 //!   even if they don't use the result!
 //! For example `\gdef` always creates a macro in the global scope, but it still needs to
-//!   call [take_global](Component::take_global).
+//!   call [read_and_reset_global](Component::read_and_reset_global).
 //! This behavior should be verified with unit tests, and this module provides
 //!   an [assert_global_is_false](get_assert_global_is_false) execution command
 //!   to make this easy.
 //!
 //! Finally, commands which can be prefixed with `\global` are manually added
 //!   to the hash set inside the [Component].
+//! This set is used to validate that the command that follows `\global` is
+//!   allowed to be prefixed by it.
 
 use crate::def;
 use crate::letassignment;
@@ -59,6 +60,7 @@ use texlang_core::variable;
 /// Component for the prefix commands.
 pub struct Component {
     global: bool,
+    prefixable_with_any: HashSet<std::any::TypeId>,
     prefixable_with_global: HashSet<std::any::TypeId>,
 }
 
@@ -66,6 +68,7 @@ impl Default for Component {
     fn default() -> Self {
         Component {
             global: false,
+            prefixable_with_any: vec![def::def_id()].into_iter().collect(),
             prefixable_with_global: vec![
                 variableops::get_variable_op_id(),
                 letassignment::let_id(),
@@ -77,10 +80,10 @@ impl Default for Component {
 }
 
 impl Component {
-    /// Get the value of the global flag and reset the flag to false.
+    /// Read the value of the global flag and reset the flag to false.
     ///
     /// See the module documentation for correct usage of this method.
-    pub fn take_global(&mut self) -> bool {
+    pub fn read_and_reset_global(&mut self) -> bool {
         let global = self.global;
         self.global = false;
         global
@@ -109,8 +112,8 @@ impl Prefix {
 }
 
 /// Get the `\global` command.
-pub fn get_global<S: HasComponent<Component>>() -> command::Definition<S> {
-    command::Definition::new_execution(global_primitive_fn).with_id(global_id())
+pub fn get_global<S: HasComponent<Component>>() -> command::Command<S> {
+    command::Command::new_execution(global_primitive_fn).with_id(global_id())
 }
 
 struct Global;
@@ -120,8 +123,8 @@ fn global_id() -> std::any::TypeId {
 }
 
 /// Get the `\long` command.
-pub fn get_long<S: HasComponent<Component>>() -> command::Definition<S> {
-    command::Definition::new_execution(long_primitive_fn).with_id(long_id())
+pub fn get_long<S: HasComponent<Component>>() -> command::Command<S> {
+    command::Command::new_execution(long_primitive_fn).with_id(long_id())
 }
 
 struct Long;
@@ -131,8 +134,8 @@ fn long_id() -> std::any::TypeId {
 }
 
 /// Get the `\outer` command.
-pub fn get_outer<S: HasComponent<Component>>() -> command::Definition<S> {
-    command::Definition::new_execution(outer_primitive_fn).with_id(outer_id())
+pub fn get_outer<S: HasComponent<Component>>() -> command::Command<S> {
+    command::Command::new_execution(outer_primitive_fn).with_id(outer_id())
 }
 
 struct Outer;
@@ -200,38 +203,39 @@ fn process_prefixes<S: HasComponent<Component>>(
         }
         Some(&t) => match t.value() {
             Value::ControlSequence(name) => {
-                if let Some(command::Command::Variable(cmd, addr)) =
-                    input.base().commands_map.get(&name)
+                // First check if it's a variable command. If so, assign to the variable at the global scope.
+                if let Some(command::Fn::Variable(cmd, addr)) =
+                    input.base().commands_map.get_fn(&name)
                 {
-                    check_only_global(t, prefix, input)?;
                     let (cmd, addr) = (*cmd, *addr);
+                    assert_only_global_prefix(t, prefix, input)?;
                     input.consume()?;
                     let var = command::resolve(cmd, addr, t, input)?;
                     variable::set_using_input(var, input, prefix.global.is_some())?;
                     return Ok(());
                 }
+                // Next check if it's a command that can be prefixed by any of the prefix command.
+                let component = input.state().component();
                 let cmd_id = input.base().commands_map.get_id(&name);
-                if cmd_id == def::def_id() {
+                if component.prefixable_with_any.contains(&cmd_id) {
                     input.state_mut().component_mut().global = prefix.global.is_some();
-                    Ok(())
-                } else if input
-                    .state()
-                    .component()
-                    .prefixable_with_global
-                    .contains(&cmd_id)
-                {
-                    check_only_global(t, prefix, input)?;
-                    input.state_mut().component_mut().global = prefix.global.is_some();
-                    Ok(())
-                } else {
-                    let (prefix_token, prefix_kind) = prefix.get_one();
-                    Err(Error::CommandCannotBePrefixed {
-                        command_token: input.trace(t),
-                        prefix_token: input.trace(prefix_token),
-                        prefix_kind,
-                    }
-                    .into())
+                    return Ok(());
                 }
+                // Next check if it's a command that can be prefixed by global only. In this case we check
+                // that no other prefixes are present.
+                if component.prefixable_with_global.contains(&cmd_id) {
+                    assert_only_global_prefix(t, prefix, input)?;
+                    input.state_mut().component_mut().global = prefix.global.is_some();
+                    return Ok(());
+                }
+                // If we make it to here, this is not a valid target for the prefix command.
+                let (prefix_token, prefix_kind) = prefix.get_one();
+                Err(Error::CommandCannotBePrefixed {
+                    command_token: input.trace(t),
+                    prefix_token: input.trace(prefix_token),
+                    prefix_kind,
+                }
+                .into())
             }
             _ => {
                 let (prefix_token, prefix_kind) = prefix.get_one();
@@ -283,7 +287,7 @@ fn complete_prefix<S>(
     complete_prefix(prefix, input)
 }
 
-fn check_only_global<S>(
+fn assert_only_global_prefix<S>(
     token: Token,
     prefix: Prefix,
     input: &runtime::ExecutionInput<S>,
@@ -406,7 +410,7 @@ pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::Exec
         _: Token,
         input: &mut runtime::ExecutionInput<S>,
     ) -> anyhow::Result<()> {
-        if input.state_mut().component_mut().take_global() {
+        if input.state_mut().component_mut().read_and_reset_global() {
             Err(anyhow::anyhow!("assertion failed: global is true"))
         } else {
             Ok(())

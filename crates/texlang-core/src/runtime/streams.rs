@@ -321,7 +321,7 @@ impl<S> ExpansionInput<S> {
 ///
 /// - Access to the input stream (with or without expansion). Its implementation of the [TokenStream]
 ///     trait returns expanded tokens.
-///     To read the input strean without performing expansion, use the
+///     To read the input stream without performing expansion, use the
 ///     [unexpanded](ExpandedStream::unexpanded) method.
 ///
 /// - Read only access to the environment using the [HasEnv] trait.
@@ -464,18 +464,18 @@ mod stream {
         let (token, command) = match next_unexpanded(env)? {
             None => return Ok(None),
             Some(token) => match token.value() {
-                ControlSequence(name) => (token, env.base_state.commands_map.get(&name)),
+                ControlSequence(name) => (token, env.base_state.commands_map.get_fn(&name)),
                 _ => return Ok(Some(token)),
             },
         };
         match command {
-            Some(command::Command::Expansion(command)) => {
+            Some(command::Fn::Expansion(command)) => {
                 let command = *command;
                 let output = command(token, ExpansionInput::new(env))?;
                 env.internal.push_expansion(&output);
                 next_expanded(env)
             }
-            Some(command::Command::Macro(command)) => {
+            Some(command::Fn::Macro(command)) => {
                 let command = command.clone();
                 command.call(token, ExpansionInput::new(env))?;
                 next_expanded(env)
@@ -490,13 +490,13 @@ mod stream {
             Some(token) => match token.value() {
                 ControlSequence(name) => (
                     unsafe { launder(token) },
-                    env.base_state.commands_map.get(&name),
+                    env.base_state.commands_map.get_fn(&name),
                 ),
                 _ => return Ok(Some(unsafe { launder(token) })),
             },
         };
         match command {
-            Some(command::Command::Expansion(command)) => {
+            Some(command::Fn::Expansion(command)) => {
                 let command = *command;
                 let token = *token;
                 consume_peek(env);
@@ -504,7 +504,7 @@ mod stream {
                 env.internal.push_expansion(&output);
                 peek_expanded(env)
             }
-            Some(command::Command::Macro(command)) => {
+            Some(command::Fn::Macro(command)) => {
                 let command = command.clone();
                 let token = *token;
                 consume_peek(env);
@@ -521,13 +521,13 @@ mod stream {
             Some(token) => match token.value() {
                 ControlSequence(name) => (
                     unsafe { launder(token) },
-                    env.base_state.commands_map.get(&name),
+                    env.base_state.commands_map.get_fn(&name),
                 ),
                 _ => return Ok(false),
             },
         };
         match command {
-            Some(command::Command::Expansion(command)) => {
+            Some(command::Fn::Expansion(command)) => {
                 let command = *command;
                 let token = *token;
                 consume_peek(env);
@@ -535,7 +535,7 @@ mod stream {
                 env.internal.push_expansion(&output);
                 Ok(true)
             }
-            Some(command::Command::Macro(command)) => {
+            Some(command::Fn::Macro(command)) => {
                 let command = command.clone();
                 let token = *token;
                 consume_peek(env);

@@ -90,7 +90,7 @@ fn init_state(
     );
     conditional::add_all_conditionals(&mut s);
 
-    s.set_command("\\", command::Command::Character(Value::Other('\\')));
+    s.set_command("\\", command::Fn::Character(Value::Other('\\')));
 
     s.set_command("advance", variableops::get_advance());
 

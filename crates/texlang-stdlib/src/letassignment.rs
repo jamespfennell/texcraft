@@ -7,8 +7,8 @@ use texlang_core::prelude::*;
 pub const LET_DOC: &str = "Assign a command or character to a control sequence";
 
 /// Get the `\let` command.
-pub fn get_let<S: HasComponent<prefix::Component>>() -> command::Definition<S> {
-    command::Definition::new_execution(let_primitive_fn)
+pub fn get_let<S: HasComponent<prefix::Component>>() -> command::Command<S> {
+    command::Command::new_execution(let_primitive_fn)
         .with_id(let_id())
         .with_doc(LET_DOC)
 }
@@ -23,7 +23,7 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
     let_token: Token,
     input: &mut runtime::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    let global = input.state_mut().component_mut().take_global();
+    let global = input.state_mut().component_mut().read_and_reset_global();
     let name = parse::parse_command_target("\\let assignment", let_token, input.unexpanded())?;
     parse::parse_optional_equals(input.unexpanded())?;
     let command =
@@ -33,11 +33,11 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
             )
             .cast()),
             Some(token) => match token.value() {
-                ControlSequence(name) => match input.base().commands_map.get(&name) {
+                ControlSequence(name) => match input.base().commands_map.get_fn(&name) {
                     None => return Err(error::new_undefined_cs_error(token, input.env())),
                     Some(cmd) => cmd.clone(),
                 },
-                _ => command::Command::Character(token.value()),
+                _ => command::Fn::Character(token.value()),
             },
         };
     let commands_map = &mut input.base_mut().commands_map;

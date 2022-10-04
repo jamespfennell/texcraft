@@ -129,19 +129,28 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
     match cs_name {
         None => {
             let mut cs_names = Vec::new();
-            let commands = env.get_commands_as_map();
+            let commands = env.get_commands_as_map_slow();
             for cs_name in commands.keys() {
                 cs_names.push(cs_name);
             }
             cs_names.sort();
             let mut last_prefix = None;
-            for cs_name in cs_names.into_iter() {
-                let _cmd = commands.get(cs_name);
+            for (i, cs_name) in cs_names.into_iter().enumerate() {
                 let new_last_prefix = cs_name.chars().next();
                 if last_prefix != new_last_prefix {
                     last_prefix = new_last_prefix;
+                    if i != 0 {
+                        println!();
+                    }
                 }
-                let doc = "todo".to_string();
+                let cs_name_s = match env.cs_name_interner().get(cs_name.clone()) {
+                    None => continue,
+                    Some(s) => s,
+                };
+                let doc = match env.base_state.commands_map.get_command_slow(&cs_name_s) {
+                    None => "",
+                    Some(cmd) => cmd.doc().unwrap_or(""),
+                };
                 let first_line = doc.split('\n').next().unwrap_or("");
                 println!["\\{}  {}", cs_name.bold(), first_line];
             }
@@ -149,18 +158,16 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
         }
         Some(cs_name) => {
             let cs_name_s = match env.cs_name_interner().get(cs_name.clone()) {
-                None => {
-                    return Err(anyhow::anyhow!("Unknown command \\{}", cs_name));
-                }
+                None => return Err(anyhow::anyhow!("Unknown command \\{}", cs_name)),
                 Some(s) => s,
             };
-            let doc = match env.base_state.commands_map.get_doc(&cs_name_s) {
+            let cmd = match env.base_state.commands_map.get_command_slow(&cs_name_s) {
                 None => {
                     return Err(anyhow::anyhow!("Unknown command \\{}", cs_name));
                 }
-                Some(d) => d,
+                Some(cmd) => cmd,
             };
-            println!["\\{}  {}", cs_name.bold(), doc];
+            println!["\\{}  {}", cs_name.bold(), cmd.doc().unwrap_or("")];
             Ok(())
         }
     }
@@ -170,6 +177,6 @@ fn new_env() -> runtime::Env<StdLibState> {
     let mut s = StdLibState::new();
     s.set_command("par", script::get_par());
     s.set_command("newline", script::get_newline());
-    s.set_command("\\", command::Command::Character(Value::Other('\\')));
+    s.set_command("\\", command::Fn::Character(Value::Other('\\')));
     s
 }

@@ -8,8 +8,8 @@
 use super::token::CsName;
 use crate::command;
 use crate::command::Command;
-use crate::command::CommandsMap;
-use crate::command::Definition;
+use crate::command::Fn;
+use crate::command::Map;
 use crate::error;
 use crate::token;
 use crate::token::catcode::CatCodeMap;
@@ -49,20 +49,22 @@ pub fn run<S>(
                     break;
                 }
                 Some(token) => match token.value() {
-                    ControlSequence(name) => match execution_input.base().commands_map.get(&name) {
-                        Some(Command::Execution(cmd)) => cmd(token, execution_input),
-                        Some(Command::Variable(cmd, addr)) => {
-                            let var = command::resolve(*cmd, *addr, token, execution_input)?;
-                            variable::set_using_input(var, execution_input, false)
+                    ControlSequence(name) => {
+                        match execution_input.base().commands_map.get_fn(&name) {
+                            Some(Fn::Execution(cmd)) => cmd(token, execution_input),
+                            Some(Fn::Variable(cmd, addr)) => {
+                                let var = command::resolve(*cmd, *addr, token, execution_input)?;
+                                variable::set_using_input(var, execution_input, false)
+                            }
+                            Some(Fn::Character(token_value)) => character_handler(
+                                Token::new_from_value(*token_value, token.trace_key()),
+                                execution_input,
+                            ),
+                            None | Some(Fn::Expansion(_)) | Some(Fn::Macro(_)) => {
+                                undefined_cs_handler(token, execution_input)
+                            }
                         }
-                        Some(Command::Character(token_value)) => character_handler(
-                            Token::new_from_value(*token_value, token.trace_key()),
-                            execution_input,
-                        ),
-                        None | Some(Command::Expansion(_)) | Some(Command::Macro(_)) => {
-                            undefined_cs_handler(token, execution_input)
-                        }
-                    },
+                    }
                     token::Value::BeginGroup(_) => {
                         execution_input.begin_group();
                         Ok(())
@@ -128,7 +130,7 @@ impl FileSystemOps for RealFileSystemOps {
 /// exectution commands.
 pub struct BaseState<S> {
     pub cat_code_map: CatCodeMap,
-    pub commands_map: CommandsMap<S>,
+    pub commands_map: Map<S>,
     pub tracing_macros: i32,
     pub max_input_levels: i32,
 }
@@ -174,7 +176,7 @@ impl<S> Env<S> {
     }
 
     /// Set a command.
-    pub fn set_command<A: AsRef<str>, B: Into<Definition<S>>>(&mut self, name: A, cmd: B) {
+    pub fn set_command<A: AsRef<str>, B: Into<Command<S>>>(&mut self, name: A, cmd: B) {
         self.base_state.commands_map.insert(
             self.internal.cs_name_interner.get_or_intern(name),
             B::into(cmd),
@@ -189,8 +191,8 @@ impl<S> Env<S> {
     /// Return a regular hash map with all the commands as they are currently defined.
     ///
     /// This function is extremely slow and is only intended to be invoked on error paths.
-    pub fn get_commands_as_map(&self) -> HashMap<String, Command<S>> {
-        let map_1: HashMap<CsName, Command<S>> = self.base_state.commands_map.to_hash_map();
+    pub fn get_commands_as_map_slow(&self) -> HashMap<String, Command<S>> {
+        let map_1: HashMap<CsName, Command<S>> = self.base_state.commands_map.to_hash_map_slow();
         let mut map = HashMap::new();
         for (cs_name, cmd) in map_1 {
             let cs_name_str = match self.internal.cs_name_interner.resolve(&cs_name) {

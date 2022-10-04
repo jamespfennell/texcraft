@@ -18,7 +18,7 @@ pub fn run<S: HasComponent<script::Component>>(env: &mut runtime::Env<S>, opts: 
 
     reader.set_prompt(opts.prompt).unwrap();
 
-    let mut names: Vec<String> = env.get_commands_as_map().into_keys().collect();
+    let mut names: Vec<String> = env.get_commands_as_map_slow().into_keys().collect();
     names.sort();
     let mut num_names = names.len();
     let a = Arc::new(ControlSequenceCompleter { names });
@@ -57,7 +57,7 @@ pub fn run<S: HasComponent<script::Component>>(env: &mut runtime::Env<S>, opts: 
         }
 
         if env.base_state.commands_map.len() != num_names {
-            let mut names: Vec<String> = env.get_commands_as_map().into_keys().collect();
+            let mut names: Vec<String> = env.get_commands_as_map_slow().into_keys().collect();
             names.sort();
             num_names = names.len();
             let a = Arc::new(ControlSequenceCompleter { names });
@@ -106,9 +106,12 @@ pub fn get_doc<S>() -> command::ExpansionFn<S> {
     |token: Token, input: &mut runtime::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
         let target = texlang_core::parse::parse_command_target("", token, input.unexpanded())?;
         let cs_name_s = input.env().cs_name_interner().resolve(&target).unwrap();
-        let doc = match input.base().commands_map.get_doc(&target) {
-            None => format!["No documentation available for the \\{} command", cs_name_s],
-            Some(doc) => format!["\\{}  {}", cs_name_s, doc],
+        let doc = match input.base().commands_map.get_command_slow(&target) {
+            None => format!["Unknown command \\{}", cs_name_s],
+            Some(cmd) => match cmd.doc() {
+                None => format!["No documentation available for the \\{} command", cs_name_s],
+                Some(doc) => format!["\\{}  {}", cs_name_s, doc],
+            },
         };
         Err(Signal::Doc(doc).into())
     }
