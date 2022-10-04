@@ -49,7 +49,6 @@ impl StdLibState {
     pub fn new() -> Env<StdLibState> {
         let mut s =
             Env::<StdLibState>::new(CatCodeMap::new_with_tex_defaults(), Default::default());
-        conditional::add_all_conditionals(&mut s);
 
         s.set_command("advance", variableops::get_advance());
 
@@ -61,9 +60,18 @@ impl StdLibState {
         s.set_command("def", def::get_def());
         s.set_command("divide", variableops::get_divide());
 
+        s.set_command("else", conditional::get_else());
+
+        s.set_command("fi", conditional::get_fi());
+
         s.set_command("gdef", def::get_gdef());
         s.set_command("global", prefix::get_global());
 
+        s.set_command("ifcase", conditional::get_if_case());
+        s.set_command("iffalse", conditional::get_if_false());
+        s.set_command("ifnum", conditional::get_if_num());
+        s.set_command("ifodd", conditional::get_if_odd());
+        s.set_command("iftrue", conditional::get_if_true());
         s.set_command("input", io::input::get_input());
 
         s.set_command("let", letassignment::get_let());
@@ -75,6 +83,7 @@ impl StdLibState {
         s.set_command("newint", alloc::get_newint());
         s.set_command("newarray", alloc::get_newarray());
 
+        s.set_command("or", conditional::get_or());
         s.set_command("outer", prefix::get_outer());
 
         s.set_command("the", the::get_the());

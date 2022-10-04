@@ -431,22 +431,6 @@ where
     command::Command::new_expansion(fi_primitive_fn).with_id(fi_id())
 }
 
-/// Add all of the conditionals defined in this module to the provided state.
-pub fn add_all_conditionals<S>(s: &mut runtime::Env<S>)
-where
-    S: HasExpansionState,
-    S::E: HasComponent<Component>,
-{
-    s.set_command("iftrue", get_if_true());
-    s.set_command("iffalse", get_if_false());
-    s.set_command("ifnum", get_if_num());
-    s.set_command("ifodd", get_if_odd());
-    s.set_command("ifcase", get_if_case());
-    s.set_command("or", get_or());
-    s.set_command("else", get_else());
-    s.set_command("fi", get_fi());
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -470,7 +454,14 @@ mod tests {
     }
 
     fn setup_expansion_test(s: &mut runtime::Env<State>) {
-        add_all_conditionals(s);
+        s.set_command("else", get_else());
+        s.set_command("fi", get_fi());
+        s.set_command("ifcase", get_if_case());
+        s.set_command("iffalse", get_if_false());
+        s.set_command("ifnum", get_if_num());
+        s.set_command("ifodd", get_if_odd());
+        s.set_command("iftrue", get_if_true());
+        s.set_command("or", get_or());
     }
 
     expansion_test![iftrue_base_case, r"\iftrue a\else b\fi c", r"ac"];
