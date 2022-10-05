@@ -137,37 +137,6 @@ impl<T: ExpandedStream> TokenStream for T {
     }
 }
 
-/// Trait indicating some part of the state is mutably accesible to expansion commands.
-///
-/// In general only execution commands can mutate the state.
-/// Expansion commands cannot.
-/// This is important for maintaining the rough invariant that commands either modify
-/// the state (execution) or modify the token stream (expansion)
-/// but not both.
-/// To enforce this, the [ExpansionInput] type does not have a way of returning a mutable
-/// reference to the state.
-///
-/// However, there are special situations in which expansion commands do need to maintain
-/// some mutable state.
-/// Currently, the only example is the collection of conditional commands
-/// in the standard libary (`\ifodd`, `\else`, `\fi`, etc.).
-/// These commands maintain a record of the conditional brances that were taken
-///     and uses this for error reporting.
-///
-/// This trait enables this use case.
-/// The part of the state that can be mutated by expansion commands is called the expansion state.
-/// If the state implements this trait, a mutable reference to the expansion state
-/// can be obtained through the [ExpansionInput] type's [expansion_state_mut](ExpansionInput::expansion_state_mut) method.
-///
-/// The standard library's `StdLibExpansionState` is an example of this pattern.
-pub trait HasExpansionState {
-    /// The type of the expansion state.
-    type E;
-
-    /// Returns a mutable reference to the expansion state.
-    fn expansion_state_mut(&mut self) -> &mut Self::E;
-}
-
 /// Stream that returns input tokens without performing expansion.
 ///
 /// The unexpanded stream is used when reading tokens without performing expansion;
@@ -238,13 +207,6 @@ impl<S> ExpandedStream for ExpansionInput<S> {
 impl<S> std::convert::AsMut<ExpansionInput<S>> for ExpansionInput<S> {
     fn as_mut(&mut self) -> &mut ExpansionInput<S> {
         self
-    }
-}
-
-impl<S: HasExpansionState> ExpansionInput<S> {
-    #[inline]
-    pub fn expansion_state_mut(&mut self) -> &mut S::E {
-        self.0.custom_state.expansion_state_mut()
     }
 }
 

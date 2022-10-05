@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use texlang_core::prelude::*;
-use texlang_core::runtime::{implement_has_component, HasExpansionState};
+use texlang_core::runtime::implement_has_component;
 use texlang_core::token;
 use texlang_stdlib::alloc;
 use texlang_stdlib::catcodecmd;
@@ -17,7 +17,6 @@ use texlang_stdlib::script;
 use texlang_stdlib::the;
 use texlang_stdlib::time;
 use texlang_stdlib::variableops;
-use texlang_stdlib::StdLibExpansionState;
 
 #[wasm_bindgen(start)]
 pub fn main_js() -> Result<(), JsValue> {
@@ -51,15 +50,7 @@ struct PlaygroundState {
     registers: registers::Component<256>,
     prefix: prefix::Component,
     time: time::Component,
-    expansion_state: StdLibExpansionState,
-}
-
-impl HasExpansionState for PlaygroundState {
-    type E = StdLibExpansionState;
-
-    fn expansion_state_mut(&mut self) -> &mut Self::E {
-        &mut self.expansion_state
-    }
+    conditional: conditional::Component,
 }
 
 implement_has_component![
@@ -69,6 +60,7 @@ implement_has_component![
     (registers::Component<256>, registers),
     (prefix::Component, prefix),
     (time::Component, time),
+    (conditional::Component, conditional),
 ];
 
 fn init_state(
@@ -85,7 +77,7 @@ fn init_state(
             registers: Default::default(),
             prefix: Default::default(),
             time: time::Component::new_with_values(minutes_since_midnight, day, month, year),
-            expansion_state: Default::default(),
+            conditional: Default::default(),
         },
     );
 

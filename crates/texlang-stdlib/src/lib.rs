@@ -7,7 +7,6 @@ extern crate texlang_core;
 
 use texlang_core::runtime::implement_has_component;
 use texlang_core::runtime::Env;
-use texlang_core::runtime::HasExpansionState;
 use texlang_core::token::catcode::CatCodeMap;
 
 pub mod alloc;
@@ -37,11 +36,6 @@ pub struct StdLibState {
     registers: registers::Component<32768>,
     prefix: prefix::Component,
     time: time::Component,
-    expansion_state: StdLibExpansionState,
-}
-
-#[derive(Default)]
-pub struct StdLibExpansionState {
     conditional: conditional::Component,
 }
 
@@ -96,14 +90,6 @@ impl StdLibState {
     }
 }
 
-impl HasExpansionState for StdLibState {
-    type E = StdLibExpansionState;
-
-    fn expansion_state_mut(&mut self) -> &mut Self::E {
-        &mut self.expansion_state
-    }
-}
-
 implement_has_component![
     StdLibState,
     (alloc::Component, alloc),
@@ -111,6 +97,5 @@ implement_has_component![
     (registers::Component<32768>, registers),
     (prefix::Component, prefix),
     (time::Component, time),
+    (conditional::Component, conditional),
 ];
-
-implement_has_component![StdLibExpansionState, (conditional::Component, conditional),];
