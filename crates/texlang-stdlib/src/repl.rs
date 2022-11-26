@@ -84,37 +84,43 @@ impl std::error::Error for Signal {}
 /// Get the `\exit` command.
 ///
 /// This exits the REPL.
-pub fn get_exit<S>() -> command::ExpansionFn<S> {
-    |_: Token, _: &mut runtime::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
-        Err(Signal::Exit.into())
-    }
+pub fn get_exit<S>() -> command::Command<S> {
+    command::Command::new_expansion(
+        |_: Token, _: &mut runtime::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
+            Err(Signal::Exit.into())
+        },
+    )
 }
 
 /// Get the `\help` command.
 ///
 /// This prints help text for the REPL.
-pub fn get_help<S>() -> command::ExpansionFn<S> {
-    |_: Token, _: &mut runtime::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
-        Err(Signal::Help.into())
-    }
+pub fn get_help<S>() -> command::Command<S> {
+    command::Command::new_expansion(
+        |_: Token, _: &mut runtime::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
+            Err(Signal::Help.into())
+        },
+    )
 }
 
 /// Get the `\doc` command.
 ///
 /// This prints the documentation for a TeX command.
-pub fn get_doc<S>() -> command::ExpansionFn<S> {
-    |token: Token, input: &mut runtime::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
-        let target = texlang_core::parse::parse_command_target("", token, input.unexpanded())?;
-        let cs_name_s = input.env().cs_name_interner().resolve(&target).unwrap();
-        let doc = match input.base().commands_map.get_command_slow(&target) {
-            None => format!["Unknown command \\{}", cs_name_s],
-            Some(cmd) => match cmd.doc() {
-                None => format!["No documentation available for the \\{} command", cs_name_s],
-                Some(doc) => format!["\\{}  {}", cs_name_s, doc],
-            },
-        };
-        Err(Signal::Doc(doc).into())
-    }
+pub fn get_doc<S>() -> command::Command<S> {
+    command::Command::new_expansion(
+        |token: Token, input: &mut runtime::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
+            let target = texlang_core::parse::parse_command_target("", token, input.unexpanded())?;
+            let cs_name_s = input.env().cs_name_interner().resolve(&target).unwrap();
+            let doc = match input.base().commands_map.get_command_slow(&target) {
+                None => format!["Unknown command \\{}", cs_name_s],
+                Some(cmd) => match cmd.doc() {
+                    None => format!["No documentation available for the \\{} command", cs_name_s],
+                    Some(doc) => format!["\\{}  {}", cs_name_s, doc],
+                },
+            };
+            Err(Signal::Doc(doc).into())
+        },
+    )
 }
 
 struct ControlSequenceCompleter {

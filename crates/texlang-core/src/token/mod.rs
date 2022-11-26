@@ -19,12 +19,12 @@ impl CsNameInterner {
     }
 
     #[inline]
-    pub fn get_or_intern<T: AsRef<str>>(&mut self, string: T) -> CsName {
+    pub fn get_or_intern(&mut self, string: &str) -> CsName {
         CsName(self.interner.get_or_intern(string))
     }
 
     #[inline]
-    pub fn get<T: AsRef<str>>(&self, string: T) -> Option<CsName> {
+    pub fn get(&self, string: &str) -> Option<CsName> {
         self.interner.get(string).map(CsName)
     }
 
@@ -231,7 +231,9 @@ where
         match &token.value {
             Value::ControlSequence(s) => {
                 pending_whitespace.write_out(&mut result);
-                let name = interner.resolve(s).unwrap_or("invalidCsName");
+                let name = interner
+                    .resolve(s)
+                    .unwrap_or("corruptedControlSequenceName");
                 result.push('\\');
                 result.push_str(name);
                 pending_whitespace.add_space();
@@ -255,6 +257,104 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    enum PreInternedToken {
+        ControlSequence(&'static str),
+        Character(char, CatCode),
+    }
+
+    macro_rules! write_tokens_test {
+        ($name: ident, $input: expr, $want: expr) => {
+            #[test]
+            fn $name() {
+                let mut tokens: Vec<Token> = vec![];
+                let mut interner = CsNameInterner::default();
+                for pre_interned_token in $input {
+                    let token = match pre_interned_token {
+                        PreInternedToken::ControlSequence(name) => {
+                            let cs_name = interner.get_or_intern(name);
+                            Token::new_control_sequence(cs_name, trace::Key::dummy())
+                        }
+                        PreInternedToken::Character(c, code) => {
+                            Token::new_from_value(Value::new(c, code), trace::Key::dummy())
+                        }
+                    };
+                    tokens.push(token);
+                }
+                let got = write_tokens(&tokens, &interner);
+                let want = $want.to_string();
+
+                if got != want {
+                    println!("Output is different:");
+                    println!("------[got]-------");
+                    println!("{}", got);
+                    println!("------[want]------");
+                    println!("{}", want);
+                    println!("-----------------");
+                    panic!("write_tokens test failed");
+                }
+            }
+        };
+    }
+
+    write_tokens_test!(blank, vec!(), "");
+    write_tokens_test![
+        trim_whitespace_from_start,
+        vec![
+            PreInternedToken::Character('\n', CatCode::Space),
+            PreInternedToken::Character('\n', CatCode::Space),
+            PreInternedToken::Character('\n', CatCode::Space),
+            PreInternedToken::Character('H', CatCode::Letter),
+        ],
+        "H"
+    ];
+    write_tokens_test![
+        trim_whitespace_from_end,
+        vec![
+            PreInternedToken::Character('H', CatCode::Letter),
+            PreInternedToken::Character('\n', CatCode::Space),
+            PreInternedToken::Character('\n', CatCode::Space),
+            PreInternedToken::Character('\n', CatCode::Space),
+        ],
+        "H"
+    ];
+    write_tokens_test![
+        trim_whitespace_from_middle_1,
+        vec![
+            PreInternedToken::Character('H', CatCode::Letter),
+            PreInternedToken::Character(' ', CatCode::Space),
+            PreInternedToken::Character(' ', CatCode::Space),
+            PreInternedToken::Character('W', CatCode::Letter),
+        ],
+        "H W"
+    ];
+    write_tokens_test![
+        trim_whitespace_from_middle_2,
+        vec![
+            PreInternedToken::Character('H', CatCode::Letter),
+            PreInternedToken::Character('\n', CatCode::Space),
+            PreInternedToken::Character(' ', CatCode::Space),
+            PreInternedToken::Character('\n', CatCode::Space),
+            PreInternedToken::Character('W', CatCode::Letter),
+        ],
+        "H\n\nW"
+    ];
+    write_tokens_test![
+        trim_whitespace_from_middle_3,
+        vec![
+            PreInternedToken::Character('H', CatCode::Letter),
+            PreInternedToken::Character('\n', CatCode::Space),
+            PreInternedToken::Character('\n', CatCode::Space),
+            PreInternedToken::Character('\n', CatCode::Space),
+            PreInternedToken::Character('W', CatCode::Letter),
+        ],
+        "H\n\n\nW"
+    ];
+    write_tokens_test![
+        control_sequence,
+        vec![PreInternedToken::ControlSequence("HelloWorld"),],
+        "\\HelloWorld"
+    ];
 
     #[test]
     fn token_size() {

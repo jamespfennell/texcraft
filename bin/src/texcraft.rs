@@ -1,9 +1,12 @@
 use clap::Parser;
 use colored::Colorize;
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use texlang_core::command::Command;
 use texlang_core::prelude::*;
 use texlang_core::token;
+use texlang_core::token::catcode;
 use texlang_stdlib::repl;
 use texlang_stdlib::script;
 use texlang_stdlib::StdLibState;
@@ -79,12 +82,7 @@ fn run(mut path: PathBuf) -> Result<(), anyhow::Error> {
 
 fn repl() {
     println!("{}\n", REPL_START.trim());
-    let mut env = new_env();
-    env.set_command("doc", repl::get_doc());
-    env.set_command("help", repl::get_help());
-    env.set_command("exit", repl::get_exit());
-    env.set_command("quit", repl::get_exit());
-    env.set_command("q", repl::get_exit());
+    let mut env = new_repl_env();
     repl::run(
         &mut env,
         repl::RunOptions {
@@ -143,7 +141,7 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
                         println!();
                     }
                 }
-                let cs_name_s = match env.cs_name_interner().get(cs_name.clone()) {
+                let cs_name_s = match env.cs_name_interner().get(cs_name) {
                     None => continue,
                     Some(s) => s,
                 };
@@ -157,7 +155,7 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
             Ok(())
         }
         Some(cs_name) => {
-            let cs_name_s = match env.cs_name_interner().get(cs_name.clone()) {
+            let cs_name_s = match env.cs_name_interner().get(&cs_name) {
                 None => return Err(anyhow::anyhow!("Unknown command \\{}", cs_name)),
                 Some(s) => s,
             };
@@ -174,9 +172,31 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
 }
 
 fn new_env() -> runtime::Env<StdLibState> {
-    let mut s = StdLibState::new();
-    s.set_command("par", script::get_par());
-    s.set_command("newline", script::get_newline());
-    s.set_command("\\", command::Fn::Character(Value::Other('\\')));
-    s
+    runtime::Env::<StdLibState>::new(
+        catcode::CatCodeMap::new_with_tex_defaults(),
+        initial_built_ins(),
+        Default::default(),
+    )
+}
+
+fn new_repl_env() -> runtime::Env<StdLibState> {
+    let mut m = initial_built_ins();
+    m.insert("doc", repl::get_doc());
+    m.insert("help", repl::get_help());
+    m.insert("exit", repl::get_exit());
+    m.insert("quit", repl::get_exit());
+    m.insert("q", repl::get_exit());
+    runtime::Env::<StdLibState>::new(
+        catcode::CatCodeMap::new_with_tex_defaults(),
+        m,
+        Default::default(),
+    )
+}
+
+fn initial_built_ins() -> HashMap<&'static str, Command<StdLibState>> {
+    let mut m = StdLibState::all_initial_built_ins();
+    m.insert("par", script::get_par());
+    m.insert("newline", script::get_newline());
+    m.insert("\\", command::Fn::Character(Value::Other('\\')).into());
+    m
 }

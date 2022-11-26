@@ -209,11 +209,31 @@ impl<S> From<Fn<S>> for Command<S> {
 ///   command functions by themselves in an array. The index in the array is the control sequence
 ///   name, which is an integer when interned. This implementation choice means fast-as-possible lookups.
 ///   Storing the function by itself means there is good cache locality.
+///
+///
+/// - Insert built in commands at the start
+///     insert_built_in(cs_name, cmd),
+/// - Insert variable commands that aren't there at the start, but will be in the future. E.g., \countdef
+///     register_built_in(cmd) <- must have a unique ID. Is type ID stable across binary builds? Maybe need to
+///          use a string ID instead? But then need to feed that the library using this registered
+/// - Should we enforce that the previous two steps can only be done at creation time? Probably
+///   Maybe initialize the map using Map<csname, cmd> and Vec<cmd>. Can provide csname<->str wrapper at
+///   the env level
+///
+/// - While running, insert macros
+///     insert_macro(&str, macro)
+/// - While running, alias commands by current name or using the special ID inserts
+///     alias_control_sequence(cs_name, cs_name) -> undefined control sequence error
+///     alias_registered_built_in(cs_name, cmd_id, variable_addr)
+///     alias_character(cs_name, token::Token)
 pub struct Map<S> {
     len: usize,
     func_map: GroupingVec<command::Fn<S>>,
     id_map: GroupingVec<std::any::TypeId>,
     doc_map: HashMap<CsName, &'static str>,
+    // initial_builtins: HashMap<CsName, Command<S>> or Vec<Command<S>>
+    // extra_builtins: Vec<Command<S>>
+    // aliases: GroupingMap<CsName, Rc<Alias>>
 }
 
 impl<S> Default for Map<S> {
@@ -228,6 +248,25 @@ impl<S> Default for Map<S> {
 }
 
 impl<S> Map<S> {
+    pub fn new(
+        initial_built_ins: HashMap<CsName, Command<S>>,
+        _additional_built_ins: Vec<Command<S>>,
+    ) -> Map<S> {
+        let len = initial_built_ins.len();
+        let mut func_map: GroupingVec<command::Fn<S>> = Default::default();
+        let mut id_map: GroupingVec<std::any::TypeId> = Default::default();
+        for (name, cmd) in initial_built_ins {
+            func_map.insert(name.to_usize(), cmd.func);
+            id_map.insert(name.to_usize(), cmd.id);
+        }
+        Self {
+            len,
+            func_map,
+            id_map,
+            doc_map: Default::default(),
+        }
+    }
+
     #[inline]
     pub fn get_fn(&self, name: &token::CsName) -> Option<&command::Fn<S>> {
         self.func_map.get(&name.to_usize())
@@ -254,8 +293,7 @@ impl<S> Map<S> {
     }
 
     #[inline]
-    pub fn insert<B: Into<command::Command<S>>>(&mut self, name: token::CsName, cmd: B) -> bool {
-        let cmd = B::into(cmd);
+    pub fn insert(&mut self, name: token::CsName, cmd: command::Command<S>) -> bool {
         self.id_map.insert(name.to_usize(), cmd.id);
         if let Some(doc) = cmd.doc {
             self.doc_map.insert(name, doc);
@@ -268,12 +306,7 @@ impl<S> Map<S> {
     }
 
     #[inline]
-    pub fn insert_global<B: Into<command::Command<S>>>(
-        &mut self,
-        name: token::CsName,
-        cmd: B,
-    ) -> bool {
-        let cmd = B::into(cmd);
+    pub fn insert_global(&mut self, name: token::CsName, cmd: command::Command<S>) -> bool {
         self.id_map.insert_global(name.to_usize(), cmd.id);
         let existed = self.func_map.insert_global(name.to_usize(), cmd.func);
         if !existed {

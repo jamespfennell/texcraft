@@ -405,7 +405,7 @@ impl std::error::Error for Error {}
 /// ```tex
 /// \global \command <input to command> \assertGlobalIsFalse
 /// ```
-pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::ExecutionFn<S> {
+pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::Command<S> {
     fn noop_execution_cmd_fn<S: HasComponent<Component>>(
         _: Token,
         input: &mut runtime::ExecutionInput<S>,
@@ -416,11 +416,13 @@ pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::Exec
             Ok(())
         }
     }
-    noop_execution_cmd_fn
+    command::Command::new_execution(noop_execution_cmd_fn)
 }
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::{
         script,
@@ -438,16 +440,18 @@ mod test {
 
     implement_has_component![State, (script::Component, exec), (Component, prefix),];
 
-    fn setup_expansion_test(s: &mut runtime::Env<State>) {
-        s.set_command("global", get_global());
-        s.set_command("long", get_long());
-        s.set_command("outer", get_outer());
-        s.set_command("i", get_integer());
-        s.set_command("the", the::get_the());
-        s.set_command("def", def::get_def());
-        s.set_command("advance", variableops::get_advance());
-        s.set_command("noOpExpansion", testutil::get_noop_expansion_cmd());
-        s.set_command("noOpExecution", testutil::get_noop_execution_cmd());
+    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+        HashMap::from([
+            ("global", get_global()),
+            ("long", get_long()),
+            ("outer", get_outer()),
+            ("i", get_integer().into()),
+            ("the", the::get_the()),
+            ("def", def::get_def()),
+            ("advance", variableops::get_advance()),
+            ("noOpExpansion", testutil::get_noop_expansion_cmd()),
+            ("noOpExecution", testutil::get_noop_execution_cmd()),
+        ])
     }
 
     fn get_integer() -> command::VariableFn<State> {

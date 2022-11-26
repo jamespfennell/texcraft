@@ -1,5 +1,7 @@
 //! Texcraft Playground TeX engine
 
+use std::collections::HashMap;
+
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
@@ -69,8 +71,53 @@ fn init_state(
     month: i32,
     year: i32,
 ) -> runtime::Env<PlaygroundState> {
-    let mut s = runtime::Env::<PlaygroundState>::new(
+    let initial_built_ins = HashMap::from([
+        ("\\", command::Fn::Character(Value::Other('\\')).into()),
+        //
+        ("advance", variableops::get_advance()),
+        //
+        ("catcode", catcodecmd::get_catcode()),
+        ("count", registers::get_count()),
+        ("countdef", registers::get_countdef()),
+        //
+        ("day", time::get_day()),
+        ("def", def::get_def()),
+        ("divide", variableops::get_divide()),
+        //
+        ("else", conditional::get_else()),
+        //
+        ("fi", conditional::get_fi()),
+        //
+        ("gdef", def::get_gdef()),
+        ("global", prefix::get_global()),
+        //
+        ("ifcase", conditional::get_if_case()),
+        ("iffalse", conditional::get_if_false()),
+        ("ifnum", conditional::get_if_num()),
+        ("ifodd", conditional::get_if_odd()),
+        ("iftrue", conditional::get_if_true()),
+        //
+        ("let", letassignment::get_let()),
+        //
+        ("month", time::get_month()),
+        ("multiply", variableops::get_multiply()),
+        //
+        ("newarray", alloc::get_newarray()),
+        ("newint", alloc::get_newint()),
+        ("newline", script::get_newline()),
+        //
+        ("or", conditional::get_or()),
+        //
+        ("par", script::get_par()),
+        //
+        ("the", the::get_the()),
+        ("time", time::get_time()),
+        //
+        ("year", time::get_year()),
+    ]);
+    runtime::Env::<PlaygroundState>::new(
         CatCodeMap::new_with_tex_defaults(),
+        initial_built_ins,
         PlaygroundState {
             alloc: Default::default(),
             exec: Default::default(),
@@ -79,50 +126,5 @@ fn init_state(
             time: time::Component::new_with_values(minutes_since_midnight, day, month, year),
             conditional: Default::default(),
         },
-    );
-
-    s.set_command("\\", command::Fn::Character(Value::Other('\\')));
-
-    s.set_command("advance", variableops::get_advance());
-
-    s.set_command("catcode", catcodecmd::get_catcode());
-    s.set_command("count", registers::get_count());
-    s.set_command("countdef", registers::get_countdef());
-
-    s.set_command("day", time::get_day());
-    s.set_command("def", def::get_def());
-    s.set_command("divide", variableops::get_divide());
-
-    s.set_command("else", conditional::get_else());
-
-    s.set_command("fi", conditional::get_fi());
-
-    s.set_command("gdef", def::get_gdef());
-    s.set_command("global", prefix::get_global());
-
-    s.set_command("ifcase", conditional::get_if_case());
-    s.set_command("iffalse", conditional::get_if_false());
-    s.set_command("ifnum", conditional::get_if_num());
-    s.set_command("ifodd", conditional::get_if_odd());
-    s.set_command("iftrue", conditional::get_if_true());
-
-    s.set_command("let", letassignment::get_let());
-
-    s.set_command("month", time::get_month());
-    s.set_command("multiply", variableops::get_multiply());
-
-    s.set_command("newarray", alloc::get_newarray());
-    s.set_command("newint", alloc::get_newint());
-    s.set_command("newline", script::get_newline());
-
-    s.set_command("or", conditional::get_or());
-
-    s.set_command("par", script::get_par());
-
-    s.set_command("the", the::get_the());
-    s.set_command("time", time::get_time());
-
-    s.set_command("year", time::get_year());
-
-    s
+    )
 }

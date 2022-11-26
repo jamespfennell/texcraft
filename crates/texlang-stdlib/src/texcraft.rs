@@ -3,8 +3,8 @@
 use texlang_core::prelude::*;
 
 /// Get the `\texcraft` expansion primtive.
-pub fn get_texcraft<S>() -> command::ExpansionFn<S> {
-    texcraft_primitive_fn
+pub fn get_texcraft<S>() -> command::Command<S> {
+    command::Command::new_expansion(texcraft_primitive_fn)
 }
 
 pub fn texcraft_primitive_fn<S>(
@@ -25,11 +25,13 @@ pub fn texcraft_primitive_fn<S>(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::testutil::*;
 
-    fn setup_expansion_test(s: &mut runtime::Env<State>) {
-        s.set_command("texcraft", get_texcraft());
+    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+        HashMap::from([("texcraft", get_texcraft())])
     }
 
     expansion_test![texcraft, r"\texcraft", r"Texcraft"];

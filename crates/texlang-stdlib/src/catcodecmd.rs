@@ -5,8 +5,8 @@ use texlang_core::variable::{TypedVariable, Variable};
 pub const CATCODE_DOC: &str = "Get or set a catcode register";
 
 /// Get the `\catcode` command.
-pub fn get_catcode<S>() -> command::VariableFn<S> {
-    catcode_fn
+pub fn get_catcode<S>() -> command::Command<S> {
+    command::Command::new_variable(catcode_fn, 0)
 }
 
 fn catcode_fn<S>(
@@ -30,14 +30,18 @@ fn catcode_fn<S>(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::catcodecmd;
     use crate::testutil::*;
     use crate::the;
     use texlang_core::prelude::*;
 
-    fn setup_expansion_test(s: &mut runtime::Env<State>) {
-        s.set_command("the", the::get_the());
-        s.set_command("catcode", catcodecmd::get_catcode());
+    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+        HashMap::from([
+            ("the", the::get_the()),
+            ("catcode", catcodecmd::get_catcode()),
+        ])
     }
 
     expansion_test![catcode_base_case, r"\catcode 48 11 \the\catcode 48", r"11"];

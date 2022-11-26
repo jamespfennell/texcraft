@@ -61,8 +61,8 @@ impl<const N: usize> Default for Component<N> {
 }
 
 /// Get the `\count` command.
-pub fn get_count<S: HasComponent<Component<N>>, const N: usize>() -> command::VariableFn<S> {
-    count_fn
+pub fn get_count<S: HasComponent<Component<N>>, const N: usize>() -> command::Command<S> {
+    command::Command::new_variable(count_fn, 0)
 }
 
 fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
@@ -86,8 +86,8 @@ fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
 }
 
 /// Get the `\countdef` command.
-pub fn get_countdef<S: HasComponent<Component<N>>, const N: usize>() -> command::ExecutionFn<S> {
-    countdef_fn
+pub fn get_countdef<S: HasComponent<Component<N>>, const N: usize>() -> command::Command<S> {
+    command::Command::new_execution(countdef_fn)
 }
 
 fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
@@ -148,6 +148,8 @@ fn integer_register_too_large_error(token: Token, addr: u32, num: usize) -> anyh
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::script;
     use crate::testutil::*;
@@ -166,10 +168,12 @@ mod tests {
         (script::Component, exec),
     ];
 
-    fn setup_expansion_test(s: &mut runtime::Env<State>) {
-        s.set_command("the", the::get_the());
-        s.set_command("count", get_count());
-        s.set_command("countdef", get_countdef());
+    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+        HashMap::from([
+            ("the", the::get_the()),
+            ("count", get_count()),
+            ("countdef", get_countdef()),
+        ])
     }
 
     expansion_test![write_and_read_register, r"\count 23 4 \the\count 23", r"4"];

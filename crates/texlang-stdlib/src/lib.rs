@@ -5,6 +5,8 @@
 extern crate texcraft_stdext;
 extern crate texlang_core;
 
+use std::collections::HashMap;
+
 use texlang_core::runtime::implement_has_component;
 use texlang_core::runtime::Env;
 use texlang_core::token::catcode::CatCodeMap;
@@ -40,53 +42,59 @@ pub struct StdLibState {
 }
 
 impl StdLibState {
+    pub fn all_initial_built_ins(
+    ) -> HashMap<&'static str, texlang_core::command::Command<StdLibState>> {
+        HashMap::from([
+            ("advance", variableops::get_advance()),
+            //
+            ("catcode", catcodecmd::get_catcode()),
+            ("count", registers::get_count()),
+            ("countdef", registers::get_countdef()),
+            //
+            ("day", time::get_day()),
+            ("def", def::get_def()),
+            ("divide", variableops::get_divide()),
+            //
+            ("else", conditional::get_else()),
+            //
+            ("fi", conditional::get_fi()),
+            //
+            ("gdef", def::get_gdef()),
+            ("global", prefix::get_global()),
+            //
+            ("ifcase", conditional::get_if_case()),
+            ("iffalse", conditional::get_if_false()),
+            ("ifnum", conditional::get_if_num()),
+            ("ifodd", conditional::get_if_odd()),
+            ("iftrue", conditional::get_if_true()),
+            ("input", io::input::get_input()),
+            //
+            ("let", letassignment::get_let()),
+            ("long", prefix::get_long()),
+            //
+            ("month", time::get_month()),
+            ("multiply", variableops::get_multiply()),
+            //
+            ("newint", alloc::get_newint()),
+            ("newarray", alloc::get_newarray()),
+            //
+            ("or", conditional::get_or()),
+            ("outer", prefix::get_outer()),
+            //
+            ("the", the::get_the()),
+            ("time", time::get_time()),
+            ("tracingmacros", tracing::get_tracingmacros()),
+            //
+            ("year", time::get_year()),
+        ])
+    }
+
     pub fn new() -> Env<StdLibState> {
-        let mut s =
-            Env::<StdLibState>::new(CatCodeMap::new_with_tex_defaults(), Default::default());
-
-        s.set_command("advance", variableops::get_advance());
-
-        s.set_command("catcode", catcodecmd::get_catcode());
-        s.set_command("count", registers::get_count());
-        s.set_command("countdef", registers::get_countdef());
-
-        s.set_command("day", time::get_day());
-        s.set_command("def", def::get_def());
-        s.set_command("divide", variableops::get_divide());
-
-        s.set_command("else", conditional::get_else());
-
-        s.set_command("fi", conditional::get_fi());
-
-        s.set_command("gdef", def::get_gdef());
-        s.set_command("global", prefix::get_global());
-
-        s.set_command("ifcase", conditional::get_if_case());
-        s.set_command("iffalse", conditional::get_if_false());
-        s.set_command("ifnum", conditional::get_if_num());
-        s.set_command("ifodd", conditional::get_if_odd());
-        s.set_command("iftrue", conditional::get_if_true());
-        s.set_command("input", io::input::get_input());
-
-        s.set_command("let", letassignment::get_let());
-        s.set_command("long", prefix::get_long());
-
-        s.set_command("month", time::get_month());
-        s.set_command("multiply", variableops::get_multiply());
-
-        s.set_command("newint", alloc::get_newint());
-        s.set_command("newarray", alloc::get_newarray());
-
-        s.set_command("or", conditional::get_or());
-        s.set_command("outer", prefix::get_outer());
-
-        s.set_command("the", the::get_the());
-        s.set_command("time", time::get_time());
-        s.set_command("tracingmacros", tracing::get_tracingmacros());
-
-        s.set_command("year", time::get_year());
-
-        s
+        Env::<StdLibState>::new(
+            CatCodeMap::new_with_tex_defaults(),
+            StdLibState::all_initial_built_ins(),
+            Default::default(),
+        )
     }
 }
 

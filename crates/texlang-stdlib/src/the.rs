@@ -7,8 +7,8 @@ use texlang_core::variable;
 pub const THE_DOC: &str = "Output text describing some inputted tokens";
 
 /// Get the `\the` expansion primitive.
-pub fn get_the<S>() -> command::ExpansionFn<S> {
-    the_primitive_fn
+pub fn get_the<S>() -> command::Command<S> {
+    command::Command::new_expansion(the_primitive_fn)
 }
 
 fn the_primitive_fn<S>(

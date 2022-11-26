@@ -5,12 +5,15 @@ use texlang_core::runtime::BaseState;
 use texlang_core::variable;
 
 /// Get the `\tracingmacros` command.
-pub fn get_tracingmacros<S>() -> command::VariableFn<S> {
-    |_, _, _| -> anyhow::Result<variable::Variable<S>> {
-        Ok(variable::Variable::BaseInt(variable::TypedVariable::new(
-            |base: &BaseState<S>, _: u32| -> &i32 { &base.tracing_macros },
-            |base: &mut BaseState<S>, _: u32| -> &mut i32 { &mut base.tracing_macros },
-            0,
-        )))
-    }
+pub fn get_tracingmacros<S>() -> command::Command<S> {
+    command::Command::new_variable(
+        |_, _, _| -> anyhow::Result<variable::Variable<S>> {
+            Ok(variable::Variable::BaseInt(variable::TypedVariable::new(
+                |base: &BaseState<S>, _: u32| -> &i32 { &base.tracing_macros },
+                |base: &mut BaseState<S>, _: u32| -> &mut i32 { &mut base.tracing_macros },
+                0,
+            )))
+        },
+        0,
+    )
 }

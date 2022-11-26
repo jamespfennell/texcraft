@@ -127,6 +127,7 @@ impl std::fmt::Display for CatCode {
     }
 }
 
+// TODO: should this just be called Map?
 pub struct CatCodeMap {
     low: [CatCode; 128],
     high: HashMap<char, CatCode>,
@@ -182,7 +183,7 @@ impl Default for CatCodeMap {
 }
 
 fn set_tex_defaults(cat_code_map: &mut CatCodeMap) {
-    let iter = [
+    for (c, code) in [
         ('\\', Escape),
         ('{', BeginGroup),
         ('}', EndGroup),
@@ -250,9 +251,7 @@ fn set_tex_defaults(cat_code_map: &mut CatCodeMap) {
         ('x', Letter),
         ('y', Letter),
         ('z', Letter),
-    ]
-    .into_iter();
-    for (c, code) in iter {
+    ] {
         cat_code_map.insert(c, code);
     }
 }

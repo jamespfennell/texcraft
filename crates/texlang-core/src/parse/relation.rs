@@ -42,12 +42,17 @@ fn parse_relation_error(token: Option<Token>) -> anyhow::Error {
 mod tests {
     use super::*;
     use crate::token::catcode;
+    use std::collections::HashMap;
 
     macro_rules! relation_success_test {
         ($name: ident, $input: expr, $expected: expr) => {
             #[test]
             fn $name() {
-                let mut env = runtime::Env::<()>::new(CatCodeMap::new_with_tex_defaults(), ());
+                let mut env = runtime::Env::<()>::new(
+                    CatCodeMap::new_with_tex_defaults(),
+                    HashMap::new(),
+                    (),
+                );
                 env.push_source("".to_string(), $input.to_string()).unwrap();
                 let input = runtime::ExecutionInput::new(&mut env);
                 let result = parse_relation(input).unwrap();
@@ -66,7 +71,7 @@ mod tests {
             fn $name() {
                 let mut map = CatCodeMap::new_with_tex_defaults();
                 map.insert('<', catcode::CatCode::Letter);
-                let mut env = runtime::Env::<()>::new(map, ());
+                let mut env = runtime::Env::<()>::new(map, HashMap::new(), ());
                 env.push_source("".to_string(), $input.to_string()).unwrap();
                 let input = runtime::ExecutionInput::new(&mut env);
                 let result = parse_relation(input);

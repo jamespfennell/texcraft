@@ -70,9 +70,9 @@ fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
     let user_defined_macro = unsafe { Macro::new_unchecked(prefix, parameters, replacement) };
     let commands_map = &mut input.base_mut().commands_map;
     if set_globally {
-        commands_map.insert_global(name, rc::Rc::new(user_defined_macro));
+        commands_map.insert_global(name, rc::Rc::new(user_defined_macro).into());
     } else {
-        commands_map.insert(name, rc::Rc::new(user_defined_macro));
+        commands_map.insert(name, rc::Rc::new(user_defined_macro).into());
     }
     Ok(())
 }
@@ -309,14 +309,18 @@ fn parse_replacement_text(
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::testutil::*;
 
-    fn setup_expansion_test(s: &mut runtime::Env<State>) {
-        s.set_command("def", get_def());
-        s.set_command("gdef", get_gdef());
-        s.set_command("global", prefix::get_global());
-        s.set_command("assertGlobalIsFalse", prefix::get_assert_global_is_false());
+    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+        HashMap::from([
+            ("def", get_def()),
+            ("gdef", get_gdef()),
+            ("global", prefix::get_global()),
+            ("assertGlobalIsFalse", prefix::get_assert_global_is_false()),
+        ])
     }
 
     expansion_test![def_parsed_succesfully, "\\def\\A{abc}", ""];

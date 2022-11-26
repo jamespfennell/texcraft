@@ -189,8 +189,8 @@ impl Default for Component {
 }
 
 /// Get the `\newint` exeuction command.
-pub fn get_newint<S: HasComponent<Component>>() -> command::ExecutionFn<S> {
-    newint_primitive_fn
+pub fn get_newint<S: HasComponent<Component>>() -> command::Command<S> {
+    command::Command::new_execution(newint_primitive_fn)
 }
 
 fn newint_primitive_fn<S: HasComponent<Component>>(
@@ -231,8 +231,8 @@ fn singleton_mut_ref_fn<S: HasComponent<Component>>(state: &mut S, addr: u32) ->
 }
 
 /// Get the `\newarray` execution command.
-pub fn get_newarray<S: HasComponent<Component>>() -> command::ExecutionFn<S> {
-    newarray_primitive_fn
+pub fn get_newarray<S: HasComponent<Component>>() -> command::Command<S> {
+    command::Command::new_execution(newarray_primitive_fn)
 }
 
 fn newarray_primitive_fn<S: HasComponent<Component>>(
@@ -310,10 +310,12 @@ mod test {
 
     implement_has_component![State, (Component, alloc), (script::Component, exec),];
 
-    fn setup_expansion_test(s: &mut runtime::Env<State>) {
-        s.set_command("newint", get_newint());
-        s.set_command("newarray", get_newarray());
-        s.set_command("the", get_the());
+    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+        HashMap::from([
+            ("newint", get_newint()),
+            ("newarray", get_newarray()),
+            ("the", get_the()),
+        ])
     }
 
     expansion_test![newint_base_case, r"\newint\a \a=3 \the\a", "3"];

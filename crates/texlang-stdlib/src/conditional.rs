@@ -410,6 +410,8 @@ pub fn get_fi<S: HasComponent<Component>>() -> command::Command<S> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::{script, testutil::*};
     use texlang_core::runtime::implement_has_component;
@@ -422,15 +424,17 @@ mod tests {
 
     implement_has_component![State, (Component, conditional), (script::Component, exec),];
 
-    fn setup_expansion_test(s: &mut runtime::Env<State>) {
-        s.set_command("else", get_else());
-        s.set_command("fi", get_fi());
-        s.set_command("ifcase", get_if_case());
-        s.set_command("iffalse", get_if_false());
-        s.set_command("ifnum", get_if_num());
-        s.set_command("ifodd", get_if_odd());
-        s.set_command("iftrue", get_if_true());
-        s.set_command("or", get_or());
+    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+        HashMap::from([
+            ("else", get_else()),
+            ("fi", get_fi()),
+            ("ifcase", get_if_case()),
+            ("iffalse", get_if_false()),
+            ("ifnum", get_if_num()),
+            ("ifodd", get_if_odd()),
+            ("iftrue", get_if_true()),
+            ("or", get_or()),
+        ])
     }
 
     expansion_test![iftrue_base_case, r"\iftrue a\else b\fi c", r"ac"];

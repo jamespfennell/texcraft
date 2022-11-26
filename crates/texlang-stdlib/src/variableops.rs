@@ -142,6 +142,8 @@ create_arithmetic_primitive![divide_fn, divide];
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::catcodecmd;
     use crate::registers;
@@ -164,17 +166,19 @@ mod tests {
         (prefix::Component, prefix),
     ];
 
-    fn setup_expansion_test(s: &mut runtime::Env<State>) {
-        s.set_command("advance", get_advance());
-        s.set_command("advancechk", get_advancechk());
-        s.set_command("multiply", get_multiply());
-        s.set_command("multiplychk", get_multiplychk());
-        s.set_command("divide", get_divide());
-
-        s.set_command("catcode", catcodecmd::get_catcode());
-        s.set_command("count", registers::get_count());
-        s.set_command("global", prefix::get_global());
-        s.set_command("the", the::get_the());
+    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+        HashMap::from([
+            ("advance", get_advance()),
+            ("advancechk", get_advancechk()),
+            ("multiply", get_multiply()),
+            ("multiplychk", get_multiplychk()),
+            ("divide", get_divide()),
+            //
+            ("catcode", catcodecmd::get_catcode()),
+            ("count", registers::get_count()),
+            ("global", prefix::get_global()),
+            ("the", the::get_the()),
+        ])
     }
 
     macro_rules! arithmetic_test {

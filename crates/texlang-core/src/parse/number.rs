@@ -281,6 +281,8 @@ fn add_lsd<T: PrimInt>(n: T, base: i32, lsd: i32) -> T {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::parse::testutil;
     use crate::token::catcode;
@@ -401,7 +403,7 @@ mod tests {
     fn number_with_letter_catcode() {
         let mut map = CatCodeMap::new_with_tex_defaults();
         map.insert('1', catcode::CatCode::Letter);
-        let mut env = runtime::Env::<()>::new(map, ());
+        let mut env = runtime::Env::<()>::new(map, HashMap::new(), ());
         env.push_source("".to_string(), r"1".to_string()).unwrap();
         let input = crate::runtime::ExecutionInput::new(&mut env);
         let result: anyhow::Result<i32> = parse_number(input);

@@ -42,23 +42,27 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
         };
     let commands_map = &mut input.base_mut().commands_map;
     if global {
-        commands_map.insert_global(name, command);
+        commands_map.insert_global(name, command.into());
     } else {
-        commands_map.insert(name, command);
+        commands_map.insert(name, command.into());
     }
     Ok(())
 }
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::def;
     use crate::testutil::*;
 
-    fn setup_expansion_test(s: &mut runtime::Env<State>) {
-        s.set_command("def", def::get_def());
-        s.set_command("global", prefix::get_global());
-        s.set_command("let", get_let());
+    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+        HashMap::from([
+            ("def", def::get_def()),
+            ("global", prefix::get_global()),
+            ("let", get_let()),
+        ])
     }
 
     expansion_test![let_for_macro, r"\def\A{abc}\let\B\A\B", "abc"];

@@ -2,13 +2,20 @@ use rand::Rng;
 use std::io::Write;
 use std::process::Command;
 use std::process::Stdio;
+use texlang_core::runtime::Env;
+use texlang_core::token::catcode;
 use texlang_stdlib::script;
 use texlang_stdlib::StdLibState;
 
 pub fn run_in_texcraft(input: &str) {
-    let mut env = StdLibState::new();
-    env.set_command("par", script::get_par());
-    env.set_command("end", script::get_newline());
+    let mut initial_built_ins = StdLibState::all_initial_built_ins();
+    initial_built_ins.insert("par", script::get_par());
+    initial_built_ins.insert("end", script::get_newline());
+    let mut env = Env::<StdLibState>::new(
+        catcode::CatCodeMap::new_with_tex_defaults(),
+        initial_built_ins,
+        Default::default(),
+    );
     env.push_source("".to_string(), input.to_string()).unwrap();
     script::run(&mut env, true).unwrap();
 }

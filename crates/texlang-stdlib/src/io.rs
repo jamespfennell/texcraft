@@ -9,8 +9,8 @@ pub mod input {
     use super::read_file;
 
     /// Get the `\input` expansion primitive.
-    pub fn get_input<S>() -> command::ExpansionFn<S> {
-        input_fn
+    pub fn get_input<S>() -> command::Command<S> {
+        command::Command::new_expansion(input_fn)
     }
 
     fn input_fn<S>(
@@ -25,10 +25,16 @@ pub mod input {
 
     #[cfg(test)]
     mod tests {
+        use std::collections::HashMap;
+
         use super::*;
         use crate::testutil::*;
 
-        fn setup_expansion_test(env: &mut runtime::Env<State>) {
+        fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+            HashMap::from([("input", get_input())])
+        }
+
+        fn setup_expansion_test_old_todo(env: &mut runtime::Env<State>) {
             let cwd = env.working_directory().unwrap();
 
             let mut file_system_ops: FileSystemOps = Default::default();
@@ -51,13 +57,36 @@ pub mod input {
             file_system_ops.add_file(path_4, "content4");
 
             env.file_system_ops = Box::new(file_system_ops);
-            env.set_command("input", get_input());
         }
 
-        expansion_test![basic_case, r"\input file1 hello", "content1 hello"];
-        expansion_test![input_together, r"\input file2 hello", r"content2hello"];
-        expansion_test![basic_case_with_ext, r"\input file1.tex", r"content1 "];
-        expansion_test![nested, r"\input file3", r"content4"];
+        expansion_test![
+            basic_case,
+            r"\input file1 hello",
+            "content1 hello",
+            setup_expansion_test,
+            Some(setup_expansion_test_old_todo)
+        ];
+        expansion_test![
+            input_together,
+            r"\input file2 hello",
+            r"content2hello",
+            setup_expansion_test,
+            Some(setup_expansion_test_old_todo)
+        ];
+        expansion_test![
+            basic_case_with_ext,
+            r"\input file1.tex",
+            r"content1 ",
+            setup_expansion_test,
+            Some(setup_expansion_test_old_todo)
+        ];
+        expansion_test![
+            nested,
+            r"\input file3",
+            r"content4",
+            setup_expansion_test,
+            Some(setup_expansion_test_old_todo)
+        ];
     }
 }
 

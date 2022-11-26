@@ -9,7 +9,6 @@ use super::token::CsName;
 use crate::command;
 use crate::command::Command;
 use crate::command::Fn;
-use crate::command::Map;
 use crate::error;
 use crate::token;
 use crate::token::catcode::CatCodeMap;
@@ -124,19 +123,22 @@ impl FileSystemOps for RealFileSystemOps {
 /// Parts of the state that are required in every Texlang environment, such as the commands map.
 ///
 /// Note that state means specifically parts of the environment that can be edited by
-/// exectution commands.
+/// execution commands.
 pub struct BaseState<S> {
     pub cat_code_map: CatCodeMap,
-    pub commands_map: Map<S>,
+    pub commands_map: command::Map<S>,
     pub tracing_macros: i32,
     pub max_input_levels: i32,
 }
 
 impl<S> BaseState<S> {
-    pub fn new(cat_code_map: CatCodeMap) -> BaseState<S> {
+    pub fn new(
+        cat_code_map: CatCodeMap,
+        initial_built_ins: HashMap<CsName, Command<S>>,
+    ) -> BaseState<S> {
         BaseState {
             cat_code_map,
-            commands_map: Default::default(),
+            commands_map: command::Map::new(initial_built_ins, vec![]),
             tracing_macros: 0,
             max_input_levels: 500,
         }
@@ -145,11 +147,20 @@ impl<S> BaseState<S> {
 
 impl<S> Env<S> {
     /// Create a new runtime environment.
-    pub fn new(initial_cat_codes: CatCodeMap, state: S) -> Env<S> {
+    pub fn new(
+        initial_cat_codes: CatCodeMap,
+        initial_built_ins: HashMap<&str, Command<S>>,
+        state: S,
+    ) -> Env<S> {
+        let mut internal: InternalEnv<S> = Default::default();
+        let initial_built_ins = initial_built_ins
+            .into_iter()
+            .map(|(key, value)| (internal.cs_name_interner.get_or_intern(key), value))
+            .collect();
         Env {
             custom_state: state,
-            base_state: BaseState::new(initial_cat_codes),
-            internal: Default::default(),
+            base_state: BaseState::new(initial_cat_codes, initial_built_ins),
+            internal,
             file_system_ops: Box::new(RealFileSystemOps {}),
         }
     }
@@ -170,14 +181,6 @@ impl<S> Env<S> {
     /// Clear all source code from the environment.
     pub fn clear_sources(&mut self) {
         self.internal.clear_sources()
-    }
-
-    /// Set a command.
-    pub fn set_command<A: AsRef<str>, B: Into<Command<S>>>(&mut self, name: A, cmd: B) {
-        self.base_state.commands_map.insert(
-            self.internal.cs_name_interner.get_or_intern(name),
-            B::into(cmd),
-        );
     }
 
     /// Return the current working directory, or [None] if it could not be determined.
@@ -338,7 +341,7 @@ impl Default for Source {
 /// Helper trait for implementing the component pattern in Texlang.
 ///
 /// With this pattern, a TeX command (like `\time`) can have a single implementation that
-///     is shared by many different pieces of software built with Texlang.
+///     is shared by many different programs built with Texlang.
 /// Additionally, a specific TeX engine can compose many different
 ///     TeX commands together without worrying about incompatibilities.
 /// In both cases the key is making the state associated with the command private.

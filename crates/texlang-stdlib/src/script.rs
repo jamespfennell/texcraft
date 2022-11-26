@@ -15,8 +15,8 @@ pub struct Component {
 /// Get the `\newline` command.
 ///
 /// This adds a newline to the output.
-pub fn get_newline<S: HasComponent<Component>>() -> command::ExecutionFn<S> {
-    newline_primitive_fn
+pub fn get_newline<S: HasComponent<Component>>() -> command::Command<S> {
+    command::Command::new_execution(newline_primitive_fn)
 }
 
 fn newline_primitive_fn<S: HasComponent<Component>>(
@@ -34,8 +34,8 @@ fn newline_primitive_fn<S: HasComponent<Component>>(
 ///
 /// The `\par` command adds two newlines to the output.
 /// Consecutive `\par` commands are treated as one.
-pub fn get_par<S: HasComponent<Component>>() -> command::ExecutionFn<S> {
-    par_primitive_fn
+pub fn get_par<S: HasComponent<Component>>() -> command::Command<S> {
+    command::Command::new_execution(par_primitive_fn)
 }
 
 fn par_primitive_fn<S: HasComponent<Component>>(
@@ -95,63 +95,55 @@ fn handle_character<S: HasComponent<Component>>(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::def;
     use crate::testutil::*;
+    use texlang_core::runtime;
+    use texlang_core::token;
+    use texlang_core::token::catcode;
 
-    fn setup_expansion_test(s: &mut runtime::Env<State>) {
-        s.set_command("par", get_par());
-        s.set_command("def", def::get_def());
-        s.set_command("newline", get_newline());
+    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+        HashMap::from([
+            ("par", get_par()),
+            ("def", def::get_def()),
+            ("newline", get_newline()),
+        ])
     }
 
-    macro_rules! whitespace_test {
-        ($name: ident, $lhs: expr, $rhs: expr) => {
+    macro_rules! script_test {
+        ($name: ident, $input: expr, $want: expr) => {
             #[test]
             fn $name() {
-                let (output_1, env_1) =
-                    crate::testutil::run(setup_expansion_test, $lhs.to_string());
-                let output_1 = output_1.unwrap();
+                let mut env = runtime::Env::<State>::new(
+                    catcode::CatCodeMap::new_with_tex_defaults(),
+                    setup_expansion_test(),
+                    Default::default(),
+                );
+                env.push_source("testutil.tex".to_string(), $input.to_string())
+                    .unwrap();
+                let tokens = run(&mut env, false).unwrap();
+                let got = token::write_tokens(&tokens, env.cs_name_interner());
+                let want = $want.to_string();
 
-                let lhs_output =
-                    ::texlang_core::token::write_tokens(&output_1, &env_1.cs_name_interner());
-                let rhs_output = $rhs.to_string();
-
-                if lhs_output != rhs_output {
+                if got != want {
                     println!("Output is different:");
-                    println!("------[lhs]------");
-                    println!("{}", lhs_output);
-                    println!("------[rhs]------");
-                    println!("{}", rhs_output);
-                    println!("--[lhs-verbose]--");
-                    for token in &output_1 {
-                        println!("{:?}", token);
-                    }
+                    println!("------[got]-------");
+                    println!("{}", got);
+                    println!("------[want]------");
+                    println!("{}", want);
                     println!("-----------------");
-                    panic!("Whitespace test failed");
+                    panic!("write_tokens test failed");
                 }
             }
         };
     }
 
-    whitespace_test![
-        trim_whitespace_from_start_1,
-        r"\def\A{}
-\A
-
-Hello",
-        r"Hello"
-    ];
-
-    whitespace_test![
-        trim_whitespace_from_start_2,
-        r"Hello
-
-\def\world{World}
-\world
-",
-        r"Hello
-
-World"
-    ];
+    script_test!(char_newline_1, "H\nW", "H W");
+    script_test!(newline_1, "H\\newline W", "H\nW");
+    script_test!(newline_2, "H\\newline \\newline W", "H\n\nW");
+    script_test!(newline_3, "H\\newline \\newline \\newline W", "H\n\n\nW");
+    script_test!(par_1, "H\n\n\nW", "H\n\nW");
+    script_test!(par_2, "H\n\n\n\n\nW", "H\n\nW");
 }
