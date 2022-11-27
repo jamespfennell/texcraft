@@ -13,7 +13,7 @@ pub struct RunOptions<'a> {
     pub help: &'a str,
 }
 
-pub fn run<S: HasComponent<script::Component>>(env: &mut runtime::Env<S>, opts: RunOptions) {
+pub fn run<S: HasComponent<script::Component>>(env: &mut vm::Env<S>, opts: RunOptions) {
     let reader = Interface::new("").unwrap();
 
     reader.set_prompt(opts.prompt).unwrap();
@@ -86,7 +86,7 @@ impl std::error::Error for Signal {}
 /// This exits the REPL.
 pub fn get_exit<S>() -> command::Command<S> {
     command::Command::new_expansion(
-        |_: Token, _: &mut runtime::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
+        |_: Token, _: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
             Err(Signal::Exit.into())
         },
     )
@@ -97,7 +97,7 @@ pub fn get_exit<S>() -> command::Command<S> {
 /// This prints help text for the REPL.
 pub fn get_help<S>() -> command::Command<S> {
     command::Command::new_expansion(
-        |_: Token, _: &mut runtime::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
+        |_: Token, _: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
             Err(Signal::Help.into())
         },
     )
@@ -108,7 +108,7 @@ pub fn get_help<S>() -> command::Command<S> {
 /// This prints the documentation for a TeX command.
 pub fn get_doc<S>() -> command::Command<S> {
     command::Command::new_expansion(
-        |token: Token, input: &mut runtime::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
+        |token: Token, input: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
             let target = texlang_core::parse::parse_command_target("", token, input.unexpanded())?;
             let cs_name_s = input.env().cs_name_interner().resolve(&target).unwrap();
             let doc = match input.base().commands_map.get_command_slow(&target) {

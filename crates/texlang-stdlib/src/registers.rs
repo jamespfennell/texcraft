@@ -2,7 +2,7 @@
 
 use texlang_core::parse;
 use texlang_core::prelude::*;
-use texlang_core::runtime::HasComponent;
+use texlang_core::vm::HasComponent;
 use texlang_core::variable::{TypedVariable, Variable};
 
 pub const COUNT_DOC: &str = "Get or set an integer register";
@@ -67,7 +67,7 @@ pub fn get_count<S: HasComponent<Component<N>>, const N: usize>() -> command::Co
 
 fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
     count_token: Token,
-    input: &mut runtime::ExpansionInput<S>,
+    input: &mut vm::ExpansionInput<S>,
     _: u32,
 ) -> anyhow::Result<Variable<S>> {
     let addr: u32 = parse::parse_number(input)?;
@@ -92,7 +92,7 @@ pub fn get_countdef<S: HasComponent<Component<N>>, const N: usize>() -> command:
 
 fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
     countdef_token: Token,
-    input: &mut runtime::ExecutionInput<S>,
+    input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let cs_name = parse::parse_command_target("countdef", countdef_token, input.unexpanded())?;
     parse::parse_optional_equals(input)?;
@@ -111,7 +111,7 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
 
 fn singleton_fn<S: HasComponent<Component<N>>, const N: usize>(
     _: Token,
-    _: &mut runtime::ExpansionInput<S>,
+    _: &mut vm::ExpansionInput<S>,
     addr: u32,
 ) -> anyhow::Result<Variable<S>> {
     Ok(Variable::Int(TypedVariable::new(
@@ -154,7 +154,7 @@ mod tests {
     use crate::script;
     use crate::testutil::*;
     use crate::the;
-    use texlang_core::runtime::implement_has_component;
+    use texlang_core::vm::implement_has_component;
 
     #[derive(Default)]
     struct State {

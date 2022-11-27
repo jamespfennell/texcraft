@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::runtime::HasEnv;
+use crate::vm::HasEnv;
 use crate::token::catcode::CatCode;
 use crate::variable;
 use num_traits::PrimInt;
@@ -10,14 +10,14 @@ use num_traits::PrimInt;
 /// from an internal registers. The full definition of a number in the TeX grammer
 /// is given on page X of the TeXBook.
 #[inline]
-pub fn parse_number<S, I: AsMut<runtime::ExpansionInput<S>>, T: PrimInt>(
+pub fn parse_number<S, I: AsMut<vm::ExpansionInput<S>>, T: PrimInt>(
     stream: &mut I,
 ) -> anyhow::Result<T> {
     parse_number_internal(stream.as_mut())
 }
 
 fn parse_number_internal<S, T: PrimInt>(
-    stream: &mut runtime::ExpansionInput<S>,
+    stream: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<T> {
     let sign = parse_optional_signs(stream)?;
     let modulus: T = match stream.next()? {
@@ -60,13 +60,13 @@ fn parse_number_internal<S, T: PrimInt>(
 }
 
 #[inline]
-pub fn parse_catcode<S, I: AsMut<runtime::ExpansionInput<S>>>(
+pub fn parse_catcode<S, I: AsMut<vm::ExpansionInput<S>>>(
     stream: &mut I,
 ) -> anyhow::Result<CatCode> {
     parse_catcode_internal(stream.as_mut())
 }
 
-fn parse_catcode_internal<S>(stream: &mut runtime::ExpansionInput<S>) -> anyhow::Result<CatCode> {
+fn parse_catcode_internal<S>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<CatCode> {
     let val: usize = parse_number(stream)?;
     if let Ok(val_u8) = u8::try_from(val) {
         if let Some(cat_code) = CatCode::from_int(val_u8) {
@@ -85,7 +85,7 @@ fn parse_catcode_internal<S>(stream: &mut runtime::ExpansionInput<S>) -> anyhow:
 /// If the combination of the signs is positive, [None] is returned.
 /// Otherwise, the Token corresponding to the last negative sign is returned.
 fn parse_optional_signs<S>(
-    stream: &mut runtime::ExpansionInput<S>,
+    stream: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Option<Token>> {
     let mut result = None;
     while let Some((sign, token)) = get_optional_element_with_token![
@@ -122,7 +122,7 @@ fn parse_number_error(token: Option<Token>) -> anyhow::Error {
 
 fn read_number_from_address<S, T: PrimInt>(
     variable: variable::Variable<S>,
-    stream: &mut runtime::ExpansionInput<S>,
+    stream: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<T> {
     match variable {
         variable::Variable::Int(variable) => {
@@ -142,7 +142,7 @@ fn read_number_from_address<S, T: PrimInt>(
     }
 }
 
-fn parse_character<S, T: PrimInt>(stream: &mut runtime::ExpansionInput<S>) -> anyhow::Result<T> {
+fn parse_character<S, T: PrimInt>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<T> {
     match stream.next()? {
         None => Err(error::EndOfInputError::new(
             "unexpected end of input while parsing a character token",
@@ -160,7 +160,7 @@ fn parse_character<S, T: PrimInt>(stream: &mut runtime::ExpansionInput<S>) -> an
     }
 }
 
-fn parse_octal<S, T: PrimInt>(stream: &mut runtime::ExpansionInput<S>) -> anyhow::Result<T> {
+fn parse_octal<S, T: PrimInt>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<T> {
     let mut n = num_traits::cast::cast(get_element![
         stream,
         parse_number_error,
@@ -191,7 +191,7 @@ fn parse_octal<S, T: PrimInt>(stream: &mut runtime::ExpansionInput<S>) -> anyhow
 }
 
 fn parse_decimal<S, T: PrimInt>(
-    stream: &mut runtime::ExpansionInput<S>,
+    stream: &mut vm::ExpansionInput<S>,
     n_start: i8,
 ) -> anyhow::Result<T> {
     let mut n: T = num_traits::cast::cast(n_start).unwrap();
@@ -213,7 +213,7 @@ fn parse_decimal<S, T: PrimInt>(
     Ok(n)
 }
 
-fn parse_hexadecimal<S, T: PrimInt>(stream: &mut runtime::ExpansionInput<S>) -> anyhow::Result<T> {
+fn parse_hexadecimal<S, T: PrimInt>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<T> {
     let mut n: T = num_traits::cast::cast(get_element![
         stream,
         parse_number_error,
@@ -290,7 +290,7 @@ mod tests {
     macro_rules! parse_number_test {
         ($input: expr, $number: expr) => {
             let mut env = testutil::new_env($input);
-            let result: i32 = parse_number(runtime::ExpansionInput::new(&mut env)).unwrap();
+            let result: i32 = parse_number(vm::ExpansionInput::new(&mut env)).unwrap();
             assert_eq![result, $number];
         };
     }
@@ -403,9 +403,9 @@ mod tests {
     fn number_with_letter_catcode() {
         let mut map = CatCodeMap::new_with_tex_defaults();
         map.insert('1', catcode::CatCode::Letter);
-        let mut env = runtime::Env::<()>::new(map, HashMap::new(), ());
+        let mut env = vm::Env::<()>::new(map, HashMap::new(), ());
         env.push_source("".to_string(), r"1".to_string()).unwrap();
-        let input = crate::runtime::ExecutionInput::new(&mut env);
+        let input = crate::vm::ExecutionInput::new(&mut env);
         let result: anyhow::Result<i32> = parse_number(input);
         if let Ok(_) = result {
             panic!["Parsed a relation from invalid input"];

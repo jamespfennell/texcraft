@@ -51,21 +51,21 @@ pub fn null_type_id() -> TypeId {
 
 /// The Rust type of expansion primitive functions.
 pub type ExpansionFn<S> =
-    fn(token: Token, input: &mut runtime::ExpansionInput<S>) -> anyhow::Result<Vec<Token>>;
+    fn(token: Token, input: &mut vm::ExpansionInput<S>) -> anyhow::Result<Vec<Token>>;
 
 /// The Rust type of execution primitive functions.
 pub type ExecutionFn<S> =
-    fn(token: Token, input: &mut runtime::ExecutionInput<S>) -> anyhow::Result<()>;
+    fn(token: Token, input: &mut vm::ExecutionInput<S>) -> anyhow::Result<()>;
 
 /// The Rust type of variable primitive functions.
 pub type VariableFn<S> = fn(
     token: Token,
-    input: &mut runtime::ExpansionInput<S>,
+    input: &mut vm::ExpansionInput<S>,
     addr: u32,
 ) -> anyhow::Result<variable::Variable<S>>;
 
 /// Obtain the variable that the command refers to.
-pub fn resolve<S, I: AsMut<runtime::ExpansionInput<S>>>(
+pub fn resolve<S, I: AsMut<vm::ExpansionInput<S>>>(
     variable_fn: VariableFn<S>,
     addr: u32,
     token: token::Token,

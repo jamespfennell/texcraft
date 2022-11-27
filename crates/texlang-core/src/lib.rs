@@ -12,7 +12,7 @@ pub mod command;
 pub mod error;
 pub mod parse;
 pub mod prelude;
-pub mod runtime;
 pub mod texmacro;
 pub mod token;
 pub mod variable;
+pub mod vm;

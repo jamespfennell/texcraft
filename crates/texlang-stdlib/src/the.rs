@@ -13,7 +13,7 @@ pub fn get_the<S>() -> command::Command<S> {
 
 fn the_primitive_fn<S>(
     the_token: Token,
-    input: &mut runtime::ExpansionInput<S>,
+    input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     let token = match input.next()? {
         None => {

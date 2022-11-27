@@ -1,9 +1,9 @@
-//! The Texlang runtime.
+//! The Texlang virtual machine (VM).
 //!
-//! This module contains the definition of the runtime environment,
+//! This module contains the definition of the runtime VM,
 //!     various input streams that wrap the environment,
 //!     and the main function that is used to run Texlang.
-//! See the runtime documentation in the Texlang book for full documentation.
+//! See the VM documentation in the Texlang book for full documentation.
 
 use super::token::CsName;
 use crate::command;
@@ -406,7 +406,7 @@ pub trait HasComponent<C> {
 /// # mod mylibrary{
 /// #   pub struct Component;
 /// # }
-/// # use texlang_core::runtime::implement_has_component;
+/// # use texlang_core::vm::implement_has_component;
 /// #
 /// struct MyState {
 ///     component: mylibrary::Component,
@@ -424,7 +424,7 @@ pub trait HasComponent<C> {
 /// # mod mylibrary2{
 /// #   pub struct Component;
 /// # }
-/// # use texlang_core::runtime::implement_has_component;
+/// # use texlang_core::vm::implement_has_component;
 /// #
 /// struct MyState {
 ///     component_1: mylibrary1::Component,
@@ -444,7 +444,7 @@ macro_rules! implement_has_component {
     };
     ( $type: path, $(($component: path, $field: ident),)+) => {
         $(
-            impl ::texlang_core::runtime::HasComponent<$component> for $type {
+            impl ::texlang_core::vm::HasComponent<$component> for $type {
                 fn component(&self) -> &$component {
                     &self.$field
                 }

@@ -1,5 +1,5 @@
 use crate::command;
-use crate::runtime;
+use crate::vm;
 use crate::token::trace;
 use crate::token::Token;
 use crate::variable;
@@ -79,11 +79,11 @@ pub trait HasEnv {
     type S;
 
     /// Returns a reference to the environment.
-    fn env(&self) -> &runtime::Env<Self::S>;
+    fn env(&self) -> &vm::Env<Self::S>;
 
     /// Returns a reference to the base state.
     #[inline]
-    fn base(&self) -> &runtime::BaseState<Self::S> {
+    fn base(&self) -> &vm::BaseState<Self::S> {
         &self.env().base_state
     }
 
@@ -145,7 +145,7 @@ impl<T: ExpandedStream> TokenStream for T {
 /// It be obtained from either the [ExecutionInput] or the [ExpansionInput]
 /// using the [ExpandedStream] trait methods.
 #[repr(transparent)]
-pub struct UnexpandedStream<S>(runtime::Env<S>);
+pub struct UnexpandedStream<S>(vm::Env<S>);
 
 impl<S> TokenStream for UnexpandedStream<S> {
     #[inline]
@@ -184,13 +184,13 @@ impl<S> TokenStream for UnexpandedStream<S> {
 /// [ExpansionInput] or [ExecutionInput] is accepted. We use this type because
 /// it has only read access to the env, and so casting does not escalate priviliges.
 #[repr(transparent)]
-pub struct ExpansionInput<S>(runtime::Env<S>);
+pub struct ExpansionInput<S>(vm::Env<S>);
 
 impl<S> HasEnv for ExpansionInput<S> {
     type S = S;
 
     #[inline]
-    fn env(&self) -> &runtime::Env<S> {
+    fn env(&self) -> &vm::Env<S> {
         &self.0
     }
 }
@@ -213,8 +213,8 @@ impl<S> std::convert::AsMut<ExpansionInput<S>> for ExpansionInput<S> {
 impl<S> ExpansionInput<S> {
     /// Creates a mutable reference to this type from the [Env](runtime::Env) type.
     #[inline]
-    pub fn new(env: &mut runtime::Env<S>) -> &mut ExpansionInput<S> {
-        unsafe { &mut *(env as *mut runtime::Env<S> as *mut ExpansionInput<S>) }
+    pub fn new(env: &mut vm::Env<S>) -> &mut ExpansionInput<S> {
+        unsafe { &mut *(env as *mut vm::Env<S> as *mut ExpansionInput<S>) }
     }
 
     /// Push source code to the front of the input stream.
@@ -291,13 +291,13 @@ impl<S> ExpansionInput<S> {
 /// - Mutable access to the base state and custom state using the [ExecutionInput::base]
 ///     and [ExecutionInput::state] methods.
 #[repr(transparent)]
-pub struct ExecutionInput<S>(runtime::Env<S>);
+pub struct ExecutionInput<S>(vm::Env<S>);
 
 impl<S> HasEnv for ExecutionInput<S> {
     type S = S;
 
     #[inline]
-    fn env(&self) -> &runtime::Env<S> {
+    fn env(&self) -> &vm::Env<S> {
         &self.0
     }
 }
@@ -314,13 +314,13 @@ impl<S> ExpandedStream for ExecutionInput<S> {
 impl<S> ExecutionInput<S> {
     /// Creates a mutable reference to this type from the [Env](runtime::Env) type.
     #[inline]
-    pub fn new(state: &mut runtime::Env<S>) -> &mut ExecutionInput<S> {
-        unsafe { &mut *(state as *mut runtime::Env<S> as *mut ExecutionInput<S>) }
+    pub fn new(state: &mut vm::Env<S>) -> &mut ExecutionInput<S> {
+        unsafe { &mut *(state as *mut vm::Env<S> as *mut ExecutionInput<S>) }
     }
 
     /// Returns a mutable reference to the base state.
     #[inline]
-    pub fn base_mut(&mut self) -> &mut runtime::BaseState<S> {
+    pub fn base_mut(&mut self) -> &mut vm::BaseState<S> {
         &mut self.0.base_state
     }
 
@@ -377,7 +377,7 @@ mod stream {
     use crate::token::Value::ControlSequence;
 
     #[inline]
-    pub fn next_unexpanded<S>(env: &mut runtime::Env<S>) -> anyhow::Result<Option<Token>> {
+    pub fn next_unexpanded<S>(env: &mut vm::Env<S>) -> anyhow::Result<Option<Token>> {
         if let Some(token) = env.internal.current_source.expansions.pop() {
             return Ok(Some(token));
         }
@@ -390,7 +390,7 @@ mod stream {
         next_unexpanded_recurse(env)
     }
 
-    fn next_unexpanded_recurse<S>(env: &mut runtime::Env<S>) -> anyhow::Result<Option<Token>> {
+    fn next_unexpanded_recurse<S>(env: &mut vm::Env<S>) -> anyhow::Result<Option<Token>> {
         if env.internal.pop_source() {
             next_unexpanded(env)
         } else {
@@ -399,7 +399,7 @@ mod stream {
     }
 
     #[inline]
-    pub fn peek_unexpanded<S>(env: &mut runtime::Env<S>) -> anyhow::Result<Option<&Token>> {
+    pub fn peek_unexpanded<S>(env: &mut vm::Env<S>) -> anyhow::Result<Option<&Token>> {
         if let Some(token) = env.internal.current_source.expansions.last() {
             return Ok(Some(unsafe { launder(token) }));
         }
@@ -413,7 +413,7 @@ mod stream {
         peek_unexpanded_recurse(env)
     }
 
-    fn peek_unexpanded_recurse<S>(env: &mut runtime::Env<S>) -> anyhow::Result<Option<&Token>> {
+    fn peek_unexpanded_recurse<S>(env: &mut vm::Env<S>) -> anyhow::Result<Option<&Token>> {
         if env.internal.pop_source() {
             peek_unexpanded(env)
         } else {
@@ -421,7 +421,7 @@ mod stream {
         }
     }
 
-    pub fn next_expanded<S>(env: &mut runtime::Env<S>) -> anyhow::Result<Option<Token>> {
+    pub fn next_expanded<S>(env: &mut vm::Env<S>) -> anyhow::Result<Option<Token>> {
         let (token, command) = match next_unexpanded(env)? {
             None => return Ok(None),
             Some(token) => match token.value() {
@@ -445,7 +445,7 @@ mod stream {
         }
     }
 
-    pub fn peek_expanded<S>(env: &mut runtime::Env<S>) -> anyhow::Result<Option<&Token>> {
+    pub fn peek_expanded<S>(env: &mut vm::Env<S>) -> anyhow::Result<Option<&Token>> {
         let (token, command) = match peek_unexpanded(env)? {
             None => return Ok(None),
             Some(token) => match token.value() {
@@ -476,7 +476,7 @@ mod stream {
         }
     }
 
-    pub fn expand_once<S>(env: &mut runtime::Env<S>) -> anyhow::Result<bool> {
+    pub fn expand_once<S>(env: &mut vm::Env<S>) -> anyhow::Result<bool> {
         let (token, command) = match peek_unexpanded(env)? {
             None => return Ok(false),
             Some(token) => match token.value() {
@@ -508,7 +508,7 @@ mod stream {
     }
 
     #[inline]
-    pub fn consume_peek<S>(env: &mut runtime::Env<S>) {
+    pub fn consume_peek<S>(env: &mut vm::Env<S>) {
         // When we peek at a token, it is placed on top of the expansions stack.
         // So to consume the token, we just need to remove it from the stack.
         env.internal.current_source.expansions.pop();

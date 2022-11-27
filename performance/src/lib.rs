@@ -2,7 +2,7 @@ use rand::Rng;
 use std::io::Write;
 use std::process::Command;
 use std::process::Stdio;
-use texlang_core::runtime::Env;
+use texlang_core::vm::Env;
 use texlang_core::token::catcode;
 use texlang_stdlib::script;
 use texlang_stdlib::StdLibState;

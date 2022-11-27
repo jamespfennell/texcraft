@@ -9,7 +9,7 @@ pub fn get_texcraft<S>() -> command::Command<S> {
 
 pub fn texcraft_primitive_fn<S>(
     t: Token,
-    _: &mut runtime::ExpansionInput<S>,
+    _: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     Ok(vec![
         Token::new_letter('T', t.trace_key()),

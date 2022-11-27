@@ -7,8 +7,8 @@ extern crate texlang_core;
 
 use std::collections::HashMap;
 
-use texlang_core::runtime::implement_has_component;
-use texlang_core::runtime::Env;
+use texlang_core::vm::implement_has_component;
+use texlang_core::vm::Env;
 use texlang_core::token::catcode::CatCodeMap;
 
 pub mod alloc;

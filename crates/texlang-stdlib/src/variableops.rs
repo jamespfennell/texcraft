@@ -46,7 +46,7 @@ macro_rules! create_arithmetic_primitive {
     ($prim_fn: ident, $arithmetic_op: ident) => {
         fn $prim_fn<S: HasComponent<prefix::Component>>(
             token: Token,
-            input: &mut runtime::ExecutionInput<S>,
+            input: &mut vm::ExecutionInput<S>,
         ) -> anyhow::Result<()> {
             let global = input.state_mut().component_mut().read_and_reset_global();
             let variable = parse::parse_variable(input)?;
@@ -150,7 +150,7 @@ mod tests {
     use crate::script;
     use crate::testutil::*;
     use crate::the;
-    use texlang_core::runtime::implement_has_component;
+    use texlang_core::vm::implement_has_component;
 
     #[derive(Default)]
     struct State {

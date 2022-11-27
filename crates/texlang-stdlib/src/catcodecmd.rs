@@ -11,16 +11,16 @@ pub fn get_catcode<S>() -> command::Command<S> {
 
 fn catcode_fn<S>(
     _catcode_token: Token,
-    input: &mut runtime::ExpansionInput<S>,
+    input: &mut vm::ExpansionInput<S>,
     _: u32,
 ) -> anyhow::Result<Variable<S>> {
     let addr: u32 = parse::parse_number(input)?;
     Ok(Variable::CatCode(TypedVariable::new(
-        |state: &runtime::BaseState<S>, addr: u32| -> &CatCode {
+        |state: &vm::BaseState<S>, addr: u32| -> &CatCode {
             let addr = char::from_u32(addr).unwrap();
             state.cat_code_map.get(&addr)
         },
-        |state: &mut runtime::BaseState<S>, addr: u32| -> &mut CatCode {
+        |state: &mut vm::BaseState<S>, addr: u32| -> &mut CatCode {
             let addr = char::from_u32(addr).unwrap();
             state.cat_code_map.get_mut(&addr)
         },

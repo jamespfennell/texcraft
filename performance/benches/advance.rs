@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use texlang_core::prelude::*;
-use texlang_core::runtime::Env;
-use texlang_core::runtime::ExpansionInput;
+use texlang_core::vm::Env;
+use texlang_core::vm::ExpansionInput;
 use texlang_core::token::catcode;
 use texlang_stdlib::script;
 use texlang_stdlib::StdLibState;

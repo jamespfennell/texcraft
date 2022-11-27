@@ -31,21 +31,21 @@ pub fn def_id() -> std::any::TypeId {
 
 fn def_primitive_fn<S: HasComponent<prefix::Component>>(
     def_token: Token,
-    input: &mut runtime::ExecutionInput<S>,
+    input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     parse_and_set_macro(def_token, input, false)
 }
 
 fn gdef_primitive_fn<S: HasComponent<prefix::Component>>(
     def_token: Token,
-    input: &mut runtime::ExecutionInput<S>,
+    input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     parse_and_set_macro(def_token, input, true)
 }
 
 fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
     def_token: Token,
-    input: &mut runtime::ExecutionInput<S>,
+    input: &mut vm::ExecutionInput<S>,
     set_globally_override: bool,
 ) -> anyhow::Result<()> {
     let set_globally =

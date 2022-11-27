@@ -6,10 +6,10 @@ use crate::prefix;
 use crate::script;
 use anyhow::Result;
 use texlang_core::command;
-use texlang_core::runtime;
-use texlang_core::runtime::implement_has_component;
-use texlang_core::runtime::Env;
-use texlang_core::runtime::HasComponent;
+use texlang_core::vm;
+use texlang_core::vm::implement_has_component;
+use texlang_core::vm::Env;
+use texlang_core::vm::HasComponent;
 use texlang_core::token;
 use texlang_core::token::catcode;
 
@@ -152,7 +152,7 @@ pub struct FileSystemOps {
     files: HashMap<std::path::PathBuf, String>,
 }
 
-impl runtime::FileSystemOps for FileSystemOps {
+impl vm::FileSystemOps for FileSystemOps {
     fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String> {
         match self.files.get(path) {
             None => Err(std::io::Error::new(
@@ -175,7 +175,7 @@ impl FileSystemOps {
 pub fn get_noop_expansion_cmd<S>() -> texlang_core::command::Command<S> {
     fn noop_expansion_cmd_fn<S>(
         _: token::Token,
-        _: &mut runtime::ExpansionInput<S>,
+        _: &mut vm::ExpansionInput<S>,
     ) -> anyhow::Result<Vec<token::Token>> {
         Ok(Vec::new())
     }
@@ -186,7 +186,7 @@ pub fn get_noop_expansion_cmd<S>() -> texlang_core::command::Command<S> {
 pub fn get_noop_execution_cmd<S>() -> texlang_core::command::Command<S> {
     fn noop_execution_cmd_fn<S>(
         _: token::Token,
-        _: &mut runtime::ExecutionInput<S>,
+        _: &mut vm::ExecutionInput<S>,
     ) -> anyhow::Result<()> {
         Ok(())
     }

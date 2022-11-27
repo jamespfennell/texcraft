@@ -171,22 +171,22 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
     }
 }
 
-fn new_env() -> runtime::Env<StdLibState> {
-    runtime::Env::<StdLibState>::new(
+fn new_env() -> vm::Env<StdLibState> {
+    vm::Env::<StdLibState>::new(
         catcode::CatCodeMap::new_with_tex_defaults(),
         initial_built_ins(),
         Default::default(),
     )
 }
 
-fn new_repl_env() -> runtime::Env<StdLibState> {
+fn new_repl_env() -> vm::Env<StdLibState> {
     let mut m = initial_built_ins();
     m.insert("doc", repl::get_doc());
     m.insert("help", repl::get_help());
     m.insert("exit", repl::get_exit());
     m.insert("quit", repl::get_exit());
     m.insert("q", repl::get_exit());
-    runtime::Env::<StdLibState>::new(
+    vm::Env::<StdLibState>::new(
         catcode::CatCodeMap::new_with_tex_defaults(),
         m,
         Default::default(),

@@ -8,7 +8,7 @@ use std::ops::Bound::Included;
 use texcraft_stdext::collections::nevec::Nevec;
 use texlang_core::parse;
 use texlang_core::prelude::*;
-use texlang_core::runtime::HasComponent;
+use texlang_core::vm::HasComponent;
 use texlang_core::variable::{TypedVariable, Variable};
 
 pub const NEWINT_DOC: &str = r"Allocate a new integer variable
@@ -195,7 +195,7 @@ pub fn get_newint<S: HasComponent<Component>>() -> command::Command<S> {
 
 fn newint_primitive_fn<S: HasComponent<Component>>(
     newint_token: Token,
-    input: &mut runtime::ExecutionInput<S>,
+    input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let name = parse::parse_command_target("newint allocation", newint_token, input.unexpanded())?;
     let addr = input.state_mut().component_mut().alloc_int();
@@ -208,7 +208,7 @@ fn newint_primitive_fn<S: HasComponent<Component>>(
 
 fn singleton_fn<S: HasComponent<Component>>(
     _: Token,
-    _: &mut runtime::ExpansionInput<S>,
+    _: &mut vm::ExpansionInput<S>,
     addr: u32,
 ) -> anyhow::Result<Variable<S>> {
     Ok(Variable::Int(TypedVariable::new(
@@ -237,7 +237,7 @@ pub fn get_newarray<S: HasComponent<Component>>() -> command::Command<S> {
 
 fn newarray_primitive_fn<S: HasComponent<Component>>(
     newarray_token: Token,
-    input: &mut runtime::ExecutionInput<S>,
+    input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let name =
         parse::parse_command_target("newarray allocation", newarray_token, input.unexpanded())?;
@@ -254,7 +254,7 @@ fn newarray_primitive_fn<S: HasComponent<Component>>(
 /// Variable command function for commands defined using \newarray.
 fn array_fn<S: HasComponent<Component>>(
     array_token: Token,
-    input: &mut runtime::ExpansionInput<S>,
+    input: &mut vm::ExpansionInput<S>,
     array_addr: u32,
 ) -> anyhow::Result<Variable<S>> {
     let array_index: u32 = parse::parse_number(input)?;
@@ -300,7 +300,7 @@ mod test {
     use super::*;
     use crate::the::get_the;
     use crate::{script, testutil::*};
-    use texlang_core::runtime::implement_has_component;
+    use texlang_core::vm::implement_has_component;
 
     #[derive(Default)]
     struct State {

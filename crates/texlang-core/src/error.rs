@@ -1,11 +1,11 @@
 //! Error types and error display logic.
 
-use crate::runtime;
+use crate::vm;
 use crate::token;
 use crate::token::trace;
 use crate::token::Token;
 use colored::*;
-use runtime::HasEnv;
+use vm::HasEnv;
 use texcraft_stdext::algorithms::spellcheck;
 
 pub struct DisplayBuilder<'a> {
@@ -180,7 +180,7 @@ impl TokenError {
         anyhow::Error::from(self)
     }
 
-    fn add_context<S>(&mut self, execution_input: &runtime::ExecutionInput<S>) {
+    fn add_context<S>(&mut self, execution_input: &vm::ExecutionInput<S>) {
         self.traceback_result = Some(execution_input.trace(self.token))
     }
 }
@@ -215,7 +215,7 @@ impl EndOfInputError {
         anyhow::Error::from(self)
     }
 
-    pub fn add_context<S>(&mut self, _execution_input: &runtime::ExecutionInput<S>) {}
+    pub fn add_context<S>(&mut self, _execution_input: &vm::ExecutionInput<S>) {}
 }
 
 impl std::error::Error for EndOfInputError {}
@@ -238,7 +238,7 @@ impl std::fmt::Display for EndOfInputError {
     }
 }
 
-pub fn add_context<S>(error: &mut anyhow::Error, execution_input: &runtime::ExecutionInput<S>) {
+pub fn add_context<S>(error: &mut anyhow::Error, execution_input: &vm::ExecutionInput<S>) {
     if let Some(error) = error.downcast_mut::<EndOfInputError>() {
         error.add_context(execution_input);
     }
@@ -247,7 +247,7 @@ pub fn add_context<S>(error: &mut anyhow::Error, execution_input: &runtime::Exec
     }
 }
 
-pub fn new_undefined_cs_error<S>(token: token::Token, state: &runtime::Env<S>) -> anyhow::Error {
+pub fn new_undefined_cs_error<S>(token: token::Token, state: &vm::Env<S>) -> anyhow::Error {
     let a = "expected a control sequence".to_string();
     let name = match &token.value() {
         token::Value::ControlSequence(name) => state.cs_name_interner().resolve(name).expect(""),

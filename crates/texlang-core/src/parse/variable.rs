@@ -1,9 +1,9 @@
 use crate::prelude::*;
-use crate::runtime::HasEnv;
+use crate::vm::HasEnv;
 use crate::variable;
 
 /// Parses a variable.
-pub fn parse_variable<S, I: AsMut<runtime::ExpansionInput<S>>>(
+pub fn parse_variable<S, I: AsMut<vm::ExpansionInput<S>>>(
     input: &mut I,
 ) -> anyhow::Result<variable::Variable<S>> {
     let input = input.as_mut();

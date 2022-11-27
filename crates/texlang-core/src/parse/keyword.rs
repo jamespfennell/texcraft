@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-pub fn parse_optional_by<S, I: AsMut<runtime::ExpansionInput<S>>>(
+pub fn parse_optional_by<S, I: AsMut<vm::ExpansionInput<S>>>(
     stream: &mut I,
 ) -> anyhow::Result<()> {
     let stream = stream.as_mut();

@@ -146,7 +146,7 @@ fn outer_id() -> std::any::TypeId {
 
 fn global_primitive_fn<S: HasComponent<Component>>(
     global_token: Token,
-    input: &mut runtime::ExecutionInput<S>,
+    input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     process_prefixes(
         Prefix {
@@ -160,7 +160,7 @@ fn global_primitive_fn<S: HasComponent<Component>>(
 
 fn long_primitive_fn<S: HasComponent<Component>>(
     long_token: Token,
-    input: &mut runtime::ExecutionInput<S>,
+    input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     process_prefixes(
         Prefix {
@@ -174,7 +174,7 @@ fn long_primitive_fn<S: HasComponent<Component>>(
 
 fn outer_primitive_fn<S: HasComponent<Component>>(
     outer_token: Token,
-    input: &mut runtime::ExecutionInput<S>,
+    input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     process_prefixes(
         Prefix {
@@ -188,7 +188,7 @@ fn outer_primitive_fn<S: HasComponent<Component>>(
 
 fn process_prefixes<S: HasComponent<Component>>(
     mut prefix: Prefix,
-    input: &mut runtime::ExecutionInput<S>,
+    input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     complete_prefix(&mut prefix, input)?;
     match input.peek()? {
@@ -252,7 +252,7 @@ fn process_prefixes<S: HasComponent<Component>>(
 
 fn complete_prefix<S>(
     prefix: &mut Prefix,
-    input: &mut runtime::ExecutionInput<S>,
+    input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     // TODO: spaces and \relax are allowed after prefixes per TeX source sections 1211 and 404.
     let found_prefix = match input.peek()? {
@@ -290,7 +290,7 @@ fn complete_prefix<S>(
 fn assert_only_global_prefix<S>(
     token: Token,
     prefix: Prefix,
-    input: &runtime::ExecutionInput<S>,
+    input: &vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     if let Some(outer_token) = prefix.outer {
         Err(Error::CommandCannotBePrefixed {
@@ -408,7 +408,7 @@ impl std::error::Error for Error {}
 pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::Command<S> {
     fn noop_execution_cmd_fn<S: HasComponent<Component>>(
         _: Token,
-        input: &mut runtime::ExecutionInput<S>,
+        input: &mut vm::ExecutionInput<S>,
     ) -> anyhow::Result<()> {
         if input.state_mut().component_mut().read_and_reset_global() {
             Err(anyhow::anyhow!("assertion failed: global is true"))
@@ -429,7 +429,7 @@ mod test {
         testutil::{self, *},
         the,
     };
-    use texlang_core::runtime::implement_has_component;
+    use texlang_core::vm::implement_has_component;
 
     #[derive(Default)]
     struct State {

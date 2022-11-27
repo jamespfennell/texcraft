@@ -3,7 +3,7 @@
 use crate::error;
 use crate::parse;
 use crate::prelude::*;
-use crate::runtime::HasEnv;
+use crate::vm::HasEnv;
 use crate::token::write_tokens;
 use crate::token::CsNameInterner;
 use crate::token::Token;
@@ -39,7 +39,7 @@ impl Macro {
     pub fn call<S>(
         &self,
         token: Token,
-        input: &mut runtime::ExpansionInput<S>,
+        input: &mut vm::ExpansionInput<S>,
     ) -> anyhow::Result<()> {
         remove_tokens_from_stream(
             &self.prefix,

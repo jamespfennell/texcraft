@@ -168,14 +168,14 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 use crate::parse;
-use crate::runtime::{self, BaseState, ExecutionInput};
+use crate::vm::{self, BaseState, ExecutionInput};
 use crate::token::catcode::CatCode;
 
 /// Enum with a variant for each type of variable in TeX.
 pub enum Variable<S> {
     Int(TypedVariable<S, i32>),
-    BaseInt(TypedVariable<runtime::BaseState<S>, i32>),
-    CatCode(TypedVariable<runtime::BaseState<S>, CatCode>),
+    BaseInt(TypedVariable<vm::BaseState<S>, i32>),
+    CatCode(TypedVariable<vm::BaseState<S>, CatCode>),
 }
 
 impl<S> Copy for Variable<S> {}
@@ -254,7 +254,7 @@ impl<S, T> TypedVariable<S, T> {
 /// Sets the value of a variable using the expanded token stream.
 pub fn set_using_input<S>(
     variable: Variable<S>,
-    input: &mut runtime::ExecutionInput<S>,
+    input: &mut vm::ExecutionInput<S>,
     global: bool,
 ) -> anyhow::Result<()> {
     parse::parse_optional_equals(input)?;
@@ -335,8 +335,8 @@ make_base_setter![
 /// The variable values that are to be restored when a group ends.
 pub struct RestoreValues<S> {
     i32: RestoreMap<S, i32>,
-    i32_base: RestoreMap<runtime::BaseState<S>, i32>,
-    catcode_base: RestoreMap<runtime::BaseState<S>, CatCode>,
+    i32_base: RestoreMap<vm::BaseState<S>, i32>,
+    catcode_base: RestoreMap<vm::BaseState<S>, CatCode>,
 }
 
 impl<S> Default for RestoreValues<S> {
@@ -350,7 +350,7 @@ impl<S> Default for RestoreValues<S> {
 }
 
 impl<S> RestoreValues<S> {
-    pub fn restore(self, base: &mut runtime::BaseState<S>, state: &mut S) {
+    pub fn restore(self, base: &mut vm::BaseState<S>, state: &mut S) {
         self.i32.restore(state);
         self.i32_base.restore(base);
         self.catcode_base.restore(base);

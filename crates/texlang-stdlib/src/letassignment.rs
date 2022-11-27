@@ -21,7 +21,7 @@ pub fn let_id() -> std::any::TypeId {
 
 fn let_primitive_fn<S: HasComponent<prefix::Component>>(
     let_token: Token,
-    input: &mut runtime::ExecutionInput<S>,
+    input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let global = input.state_mut().component_mut().read_and_reset_global();
     let name = parse::parse_command_target("\\let assignment", let_token, input.unexpanded())?;

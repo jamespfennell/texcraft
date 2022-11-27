@@ -6,7 +6,7 @@ use std::any;
 use std::cell::RefCell;
 use texlang_core::parse;
 use texlang_core::prelude::*;
-use texlang_core::runtime::HasComponent;
+use texlang_core::vm::HasComponent;
 
 pub const ELSE_DOC: &str = "Start the else branch of a conditional or switch statement";
 pub const IFCASE_DOC: &str = "Begin a switch statement";
@@ -65,12 +65,12 @@ impl Default for Component {
     }
 }
 
-fn push_branch<S: HasComponent<Component>>(input: &mut runtime::ExpansionInput<S>, branch: Branch) {
+fn push_branch<S: HasComponent<Component>>(input: &mut vm::ExpansionInput<S>, branch: Branch) {
     input.state().component().branches.borrow_mut().push(branch)
 }
 
 fn pop_branch<S: HasComponent<Component>>(
-    input: &mut runtime::ExpansionInput<S>,
+    input: &mut vm::ExpansionInput<S>,
 ) -> Option<Branch> {
     input.state().component().branches.borrow_mut().pop()
 }
@@ -96,7 +96,7 @@ fn fi_id() -> any::TypeId {
 // The `true_case` function is executed whenever a conditional evaluates to true.
 fn true_case<S: HasComponent<Component>>(
     token: Token,
-    input: &mut runtime::ExpansionInput<S>,
+    input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     push_branch(
         input,
@@ -114,7 +114,7 @@ fn true_case<S: HasComponent<Component>>(
 // either a \else or \fi command.
 fn false_case<S: HasComponent<Component>>(
     original_token: Token,
-    input: &mut runtime::ExpansionInput<S>,
+    input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     let mut depth = 0;
     let mut last_token = None;
@@ -163,7 +163,7 @@ macro_rules! create_if_primitive {
     ($if_fn: ident, $if_primitive_fn: ident, $get_if: ident, $docs: expr) => {
         fn $if_primitive_fn<S: HasComponent<Component>>(
             token: Token,
-            input: &mut runtime::ExpansionInput<S>,
+            input: &mut vm::ExpansionInput<S>,
         ) -> anyhow::Result<Vec<Token>> {
             match $if_fn(input)? {
                 true => true_case(token, input),
@@ -177,15 +177,15 @@ macro_rules! create_if_primitive {
     };
 }
 
-fn if_true<S>(_: &mut runtime::ExpansionInput<S>) -> anyhow::Result<bool> {
+fn if_true<S>(_: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
     Ok(true)
 }
 
-fn if_false<S>(_: &mut runtime::ExpansionInput<S>) -> anyhow::Result<bool> {
+fn if_false<S>(_: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
     Ok(false)
 }
 
-fn if_num<S>(stream: &mut runtime::ExpansionInput<S>) -> anyhow::Result<bool> {
+fn if_num<S>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
     let a: i32 = parse::parse_number(stream)?;
     let r = parse::parse_relation(stream)?;
     let b: i32 = parse::parse_number(stream)?;
@@ -197,7 +197,7 @@ fn if_num<S>(stream: &mut runtime::ExpansionInput<S>) -> anyhow::Result<bool> {
     })
 }
 
-fn if_odd<S>(stream: &mut runtime::ExpansionInput<S>) -> anyhow::Result<bool> {
+fn if_odd<S>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
     let n: i32 = parse::parse_number(stream)?;
     Ok((n % 2) == 1)
 }
@@ -209,7 +209,7 @@ create_if_primitive![if_odd, if_odd_primitive_fn, get_if_odd, IFODD_DOC];
 
 fn if_case_primitive_fn<S: HasComponent<Component>>(
     ifcase_token: Token,
-    input: &mut runtime::ExpansionInput<S>,
+    input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     // TODO: should we reading the number from the unexpanded stream? Probably!
     let mut cases_to_skip: i32 = parse::parse_number(input)?;
@@ -284,7 +284,7 @@ pub fn get_if_case<S: HasComponent<Component>>() -> command::Command<S> {
 
 fn or_primitive_fn<S: HasComponent<Component>>(
     ifcase_token: Token,
-    input: &mut runtime::ExpansionInput<S>,
+    input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     let branch = pop_branch(input);
     // For an or command to be valid, we must be in a switch statement
@@ -339,7 +339,7 @@ pub fn get_or<S: HasComponent<Component>>() -> command::Command<S> {
 
 fn else_primitive_fn<S: HasComponent<Component>>(
     else_token: Token,
-    input: &mut runtime::ExpansionInput<S>,
+    input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     let branch = pop_branch(input);
     // For else token to be valid, we must be in the true branch of a conditional
@@ -391,7 +391,7 @@ pub fn get_else<S: HasComponent<Component>>() -> command::Command<S> {
 /// Get the `\fi` primitive.
 fn fi_primitive_fn<S: HasComponent<Component>>(
     token: Token,
-    input: &mut runtime::ExpansionInput<S>,
+    input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
     let branch = pop_branch(input);
     // For a \fi primitive to be valid, we must be in a conditional.
@@ -414,7 +414,7 @@ mod tests {
 
     use super::*;
     use crate::{script, testutil::*};
-    use texlang_core::runtime::implement_has_component;
+    use texlang_core::vm::implement_has_component;
 
     #[derive(Default)]
     struct State {

@@ -6,7 +6,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use texlang_core::prelude::*;
-use texlang_core::runtime::implement_has_component;
+use texlang_core::vm::implement_has_component;
 use texlang_core::token;
 use texlang_stdlib::alloc;
 use texlang_stdlib::catcodecmd;
@@ -70,7 +70,7 @@ fn init_state(
     day: i32,
     month: i32,
     year: i32,
-) -> runtime::Env<PlaygroundState> {
+) -> vm::Env<PlaygroundState> {
     let initial_built_ins = HashMap::from([
         ("\\", command::Fn::Character(Value::Other('\\')).into()),
         //
@@ -115,7 +115,7 @@ fn init_state(
         //
         ("year", time::get_year()),
     ]);
-    runtime::Env::<PlaygroundState>::new(
+    vm::Env::<PlaygroundState>::new(
         CatCodeMap::new_with_tex_defaults(),
         initial_built_ins,
         PlaygroundState {

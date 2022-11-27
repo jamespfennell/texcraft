@@ -15,7 +15,7 @@ pub mod input {
 
     fn input_fn<S>(
         input_token: Token,
-        input: &mut runtime::ExpansionInput<S>,
+        input: &mut vm::ExpansionInput<S>,
     ) -> anyhow::Result<Vec<Token>> {
         let file_location = parse::parse_file_location(input)?;
         let (file_path, source_code) = read_file(input_token, input.env(), file_location, ".tex")?;
@@ -34,7 +34,7 @@ pub mod input {
             HashMap::from([("input", get_input())])
         }
 
-        fn setup_expansion_test_old_todo(env: &mut runtime::Env<State>) {
+        fn setup_expansion_test_old_todo(env: &mut vm::Env<State>) {
             let cwd = env.working_directory().unwrap();
 
             let mut file_system_ops: FileSystemOps = Default::default();
@@ -92,7 +92,7 @@ pub mod input {
 
 fn read_file<S>(
     t: Token,
-    env: &runtime::Env<S>,
+    env: &vm::Env<S>,
     file_location: parse::FileLocation,
     default_extension: &str,
 ) -> anyhow::Result<(String, String)> {

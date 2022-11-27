@@ -4,8 +4,8 @@
 
 pub use crate::command;
 pub use crate::error;
-pub use crate::runtime;
-pub use crate::runtime::TokenStream;
+pub use crate::vm;
+pub use crate::vm::TokenStream;
 pub use crate::token::catcode::CatCode;
 pub use crate::token::catcode::CatCodeMap;
 pub use crate::token::trace;
@@ -15,5 +15,5 @@ pub use crate::token::Value;
 pub use crate::token::Value::ControlSequence;
 
 // Traits
-pub use crate::runtime::HasComponent;
-pub use crate::runtime::{ExpandedStream, HasEnv};
+pub use crate::vm::HasComponent;
+pub use crate::vm::{ExpandedStream, HasEnv};
