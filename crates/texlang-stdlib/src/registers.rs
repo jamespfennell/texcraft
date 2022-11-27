@@ -2,8 +2,8 @@
 
 use texlang_core::parse;
 use texlang_core::prelude::*;
-use texlang_core::vm::HasComponent;
 use texlang_core::variable::{TypedVariable, Variable};
+use texlang_core::vm::HasComponent;
 
 pub const COUNT_DOC: &str = "Get or set an integer register";
 pub const COUNTDEF_DOC: &str = "Bind an integer register to a control sequence";

@@ -1,7 +1,7 @@
 use crate::prelude::*;
-use crate::vm::HasEnv;
 use crate::token::catcode::CatCode;
 use crate::variable;
+use crate::vm::RefVM;
 use num_traits::PrimInt;
 
 /// Parses a number from the provided stream.
@@ -16,9 +16,7 @@ pub fn parse_number<S, I: AsMut<vm::ExpansionInput<S>>, T: PrimInt>(
     parse_number_internal(stream.as_mut())
 }
 
-fn parse_number_internal<S, T: PrimInt>(
-    stream: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<T> {
+fn parse_number_internal<S, T: PrimInt>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<T> {
     let sign = parse_optional_signs(stream)?;
     let modulus: T = match stream.next()? {
         None => return Err(parse_number_error(None)),
@@ -84,9 +82,7 @@ fn parse_catcode_internal<S>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Resu
 ///
 /// If the combination of the signs is positive, [None] is returned.
 /// Otherwise, the Token corresponding to the last negative sign is returned.
-fn parse_optional_signs<S>(
-    stream: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Option<Token>> {
+fn parse_optional_signs<S>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<Option<Token>> {
     let mut result = None;
     while let Some((sign, token)) = get_optional_element_with_token![
         stream,
@@ -289,8 +285,8 @@ mod tests {
 
     macro_rules! parse_number_test {
         ($input: expr, $number: expr) => {
-            let mut env = testutil::new_env($input);
-            let result: i32 = parse_number(vm::ExpansionInput::new(&mut env)).unwrap();
+            let mut vm = testutil::new_vm($input);
+            let result: i32 = parse_number(vm::ExpansionInput::new(&mut vm)).unwrap();
             assert_eq![result, $number];
         };
     }
@@ -403,9 +399,9 @@ mod tests {
     fn number_with_letter_catcode() {
         let mut map = CatCodeMap::new_with_tex_defaults();
         map.insert('1', catcode::CatCode::Letter);
-        let mut env = vm::Env::<()>::new(map, HashMap::new(), ());
-        env.push_source("".to_string(), r"1".to_string()).unwrap();
-        let input = crate::vm::ExecutionInput::new(&mut env);
+        let mut vm = vm::VM::<()>::new(map, HashMap::new(), ());
+        vm.push_source("".to_string(), r"1".to_string()).unwrap();
+        let input = crate::vm::ExecutionInput::new(&mut vm);
         let result: anyhow::Result<i32> = parse_number(input);
         if let Ok(_) = result {
             panic!["Parsed a relation from invalid input"];

@@ -71,20 +71,20 @@ fn run(mut path: PathBuf) -> Result<(), anyhow::Error> {
             return Err(anyhow::anyhow!["Failed to open file {:?}: {}", &path, err]);
         }
     };
-    let mut env = new_env();
+    let mut vm = new_vm();
     // The only error possible is input stack size exceeded, which can't be hit.
-    let _ = env.push_source(path.to_string_lossy().to_string(), source_code);
-    let tokens = script::run(&mut env, true)?;
-    let pretty = token::write_tokens(&tokens, env.cs_name_interner());
+    let _ = vm.push_source(path.to_string_lossy().to_string(), source_code);
+    let tokens = script::run(&mut vm, true)?;
+    let pretty = token::write_tokens(&tokens, vm.cs_name_interner());
     println!("{}", pretty);
     Ok(())
 }
 
 fn repl() {
     println!("{}\n", REPL_START.trim());
-    let mut env = new_repl_env();
+    let mut vm = new_repl_vm();
     repl::run(
-        &mut env,
+        &mut vm,
         repl::RunOptions {
             prompt: "tex> ",
             help: REPL_HELP,
@@ -122,12 +122,12 @@ Website: https://texcraft.dev
 ";
 
 fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
-    let env = new_env();
+    let vm = new_vm();
 
     match cs_name {
         None => {
             let mut cs_names = Vec::new();
-            let commands = env.get_commands_as_map_slow();
+            let commands = vm.get_commands_as_map_slow();
             for cs_name in commands.keys() {
                 cs_names.push(cs_name);
             }
@@ -141,11 +141,11 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
                         println!();
                     }
                 }
-                let cs_name_s = match env.cs_name_interner().get(cs_name) {
+                let cs_name_s = match vm.cs_name_interner().get(cs_name) {
                     None => continue,
                     Some(s) => s,
                 };
-                let doc = match env.base_state.commands_map.get_command_slow(&cs_name_s) {
+                let doc = match vm.base_state.commands_map.get_command_slow(&cs_name_s) {
                     None => "",
                     Some(cmd) => cmd.doc().unwrap_or(""),
                 };
@@ -155,11 +155,11 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
             Ok(())
         }
         Some(cs_name) => {
-            let cs_name_s = match env.cs_name_interner().get(&cs_name) {
+            let cs_name_s = match vm.cs_name_interner().get(&cs_name) {
                 None => return Err(anyhow::anyhow!("Unknown command \\{}", cs_name)),
                 Some(s) => s,
             };
-            let cmd = match env.base_state.commands_map.get_command_slow(&cs_name_s) {
+            let cmd = match vm.base_state.commands_map.get_command_slow(&cs_name_s) {
                 None => {
                     return Err(anyhow::anyhow!("Unknown command \\{}", cs_name));
                 }
@@ -171,22 +171,22 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
     }
 }
 
-fn new_env() -> vm::Env<StdLibState> {
-    vm::Env::<StdLibState>::new(
+fn new_vm() -> vm::VM<StdLibState> {
+    vm::VM::<StdLibState>::new(
         catcode::CatCodeMap::new_with_tex_defaults(),
         initial_built_ins(),
         Default::default(),
     )
 }
 
-fn new_repl_env() -> vm::Env<StdLibState> {
+fn new_repl_vm() -> vm::VM<StdLibState> {
     let mut m = initial_built_ins();
     m.insert("doc", repl::get_doc());
     m.insert("help", repl::get_help());
     m.insert("exit", repl::get_exit());
     m.insert("quit", repl::get_exit());
     m.insert("q", repl::get_exit());
-    vm::Env::<StdLibState>::new(
+    vm::VM::<StdLibState>::new(
         catcode::CatCodeMap::new_with_tex_defaults(),
         m,
         Default::default(),

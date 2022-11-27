@@ -62,20 +62,20 @@ fn par_primitive_fn<S: HasComponent<Component>>(
     Ok(())
 }
 
-/// Run the Texlang interpreter for the provided environment and return the result as list of tokens.
+/// Run the Texlang interpreter for the provided VM and return the result as list of tokens.
 pub fn run<S: HasComponent<Component>>(
-    env: &mut vm::Env<S>,
+    vm: &mut vm::VM<S>,
     err_for_undefined_cs: bool,
 ) -> anyhow::Result<Vec<Token>> {
     let undefined_cs_handler = match err_for_undefined_cs {
         true => vm::default_undefined_cs_handler,
         false => handle_character,
     };
-    vm::run(env, handle_character, undefined_cs_handler)?;
+    vm::run(vm, handle_character, undefined_cs_handler)?;
     let mut result = Vec::new();
     std::mem::swap(
         &mut result,
-        &mut env.custom_state.component_mut().exec_output,
+        &mut vm.custom_state.component_mut().exec_output,
     );
     Ok(result)
 }
@@ -100,9 +100,9 @@ mod tests {
     use super::*;
     use crate::def;
     use crate::testutil::*;
-    use texlang_core::vm;
     use texlang_core::token;
     use texlang_core::token::catcode;
+    use texlang_core::vm;
 
     fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
         HashMap::from([
@@ -116,15 +116,15 @@ mod tests {
         ($name: ident, $input: expr, $want: expr) => {
             #[test]
             fn $name() {
-                let mut env = vm::Env::<State>::new(
+                let mut vm = vm::VM::<State>::new(
                     catcode::CatCodeMap::new_with_tex_defaults(),
                     setup_expansion_test(),
                     Default::default(),
                 );
-                env.push_source("testutil.tex".to_string(), $input.to_string())
+                vm.push_source("testutil.tex".to_string(), $input.to_string())
                     .unwrap();
-                let tokens = run(&mut env, false).unwrap();
-                let got = token::write_tokens(&tokens, env.cs_name_interner());
+                let tokens = run(&mut vm, false).unwrap();
+                let got = token::write_tokens(&tokens, vm.cs_name_interner());
                 let want = $want.to_string();
 
                 if got != want {

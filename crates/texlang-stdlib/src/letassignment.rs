@@ -34,7 +34,7 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
             .cast()),
             Some(token) => match token.value() {
                 ControlSequence(name) => match input.base().commands_map.get_fn(&name) {
-                    None => return Err(error::new_undefined_cs_error(token, input.env())),
+                    None => return Err(error::new_undefined_cs_error(token, input.vm())),
                     Some(cmd) => cmd.clone(),
                 },
                 _ => command::Fn::Character(token.value()),

@@ -8,8 +8,8 @@ use std::ops::Bound::Included;
 use texcraft_stdext::collections::nevec::Nevec;
 use texlang_core::parse;
 use texlang_core::prelude::*;
-use texlang_core::vm::HasComponent;
 use texlang_core::variable::{TypedVariable, Variable};
+use texlang_core::vm::HasComponent;
 
 pub const NEWINT_DOC: &str = r"Allocate a new integer variable
 

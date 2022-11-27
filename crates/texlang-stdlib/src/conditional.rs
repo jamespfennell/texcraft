@@ -69,9 +69,7 @@ fn push_branch<S: HasComponent<Component>>(input: &mut vm::ExpansionInput<S>, br
     input.state().component().branches.borrow_mut().push(branch)
 }
 
-fn pop_branch<S: HasComponent<Component>>(
-    input: &mut vm::ExpansionInput<S>,
-) -> Option<Branch> {
+fn pop_branch<S: HasComponent<Component>>(input: &mut vm::ExpansionInput<S>) -> Option<Branch> {
     input.state().component().branches.borrow_mut().pop()
 }
 

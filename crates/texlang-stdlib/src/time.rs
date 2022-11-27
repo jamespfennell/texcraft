@@ -2,7 +2,7 @@
 
 #[cfg(feature = "time")]
 use chrono::prelude::*;
-use texlang_core::{command, vm::HasComponent, variable};
+use texlang_core::{command, variable, vm::HasComponent};
 
 /// Component for storing state related to the time commands.
 pub struct Component {

@@ -6,8 +6,8 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use texlang_core::prelude::*;
-use texlang_core::vm::implement_has_component;
 use texlang_core::token;
+use texlang_core::vm::implement_has_component;
 use texlang_stdlib::alloc;
 use texlang_stdlib::catcodecmd;
 use texlang_stdlib::conditional;
@@ -38,10 +38,10 @@ pub fn run(
     month: i32,
     year: i32,
 ) -> String {
-    let mut env = init_state(minutes_since_midnight, day, month, year);
-    env.push_source(file_name, input).unwrap();
-    match script::run(&mut env, true) {
-        Ok(tokens) => token::write_tokens(&tokens, env.cs_name_interner()),
+    let mut vm = new_vm(minutes_since_midnight, day, month, year);
+    vm.push_source(file_name, input).unwrap();
+    match script::run(&mut vm, true) {
+        Ok(tokens) => token::write_tokens(&tokens, vm.cs_name_interner()),
         Err(err) => format!["{}", err],
     }
 }
@@ -65,12 +65,7 @@ implement_has_component![
     (conditional::Component, conditional),
 ];
 
-fn init_state(
-    minutes_since_midnight: i32,
-    day: i32,
-    month: i32,
-    year: i32,
-) -> vm::Env<PlaygroundState> {
+fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::VM<PlaygroundState> {
     let initial_built_ins = HashMap::from([
         ("\\", command::Fn::Character(Value::Other('\\')).into()),
         //
@@ -115,7 +110,7 @@ fn init_state(
         //
         ("year", time::get_year()),
     ]);
-    vm::Env::<PlaygroundState>::new(
+    vm::VM::<PlaygroundState>::new(
         CatCodeMap::new_with_tex_defaults(),
         initial_built_ins,
         PlaygroundState {

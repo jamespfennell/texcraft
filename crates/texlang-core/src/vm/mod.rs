@@ -1,7 +1,7 @@
 //! The Texlang virtual machine (VM).
 //!
 //! This module contains the definition of the runtime VM,
-//!     various input streams that wrap the environment,
+//!     various input streams that wrap the VM
 //!     and the main function that is used to run Texlang.
 //! See the VM documentation in the Texlang book for full documentation.
 
@@ -30,16 +30,16 @@ pub use streams::TokenStream;
 pub use streams::UnexpandedStream;
 */
 
-/// Run the Texlang interpreter for the provided environment.
+/// Run the Texlang interpreter for the provided VM.
 ///
-/// It is assumed that the environment has been preloaded with TeX source using the
-/// [Env::push_source] method.
+/// It is assumed that the VM has been preloaded with TeX source using the
+/// [VM::push_source] method.
 pub fn run<S>(
-    env: &mut Env<S>,
+    vm: &mut VM<S>,
     character_handler: command::ExecutionFn<S>,
     undefined_cs_handler: command::ExecutionFn<S>,
 ) -> anyhow::Result<()> {
-    let execution_input = ExecutionInput::new(env);
+    let execution_input = ExecutionInput::new(vm);
     loop {
         let fully_expanded_token = execution_input.next();
         let result = match fully_expanded_token {
@@ -87,19 +87,19 @@ pub fn default_undefined_cs_handler<S>(
     token: Token,
     input: &mut streams::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    Err(error::new_undefined_cs_error(token, input.env()))
+    Err(error::new_undefined_cs_error(token, input.vm()))
 }
 
-/// The Texlang runtime environment.
+/// The Texlang VM.
 ///
 /// This is sort of a God object that is passed around all of Texcraft code.
 /// However we have many strategies for limiting visibility of various parts of it;
-///   see the runtime documentation.
-pub struct Env<S> {
+///   see the VM documentation.
+pub struct VM<S> {
     pub base_state: BaseState<S>,
     pub custom_state: S,
     pub file_system_ops: Box<dyn FileSystemOps>,
-    internal: InternalEnv<S>,
+    internal: Internal<S>,
 }
 
 /// File system operations that TeX may need to perform.
@@ -120,9 +120,9 @@ impl FileSystemOps for RealFileSystemOps {
     }
 }
 
-/// Parts of the state that are required in every Texlang environment, such as the commands map.
+/// Parts of the state that are required in every Texlang VM, such as the commands map.
 ///
-/// Note that state means specifically parts of the environment that can be edited by
+/// Note that state means specifically parts of the VM that can be modified by
 /// execution commands.
 pub struct BaseState<S> {
     pub cat_code_map: CatCodeMap,
@@ -145,19 +145,19 @@ impl<S> BaseState<S> {
     }
 }
 
-impl<S> Env<S> {
-    /// Create a new runtime environment.
+impl<S> VM<S> {
+    /// Create a new VM.
     pub fn new(
         initial_cat_codes: CatCodeMap,
         initial_built_ins: HashMap<&str, Command<S>>,
         state: S,
-    ) -> Env<S> {
-        let mut internal: InternalEnv<S> = Default::default();
+    ) -> VM<S> {
+        let mut internal: Internal<S> = Default::default();
         let initial_built_ins = initial_built_ins
             .into_iter()
             .map(|(key, value)| (internal.cs_name_interner.get_or_intern(key), value))
             .collect();
-        Env {
+        VM {
             custom_state: state,
             base_state: BaseState::new(initial_cat_codes, initial_built_ins),
             internal,
@@ -165,7 +165,7 @@ impl<S> Env<S> {
         }
     }
 
-    /// Add new source code to the environment.
+    /// Add new source code to the VM.
     ///
     /// TeX input source code is organized as a stack.
     /// Pushing source code onto the stack will mean it is executed first.
@@ -178,7 +178,7 @@ impl<S> Env<S> {
         )
     }
 
-    /// Clear all source code from the environment.
+    /// Clear all source code from the VM.
     pub fn clear_sources(&mut self) {
         self.internal.clear_sources()
     }
@@ -229,9 +229,9 @@ impl<S> Env<S> {
     }
 }
 
-/// Parts of the runtime environment that are only visible to the runtime itself.
-struct InternalEnv<S> {
-    // The sources form a stack. We store the top element directly on the env
+/// Parts of the VM that are only visible to the VM.
+struct Internal<S> {
+    // The sources form a stack. We store the top element directly on the VM
     // for performance reasons.
     current_source: Source,
     sources: Vec<Source>,
@@ -247,9 +247,9 @@ struct InternalEnv<S> {
     groups: Vec<variable::RestoreValues<S>>,
 }
 
-impl<S> Default for InternalEnv<S> {
+impl<S> Default for Internal<S> {
     fn default() -> Self {
-        InternalEnv {
+        Internal {
             current_source: Default::default(),
             sources: Default::default(),
             working_directory: match std::env::current_dir() {
@@ -267,7 +267,7 @@ impl<S> Default for InternalEnv<S> {
     }
 }
 
-impl<S> InternalEnv<S> {
+impl<S> Internal<S> {
     fn push_source(
         &mut self,
         token: Option<Token>,

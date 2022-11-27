@@ -16,7 +16,7 @@
 //! ## Expansion vs execution
 //!
 //! Expansion and execution commands seem similar because they both optionally
-//! read input tokens and then make changes to the engine’s environment.
+//! read input tokens and then make changes to the VM.
 //! However the differences are pretty significant in practice:
 //!
 //! |                                          | Expansion | Execution
@@ -54,8 +54,7 @@ pub type ExpansionFn<S> =
     fn(token: Token, input: &mut vm::ExpansionInput<S>) -> anyhow::Result<Vec<Token>>;
 
 /// The Rust type of execution primitive functions.
-pub type ExecutionFn<S> =
-    fn(token: Token, input: &mut vm::ExecutionInput<S>) -> anyhow::Result<()>;
+pub type ExecutionFn<S> = fn(token: Token, input: &mut vm::ExecutionInput<S>) -> anyhow::Result<()>;
 
 /// The Rust type of variable primitive functions.
 pub type VariableFn<S> = fn(
@@ -218,7 +217,7 @@ impl<S> From<Fn<S>> for Command<S> {
 ///          use a string ID instead? But then need to feed that the library using this registered
 /// - Should we enforce that the previous two steps can only be done at creation time? Probably
 ///   Maybe initialize the map using Map<csname, cmd> and Vec<cmd>. Can provide csname<->str wrapper at
-///   the env level
+///   the VM level
 ///
 /// - While running, insert macros
 ///     insert_macro(&str, macro)

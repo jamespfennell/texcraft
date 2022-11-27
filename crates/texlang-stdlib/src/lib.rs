@@ -7,9 +7,9 @@ extern crate texlang_core;
 
 use std::collections::HashMap;
 
-use texlang_core::vm::implement_has_component;
-use texlang_core::vm::Env;
 use texlang_core::token::catcode::CatCodeMap;
+use texlang_core::vm::implement_has_component;
+use texlang_core::vm::VM;
 
 pub mod alloc;
 pub mod catcodecmd;
@@ -89,8 +89,8 @@ impl StdLibState {
         ])
     }
 
-    pub fn new() -> Env<StdLibState> {
-        Env::<StdLibState>::new(
+    pub fn new() -> VM<StdLibState> {
+        VM::<StdLibState>::new(
             CatCodeMap::new_with_tex_defaults(),
             StdLibState::all_initial_built_ins(),
             Default::default(),

@@ -6,12 +6,12 @@ use crate::prefix;
 use crate::script;
 use anyhow::Result;
 use texlang_core::command;
-use texlang_core::vm;
-use texlang_core::vm::implement_has_component;
-use texlang_core::vm::Env;
-use texlang_core::vm::HasComponent;
 use texlang_core::token;
 use texlang_core::token::catcode;
+use texlang_core::vm;
+use texlang_core::vm::implement_has_component;
+use texlang_core::vm::HasComponent;
+use texlang_core::vm::VM;
 
 #[derive(Default)]
 pub struct State {
@@ -54,14 +54,14 @@ pub use expansion_failure_test;
 
 pub fn run_expansion_test<S: Default + HasComponent<script::Component>>(
     setup_fn: fn() -> HashMap<&'static str, command::Command<S>>,
-    post_setup_env_fn: Option<fn(&mut Env<S>)>,
+    post_setup_vm_fn: Option<fn(&mut VM<S>)>,
     lhs: String,
     rhs: String,
 ) {
     use ::texlang_core::token::Value::ControlSequence;
 
-    let (output_1, env_1) = crate::testutil::run(setup_fn, post_setup_env_fn, lhs);
-    let (output_2, env_2) = crate::testutil::run(setup_fn, post_setup_env_fn, rhs);
+    let (output_1, vm_1) = crate::testutil::run(setup_fn, post_setup_vm_fn, lhs);
+    let (output_2, vm_2) = crate::testutil::run(setup_fn, post_setup_vm_fn, rhs);
 
     let output_1 = output_1.unwrap();
     let output_2 = output_2.unwrap();
@@ -81,8 +81,8 @@ pub fn run_expansion_test<S: Default + HasComponent<script::Component>>(
             for (token_1, token_2) in output_1.iter().zip(output_2.iter()) {
                 let token_equal = match (&token_1.value(), &token_2.value()) {
                     (ControlSequence(cs_name_1), ControlSequence(cs_name_2)) => {
-                        let name_1 = env_1.cs_name_interner().resolve(cs_name_1).unwrap();
-                        let name_2 = env_2.cs_name_interner().resolve(cs_name_2).unwrap();
+                        let name_1 = vm_1.cs_name_interner().resolve(cs_name_1).unwrap();
+                        let name_2 = vm_2.cs_name_interner().resolve(cs_name_2).unwrap();
                         name_1 == name_2
                     }
                     _ => token_1 == token_2,
@@ -101,12 +101,12 @@ pub fn run_expansion_test<S: Default + HasComponent<script::Component>>(
         println!("------[lhs]------");
         println!(
             "'{}'",
-            ::texlang_core::token::write_tokens(&output_1, &env_1.cs_name_interner())
+            ::texlang_core::token::write_tokens(&output_1, &vm_1.cs_name_interner())
         );
         println!("------[rhs]------");
         println!(
             "'{}'",
-            ::texlang_core::token::write_tokens(&output_2, &env_2.cs_name_interner())
+            ::texlang_core::token::write_tokens(&output_2, &vm_2.cs_name_interner())
         );
         println!("-----------------");
         panic!("Expansion test failed");
@@ -117,12 +117,12 @@ pub fn run_expansion_failure_test<S: Default + HasComponent<script::Component>>(
     setup_fn: fn() -> HashMap<&'static str, command::Command<S>>,
     input: String,
 ) {
-    let (result, env) = run(setup_fn, None, input);
+    let (result, vm) = run(setup_fn, None, input);
     if let Ok(output) = result {
         println!("Expansion succeeded:");
         println!(
             "{}",
-            ::texlang_core::token::write_tokens(&output, &env.cs_name_interner())
+            ::texlang_core::token::write_tokens(&output, &vm.cs_name_interner())
         );
         panic!("Expansion failure test did not pass: expansion successful");
     }
@@ -130,20 +130,20 @@ pub fn run_expansion_failure_test<S: Default + HasComponent<script::Component>>(
 
 fn run<S: Default + HasComponent<script::Component>>(
     setup_fn: fn() -> HashMap<&'static str, command::Command<S>>,
-    post_setup_env_fn: Option<fn(&mut Env<S>)>,
+    post_setup_vm_fn: Option<fn(&mut VM<S>)>,
     source: String,
-) -> (Result<Vec<token::Token>>, Env<S>) {
-    let mut env = Env::<S>::new(
+) -> (Result<Vec<token::Token>>, VM<S>) {
+    let mut vm = VM::<S>::new(
         catcode::CatCodeMap::new_with_tex_defaults(),
         setup_fn(),
         Default::default(),
     );
-    if let Some(post_set_env_fn) = post_setup_env_fn {
-        post_set_env_fn(&mut env)
+    if let Some(post_set_vm_fn) = post_setup_vm_fn {
+        post_set_vm_fn(&mut vm)
     }
-    env.push_source("testutil.tex".to_string(), source).unwrap();
-    let output = script::run(&mut env, false);
-    (output, env)
+    vm.push_source("testutil.tex".to_string(), source).unwrap();
+    let output = script::run(&mut vm, false);
+    (output, vm)
 }
 
 /// In-memory filesystem for testing.

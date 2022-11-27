@@ -3,10 +3,10 @@
 use crate::error;
 use crate::parse;
 use crate::prelude::*;
-use crate::vm::HasEnv;
 use crate::token::write_tokens;
 use crate::token::CsNameInterner;
 use crate::token::Token;
+use crate::vm::RefVM;
 use arrayvec::ArrayVec;
 use colored::*;
 use texcraft_stdext::algorithms::substringsearch::KMPMatcherFactory;
@@ -36,11 +36,7 @@ pub enum Parameter {
 }
 
 impl Macro {
-    pub fn call<S>(
-        &self,
-        token: Token,
-        input: &mut vm::ExpansionInput<S>,
-    ) -> anyhow::Result<()> {
+    pub fn call<S>(&self, token: Token, input: &mut vm::ExpansionInput<S>) -> anyhow::Result<()> {
         remove_tokens_from_stream(
             &self.prefix,
             input.unexpanded(),
@@ -79,7 +75,7 @@ impl Macro {
                         " | {}{}={}",
                         "#".bright_yellow().bold(),
                         (i + 1).to_string().bright_yellow().bold(),
-                        write_tokens(*argument, input.env().cs_name_interner()).bright_yellow()
+                        write_tokens(*argument, input.vm().cs_name_interner()).bright_yellow()
                     ]
                 }
                 println![

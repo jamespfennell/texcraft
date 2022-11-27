@@ -13,12 +13,12 @@ pub struct RunOptions<'a> {
     pub help: &'a str,
 }
 
-pub fn run<S: HasComponent<script::Component>>(env: &mut vm::Env<S>, opts: RunOptions) {
+pub fn run<S: HasComponent<script::Component>>(vm: &mut vm::VM<S>, opts: RunOptions) {
     let reader = Interface::new("").unwrap();
 
     reader.set_prompt(opts.prompt).unwrap();
 
-    let mut names: Vec<String> = env.get_commands_as_map_slow().into_keys().collect();
+    let mut names: Vec<String> = vm.get_commands_as_map_slow().into_keys().collect();
     names.sort();
     let mut num_names = names.len();
     let a = Arc::new(ControlSequenceCompleter { names });
@@ -27,9 +27,9 @@ pub fn run<S: HasComponent<script::Component>>(env: &mut vm::Env<S>, opts: RunOp
     while let ReadResult::Input(input) = reader.read_line().unwrap() {
         reader.add_history(input.clone());
 
-        env.clear_sources();
-        env.push_source("".to_string(), input).unwrap();
-        let tokens = match script::run(env, true) {
+        vm.clear_sources();
+        vm.push_source("".to_string(), input).unwrap();
+        let tokens = match script::run(vm, true) {
             Ok(s) => s,
             Err(err) => {
                 if let Some(signal) = anyhow::Error::downcast_ref::<Signal>(&err) {
@@ -51,13 +51,13 @@ pub fn run<S: HasComponent<script::Component>>(env: &mut vm::Env<S>, opts: RunOp
                 continue;
             }
         };
-        let pretty = token::write_tokens(&tokens, env.cs_name_interner());
+        let pretty = token::write_tokens(&tokens, vm.cs_name_interner());
         if !pretty.trim().is_empty() {
             println!("{}\n", pretty);
         }
 
-        if env.base_state.commands_map.len() != num_names {
-            let mut names: Vec<String> = env.get_commands_as_map_slow().into_keys().collect();
+        if vm.base_state.commands_map.len() != num_names {
+            let mut names: Vec<String> = vm.get_commands_as_map_slow().into_keys().collect();
             names.sort();
             num_names = names.len();
             let a = Arc::new(ControlSequenceCompleter { names });
@@ -110,7 +110,7 @@ pub fn get_doc<S>() -> command::Command<S> {
     command::Command::new_expansion(
         |token: Token, input: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
             let target = texlang_core::parse::parse_command_target("", token, input.unexpanded())?;
-            let cs_name_s = input.env().cs_name_interner().resolve(&target).unwrap();
+            let cs_name_s = input.vm().cs_name_interner().resolve(&target).unwrap();
             let doc = match input.base().commands_map.get_command_slow(&target) {
                 None => format!["Unknown command \\{}", cs_name_s],
                 Some(cmd) => match cmd.doc() {

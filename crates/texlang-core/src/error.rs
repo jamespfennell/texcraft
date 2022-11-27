@@ -1,12 +1,12 @@
 //! Error types and error display logic.
 
-use crate::vm;
 use crate::token;
 use crate::token::trace;
 use crate::token::Token;
+use crate::vm;
 use colored::*;
-use vm::HasEnv;
 use texcraft_stdext::algorithms::spellcheck;
+use vm::RefVM;
 
 pub struct DisplayBuilder<'a> {
     token: &'a trace::Trace,
@@ -247,7 +247,7 @@ pub fn add_context<S>(error: &mut anyhow::Error, execution_input: &vm::Execution
     }
 }
 
-pub fn new_undefined_cs_error<S>(token: token::Token, state: &vm::Env<S>) -> anyhow::Error {
+pub fn new_undefined_cs_error<S>(token: token::Token, state: &vm::VM<S>) -> anyhow::Error {
     let a = "expected a control sequence".to_string();
     let name = match &token.value() {
         token::Value::ControlSequence(name) => state.cs_name_interner().resolve(name).expect(""),

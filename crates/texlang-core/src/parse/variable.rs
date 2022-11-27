@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use crate::vm::HasEnv;
 use crate::variable;
+use crate::vm::RefVM;
 
 /// Parses a variable.
 pub fn parse_variable<S, I: AsMut<vm::ExpansionInput<S>>>(

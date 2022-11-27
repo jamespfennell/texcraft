@@ -168,8 +168,8 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 use crate::parse;
-use crate::vm::{self, BaseState, ExecutionInput};
 use crate::token::catcode::CatCode;
+use crate::vm::{self, BaseState, ExecutionInput};
 
 /// Enum with a variant for each type of variable in TeX.
 pub enum Variable<S> {

@@ -1,8 +1,8 @@
 use crate::command;
-use crate::vm;
 use crate::token::trace;
 use crate::token::Token;
 use crate::variable;
+use crate::vm;
 
 use super::BaseState;
 
@@ -73,35 +73,35 @@ pub trait TokenStream {
     }
 }
 
-/// Trait indicating a type has read only access to the environment.
-pub trait HasEnv {
-    // The type of the custom state in the environment.
+/// Trait indicating a type has read only access to the VM.
+pub trait RefVM {
+    // The type of the custom state in the VM.
     type S;
 
-    /// Returns a reference to the environment.
-    fn env(&self) -> &vm::Env<Self::S>;
+    /// Returns a reference to the VM.
+    fn vm(&self) -> &vm::VM<Self::S>;
 
     /// Returns a reference to the base state.
     #[inline]
     fn base(&self) -> &vm::BaseState<Self::S> {
-        &self.env().base_state
+        &self.vm().base_state
     }
 
     // Returns a reference to the custom state.
     #[inline]
     fn state(&self) -> &Self::S {
-        &self.env().custom_state
+        &self.vm().custom_state
     }
 
     fn trace(&self, token: Token) -> trace::Trace {
-        self.env()
+        self.vm()
             .internal
             .tracer
-            .trace(token, &self.env().internal.cs_name_interner)
+            .trace(token, &self.vm().internal.cs_name_interner)
     }
 
     fn trace_end_of_input(&self) -> trace::Trace {
-        self.env().internal.tracer.trace_end_of_input()
+        self.vm().internal.tracer.trace_end_of_input()
     }
 }
 
@@ -145,7 +145,7 @@ impl<T: ExpandedStream> TokenStream for T {
 /// It be obtained from either the [ExecutionInput] or the [ExpansionInput]
 /// using the [ExpandedStream] trait methods.
 #[repr(transparent)]
-pub struct UnexpandedStream<S>(vm::Env<S>);
+pub struct UnexpandedStream<S>(vm::VM<S>);
 
 impl<S> TokenStream for UnexpandedStream<S> {
     #[inline]
@@ -168,7 +168,7 @@ impl<S> TokenStream for UnexpandedStream<S> {
 ///     To read the input strean without performing expansion, use the
 ///     [unexpanded](ExpandedStream::unexpanded) method.
 ///
-/// - Read only access to the environment using the [HasEnv] trait.
+/// - Read only access to the VM using the [RefVM] trait.
 ///
 /// - Mutable access to the expansion state if the underlying state has such a state.
 ///     This is related to the [HasExpansionState] trait.
@@ -182,15 +182,15 @@ impl<S> TokenStream for UnexpandedStream<S> {
 ///
 /// This type is also used in the parsing code for situations where both an
 /// [ExpansionInput] or [ExecutionInput] is accepted. We use this type because
-/// it has only read access to the env, and so casting does not escalate priviliges.
+/// it has only read access to the VM, and so casting does not escalate priviliges.
 #[repr(transparent)]
-pub struct ExpansionInput<S>(vm::Env<S>);
+pub struct ExpansionInput<S>(vm::VM<S>);
 
-impl<S> HasEnv for ExpansionInput<S> {
+impl<S> RefVM for ExpansionInput<S> {
     type S = S;
 
     #[inline]
-    fn env(&self) -> &vm::Env<S> {
+    fn vm(&self) -> &vm::VM<S> {
         &self.0
     }
 }
@@ -211,10 +211,10 @@ impl<S> std::convert::AsMut<ExpansionInput<S>> for ExpansionInput<S> {
 }
 
 impl<S> ExpansionInput<S> {
-    /// Creates a mutable reference to this type from the [Env](runtime::Env) type.
+    /// Creates a mutable reference to this type from the [VM](vm::VM) type.
     #[inline]
-    pub fn new(env: &mut vm::Env<S>) -> &mut ExpansionInput<S> {
-        unsafe { &mut *(env as *mut vm::Env<S> as *mut ExpansionInput<S>) }
+    pub fn new(vm: &mut vm::VM<S>) -> &mut ExpansionInput<S> {
+        unsafe { &mut *(vm as *mut vm::VM<S> as *mut ExpansionInput<S>) }
     }
 
     /// Push source code to the front of the input stream.
@@ -286,18 +286,18 @@ impl<S> ExpansionInput<S> {
 ///     To read the input stream without performing expansion, use the
 ///     [unexpanded](ExpandedStream::unexpanded) method.
 ///
-/// - Read only access to the environment using the [HasEnv] trait.
+/// - Read only access to the VM using the [RefVM] trait.
 ///
 /// - Mutable access to the base state and custom state using the [ExecutionInput::base]
 ///     and [ExecutionInput::state] methods.
 #[repr(transparent)]
-pub struct ExecutionInput<S>(vm::Env<S>);
+pub struct ExecutionInput<S>(vm::VM<S>);
 
-impl<S> HasEnv for ExecutionInput<S> {
+impl<S> RefVM for ExecutionInput<S> {
     type S = S;
 
     #[inline]
-    fn env(&self) -> &vm::Env<S> {
+    fn vm(&self) -> &vm::VM<S> {
         &self.0
     }
 }
@@ -312,10 +312,10 @@ impl<S> ExpandedStream for ExecutionInput<S> {
 }
 
 impl<S> ExecutionInput<S> {
-    /// Creates a mutable reference to this type from the [Env](runtime::Env) type.
+    /// Creates a mutable reference to this type from the [VM](vm::VM) type.
     #[inline]
-    pub fn new(state: &mut vm::Env<S>) -> &mut ExecutionInput<S> {
-        unsafe { &mut *(state as *mut vm::Env<S> as *mut ExecutionInput<S>) }
+    pub fn new(state: &mut vm::VM<S>) -> &mut ExecutionInput<S> {
+        unsafe { &mut *(state as *mut vm::VM<S> as *mut ExecutionInput<S>) }
     }
 
     /// Returns a mutable reference to the base state.
@@ -377,81 +377,81 @@ mod stream {
     use crate::token::Value::ControlSequence;
 
     #[inline]
-    pub fn next_unexpanded<S>(env: &mut vm::Env<S>) -> anyhow::Result<Option<Token>> {
-        if let Some(token) = env.internal.current_source.expansions.pop() {
+    pub fn next_unexpanded<S>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<Token>> {
+        if let Some(token) = vm.internal.current_source.expansions.pop() {
             return Ok(Some(token));
         }
-        if let Some(token) = env.internal.current_source.root.next(
-            &env.base_state.cat_code_map,
-            &mut env.internal.cs_name_interner,
+        if let Some(token) = vm.internal.current_source.root.next(
+            &vm.base_state.cat_code_map,
+            &mut vm.internal.cs_name_interner,
         )? {
             return Ok(Some(token));
         }
-        next_unexpanded_recurse(env)
+        next_unexpanded_recurse(vm)
     }
 
-    fn next_unexpanded_recurse<S>(env: &mut vm::Env<S>) -> anyhow::Result<Option<Token>> {
-        if env.internal.pop_source() {
-            next_unexpanded(env)
+    fn next_unexpanded_recurse<S>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<Token>> {
+        if vm.internal.pop_source() {
+            next_unexpanded(vm)
         } else {
             Ok(None)
         }
     }
 
     #[inline]
-    pub fn peek_unexpanded<S>(env: &mut vm::Env<S>) -> anyhow::Result<Option<&Token>> {
-        if let Some(token) = env.internal.current_source.expansions.last() {
+    pub fn peek_unexpanded<S>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<&Token>> {
+        if let Some(token) = vm.internal.current_source.expansions.last() {
             return Ok(Some(unsafe { launder(token) }));
         }
-        if let Some(token) = env.internal.current_source.root.next(
-            &env.base_state.cat_code_map,
-            &mut env.internal.cs_name_interner,
+        if let Some(token) = vm.internal.current_source.root.next(
+            &vm.base_state.cat_code_map,
+            &mut vm.internal.cs_name_interner,
         )? {
-            env.internal.current_source.expansions.push(token);
-            return Ok(env.internal.current_source.expansions.last());
+            vm.internal.current_source.expansions.push(token);
+            return Ok(vm.internal.current_source.expansions.last());
         }
-        peek_unexpanded_recurse(env)
+        peek_unexpanded_recurse(vm)
     }
 
-    fn peek_unexpanded_recurse<S>(env: &mut vm::Env<S>) -> anyhow::Result<Option<&Token>> {
-        if env.internal.pop_source() {
-            peek_unexpanded(env)
+    fn peek_unexpanded_recurse<S>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<&Token>> {
+        if vm.internal.pop_source() {
+            peek_unexpanded(vm)
         } else {
             Ok(None)
         }
     }
 
-    pub fn next_expanded<S>(env: &mut vm::Env<S>) -> anyhow::Result<Option<Token>> {
-        let (token, command) = match next_unexpanded(env)? {
+    pub fn next_expanded<S>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<Token>> {
+        let (token, command) = match next_unexpanded(vm)? {
             None => return Ok(None),
             Some(token) => match token.value() {
-                ControlSequence(name) => (token, env.base_state.commands_map.get_fn(&name)),
+                ControlSequence(name) => (token, vm.base_state.commands_map.get_fn(&name)),
                 _ => return Ok(Some(token)),
             },
         };
         match command {
             Some(command::Fn::Expansion(command)) => {
                 let command = *command;
-                let output = command(token, ExpansionInput::new(env))?;
-                env.internal.push_expansion(&output);
-                next_expanded(env)
+                let output = command(token, ExpansionInput::new(vm))?;
+                vm.internal.push_expansion(&output);
+                next_expanded(vm)
             }
             Some(command::Fn::Macro(command)) => {
                 let command = command.clone();
-                command.call(token, ExpansionInput::new(env))?;
-                next_expanded(env)
+                command.call(token, ExpansionInput::new(vm))?;
+                next_expanded(vm)
             }
             _ => Ok(Some(token)),
         }
     }
 
-    pub fn peek_expanded<S>(env: &mut vm::Env<S>) -> anyhow::Result<Option<&Token>> {
-        let (token, command) = match peek_unexpanded(env)? {
+    pub fn peek_expanded<S>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<&Token>> {
+        let (token, command) = match peek_unexpanded(vm)? {
             None => return Ok(None),
             Some(token) => match token.value() {
                 ControlSequence(name) => (
                     unsafe { launder(token) },
-                    env.base_state.commands_map.get_fn(&name),
+                    vm.base_state.commands_map.get_fn(&name),
                 ),
                 _ => return Ok(Some(unsafe { launder(token) })),
             },
@@ -460,29 +460,29 @@ mod stream {
             Some(command::Fn::Expansion(command)) => {
                 let command = *command;
                 let token = *token;
-                consume_peek(env);
-                let output = command(token, ExpansionInput::new(env))?;
-                env.internal.push_expansion(&output);
-                peek_expanded(env)
+                consume_peek(vm);
+                let output = command(token, ExpansionInput::new(vm))?;
+                vm.internal.push_expansion(&output);
+                peek_expanded(vm)
             }
             Some(command::Fn::Macro(command)) => {
                 let command = command.clone();
                 let token = *token;
-                consume_peek(env);
-                command.call(token, ExpansionInput::new(env))?;
-                peek_expanded(env)
+                consume_peek(vm);
+                command.call(token, ExpansionInput::new(vm))?;
+                peek_expanded(vm)
             }
             _ => Ok(Some(unsafe { launder(token) })),
         }
     }
 
-    pub fn expand_once<S>(env: &mut vm::Env<S>) -> anyhow::Result<bool> {
-        let (token, command) = match peek_unexpanded(env)? {
+    pub fn expand_once<S>(vm: &mut vm::VM<S>) -> anyhow::Result<bool> {
+        let (token, command) = match peek_unexpanded(vm)? {
             None => return Ok(false),
             Some(token) => match token.value() {
                 ControlSequence(name) => (
                     unsafe { launder(token) },
-                    env.base_state.commands_map.get_fn(&name),
+                    vm.base_state.commands_map.get_fn(&name),
                 ),
                 _ => return Ok(false),
             },
@@ -491,16 +491,16 @@ mod stream {
             Some(command::Fn::Expansion(command)) => {
                 let command = *command;
                 let token = *token;
-                consume_peek(env);
-                let output = command(token, ExpansionInput::new(env))?;
-                env.internal.push_expansion(&output);
+                consume_peek(vm);
+                let output = command(token, ExpansionInput::new(vm))?;
+                vm.internal.push_expansion(&output);
                 Ok(true)
             }
             Some(command::Fn::Macro(command)) => {
                 let command = command.clone();
                 let token = *token;
-                consume_peek(env);
-                command.call(token, ExpansionInput::new(env))?;
+                consume_peek(vm);
+                command.call(token, ExpansionInput::new(vm))?;
                 Ok(true)
             }
             _ => Ok(false),
@@ -508,9 +508,9 @@ mod stream {
     }
 
     #[inline]
-    pub fn consume_peek<S>(env: &mut vm::Env<S>) {
+    pub fn consume_peek<S>(vm: &mut vm::VM<S>) {
         // When we peek at a token, it is placed on top of the expansions stack.
         // So to consume the token, we just need to remove it from the stack.
-        env.internal.current_source.expansions.pop();
+        vm.internal.current_source.expansions.pop();
     }
 }

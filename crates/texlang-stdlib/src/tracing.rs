@@ -1,8 +1,8 @@
 //! Commands for tracing TeX execution
 
 use texlang_core::command;
-use texlang_core::vm::BaseState;
 use texlang_core::variable;
+use texlang_core::vm::BaseState;
 
 /// Get the `\tracingmacros` command.
 pub fn get_tracingmacros<S>() -> command::Command<S> {

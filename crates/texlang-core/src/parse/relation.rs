@@ -48,13 +48,10 @@ mod tests {
         ($name: ident, $input: expr, $expected: expr) => {
             #[test]
             fn $name() {
-                let mut env = vm::Env::<()>::new(
-                    CatCodeMap::new_with_tex_defaults(),
-                    HashMap::new(),
-                    (),
-                );
-                env.push_source("".to_string(), $input.to_string()).unwrap();
-                let input = vm::ExecutionInput::new(&mut env);
+                let mut vm =
+                    vm::VM::<()>::new(CatCodeMap::new_with_tex_defaults(), HashMap::new(), ());
+                vm.push_source("".to_string(), $input.to_string()).unwrap();
+                let input = vm::ExecutionInput::new(&mut vm);
                 let result = parse_relation(input).unwrap();
                 assert_eq![result, $expected];
             }
@@ -71,9 +68,9 @@ mod tests {
             fn $name() {
                 let mut map = CatCodeMap::new_with_tex_defaults();
                 map.insert('<', catcode::CatCode::Letter);
-                let mut env = vm::Env::<()>::new(map, HashMap::new(), ());
-                env.push_source("".to_string(), $input.to_string()).unwrap();
-                let input = vm::ExecutionInput::new(&mut env);
+                let mut vm = vm::VM::<()>::new(map, HashMap::new(), ());
+                vm.push_source("".to_string(), $input.to_string()).unwrap();
+                let input = vm::ExecutionInput::new(&mut vm);
                 let result = parse_relation(input);
                 if let Ok(_) = result {
                     panic!["Parsed a relation from invalid input"];

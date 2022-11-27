@@ -18,7 +18,7 @@ pub mod input {
         input: &mut vm::ExpansionInput<S>,
     ) -> anyhow::Result<Vec<Token>> {
         let file_location = parse::parse_file_location(input)?;
-        let (file_path, source_code) = read_file(input_token, input.env(), file_location, ".tex")?;
+        let (file_path, source_code) = read_file(input_token, input.vm(), file_location, ".tex")?;
         input.push_source(input_token, file_path, source_code)?;
         Ok(Vec::new())
     }
@@ -34,8 +34,8 @@ pub mod input {
             HashMap::from([("input", get_input())])
         }
 
-        fn setup_expansion_test_old_todo(env: &mut vm::Env<State>) {
-            let cwd = env.working_directory().unwrap();
+        fn setup_expansion_test_old_todo(vm: &mut vm::VM<State>) {
+            let cwd = vm.working_directory().unwrap();
 
             let mut file_system_ops: FileSystemOps = Default::default();
 
@@ -56,7 +56,7 @@ pub mod input {
             path_4.push("file4.tex");
             file_system_ops.add_file(path_4, "content4");
 
-            env.file_system_ops = Box::new(file_system_ops);
+            vm.file_system_ops = Box::new(file_system_ops);
         }
 
         expansion_test![
@@ -92,7 +92,7 @@ pub mod input {
 
 fn read_file<S>(
     t: Token,
-    env: &vm::Env<S>,
+    vm: &vm::VM<S>,
     file_location: parse::FileLocation,
     default_extension: &str,
 ) -> anyhow::Result<(String, String)> {
@@ -107,7 +107,7 @@ fn read_file<S>(
     let file_path = match path::Path::new(&raw_file_path).is_absolute() {
         true => path::Path::new(&raw_file_path).to_path_buf(),
         false => match file_location.area {
-            None => match env.working_directory() {
+            None => match vm.working_directory() {
                 None => {
                     return Err(anyhow::anyhow!(
                         "cannot read from relative path {} because no working directory is set",
@@ -125,7 +125,7 @@ fn read_file<S>(
         },
     };
 
-    match env.file_system_ops.read_to_string(&file_path) {
+    match vm.file_system_ops.read_to_string(&file_path) {
         Ok(s) => Ok((raw_file_path, s)),
         Err(err) => Err(
             error::TokenError::new(t, format!("could not read from {:?}", &file_path))
