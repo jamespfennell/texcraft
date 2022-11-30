@@ -82,18 +82,10 @@ pub trait BackingContainer<K, V>: Default {
 
     /// Remove a value with the provided key, if it exists.
     fn remove(&mut self, k: &K);
+
+    /// Invoke the provided function for all (key, value) pairs in the map.
+    fn visit<F: FnMut(&K, &V)>(&self, f: F);
 }
-
-/// A grouping container based on the [HashMap] type.
-pub type GroupingHashMap<K, V> = GroupingContainer<K, V, HashMap<K, V>>;
-
-/// A grouping container based on the [Vec] type.
-///
-/// The vector is given map semantics with keys of type [usize], which are used as
-/// indices for the vector.
-/// When inserting an element at a key, the vector is extended if needed so that it can
-/// hold an element with that index.
-pub type GroupingVec<V> = GroupingContainer<usize, V, Vec<Option<V>>>;
 
 impl<K: Eq + Hash + Clone, V> BackingContainer<K, V> for HashMap<K, V> {
     #[inline]
@@ -111,6 +103,11 @@ impl<K: Eq + Hash + Clone, V> BackingContainer<K, V> for HashMap<K, V> {
     #[inline]
     fn remove(&mut self, k: &K) {
         HashMap::remove(self, k);
+    }
+    fn visit<F: FnMut(&K, &V)>(&self, mut f: F) {
+        for (k, v) in HashMap::iter(self) {
+            f(k, v);
+        }
     }
 }
 
@@ -149,11 +146,20 @@ impl<V> BackingContainer<usize, V> for Vec<Option<V>> {
             *elem = None;
         }
     }
+
+    fn visit<F: FnMut(&usize, &V)>(&self, mut f: F) {
+        for (k, v) in <[Option<V>]>::iter(self).enumerate() {
+            if let Some(v) = v {
+                f(&k, v);
+            }
+        }
+    }
 }
 
 /// A wrapper around [BackingContainer] types that adds a specific kind of group semantics.
 ///
 /// See the module docs for more information.
+#[derive(Debug, PartialEq)]
 pub struct GroupingContainer<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> {
     backing_container: T,
 
@@ -161,6 +167,18 @@ pub struct GroupingContainer<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>>
     groups: Vec<HashMap<K, EndOfGroupAction<V>>>,
 }
 
+/// A grouping container based on the [HashMap] type.
+pub type GroupingHashMap<K, V> = GroupingContainer<K, V, HashMap<K, V>>;
+
+/// A grouping container based on the [Vec] type.
+///
+/// The vector is given map semantics with keys of type [usize], which are used as
+/// indices for the vector.
+/// When inserting an element at a key, the vector is extended if needed so that it can
+/// hold an element with that index.
+pub type GroupingVec<V> = GroupingContainer<usize, V, Vec<Option<V>>>;
+
+#[derive(Debug, PartialEq)]
 enum EndOfGroupAction<V> {
     Revert(V),
     Delete,
@@ -287,6 +305,31 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V,
             groups: Vec::new(),
         }
     }
+
+    /// Builds a new [GroupingContainer] which is clone of this grouping map except
+    /// each value is converted using the provided convert function.
+    pub fn clone_with_conversion<W, R: BackingContainer<K, W>>(
+        &self,
+        convert: &mut dyn FnMut(&V) -> W,
+    ) -> GroupingContainer<K, W, R> {
+        let mut m: GroupingContainer<K, W, R> = Default::default();
+        self.backing_container
+            .visit(|k: &K, v: &V| m.backing_container.insert(k.clone(), convert(v)));
+        for group in &self.groups {
+            let mut new_group: HashMap<K, EndOfGroupAction<W>> = Default::default();
+            for (k, action) in group {
+                new_group.insert(
+                    k.clone(),
+                    match action {
+                        EndOfGroupAction::Revert(v) => EndOfGroupAction::Revert(convert(v)),
+                        EndOfGroupAction::Delete => EndOfGroupAction::Delete,
+                    },
+                );
+            }
+            m.groups.push(new_group);
+        }
+        m
+    }
 }
 
 impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> Default for GroupingContainer<K, V, T> {
@@ -317,5 +360,35 @@ mod tests {
         map.insert_global(3, 5);
         assert_eq!(map.end_group(), true);
         assert_eq!(map.get(&3), Some(&5));
+    }
+
+    #[test]
+    fn clone_with_conversion() {
+        let mut original = GroupingHashMap::new();
+        original.insert("key1", 1);
+        original.begin_group();
+        original.insert("key1", 2);
+        original.insert("key2", 3);
+        original.insert("key3", 4);
+        original.begin_group();
+        original.insert("key1", 5);
+        original.insert_global("key3", 6);
+        assert_eq!(original.end_group(), true);
+
+        let mut want = GroupingHashMap::new();
+        want.insert("key1", "1".to_string());
+        want.begin_group();
+        want.insert("key1", "2".to_string());
+        want.insert("key2", "3".to_string());
+        want.insert("key3", "4".to_string());
+        want.begin_group();
+        want.insert("key1", "5".to_string());
+        want.insert_global("key3", "6".to_string());
+        assert_eq!(want.end_group(), true);
+
+        let got: GroupingHashMap<&'static str, String> =
+            original.clone_with_conversion(&mut |i| format!["{}", i]);
+
+        assert_eq!(got, want);
     }
 }
