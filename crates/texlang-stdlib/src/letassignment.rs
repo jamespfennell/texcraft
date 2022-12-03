@@ -23,7 +23,7 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
     let_token: Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    let global = input.state_mut().component_mut().read_and_reset_global();
+    let scope = input.state_mut().component_mut().read_and_reset_global();
     let name = parse::parse_command_target("\\let assignment", let_token, input.unexpanded())?;
     parse::parse_optional_equals(input.unexpanded())?;
     let command =
@@ -40,12 +40,10 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
                 _ => command::Fn::Character(token.value()),
             },
         };
-    let commands_map = &mut input.base_mut().commands_map;
-    if global {
-        commands_map.insert_global(name, command.into());
-    } else {
-        commands_map.insert(name, command.into());
-    }
+    input
+        .base_mut()
+        .commands_map
+        .insert(name, command.into(), scope);
     Ok(())
 }
 

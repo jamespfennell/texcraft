@@ -20,27 +20,29 @@
 //! The basic associative methods are the same as the standard hash map.
 //! ```
 //! # use texcraft_stdext::collections::groupingmap::GroupingHashMap;
+//! # use texcraft_stdext::collections::groupingmap::Scope;
 //! let mut cat_colors = GroupingHashMap::new();
-//! cat_colors.insert("mint", "ginger");
+//! cat_colors.insert("mint", "ginger", Scope::Local);
 //! assert_eq!(cat_colors.get(&"mint"), Some(&"ginger"));
 //! ```
 //! The grouping methods are the main addition.
 //! ```
 //! # use texcraft_stdext::collections::groupingmap::GroupingHashMap;
+//! # use texcraft_stdext::collections::groupingmap::Scope;
 //! let mut cat_colors = GroupingHashMap::new();
 //!
 //! // Insert a new value, update the value in a new group, and then end the group to roll back
 //! // the update.
-//! cat_colors.insert("paganini", "black");
+//! cat_colors.insert("paganini", "black", Scope::Local);
 //! cat_colors.begin_group();
-//! cat_colors.insert("paganini", "gray");
+//! cat_colors.insert("paganini", "gray", Scope::Local);
 //! assert_eq!(cat_colors.get(&"paganini"), Some(&"gray"));
 //! assert_eq!(cat_colors.end_group(), true);
 //! assert_eq!(cat_colors.get(&"paganini"), Some(&"black"));
 //!
 //! // Begin a new group, insert a value, and then end the group to roll back the insert.
 //! cat_colors.begin_group();
-//! cat_colors.insert("mint", "ginger");
+//! cat_colors.insert("mint", "ginger", Scope::Local);
 //! assert_eq!(cat_colors.get(&"mint"), Some(&"ginger"));
 //! assert_eq!(cat_colors.end_group(), true);
 //! assert_eq!(cat_colors.get(&"mint"), None);
@@ -50,6 +52,7 @@
 //! annoted with `#[must_use]`.
 //! ```
 //! # use texcraft_stdext::collections::groupingmap::GroupingHashMap;
+//! # use texcraft_stdext::collections::groupingmap::Scope;
 //! let mut cat_colors = GroupingHashMap::<String, String>::new();
 //! assert_eq!(cat_colors.end_group(), false);
 //! ```
@@ -57,10 +60,11 @@
 //! group, and erases all other values.
 //! ```
 //! # use texcraft_stdext::collections::groupingmap::GroupingHashMap;
+//! # use texcraft_stdext::collections::groupingmap::Scope;
 //! let mut cat_colors = GroupingHashMap::new();
-//! cat_colors.insert("paganini", "black");
+//! cat_colors.insert("paganini", "black", Scope::Local);
 //! cat_colors.begin_group();
-//! cat_colors.insert_global("paganini", "gray");
+//! cat_colors.insert("paganini", "gray", Scope::Global);
 //! assert_eq!(cat_colors.end_group(), true);
 //! assert_eq!(cat_colors.get(&"paganini"), Some(&"gray"));
 //! ```
@@ -178,6 +182,16 @@ pub type GroupingHashMap<K, V> = GroupingContainer<K, V, HashMap<K, V>>;
 /// hold an element with that index.
 pub type GroupingVec<V> = GroupingContainer<usize, V, Vec<Option<V>>>;
 
+/// Scope is used in the insertion method to determine the scope to insert at.
+#[derive(Clone, Copy)]
+pub enum Scope {
+    /// Insertions in the local scope are rolled back at the end of the current group.
+    Local,
+    /// Insertions in the global scope erase any other insertions for the same key, and
+    /// persist beyond the end of the current groups.
+    Global,
+}
+
 #[derive(Debug, PartialEq)]
 enum EndOfGroupAction<V> {
     Revert(V),
@@ -185,9 +199,18 @@ enum EndOfGroupAction<V> {
 }
 
 impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V, T> {
-    /// Inserts the key, value pair.
-    pub fn insert(&mut self, key: K, mut val: V) -> bool {
-        match (self.backing_container.get_mut(&key), self.groups.last_mut()) {
+    /// Inserts the key, value pair in the provided scope.
+    pub fn insert(&mut self, key: K, mut val: V, scope: Scope) -> bool {
+        let group = match scope {
+            Scope::Local => self.groups.last_mut(),
+            Scope::Global => {
+                for group in &mut self.groups {
+                    group.remove(&key);
+                }
+                None
+            }
+        };
+        match (self.backing_container.get_mut(&key), group) {
             (None, None) => {
                 self.backing_container.insert(key, val);
                 false
@@ -206,23 +229,6 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V,
                 if let Entry::Vacant(vac) = group.entry(key) {
                     vac.insert(EndOfGroupAction::Revert(val));
                 };
-                true
-            }
-        }
-    }
-
-    /// Inserts the key, value pair in the global group.
-    pub fn insert_global(&mut self, key: K, val: V) -> bool {
-        for group in &mut self.groups {
-            group.remove(&key);
-        }
-        match self.backing_container.get_mut(&key) {
-            None => {
-                self.backing_container.insert(key, val);
-                false
-            }
-            Some(val_ref) => {
-                *val_ref = val;
                 true
             }
         }
@@ -285,7 +291,7 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V,
     /// ```
     pub fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
         for (key, val) in iter {
-            self.insert(key, val);
+            self.insert(key, val, Scope::Local);
         }
     }
 
@@ -346,10 +352,10 @@ mod tests {
     fn insert_after_nested_insert() {
         let mut map = GroupingHashMap::new();
         map.begin_group();
-        map.insert(3, 5);
+        map.insert(3, 5, Scope::Local);
         assert_eq!(map.end_group(), true);
         assert_eq!(map.get(&3), None);
-        map.insert(3, 4);
+        map.insert(3, 4, Scope::Local);
         assert_eq!(map.get(&3), Some(&4));
     }
 
@@ -357,7 +363,7 @@ mod tests {
     fn insert_global_after_no_insert() {
         let mut map = GroupingHashMap::new();
         map.begin_group();
-        map.insert_global(3, 5);
+        map.insert(3, 5, Scope::Global);
         assert_eq!(map.end_group(), true);
         assert_eq!(map.get(&3), Some(&5));
     }
@@ -365,25 +371,25 @@ mod tests {
     #[test]
     fn clone_with_conversion() {
         let mut original = GroupingHashMap::new();
-        original.insert("key1", 1);
+        original.insert("key1", 1, Scope::Local);
         original.begin_group();
-        original.insert("key1", 2);
-        original.insert("key2", 3);
-        original.insert("key3", 4);
+        original.insert("key1", 2, Scope::Local);
+        original.insert("key2", 3, Scope::Local);
+        original.insert("key3", 4, Scope::Local);
         original.begin_group();
-        original.insert("key1", 5);
-        original.insert_global("key3", 6);
+        original.insert("key1", 5, Scope::Local);
+        original.insert("key3", 6, Scope::Global);
         assert_eq!(original.end_group(), true);
 
         let mut want = GroupingHashMap::new();
-        want.insert("key1", "1".to_string());
+        want.insert("key1", "1".to_string(), Scope::Local);
         want.begin_group();
-        want.insert("key1", "2".to_string());
-        want.insert("key2", "3".to_string());
-        want.insert("key3", "4".to_string());
+        want.insert("key1", "2".to_string(), Scope::Local);
+        want.insert("key2", "3".to_string(), Scope::Local);
+        want.insert("key3", "4".to_string(), Scope::Local);
         want.begin_group();
-        want.insert("key1", "5".to_string());
-        want.insert_global("key3", "6".to_string());
+        want.insert("key1", "5".to_string(), Scope::Local);
+        want.insert("key3", "6".to_string(), Scope::Global);
         assert_eq!(want.end_group(), true);
 
         let got: GroupingHashMap<&'static str, String> =

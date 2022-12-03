@@ -5,6 +5,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound::Included;
+use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
 use texlang_core::parse;
 use texlang_core::prelude::*;
@@ -199,10 +200,11 @@ fn newint_primitive_fn<S: HasComponent<Component>>(
 ) -> anyhow::Result<()> {
     let name = parse::parse_command_target("newint allocation", newint_token, input.unexpanded())?;
     let addr = input.state_mut().component_mut().alloc_int();
-    input
-        .base_mut()
-        .commands_map
-        .insert(name, command::Command::new_variable(singleton_fn, addr));
+    input.base_mut().commands_map.insert(
+        name,
+        command::Command::new_variable(singleton_fn, addr),
+        groupingmap::Scope::Local,
+    );
     Ok(())
 }
 
@@ -243,10 +245,11 @@ fn newarray_primitive_fn<S: HasComponent<Component>>(
         parse::parse_command_target("newarray allocation", newarray_token, input.unexpanded())?;
     let len: u32 = parse::parse_number(input)?;
     let addr = input.state_mut().component_mut().alloc_array(len);
-    input
-        .base_mut()
-        .commands_map
-        .insert(name, command::Command::new_variable(array_fn, addr));
+    input.base_mut().commands_map.insert(
+        name,
+        command::Command::new_variable(array_fn, addr),
+        groupingmap::Scope::Local,
+    );
     // TODO: Return the arraydef version
     Ok(())
 }

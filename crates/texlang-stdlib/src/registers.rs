@@ -1,5 +1,6 @@
 //! TeX registers and commands to access them
 
+use texcraft_stdext::collections::groupingmap;
 use texlang_core::parse;
 use texlang_core::prelude::*;
 use texlang_core::variable::{TypedVariable, Variable};
@@ -105,7 +106,11 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
         ));
     }
     let new_cmd = command::Command::new_variable(singleton_fn, addr);
-    input.base_mut().commands_map.insert(cs_name, new_cmd);
+    // TODO: I suspect \countdef should honor \global, but haven't checked pdfTeX.
+    input
+        .base_mut()
+        .commands_map
+        .insert(cs_name, new_cmd, groupingmap::Scope::Local);
     Ok(())
 }
 

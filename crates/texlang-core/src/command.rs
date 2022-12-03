@@ -37,6 +37,7 @@ use crate::variable;
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::rc;
+use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::groupingmap::GroupingVec;
 
 enum NullTypeIdType {}
@@ -255,8 +256,8 @@ impl<S> Map<S> {
         let mut func_map: GroupingVec<command::Fn<S>> = Default::default();
         let mut id_map: GroupingVec<std::any::TypeId> = Default::default();
         for (name, cmd) in initial_built_ins {
-            func_map.insert(name.to_usize(), cmd.func);
-            id_map.insert(name.to_usize(), cmd.id);
+            func_map.insert(name.to_usize(), cmd.func, groupingmap::Scope::Local);
+            id_map.insert(name.to_usize(), cmd.id, groupingmap::Scope::Local);
         }
         Self {
             len,
@@ -292,22 +293,14 @@ impl<S> Map<S> {
     }
 
     #[inline]
-    pub fn insert(&mut self, name: token::CsName, cmd: command::Command<S>) -> bool {
-        self.id_map.insert(name.to_usize(), cmd.id);
-        if let Some(doc) = cmd.doc {
-            self.doc_map.insert(name, doc);
-        }
-        let existed = self.func_map.insert(name.to_usize(), cmd.func);
-        if !existed {
-            self.len += 1;
-        }
-        existed
-    }
-
-    #[inline]
-    pub fn insert_global(&mut self, name: token::CsName, cmd: command::Command<S>) -> bool {
-        self.id_map.insert_global(name.to_usize(), cmd.id);
-        let existed = self.func_map.insert_global(name.to_usize(), cmd.func);
+    pub fn insert(
+        &mut self,
+        name: token::CsName,
+        cmd: command::Command<S>,
+        scope: groupingmap::Scope,
+    ) -> bool {
+        self.id_map.insert(name.to_usize(), cmd.id, scope);
+        let existed = self.func_map.insert(name.to_usize(), cmd.func, scope);
         if !existed {
             self.len += 1;
         }

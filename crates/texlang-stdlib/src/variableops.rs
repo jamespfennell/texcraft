@@ -48,19 +48,19 @@ macro_rules! create_arithmetic_primitive {
             token: Token,
             input: &mut vm::ExecutionInput<S>,
         ) -> anyhow::Result<()> {
-            let global = input.state_mut().component_mut().read_and_reset_global();
+            let scope = input.state_mut().component_mut().read_and_reset_global();
             let variable = parse::parse_variable(input)?;
             parse::parse_optional_by(input)?;
             let n: i32 = parse::parse_number(input)?;
             match variable {
                 Variable::Int(variable) => {
                     let result = $arithmetic_op(token, *variable.get(input.state()), n)?;
-                    variable::set_i32(variable, result, input, global);
+                    variable::set_i32(variable, result, input, scope);
                     Ok(())
                 }
                 Variable::BaseInt(variable) => {
                     let result = $arithmetic_op(token, *variable.get(input.base()), n)?;
-                    variable::set_base_i32(variable, result, input, global);
+                    variable::set_base_i32(variable, result, input, scope);
                     Ok(())
                 }
                 Variable::CatCode(_) => invalid_variable_error(token),

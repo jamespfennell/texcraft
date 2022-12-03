@@ -53,7 +53,11 @@ pub fn run<S>(
                             Some(Fn::Execution(cmd)) => cmd(token, execution_input),
                             Some(Fn::Variable(cmd, addr)) => {
                                 let var = command::resolve(*cmd, *addr, token, execution_input)?;
-                                variable::set_using_input(var, execution_input, false)
+                                variable::set_using_input(
+                                    var,
+                                    execution_input,
+                                    groupingmap::Scope::Local,
+                                )
                             }
                             Some(Fn::Character(token_value)) => character_handler(
                                 Token::new_from_value(*token_value, token.trace_key()),
@@ -457,3 +461,4 @@ macro_rules! implement_has_component {
 }
 
 pub use implement_has_component;
+use texcraft_stdext::collections::groupingmap;

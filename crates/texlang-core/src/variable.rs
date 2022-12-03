@@ -167,6 +167,8 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
+use texcraft_stdext::collections::groupingmap;
+
 use crate::parse;
 use crate::token::catcode::CatCode;
 use crate::vm::{self, BaseState, ExecutionInput};
@@ -255,21 +257,21 @@ impl<S, T> TypedVariable<S, T> {
 pub fn set_using_input<S>(
     variable: Variable<S>,
     input: &mut vm::ExecutionInput<S>,
-    global: bool,
+    scope: groupingmap::Scope,
 ) -> anyhow::Result<()> {
     parse::parse_optional_equals(input)?;
     match variable {
         Variable::Int(variable) => {
             let value: i32 = parse::parse_number(input)?;
-            set_i32(variable, value, input, global)
+            set_i32(variable, value, input, scope)
         }
         Variable::BaseInt(variable) => {
             let value: i32 = parse::parse_number(input)?;
-            set_base_i32(variable, value, input, global)
+            set_base_i32(variable, value, input, scope)
         }
         Variable::CatCode(variable) => {
             let value = parse::parse_catcode(input)?;
-            set_base_catcode(variable, value, input, global)
+            set_base_catcode(variable, value, input, scope)
         }
     }
     Ok(())
@@ -283,16 +285,19 @@ macro_rules! make_setter {
             variable: TypedVariable<$t, $type>,
             mut value: $type,
             input: &mut ExecutionInput<S>,
-            global: bool,
+            scope: groupingmap::Scope,
         ) {
             std::mem::swap(&mut value, variable.get_mut(input.$state_getter()));
-            if global {
-                for group in input.groups() {
-                    group.$map_name.remove(&variable);
+            match scope {
+                groupingmap::Scope::Global => {
+                    for group in input.groups() {
+                        group.$map_name.remove(&variable);
+                    }
                 }
-            } else {
-                if let Some((group, _, _)) = input.current_group_mut() {
-                    group.$map_name.save(variable, value);
+                groupingmap::Scope::Local => {
+                    if let Some((group, _, _)) = input.current_group_mut() {
+                        group.$map_name.save(variable, value);
+                    }
                 }
             }
         }

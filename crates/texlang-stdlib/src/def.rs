@@ -4,6 +4,7 @@ use crate::prefix;
 use arrayvec::ArrayVec;
 use std::rc;
 use texcraft_stdext::algorithms::substringsearch::KMPMatcherFactory;
+use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
 use texcraft_stdext::nevec;
 use texlang_core::error;
@@ -48,8 +49,10 @@ fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
     input: &mut vm::ExecutionInput<S>,
     set_globally_override: bool,
 ) -> anyhow::Result<()> {
-    let set_globally =
-        input.state_mut().component_mut().read_and_reset_global() || set_globally_override;
+    let mut scope = input.state_mut().component_mut().read_and_reset_global();
+    if set_globally_override {
+        scope = groupingmap::Scope::Global;
+    }
     let name = parse::parse_command_target("macro definition", def_token, input.unexpanded())?;
     let (prefix, raw_parameters, replacement_end_token) =
         parse_prefix_and_parameters(input.unexpanded())?;
@@ -68,12 +71,10 @@ fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
         }
     }
     let user_defined_macro = unsafe { Macro::new_unchecked(prefix, parameters, replacement) };
-    let commands_map = &mut input.base_mut().commands_map;
-    if set_globally {
-        commands_map.insert_global(name, rc::Rc::new(user_defined_macro).into());
-    } else {
-        commands_map.insert(name, rc::Rc::new(user_defined_macro).into());
-    }
+    input
+        .base_mut()
+        .commands_map
+        .insert(name, rc::Rc::new(user_defined_macro).into(), scope);
     Ok(())
 }
 

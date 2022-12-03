@@ -54,12 +54,13 @@ use crate::def;
 use crate::letassignment;
 use crate::variableops;
 use std::collections::HashSet;
+use texcraft_stdext::collections::groupingmap;
 use texlang_core::prelude::*;
 use texlang_core::variable;
 
 /// Component for the prefix commands.
 pub struct Component {
-    global: bool,
+    scope: groupingmap::Scope,
     prefixable_with_any: HashSet<std::any::TypeId>,
     prefixable_with_global: HashSet<std::any::TypeId>,
 }
@@ -67,7 +68,7 @@ pub struct Component {
 impl Default for Component {
     fn default() -> Self {
         Component {
-            global: false,
+            scope: groupingmap::Scope::Local,
             prefixable_with_any: vec![def::def_id()].into_iter().collect(),
             prefixable_with_global: vec![
                 variableops::get_variable_op_id(),
@@ -83,10 +84,10 @@ impl Component {
     /// Read the value of the global flag and reset the flag to false.
     ///
     /// See the module documentation for correct usage of this method.
-    pub fn read_and_reset_global(&mut self) -> bool {
-        let global = self.global;
-        self.global = false;
-        global
+    pub fn read_and_reset_global(&mut self) -> groupingmap::Scope {
+        let scope = self.scope;
+        self.scope = groupingmap::Scope::Local;
+        scope
     }
 }
 
@@ -211,21 +212,34 @@ fn process_prefixes<S: HasComponent<Component>>(
                     assert_only_global_prefix(t, prefix, input)?;
                     input.consume()?;
                     let var = command::resolve(cmd, addr, t, input)?;
-                    variable::set_using_input(var, input, prefix.global.is_some())?;
+                    variable::set_using_input(
+                        var,
+                        input,
+                        match prefix.global {
+                            None => groupingmap::Scope::Local,
+                            Some(_) => groupingmap::Scope::Global,
+                        },
+                    )?;
                     return Ok(());
                 }
                 // Next check if it's a command that can be prefixed by any of the prefix command.
                 let component = input.state().component();
                 let cmd_id = input.base().commands_map.get_id(&name);
                 if component.prefixable_with_any.contains(&cmd_id) {
-                    input.state_mut().component_mut().global = prefix.global.is_some();
+                    input.state_mut().component_mut().scope = match prefix.global {
+                        None => groupingmap::Scope::Local,
+                        Some(_) => groupingmap::Scope::Global,
+                    };
                     return Ok(());
                 }
                 // Next check if it's a command that can be prefixed by global only. In this case we check
                 // that no other prefixes are present.
                 if component.prefixable_with_global.contains(&cmd_id) {
                     assert_only_global_prefix(t, prefix, input)?;
-                    input.state_mut().component_mut().global = prefix.global.is_some();
+                    input.state_mut().component_mut().scope = match prefix.global {
+                        None => groupingmap::Scope::Local,
+                        Some(_) => groupingmap::Scope::Global,
+                    };
                     return Ok(());
                 }
                 // If we make it to here, this is not a valid target for the prefix command.
@@ -410,10 +424,9 @@ pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::Comm
         _: Token,
         input: &mut vm::ExecutionInput<S>,
     ) -> anyhow::Result<()> {
-        if input.state_mut().component_mut().read_and_reset_global() {
-            Err(anyhow::anyhow!("assertion failed: global is true"))
-        } else {
-            Ok(())
+        match input.state_mut().component_mut().read_and_reset_global() {
+            groupingmap::Scope::Global => Err(anyhow::anyhow!("assertion failed: global is true")),
+            groupingmap::Scope::Local => Ok(()),
         }
     }
     command::Command::new_execution(noop_execution_cmd_fn)
