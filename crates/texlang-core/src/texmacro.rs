@@ -7,14 +7,13 @@ use crate::token::write_tokens;
 use crate::token::CsNameInterner;
 use crate::token::Token;
 use crate::vm::RefVM;
-use arrayvec::ArrayVec;
 use colored::*;
 use texcraft_stdext::algorithms::substringsearch::KMPMatcherFactory;
 
 /// A TeX Macro.
 pub struct Macro {
     prefix: Vec<Token>,
-    parameters: ArrayVec<Parameter, 9>,
+    parameters: Vec<Parameter>,
     replacement_text: Vec<Replacement>,
 }
 
@@ -42,7 +41,7 @@ impl Macro {
             input.unexpanded(),
             "matching the prefix for a user-defined macro",
         )?;
-        let mut argument_indices: ArrayVec<(usize, usize), 9> = Default::default();
+        let mut argument_indices: Vec<(usize, usize)> = Default::default();
         let mut argument_tokens = input.scratch_space();
         let unexpanded_stream = input.unexpanded();
         for (i, parameter) in self.parameters.iter().enumerate() {
@@ -59,7 +58,7 @@ impl Macro {
         // We need a block here to make the borrow checker happy about the lifetimes on the
         // `arguments` and `argument_tokens` variables.
         {
-            let mut arguments: ArrayVec<&[Token], 9> = Default::default();
+            let mut arguments: Vec<&[Token]> = Default::default();
             for (i, j) in &argument_indices {
                 let slice = argument_tokens.get(*i..*j).unwrap();
                 arguments.push(slice);
@@ -109,15 +108,9 @@ impl Macro {
     }
 
     /// Create a new macro.
-    ///
-    /// # Safety
-    ///
-    /// This constructor does not check that the replacement text is valid; i.e., that indices
-    /// appearing in any [Replacement::Parameter] are less than the number of parameters. If
-    /// this is not the case, undefined behavior will occur when the macro is expanded.
-    pub unsafe fn new_unchecked(
+    pub fn new(
         prefix: Vec<Token>,
-        parameters: ArrayVec<Parameter, 9>,
+        parameters: Vec<Parameter>,
         replacement_text: Vec<Replacement>,
     ) -> Macro {
         Macro {

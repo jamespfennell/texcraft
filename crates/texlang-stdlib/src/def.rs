@@ -1,7 +1,6 @@
 //! Primitives for creating user-defined macros (`\def` and friends).
 
 use crate::prefix;
-use arrayvec::ArrayVec;
 use std::rc;
 use texcraft_stdext::algorithms::substringsearch::KMPMatcherFactory;
 use texcraft_stdext::collections::groupingmap;
@@ -56,7 +55,7 @@ fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
     let name = parse::parse_command_target("macro definition", def_token, input.unexpanded())?;
     let (prefix, raw_parameters, replacement_end_token) =
         parse_prefix_and_parameters(input.unexpanded())?;
-    let parameters: ArrayVec<Parameter, 9> = raw_parameters
+    let parameters: Vec<Parameter> = raw_parameters
         .into_iter()
         .map(|a| match a {
             RawParameter::Undelimited => Parameter::Undelimited,
@@ -70,7 +69,7 @@ fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
             tokens.reverse();
         }
     }
-    let user_defined_macro = unsafe { Macro::new_unchecked(prefix, parameters, replacement) };
+    let user_defined_macro = Macro::new(prefix, parameters, replacement);
     input
         .base_mut()
         .commands_map

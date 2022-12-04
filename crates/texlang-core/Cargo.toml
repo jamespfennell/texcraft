@@ -15,12 +15,7 @@ anyhow = "1.0"
 # Nice terminal output.
 colored = "2"
 
-
 # String interning for control sequence names.
 string-interner = "0.13.0"
 
-# In the macros system
-arrayvec = "0.7.1"
-
 texcraft-stdext = { path = "../texcraft-stdext" }
-
