@@ -127,7 +127,7 @@ impl<'a, T> IntoIterator for &'a Nevec<T> {
 impl<T: std::fmt::Display> std::fmt::Display for Nevec<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for t in self {
-            write![f, "{}", t]?;
+            write![f, "{t}"]?;
         }
         Ok(())
     }

@@ -56,7 +56,7 @@ fn main() {
         SubCommand::Run(run_args) => run(run_args.file_path),
     };
     if let Err(err) = result {
-        println!["{}", err];
+        println!["{err}"];
         std::process::exit(1);
     }
 }
@@ -76,7 +76,7 @@ fn run(mut path: PathBuf) -> Result<(), anyhow::Error> {
     let _ = vm.push_source(path.to_string_lossy().to_string(), source_code);
     let tokens = script::run(&mut vm, true)?;
     let pretty = token::write_tokens(&tokens, vm.cs_name_interner());
-    println!("{}", pretty);
+    println!("{pretty}");
     Ok(())
 }
 

@@ -362,10 +362,7 @@ impl std::fmt::Display for Error {
             } => {
                 error::DisplayBuilder::new(
                     command_token,
-                    format!(
-                        "the command {} cannot be prefixed with {}",
-                        command_token, prefix_token
-                    ),
+                    format!("the command {command_token} cannot be prefixed with {prefix_token}"),
                 ).add_note(match prefix_kind {
                     Kind::Global => {
                         r"see the documention for \global for the list of commands this prefix can be used with"
@@ -385,10 +382,7 @@ impl std::fmt::Display for Error {
             } => {
                 error::DisplayBuilder::new(
                     token,
-                    format!(
-                        "character tokens cannot be prefixed with {}",
-                        prefix_token
-                    ),
+                    format!("character tokens cannot be prefixed with {prefix_token}"),
                 ).fmt(f)
             }
             Error::EndOfInputAfterPrefix {
@@ -398,10 +392,7 @@ impl std::fmt::Display for Error {
             } => {
                 error::DisplayBuilder::new(
                     end_of_input,
-                    format!(
-                        "end of input after prefix command {}",
-                        prefix_token
-                    ),
+                    format!("end of input after prefix command {prefix_token}"),
                 ).add_note(r"prefix commands must be followed by a valid prefix target like \def").fmt(f)
             },
         }

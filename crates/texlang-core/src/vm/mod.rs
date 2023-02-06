@@ -259,7 +259,7 @@ impl<S> Default for Internal<S> {
             working_directory: match std::env::current_dir() {
                 Ok(path_buf) => Some(path_buf),
                 Err(err) => {
-                    print!("failed to determine the working directory: {}", err);
+                    print!("failed to determine the working directory: {err}");
                     None
                 }
             },

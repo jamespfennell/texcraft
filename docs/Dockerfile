@@ -10,7 +10,7 @@ WORKDIR /website
 COPY . .
 RUN cd docs && hugo
 
-FROM rust:1.59 AS rust-builder
+FROM rust:1.67 AS rust-builder
 
 # Build the Rustdoc HTML files
 WORKDIR /rustdoc

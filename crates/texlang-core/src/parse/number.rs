@@ -40,7 +40,7 @@ fn parse_number_internal<S, T: PrimInt>(stream: &mut vm::ExpansionInput<S>) -> a
                     let variable = command::resolve(*cmd, *addr, token, stream)?;
                     read_number_from_address(variable, stream)?
                 } else {
-                    println!("Command: {:?}", cmd);
+                    println!("Command: {cmd:?}");
                     return Err(parse_number_error(Some(token)));
                 }
             }

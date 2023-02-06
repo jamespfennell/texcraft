@@ -41,8 +41,7 @@ pub fn parse_command_target<S: TokenStream>(
             return Err(error::TokenError::new(
                 token,
                 format![
-                    "unexpected end of input while reading the target of a {}",
-                    target_description
+                    "unexpected end of input while reading the target of a {target_description}"
                 ],
             )
             .cast());
@@ -52,11 +51,10 @@ pub fn parse_command_target<S: TokenStream>(
             _ => {
                 return Err(error::TokenError::new(
                     token,
-                    format!["unexpected target of a {}", target_description],
+                    format!["unexpected target of a {target_description}"],
                 )
                 .add_note(format![
-                    "the target of a {} must be a control sequence",
-                    target_description
+                    "the target of a {target_description} must be a control sequence"
                 ])
                 .cast());
             }

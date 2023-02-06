@@ -110,17 +110,15 @@ fn read_file<S>(
             None => match vm.working_directory() {
                 None => {
                     return Err(anyhow::anyhow!(
-                        "cannot read from relative path {} because no working directory is set",
-                        raw_file_path,
+                      format![  "cannot read from relative path {raw_file_path} because no working directory is set"]
                     ));
                 }
                 Some(working_directory) => working_directory.join(&raw_file_path),
             },
             Some(area) => {
-                return Err(anyhow::anyhow!(
-                    "cannot read from area {} as areas are not implemented",
-                    area,
-                ));
+                return Err(anyhow::anyhow!(format![
+                    "cannot read from area {area} as areas are not implemented"
+                ]));
             }
         },
     };
@@ -129,7 +127,7 @@ fn read_file<S>(
         Ok(s) => Ok((raw_file_path, s)),
         Err(err) => Err(
             error::TokenError::new(t, format!("could not read from {:?}", &file_path))
-                .add_note(format!("underlying filesystem error: {}", err))
+                .add_note(format!("underlying filesystem error: {err}"))
                 .cast(),
         ),
     }

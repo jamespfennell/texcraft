@@ -42,18 +42,18 @@ pub fn run<S: HasComponent<script::Component>>(vm: &mut vm::VM<S>, opts: RunOpti
                             continue;
                         }
                         Signal::Doc(doc) => {
-                            println!("{}\n", doc);
+                            println!("{doc}\n");
                             continue;
                         }
                     }
                 }
-                println!("{}", err);
+                println!("{err}");
                 continue;
             }
         };
         let pretty = token::write_tokens(&tokens, vm.cs_name_interner());
         if !pretty.trim().is_empty() {
-            println!("{}\n", pretty);
+            println!("{pretty}\n");
         }
 
         if vm.base_state.commands_map.len() != num_names {
@@ -112,10 +112,10 @@ pub fn get_doc<S>() -> command::Command<S> {
             let target = texlang_core::parse::parse_command_target("", token, input.unexpanded())?;
             let cs_name_s = input.vm().cs_name_interner().resolve(&target).unwrap();
             let doc = match input.base().commands_map.get_command_slow(&target) {
-                None => format!["Unknown command \\{}", cs_name_s],
+                None => format!["Unknown command \\{cs_name_s}"],
                 Some(cmd) => match cmd.doc() {
-                    None => format!["No documentation available for the \\{} command", cs_name_s],
-                    Some(doc) => format!["\\{}  {}", cs_name_s, doc],
+                    None => format!["No documentation available for the \\{cs_name_s} command"],
+                    Some(doc) => format!["\\{cs_name_s}  {doc}"],
                 },
             };
             Err(Signal::Doc(doc).into())

@@ -269,8 +269,7 @@ fn array_fn<S: HasComponent<Component>>(
         return Err(error::TokenError::new(
             array_token,
             format![
-                "Array out of bounds: cannot access index {} of array with length {}",
-                array_index, array_len,
+                "Array out of bounds: cannot access index {array_index} of array with length {array_len}"
             ],
         )
         .cast());

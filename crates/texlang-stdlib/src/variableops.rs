@@ -91,8 +91,8 @@ fn checked_add(token: Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
         Some(result) => Ok(result),
         None => Err(
             error::TokenError::new(token, "overflow in checked addition")
-                .add_note(format!["left hand side evaluated to {}", lhs])
-                .add_note(format!["right hand side evaluated {}", rhs])
+                .add_note(format!["left hand side evaluated to {lhs}"])
+                .add_note(format!["right hand side evaluated {rhs}"])
                 .add_note(format![
                     "overflowed result would be {}",
                     lhs.wrapping_add(rhs)
@@ -114,8 +114,8 @@ fn checked_multiply(token: Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
         Some(result) => Ok(result),
         None => Err(
             error::TokenError::new(token, "overflow in checked multiplication")
-                .add_note(format!["left hand side evaluated to {}", lhs])
-                .add_note(format!["right hand side evaluated {}", rhs])
+                .add_note(format!["left hand side evaluated to {lhs}"])
+                .add_note(format!["right hand side evaluated {rhs}"])
                 .add_note(format![
                     "overflowed result would be {}",
                     lhs.wrapping_mul(rhs)

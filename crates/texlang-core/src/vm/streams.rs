@@ -368,7 +368,7 @@ impl<S> std::convert::AsMut<ExpansionInput<S>> for ExecutionInput<S> {
 /// See this question for the type of code this function is designed for:
 /// https://stackoverflow.com/questions/69680201/is-this-use-of-unsafe-trivially-safe
 #[inline]
-unsafe fn launder<'a, 'b>(token: &'a Token) -> &'b Token {
+unsafe fn launder<'a>(token: &Token) -> &'a Token {
     &*(token as *const Token)
 }
 

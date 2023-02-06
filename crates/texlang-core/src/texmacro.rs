@@ -68,7 +68,7 @@ impl Macro {
             Macro::perform_replacement(&self.replacement_text, &arguments, result);
 
             if input.base().tracing_macros > 0 {
-                println![" +---[ Tracing macro expansion of {} ]--+", token];
+                println![" +---[ Tracing macro expansion of {token} ]--+"];
                 for (i, argument) in arguments.iter().enumerate() {
                     println![
                         " | {}{}={}",
@@ -210,8 +210,7 @@ impl Parameter {
             }
         }
         let mut e = error::EndOfInputError::new(format![
-            "unexpected end of input while reading argument #{} for the macro {}",
-            param_num, macro_token
+            "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
         ])
         .add_note(format![
             "this argument is delimited and must be suffixed by the tokens `{}`",
@@ -259,8 +258,7 @@ impl Parameter {
         let opening_brace = match stream.next()? {
             None => {
                 return Err(error::EndOfInputError::new(format![
-                    "unexpected end of input while reading argument #{} for the macro {}",
-                    param_num, macro_token
+                    "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
                 ])
                 .add_token_context(macro_token, "the macro invocation started here:")
                 .cast());
@@ -276,12 +274,10 @@ impl Parameter {
         match parse::parse_balanced_tokens(stream, result)? {
             true => Ok(()),
             false => Err(error::EndOfInputError::new(format![
-                "unexpected end of input while reading argument #{} for the macro {}",
-                param_num, macro_token
+                "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
             ])
             .add_note(format![
-            "this argument started with a `{}` and must be finished with a matching closing brace",
-            &opening_brace
+            "this argument started with a `{opening_brace}` and must be finished with a matching closing brace"
         ])
             .add_token_context(&opening_brace, "the argument started here:")
             .add_token_context(macro_token, "the macro invocation started here:")
@@ -379,8 +375,7 @@ pub fn remove_tokens_from_stream(
         let stream_token = match stream.next()? {
             None => {
                 return Err(error::EndOfInputError::new(format![
-                    "unexpected end of input while {}",
-                    action
+                    "unexpected end of input while {action}"
                 ])
                 .cast());
             }
@@ -401,7 +396,7 @@ pub fn remove_tokens_from_stream(
             let note = "todo";
             return Err(error::TokenError::new(
                 stream_token,
-                format!["unexpected token while {}", action],
+                format!["unexpected token while {action}"],
             )
             .add_note(note)
             .cast());

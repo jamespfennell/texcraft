@@ -144,8 +144,7 @@ fn integer_register_too_large_error(token: Token, addr: u32, num: usize) -> anyh
     error::TokenError::new(
         token,
         format![
-            "Register number {} passed to {} is too large; there are only {} integer registers",
-            addr, token, num,
+            "Register number {addr} passed to {token} is too large; there are only {num} integer registers"
         ],
     )
     .cast()

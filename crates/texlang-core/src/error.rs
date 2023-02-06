@@ -139,8 +139,8 @@ impl std::fmt::Display for TokenError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let tr = match &self.traceback_result {
             None => {
-                println!["Token error: {}", self.message];
-                println!["This error does not have any context because `texcraft_core::error::add_context` was not called"];
+                writeln![f, "Token error: {}", self.message]?;
+                writeln![f, "This error does not have any context because `texcraft_core::error::add_context` was not called"]?;
                 return Ok(());
             }
             Some(tr) => tr,

@@ -152,7 +152,7 @@ fn false_case<S: HasComponent<Component>>(
             .add_note("each `if` command must be terminated by a `fi` command, with an optional `else` in between")
             .add_note("this `if` command evaluated to false, and the input ended while skipping the true branch")
             .add_note("this is the `if` command involved in the error:")
-            .add_note(format!["{:?}", branch])
+            .add_note(format!["{branch:?}"])
             .cast()
     )
 }

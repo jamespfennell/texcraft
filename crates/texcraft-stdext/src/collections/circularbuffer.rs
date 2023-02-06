@@ -130,11 +130,11 @@ impl<T: Clone> CircularBuffer<T> {
             }
             std::cmp::Ordering::Less => {
                 let (front, back) = self.data.split_at_mut(tail_i);
-                (&mut back[0]).clone_from(&front[i]);
+                back[0].clone_from(&front[i]);
             }
             std::cmp::Ordering::Greater => {
                 let (front, back) = self.data.split_at_mut(i);
-                (&mut front[tail_i]).clone_from(&back[0]);
+                front[tail_i].clone_from(&back[0]);
             }
         }
         self.head = tail_i;
