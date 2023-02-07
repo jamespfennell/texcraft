@@ -58,11 +58,6 @@ macro_rules! create_arithmetic_primitive {
                     variable::set_i32(variable, result, input, scope);
                     Ok(())
                 }
-                Variable::BaseInt(variable) => {
-                    let result = $arithmetic_op(token, *variable.get(input.base()), n)?;
-                    variable::set_base_i32(variable, result, input, scope);
-                    Ok(())
-                }
                 Variable::CatCode(_) => invalid_variable_error(token),
             }
         }

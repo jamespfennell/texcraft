@@ -176,7 +176,6 @@ use crate::vm::{self, BaseState, ExecutionInput};
 /// Enum with a variant for each type of variable in TeX.
 pub enum Variable<S> {
     Int(TypedVariable<S, i32>),
-    BaseInt(TypedVariable<vm::BaseState<S>, i32>),
     CatCode(TypedVariable<vm::BaseState<S>, CatCode>),
 }
 
@@ -264,10 +263,6 @@ pub fn set_using_input<S>(
         Variable::Int(variable) => {
             let value: i32 = parse::parse_number(input)?;
             set_i32(variable, value, input, scope)
-        }
-        Variable::BaseInt(variable) => {
-            let value: i32 = parse::parse_number(input)?;
-            set_base_i32(variable, value, input, scope)
         }
         Variable::CatCode(variable) => {
             let value = parse::parse_catcode(input)?;
