@@ -94,10 +94,7 @@ pub trait RefVM {
     }
 
     fn trace(&self, token: Token) -> trace::Trace {
-        self.vm()
-            .internal
-            .tracer
-            .trace(token, &self.vm().internal.cs_name_interner)
+        self.vm().trace(token)
     }
 
     fn trace_end_of_input(&self) -> trace::Trace {
@@ -239,6 +236,17 @@ impl<S> ExpansionInput<S> {
     #[inline]
     pub fn push_expansion(&mut self, expansion: &[Token]) {
         self.0.internal.push_expansion(expansion)
+    }
+
+    /// Returns a reference to the expanded tokens stack for the current input source.
+    ///
+    /// The tokens are a stack, so the next token is the last token in the vector.
+    ///
+    /// Adding tokens to the front of the input using this method can be more efficient
+    /// than using [ExpansionInput::push_expansion] because an allocation is avoided.
+    #[inline]
+    pub fn expansions(&self) -> &Vec<Token> {
+        self.0.internal.expansions()
     }
 
     /// Returns a mutable reference to the expanded tokens stack for the current input source.

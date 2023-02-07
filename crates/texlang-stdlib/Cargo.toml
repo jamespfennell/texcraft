@@ -19,6 +19,8 @@ texlang-core = { path = "../texlang-core" }
 # Error handling.
 anyhow = "1.0"
 
+# Nice terminal output.
+colored = "2"
 
 # In the macros system
 arrayvec = "0.7.1"

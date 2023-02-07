@@ -121,5 +121,6 @@ fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::V
             time: time::Component::new_with_values(minutes_since_midnight, day, month, year),
             conditional: Default::default(),
         },
+        None,
     )
 }

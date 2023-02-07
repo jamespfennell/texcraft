@@ -34,6 +34,7 @@
 //!     into the source code.
 //! Thus we can uniquely identify the UTF-8 character the key is a associated to.
 use crate::token::{CsNameInterner, Token, Value};
+use colored::*;
 use std::collections::BTreeMap;
 use std::ops::Bound::Included;
 
@@ -245,7 +246,35 @@ impl Tracer {
 
 impl std::fmt::Display for Trace {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.value.fmt(f)
+        let margin_width = self.line_number.to_string().len() + 1;
+        let bar = "|".bright_yellow();
+        writeln!(
+            f,
+            "{}{} {}:{}:{}",
+            " ".repeat(margin_width - 1),
+            ">>>".bright_yellow().bold(),
+            self.file_name,
+            self.line_number,
+            self.index + 1
+        )?;
+        writeln!(f, "{}{} ", " ".repeat(margin_width), bar)?;
+        writeln!(
+            f,
+            "{}{} {} {}",
+            " ".repeat(margin_width - self.line_number.to_string().len() - 1),
+            self.line_number.to_string().bright_yellow(),
+            bar,
+            self.line_content.trim_end()
+        )?;
+        write!(
+            f,
+            "{}{} {}{}",
+            " ".repeat(margin_width),
+            bar,
+            " ".repeat(self.index),
+            "^".repeat(self.value.len()).bright_red().bold(),
+        )?;
+        Ok(())
     }
 }
 

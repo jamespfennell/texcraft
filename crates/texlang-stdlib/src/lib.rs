@@ -27,18 +27,19 @@ pub mod testutil;
 pub mod texcraft;
 pub mod the;
 pub mod time;
-pub mod tracing;
+pub mod tracingmacros;
 pub mod variableops;
 
 /// A state struct that is compatible with every primitive in the Texlang standard library.
 #[derive(Default)]
 pub struct StdLibState {
     alloc: alloc::Component,
-    exec: script::Component,
-    registers: registers::Component<32768>,
-    prefix: prefix::Component,
-    time: time::Component,
     conditional: conditional::Component,
+    prefix: prefix::Component,
+    registers: registers::Component<32768>,
+    script: script::Component,
+    time: time::Component,
+    tracing_macros: tracingmacros::Component,
 }
 
 impl StdLibState {
@@ -83,7 +84,7 @@ impl StdLibState {
             //
             ("the", the::get_the()),
             ("time", time::get_time()),
-            ("tracingmacros", tracing::get_tracingmacros()),
+            ("tracingmacros", tracingmacros::get_tracingmacros()),
             //
             ("year", time::get_year()),
         ])
@@ -94,6 +95,7 @@ impl StdLibState {
             CatCodeMap::new_with_tex_defaults(),
             StdLibState::all_initial_built_ins(),
             Default::default(),
+            Some(tracingmacros::hook),
         )
     }
 }
@@ -101,9 +103,10 @@ impl StdLibState {
 implement_has_component![
     StdLibState,
     (alloc::Component, alloc),
-    (script::Component, exec),
-    (registers::Component<32768>, registers),
-    (prefix::Component, prefix),
-    (time::Component, time),
     (conditional::Component, conditional),
+    (prefix::Component, prefix),
+    (registers::Component<32768>, registers),
+    (script::Component, script),
+    (time::Component, time),
+    (tracingmacros::Component, tracing_macros),
 ];

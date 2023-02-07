@@ -399,7 +399,7 @@ mod tests {
     fn number_with_letter_catcode() {
         let mut map = CatCodeMap::new_with_tex_defaults();
         map.insert('1', catcode::CatCode::Letter);
-        let mut vm = vm::VM::<()>::new(map, HashMap::new(), ());
+        let mut vm = vm::VM::<()>::new(map, HashMap::new(), (), None);
         vm.push_source("".to_string(), r"1".to_string()).unwrap();
         let input = crate::vm::ExecutionInput::new(&mut vm);
         let result: anyhow::Result<i32> = parse_number(input);

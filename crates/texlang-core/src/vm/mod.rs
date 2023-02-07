@@ -10,6 +10,7 @@ use crate::command;
 use crate::command::Command;
 use crate::command::Fn;
 use crate::error;
+use crate::texmacro;
 use crate::token;
 use crate::token::catcode::CatCodeMap;
 use crate::token::lexer;
@@ -131,7 +132,6 @@ impl FileSystemOps for RealFileSystemOps {
 pub struct BaseState<S> {
     pub cat_code_map: CatCodeMap,
     pub commands_map: command::Map<S>,
-    pub tracing_macros: i32,
     pub max_input_levels: i32,
 }
 
@@ -143,7 +143,6 @@ impl<S> BaseState<S> {
         BaseState {
             cat_code_map,
             commands_map: command::Map::new(initial_built_ins, vec![]),
-            tracing_macros: 0,
             max_input_levels: 500,
         }
     }
@@ -155,8 +154,12 @@ impl<S> VM<S> {
         initial_cat_codes: CatCodeMap,
         initial_built_ins: HashMap<&str, Command<S>>,
         state: S,
+        tex_macro_hook: Option<fn(texmacro::HookInput<S>)>,
     ) -> VM<S> {
         let mut internal: Internal<S> = Default::default();
+        if let Some(tex_macro_hook) = tex_macro_hook {
+            internal.tex_macro_hook = tex_macro_hook;
+        }
         let initial_built_ins = initial_built_ins
             .into_iter()
             .map(|(key, value)| (internal.cs_name_interner.get_or_intern(key), value))
@@ -216,6 +219,12 @@ impl<S> VM<S> {
         &self.internal.cs_name_interner
     }
 
+    /// Return the VM's TeX macro hook.
+    #[inline]
+    pub fn tex_macro_hook(&self) -> fn(texmacro::HookInput<S>) {
+        self.internal.tex_macro_hook
+    }
+
     fn begin_group(&mut self) {
         self.base_state.commands_map.begin_group();
         self.internal.groups.push(Default::default());
@@ -231,9 +240,15 @@ impl<S> VM<S> {
             }
         }
     }
+
+    pub fn trace(&self, token: Token) -> trace::Trace {
+        self.internal
+            .tracer
+            .trace(token, &self.internal.cs_name_interner)
+    }
 }
 
-/// Parts of the VM that are only visible to the VM.
+/// Parts of the VM that cannot be edited by TeX commands at runtime.
 struct Internal<S> {
     // The sources form a stack. We store the top element directly on the VM
     // for performance reasons.
@@ -249,6 +264,7 @@ struct Internal<S> {
     scratch_space: Vec<Token>,
 
     groups: Vec<variable::RestoreValues<S>>,
+    tex_macro_hook: fn(texmacro::HookInput<S>),
 }
 
 impl<S> Default for Internal<S> {
@@ -267,6 +283,7 @@ impl<S> Default for Internal<S> {
             tracer: Default::default(),
             scratch_space: Default::default(),
             groups: Default::default(),
+            tex_macro_hook: texmacro::no_op_hook,
         }
     }
 }
@@ -304,6 +321,11 @@ impl<S> Internal<S> {
         self.current_source
             .expansions
             .extend(expansion.iter().rev());
+    }
+
+    #[inline]
+    fn expansions(&self) -> &Vec<Token> {
+        &self.current_source.expansions
     }
 
     #[inline]

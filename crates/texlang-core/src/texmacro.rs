@@ -14,7 +14,13 @@ use texcraft_stdext::algorithms::substringsearch::KMPMatcherFactory;
 pub struct Macro {
     prefix: Vec<Token>,
     parameters: Vec<Parameter>,
-    replacement_text: Vec<Replacement>,
+    replacements: Vec<Replacement>,
+}
+
+impl Macro {
+    pub fn replacements(&self) -> &[Replacement] {
+        &self.replacements
+    }
 }
 
 /// A token list or parameter in a replacement text.
@@ -33,6 +39,17 @@ pub enum Parameter {
     Undelimited,
     Delimited(KMPMatcherFactory<Token>),
 }
+
+// Input type for macro hooks
+pub struct HookInput<'a, S> {
+    pub vm: &'a vm::VM<S>,
+    pub token: Token,
+    pub tex_macro: &'a Macro,
+    pub arguments: &'a [&'a [Token]],
+    pub reverse_expansion: &'a [Token],
+}
+
+pub fn no_op_hook<S>(_: HookInput<S>) {}
 
 impl Macro {
     pub fn call<S>(&self, token: Token, input: &mut vm::ExpansionInput<S>) -> anyhow::Result<()> {
@@ -55,35 +72,25 @@ impl Macro {
             argument_indices.push(element);
         }
 
-        // We need a block here to make the borrow checker happy about the lifetimes on the
-        // `arguments` and `argument_tokens` variables.
-        {
-            let mut arguments: Vec<&[Token]> = Default::default();
-            for (i, j) in &argument_indices {
-                let slice = argument_tokens.get(*i..*j).unwrap();
-                arguments.push(slice);
-            }
-
-            let result = input.expansions_mut();
-            Macro::perform_replacement(&self.replacement_text, &arguments, result);
-
-            if input.base().tracing_macros > 0 {
-                println![" +---[ Tracing macro expansion of {token} ]--+"];
-                for (i, argument) in arguments.iter().enumerate() {
-                    println![
-                        " | {}{}={}",
-                        "#".bright_yellow().bold(),
-                        (i + 1).to_string().bright_yellow().bold(),
-                        write_tokens(*argument, input.vm().cs_name_interner()).bright_yellow()
-                    ]
-                }
-                println![
-                    " | Expansion:\n | ```\n | todo: renable this\n | ```",
-                    // write_tokens(result.iter(), &input.base().cs_names)
-                ];
-                println![" +--------------------------------+\n"];
-            }
+        let mut arguments: Vec<&[Token]> = Default::default();
+        for (i, j) in &argument_indices {
+            let slice = argument_tokens.get(*i..*j).unwrap();
+            arguments.push(slice);
         }
+
+        let result = input.expansions_mut();
+        let num_tokens = Macro::perform_replacement(&self.replacements, &arguments, result);
+
+        // To keep the borrow checker happy we need to downgrade result to a shared reference.
+        let result = input.expansions();
+        let hook = input.vm().tex_macro_hook();
+        hook(HookInput {
+            vm: input.vm(),
+            token,
+            tex_macro: self,
+            arguments: &arguments,
+            reverse_expansion: &result[result.len() - num_tokens..result.len()],
+        });
 
         input.return_scratch_space(argument_tokens);
         Ok(())
@@ -102,7 +109,7 @@ impl Macro {
         d.push_str(&format![
             "\n\n{} `{}`\n",
             "Replacement definition:".italic(),
-            pretty_print_replacement_text(&self.replacement_text),
+            pretty_print_replacement_text(&self.replacements),
         ]);
         d
     }
@@ -116,7 +123,7 @@ impl Macro {
         Macro {
             prefix,
             parameters,
-            replacement_text,
+            replacements: replacement_text,
         }
     }
 
@@ -124,7 +131,7 @@ impl Macro {
         replacements: &[Replacement],
         arguments: &[&[Token]],
         result: &mut Vec<Token>,
-    ) {
+    ) -> usize {
         let mut output_size = 0;
         for replacement in replacements.iter() {
             output_size += match replacement {
@@ -143,6 +150,7 @@ impl Macro {
                 }
             }
         }
+        output_size
     }
 }
 

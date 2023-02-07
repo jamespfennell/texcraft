@@ -120,6 +120,7 @@ mod tests {
                     catcode::CatCodeMap::new_with_tex_defaults(),
                     setup_expansion_test(),
                     Default::default(),
+                    None,
                 );
                 vm.push_source("testutil.tex".to_string(), $input.to_string())
                     .unwrap();

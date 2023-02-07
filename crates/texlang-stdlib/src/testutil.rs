@@ -137,6 +137,7 @@ fn run<S: Default + HasComponent<script::Component>>(
         catcode::CatCodeMap::new_with_tex_defaults(),
         setup_fn(),
         Default::default(),
+        None,
     );
     if let Some(post_set_vm_fn) = post_setup_vm_fn {
         post_set_vm_fn(&mut vm)

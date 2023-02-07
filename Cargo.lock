@@ -1056,6 +1056,7 @@ dependencies = [
  "anyhow",
  "arrayvec 0.7.1",
  "chrono",
+ "colored",
  "linefeed",
  "texcraft-stdext",
  "texlang-core",

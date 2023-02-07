@@ -41,7 +41,7 @@ impl<'a> std::fmt::Display for DisplayBuilder<'a> {
         let margin_width = self.token.line_number.to_string().len() + 1;
         print_error_header(f, &self.title)?;
         // TODO: support adding an annotation to the token
-        fmt_traceback_result(self.token, f, margin_width, &self.annotation)?;
+        writeln!(f, "{}", self.token)?;
         if !self.notes.is_empty() {
             print_line_with_bar(f, margin_width)?;
         }
@@ -50,43 +50,6 @@ impl<'a> std::fmt::Display for DisplayBuilder<'a> {
         }
         Ok(())
     }
-}
-
-fn fmt_traceback_result(
-    tr: &trace::Trace,
-    f: &mut std::fmt::Formatter<'_>,
-    margin_width: usize,
-    annotation: &str,
-) -> std::fmt::Result {
-    let _prefix = " ".repeat(margin_width);
-    writeln!(
-        f,
-        "{}{} {}:{}:{}",
-        " ".repeat(margin_width - 1),
-        ">>>".bright_yellow().bold(),
-        tr.file_name,
-        tr.line_number,
-        tr.index + 1
-    )?;
-    print_line_with_bar(f, margin_width)?;
-    writeln!(
-        f,
-        "{}{} {} {}",
-        " ".repeat(margin_width - tr.line_number.to_string().len() - 1),
-        tr.line_number.to_string().bright_yellow(),
-        bar(),
-        tr.line_content.trim_end()
-    )?;
-    writeln!(
-        f,
-        "{}{} {}{} {}",
-        " ".repeat(margin_width),
-        bar(),
-        " ".repeat(tr.index),
-        "^".repeat(tr.value.len()).bright_red().bold(),
-        annotation.bright_red(),
-    )?;
-    Ok(())
 }
 
 fn bar() -> ColoredString {
@@ -149,7 +112,7 @@ impl std::fmt::Display for TokenError {
         let margin_width = tr.line_number.to_string().len() + 1;
         print_error_header(f, &self.message)?;
         // TODO: support adding an annotation to the token
-        fmt_traceback_result(tr, f, margin_width, "")?;
+        writeln!(f, "{tr}")?;
         if !self.notes.is_empty() {
             print_line_with_bar(f, margin_width)?;
         }
