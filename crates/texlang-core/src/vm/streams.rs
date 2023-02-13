@@ -174,8 +174,8 @@ impl<S> TokenStream for UnexpandedStream<S> {
 ///     For source code use [ExpansionInput::push_source];
 ///     for tokens use [ExpansionInput::push_expansion] or [ExpansionInput::expansions_mut].
 ///
-/// - Access to scratch space using the [ExpansionInput::scratch_space] and
-///     [ExpansionInput::return_scratch_space] methods.
+/// - Access to a token buffer the [ExpansionInput::take_token_buffer] and
+///     [ExpansionInput::return_token_buffer] methods.
 ///
 /// This type is also used in the parsing code for situations where both an
 /// [ExpansionInput] or [ExecutionInput] is accepted. We use this type because
@@ -260,28 +260,36 @@ impl<S> ExpansionInput<S> {
         self.0.internal.expansions_mut()
     }
 
-    /// Gets a vector of tokens that may be used as scratch space.
+    /// Returns a vector than can be used as a token buffer, potentially without allocating memory.
     ///
-    /// By reusing the same vector of tokens for scratch space we can avoid allocating a new
-    /// vector each time we need it. This was originally created for the TeX macros system.
+    /// The returned vector is empty, but will generally have non-zero capacity from previous uses of the buffer.
+    /// Reusing the allocated memory results in fewer allocations overall.
+    /// This buffer mechanism was introduced in a successful attempt to improve the performance of the
+    /// TeX macros implementation.
     ///
-    /// When finished with the vector, return it using [return_scratch_space](ExpansionInput::return_scratch_space).
-    pub fn scratch_space(&mut self) -> Vec<Token> {
-        // Note: the scratch space system here makes the benchmarks about 3% slower versus the previous system.
-        // In the previous system a mutable reference to the scratch space was returned with the unexpanded
-        // stream and so no swapping occured. If 3% is a big deal, we can bring it back.
-        let mut s = Vec::new();
-        std::mem::swap(&mut s, &mut self.0.internal.scratch_space);
-        s
+    /// When finished with the buffer, return it using [return_token_buffer](ExpansionInput::return_token_buffer).
+    ///
+    /// The current API in which a buffer is taken and then returned allows for multiple buffers to be taken
+    /// out at once.
+    /// If this happens, much of the performance benefit may be lost due to the current implementation.
+    /// Thus, you are strongly encouraged to structure your code such that no other buffer is taken out
+    ///     during the lifetime of the buffer you take out..
+    /// A simple way to guarantee this is to return the token buffer in the same function that you take it.
+    ///
+    /// This API exists mainly because it keeps the borrow checker happy, and may be changed in the future.
+    /// A previous API returned a mutable reference to the buffer, which introduced all kinds of lifetime issues,
+    /// though benchmarking indicated it was ~3% more performant.
+    pub fn take_token_buffer(&mut self) -> Vec<Token> {
+        std::mem::take(&mut self.0.internal.token_buffer)
     }
 
-    /// Return scratch space, allowing it to be reused.
-    pub fn return_scratch_space(&mut self, mut scratch_space: Vec<Token>) {
-        if scratch_space.len() < self.0.internal.scratch_space.len() {
+    /// Return a token buffer, allowing it to be reused.
+    pub fn return_token_buffer(&mut self, mut token_buffer: Vec<Token>) {
+        if token_buffer.capacity() <= self.0.internal.token_buffer.capacity() {
             return;
         }
-        scratch_space.clear();
-        std::mem::swap(&mut scratch_space, &mut self.0.internal.scratch_space);
+        token_buffer.clear();
+        std::mem::swap(&mut token_buffer, &mut self.0.internal.token_buffer);
     }
 }
 

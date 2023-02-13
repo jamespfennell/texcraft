@@ -46,7 +46,8 @@ impl std::error::Error for LexerError {}
 pub struct Lexer {
     raw_lexer: RawLexer,
     trim_next_whitespace: bool,
-    scratch_string: String,
+    // We read control sequence names into a shared buffer to avoid allocating for each one.
+    buffer: String,
 }
 
 impl Lexer {
@@ -54,7 +55,7 @@ impl Lexer {
         Lexer {
             raw_lexer: RawLexer::new(source_code, trace_key_range),
             trim_next_whitespace: false,
-            scratch_string: Default::default(),
+            buffer: Default::default(),
         }
     }
 
@@ -139,7 +140,7 @@ impl Lexer {
         cat_code_map: &CatCodeMap,
         cs_name_interner: &mut CsNameInterner,
     ) -> Result<token::CsName, LexerError> {
-        self.scratch_string.clear();
+        self.buffer.clear();
         match self.raw_lexer.next(cat_code_map) {
             None => {
                 // TODO: this should be an end of input errro
@@ -157,7 +158,7 @@ impl Lexer {
                 code: CatCode::Letter,
                 ..
             }) => {
-                self.scratch_string.push(char);
+                self.buffer.push(char);
                 while let Some(RawToken {
                     char: subsequent_char,
                     code: CatCode::Letter,
@@ -165,14 +166,14 @@ impl Lexer {
                 }) = self.raw_lexer.peek(cat_code_map)
                 {
                     self.raw_lexer.advance();
-                    self.scratch_string.push(subsequent_char);
+                    self.buffer.push(subsequent_char);
                 }
             }
             Some(first_raw_token) => {
-                self.scratch_string.push(first_raw_token.char);
+                self.buffer.push(first_raw_token.char);
             }
         };
-        Ok(cs_name_interner.get_or_intern(&self.scratch_string))
+        Ok(cs_name_interner.get_or_intern(&self.buffer))
     }
 
     pub fn source_code(&self) -> &str {

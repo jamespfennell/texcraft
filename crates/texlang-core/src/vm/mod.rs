@@ -261,7 +261,7 @@ struct Internal<S> {
 
     tracer: trace::Tracer,
 
-    scratch_space: Vec<Token>,
+    token_buffer: Vec<Token>,
 
     groups: Vec<variable::RestoreValues<S>>,
     tex_macro_hook: fn(texmacro::HookInput<S>),
@@ -281,7 +281,7 @@ impl<S> Default for Internal<S> {
             },
             cs_name_interner: Default::default(),
             tracer: Default::default(),
-            scratch_space: Default::default(),
+            token_buffer: Default::default(),
             groups: Default::default(),
             tex_macro_hook: texmacro::no_op_hook,
         }

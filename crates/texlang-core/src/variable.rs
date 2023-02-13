@@ -75,40 +75,40 @@
 //! Of course, the tradeoff is that wiring up a new variable is a bit tedious.
 //!
 //! For a case when the address index might be used,
-//!   suppose that our state `S` also offers some integer scratch space.
-//! This is stored in member `scratch_space` which is a 10 element vector of [i32] types.
+//!   suppose that our state `S` also offers an integer buffer.
+//! This buffer is a 10 element vector of [i32] types.
 //! The getter would be:
 //!
 //! ```
 //! struct S {
-//!     scratch_space: Vec<i32>
+//!     buffer: Vec<i32>
 //! }
 //!
-//! fn get_scratch_space(state: &S, addr: u32) -> &i32 {
-//!     &state.scratch_space[addr as usize]
+//! fn get_buffer(state: &S, addr: u32) -> &i32 {
+//!     &state.buffer[addr as usize]
 //! }
-//! # fn get_mut_scratch_space(state: &mut S, addr: u32) -> &mut i32 {
-//! #    &mut state.scratch_space[addr as usize]
+//! # fn get_mut_buffer(state: &mut S, addr: u32) -> &mut i32 {
+//! #    &mut state.buffer[addr as usize]
 //! # }
 //! # use texlang_core::variable;
-//! # variable::Variable::Int(variable::TypedVariable::new(get_scratch_space, get_mut_scratch_space, 0));
+//! # variable::Variable::Int(variable::TypedVariable::new(get_buffer, get_mut_buffer, 0));
 //! ```
 //!
 //! And the mutable setter:
 //!
 //! ```
 //! # struct S {
-//! #     scratch_space: Vec<i32>
+//! #     buffer: Vec<i32>
 //! # }
 //!
-//! # fn get_scratch_space(state: &S, addr: u32) -> &i32 {
-//! #     &state.scratch_space[addr as usize]
+//! # fn get_buffer(state: &S, addr: u32) -> &i32 {
+//! #     &state.buffer[addr as usize]
 //! # }
-//! fn get_mut_scratch_space(state: &mut S, addr: u32) -> &mut i32 {
-//!     &mut state.scratch_space[addr as usize]
+//! fn get_mut_buffer(state: &mut S, addr: u32) -> &mut i32 {
+//!     &mut state.buffer[addr as usize]
 //! }
 //! # use texlang_core::variable;
-//! # variable::Variable::Int(variable::TypedVariable::new(get_scratch_space, get_mut_scratch_space, 0));
+//! # variable::Variable::Int(variable::TypedVariable::new(get_buffer, get_mut_buffer, 0));
 //! ```
 //!
 //! There are 10 possible [TypedVariable] instances depending on the index referred to.

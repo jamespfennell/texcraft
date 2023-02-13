@@ -59,7 +59,7 @@ impl Macro {
             "matching the prefix for a user-defined macro",
         )?;
         let mut argument_indices: Vec<(usize, usize)> = Default::default();
-        let mut argument_tokens = input.scratch_space();
+        let mut argument_tokens = input.take_token_buffer();
         let unexpanded_stream = input.unexpanded();
         for (i, parameter) in self.parameters.iter().enumerate() {
             let start_index = argument_tokens.len();
@@ -92,7 +92,7 @@ impl Macro {
             reverse_expansion: &result[result.len() - num_tokens..result.len()],
         });
 
-        input.return_scratch_space(argument_tokens);
+        input.return_token_buffer(argument_tokens);
         Ok(())
     }
 
