@@ -22,6 +22,7 @@ pub mod registers;
 #[cfg(feature = "repl")]
 pub mod repl;
 pub mod script;
+pub mod sleep;
 #[cfg(test)]
 pub mod testutil;
 pub mod texcraft;
@@ -81,6 +82,8 @@ impl StdLibState {
             //
             ("or", conditional::get_or()),
             ("outer", prefix::get_outer()),
+            //
+            ("sleep", sleep::get_sleep()),
             //
             ("the", the::get_the()),
             ("time", time::get_time()),
