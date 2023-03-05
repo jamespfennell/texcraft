@@ -10,11 +10,18 @@ pub fn get_catcode<S>() -> command::Command<S> {
 }
 
 fn catcode_fn<S>(
-    _catcode_token: Token,
+    token: Token,
     input: &mut vm::ExpansionInput<S>,
     _: u32,
 ) -> anyhow::Result<Variable<S>> {
     let addr: u32 = parse::parse_number(input)?;
+    if char::from_u32(addr) == None {
+        return Err(error::TokenError::new(
+            token,
+            format!["Argument {addr} passed to {token} is not a valid UTF-8 codepoint"],
+        )
+        .cast());
+    }
     Ok(Variable::CatCode(TypedVariable::new(
         |state: &vm::BaseState<S>, addr: u32| -> &CatCode {
             let addr = char::from_u32(addr).unwrap();
@@ -53,4 +60,5 @@ mod tests {
     expansion_test![catcode_default, r"\the\catcode 48", r"12"];
     expansion_failure_test![catcode_value_too_large, r"\catcode 48 16"];
     expansion_failure_test![catcode_value_is_negative_large, r"\catcode 48 -1"];
+    expansion_failure_test![invalid_utf_8_number, r"\catcode 55296 12"];
 }
