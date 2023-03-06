@@ -56,7 +56,6 @@ use crate::variableops;
 use std::collections::HashSet;
 use texcraft_stdext::collections::groupingmap;
 use texlang_core::prelude::*;
-use texlang_core::variable;
 
 /// Component for the prefix commands.
 pub struct Component {
@@ -204,16 +203,13 @@ fn process_prefixes<S: HasComponent<Component>>(
         }
         Some(&t) => match t.value() {
             Value::ControlSequence(name) => {
-                // First check if it's a variable command. If so, assign to the variable at the global scope.
-                if let Some(command::Fn::Variable(cmd, addr)) =
-                    input.base().commands_map.get_fn(&name)
-                {
-                    let (cmd, addr) = (*cmd, *addr);
+                // First check if it's a variable command. If so, assign to the variable at the local or global scope.
+                if let Some(command::Fn::Variable(cmd)) = input.base().commands_map.get_fn(&name) {
+                    let cmd = cmd.clone();
                     assert_only_global_prefix(t, prefix, input)?;
                     input.consume()?;
-                    let var = command::resolve(cmd, addr, t, input)?;
-                    variable::set_using_input(
-                        var,
+                    cmd.set_value_using_input(
+                        t,
                         input,
                         match prefix.global {
                             None => groupingmap::Scope::Local,
@@ -425,14 +421,14 @@ pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::Comm
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
-
     use super::*;
     use crate::{
         script,
         testutil::{self, *},
         the,
     };
+    use std::collections::HashMap;
+    use texlang_core::variable;
     use texlang_core::vm::implement_has_component;
 
     #[derive(Default)]
@@ -449,7 +445,7 @@ mod test {
             ("global", get_global()),
             ("long", get_long()),
             ("outer", get_outer()),
-            ("i", get_integer().into()),
+            ("i", get_integer()),
             ("the", the::get_the()),
             ("def", def::get_def()),
             ("advance", variableops::get_advance()),
@@ -458,14 +454,13 @@ mod test {
         ])
     }
 
-    fn get_integer() -> command::VariableFn<State> {
-        |_, _, _| -> anyhow::Result<variable::Variable<State>> {
-            Ok(variable::Variable::Int(variable::TypedVariable::new(
-                |state: &State, _: u32| -> &i32 { &state.integer },
-                |state: &mut State, _: u32| -> &mut i32 { &mut state.integer },
-                0,
-            )))
-        }
+    fn get_integer() -> command::Command<State> {
+        variable::Command::new(
+            |state: &State, _: u32| -> &i32 { &state.integer },
+            |state: &mut State, _: u32| -> &mut i32 { &mut state.integer },
+            variable::AddressSpec::NoAddress,
+        )
+        .into()
     }
 
     expansion_test![non_global, r"\i=5{\i=8}\the\i", "5"];

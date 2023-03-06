@@ -4,7 +4,6 @@ use crate::prefix;
 use texlang_core::parse;
 use texlang_core::prelude::*;
 use texlang_core::variable;
-use texlang_core::variable::Variable;
 
 pub const ADVANCE_DOC: &str = "Add an integer to a variable";
 pub const ADVANCECHK_DOC: &str = "Add an integer to a variable and error on overflow";
@@ -51,14 +50,16 @@ macro_rules! create_arithmetic_primitive {
             let scope = input.state_mut().component_mut().read_and_reset_global();
             let variable = parse::parse_variable(input)?;
             parse::parse_optional_by(input)?;
-            let n: i32 = parse::parse_number(input)?;
             match variable {
-                Variable::Int(variable) => {
-                    let result = $arithmetic_op(token, *variable.get(input.state()), n)?;
-                    variable::set_i32(variable, result, input, scope);
+                variable::Variable::Int(variable) => {
+                    let n: i32 = parse::parse_number(input)?;
+                    let i = variable.value_mut(input, scope);
+                    println!["n={}, i={}", n, *i];
+                    *i = $arithmetic_op(token, *i, n)?;
+                    println!["n={}, i={}", n, *i];
                     Ok(())
                 }
-                Variable::CatCode(_) => invalid_variable_error(token),
+                variable::Variable::CatCode(_) => invalid_variable_error(token),
             }
         }
     };
@@ -211,7 +212,11 @@ mod tests {
         advancechk_overflow,
         r"\count 1 2147483647 \advancechk\count 1 by 1"
     ];
-
+    expansion_test![
+        advance_x_by_x,
+        r"\count 1 200 \advance \count 1 by \count 1 a\the\count 1",
+        r"a400"
+    ];
     arithmetic_test![multiply_base_case, r"\multiply", "5", "4", "20"];
     arithmetic_test![multiply_base_case_with_by, r"\multiply", "5", "by 4", "20"];
     arithmetic_test![multiply_pos_neg, r"\multiply", "-5", "4", "-20"];

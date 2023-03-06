@@ -15,6 +15,7 @@ fn the_primitive_fn<S>(
     the_token: Token,
     input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<Token>> {
+    // TODO: double check \the expands the input
     let token = match input.next()? {
         None => {
             return Err(error::EndOfInputError::new("").cast());
@@ -23,22 +24,17 @@ fn the_primitive_fn<S>(
     };
     Ok(match &token.value() {
         ControlSequence(name) => {
-            if let Some(command::Fn::Variable(cmd, addr)) = input.base().commands_map.get_fn(name) {
-                let (cmd, addr) = (*cmd, *addr);
-                let variable = command::resolve(cmd, addr, token, input)?;
-                match variable {
-                    variable::Variable::Int(variable) => {
-                        let value = *variable.get(input.state());
-                        return Ok(int_to_tokens(the_token, value));
-                    }
-                    variable::Variable::CatCode(v) => {
-                        let val = (*v.get(input.base())).int();
-                        return Ok(int_to_tokens(the_token, val.into()));
-                    }
+            if let Some(command::Fn::Variable(cmd)) = input.base().commands_map.get_fn(name) {
+                match cmd.clone().value(the_token, input)? {
+                    variable::ValueRef::Int(i) => int_to_tokens(the_token, *i),
+                    variable::ValueRef::CatCode(i) => int_to_tokens(the_token, i.int().into()),
                 }
+            } else {
+                // TODO: push straight onto the expansions stack?
+                vec![token]
             }
-            vec![token]
         }
+        // TODO: push straight onto the expansions stack?
         _ => vec![token],
     })
 }
@@ -49,6 +45,7 @@ fn int_to_tokens(the_token: Token, mut i: i32) -> Vec<Token> {
     }
     let negative = i < 0;
     // TODO: allocate the capacity precisely?
+    // Even better: can push straight onto the expansions stack?
     let mut tokens = Vec::new();
     while i != 0 {
         let digit = (i % 10).abs();

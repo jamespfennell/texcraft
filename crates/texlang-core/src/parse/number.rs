@@ -1,7 +1,9 @@
-use crate::prelude::*;
+use std::rc;
+
 use crate::token::catcode::CatCode;
 use crate::variable;
 use crate::vm::RefVM;
+use crate::{prelude::*, token};
 use num_traits::PrimInt;
 
 /// Parses a number from the provided stream.
@@ -36,11 +38,9 @@ fn parse_number_internal<S, T: PrimInt>(stream: &mut vm::ExpansionInput<S>) -> a
             Value::Other('`') => parse_character(stream)?,
             ControlSequence(name) => {
                 let cmd = stream.base().commands_map.get_fn(&name);
-                if let Some(command::Fn::Variable(cmd, addr)) = cmd {
-                    let variable = command::resolve(*cmd, *addr, token, stream)?;
-                    read_number_from_address(variable, stream)?
+                if let Some(command::Fn::Variable(cmd)) = cmd {
+                    read_number_from_variable(token, cmd.clone(), stream)?
                 } else {
-                    println!("Command: {cmd:?}");
                     return Err(parse_number_error(Some(token)));
                 }
             }
@@ -116,20 +116,21 @@ fn parse_number_error(token: Option<Token>) -> anyhow::Error {
     }
 }
 
-fn read_number_from_address<S, T: PrimInt>(
-    variable: variable::Variable<S>,
+fn read_number_from_variable<S, T: PrimInt>(
+    token: token::Token,
+    cmd: rc::Rc<variable::Command<S>>,
     stream: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<T> {
-    match variable {
-        variable::Variable::Int(variable) => {
+    match cmd.resolve(token, stream)?.value(stream) {
+        variable::ValueRef::Int(i) => {
             // TODO: this case may not work; e.g., requesting a register index u8 from a register value i32
-            Ok(num_traits::cast::cast(*variable.get(stream.state())).unwrap())
+            Ok(num_traits::cast::cast(*i).unwrap())
         }
-        variable::Variable::CatCode(v) => {
+        variable::ValueRef::CatCode(c) => {
             // This will always work becuase cat codes are between 0 and 15 inclusive and can
             // fit in any integral type.
             // TODO: implement From on catcode directly
-            Ok(num_traits::cast::cast((*v.get(stream.base())).int()).unwrap())
+            Ok(num_traits::cast::cast(c.int()).unwrap())
         }
     }
 }

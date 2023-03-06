@@ -7,6 +7,7 @@
 use std::ops::Index;
 
 /// Non-empty vector type.
+#[derive(Default)]
 pub struct Nevec<T> {
     first: T,
     tail: Vec<T>,

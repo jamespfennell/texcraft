@@ -7,10 +7,9 @@ use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound::Included;
 use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
-use texlang_core::parse;
 use texlang_core::prelude::*;
-use texlang_core::variable::{TypedVariable, Variable};
 use texlang_core::vm::HasComponent;
+use texlang_core::{parse, variable};
 
 pub const NEWINT_DOC: &str = r"Allocate a new integer variable
 
@@ -72,6 +71,7 @@ then the variable is never deallocated.
 ";
 
 /// Component required for the alloc commands.
+#[derive(Default)]
 pub struct Component {
     allocations: Nevec<GroupAllocations>,
 
@@ -91,6 +91,7 @@ pub struct Component {
 }
 
 /// Contains all the allocations for a single group.
+#[derive(Default)]
 struct GroupAllocations {
     // TODO: rather than using a Vec of Vecs it may be more efficient
     // to use a single global Vec and a single non-global Vec.
@@ -109,20 +110,6 @@ struct Array {
 }
 
 impl Component {
-    /// Create a new alloc component.
-    pub fn new() -> Component {
-        Component {
-            allocations: Nevec::new(GroupAllocations {
-                singletons: vec![],
-                arrays: vec![],
-            }),
-            singleton_addr_map: HashMap::new(),
-            next_singleton_addr: 0,
-            array_addr_map: BTreeMap::new(),
-            next_array_addr: 0,
-        }
-    }
-
     fn alloc_int(&mut self) -> u32 {
         let i = (
             self.allocations.len() - 1,
@@ -161,6 +148,7 @@ impl Component {
         (*a, (*b, *c))
     }
 
+    // TODO: why isn't this used?
     pub fn begin_group(&mut self) {
         self.allocations.push(GroupAllocations {
             singletons: vec![],
@@ -168,6 +156,7 @@ impl Component {
         });
     }
 
+    // TODO: why isn't this used?
     pub fn end_group(&mut self) -> bool {
         let allocations = match self.allocations.pop_from_tail() {
             None => return false,
@@ -180,12 +169,6 @@ impl Component {
             self.array_addr_map.remove(&array.addr);
         }
         true
-    }
-}
-
-impl Default for Component {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -202,22 +185,27 @@ fn newint_primitive_fn<S: HasComponent<Component>>(
     let addr = input.state_mut().component_mut().alloc_int();
     input.base_mut().commands_map.insert(
         name,
-        command::Command::new_variable(singleton_fn, addr),
+        variable::Command::new(
+            singleton_ref_fn,
+            singleton_mut_ref_fn,
+            variable::AddressSpec::DynamicVirtual(Box::new(SingletonAddressSpec(addr))),
+        )
+        .into(),
         groupingmap::Scope::Local,
     );
     Ok(())
 }
 
-fn singleton_fn<S: HasComponent<Component>>(
-    _: Token,
-    _: &mut vm::ExpansionInput<S>,
-    addr: u32,
-) -> anyhow::Result<Variable<S>> {
-    Ok(Variable::Int(TypedVariable::new(
-        singleton_ref_fn,
-        singleton_mut_ref_fn,
-        addr,
-    )))
+struct SingletonAddressSpec(u32);
+
+impl<S> variable::DynamicAddressSpec<S> for SingletonAddressSpec {
+    fn resolve(
+        &self,
+        _: texlang_core::token::Token,
+        _: &mut vm::ExpansionInput<S>,
+    ) -> anyhow::Result<u32> {
+        Ok(self.0)
+    }
 }
 
 fn singleton_ref_fn<S: HasComponent<Component>>(state: &S, addr: u32) -> &i32 {
@@ -247,38 +235,43 @@ fn newarray_primitive_fn<S: HasComponent<Component>>(
     let addr = input.state_mut().component_mut().alloc_array(len);
     input.base_mut().commands_map.insert(
         name,
-        command::Command::new_variable(array_fn, addr),
+        variable::Command::new(
+            array_element_ref_fn,
+            array_element_mut_ref_fn,
+            variable::AddressSpec::DynamicVirtual(Box::new(ArrayAddressSpec(addr))),
+        )
+        .into(),
         groupingmap::Scope::Local,
     );
     // TODO: Return the arraydef version
     Ok(())
 }
 
-/// Variable command function for commands defined using \newarray.
-fn array_fn<S: HasComponent<Component>>(
-    array_token: Token,
-    input: &mut vm::ExpansionInput<S>,
-    array_addr: u32,
-) -> anyhow::Result<Variable<S>> {
-    let array_index: u32 = parse::parse_number(input)?;
-    let (allocations_i, inner_i) = input.state().component().array_addr_map[&array_addr];
-    let array_len = input.state().component().allocations[allocations_i].arrays[inner_i]
-        .value
-        .len();
-    if (array_index as usize) >= array_len {
-        return Err(error::TokenError::new(
-            array_token,
+struct ArrayAddressSpec(u32);
+
+impl<S: HasComponent<Component>> variable::DynamicAddressSpec<S> for ArrayAddressSpec {
+    fn resolve(
+        &self,
+        token: texlang_core::token::Token,
+        input: &mut vm::ExpansionInput<S>,
+    ) -> anyhow::Result<u32> {
+        let array_addr = self.0;
+        let array_index: u32 = parse::parse_number(input)?;
+        let (allocations_i, inner_i) = input.state().component().array_addr_map[&array_addr];
+        let array_len = input.state().component().allocations[allocations_i].arrays[inner_i]
+            .value
+            .len();
+        if (array_index as usize) >= array_len {
+            return Err(error::TokenError::new(
+            token,
             format![
                 "Array out of bounds: cannot access index {array_index} of array with length {array_len}"
             ],
         )
         .cast());
+        }
+        Ok(array_addr + array_index)
     }
-    Ok(Variable::Int(TypedVariable::new(
-        array_element_ref_fn,
-        array_element_mut_ref_fn,
-        array_addr + array_index,
-    )))
 }
 
 fn array_element_ref_fn<S: HasComponent<Component>>(state: &S, addr: u32) -> &i32 {

@@ -1,4 +1,4 @@
-//! The Texlang virtual machine (VM).
+//! Texlang virtual machine (VM).
 //!
 //! This module contains the definition of the runtime VM,
 //!     various input streams that wrap the VM
@@ -52,14 +52,11 @@ pub fn run<S>(
                     ControlSequence(name) => {
                         match execution_input.base().commands_map.get_fn(&name) {
                             Some(Fn::Execution(cmd)) => cmd(token, execution_input),
-                            Some(Fn::Variable(cmd, addr)) => {
-                                let var = command::resolve(*cmd, *addr, token, execution_input)?;
-                                variable::set_using_input(
-                                    var,
-                                    execution_input,
-                                    groupingmap::Scope::Local,
-                                )
-                            }
+                            Some(Fn::Variable(cmd)) => cmd.clone().set_value_using_input(
+                                token,
+                                execution_input,
+                                groupingmap::Scope::Local,
+                            ),
                             Some(Fn::Character(token_value)) => character_handler(
                                 Token::new_from_value(*token_value, token.trace_key()),
                                 execution_input,
@@ -263,7 +260,7 @@ struct Internal<S> {
 
     token_buffer: Vec<Token>,
 
-    groups: Vec<variable::RestoreValues<S>>,
+    groups: Vec<variable::internal::RestoreValues<S>>,
     tex_macro_hook: fn(texmacro::HookInput<S>),
 }
 
@@ -366,35 +363,35 @@ impl Default for Source {
 
 /// Helper trait for implementing the component pattern in Texlang.
 ///
-/// With this pattern, a TeX command (like `\time`) can have a single implementation that
-///     is shared by many different programs built with Texlang.
+/// The component pattern is a design pattern used when implementing TeX commands that require some state.
+/// An example of a stateful TeX command is `\year`, which needs to store the current year somewhere.
+/// When the component pattern is used, a stateful TeX command
+///     can have a single implementation that
+///     is used by multiple TeX enginess built with Texlang.
 /// Additionally, a specific TeX engine can compose many different
-///     TeX commands together without worrying about incompatibilities.
-/// In both cases the key is making the state associated with the command private.
-/// The state being private also means Texlang avoids the globally mutable state problem
-///     that is prevalent in the legacy TeX implemenations.
-///
+///     stateful TeX commands together without worrying about conflicts between their state.
+/// The component pattern is Texlang's main solution to the problem of
+///     global mutable state that is pervasive in the original implementations of TeX.
+/// 
 /// In the component pattern, the state
-///     needed by a specific command like `\count` is isolated in a component, which is a concrete
+///     needed by a specific command like `\year` is isolated in a _component_, which is a concrete
 ///     Rust type like a struct.
 /// This Rust type is the generic type `C` in the trait.
-/// The command (e.g. `\count`) is defined in the same Rust module as the component.
-/// The internals of the component are private to the module it is defined in,
-///     meaning this piece of state can only be mutated by the command.
-/// This makes the state highly local and easier to reason about.
+/// The stateful command (e.g. `\year`) is defined in the same Rust module as the component.
+/// The internals of the component are made private to the module it is defined in.
+/// This means the state can only be mutated by the command (or commands) implemented in the module.
 ///
-/// In order to work the command needs to have access to an instance of the component in which
+/// In order to function, the command needs to have access to an instance of the component in which
 ///     the command will maintain its state.
 /// The `HasComponent` trait enforces this.
-/// Any state
-///     that contains the component can implement the trait.
+/// Any VM state type that contains the component can implement the trait.
 /// The Rust code defining the
 ///     command specifies the trait in its trait bounds, and uses the trait to access the component.
 ///
 /// The pattern enables composibility of Texlang code as follows.
-/// Different states can include the same component and thus reuse the same commands.
+/// Different VM states can include the same component and thus reuse the same commands.
 /// Combining multiple commands into one state just involves having the
-///     state include all of the relevant components.
+///     VM state include all of the relevant components.
 ///
 /// Notes:
 ///
@@ -412,12 +409,12 @@ impl Default for Source {
 ///     of the state.
 ///     In this case the [implement_has_component] macro can be used to easily implement the
 ///     trait.
-///     The Texlang standard library exemplifies this approach.
+///     The Texlang standard library uses this approach.
 pub trait HasComponent<C> {
-    // Returns a immutable reference to the component.
+    /// Return a immutable reference to the component.
     fn component(&self) -> &C;
 
-    // Returns a mutable reference to the component.
+    /// Return a mutable reference to the component.
     fn component_mut(&mut self) -> &mut C;
 }
 

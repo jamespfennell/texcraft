@@ -11,16 +11,12 @@ pub struct Component {
 
 /// Get the `\tracingmacros` command.
 pub fn get_tracingmacros<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_variable(
-        |_, _, _| -> anyhow::Result<variable::Variable<S>> {
-            Ok(variable::Variable::Int(variable::TypedVariable::new(
-                |state: &S, _: u32| -> &i32 { &state.component().tracing_macros },
-                |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().tracing_macros },
-                0,
-            )))
-        },
-        0,
+    variable::Command::new(
+        |state: &S, _: u32| -> &i32 { &state.component().tracing_macros },
+        |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().tracing_macros },
+        variable::AddressSpec::NoAddress,
     )
+    .into()
 }
 
 pub fn hook<S: HasComponent<Component>>(input: texmacro::HookInput<S>) {

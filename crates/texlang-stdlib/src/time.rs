@@ -62,58 +62,40 @@ impl Default for Component {
 
 /// Get the `\time` command.
 pub fn get_time<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_variable(
-        |_, _, _| -> anyhow::Result<variable::Variable<S>> {
-            Ok(variable::Variable::Int(variable::TypedVariable::new(
-                |state: &S, _: u32| -> &i32 { &state.component().minutes_since_midnight },
-                |state: &mut S, _: u32| -> &mut i32 {
-                    &mut state.component_mut().minutes_since_midnight
-                },
-                0,
-            )))
-        },
-        0,
+    variable::Command::new(
+        |state: &S, _: u32| -> &i32 { &state.component().minutes_since_midnight },
+        |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().minutes_since_midnight },
+        variable::AddressSpec::NoAddress,
     )
+    .into()
 }
 
 /// Get the `\day` command.
 pub fn get_day<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_variable(
-        |_, _, _| -> anyhow::Result<variable::Variable<S>> {
-            Ok(variable::Variable::Int(variable::TypedVariable::new(
-                |state: &S, _: u32| -> &i32 { &state.component().day },
-                |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().day },
-                0,
-            )))
-        },
-        0,
+    variable::Command::new(
+        |state: &S, _: u32| -> &i32 { &state.component().day },
+        |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().day },
+        variable::AddressSpec::NoAddress,
     )
+    .into()
 }
 
 /// Get the `\month` command.
 pub fn get_month<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_variable(
-        |_, _, _| -> anyhow::Result<variable::Variable<S>> {
-            Ok(variable::Variable::Int(variable::TypedVariable::new(
-                |state: &S, _: u32| -> &i32 { &state.component().month },
-                |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().month },
-                0,
-            )))
-        },
-        0,
+    variable::Command::new(
+        |state: &S, _: u32| -> &i32 { &state.component().month },
+        |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().month },
+        variable::AddressSpec::NoAddress,
     )
+    .into()
 }
 
 /// Get the `\year` command.
 pub fn get_year<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_variable(
-        |_, _, _| -> anyhow::Result<variable::Variable<S>> {
-            Ok(variable::Variable::Int(variable::TypedVariable::new(
-                |state: &S, _: u32| -> &i32 { &state.component().year },
-                |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().year },
-                0,
-            )))
-        },
-        0,
+    variable::Command::new(
+        |state: &S, _: u32| -> &i32 { &state.component().year },
+        |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().year },
+        variable::AddressSpec::NoAddress,
     )
+    .into()
 }

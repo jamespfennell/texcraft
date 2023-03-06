@@ -57,23 +57,6 @@ pub type ExpansionFn<S> =
 /// The Rust type of execution primitive functions.
 pub type ExecutionFn<S> = fn(token: Token, input: &mut vm::ExecutionInput<S>) -> anyhow::Result<()>;
 
-/// The Rust type of variable primitive functions.
-pub type VariableFn<S> = fn(
-    token: Token,
-    input: &mut vm::ExpansionInput<S>,
-    addr: u32,
-) -> anyhow::Result<variable::Variable<S>>;
-
-/// Obtain the variable that the command refers to.
-pub fn resolve<S, I: AsMut<vm::ExpansionInput<S>>>(
-    variable_fn: VariableFn<S>,
-    addr: u32,
-    token: token::Token,
-    input: &mut I,
-) -> anyhow::Result<variable::Variable<S>> {
-    variable_fn(token, input.as_mut(), addr)
-}
-
 /// Function that determines the actual behaviour of a TeX command.
 pub enum Fn<S> {
     /// An expansion command that is implemented in the engine. Examples: `\the`, `\ifnum`.
@@ -88,7 +71,7 @@ pub enum Fn<S> {
 
     /// A command that is used to reference a variable, like a parameter or a register.
     /// Such a command is *resolved* to get the variable using the function pointer it holds.
-    Variable(VariableFn<S>, u32),
+    Variable(rc::Rc<variable::Command<S>>),
 
     /// A command that aliases a character.
     /// Depending on the context in which this command appears it may behave like a
@@ -118,8 +101,8 @@ impl<S> Command<S> {
     }
 
     /// Create a new variable command definition.
-    pub fn new_variable(f: VariableFn<S>, addr: u32) -> Command<S> {
-        Fn::Variable(f, addr).into()
+    pub fn new_variable(cmd: variable::Command<S>) -> Command<S> {
+        Fn::Variable(rc::Rc::new(cmd)).into()
     }
 
     /// Set the ID for this command definition.
@@ -161,7 +144,7 @@ impl<S> Clone for Fn<S> {
             Fn::Expansion(e) => Fn::Expansion::<S>(*e),
             Fn::Macro(m) => Fn::Macro(m.clone()),
             Fn::Execution(e) => Fn::Execution(*e),
-            Fn::Variable(v, a) => Fn::Variable(*v, *a),
+            Fn::Variable(v) => Fn::Variable(v.clone()),
             Fn::Character(tv) => Fn::Character(*tv),
         }
     }
@@ -185,9 +168,9 @@ impl<S> From<ExecutionFn<S>> for Command<S> {
     }
 }
 
-impl<S> From<VariableFn<S>> for Command<S> {
-    fn from(f: VariableFn<S>) -> Self {
-        Fn::Variable(f, 0).into()
+impl<S> From<variable::Command<S>> for Command<S> {
+    fn from(cmd: variable::Command<S>) -> Self {
+        Fn::Variable(rc::Rc::new(cmd)).into()
     }
 }
 
@@ -217,7 +200,7 @@ impl<S> From<Fn<S>> for Command<S> {
 ///     register_built_in(cmd) <- must have a unique ID. Is type ID stable across binary builds? Maybe need to
 ///          use a string ID instead? But then need to feed that the library using this registered
 /// - Should we enforce that the previous two steps can only be done at creation time? Probably
-///   Maybe initialize the map using Map<csname, cmd> and Vec<cmd>. Can provide csname<->str wrapper at
+///   Maybe initialize the map using Map<csname, cmd> and `Vec<cmd>`. Can provide csname<->str wrapper at
 ///   the VM level
 ///
 /// - While running, insert macros

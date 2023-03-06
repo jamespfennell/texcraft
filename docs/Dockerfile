@@ -21,7 +21,7 @@ COPY performance performance
 COPY playground playground
 COPY crates crates
 RUN cargo fetch
-RUN cargo doc --no-deps --lib
+RUN RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --lib
 
 FROM nginx
 

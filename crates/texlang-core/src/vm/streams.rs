@@ -167,9 +167,6 @@ impl<S> TokenStream for UnexpandedStream<S> {
 ///
 /// - Read only access to the VM using the [RefVM] trait.
 ///
-/// - Mutable access to the expansion state if the underlying state has such a state.
-///     This is related to the [HasExpansionState] trait.
-///
 /// - The ability to push source code or token expansions to the front of the input stream.
 ///     For source code use [ExpansionInput::push_source];
 ///     for tokens use [ExpansionInput::push_expansion] or [ExpansionInput::expansions_mut].
@@ -355,13 +352,13 @@ impl<S> ExecutionInput<S> {
         self.0.end_group(token)
     }
 
-    pub fn groups(&mut self) -> &mut [variable::RestoreValues<S>] {
+    pub fn groups(&mut self) -> &mut [variable::internal::RestoreValues<S>] {
         &mut self.0.internal.groups
     }
 
     pub fn current_group_mut(
         &mut self,
-    ) -> Option<(&mut variable::RestoreValues<S>, &BaseState<S>, &S)> {
+    ) -> Option<(&mut variable::internal::RestoreValues<S>, &BaseState<S>, &S)> {
         match self.0.internal.groups.last_mut() {
             None => None,
             Some(g) => Some((g, &self.0.base_state, &self.0.custom_state)),

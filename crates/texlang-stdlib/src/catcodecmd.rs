@@ -1,28 +1,13 @@
 use texlang_core::parse;
 use texlang_core::prelude::*;
-use texlang_core::variable::{TypedVariable, Variable};
+use texlang_core::token;
+use texlang_core::variable;
 
 pub const CATCODE_DOC: &str = "Get or set a catcode register";
 
 /// Get the `\catcode` command.
 pub fn get_catcode<S>() -> command::Command<S> {
-    command::Command::new_variable(catcode_fn, 0)
-}
-
-fn catcode_fn<S>(
-    token: Token,
-    input: &mut vm::ExpansionInput<S>,
-    _: u32,
-) -> anyhow::Result<Variable<S>> {
-    let addr: u32 = parse::parse_number(input)?;
-    if char::from_u32(addr) == None {
-        return Err(error::TokenError::new(
-            token,
-            format!["Argument {addr} passed to {token} is not a valid UTF-8 codepoint"],
-        )
-        .cast());
-    }
-    Ok(Variable::CatCode(TypedVariable::new(
+    variable::Command::new_base(
         |state: &vm::BaseState<S>, addr: u32| -> &CatCode {
             let addr = char::from_u32(addr).unwrap();
             state.cat_code_map.get(&addr)
@@ -31,8 +16,23 @@ fn catcode_fn<S>(
             let addr = char::from_u32(addr).unwrap();
             state.cat_code_map.get_mut(&addr)
         },
-        addr,
-    )))
+        variable::AddressSpec::Dynamic(
+            |token: token::Token, input: &mut vm::ExpansionInput<S>| -> anyhow::Result<u32> {
+                let address: u32 = parse::parse_number(input)?;
+                match char::from_u32(address) {
+                    None => Err(error::TokenError::new(
+                        token,
+                        format![
+                            "Argument {address} passed to {token} is not a valid UTF-8 codepoint"
+                        ],
+                    )
+                    .cast()),
+                    Some(_) => Ok(address),
+                }
+            },
+        ),
+    )
+    .into()
 }
 
 #[cfg(test)]

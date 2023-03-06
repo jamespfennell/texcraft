@@ -3,7 +3,7 @@
 use texcraft_stdext::collections::groupingmap;
 use texlang_core::parse;
 use texlang_core::prelude::*;
-use texlang_core::variable::{TypedVariable, Variable};
+use texlang_core::variable;
 use texlang_core::vm::HasComponent;
 
 pub const COUNT_DOC: &str = "Get or set an integer register";
@@ -63,27 +63,27 @@ impl<const N: usize> Default for Component<N> {
 
 /// Get the `\count` command.
 pub fn get_count<S: HasComponent<Component<N>>, const N: usize>() -> command::Command<S> {
-    command::Command::new_variable(count_fn, 0)
+    variable::Command::new(
+        int_register_ref_fn,
+        int_register_mut_ref_fn,
+        variable::AddressSpec::Dynamic(count_fn),
+    )
+    .into()
 }
 
 fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
     count_token: Token,
     input: &mut vm::ExpansionInput<S>,
-    _: u32,
-) -> anyhow::Result<Variable<S>> {
-    let addr: u32 = parse::parse_number(input)?;
-    if (addr as usize) >= N {
+) -> anyhow::Result<u32> {
+    let address: u32 = parse::parse_number(input)?;
+    if (address as usize) >= N {
         return Err(integer_register_too_large_error(
             count_token,
-            addr,
+            address,
             input.state().component().int_registers.num(),
         ));
     }
-    Ok(Variable::Int(TypedVariable::new(
-        int_register_ref_fn,
-        int_register_mut_ref_fn,
-        addr,
-    )))
+    Ok(address)
 }
 
 /// Get the `\countdef` command.
@@ -105,25 +105,17 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
             input.state().component().int_registers.num(),
         ));
     }
-    let new_cmd = command::Command::new_variable(singleton_fn, addr);
+    let new_cmd = variable::Command::new(
+        int_register_ref_fn,
+        int_register_mut_ref_fn,
+        variable::AddressSpec::StaticAddress(addr),
+    );
     // TODO: I suspect \countdef should honor \global, but haven't checked pdfTeX.
     input
         .base_mut()
         .commands_map
-        .insert(cs_name, new_cmd, groupingmap::Scope::Local);
+        .insert(cs_name, new_cmd.into(), groupingmap::Scope::Local);
     Ok(())
-}
-
-fn singleton_fn<S: HasComponent<Component<N>>, const N: usize>(
-    _: Token,
-    _: &mut vm::ExpansionInput<S>,
-    addr: u32,
-) -> anyhow::Result<Variable<S>> {
-    Ok(Variable::Int(TypedVariable::new(
-        int_register_ref_fn,
-        int_register_mut_ref_fn,
-        addr,
-    )))
 }
 
 fn int_register_ref_fn<S: HasComponent<Component<N>>, const N: usize>(
