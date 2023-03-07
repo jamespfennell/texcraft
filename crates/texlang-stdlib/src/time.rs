@@ -63,8 +63,10 @@ impl Default for Component {
 /// Get the `\time` command.
 pub fn get_time<S: HasComponent<Component>>() -> command::Command<S> {
     variable::Command::new(
-        |state: &S, _: u32| -> &i32 { &state.component().minutes_since_midnight },
-        |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().minutes_since_midnight },
+        |state: &S, _: variable::Address| -> &i32 { &state.component().minutes_since_midnight },
+        |state: &mut S, _: variable::Address| -> &mut i32 {
+            &mut state.component_mut().minutes_since_midnight
+        },
         variable::AddressSpec::NoAddress,
     )
     .into()
@@ -73,8 +75,8 @@ pub fn get_time<S: HasComponent<Component>>() -> command::Command<S> {
 /// Get the `\day` command.
 pub fn get_day<S: HasComponent<Component>>() -> command::Command<S> {
     variable::Command::new(
-        |state: &S, _: u32| -> &i32 { &state.component().day },
-        |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().day },
+        |state: &S, _: variable::Address| -> &i32 { &state.component().day },
+        |state: &mut S, _: variable::Address| -> &mut i32 { &mut state.component_mut().day },
         variable::AddressSpec::NoAddress,
     )
     .into()
@@ -83,8 +85,8 @@ pub fn get_day<S: HasComponent<Component>>() -> command::Command<S> {
 /// Get the `\month` command.
 pub fn get_month<S: HasComponent<Component>>() -> command::Command<S> {
     variable::Command::new(
-        |state: &S, _: u32| -> &i32 { &state.component().month },
-        |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().month },
+        |state: &S, _: variable::Address| -> &i32 { &state.component().month },
+        |state: &mut S, _: variable::Address| -> &mut i32 { &mut state.component_mut().month },
         variable::AddressSpec::NoAddress,
     )
     .into()
@@ -93,8 +95,8 @@ pub fn get_month<S: HasComponent<Component>>() -> command::Command<S> {
 /// Get the `\year` command.
 pub fn get_year<S: HasComponent<Component>>() -> command::Command<S> {
     variable::Command::new(
-        |state: &S, _: u32| -> &i32 { &state.component().year },
-        |state: &mut S, _: u32| -> &mut i32 { &mut state.component_mut().year },
+        |state: &S, _: variable::Address| -> &i32 { &state.component().year },
+        |state: &mut S, _: variable::Address| -> &mut i32 { &mut state.component_mut().year },
         variable::AddressSpec::NoAddress,
     )
     .into()

@@ -76,8 +76,8 @@ pub struct Component {
     allocations: Nevec<GroupAllocations>,
 
     // Map from addr to (group allocations index, allocations.singletons index)
-    singleton_addr_map: HashMap<u32, (usize, usize)>,
-    next_singleton_addr: u32,
+    singleton_addr_map: HashMap<variable::Address, (usize, usize)>,
+    next_singleton_addr: variable::Address,
 
     // Map from addr to (group allocations index, gallocations.singletons index)
     //
@@ -86,8 +86,8 @@ pub struct Component {
     // addr + i then references the ith element of the array, for
     // appropriate i. We use a BTreeMap to make it fast to obtain the
     // indices from addr + i for any i.
-    array_addr_map: BTreeMap<u32, (usize, usize)>,
-    next_array_addr: u32,
+    array_addr_map: BTreeMap<variable::Address, (usize, usize)>,
+    next_array_addr: variable::Address,
 }
 
 /// Contains all the allocations for a single group.
@@ -100,17 +100,17 @@ struct GroupAllocations {
 }
 
 struct Singleton {
-    addr: u32,
+    addr: variable::Address,
     value: i32,
 }
 
 struct Array {
-    addr: u32,
+    addr: variable::Address,
     value: Vec<i32>,
 }
 
 impl Component {
-    fn alloc_int(&mut self) -> u32 {
+    fn alloc_int(&mut self) -> variable::Address {
         let i = (
             self.allocations.len() - 1,
             self.allocations.last().singletons.len(),
@@ -120,28 +120,28 @@ impl Component {
             value: 0,
         });
         self.singleton_addr_map.insert(self.next_singleton_addr, i);
-        self.next_singleton_addr += 1;
-        self.next_singleton_addr - 1
+        self.next_singleton_addr.0 += 1;
+        variable::Address(self.next_singleton_addr.0 - 1)
     }
 
-    fn alloc_array(&mut self, len: u32) -> u32 {
+    fn alloc_array(&mut self, len: usize) -> variable::Address {
         let i = (
             self.allocations.len() - 1,
             self.allocations.last().arrays.len(),
         );
         self.allocations.last_mut().arrays.push(Array {
             addr: self.next_array_addr,
-            value: vec![0; len as usize],
+            value: vec![0; len],
         });
         self.array_addr_map.insert(self.next_array_addr, i);
-        self.next_array_addr += len;
-        self.next_array_addr - len
+        self.next_array_addr.0 += len;
+        variable::Address(self.next_array_addr.0 - len)
     }
 
-    fn find_array(&self, elem_addr: u32) -> (u32, (usize, usize)) {
+    fn find_array(&self, elem_addr: variable::Address) -> (variable::Address, (usize, usize)) {
         let (a, (b, c)) = self
             .array_addr_map
-            .range((Included(&0), Included(&elem_addr)))
+            .range((Included(&variable::Address(0)), Included(&elem_addr)))
             .rev()
             .next()
             .unwrap();
@@ -196,25 +196,28 @@ fn newint_primitive_fn<S: HasComponent<Component>>(
     Ok(())
 }
 
-struct SingletonAddressSpec(u32);
+struct SingletonAddressSpec(variable::Address);
 
 impl<S> variable::DynamicAddressSpec<S> for SingletonAddressSpec {
     fn resolve(
         &self,
         _: texlang_core::token::Token,
         _: &mut vm::ExpansionInput<S>,
-    ) -> anyhow::Result<u32> {
+    ) -> anyhow::Result<variable::Address> {
         Ok(self.0)
     }
 }
 
-fn singleton_ref_fn<S: HasComponent<Component>>(state: &S, addr: u32) -> &i32 {
+fn singleton_ref_fn<S: HasComponent<Component>>(state: &S, addr: variable::Address) -> &i32 {
     let a = state.component();
     let (allocations_i, inner_i) = a.singleton_addr_map[&addr];
     &a.allocations.get(allocations_i).unwrap().singletons[inner_i].value
 }
 
-fn singleton_mut_ref_fn<S: HasComponent<Component>>(state: &mut S, addr: u32) -> &mut i32 {
+fn singleton_mut_ref_fn<S: HasComponent<Component>>(
+    state: &mut S,
+    addr: variable::Address,
+) -> &mut i32 {
     let a = state.component_mut();
     let (allocations_i, inner_i) = a.singleton_addr_map[&addr];
     &mut a.allocations.get_mut(allocations_i).unwrap().singletons[inner_i].value
@@ -231,7 +234,7 @@ fn newarray_primitive_fn<S: HasComponent<Component>>(
 ) -> anyhow::Result<()> {
     let name =
         parse::parse_command_target("newarray allocation", newarray_token, input.unexpanded())?;
-    let len: u32 = parse::parse_number(input)?;
+    let len: usize = parse::parse_number(input)?;
     let addr = input.state_mut().component_mut().alloc_array(len);
     input.base_mut().commands_map.insert(
         name,
@@ -247,16 +250,16 @@ fn newarray_primitive_fn<S: HasComponent<Component>>(
     Ok(())
 }
 
-struct ArrayAddressSpec(u32);
+struct ArrayAddressSpec(variable::Address);
 
 impl<S: HasComponent<Component>> variable::DynamicAddressSpec<S> for ArrayAddressSpec {
     fn resolve(
         &self,
         token: texlang_core::token::Token,
         input: &mut vm::ExpansionInput<S>,
-    ) -> anyhow::Result<u32> {
+    ) -> anyhow::Result<variable::Address> {
         let array_addr = self.0;
-        let array_index: u32 = parse::parse_number(input)?;
+        let array_index: usize = parse::parse_number(input)?;
         let (allocations_i, inner_i) = input.state().component().array_addr_map[&array_addr];
         let array_len = input.state().component().allocations[allocations_i].arrays[inner_i]
             .value
@@ -270,16 +273,20 @@ impl<S: HasComponent<Component>> variable::DynamicAddressSpec<S> for ArrayAddres
         )
         .cast());
         }
-        Ok(array_addr + array_index)
+        Ok(variable::Address(array_addr.0 + array_index))
     }
 }
 
-fn array_element_ref_fn<S: HasComponent<Component>>(state: &S, addr: u32) -> &i32 {
+fn array_element_ref_fn<S: HasComponent<Component>>(state: &S, addr: variable::Address) -> &i32 {
     let (addr_0, (allocations_i, inner_i)) = state.component().find_array(addr);
-    &state.component().allocations[allocations_i].arrays[inner_i].value[(addr - addr_0) as usize]
+    &state.component().allocations[allocations_i].arrays[inner_i].value
+        [(addr.0 - addr_0.0) as usize]
 }
 
-fn array_element_mut_ref_fn<S: HasComponent<Component>>(state: &mut S, addr: u32) -> &mut i32 {
+fn array_element_mut_ref_fn<S: HasComponent<Component>>(
+    state: &mut S,
+    addr: variable::Address,
+) -> &mut i32 {
     let (addr_0, (allocations_i, inner_i)) = state.component().find_array(addr);
     &mut state
         .component_mut()
@@ -287,7 +294,7 @@ fn array_element_mut_ref_fn<S: HasComponent<Component>>(state: &mut S, addr: u32
         .get_mut(allocations_i)
         .unwrap()
         .arrays[inner_i]
-        .value[(addr - addr_0) as usize]
+        .value[addr.0 - addr_0.0]
 }
 
 #[cfg(test)]

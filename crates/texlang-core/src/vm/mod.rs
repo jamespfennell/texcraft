@@ -372,7 +372,7 @@ impl Default for Source {
 ///     stateful TeX commands together without worrying about conflicts between their state.
 /// The component pattern is Texlang's main solution to the problem of
 ///     global mutable state that is pervasive in the original implementations of TeX.
-/// 
+///
 /// In the component pattern, the state
 ///     needed by a specific command like `\year` is isolated in a _component_, which is a concrete
 ///     Rust type like a struct.

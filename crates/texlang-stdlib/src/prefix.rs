@@ -456,8 +456,8 @@ mod test {
 
     fn get_integer() -> command::Command<State> {
         variable::Command::new(
-            |state: &State, _: u32| -> &i32 { &state.integer },
-            |state: &mut State, _: u32| -> &mut i32 { &mut state.integer },
+            |state: &State, _: variable::Address| -> &i32 { &state.integer },
+            |state: &mut State, _: variable::Address| -> &mut i32 { &mut state.integer },
             variable::AddressSpec::NoAddress,
         )
         .into()

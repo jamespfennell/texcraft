@@ -11,33 +11,21 @@ pub const COUNTDEF_DOC: &str = "Bind an integer register to a control sequence";
 
 struct Registers<T: Copy + Default, const N: usize> {
     values: [T; N],
-    fallback: T,
 }
 
 impl<T: Copy + Default, const N: usize> Registers<T, N> {
     fn new() -> Registers<T, N> {
         Registers {
             values: [Default::default(); N],
-            fallback: Default::default(),
         }
     }
 
-    fn read(&self, addr: u32) -> &T {
-        match self.values.get(addr as usize) {
-            None => &self.fallback,
-            Some(value) => value,
-        }
+    fn read(&self, addr: usize) -> &T {
+        self.values.get(addr).unwrap()
     }
 
-    fn write(&mut self, addr: u32) -> &mut T {
-        match self.values.get_mut(addr as usize) {
-            None => &mut self.fallback,
-            Some(r) => r,
-        }
-    }
-
-    fn num(&self) -> usize {
-        self.values.len()
+    fn write(&mut self, addr: usize) -> &mut T {
+        self.values.get_mut(addr).unwrap()
     }
 }
 
@@ -74,16 +62,12 @@ pub fn get_count<S: HasComponent<Component<N>>, const N: usize>() -> command::Co
 fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
     count_token: Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<u32> {
-    let address: u32 = parse::parse_number(input)?;
+) -> anyhow::Result<variable::Address> {
+    let address: usize = parse::parse_number(input)?;
     if (address as usize) >= N {
-        return Err(integer_register_too_large_error(
-            count_token,
-            address,
-            input.state().component().int_registers.num(),
-        ));
+        return Err(integer_register_too_large_error(count_token, address, N));
     }
-    Ok(address)
+    Ok(address.into())
 }
 
 /// Get the `\countdef` command.
@@ -97,18 +81,14 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
 ) -> anyhow::Result<()> {
     let cs_name = parse::parse_command_target("countdef", countdef_token, input.unexpanded())?;
     parse::parse_optional_equals(input)?;
-    let addr: u32 = parse::parse_number(input)?;
-    if (addr as usize) >= input.state().component().int_registers.num() {
-        return Err(integer_register_too_large_error(
-            countdef_token,
-            addr,
-            input.state().component().int_registers.num(),
-        ));
+    let addr: usize = parse::parse_number(input)?;
+    if (addr as usize) >= N {
+        return Err(integer_register_too_large_error(countdef_token, addr, N));
     }
     let new_cmd = variable::Command::new(
         int_register_ref_fn,
         int_register_mut_ref_fn,
-        variable::AddressSpec::StaticAddress(addr),
+        variable::AddressSpec::StaticAddress(addr.into()),
     );
     // TODO: I suspect \countdef should honor \global, but haven't checked pdfTeX.
     input
@@ -120,19 +100,19 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
 
 fn int_register_ref_fn<S: HasComponent<Component<N>>, const N: usize>(
     state: &S,
-    addr: u32,
+    addr: variable::Address,
 ) -> &i32 {
-    state.component().int_registers.read(addr)
+    state.component().int_registers.read(addr.0)
 }
 
 fn int_register_mut_ref_fn<S: HasComponent<Component<N>>, const N: usize>(
     state: &mut S,
-    addr: u32,
+    addr: variable::Address,
 ) -> &mut i32 {
-    state.component_mut().int_registers.write(addr)
+    state.component_mut().int_registers.write(addr.0)
 }
 
-fn integer_register_too_large_error(token: Token, addr: u32, num: usize) -> anyhow::Error {
+fn integer_register_too_large_error(token: Token, addr: usize, num: usize) -> anyhow::Error {
     error::TokenError::new(
         token,
         format![

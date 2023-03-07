@@ -6,29 +6,29 @@
 //! There are a few possible types, which are [listed below](#tex-variable-types).
 //! Texlang currently supports only a subset of these types,
 //!     but has been designed so that it will be easy to support the other types in the near future.
-//! 
+//!
 //! This documentatation is targetted at users of Texlang
 //!     who want to add a new variable to their TeX engine,
 //!     or consume variables already defined.
-//! 
+//!
 //! ## Historical note on variables in the TeXBook
-//! 
+//!
 //! This section is not needed to understand how to use Texlang's variables API
 //!     and can be freely skipped.
-//! 
-//! The TeXBook talks a lot about the different variables that are available in 
+//!
+//! The TeXBook talks a lot about the different variables that are available in
 //!     the original TeX engine, like `\linepenalty` and `\count`.
-//! The impression one sometimes gets from the TeXBook is that 
+//! The impression one sometimes gets from the TeXBook is that
 //!     these variables are highly heterogeneous in term of how they interact with the wider language.
 //! For example, on page 271 when describing the grammar of the TeX language,
 //!     we find the following rule:
-//! 
+//!
 //! ```text
 //! <internal integer> -> <integer parameter> | <special integer> | \lastpenalty
 //!     <countdef token> | \count<8-bit number>
 //!     ...
 //! ```
-//! 
+//!
 //! This makes it seems that an "integer parameter"
 //! behaves differently to a "special integer", or to a register accessed via `\count`,
 //!     even though all of these variables have the same concrete type (a 32 bit integer).
@@ -39,31 +39,31 @@
 //!     both for
 //!     people who are adding variables to their TeX engines and for
 //!     code that needs to consume these variables.
-//! 
-//! 
+//!
+//!
 //! ## The design of the Texlang variables API
-//! 
+//!
 //! The TeXBook does make one distinction among variables which is
 //!     important and actually reflective of the TeX grammar.
 //! This is the distinction between singleton variables (like `\linepenalty`)
 //!     and array variables (like `\count N`, where N is in the index in the array).
 //! In the Texlang variables API, both of these cases are handled uniformly.
 //! This is done by employing an indirection.
-//! 
+//!
 //! In Texlang, the control sequences `\linepenalty` and  `\count` are not considered variables themselves.
 //! Instead they are _variable commands_.
 //! A variable command is _resolved_ to obtain a variable.
 //! A variable is an object that ultimately points to a specific piece of memory like an `i32` in the state.
-//! 
+//!
 //! The resolution process of going from a command to a variable is sometimes basically a no-op.
 //! For `\linepenalty` nothing needs to be resolved: as soon as the interpreter sees the control sequence,
 //!     it can identify the piece of memory where the `i32` line penalty is stored.
 //! On the other hand, sometimes some work is needed to go from the command to the variable.
-//! In the case of `\count`, the interpreter needs to read the array index from the input stream. 
-//! 
-//! We will first implement a singleton variable like `\linepenalty` before moving onto 
+//! In the case of `\count`, the interpreter needs to read the array index from the input stream.
+//!
+//! We will first implement a singleton variable like `\linepenalty` before moving onto
 //!     the case of array variables like `\count`.
-//! 
+//!
 //! ## Implementing a singleton variable
 //!
 //! Variables require some state in which to store the associated value.
@@ -76,44 +76,45 @@
 //!     my_variable_value: i32
 //! }
 //! ```
-//! 
+//!
 //! To make a Texlang variable out of this `i32` we need to provde an immutable getter
 //! and a mutable getter.
 //! These getters have the signature [RefFn] and [MutRefFn] respectively.
 //! Both getters accept a reference to the state and an address, and return a reference to the variable.
 //! Don't worry about the address argument for the moment: for singleton variables, it is ignored.
-//! 
+//!
 //! For the value above, our getters look like this:
-//! 
+//!
 //! ```
 //! # pub struct MyComponent {
 //! #     my_variable_value: i32
 //! # }
 //! use texlang_core::vm::HasComponent;
-//! 
-//! fn getter<S: HasComponent<MyComponent>>(state: &S, address: u32) -> &i32 {
+//! use texlang_core::variable;
+//!
+//! fn getter<S: HasComponent<MyComponent>>(state: &S, address: variable::Address) -> &i32 {
 //!     &state.component().my_variable_value
 //! }
-//! fn mut_getter<S: HasComponent<MyComponent>>(state: &mut S, address: u32) -> &mut i32 {
+//! fn mut_getter<S: HasComponent<MyComponent>>(state: &mut S, address: variable::Address) -> &mut i32 {
 //!     &mut state.component_mut().my_variable_value
 //! }
 //! ```
 //! Once we have the getters, we can create the TeX command:
-//! 
+//!
 //! ```
 //! # pub struct MyComponent {
 //! #     my_variable_value: i32
 //! # }
 //! # use texlang_core::vm::HasComponent;
-//! # fn getter<S: HasComponent<MyComponent>>(state: &S, address: u32) -> &i32 {
+//! # fn getter<S: HasComponent<MyComponent>>(state: &S, address: variable::Address) -> &i32 {
 //! #    &state.component().my_variable_value
 //! # }
-//! # fn mut_getter<S: HasComponent<MyComponent>>(state: &mut S, address: u32) -> &mut i32 {
+//! # fn mut_getter<S: HasComponent<MyComponent>>(state: &mut S, address: variable::Address) -> &mut i32 {
 //! #    &mut state.component_mut().my_variable_value
 //! # }
 //! use texlang_core::variable;
 //! use texlang_core::command;
-//! 
+//!
 //! pub fn my_variable<S: HasComponent<MyComponent>>() -> command::Command<S> {
 //!     return variable::Command::new(
 //!         getter,
@@ -122,48 +123,48 @@
 //!     ).into()
 //! }
 //! ```
-//! 
+//!
 //! The function [Command::new] creates a new variable command.
 //! The last argument is an [address spec](AddressSpec) which we discuss below,
 //!     but which is always [AddressSpec::NoAddress] for singleton variables.
 //! We cast the variable command into a generic command using the `into` method.
 //! This command can now be included in the VM's command map and the value can be accessed in TeX scripts!
-//! 
+//!
 //! As usual with the component pattern, the code we write works for _any_ TeX engine
 //! whose state contains our compenent.
-//! 
+//!
 //! Finally, as a matter of style, we recommend implementing the getters inline as closures.
 //! This makes the code a little more compact and readable.
 //! With this style, the full code listing is as follows:
-//! 
+//!
 //! ```
 //! use texlang_core::vm::HasComponent;
 //! use texlang_core::variable;
 //! use texlang_core::command;
-//! 
+//!
 //! pub struct MyComponent {
 //!     my_variable_value: i32
 //! }
-//! 
+//!
 //! pub fn my_variable<S: HasComponent<MyComponent>>() -> command::Command<S> {
 //!     return variable::Command::new(
-//!         |state: &S, address: u32| -> &i32 {
+//!         |state: &S, address: variable::Address| -> &i32 {
 //!             &state.component().my_variable_value
 //!         },
-//!         |state: &mut S, address: u32| -> &mut i32 {
+//!         |state: &mut S, address: variable::Address| -> &mut i32 {
 //!             &mut state.component_mut().my_variable_value
 //!         },
 //!         variable::AddressSpec::NoAddress,
 //!     ).into()
 //! }
 //! ```
-//! 
-//! 
+//!
+//!
 //! ## Implementing an array variable
-//! 
+//!
 //! The main difference in the variables API between singleton and array variables is that we
 //!     need to use the various address arguments that were ignored above.
-//! 
+//!
 //! In this section we will implement an array variable with 10 entries.
 //! In the component, we replace the `i32` with an array of `i32`s:
 //! ```
@@ -171,57 +172,58 @@
 //!     my_array_values: [i32; 10]
 //! }
 //! ```
-//! 
+//!
 //! The getter functions use the provided address argument to determine the index to use for the array:
 //! ```
 //! # pub struct MyComponent {
 //! #     my_array_values: [i32; 10]
 //! # }
 //! # use texlang_core::vm::HasComponent;
-//! fn getter<S: HasComponent<MyComponent>>(state: &S, address: u32) -> &i32 {
-//!     &state.component().my_array_values[address as usize]
+//! # use texlang_core::variable;
+//! fn getter<S: HasComponent<MyComponent>>(state: &S, address: variable::Address) -> &i32 {
+//!     &state.component().my_array_values[address.0 as usize]
 //! }
 //! ```
-//! 
+//!
 //! The above listing raises an important question: what if the array access is out of bounds?
 //! The Rust code here will panic, and in Texlang this is the correct behaviour.
 //! Texlang always assumes that variable getters are infallible.
 //! This is the same as assuming that an instantiated [Variable] type points to a valid piece of memory
 //! and is not (say) dangling.
-//! 
+//!
 //! Next, we construct the command.
 //! Unlike the singleton command, this command will need to figure out the address of the variable.
 //! As with `\count`, our command will do this by reading the index from the input token stream.
 //! In the variables API, we implement this by providing the following type of function:
-//! 
+//!
 //! ```
-//! use texlang_core::{parse, token, vm};
+//! use texlang_core::{parse, token, variable, vm};
 //! use anyhow;
-//! 
-//! fn address<S>(token: token::Token, input: &mut vm::ExpansionInput<S>) -> anyhow::Result<u32> {
-//!     let address: u32 = parse::parse_number(input)?;
+//!
+//! fn address<S>(token: token::Token, input: &mut vm::ExpansionInput<S>) -> anyhow::Result<variable::Address> {
+//!     let address: usize = parse::parse_number(input)?;
 //!     if address >= 10 {
 //!         // for simplicity we panic, but in real code we should return an error
 //!         panic!["out of bounds"]
 //!     }
-//!     return Ok(address)
+//!     return Ok(address.into())
 //! }
 //! ```
-//! 
+//!
 //! Finally we create the command.
 //! This is the same as the singleton case, except we pass the address function above as an address spec
 //! with the `Dynamic` variant:
-//! 
+//!
 //! ```
 //! # use texlang_core::{command, parse, token, variable, vm};
 //! # use anyhow;
-//! # fn getter<S: HasComponent<MyComponent>>(state: &S, address: u32) -> &i32 {
+//! # fn getter<S: HasComponent<MyComponent>>(state: &S, address: variable::Address) -> &i32 {
 //! #   panic![""]
 //! # }
-//! # fn mut_getter<S: HasComponent<MyComponent>>(state: &mut S, address: u32) -> &mut i32 {
+//! # fn mut_getter<S: HasComponent<MyComponent>>(state: &mut S, address: variable::Address) -> &mut i32 {
 //! #   panic![""]
 //! # }
-//! # fn address<S>(token: token::Token, input: &mut vm::ExpansionInput<S>) -> anyhow::Result<u32> {
+//! # fn address<S>(token: token::Token, input: &mut vm::ExpansionInput<S>) -> anyhow::Result<variable::Address> {
 //! #   panic![""]
 //! # }
 //! # pub struct MyComponent {
@@ -236,32 +238,32 @@
 //!     ).into()
 //! }
 //! ```
-//! 
+//!
 //! ## Implementing a `\countdef` type command
-//! 
+//!
 //! In Knuth's TeX, the `\countdef` command is an execution command with the following semantics.
 //! After executing the TeX code `\countdef \A 1`,
 //!     the control sequence `\A` will be a variable command pointing to the same
 //!     memory as `\count 1`.
 //! One way of thinking about it is that `\A` aliases `\count 1`.
-//! 
+//!
 //! Using the Texlang variables API it is possible to implement the analagous command
 //! for the `\myarray` command implemented above.
 //! The implementation is in 3 steps:
-//! 
+//!
 //! 1. The target (e.g. `\A`) is read using [crate::parse::parse_command_target].
-//! 
+//!
 //! 1. The address (e.g. `1`) is read using [crate::parse::parse_number], just like in the previous section.
-//! 
+//!
 //! 1. A new variable command is then created and added to the commands map.
 //!     This command is created using [Command::new] just as above, except in the address
 //!     spec we use the [AddressSpec::StaticAddress] variant with the address calculated in part 2.
-//! 
+//!
 //! For a full example where this is all worked out, consult the implementation of `\countdef`
 //! in the Texlang standard library.
-//! 
+//!
 //! ## Consuming TeX variables
-//! 
+//!
 //! ## TeX variable types
 //!
 //! | Type      | Rust type      | Register accessor command | Texcraft status
@@ -292,7 +294,7 @@ use vm::RefVM;
 /// This type alias just defines the signature of immutable getters.
 /// The first argument is the state, and the second argument is the address of the variable.
 /// Note that for many variables the address argument is ignored.
-pub type RefFn<S, T> = fn(state: &S, address: u32) -> &T;
+pub type RefFn<S, T> = fn(state: &S, address: Address) -> &T;
 
 /// Function signature for a variable's mutable getters.
 ///
@@ -300,23 +302,33 @@ pub type RefFn<S, T> = fn(state: &S, address: u32) -> &T;
 /// This type alias just defines the signature of mutable getters.
 /// The first argument is the state, and the second argument is the address of the variable.
 /// Note that for many variables the address argument is ignored.
-pub type MutRefFn<S, T> = fn(state: &mut S, address: u32) -> &mut T;
+pub type MutRefFn<S, T> = fn(state: &mut S, address: Address) -> &mut T;
+
+/// Address of a variable.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct Address(pub usize);
+
+impl From<usize> for Address {
+    fn from(value: usize) -> Self {
+        Address(value)
+    }
+}
 
 /// Specification for how the address of a variable is determined.
 ///
-/// Obtaining a variable from a command involves determing the variable's `u32` address.
+/// Obtaining a variable from a command involves determing the variable's [Address].
 /// This address is ultimately passed into the variable's getters to get a reference or mutable reference
 /// to the underlying Rust value.
 pub enum AddressSpec<S> {
-    /// No address. This currently resolves to `0_u32`.
+    /// No address. This currently resolves to 0,
     NoAddress,
     /// A specific static address, provided in the enum variant.
-    StaticAddress(u32),
+    StaticAddress(Address),
     /// A dynamic address that is determined by reading the input token stream.
     ///
     /// For example, in `\count 4` the address of `4` is determined by parsing a number
     /// from the input token stream.
-    Dynamic(fn(token::Token, &mut vm::ExpansionInput<S>) -> anyhow::Result<u32>),
+    Dynamic(fn(token::Token, &mut vm::ExpansionInput<S>) -> anyhow::Result<Address>),
     /// A dynamic address, but determined using virtual method dispatch.
     ///
     /// This method is more flexible than the Dynamic variant, but less performant.
@@ -330,7 +342,7 @@ pub trait DynamicAddressSpec<S> {
         &self,
         token: token::Token,
         input: &mut vm::ExpansionInput<S>,
-    ) -> anyhow::Result<u32>;
+    ) -> anyhow::Result<Address>;
 }
 
 impl<S> AddressSpec<S> {
@@ -339,9 +351,9 @@ impl<S> AddressSpec<S> {
         &self,
         token: token::Token,
         input: &mut vm::ExpansionInput<S>,
-    ) -> anyhow::Result<u32> {
+    ) -> anyhow::Result<Address> {
         match self {
-            AddressSpec::NoAddress => Ok(0),
+            AddressSpec::NoAddress => Ok(Address(0)),
             AddressSpec::StaticAddress(addr) => Ok(*addr),
             AddressSpec::Dynamic(f) => f(token, input),
             AddressSpec::DynamicVirtual(v) => v.resolve(token, input),
@@ -350,20 +362,20 @@ impl<S> AddressSpec<S> {
 }
 
 /// A TeX command that is resolved to obtain a [Variable].
-/// 
+///
 /// A command consists of three parts.
-/// 
+///
 /// The first two parts are an immutable getter (of type [RefFn])
 /// and a mutable getter (of type [MutRefFn]).
 /// Both of these getters accept a reference to the state (where the variable's value lives)
-/// and an `u32` address.
+/// and an [Address].
 /// The address can be used by the getters to return different values in memory.
 /// For example, if the getters read from an array, the address may be just the index in the array.
 /// This mechanism allows users of Texlang to write one pair of getters that can be used in many variables.
-/// 
+///
 /// The third part of a command is an [AddressSpec] that is used to determine the aforementioned address
 /// of a variable at runtime.
-/// The process of resolving a command involves determining the `u32` address and returning a [Variable] type,
+/// The process of resolving a command involves determining the [Address] and returning a [Variable] type,
 /// which under the hood is just the two getters and this address.
 pub struct Command<S> {
     getter: Getter<S>,
@@ -437,13 +449,13 @@ pub enum ValueRef<'a> {
 ///
 /// A variable uniquely identifies a Rust value in the state, like an `i32`.
 /// Operations on this value (like reading or setting the value) can be done in two ways:
-/// 
+///
 /// 1. (Easy, less flexible) Use the methods directly on this type like [Variable::value]
 ///     or [Variable::set_value_using_input] to read or set the value.
 ///     These methods are really ergonomic.
 ///     The problem with the value method specifically is that the result
 ///     is a reference which keeps the borrow of the state alive.
-///     Thus, while holding onto the result of the value, you can't do anything this the 
+///     Thus, while holding onto the result of the value, you can't do anything this the
 ///     input stream like reading an argument.
 ///     This is especially a problem when you need to perform a different action depending on the conrete type of the variable.
 ///     
@@ -497,7 +509,7 @@ enum Getter<S> {
 }
 
 /// A TeX variable of a specific Rust type `T`.
-pub struct TypedVariable<S, T>(RefFn<S, T>, MutRefFn<S, T>, u32);
+pub struct TypedVariable<S, T>(RefFn<S, T>, MutRefFn<S, T>, Address);
 
 impl<S, T> Copy for TypedVariable<S, T> {}
 
@@ -513,7 +525,7 @@ impl<S, T> TypedVariable<S, T> {
         (self.0)(state, self.2)
     }
 
-    fn key(&self) -> (usize, usize, u32) {
+    fn key(&self) -> (usize, usize, Address) {
         (self.0 as usize, self.1 as usize, self.2)
     }
 }
@@ -523,14 +535,14 @@ where
     T: Copy + SupportedType,
 {
     /// Returns a mutable reference to the variable's value. This method is used for regular non-base variables.
-    /// 
+    ///
     /// The input and scope must be passed because of TeX's grouping semantics.
     /// When the current group ends, any variable assignments made in the group
     ///     are rolled back.
     /// Thus this function generally saves the current value of the variable in the VM so that it
     ///     can be restored later.
     /// This is why the full input must be provided, and not just the state.
-    /// 
+    ///
     /// **Important note**: this function assumes that the mutable reference is being
     ///     requested in order to assign to the value.
     /// If no assignment happens, the variable may be in a wierd state afterwards.
@@ -565,7 +577,7 @@ where
     T: Copy + SupportedBaseType,
 {
     /// Returns a mutable reference to the base variable's value. This method is used for base variables.
-    /// 
+    ///
     /// See the documentation on [TypedVariable::value_mut] for information on this method.
     pub fn value_mut_base<'a>(
         &self,
@@ -622,7 +634,7 @@ pub trait SupportedBaseType: internal::SupportedBaseTypeInternal {}
 impl SupportedBaseType for CatCode {}
 
 /// Parts of the variable system that are private to the Texlang core crate.
-/// 
+///
 /// This is basically a hack, and may not work in future versions of Rust.
 /// The basic problem it solves is that for the variables API it's really nice to have the public [SupportedType]
 ///     trait.
@@ -631,7 +643,7 @@ impl SupportedBaseType for CatCode {}
 /// Because [SupportedType] is public, it's hard to do this without making some of these implementation
 ///     details public too.
 /// This is because the Rust compiler (reasonably) enforces that public traits don't reference or leak private types.
-/// 
+///
 /// The loophole is that placing all of this stuff as _public_ items in a _private_ module is allowed!
 /// And it hides all of the stuff from end users.
 /// Shhhhh! Don't tell the Rust team, they may fix the bug.
@@ -693,8 +705,8 @@ pub(crate) mod internal {
         fn restore_map_mut<S>(_: &mut RestoreValues<S>) -> &mut RestoreMap<S, Self>;
 
         fn new_command<S>(
-            _: fn(state: &S, address: u32) -> &Self,
-            _: fn(state: &mut S, address: u32) -> &mut Self,
+            ref_fn: RefFn<S, Self>,
+            ref_mut_fn: MutRefFn<S, Self>,
             _: AddressSpec<S>,
         ) -> Command<S>;
     }
@@ -704,8 +716,8 @@ pub(crate) mod internal {
             &mut m.i32
         }
         fn new_command<S>(
-            ref_fn: fn(state: &S, address: u32) -> &Self,
-            ref_mut_fn: fn(state: &mut S, address: u32) -> &mut Self,
+            ref_fn: RefFn<S, Self>,
+            ref_mut_fn: MutRefFn<S, Self>,
             address: AddressSpec<S>,
         ) -> Command<S> {
             Command {
@@ -719,8 +731,8 @@ pub(crate) mod internal {
         fn restore_map_mut<S>(_: &mut RestoreValues<S>) -> &mut RestoreMap<vm::BaseState<S>, Self>;
 
         fn new_command<S>(
-            _: fn(state: &vm::BaseState<S>, address: u32) -> &Self,
-            _: fn(state: &mut vm::BaseState<S>, address: u32) -> &mut Self,
+            _: RefFn<vm::BaseState<S>, Self>,
+            _: MutRefFn<vm::BaseState<S>, Self>,
             _: AddressSpec<S>,
         ) -> Command<S>;
     }
@@ -731,8 +743,8 @@ pub(crate) mod internal {
         }
 
         fn new_command<S>(
-            ref_fn: fn(state: &vm::BaseState<S>, address: u32) -> &Self,
-            ref_mut_fn: fn(state: &mut vm::BaseState<S>, address: u32) -> &mut Self,
+            ref_fn: RefFn<vm::BaseState<S>, Self>,
+            ref_mut_fn: MutRefFn<vm::BaseState<S>, Self>,
             address: AddressSpec<S>,
         ) -> Command<S> {
             Command {

@@ -8,16 +8,18 @@ pub const CATCODE_DOC: &str = "Get or set a catcode register";
 /// Get the `\catcode` command.
 pub fn get_catcode<S>() -> command::Command<S> {
     variable::Command::new_base(
-        |state: &vm::BaseState<S>, addr: u32| -> &CatCode {
-            let addr = char::from_u32(addr).unwrap();
+        |state: &vm::BaseState<S>, addr: variable::Address| -> &CatCode {
+            let addr = char::from_u32(addr.0.try_into().unwrap()).unwrap();
             state.cat_code_map.get(&addr)
         },
-        |state: &mut vm::BaseState<S>, addr: u32| -> &mut CatCode {
-            let addr = char::from_u32(addr).unwrap();
+        |state: &mut vm::BaseState<S>, addr: variable::Address| -> &mut CatCode {
+            let addr = char::from_u32(addr.0.try_into().unwrap()).unwrap();
             state.cat_code_map.get_mut(&addr)
         },
         variable::AddressSpec::Dynamic(
-            |token: token::Token, input: &mut vm::ExpansionInput<S>| -> anyhow::Result<u32> {
+            |token: token::Token,
+             input: &mut vm::ExpansionInput<S>|
+             -> anyhow::Result<variable::Address> {
                 let address: u32 = parse::parse_number(input)?;
                 match char::from_u32(address) {
                     None => Err(error::TokenError::new(
@@ -27,7 +29,7 @@ pub fn get_catcode<S>() -> command::Command<S> {
                         ],
                     )
                     .cast()),
-                    Some(_) => Ok(address),
+                    Some(_) => Ok((address as usize).into()),
                 }
             },
         ),
