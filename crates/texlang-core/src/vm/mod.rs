@@ -139,7 +139,7 @@ impl<S> BaseState<S> {
     ) -> BaseState<S> {
         BaseState {
             cat_code_map,
-            commands_map: command::Map::new(initial_built_ins, vec![]),
+            commands_map: command::Map::new(initial_built_ins, Default::default()),
             max_input_levels: 500,
         }
     }

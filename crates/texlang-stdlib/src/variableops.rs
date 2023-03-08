@@ -54,9 +54,7 @@ macro_rules! create_arithmetic_primitive {
                 variable::Variable::Int(variable) => {
                     let n: i32 = parse::parse_number(input)?;
                     let i = variable.value_mut(input, scope);
-                    println!["n={}, i={}", n, *i];
                     *i = $arithmetic_op(token, *i, n)?;
-                    println!["n={}, i={}", n, *i];
                     Ok(())
                 }
                 variable::Variable::CatCode(_) => invalid_variable_error(token),

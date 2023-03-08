@@ -1,7 +1,6 @@
 //! Primitives for creating user-defined macros (`\def` and friends).
 
 use crate::prefix;
-use std::rc;
 use texcraft_stdext::algorithms::substringsearch::KMPMatcherFactory;
 use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
@@ -73,7 +72,7 @@ fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
     input
         .base_mut()
         .commands_map
-        .insert(name, rc::Rc::new(user_defined_macro).into(), scope);
+        .insert_macro(name, user_defined_macro, scope);
     Ok(())
 }
 

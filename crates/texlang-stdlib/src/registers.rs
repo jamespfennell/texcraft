@@ -85,16 +85,16 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
     if addr >= N {
         return Err(integer_register_too_large_error(countdef_token, addr, N));
     }
-    let new_cmd = variable::Command::new(
-        int_register_ref_fn,
-        int_register_mut_ref_fn,
-        variable::AddressSpec::StaticAddress(addr.into()),
-    );
     // TODO: I suspect \countdef should honor \global, but haven't checked pdfTeX.
-    input
-        .base_mut()
-        .commands_map
-        .insert(cs_name, new_cmd.into(), groupingmap::Scope::Local);
+    input.base_mut().commands_map.insert_variable_command(
+        cs_name,
+        variable::Command::new(
+            int_register_ref_fn,
+            int_register_mut_ref_fn,
+            variable::AddressSpec::StaticAddress(addr.into()),
+        ),
+        groupingmap::Scope::Local,
+    );
     Ok(())
 }
 

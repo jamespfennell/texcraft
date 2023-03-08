@@ -183,14 +183,13 @@ fn newint_primitive_fn<S: HasComponent<Component>>(
 ) -> anyhow::Result<()> {
     let name = parse::parse_command_target("newint allocation", newint_token, input.unexpanded())?;
     let addr = input.state_mut().component_mut().alloc_int();
-    input.base_mut().commands_map.insert(
+    input.base_mut().commands_map.insert_variable_command(
         name,
         variable::Command::new(
             singleton_ref_fn,
             singleton_mut_ref_fn,
             variable::AddressSpec::DynamicVirtual(Box::new(SingletonAddressSpec(addr))),
-        )
-        .into(),
+        ),
         groupingmap::Scope::Local,
     );
     Ok(())
@@ -236,14 +235,13 @@ fn newarray_primitive_fn<S: HasComponent<Component>>(
         parse::parse_command_target("newarray allocation", newarray_token, input.unexpanded())?;
     let len: usize = parse::parse_number(input)?;
     let addr = input.state_mut().component_mut().alloc_array(len);
-    input.base_mut().commands_map.insert(
+    input.base_mut().commands_map.insert_variable_command(
         name,
         variable::Command::new(
             array_element_ref_fn,
             array_element_mut_ref_fn,
             variable::AddressSpec::DynamicVirtual(Box::new(ArrayAddressSpec(addr))),
-        )
-        .into(),
+        ),
         groupingmap::Scope::Local,
     );
     // TODO: Return the arraydef version
@@ -279,8 +277,7 @@ impl<S: HasComponent<Component>> variable::DynamicAddressSpec<S> for ArrayAddres
 
 fn array_element_ref_fn<S: HasComponent<Component>>(state: &S, addr: variable::Address) -> &i32 {
     let (addr_0, (allocations_i, inner_i)) = state.component().find_array(addr);
-    &state.component().allocations[allocations_i].arrays[inner_i].value
-        [addr.0 - addr_0.0]
+    &state.component().allocations[allocations_i].arrays[inner_i].value[addr.0 - addr_0.0]
 }
 
 fn array_element_mut_ref_fn<S: HasComponent<Component>>(

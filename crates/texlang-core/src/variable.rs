@@ -437,6 +437,14 @@ impl<S> Command<S> {
         self.resolve(token, input.as_mut())?
             .set_value_using_input(input, scope)
     }
+
+    pub(crate) fn getter_key(&self) -> GetterKey {
+        self.getter.key()
+    }
+
+    pub(crate) fn address_spec(&self) -> &AddressSpec<S> {
+        &self.address
+    }
 }
 
 /// Immutable reference to the value of a variable.
@@ -500,12 +508,24 @@ impl<S> Variable<S> {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct GetterKey(usize, usize);
+
 enum Getter<S> {
     Int(RefFn<S, i32>, MutRefFn<S, i32>),
     CatCode(
         RefFn<vm::BaseState<S>, CatCode>,
         MutRefFn<vm::BaseState<S>, CatCode>,
     ),
+}
+
+impl<S> Getter<S> {
+    fn key(&self) -> GetterKey {
+        match self {
+            Getter::Int(a, b) => GetterKey(*a as usize, *b as usize),
+            Getter::CatCode(a, b) => GetterKey(*a as usize, *b as usize),
+        }
+    }
 }
 
 /// A TeX variable of a specific Rust type `T`.

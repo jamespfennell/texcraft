@@ -35,10 +35,11 @@ use crate::texmacro;
 use crate::token;
 use crate::variable;
 use std::any::TypeId;
-use std::collections::HashMap;
 use std::rc;
-use texcraft_stdext::collections::groupingmap;
-use texcraft_stdext::collections::groupingmap::GroupingVec;
+
+mod map;
+
+pub use map::Map;
 
 enum NullTypeIdType {}
 
@@ -150,6 +151,17 @@ impl<S> Clone for Fn<S> {
     }
 }
 
+// We need to implement Clone manually as the derived implementation requires S to be Clone.
+impl<S> Clone for Command<S> {
+    fn clone(&self) -> Self {
+        Self {
+            func: self.func.clone(),
+            id: self.id,
+            doc: self.doc,
+        }
+    }
+}
+
 impl<S> From<ExpansionFn<S>> for Command<S> {
     fn from(cmd: ExpansionFn<S>) -> Self {
         Fn::Expansion(cmd).into()
@@ -181,146 +193,6 @@ impl<S> From<Fn<S>> for Command<S> {
             id: null_type_id(),
             doc: None,
         }
-    }
-}
-
-/// Map is a map type where the keys are control sequence names and the values are TeX commands.
-///
-/// There are a number of design goals for the map:
-///
-/// - Make retrieving the function for a command very fast. This is achieved primarily by storing
-///   command functions by themselves in an array. The index in the array is the control sequence
-///   name, which is an integer when interned. This implementation choice means fast-as-possible lookups.
-///   Storing the function by itself means there is good cache locality.
-///
-///
-/// - Insert built in commands at the start
-///     insert_built_in(cs_name, cmd),
-/// - Insert variable commands that aren't there at the start, but will be in the future. E.g., \countdef
-///     register_built_in(cmd) <- must have a unique ID. Is type ID stable across binary builds? Maybe need to
-///          use a string ID instead? But then need to feed that the library using this registered
-/// - Should we enforce that the previous two steps can only be done at creation time? Probably
-///   Maybe initialize the map using Map<csname, cmd> and `Vec<cmd>`. Can provide csname<->str wrapper at
-///   the VM level
-///
-/// - While running, insert macros
-///     insert_macro(&str, macro)
-/// - While running, alias commands by current name or using the special ID inserts
-///     alias_control_sequence(cs_name, cs_name) -> undefined control sequence error
-///     alias_registered_built_in(cs_name, cmd_id, variable_addr)
-///     alias_character(cs_name, token::Token)
-pub struct Map<S> {
-    len: usize,
-    func_map: GroupingVec<command::Fn<S>>,
-    id_map: GroupingVec<std::any::TypeId>,
-    doc_map: HashMap<CsName, &'static str>,
-    // initial_builtins: HashMap<CsName, Command<S>> or Vec<Command<S>>
-    // extra_builtins: Vec<Command<S>>
-    // aliases: GroupingMap<CsName, Rc<Alias>>
-}
-
-impl<S> Default for Map<S> {
-    fn default() -> Self {
-        Self {
-            func_map: Default::default(),
-            len: 0,
-            id_map: Default::default(),
-            doc_map: Default::default(),
-        }
-    }
-}
-
-impl<S> Map<S> {
-    pub fn new(
-        initial_built_ins: HashMap<CsName, Command<S>>,
-        _additional_built_ins: Vec<Command<S>>,
-    ) -> Map<S> {
-        let len = initial_built_ins.len();
-        let mut func_map: GroupingVec<command::Fn<S>> = Default::default();
-        let mut id_map: GroupingVec<std::any::TypeId> = Default::default();
-        for (name, cmd) in initial_built_ins {
-            func_map.insert(name.to_usize(), cmd.func, groupingmap::Scope::Local);
-            id_map.insert(name.to_usize(), cmd.id, groupingmap::Scope::Local);
-        }
-        Self {
-            len,
-            func_map,
-            id_map,
-            doc_map: Default::default(),
-        }
-    }
-
-    #[inline]
-    pub fn get_fn(&self, name: &token::CsName) -> Option<&command::Fn<S>> {
-        self.func_map.get(&name.to_usize())
-    }
-
-    pub fn get_id(&self, name: &token::CsName) -> std::any::TypeId {
-        self.id_map
-            .get(&name.to_usize())
-            .copied()
-            .unwrap_or_else(null_type_id)
-    }
-
-    pub fn get_command_slow(&self, name: &token::CsName) -> Option<command::Command<S>> {
-        let func = match self.get_fn(name) {
-            None => return None,
-            Some(func) => func,
-        }
-        .clone();
-        Some(Command {
-            func,
-            id: self.get_id(name),
-            doc: self.doc_map.get(name).cloned(),
-        })
-    }
-
-    #[inline]
-    pub fn insert(
-        &mut self,
-        name: token::CsName,
-        cmd: command::Command<S>,
-        scope: groupingmap::Scope,
-    ) -> bool {
-        self.id_map.insert(name.to_usize(), cmd.id, scope);
-        let existed = self.func_map.insert(name.to_usize(), cmd.func, scope);
-        if !existed {
-            self.len += 1;
-        }
-        existed
-    }
-
-    pub fn to_hash_map_slow(&self) -> HashMap<CsName, command::Command<S>> {
-        let mut result = HashMap::new();
-        for (key, _value) in self.func_map.backing_container().iter().enumerate() {
-            let cs_name = match CsName::try_from_usize(key) {
-                None => continue,
-                Some(cs_name) => cs_name,
-            };
-            let cmd = match self.get_command_slow(&cs_name) {
-                None => continue,
-                Some(cmd) => cmd,
-            };
-            result.insert(cs_name, cmd);
-        }
-        result
-    }
-
-    pub fn begin_group(&mut self) {
-        self.func_map.begin_group();
-        self.id_map.begin_group();
-    }
-
-    pub fn end_group(&mut self) -> bool {
-        self.func_map.end_group() && self.id_map.end_group()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    pub fn len(&self) -> usize {
-        self.len
     }
 }
 
