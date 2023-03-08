@@ -89,6 +89,14 @@ pub trait BackingContainer<K, V>: Default {
 
     /// Invoke the provided function for all (key, value) pairs in the map.
     fn visit<F: FnMut(&K, &V)>(&self, f: F);
+
+    /// Return the number of elements in the container.
+    fn len(&self) -> usize;
+
+    /// Return whether the container is empty.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl<K: Eq + Hash + Clone, V> BackingContainer<K, V> for HashMap<K, V> {
@@ -112,6 +120,9 @@ impl<K: Eq + Hash + Clone, V> BackingContainer<K, V> for HashMap<K, V> {
         for (k, v) in HashMap::iter(self) {
             f(k, v);
         }
+    }
+    fn len(&self) -> usize {
+        HashMap::len(self)
     }
 }
 
@@ -157,6 +168,16 @@ impl<V> BackingContainer<usize, V> for Vec<Option<V>> {
                 f(&k, v);
             }
         }
+    }
+
+    fn len(&self) -> usize {
+        let mut l = 0;
+        for v in <[Option<V>]>::iter(self) {
+            if v.is_some() {
+                l += 1;
+            }
+        }
+        l
     }
 }
 
@@ -335,6 +356,16 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V,
             m.groups.push(new_group);
         }
         m
+    }
+
+    /// Returns the number of elements in the container.
+    pub fn len(&self) -> usize {
+        self.backing_container.len()
+    }
+
+    /// Returns whether the container is empty.
+    pub fn is_empty(&self) -> bool {
+        self.backing_container.is_empty()
     }
 }
 

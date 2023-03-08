@@ -64,7 +64,7 @@ fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
     input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<variable::Address> {
     let address: usize = parse::parse_number(input)?;
-    if (address as usize) >= N {
+    if address >= N {
         return Err(integer_register_too_large_error(count_token, address, N));
     }
     Ok(address.into())
@@ -82,7 +82,7 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
     let cs_name = parse::parse_command_target("countdef", countdef_token, input.unexpanded())?;
     parse::parse_optional_equals(input)?;
     let addr: usize = parse::parse_number(input)?;
-    if (addr as usize) >= N {
+    if addr >= N {
         return Err(integer_register_too_large_error(countdef_token, addr, N));
     }
     let new_cmd = variable::Command::new(

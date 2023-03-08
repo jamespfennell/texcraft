@@ -264,7 +264,7 @@ impl<S: HasComponent<Component>> variable::DynamicAddressSpec<S> for ArrayAddres
         let array_len = input.state().component().allocations[allocations_i].arrays[inner_i]
             .value
             .len();
-        if (array_index as usize) >= array_len {
+        if array_index >= array_len {
             return Err(error::TokenError::new(
             token,
             format![
@@ -280,7 +280,7 @@ impl<S: HasComponent<Component>> variable::DynamicAddressSpec<S> for ArrayAddres
 fn array_element_ref_fn<S: HasComponent<Component>>(state: &S, addr: variable::Address) -> &i32 {
     let (addr_0, (allocations_i, inner_i)) = state.component().find_array(addr);
     &state.component().allocations[allocations_i].arrays[inner_i].value
-        [(addr.0 - addr_0.0) as usize]
+        [addr.0 - addr_0.0]
 }
 
 fn array_element_mut_ref_fn<S: HasComponent<Component>>(
