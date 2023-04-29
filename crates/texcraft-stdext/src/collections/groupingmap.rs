@@ -335,20 +335,29 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V,
 
     /// Builds a new [GroupingContainer] which is clone of this grouping map except
     /// each value is converted using the provided convert function.
-    pub fn clone_with_conversion<W, R: BackingContainer<K, W>>(
+    pub fn clone_with_conversion<
+        KNew: Eq + Hash + Clone,
+        VNew,
+        TNew: BackingContainer<KNew, VNew>,
+    >(
         &self,
-        convert: &mut dyn FnMut(&V) -> W,
-    ) -> GroupingContainer<K, W, R> {
-        let mut m: GroupingContainer<K, W, R> = Default::default();
-        self.backing_container
-            .visit(|k: &K, v: &V| m.backing_container.insert(k.clone(), convert(v)));
+        convert_key: &mut dyn FnMut(&K) -> KNew,
+        convert_value: &mut dyn FnMut(&K, &V) -> VNew,
+    ) -> GroupingContainer<KNew, VNew, TNew> {
+        let mut m: GroupingContainer<KNew, VNew, TNew> = Default::default();
+        self.backing_container.visit(|k: &K, v: &V| {
+            m.backing_container
+                .insert(convert_key(k), convert_value(k, v));
+        });
         for group in &self.groups {
-            let mut new_group: HashMap<K, EndOfGroupAction<W>> = Default::default();
+            let mut new_group: HashMap<KNew, EndOfGroupAction<VNew>> = Default::default();
             for (k, action) in group {
                 new_group.insert(
-                    k.clone(),
+                    convert_key(k),
                     match action {
-                        EndOfGroupAction::Revert(v) => EndOfGroupAction::Revert(convert(v)),
+                        EndOfGroupAction::Revert(v) => {
+                            EndOfGroupAction::Revert(convert_value(k, v))
+                        }
                         EndOfGroupAction::Delete => EndOfGroupAction::Delete,
                     },
                 );
@@ -413,18 +422,20 @@ mod tests {
         assert_eq!(original.end_group(), true);
 
         let mut want = GroupingHashMap::new();
-        want.insert("key1", "1".to_string(), Scope::Local);
+        want.insert("key1-new".to_string(), "key1-1".to_string(), Scope::Local);
         want.begin_group();
-        want.insert("key1", "2".to_string(), Scope::Local);
-        want.insert("key2", "3".to_string(), Scope::Local);
-        want.insert("key3", "4".to_string(), Scope::Local);
+        want.insert("key1-new".to_string(), "key1-2".to_string(), Scope::Local);
+        want.insert("key2-new".to_string(), "key2-3".to_string(), Scope::Local);
+        want.insert("key3-new".to_string(), "key3-4".to_string(), Scope::Local);
         want.begin_group();
-        want.insert("key1", "5".to_string(), Scope::Local);
-        want.insert("key3", "6".to_string(), Scope::Global);
+        want.insert("key1-new".to_string(), "key1-5".to_string(), Scope::Local);
+        want.insert("key3-new".to_string(), "key3-6".to_string(), Scope::Global);
         assert_eq!(want.end_group(), true);
 
-        let got: GroupingHashMap<&'static str, String> =
-            original.clone_with_conversion(&mut |i| format!["{}", i]);
+        let got: GroupingHashMap<String, String> = original
+            .clone_with_conversion(&mut |k| format!["{}-new", k], &mut |k, v| {
+                format!["{}-{}", k, v]
+            });
 
         assert_eq!(got, want);
     }
