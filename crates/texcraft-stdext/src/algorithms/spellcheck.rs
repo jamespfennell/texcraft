@@ -245,8 +245,9 @@ impl Clone for WordDiff {
 mod tests {
     use super::*;
 
-    macro_rules! levenshtein_test {
-        ($name: ident, $a: expr, $b: expr, $i: expr) => {
+    macro_rules! levenshtein_tests {
+        ($( ($name: ident, $a: expr, $b: expr, $i: expr),)+) => {
+            $(
             #[test]
             fn $name() {
                 let mut cmp = WordDiff {
@@ -268,74 +269,77 @@ mod tests {
                 };
                 assert_eq![levenshtein_distance($b, $a), cmp];
             }
+            )+
         };
     }
 
-    levenshtein_test![case_1, "", "", Vec::<DiffOp>::new()];
-    levenshtein_test![case_2, "a", "", vec![DiffOp::Subtract('a')]];
-    levenshtein_test![case_3, "a", "a", vec![DiffOp::Keep('a')]];
-    levenshtein_test![case_4, "a", "b", vec![DiffOp::Modify('a', 'b')]];
-    levenshtein_test![
-        case_5,
-        "aa",
-        "a",
-        vec![DiffOp::Subtract('a'), DiffOp::Keep('a')]
-    ];
-    levenshtein_test![
-        case_6,
-        "aa",
-        "ab",
-        vec![DiffOp::Keep('a'), DiffOp::Modify('a', 'b')]
-    ];
-    levenshtein_test![
-        case_7,
-        "abb",
-        "acbb",
-        vec![
-            DiffOp::Keep('a'),
-            DiffOp::Add('c'),
-            DiffOp::Keep('b'),
-            DiffOp::Keep('b'),
-        ]
-    ];
-    levenshtein_test![
-        case_8,
-        "aabb",
-        "abb",
-        vec![
-            DiffOp::Subtract('a'),
-            DiffOp::Keep('a'),
-            DiffOp::Keep('b'),
-            DiffOp::Keep('b'),
-        ]
-    ];
-    levenshtein_test![
-        case_9,
-        "james",
-        "laura",
-        vec![
-            DiffOp::Modify('j', 'l'),
-            DiffOp::Keep('a'),
-            DiffOp::Modify('m', 'u'),
-            DiffOp::Modify('e', 'r'),
-            DiffOp::Modify('s', 'a'),
-        ]
-    ];
-    levenshtein_test![
-        case_10,
-        "ab12345e",
-        "a12345de",
-        vec![
-            DiffOp::Keep('a'),
-            DiffOp::Subtract('b'),
-            DiffOp::Keep('1'),
-            DiffOp::Keep('2'),
-            DiffOp::Keep('3'),
-            DiffOp::Keep('4'),
-            DiffOp::Keep('5'),
-            DiffOp::Add('d'),
-            DiffOp::Keep('e'),
-        ]
+    levenshtein_tests![
+        (case_1, "", "", Vec::<DiffOp>::new()),
+        (case_2, "a", "", vec![DiffOp::Subtract('a')]),
+        (case_3, "a", "a", vec![DiffOp::Keep('a')]),
+        (case_4, "a", "b", vec![DiffOp::Modify('a', 'b')]),
+        (
+            case_5,
+            "aa",
+            "a",
+            vec![DiffOp::Subtract('a'), DiffOp::Keep('a')]
+        ),
+        (
+            case_6,
+            "aa",
+            "ab",
+            vec![DiffOp::Keep('a'), DiffOp::Modify('a', 'b')]
+        ),
+        (
+            case_7,
+            "abb",
+            "acbb",
+            vec![
+                DiffOp::Keep('a'),
+                DiffOp::Add('c'),
+                DiffOp::Keep('b'),
+                DiffOp::Keep('b'),
+            ]
+        ),
+        (
+            case_8,
+            "aabb",
+            "abb",
+            vec![
+                DiffOp::Subtract('a'),
+                DiffOp::Keep('a'),
+                DiffOp::Keep('b'),
+                DiffOp::Keep('b'),
+            ]
+        ),
+        (
+            case_9,
+            "james",
+            "laura",
+            vec![
+                DiffOp::Modify('j', 'l'),
+                DiffOp::Keep('a'),
+                DiffOp::Modify('m', 'u'),
+                DiffOp::Modify('e', 'r'),
+                DiffOp::Modify('s', 'a'),
+            ]
+        ),
+        (
+            case_10,
+            "ab12345e",
+            "a12345de",
+            vec![
+                DiffOp::Keep('a'),
+                DiffOp::Subtract('b'),
+                DiffOp::Keep('1'),
+                DiffOp::Keep('2'),
+                DiffOp::Keep('3'),
+                DiffOp::Keep('4'),
+                DiffOp::Keep('5'),
+                DiffOp::Add('d'),
+                DiffOp::Keep('e'),
+            ]
+        ),
     ];
 
     #[test]

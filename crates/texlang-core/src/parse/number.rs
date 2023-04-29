@@ -8,7 +8,7 @@ use num_traits::PrimInt;
 
 /// Parses a number from the provided stream.
 ///
-/// The number may be octal, decimal, hexadecimal, cast from a character token, or read
+/// The number may be octal, decimal_, hexadecimal_, cast from a character token, or read
 /// from an internal registers. The full definition of a number in the TeX grammer
 /// is given on page X of the TeXBook.
 #[inline]
@@ -280,117 +280,99 @@ mod tests {
     use crate::parse::testutil;
     use crate::token::catcode;
 
-    macro_rules! parse_number_test {
-        ($input: expr, $number: expr) => {
-            let mut vm = testutil::new_vm($input);
-            let result: i32 = parse_number(vm::ExpansionInput::new(&mut vm)).unwrap();
-            assert_eq![result, $number];
+    macro_rules! parse_number_tests {
+        ($( ($name: ident, $input: expr, $number: expr),)+) => {
+            $(
+            #[test]
+            fn $name() {
+                let mut vm = testutil::new_vm($input);
+                let result: i32 = parse_number(vm::ExpansionInput::new(&mut vm)).unwrap();
+                assert_eq![result, $number];
+            }
+            )+
         };
     }
 
-    #[test]
-    fn octal_basic() {
-        parse_number_test!["'0", 0];
-        parse_number_test!["'1", 1];
-        parse_number_test!["'2", 2];
-        parse_number_test!["'3", 3];
-        parse_number_test!["'4", 4];
-        parse_number_test!["'5", 5];
-        parse_number_test!["'6", 6];
-        parse_number_test!["'7", 7];
-
-        parse_number_test!["'10", 8];
-        parse_number_test!["'11", 9];
-        parse_number_test!["'12", 10];
-        parse_number_test!["'13", 11];
-        parse_number_test!["'14", 12];
-        parse_number_test!["'15", 13];
-        parse_number_test!["'16", 14];
-        parse_number_test!["'17", 15];
-
-        parse_number_test!["'201", 129];
-    }
-
-    #[test]
-    fn decimal_basic() {
-        parse_number_test!["0", 0];
-        parse_number_test!["1", 1];
-        parse_number_test!["2", 2];
-        parse_number_test!["3", 3];
-        parse_number_test!["4", 4];
-        parse_number_test!["5", 5];
-        parse_number_test!["6", 6];
-        parse_number_test!["7", 7];
-        parse_number_test!["8", 8];
-        parse_number_test!["9", 9];
-
-        parse_number_test!["10", 10];
-        parse_number_test!["11", 11];
-        parse_number_test!["12", 12];
-        parse_number_test!["13", 13];
-        parse_number_test!["14", 14];
-        parse_number_test!["15", 15];
-        parse_number_test!["16", 16];
-        parse_number_test!["17", 17];
-        parse_number_test!["18", 18];
-        parse_number_test!["19", 19];
-
-        parse_number_test!["00019", 19];
-        parse_number_test!["201", 201];
-    }
-
-    #[test]
-    fn hexadecimal_basic() {
-        parse_number_test!["\"0", 0];
-        parse_number_test!["\"1", 1];
-        parse_number_test!["\"2", 2];
-        parse_number_test!["\"3", 3];
-        parse_number_test!["\"4", 4];
-        parse_number_test!["\"5", 5];
-        parse_number_test!["\"6", 6];
-        parse_number_test!["\"7", 7];
-        parse_number_test!["\"8", 8];
-        parse_number_test!["\"9", 9];
-        parse_number_test!["\"A", 10];
-        parse_number_test!["\"B", 11];
-        parse_number_test!["\"C", 12];
-        parse_number_test!["\"D", 13];
-        parse_number_test!["\"E", 14];
-        parse_number_test!["\"F", 15];
-
-        parse_number_test!["\"10", 16];
-        parse_number_test!["\"11", 17];
-        parse_number_test!["\"12", 18];
-        parse_number_test!["\"13", 19];
-        parse_number_test!["\"14", 20];
-        parse_number_test!["\"15", 21];
-        parse_number_test!["\"16", 22];
-        parse_number_test!["\"17", 23];
-        parse_number_test!["\"18", 24];
-        parse_number_test!["\"19", 25];
-        parse_number_test!["\"1A", 26];
-        parse_number_test!["\"1B", 27];
-        parse_number_test!["\"1C", 28];
-        parse_number_test!["\"1D", 29];
-        parse_number_test!["\"1E", 30];
-        parse_number_test!["\"1F", 31];
-
-        parse_number_test!["\"201", 513];
-    }
-
-    #[test]
-    fn number_from_character() {
-        parse_number_test!["`A", 65];
-    }
-
-    #[test]
-    fn signs() {
-        parse_number_test![r"+4", 4];
-        parse_number_test![r"-4", -4];
-        parse_number_test![r"+-4", -4];
-        parse_number_test![r"--4", 4];
-        parse_number_test![r"  -  - 4", 4];
-    }
+    parse_number_tests![
+        (octal_0, "'0", 0),
+        (octal_1, "'1", 1),
+        (octal_2, "'2", 2),
+        (octal_3, "'3", 3),
+        (octal_4, "'4", 4),
+        (octal_5, "'5", 5),
+        (octal_6, "'6", 6),
+        (octal_7, "'7", 7),
+        (octal_8, "'10", 8),
+        (octal_9, "'11", 9),
+        (octal_19, "'12", 10),
+        (octal_11, "'13", 11),
+        (octal_12, "'14", 12),
+        (octal_13, "'15", 13),
+        (octal_14, "'16", 14),
+        (octal_15, "'17", 15),
+        (octal_129, "'201", 129),
+        (decimal_0, "0", 0),
+        (decimal_1, "1", 1),
+        (decimal_2, "2", 2),
+        (decimal_3, "3", 3),
+        (decimal_4, "4", 4),
+        (decimal_5, "5", 5),
+        (decimal_6, "6", 6),
+        (decimal_7, "7", 7),
+        (decimal_8, "8", 8),
+        (decimal_9, "9", 9),
+        (decimal_10, "10", 10),
+        (decimal_11, "11", 11),
+        (decimal_12, "12", 12),
+        (decimal_13, "13", 13),
+        (decimal_14, "14", 14),
+        (decimal_15, "15", 15),
+        (decimal_16, "16", 16),
+        (decimal_17, "17", 17),
+        (decimal_18, "18", 18),
+        (decimal_19, "19", 19),
+        (decimal_1_with_0_padding, "00019", 19),
+        (decimal_201, "201", 201),
+        (hexadecimal_0, "\"0", 0),
+        (hexadecimal_1, "\"1", 1),
+        (hexadecimal_2, "\"2", 2),
+        (hexadecimal_3, "\"3", 3),
+        (hexadecimal_4, "\"4", 4),
+        (hexadecimal_5, "\"5", 5),
+        (hexadecimal_6, "\"6", 6),
+        (hexadecimal_7, "\"7", 7),
+        (hexadecimal_8, "\"8", 8),
+        (hexadecimal_9, "\"9", 9),
+        (hexadecimal_10, "\"A", 10),
+        (hexadecimal_11, "\"B", 11),
+        (hexadecimal_12, "\"C", 12),
+        (hexadecimal_13, "\"D", 13),
+        (hexadecimal_14, "\"E", 14),
+        (hexadecimal_15, "\"F", 15),
+        (hexadecimal_16, "\"10", 16),
+        (hexadecimal_17, "\"11", 17),
+        (hexadecimal_18, "\"12", 18),
+        (hexadecimal_19, "\"13", 19),
+        (hexadecimal_20, "\"14", 20),
+        (hexadecimal_21, "\"15", 21),
+        (hexadecimal_22, "\"16", 22),
+        (hexadecimal_23, "\"17", 23),
+        (hexadecimal_24, "\"18", 24),
+        (hexadecimal_25, "\"19", 25),
+        (hexadecimal_26, "\"1A", 26),
+        (hexadecimal_27, "\"1B", 27),
+        (hexadecimal_28, "\"1C", 28),
+        (hexadecimal_29, "\"1D", 29),
+        (hexadecimal_30, "\"1E", 30),
+        (hexadecimal_31, "\"1F", 31),
+        (hexadecimal_513, "\"201", 513),
+        (number_from_character, "`A", 65),
+        (signs_plus, r"+4", 4),
+        (signs_minus, r"-4", -4),
+        (signs_plus_minus, r"+-4", -4),
+        (signs_minus_minus, r"--4", 4),
+        (signs_minus_minus_spaces, r"  -  - 4", 4),
+    ];
 
     #[test]
     fn number_with_letter_catcode() {

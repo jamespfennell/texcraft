@@ -44,8 +44,9 @@ mod tests {
     use crate::token::catcode;
     use std::collections::HashMap;
 
-    macro_rules! relation_success_test {
-        ($name: ident, $input: expr, $expected: expr) => {
+    macro_rules! relation_success_tests {
+        ($( ($name: ident, $input: expr, $expected: expr), )+) => {
+            $(
             #[test]
             fn $name() {
                 let mut vm = vm::VM::<()>::new(
@@ -59,15 +60,19 @@ mod tests {
                 let result = parse_relation(input).unwrap();
                 assert_eq![result, $expected];
             }
+            )+
         };
     }
 
-    relation_success_test![less_than, r"<a", Relation::LessThan];
-    relation_success_test![equals, r"=a", Relation::Equal];
-    relation_success_test![greater_than, r">a", Relation::GreaterThan];
+    relation_success_tests![
+        (less_than, r"<a", Relation::LessThan),
+        (equals, r"=a", Relation::Equal),
+        (greater_than, r">a", Relation::GreaterThan),
+    ];
 
-    macro_rules! relation_failure_test {
-        ($name: ident, $input: expr) => {
+    macro_rules! relation_failure_tests {
+        ($( ($name: ident, $input: expr), )+) => {
+            $(
             #[test]
             fn $name() {
                 let mut map = CatCodeMap::new_with_tex_defaults();
@@ -80,11 +85,14 @@ mod tests {
                     panic!["Parsed a relation from invalid input"];
                 }
             }
+            )+
         };
     }
 
-    relation_failure_test![empty_input, ""];
-    relation_failure_test![letter, "a"];
-    relation_failure_test![control_sequence, r"\A"];
-    relation_failure_test![incorrect_catcode, "<"];
+    relation_failure_tests![
+        (empty_input, ""),
+        (letter, "a"),
+        (control_sequence, r"\A"),
+        (incorrect_catcode, "<"),
+    ];
 }

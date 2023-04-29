@@ -260,8 +260,9 @@ mod tests {
         }
     }
 
-    macro_rules! lexer_test {
-        ( $name: ident, $input: expr, $ ( $expected_token : expr, ) * ) => {
+    macro_rules! lexer_tests {
+        ($( ( $name: ident, $input: expr, $ ( $expected_token : expr, ) * ), )+) => {
+            $(
             #[test]
             fn $name() {
                 let mut lexer = Lexer::new($input.to_string(), trace::KeyRange::for_testing());
@@ -277,161 +278,143 @@ mod tests {
                 let expected: Vec<Value> = vec![$ ( $expected_token.convert(&mut cs_name_interner) ) , * ];
                 assert_eq!(expected, actual);
             }
+            )+
         };
     }
 
-    lexer_test![
-        case_1,
-        r"\a{b}",
-        ControlSequence("a"),
-        Character('{', BeginGroup),
-        Character('b', Letter),
-        Character('}', EndGroup),
+    lexer_tests![
+        (
+            case_1,
+            r"\a{b}",
+            ControlSequence("a"),
+            Character('{', BeginGroup),
+            Character('b', Letter),
+            Character('}', EndGroup),
+        ),
+        (
+            case_2,
+            r"\a b",
+            ControlSequence("a"),
+            Character('b', Letter),
+        ),
+        (
+            case_3,
+            "\\a  b",
+            ControlSequence("a"),
+            Character('b', Letter),
+        ),
+        (
+            case_4,
+            "\\a\n b",
+            ControlSequence("a"),
+            Character('b', Letter),
+        ),
+        (
+            case_5,
+            "\\ABC{D}",
+            ControlSequence("ABC"),
+            Character('{', BeginGroup),
+            Character('D', Letter),
+            Character('}', EndGroup),
+        ),
+        (
+            multi_character_control_sequence,
+            "\\ABC",
+            ControlSequence("ABC"),
+        ),
+        (
+            single_non_letter_character_control_sequence,
+            "\\{{",
+            ControlSequence("{"),
+            Character('{', BeginGroup),
+        ),
+        (
+            single_non_letter_character_control_sequence_followed_by_letter,
+            "\\{A",
+            ControlSequence("{"),
+            Character('A', Letter),
+        ),
+        (
+            case_8,
+            "A%a comment here\nC",
+            Character('A', Letter),
+            Character('C', Letter),
+        ),
+        (
+            case_9,
+            "A%a comment here\n%A second comment\nC",
+            Character('A', Letter),
+            Character('C', Letter),
+        ),
+        (case_10, "A%a comment here", Character('A', Letter),),
+        (
+            case_11,
+            "A%\n B",
+            Character('A', Letter),
+            Character('B', Letter),
+        ),
+        (
+            case_12,
+            "A%\n\n B",
+            Character('A', Letter),
+            ControlSequence("par"),
+            Character('B', Letter),
+        ),
+        (
+            case_13,
+            "\\A %\nB",
+            ControlSequence("A"),
+            Character('B', Letter),
+        ),
+        (
+            double_space_creates_one_space,
+            "A  B",
+            Character('A', Letter),
+            Character(' ', Space),
+            Character('B', Letter),
+        ),
+        (
+            single_newline_creates_one_space,
+            "A\nB",
+            Character('A', Letter),
+            Character('\n', Space),
+            Character('B', Letter),
+        ),
+        (
+            space_and_newline_creates_space,
+            "A \nB",
+            Character('A', Letter),
+            Character(' ', Space),
+            Character('B', Letter),
+        ),
+        (
+            double_newline_creates_par,
+            "A\n\nB",
+            Character('A', Letter),
+            ControlSequence("par"),
+            Character('B', Letter),
+        ),
+        (
+            newline_space_newline_creates_par,
+            "A\n \nB",
+            Character('A', Letter),
+            ControlSequence("par"),
+            Character('B', Letter),
+        ),
+        (
+            non_standard_whitespace_character,
+            "AYB",
+            Character('A', Letter),
+            Character('Y', Space),
+            Character('B', Letter),
+        ),
+        (
+            non_standard_newline_character,
+            "AXB",
+            Character('A', Letter),
+            Character('X', Space),
+            Character('B', Letter),
+        ),
+        (single_ignored_character, "Z",),
     ];
-
-    lexer_test![
-        case_2,
-        r"\a b",
-        ControlSequence("a"),
-        Character('b', Letter),
-    ];
-
-    lexer_test![
-        case_3,
-        "\\a  b",
-        ControlSequence("a"),
-        Character('b', Letter),
-    ];
-
-    lexer_test![
-        case_4,
-        "\\a\n b",
-        ControlSequence("a"),
-        Character('b', Letter),
-    ];
-
-    lexer_test![
-        case_5,
-        "\\ABC{D}",
-        ControlSequence("ABC"),
-        Character('{', BeginGroup),
-        Character('D', Letter),
-        Character('}', EndGroup),
-    ];
-
-    lexer_test![
-        multi_character_control_sequence,
-        "\\ABC",
-        ControlSequence("ABC"),
-    ];
-
-    lexer_test![
-        single_non_letter_character_control_sequence,
-        "\\{{",
-        ControlSequence("{"),
-        Character('{', BeginGroup),
-    ];
-
-    lexer_test![
-        single_non_letter_character_control_sequence_followed_by_letter,
-        "\\{A",
-        ControlSequence("{"),
-        Character('A', Letter),
-    ];
-
-    lexer_test![
-        case_8,
-        "A%a comment here\nC",
-        Character('A', Letter),
-        Character('C', Letter),
-    ];
-
-    lexer_test![
-        case_9,
-        "A%a comment here\n%A second comment\nC",
-        Character('A', Letter),
-        Character('C', Letter),
-    ];
-
-    lexer_test![case_10, "A%a comment here", Character('A', Letter),];
-
-    lexer_test![
-        case_11,
-        "A%\n B",
-        Character('A', Letter),
-        Character('B', Letter),
-    ];
-
-    lexer_test![
-        case_12,
-        "A%\n\n B",
-        Character('A', Letter),
-        ControlSequence("par"),
-        Character('B', Letter),
-    ];
-
-    lexer_test![
-        case_13,
-        "\\A %\nB",
-        ControlSequence("A"),
-        Character('B', Letter),
-    ];
-
-    lexer_test![
-        double_space_creates_one_space,
-        "A  B",
-        Character('A', Letter),
-        Character(' ', Space),
-        Character('B', Letter),
-    ];
-
-    lexer_test![
-        single_newline_creates_one_space,
-        "A\nB",
-        Character('A', Letter),
-        Character('\n', Space),
-        Character('B', Letter),
-    ];
-
-    lexer_test![
-        space_and_newline_creates_space,
-        "A \nB",
-        Character('A', Letter),
-        Character(' ', Space),
-        Character('B', Letter),
-    ];
-
-    lexer_test![
-        double_newline_creates_par,
-        "A\n\nB",
-        Character('A', Letter),
-        ControlSequence("par"),
-        Character('B', Letter),
-    ];
-
-    lexer_test![
-        newline_space_newline_creates_par,
-        "A\n \nB",
-        Character('A', Letter),
-        ControlSequence("par"),
-        Character('B', Letter),
-    ];
-
-    lexer_test![
-        non_standard_whitespace_character,
-        "AYB",
-        Character('A', Letter),
-        Character('Y', Space),
-        Character('B', Letter),
-    ];
-
-    lexer_test![
-        non_standard_newline_character,
-        "AXB",
-        Character('A', Letter),
-        Character('X', Space),
-        Character('B', Letter),
-    ];
-
-    lexer_test![single_ignored_character, "Z",];
 }
