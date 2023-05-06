@@ -2,8 +2,8 @@
 //!
 //! # Writing new conditional primitives
 
-use std::any;
 use std::cell::RefCell;
+use texlang_core::command;
 use texlang_core::parse;
 use texlang_core::prelude::*;
 use texlang_core::vm::HasComponent;
@@ -20,7 +20,7 @@ pub const OR_DOC: &str = "Begin the next branch of a switch statement";
 /// A component that is attached to the input unit for keeping track of conditional branches
 /// as they are expanded.
 pub struct Component {
-    // branches is a stack where each element corresponds to a conditional that is currently
+    // Branches is a stack where each element corresponds to a conditional that is currently
     // expanding. A nested conditional is further up the stack than the conditional it is
     // nested in.
     //
@@ -33,6 +33,12 @@ pub struct Component {
     // to the state. We thus wrap the branches in a ref cell to support mutating them through
     // an immutable reference.
     branches: RefCell<Vec<Branch>>,
+
+    // We cache the tag values inside the component for performance reasons.
+    if_tag: command::Tag,
+    else_tag: command::Tag,
+    or_tag: command::Tag,
+    fi_tag: command::Tag,
 }
 
 #[derive(Debug)]
@@ -55,6 +61,10 @@ impl Component {
     pub fn new() -> Component {
         Component {
             branches: RefCell::new(Vec::new()),
+            if_tag: IF_TAG.get(),
+            else_tag: ELSE_TAG.get(),
+            or_tag: OR_TAG.get(),
+            fi_tag: FI_TAG.get(),
         }
     }
 }
@@ -73,23 +83,10 @@ fn pop_branch<S: HasComponent<Component>>(input: &mut vm::ExpansionInput<S>) -> 
     input.state().component().branches.borrow_mut().pop()
 }
 
-enum If {}
-enum Else {}
-enum Or {}
-enum Fi {}
-
-fn if_id() -> any::TypeId {
-    any::TypeId::of::<If>()
-}
-fn else_id() -> any::TypeId {
-    any::TypeId::of::<Else>()
-}
-fn or_id() -> any::TypeId {
-    any::TypeId::of::<Or>()
-}
-fn fi_id() -> any::TypeId {
-    any::TypeId::of::<Fi>()
-}
+static IF_TAG: command::StaticTag = command::StaticTag::new();
+static ELSE_TAG: command::StaticTag = command::StaticTag::new();
+static OR_TAG: command::StaticTag = command::StaticTag::new();
+static FI_TAG: command::StaticTag = command::StaticTag::new();
 
 // The `true_case` function is executed whenever a conditional evaluates to true.
 fn true_case<S: HasComponent<Component>>(
@@ -118,8 +115,9 @@ fn false_case<S: HasComponent<Component>>(
     let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
         if let ControlSequence(name) = &token.value() {
-            let id = input.base().commands_map.get_id(name);
-            if id == else_id() && depth == 0 {
+            // TODO: use switch
+            let tag = input.base().commands_map.get_tag(name);
+            if tag == Some(input.state().component().else_tag) && depth == 0 {
                 push_branch(
                     input,
                     Branch {
@@ -129,10 +127,10 @@ fn false_case<S: HasComponent<Component>>(
                 );
                 return Ok(Vec::new());
             }
-            if id == if_id() {
+            if tag == Some(input.state().component().if_tag) {
                 depth += 1;
             }
-            if id == fi_id() {
+            if tag == Some(input.state().component().fi_tag) {
                 depth -= 1;
                 if depth < 0 {
                     return Ok(Vec::new());
@@ -170,7 +168,7 @@ macro_rules! create_if_primitive {
         }
 
         pub fn $get_if<S: HasComponent<Component>>() -> command::Command<S> {
-            command::Command::new_expansion($if_primitive_fn).with_id(if_id())
+            command::Command::new_expansion($if_primitive_fn).with_tag(IF_TAG.get())
         }
     };
 }
@@ -225,8 +223,9 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
     let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
         if let ControlSequence(name) = &token.value() {
-            let id = input.base().commands_map.get_id(name);
-            if id == or_id() && depth == 0 {
+            // TODO: switch
+            let tag = input.base().commands_map.get_tag(name);
+            if tag == Some(input.state().component().or_tag) && depth == 0 {
                 cases_to_skip -= 1;
                 if cases_to_skip == 0 {
                     push_branch(
@@ -239,7 +238,7 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
                     return Ok(Vec::new());
                 }
             }
-            if id == else_id() && depth == 0 {
+            if tag == Some(input.state().component().else_tag) && depth == 0 {
                 push_branch(
                     input,
                     Branch {
@@ -249,10 +248,10 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
                 );
                 return Ok(Vec::new());
             }
-            if id == if_id() {
+            if tag == Some(input.state().component().if_tag) {
                 depth += 1;
             }
-            if id == fi_id() {
+            if tag == Some(input.state().component().fi_tag) {
                 depth -= 1;
                 if depth < 0 {
                     return Ok(Vec::new());
@@ -277,7 +276,7 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
 
 /// Get the `\ifcase` primitive.
 pub fn get_if_case<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_expansion(if_case_primitive_fn).with_id(if_id())
+    command::Command::new_expansion(if_case_primitive_fn).with_tag(IF_TAG.get())
 }
 
 fn or_primitive_fn<S: HasComponent<Component>>(
@@ -298,11 +297,12 @@ fn or_primitive_fn<S: HasComponent<Component>>(
     let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
         if let ControlSequence(name) = &token.value() {
-            let id = input.base().commands_map.get_id(name);
-            if id == if_id() {
+            // TODO: switch
+            let tag = input.base().commands_map.get_tag(name);
+            if tag == Some(input.state().component().if_tag) {
                 depth += 1;
             }
-            if id == fi_id() {
+            if tag == Some(input.state().component().fi_tag) {
                 depth -= 1;
                 if depth < 0 {
                     return Ok(Vec::new());
@@ -332,7 +332,7 @@ fn or_primitive_fn<S: HasComponent<Component>>(
 
 /// Get the `\or` primitive.
 pub fn get_or<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_expansion(or_primitive_fn).with_id(or_id())
+    command::Command::new_expansion(or_primitive_fn).with_tag(OR_TAG.get())
 }
 
 fn else_primitive_fn<S: HasComponent<Component>>(
@@ -354,11 +354,12 @@ fn else_primitive_fn<S: HasComponent<Component>>(
     let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
         if let ControlSequence(name) = &token.value() {
-            let id = input.base().commands_map.get_id(name);
-            if id == if_id() {
+            // TODO: switch
+            let tag = input.base().commands_map.get_tag(name);
+            if tag == Some(input.state().component().if_tag) {
                 depth += 1;
             }
-            if id == fi_id() {
+            if tag == Some(input.state().component().fi_tag) {
                 depth -= 1;
                 if depth < 0 {
                     return Ok(Vec::new());
@@ -383,7 +384,7 @@ fn else_primitive_fn<S: HasComponent<Component>>(
 
 /// Get the `\else` primitive.
 pub fn get_else<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_expansion(else_primitive_fn).with_id(else_id())
+    command::Command::new_expansion(else_primitive_fn).with_tag(ELSE_TAG.get())
 }
 
 /// Get the `\fi` primitive.
@@ -403,7 +404,7 @@ fn fi_primitive_fn<S: HasComponent<Component>>(
 }
 
 pub fn get_fi<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_expansion(fi_primitive_fn).with_id(fi_id())
+    command::Command::new_expansion(fi_primitive_fn).with_tag(FI_TAG.get())
 }
 
 #[cfg(test)]

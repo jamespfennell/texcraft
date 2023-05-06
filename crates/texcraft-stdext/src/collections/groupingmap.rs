@@ -131,7 +131,7 @@ impl<V> BackingContainer<usize, V> for Vec<Option<V>> {
     fn insert(&mut self, k: usize, v: V) {
         match <[Option<V>]>::get_mut(self, k) {
             None => {
-                self.resize_with(k, || None);
+                self.resize_with(k, Default::default);
                 self.push(Some(v))
             }
             Some(elem) => {
@@ -147,6 +147,7 @@ impl<V> BackingContainer<usize, V> for Vec<Option<V>> {
             Some(v) => v.as_ref(),
         }
     }
+
     #[inline]
     fn get_mut(&mut self, k: &usize) -> Option<&mut V> {
         match <[Option<V>]>::get_mut(self, *k) {
@@ -156,7 +157,7 @@ impl<V> BackingContainer<usize, V> for Vec<Option<V>> {
     }
 
     #[inline]
-    fn remove(self: &mut Vec<Option<V>>, k: &usize) {
+    fn remove(&mut self, k: &usize) {
         if let Some(elem) = <[Option<V>]>::get_mut(self, *k) {
             *elem = None;
         }

@@ -14,18 +14,18 @@ pub const DEF_DOC: &str = "Define a custom macro";
 
 /// Get the `\def` command.
 pub fn get_def<S: HasComponent<prefix::Component>>() -> command::Command<S> {
-    command::Command::new_execution(def_primitive_fn).with_id(def_id())
+    command::Command::new_execution(def_primitive_fn).with_tag(def_tag())
 }
 
 /// Get the `\gdef` command.
 pub fn get_gdef<S: HasComponent<prefix::Component>>() -> command::Command<S> {
-    command::Command::new_execution(gdef_primitive_fn).with_id(def_id())
+    command::Command::new_execution(gdef_primitive_fn).with_tag(def_tag())
 }
 
-struct Def;
+static DEF_TAG: command::StaticTag = command::StaticTag::new();
 
-pub fn def_id() -> std::any::TypeId {
-    std::any::TypeId::of::<Def>()
+pub fn def_tag() -> command::Tag {
+    DEF_TAG.get()
 }
 
 fn def_primitive_fn<S: HasComponent<prefix::Component>>(

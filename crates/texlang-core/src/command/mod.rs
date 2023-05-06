@@ -34,22 +34,14 @@ use crate::prelude::*;
 use crate::texmacro;
 use crate::token;
 use crate::variable;
-use std::any::TypeId;
+use once_cell::sync::OnceCell;
+use std::num;
 use std::rc;
+use std::sync;
 
 mod map;
 
 pub use map::Map;
-
-enum NullTypeIdType {}
-
-/// Returns a [TypeId] that can be used to represent "no type ID".
-///
-/// Ideally "no type ID" would be represented using the `None` variant of `Option<TypeId>`,
-/// but this type takes up two words instead of one.
-pub fn null_type_id() -> TypeId {
-    std::any::TypeId::of::<NullTypeIdType>()
-}
 
 /// The Rust type of expansion primitive functions.
 pub type ExpansionFn<S> =
@@ -83,10 +75,11 @@ pub enum Fn<S> {
 
 /// Texlang representation of a TeX command.
 ///
-/// Consists of a function, and optional ID, and an optional doc string.
+/// Consists of a function, and optional tag, and an optional doc string.
 pub struct Command<S> {
     func: Fn<S>,
-    id: std::any::TypeId,
+    // TODO: should we just put the tag on the two Fns (expansion, execution) that support it?
+    tag: Option<Tag>,
     doc: Option<&'static str>,
 }
 
@@ -107,8 +100,8 @@ impl<S> Command<S> {
     }
 
     /// Set the ID for this command definition.
-    pub fn with_id(mut self, id: std::any::TypeId) -> Command<S> {
-        self.id = id;
+    pub fn with_tag(mut self, tag: Tag) -> Command<S> {
+        self.tag = Some(tag);
         self
     }
 
@@ -122,8 +115,8 @@ impl<S> Command<S> {
         &self.func
     }
 
-    pub fn id(&self) -> &TypeId {
-        &self.id
+    pub fn tag(&self) -> Option<Tag> {
+        self.tag
     }
 
     pub fn doc(&self) -> Option<&'static str> {
@@ -133,7 +126,7 @@ impl<S> Command<S> {
 
 impl<S> std::fmt::Debug for Fn<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "This is a command",)?;
+        write!(f, "todo")?;
         Ok(())
     }
 }
@@ -156,7 +149,7 @@ impl<S> Clone for Command<S> {
     fn clone(&self) -> Self {
         Self {
             func: self.func.clone(),
-            id: self.id,
+            tag: self.tag,
             doc: self.doc,
         }
     }
@@ -190,9 +183,96 @@ impl<S> From<Fn<S>> for Command<S> {
     fn from(cmd: Fn<S>) -> Self {
         Command {
             func: cmd,
-            id: null_type_id(),
+            tag: None,
             doc: None,
         }
+    }
+}
+
+/// A tag is a piece of metadata that is optionally attached to a command.
+///
+/// Tags are used to implement certain TeX language semantics.
+/// An example is TeX conditionals.
+/// When a TeX conditional statement evaluates to false, the `\if` command must scan
+///     the input stream until it finds either an `\else` or `\fi` command.
+/// (The tokens scanned in this process are in the true branch of the conditional,
+///     and must thus be discarded.)
+/// Tags are the mechanism by which the scanning algorithm can
+///     determine if a token corresponds to an `\else` of `\fi` command.
+/// Concretely, both `\else` of `\fi` command have unique tags associated to them.
+/// When scanning the stream,
+///     if a token is a command token then the tag for the associated command is
+///     compared to the known tags for `\else` and `\fi`.
+/// If the tags match, the true branch is finished.
+///
+/// In general, TeX commands interface with the VM in two ways.
+/// The first most common way is when the main VM loop or expansion loop encounters a command.
+/// The loop invokes the command's associated Rust function.
+/// One can think of the Rust function as providing the behaviour of the command in this context.
+///
+/// The second way is when a different command, like a conditional command, performs some operation
+///     that is dependent on the commands it reads out of the input stream.
+/// In this context the commands in the input stream provide behaviour using tags.
+/// The `\else` command having the specific else tag results in the conditional branch processing completing.
+///
+/// Note that the same tag can be used for multiple commands,
+/// but each command can only have one tag.
+///
+/// ## Implementation details
+///
+/// Tags are non-zero 32 bit integers.
+/// The first tag created has value 1, the second tag has value 2, and so on.
+/// A global mutex is used to store the next tag value.
+/// Tags have the property that `Option<Tag>` takes up 4 bytes in memory.
+#[derive(PartialEq, Eq, Clone, Copy, Debug, PartialOrd, Ord, Hash)]
+pub struct Tag(num::NonZeroU16);
+
+static NEXT_TAG_VALUE: sync::Mutex<u16> = sync::Mutex::new(1);
+
+impl Tag {
+    /// Creates a new unique tag.
+    ///
+    /// ```
+    /// # use texlang_core::command::Tag;
+    /// let tag_1 = Tag::new();
+    /// let tag_2 = Tag::new();
+    /// assert_ne!(tag_1, tag_2);
+    /// ```
+    pub fn new() -> Tag {
+        let mut n = NEXT_TAG_VALUE.lock().unwrap();
+        let tag = Tag(num::NonZeroU16::new(*n).unwrap());
+        *n = n.checked_add(1).unwrap();
+        tag
+    }
+}
+
+/// A static tag enables creating a tag in a static variable.
+///
+/// ```
+/// # use texlang_core::command::StaticTag;
+/// static TAG: StaticTag = StaticTag::new();
+///
+/// let first_get = TAG.get();
+/// let second_get = TAG.get();
+/// assert_eq!(first_get, second_get);
+/// ```
+pub struct StaticTag(OnceCell<Tag>);
+
+impl StaticTag {
+    /// Create a new static tag.
+    pub const fn new() -> StaticTag {
+        StaticTag(OnceCell::new())
+    }
+
+    /// Get the actual [Tag] out of this [StaticTag].
+    /// Repeated calls to this function return the same tag.
+    ///
+    /// This is not a trivial getter.
+    /// The [Tag] is lazily constructed so even subsequent calls to this getter must do some work to check if the [Tag]
+    ///     exists or not.
+    /// For very hot code paths it is advised to cache the return value somewhere, for example in a relevent command's state.
+    pub fn get(&self) -> Tag {
+        *self.0.get_or_init(Tag::new)
     }
 }
 
@@ -203,5 +283,30 @@ mod tests {
     #[test]
     fn func_size() {
         assert_eq!(std::mem::size_of::<Fn<()>>(), 16);
+    }
+
+    static STATIC_TAG_1: StaticTag = StaticTag::new();
+    static STATIC_TAG_2: StaticTag = StaticTag::new();
+
+    #[test]
+    fn tag() {
+        let tag_1_val_1 = STATIC_TAG_1.get();
+        let tag_2_val_1 = STATIC_TAG_2.get();
+        let other_tag_1 = Tag::new();
+        let tag_1_val_2 = STATIC_TAG_1.get();
+        let tag_2_val_2 = STATIC_TAG_2.get();
+        let other_tag_2 = Tag::new();
+
+        assert_eq!(tag_1_val_1, tag_1_val_2);
+        assert_eq!(tag_2_val_1, tag_2_val_2);
+
+        assert_ne!(tag_1_val_1, tag_2_val_2);
+        assert_ne!(tag_1_val_1, other_tag_1);
+        assert_ne!(tag_1_val_1, other_tag_2);
+    }
+
+    #[test]
+    fn tag_size() {
+        assert_eq!(std::mem::size_of::<Option<Tag>>(), 2);
     }
 }

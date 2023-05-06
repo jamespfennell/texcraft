@@ -32,7 +32,9 @@ use texcraft_stdext::collections::groupingmap::GroupingVec;
 ///     alias_character(cs_name, token::Token)
 pub struct Map<S> {
     funcs: GroupingVec<command::Fn<S>>,
-    ids: GroupingVec<std::any::TypeId>,
+    // TODO: the tags map is not optimal because the tags are stored in memory as Option<Option<Tag>>
+    // which takes up 4 words instead of Option<Tag> which takes up 2 words. We should fix this.
+    tags: GroupingVec<Option<command::Tag>>,
 
     built_ins: HashMap<BuiltIn, Command<S>>,
     key_to_built_in: HashMap<Key, BuiltIn>,
@@ -41,8 +43,8 @@ pub struct Map<S> {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Key {
-    Execution(usize, std::any::TypeId),
-    Expansion(usize, std::any::TypeId),
+    Execution(usize, Option<command::Tag>),
+    Expansion(usize, Option<command::Tag>),
     VariableNoAddress(variable::GetterKey),
     VariableStaticAddress(variable::GetterKey, variable::Address),
     VariableDynamic(variable::GetterKey, usize),
@@ -52,17 +54,17 @@ impl<S> TryFrom<&Command<S>> for Key {
     type Error = ();
 
     fn try_from(value: &Command<S>) -> Result<Self, Self::Error> {
-        (&value.func, &value.id).try_into()
+        (&value.func, value.tag).try_into()
     }
 }
 
-impl<S> TryFrom<(&command::Fn<S>, &std::any::TypeId)> for Key {
+impl<S> TryFrom<(&command::Fn<S>, Option<command::Tag>)> for Key {
     type Error = ();
 
-    fn try_from(value: (&command::Fn<S>, &std::any::TypeId)) -> Result<Self, Self::Error> {
+    fn try_from(value: (&command::Fn<S>, Option<command::Tag>)) -> Result<Self, Self::Error> {
         match &value.0 {
-            Fn::Expansion(f) => Ok(Key::Expansion(*f as usize, *value.1)),
-            Fn::Execution(f) => Ok(Key::Execution(*f as usize, *value.1)),
+            Fn::Expansion(f) => Ok(Key::Expansion(*f as usize, value.1)),
+            Fn::Execution(f) => Ok(Key::Execution(*f as usize, value.1)),
             Fn::Variable(v) => {
                 let v_id = v.getter_key();
                 match v.address_spec() {
@@ -108,7 +110,7 @@ impl<S> Map<S> {
         additional_built_ins: HashMap<rc::Rc<str>, Command<S>>,
     ) -> Map<S> {
         let mut funcs: GroupingVec<command::Fn<S>> = Default::default();
-        let mut ids: GroupingVec<std::any::TypeId> = Default::default();
+        let mut tags: GroupingVec<Option<command::Tag>> = Default::default();
         let mut built_ins: HashMap<BuiltIn, Command<S>> = Default::default();
         let mut key_to_built_in: HashMap<Key, BuiltIn> = Default::default();
         let mut getter_key_to_built_in: HashMap<variable::GetterKey, BuiltIn> = Default::default();
@@ -126,7 +128,7 @@ impl<S> Map<S> {
         for (name, cmd) in initial_built_ins {
             let key = name.to_usize();
             funcs.insert(key, cmd.func.clone(), groupingmap::Scope::Local);
-            ids.insert(key, cmd.id, groupingmap::Scope::Local);
+            tags.insert(key, cmd.tag, groupingmap::Scope::Local);
             insert(BuiltIn::Initial(name), cmd);
         }
         for (name, cmd) in additional_built_ins {
@@ -134,7 +136,7 @@ impl<S> Map<S> {
         }
         Self {
             funcs,
-            ids,
+            tags,
             built_ins,
             key_to_built_in,
             _getter_key_to_built_in: getter_key_to_built_in,
@@ -146,26 +148,26 @@ impl<S> Map<S> {
         self.funcs.get(&name.to_usize())
     }
 
-    pub fn get_id(&self, name: &token::CsName) -> std::any::TypeId {
-        self.ids
-            .get(&name.to_usize())
-            .copied()
-            .unwrap_or_else(null_type_id)
+    pub fn get_tag(&self, name: &token::CsName) -> Option<command::Tag> {
+        match self.tags.get(&name.to_usize()) {
+            None => None,
+            Some(tag) => *tag,
+        }
     }
 
     pub fn get_command_slow(&self, name: &token::CsName) -> Option<command::Command<S>> {
-        let (func, id) = match self.get_all(name) {
+        let (func, tag) = match self.get_all(name) {
             None => return None,
             Some(t) => t,
         };
-        if let Ok(ref key) = (func, id).try_into() {
+        if let Ok(ref key) = (func, tag).try_into() {
             if let Some(built_in) = self.key_to_built_in.get(key) {
                 return self.built_ins.get(built_in).cloned();
             }
         }
         Some(command::Command {
             func: func.clone(),
-            id: *id,
+            tag,
             doc: None,
         })
     }
@@ -177,25 +179,22 @@ impl<S> Map<S> {
         variable_command: variable::Command<S>,
         scope: groupingmap::Scope,
     ) {
-        let key = name.to_usize();
-        self.ids.insert(key, null_type_id(), scope);
-        self.funcs.insert(
-            key,
+        self.insert(
+            name,
             command::Fn::Variable(rc::Rc::new(variable_command)),
+            None,
             scope,
         );
     }
 
+    // TODO: reconsider this API of 4 setters ... it seems to be unneccessary complexity?
     pub fn insert_macro(
         &mut self,
         name: token::CsName,
         texmacro: texmacro::Macro,
         scope: groupingmap::Scope,
     ) {
-        let key = name.to_usize();
-        self.ids.insert(key, null_type_id(), scope);
-        self.funcs
-            .insert(key, command::Fn::Macro(rc::Rc::new(texmacro)), scope);
+        self.insert(name, command::Fn::Macro(rc::Rc::new(texmacro)), None, scope);
     }
 
     pub fn alias_control_sequence(
@@ -204,15 +203,11 @@ impl<S> Map<S> {
         control_sequence: token::CsName,
         scope: groupingmap::Scope,
     ) -> Result<(), InvalidAlias> {
-        let (func, id) = match self.get_all(&control_sequence) {
+        let (func, tag) = match self.get_all(&control_sequence) {
             None => return Err(InvalidAlias {}),
             Some(t) => t,
         };
-        let key = alias.to_usize();
-        let id = *id;
-        let func = func.clone();
-        self.ids.insert(key, id, scope);
-        self.funcs.insert(key, func, scope);
+        self.insert(alias, func.clone(), tag, scope);
         Ok(())
     }
 
@@ -222,10 +217,19 @@ impl<S> Map<S> {
         token: token::Token,
         scope: groupingmap::Scope,
     ) {
-        let key = alias.to_usize();
-        self.ids.insert(key, null_type_id(), scope);
-        self.funcs
-            .insert(key, command::Fn::Character(token.value()), scope);
+        self.insert(alias, command::Fn::Character(token.value()), None, scope);
+    }
+
+    fn insert(
+        &mut self,
+        name: token::CsName,
+        func: command::Fn<S>,
+        tag: Option<Tag>,
+        scope: groupingmap::Scope,
+    ) {
+        let key = name.to_usize();
+        self.funcs.insert(key, func, scope);
+        self.tags.insert(key, tag, scope);
     }
 
     pub fn to_hash_map_slow(&self) -> HashMap<CsName, command::Command<S>> {
@@ -246,11 +250,11 @@ impl<S> Map<S> {
 
     pub(crate) fn begin_group(&mut self) {
         self.funcs.begin_group();
-        self.ids.begin_group();
+        self.tags.begin_group();
     }
 
     pub(crate) fn end_group(&mut self) -> bool {
-        self.funcs.end_group() && self.ids.end_group()
+        self.funcs.end_group() && self.tags.end_group()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -261,17 +265,17 @@ impl<S> Map<S> {
         self.funcs.len()
     }
 
-    fn get_all(&self, cs_name: &token::CsName) -> Option<(&command::Fn<S>, &std::any::TypeId)> {
+    fn get_all(&self, cs_name: &token::CsName) -> Option<(&command::Fn<S>, Option<command::Tag>)> {
         let key = cs_name.to_usize();
         let func = match self.funcs.get(&key) {
             None => return None,
             Some(func) => func,
         };
-        let id = match self.ids.get(&key) {
-            None => return None,
-            Some(id) => id,
+        let tag = match self.tags.get(&key) {
+            None => None,
+            Some(tag) => *tag,
         };
-        Some((func, id))
+        Some((func, tag))
     }
 }
 

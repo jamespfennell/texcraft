@@ -13,32 +13,33 @@ pub const DIVIDE_DOC: &str = "Divide a variable by an integer";
 
 /// Get the `\advance` command.
 pub fn get_advance<S: HasComponent<prefix::Component>>() -> command::Command<S> {
-    command::Command::new_execution(advance_fn).with_id(get_variable_op_id())
+    command::Command::new_execution(advance_fn).with_tag(get_variable_op_tag())
 }
 
 /// Get the `\advancechk` command.
 pub fn get_advancechk<S: HasComponent<prefix::Component>>() -> command::Command<S> {
-    command::Command::new_execution(advancechk_fn).with_id(get_variable_op_id())
+    command::Command::new_execution(advancechk_fn).with_tag(get_variable_op_tag())
 }
 
 /// Get the `\multiply` command.
 pub fn get_multiply<S: HasComponent<prefix::Component>>() -> command::Command<S> {
-    command::Command::new_execution(multiply_fn).with_id(get_variable_op_id())
+    command::Command::new_execution(multiply_fn).with_tag(get_variable_op_tag())
 }
 
 /// Get the `\multiplychk` command.
 pub fn get_multiplychk<S: HasComponent<prefix::Component>>() -> command::Command<S> {
-    command::Command::new_execution(multiplychk_fn).with_id(get_variable_op_id())
+    command::Command::new_execution(multiplychk_fn).with_tag(get_variable_op_tag())
 }
 
 /// Get the `\divide` command.
 pub fn get_divide<S: HasComponent<prefix::Component>>() -> command::Command<S> {
-    command::Command::new_execution(divide_fn).with_id(get_variable_op_id())
+    command::Command::new_execution(divide_fn).with_tag(get_variable_op_tag())
 }
-struct VariableOp;
 
-pub fn get_variable_op_id() -> std::any::TypeId {
-    std::any::TypeId::of::<VariableOp>()
+static VARIABLE_OP_TAG: command::StaticTag = command::StaticTag::new();
+
+pub fn get_variable_op_tag() -> command::Tag {
+    VARIABLE_OP_TAG.get()
 }
 
 macro_rules! create_arithmetic_primitive {

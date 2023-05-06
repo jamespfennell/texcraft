@@ -60,18 +60,18 @@ use texlang_core::prelude::*;
 /// Component for the prefix commands.
 pub struct Component {
     scope: groupingmap::Scope,
-    prefixable_with_any: HashSet<std::any::TypeId>,
-    prefixable_with_global: HashSet<std::any::TypeId>,
+    prefixable_with_any: HashSet<command::Tag>,
+    prefixable_with_global: HashSet<command::Tag>,
 }
 
 impl Default for Component {
     fn default() -> Self {
         Component {
             scope: groupingmap::Scope::Local,
-            prefixable_with_any: vec![def::def_id()].into_iter().collect(),
+            prefixable_with_any: vec![def::def_tag()].into_iter().collect(),
             prefixable_with_global: vec![
-                variableops::get_variable_op_id(),
-                letassignment::let_id(),
+                variableops::get_variable_op_tag(),
+                letassignment::let_tag(),
             ]
             .into_iter()
             .collect(),
@@ -113,35 +113,35 @@ impl Prefix {
 
 /// Get the `\global` command.
 pub fn get_global<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_execution(global_primitive_fn).with_id(global_id())
+    command::Command::new_execution(global_primitive_fn).with_tag(global_tag())
 }
 
-struct Global;
+static GLOBAL_TAG: command::StaticTag = command::StaticTag::new();
 
-fn global_id() -> std::any::TypeId {
-    std::any::TypeId::of::<Global>()
+fn global_tag() -> command::Tag {
+    GLOBAL_TAG.get()
 }
 
 /// Get the `\long` command.
 pub fn get_long<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_execution(long_primitive_fn).with_id(long_id())
+    command::Command::new_execution(long_primitive_fn).with_tag(long_tag())
 }
 
-struct Long;
+static LONG_TAG: command::StaticTag = command::StaticTag::new();
 
-fn long_id() -> std::any::TypeId {
-    std::any::TypeId::of::<Long>()
+fn long_tag() -> command::Tag {
+    LONG_TAG.get()
 }
 
 /// Get the `\outer` command.
 pub fn get_outer<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_execution(outer_primitive_fn).with_id(outer_id())
+    command::Command::new_execution(outer_primitive_fn).with_tag(outer_tag())
 }
 
-struct Outer;
+static OUTER_TAG: command::StaticTag = command::StaticTag::new();
 
-fn outer_id() -> std::any::TypeId {
-    std::any::TypeId::of::<Outer>()
+fn outer_tag() -> command::Tag {
+    OUTER_TAG.get()
 }
 
 fn global_primitive_fn<S: HasComponent<Component>>(
@@ -220,23 +220,25 @@ fn process_prefixes<S: HasComponent<Component>>(
                 }
                 // Next check if it's a command that can be prefixed by any of the prefix command.
                 let component = input.state().component();
-                let cmd_id = input.base().commands_map.get_id(&name);
-                if component.prefixable_with_any.contains(&cmd_id) {
-                    input.state_mut().component_mut().scope = match prefix.global {
-                        None => groupingmap::Scope::Local,
-                        Some(_) => groupingmap::Scope::Global,
-                    };
-                    return Ok(());
-                }
-                // Next check if it's a command that can be prefixed by global only. In this case we check
-                // that no other prefixes are present.
-                if component.prefixable_with_global.contains(&cmd_id) {
-                    assert_only_global_prefix(t, prefix, input)?;
-                    input.state_mut().component_mut().scope = match prefix.global {
-                        None => groupingmap::Scope::Local,
-                        Some(_) => groupingmap::Scope::Global,
-                    };
-                    return Ok(());
+                let tag = input.base().commands_map.get_tag(&name);
+                if let Some(tag) = tag {
+                    if component.prefixable_with_any.contains(&tag) {
+                        input.state_mut().component_mut().scope = match prefix.global {
+                            None => groupingmap::Scope::Local,
+                            Some(_) => groupingmap::Scope::Global,
+                        };
+                        return Ok(());
+                    }
+                    // Next check if it's a command that can be prefixed by global only. In this case we check
+                    // that no other prefixes are present.
+                    if component.prefixable_with_global.contains(&tag) {
+                        assert_only_global_prefix(t, prefix, input)?;
+                        input.state_mut().component_mut().scope = match prefix.global {
+                            None => groupingmap::Scope::Local,
+                            Some(_) => groupingmap::Scope::Global,
+                        };
+                        return Ok(());
+                    }
                 }
                 // If we make it to here, this is not a valid target for the prefix command.
                 let (prefix_token, prefix_kind) = prefix.get_one();
@@ -269,18 +271,19 @@ fn complete_prefix<S>(
         None => false,
         Some(&t) => match t.value() {
             Value::ControlSequence(name) => {
-                let cmd_id = input.base().commands_map.get_id(&name);
-                let global_id = global_id();
-                let outer_id = outer_id();
-                let long_id = long_id();
-                // For some reason a match statement doesn't work here.
-                if cmd_id == global_id {
+                let cmd_id = input.base().commands_map.get_tag(&name);
+                // TODO: cache these tags in the component
+                let global_id = global_tag();
+                let outer_id = outer_tag();
+                let long_id = long_tag();
+                // TODO: switch
+                if cmd_id == Some(global_id) {
                     prefix.global = Some(t);
                     true
-                } else if cmd_id == outer_id {
+                } else if cmd_id == Some(outer_id) {
                     prefix.outer = Some(t);
                     true
-                } else if cmd_id == long_id {
+                } else if cmd_id == Some(long_id) {
                     prefix.long = Some(t);
                     true
                 } else {

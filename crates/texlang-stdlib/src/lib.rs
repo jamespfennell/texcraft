@@ -113,3 +113,20 @@ implement_has_component![
     (time::Component, time),
     (tracingmacros::Component, tracing_macros),
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use texlang_core::command;
+
+    type State = StdLibState;
+    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+        StdLibState::all_initial_built_ins()
+    }
+
+    expansion_test![
+        overwrite_else,
+        r"\def\else{}\ifodd 2 \else should be skipped \fi",
+        r""
+    ];
+}

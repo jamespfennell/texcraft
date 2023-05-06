@@ -9,14 +9,14 @@ pub const LET_DOC: &str = "Assign a command or character to a control sequence";
 /// Get the `\let` command.
 pub fn get_let<S: HasComponent<prefix::Component>>() -> command::Command<S> {
     command::Command::new_execution(let_primitive_fn)
-        .with_id(let_id())
+        .with_tag(let_tag())
         .with_doc(LET_DOC)
 }
 
-struct Let;
+static LET_TAG: command::StaticTag = command::StaticTag::new();
 
-pub fn let_id() -> std::any::TypeId {
-    std::any::TypeId::of::<Let>()
+pub fn let_tag() -> command::Tag {
+    LET_TAG.get()
 }
 
 fn let_primitive_fn<S: HasComponent<prefix::Component>>(

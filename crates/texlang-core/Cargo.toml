@@ -15,7 +15,9 @@ anyhow = "1.0"
 # Nice terminal output.
 colored = "2"
 
+once_cell = "1.17.1"
+
 # String interning for control sequence names.
-string-interner = "0.13.0"
+string-interner = "0.14.0"
 
 texcraft-stdext = { path = "../texcraft-stdext" }
