@@ -9,8 +9,8 @@ pub mod input {
     use super::read_file;
 
     /// Get the `\input` expansion primitive.
-    pub fn get_input<S>() -> command::Command<S> {
-        command::Command::new_expansion(input_fn)
+    pub fn get_input<S>() -> command::BuiltIn<S> {
+        command::BuiltIn::new_expansion(input_fn)
     }
 
     fn input_fn<S>(
@@ -30,7 +30,7 @@ pub mod input {
         use super::*;
         use crate::testutil::*;
 
-        fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+        fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
             HashMap::from([("input", get_input())])
         }
 

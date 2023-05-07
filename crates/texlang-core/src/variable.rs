@@ -115,7 +115,7 @@
 //! use texlang_core::variable;
 //! use texlang_core::command;
 //!
-//! pub fn my_variable<S: HasComponent<MyComponent>>() -> command::Command<S> {
+//! pub fn my_variable<S: HasComponent<MyComponent>>() -> command::BuiltIn<S> {
 //!     return variable::Command::new(
 //!         getter,
 //!         mut_getter,
@@ -146,7 +146,7 @@
 //!     my_variable_value: i32
 //! }
 //!
-//! pub fn my_variable<S: HasComponent<MyComponent>>() -> command::Command<S> {
+//! pub fn my_variable<S: HasComponent<MyComponent>>() -> command::BuiltIn<S> {
 //!     return variable::Command::new(
 //!         |state: &S, address: variable::Address| -> &i32 {
 //!             &state.component().my_variable_value
@@ -230,7 +230,7 @@
 //! #     my_array_values: [i32; 10]
 //! # }
 //! # use texlang_core::vm::HasComponent;
-//! pub fn my_array<S: HasComponent<MyComponent>>() -> command::Command<S> {
+//! pub fn my_array<S: HasComponent<MyComponent>>() -> command::BuiltIn<S> {
 //!     return variable::Command::new(
 //!         getter,
 //!         mut_getter,

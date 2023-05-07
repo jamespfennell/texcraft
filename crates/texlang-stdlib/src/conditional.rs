@@ -167,8 +167,8 @@ macro_rules! create_if_primitive {
             }
         }
 
-        pub fn $get_if<S: HasComponent<Component>>() -> command::Command<S> {
-            command::Command::new_expansion($if_primitive_fn).with_tag(IF_TAG.get())
+        pub fn $get_if<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+            command::BuiltIn::new_expansion($if_primitive_fn).with_tag(IF_TAG.get())
         }
     };
 }
@@ -275,8 +275,8 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
 }
 
 /// Get the `\ifcase` primitive.
-pub fn get_if_case<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_expansion(if_case_primitive_fn).with_tag(IF_TAG.get())
+pub fn get_if_case<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_expansion(if_case_primitive_fn).with_tag(IF_TAG.get())
 }
 
 fn or_primitive_fn<S: HasComponent<Component>>(
@@ -331,8 +331,8 @@ fn or_primitive_fn<S: HasComponent<Component>>(
 }
 
 /// Get the `\or` primitive.
-pub fn get_or<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_expansion(or_primitive_fn).with_tag(OR_TAG.get())
+pub fn get_or<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_expansion(or_primitive_fn).with_tag(OR_TAG.get())
 }
 
 fn else_primitive_fn<S: HasComponent<Component>>(
@@ -383,8 +383,8 @@ fn else_primitive_fn<S: HasComponent<Component>>(
 }
 
 /// Get the `\else` primitive.
-pub fn get_else<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_expansion(else_primitive_fn).with_tag(ELSE_TAG.get())
+pub fn get_else<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_expansion(else_primitive_fn).with_tag(ELSE_TAG.get())
 }
 
 /// Get the `\fi` primitive.
@@ -403,8 +403,8 @@ fn fi_primitive_fn<S: HasComponent<Component>>(
     Ok(Vec::new())
 }
 
-pub fn get_fi<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_expansion(fi_primitive_fn).with_tag(FI_TAG.get())
+pub fn get_fi<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_expansion(fi_primitive_fn).with_tag(FI_TAG.get())
 }
 
 #[cfg(test)]
@@ -423,7 +423,7 @@ mod tests {
 
     implement_has_component![State, (Component, conditional), (script::Component, exec),];
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("else", get_else()),
             ("fi", get_fi()),

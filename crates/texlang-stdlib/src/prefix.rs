@@ -112,8 +112,8 @@ impl Prefix {
 }
 
 /// Get the `\global` command.
-pub fn get_global<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_execution(global_primitive_fn).with_tag(global_tag())
+pub fn get_global<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(global_primitive_fn).with_tag(global_tag())
 }
 
 static GLOBAL_TAG: command::StaticTag = command::StaticTag::new();
@@ -123,8 +123,8 @@ fn global_tag() -> command::Tag {
 }
 
 /// Get the `\long` command.
-pub fn get_long<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_execution(long_primitive_fn).with_tag(long_tag())
+pub fn get_long<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(long_primitive_fn).with_tag(long_tag())
 }
 
 static LONG_TAG: command::StaticTag = command::StaticTag::new();
@@ -134,8 +134,8 @@ fn long_tag() -> command::Tag {
 }
 
 /// Get the `\outer` command.
-pub fn get_outer<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_execution(outer_primitive_fn).with_tag(outer_tag())
+pub fn get_outer<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(outer_primitive_fn).with_tag(outer_tag())
 }
 
 static OUTER_TAG: command::StaticTag = command::StaticTag::new();
@@ -204,7 +204,9 @@ fn process_prefixes<S: HasComponent<Component>>(
         Some(&t) => match t.value() {
             Value::ControlSequence(name) => {
                 // First check if it's a variable command. If so, assign to the variable at the local or global scope.
-                if let Some(command::Fn::Variable(cmd)) = input.base().commands_map.get_fn(&name) {
+                if let Some(command::Command::Variable(cmd)) =
+                    input.base().commands_map.get_command(&name)
+                {
                     let cmd = cmd.clone();
                     assert_only_global_prefix(t, prefix, input)?;
                     input.consume()?;
@@ -409,7 +411,7 @@ impl std::error::Error for Error {}
 /// ```tex
 /// \global \command <input to command> \assertGlobalIsFalse
 /// ```
-pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::Command<S> {
+pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     fn noop_execution_cmd_fn<S: HasComponent<Component>>(
         _: Token,
         input: &mut vm::ExecutionInput<S>,
@@ -419,7 +421,7 @@ pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::Comm
             groupingmap::Scope::Local => Ok(()),
         }
     }
-    command::Command::new_execution(noop_execution_cmd_fn)
+    command::BuiltIn::new_execution(noop_execution_cmd_fn)
 }
 
 #[cfg(test)]
@@ -443,7 +445,7 @@ mod test {
 
     implement_has_component![State, (script::Component, exec), (Component, prefix),];
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("global", get_global()),
             ("long", get_long()),
@@ -457,7 +459,7 @@ mod test {
         ])
     }
 
-    fn get_integer() -> command::Command<State> {
+    fn get_integer() -> command::BuiltIn<State> {
         variable::Command::new(
             |state: &State, _: variable::Address| -> &i32 { &state.integer },
             |state: &mut State, _: variable::Address| -> &mut i32 { &mut state.integer },

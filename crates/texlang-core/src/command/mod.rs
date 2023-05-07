@@ -50,20 +50,21 @@ pub type ExpansionFn<S> =
 /// The Rust type of execution primitive functions.
 pub type ExecutionFn<S> = fn(token: Token, input: &mut vm::ExecutionInput<S>) -> anyhow::Result<()>;
 
-/// Function that determines the actual behaviour of a TeX command.
-pub enum Fn<S> {
-    /// An expansion command that is implemented in the engine. Examples: `\the`, `\ifnum`.
-    Expansion(ExpansionFn<S>),
+/// A TeX command.
+pub enum Command<S> {
+    /// An expansion primitive that is implemented in the engine. Examples: `\the`, `\ifnum`.
+    Expansion(ExpansionFn<S>, Option<Tag>),
 
     /// A user defined macro.
     /// Examples: `\newcommand` and `\include` in LaTeX.
     Macro(rc::Rc<texmacro::Macro>),
 
-    /// A non-expandable command that performs operations on the state. Examples: `\def`, `\par`.
-    Execution(ExecutionFn<S>),
+    /// A non-expansion primitive that performs operations on the state. Examples: `\def`, `\par`.
+    Execution(ExecutionFn<S>, Option<Tag>),
 
     /// A command that is used to reference a variable, like a parameter or a register.
     /// Such a command is *resolved* to get the variable using the function pointer it holds.
+    /// Examples: `\count`, `\year`.
     Variable(rc::Rc<variable::Command<S>>),
 
     /// A command that aliases a character.
@@ -73,50 +74,64 @@ pub enum Fn<S> {
     Character(token::Value),
 }
 
-/// Texlang representation of a TeX command.
+impl<S> Command<S> {
+    /// Gets the tag associated to this command, or [None] if the command has no tag.
+    pub fn tag(&self) -> Option<Tag> {
+        match self {
+            Command::Expansion(_, tag) => *tag,
+            Command::Macro(_) => None,
+            Command::Execution(_, tag) => *tag,
+            Command::Variable(_) => None,
+            Command::Character(_) => None,
+        }
+    }
+}
+
+/// A built-in command provided at VM initialization.
 ///
-/// Consists of a function, and optional tag, and an optional doc string.
-pub struct Command<S> {
-    func: Fn<S>,
-    // TODO: should we just put the tag on the two Fns (expansion, execution) that support it?
-    tag: Option<Tag>,
+/// This struct is simply a combination of a [Command] and a documentation string for the command.
+/// It is used when providing the initial set of built-in commands for a VM.
+pub struct BuiltIn<S> {
+    cmd: Command<S>,
     doc: Option<&'static str>,
 }
 
-impl<S> Command<S> {
-    /// Create a new expansion command definition.
-    pub fn new_expansion(t: ExpansionFn<S>) -> Command<S> {
+impl<S> BuiltIn<S> {
+    /// Create a new expansion built-in command.
+    pub fn new_expansion(t: ExpansionFn<S>) -> BuiltIn<S> {
         t.into()
     }
 
-    /// Create a new expansion command definition.
-    pub fn new_execution(t: ExecutionFn<S>) -> Command<S> {
+    /// Create a new expansion built-in command.
+    pub fn new_execution(t: ExecutionFn<S>) -> BuiltIn<S> {
         t.into()
     }
 
-    /// Create a new variable command definition.
-    pub fn new_variable(cmd: variable::Command<S>) -> Command<S> {
-        Fn::Variable(rc::Rc::new(cmd)).into()
+    /// Create a new variable built-in command.
+    pub fn new_variable(cmd: variable::Command<S>) -> BuiltIn<S> {
+        Command::Variable(rc::Rc::new(cmd)).into()
     }
 
-    /// Set the ID for this command definition.
-    pub fn with_tag(mut self, tag: Tag) -> Command<S> {
-        self.tag = Some(tag);
+    /// Set the tag for this built-in command.
+    pub fn with_tag(mut self, tag: Tag) -> BuiltIn<S> {
+        match &mut self.cmd {
+            Command::Expansion(_, t) => *t = Some(tag),
+            Command::Execution(_, t) => *t = Some(tag),
+            Command::Macro(_) | Command::Variable(_) | Command::Character(_) => {
+                panic!("cannot add a tag to this type of command")
+            }
+        }
         self
     }
 
-    // Set the doc for this command definition.
-    pub fn with_doc(mut self, doc: &'static str) -> Command<S> {
+    // Set the doc for this built-in command.
+    pub fn with_doc(mut self, doc: &'static str) -> BuiltIn<S> {
         self.doc = Some(doc);
         self
     }
 
-    pub fn func(&self) -> &Fn<S> {
-        &self.func
-    }
-
-    pub fn tag(&self) -> Option<Tag> {
-        self.tag
+    pub fn cmd(&self) -> &Command<S> {
+        &self.cmd
     }
 
     pub fn doc(&self) -> Option<&'static str> {
@@ -124,7 +139,7 @@ impl<S> Command<S> {
     }
 }
 
-impl<S> std::fmt::Debug for Fn<S> {
+impl<S> std::fmt::Debug for Command<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "todo")?;
         Ok(())
@@ -132,60 +147,55 @@ impl<S> std::fmt::Debug for Fn<S> {
 }
 
 // We need to implement Clone manually as the derived implementation requires S to be Clone.
-impl<S> Clone for Fn<S> {
+impl<S> Clone for Command<S> {
     fn clone(&self) -> Self {
         match self {
-            Fn::Expansion(e) => Fn::Expansion::<S>(*e),
-            Fn::Macro(m) => Fn::Macro(m.clone()),
-            Fn::Execution(e) => Fn::Execution(*e),
-            Fn::Variable(v) => Fn::Variable(v.clone()),
-            Fn::Character(tv) => Fn::Character(*tv),
+            Command::Expansion(e, t) => Command::Expansion::<S>(*e, *t),
+            Command::Macro(m) => Command::Macro(m.clone()),
+            Command::Execution(e, t) => Command::Execution(*e, *t),
+            Command::Variable(v) => Command::Variable(v.clone()),
+            Command::Character(tv) => Command::Character(*tv),
         }
     }
 }
 
 // We need to implement Clone manually as the derived implementation requires S to be Clone.
-impl<S> Clone for Command<S> {
+impl<S> Clone for BuiltIn<S> {
     fn clone(&self) -> Self {
         Self {
-            func: self.func.clone(),
-            tag: self.tag,
+            cmd: self.cmd.clone(),
             doc: self.doc,
         }
     }
 }
 
-impl<S> From<ExpansionFn<S>> for Command<S> {
+impl<S> From<ExpansionFn<S>> for BuiltIn<S> {
     fn from(cmd: ExpansionFn<S>) -> Self {
-        Fn::Expansion(cmd).into()
+        Command::Expansion(cmd, None).into()
     }
 }
 
-impl<S> From<rc::Rc<texmacro::Macro>> for Command<S> {
+impl<S> From<rc::Rc<texmacro::Macro>> for BuiltIn<S> {
     fn from(cmd: rc::Rc<texmacro::Macro>) -> Self {
-        Fn::Macro(cmd).into()
+        Command::Macro(cmd).into()
     }
 }
 
-impl<S> From<ExecutionFn<S>> for Command<S> {
+impl<S> From<ExecutionFn<S>> for BuiltIn<S> {
     fn from(cmd: ExecutionFn<S>) -> Self {
-        Fn::Execution(cmd).into()
+        Command::Execution(cmd, None).into()
     }
 }
 
-impl<S> From<variable::Command<S>> for Command<S> {
+impl<S> From<variable::Command<S>> for BuiltIn<S> {
     fn from(cmd: variable::Command<S>) -> Self {
-        Fn::Variable(rc::Rc::new(cmd)).into()
+        Command::Variable(rc::Rc::new(cmd)).into()
     }
 }
 
-impl<S> From<Fn<S>> for Command<S> {
-    fn from(cmd: Fn<S>) -> Self {
-        Command {
-            func: cmd,
-            tag: None,
-            doc: None,
-        }
+impl<S> From<Command<S>> for BuiltIn<S> {
+    fn from(cmd: Command<S>) -> Self {
+        BuiltIn { cmd, doc: None }
     }
 }
 
@@ -225,9 +235,9 @@ impl<S> From<Fn<S>> for Command<S> {
 /// A global mutex is used to store the next tag value.
 /// Tags have the property that `Option<Tag>` takes up 4 bytes in memory.
 #[derive(PartialEq, Eq, Clone, Copy, Debug, PartialOrd, Ord, Hash)]
-pub struct Tag(num::NonZeroU16);
+pub struct Tag(num::NonZeroU32);
 
-static NEXT_TAG_VALUE: sync::Mutex<u16> = sync::Mutex::new(1);
+static NEXT_TAG_VALUE: sync::Mutex<u32> = sync::Mutex::new(1);
 
 impl Tag {
     /// Creates a new unique tag.
@@ -243,7 +253,7 @@ impl Tag {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Tag {
         let mut n = NEXT_TAG_VALUE.lock().unwrap();
-        let tag = Tag(num::NonZeroU16::new(*n).unwrap());
+        let tag = Tag(num::NonZeroU32::new(*n).unwrap());
         *n = n.checked_add(1).unwrap();
         tag
     }
@@ -285,7 +295,7 @@ mod tests {
 
     #[test]
     fn func_size() {
-        assert_eq!(std::mem::size_of::<Fn<()>>(), 16);
+        assert_eq!(std::mem::size_of::<Command<()>>(), 16);
     }
 
     static STATIC_TAG_1: StaticTag = StaticTag::new();
@@ -310,6 +320,6 @@ mod tests {
 
     #[test]
     fn tag_size() {
-        assert_eq!(std::mem::size_of::<Option<Tag>>(), 2);
+        assert_eq!(std::mem::size_of::<Option<Tag>>(), 4);
     }
 }

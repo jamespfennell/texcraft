@@ -45,7 +45,7 @@ pub struct StdLibState {
 
 impl StdLibState {
     pub fn all_initial_built_ins(
-    ) -> HashMap<&'static str, texlang_core::command::Command<StdLibState>> {
+    ) -> HashMap<&'static str, texlang_core::command::BuiltIn<StdLibState>> {
         HashMap::from([
             ("advance", variableops::get_advance()),
             //
@@ -120,7 +120,7 @@ mod tests {
     use texlang_core::command;
 
     type State = StdLibState;
-    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
         StdLibState::all_initial_built_ins()
     }
 

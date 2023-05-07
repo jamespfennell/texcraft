@@ -6,7 +6,7 @@ use texlang_core::variable;
 pub const CATCODE_DOC: &str = "Get or set a catcode register";
 
 /// Get the `\catcode` command.
-pub fn get_catcode<S>() -> command::Command<S> {
+pub fn get_catcode<S>() -> command::BuiltIn<S> {
     variable::Command::new_base(
         |state: &vm::BaseState<S>, addr: variable::Address| -> &CatCode {
             let addr = char::from_u32(addr.0.try_into().unwrap()).unwrap();
@@ -46,7 +46,7 @@ mod tests {
     use crate::the;
     use texlang_core::prelude::*;
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("the", the::get_the()),
             ("catcode", catcodecmd::get_catcode()),

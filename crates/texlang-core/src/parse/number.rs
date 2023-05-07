@@ -37,8 +37,8 @@ fn parse_number_internal<S, T: PrimInt>(stream: &mut vm::ExpansionInput<S>) -> a
             Value::Other('"') => parse_hexadecimal(stream)?,
             Value::Other('`') => parse_character(stream)?,
             ControlSequence(name) => {
-                let cmd = stream.base().commands_map.get_fn(&name);
-                if let Some(command::Fn::Variable(cmd)) = cmd {
+                let cmd = stream.base().commands_map.get_command(&name);
+                if let Some(command::Command::Variable(cmd)) = cmd {
                     read_number_from_variable(token, cmd.clone(), stream)?
                 } else {
                     return Err(parse_number_error(Some(token)));

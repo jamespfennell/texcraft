@@ -13,13 +13,13 @@ use texlang_core::texmacro::*;
 pub const DEF_DOC: &str = "Define a custom macro";
 
 /// Get the `\def` command.
-pub fn get_def<S: HasComponent<prefix::Component>>() -> command::Command<S> {
-    command::Command::new_execution(def_primitive_fn).with_tag(def_tag())
+pub fn get_def<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(def_primitive_fn).with_tag(def_tag())
 }
 
 /// Get the `\gdef` command.
-pub fn get_gdef<S: HasComponent<prefix::Component>>() -> command::Command<S> {
-    command::Command::new_execution(gdef_primitive_fn).with_tag(def_tag())
+pub fn get_gdef<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(gdef_primitive_fn).with_tag(def_tag())
 }
 
 static DEF_TAG: command::StaticTag = command::StaticTag::new();
@@ -313,7 +313,7 @@ mod test {
     use super::*;
     use crate::testutil::*;
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("def", get_def()),
             ("gdef", get_gdef()),

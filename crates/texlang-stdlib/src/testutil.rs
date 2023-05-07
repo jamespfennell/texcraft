@@ -53,7 +53,7 @@ macro_rules! expansion_failure_test {
 pub use expansion_failure_test;
 
 pub fn run_expansion_test<S: Default + HasComponent<script::Component>>(
-    setup_fn: fn() -> HashMap<&'static str, command::Command<S>>,
+    setup_fn: fn() -> HashMap<&'static str, command::BuiltIn<S>>,
     post_setup_vm_fn: Option<fn(&mut VM<S>)>,
     lhs: String,
     rhs: String,
@@ -114,7 +114,7 @@ pub fn run_expansion_test<S: Default + HasComponent<script::Component>>(
 }
 
 pub fn run_expansion_failure_test<S: Default + HasComponent<script::Component>>(
-    setup_fn: fn() -> HashMap<&'static str, command::Command<S>>,
+    setup_fn: fn() -> HashMap<&'static str, command::BuiltIn<S>>,
     input: String,
 ) {
     let (result, vm) = run(setup_fn, None, input);
@@ -129,7 +129,7 @@ pub fn run_expansion_failure_test<S: Default + HasComponent<script::Component>>(
 }
 
 fn run<S: Default + HasComponent<script::Component>>(
-    setup_fn: fn() -> HashMap<&'static str, command::Command<S>>,
+    setup_fn: fn() -> HashMap<&'static str, command::BuiltIn<S>>,
     post_setup_vm_fn: Option<fn(&mut VM<S>)>,
     source: String,
 ) -> (Result<Vec<token::Token>>, VM<S>) {
@@ -173,23 +173,23 @@ impl FileSystemOps {
 }
 
 /// Gets an expansion command which does noting and always succeeds.
-pub fn get_noop_expansion_cmd<S>() -> texlang_core::command::Command<S> {
+pub fn get_noop_expansion_cmd<S>() -> texlang_core::command::BuiltIn<S> {
     fn noop_expansion_cmd_fn<S>(
         _: token::Token,
         _: &mut vm::ExpansionInput<S>,
     ) -> anyhow::Result<Vec<token::Token>> {
         Ok(Vec::new())
     }
-    texlang_core::command::Command::new_expansion(noop_expansion_cmd_fn)
+    texlang_core::command::BuiltIn::new_expansion(noop_expansion_cmd_fn)
 }
 
 /// Gets an execution command which does noting and always succeeds.
-pub fn get_noop_execution_cmd<S>() -> texlang_core::command::Command<S> {
+pub fn get_noop_execution_cmd<S>() -> texlang_core::command::BuiltIn<S> {
     fn noop_execution_cmd_fn<S>(
         _: token::Token,
         _: &mut vm::ExecutionInput<S>,
     ) -> anyhow::Result<()> {
         Ok(())
     }
-    texlang_core::command::Command::new_execution(noop_execution_cmd_fn)
+    texlang_core::command::BuiltIn::new_execution(noop_execution_cmd_fn)
 }

@@ -15,8 +15,8 @@ pub struct Component {
 /// Get the `\newline` command.
 ///
 /// This adds a newline to the output.
-pub fn get_newline<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_execution(newline_primitive_fn)
+pub fn get_newline<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(newline_primitive_fn)
 }
 
 fn newline_primitive_fn<S: HasComponent<Component>>(
@@ -34,8 +34,8 @@ fn newline_primitive_fn<S: HasComponent<Component>>(
 ///
 /// The `\par` command adds two newlines to the output.
 /// Consecutive `\par` commands are treated as one.
-pub fn get_par<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_execution(par_primitive_fn)
+pub fn get_par<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(par_primitive_fn)
 }
 
 fn par_primitive_fn<S: HasComponent<Component>>(
@@ -104,7 +104,7 @@ mod tests {
     use texlang_core::token::catcode;
     use texlang_core::vm;
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("par", get_par()),
             ("def", def::get_def()),

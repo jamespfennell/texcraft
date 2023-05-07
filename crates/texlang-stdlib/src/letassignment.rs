@@ -7,8 +7,8 @@ use texlang_core::prelude::*;
 pub const LET_DOC: &str = "Assign a command or character to a control sequence";
 
 /// Get the `\let` command.
-pub fn get_let<S: HasComponent<prefix::Component>>() -> command::Command<S> {
-    command::Command::new_execution(let_primitive_fn)
+pub fn get_let<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(let_primitive_fn)
         .with_tag(let_tag())
         .with_doc(LET_DOC)
 }
@@ -61,7 +61,7 @@ mod test {
     use crate::def;
     use crate::testutil::*;
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("def", def::get_def()),
             ("global", prefix::get_global()),

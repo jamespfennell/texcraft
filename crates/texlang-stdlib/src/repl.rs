@@ -84,8 +84,8 @@ impl std::error::Error for Signal {}
 /// Get the `\exit` command.
 ///
 /// This exits the REPL.
-pub fn get_exit<S>() -> command::Command<S> {
-    command::Command::new_expansion(
+pub fn get_exit<S>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_expansion(
         |_: Token, _: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
             Err(Signal::Exit.into())
         },
@@ -95,8 +95,8 @@ pub fn get_exit<S>() -> command::Command<S> {
 /// Get the `\help` command.
 ///
 /// This prints help text for the REPL.
-pub fn get_help<S>() -> command::Command<S> {
-    command::Command::new_expansion(
+pub fn get_help<S>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_expansion(
         |_: Token, _: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
             Err(Signal::Help.into())
         },
@@ -106,8 +106,8 @@ pub fn get_help<S>() -> command::Command<S> {
 /// Get the `\doc` command.
 ///
 /// This prints the documentation for a TeX command.
-pub fn get_doc<S>() -> command::Command<S> {
-    command::Command::new_expansion(
+pub fn get_doc<S>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_expansion(
         |token: Token, input: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
             let target = texlang_core::parse::parse_command_target("", token, input.unexpanded())?;
             let cs_name_s = input.vm().cs_name_interner().resolve(&target).unwrap();

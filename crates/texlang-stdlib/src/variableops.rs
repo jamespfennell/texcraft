@@ -12,28 +12,28 @@ pub const MULTIPLYCHK_DOC: &str = "Multiply a variable by an integer and error o
 pub const DIVIDE_DOC: &str = "Divide a variable by an integer";
 
 /// Get the `\advance` command.
-pub fn get_advance<S: HasComponent<prefix::Component>>() -> command::Command<S> {
-    command::Command::new_execution(advance_fn).with_tag(get_variable_op_tag())
+pub fn get_advance<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(advance_fn).with_tag(get_variable_op_tag())
 }
 
 /// Get the `\advancechk` command.
-pub fn get_advancechk<S: HasComponent<prefix::Component>>() -> command::Command<S> {
-    command::Command::new_execution(advancechk_fn).with_tag(get_variable_op_tag())
+pub fn get_advancechk<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(advancechk_fn).with_tag(get_variable_op_tag())
 }
 
 /// Get the `\multiply` command.
-pub fn get_multiply<S: HasComponent<prefix::Component>>() -> command::Command<S> {
-    command::Command::new_execution(multiply_fn).with_tag(get_variable_op_tag())
+pub fn get_multiply<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(multiply_fn).with_tag(get_variable_op_tag())
 }
 
 /// Get the `\multiplychk` command.
-pub fn get_multiplychk<S: HasComponent<prefix::Component>>() -> command::Command<S> {
-    command::Command::new_execution(multiplychk_fn).with_tag(get_variable_op_tag())
+pub fn get_multiplychk<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(multiplychk_fn).with_tag(get_variable_op_tag())
 }
 
 /// Get the `\divide` command.
-pub fn get_divide<S: HasComponent<prefix::Component>>() -> command::Command<S> {
-    command::Command::new_execution(divide_fn).with_tag(get_variable_op_tag())
+pub fn get_divide<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(divide_fn).with_tag(get_variable_op_tag())
 }
 
 static VARIABLE_OP_TAG: command::StaticTag = command::StaticTag::new();
@@ -161,7 +161,7 @@ mod tests {
         (prefix::Component, prefix),
     ];
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("advance", get_advance()),
             ("advancechk", get_advancechk()),

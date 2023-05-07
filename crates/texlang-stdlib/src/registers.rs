@@ -50,7 +50,7 @@ impl<const N: usize> Default for Component<N> {
 }
 
 /// Get the `\count` command.
-pub fn get_count<S: HasComponent<Component<N>>, const N: usize>() -> command::Command<S> {
+pub fn get_count<S: HasComponent<Component<N>>, const N: usize>() -> command::BuiltIn<S> {
     variable::Command::new(
         int_register_ref_fn,
         int_register_mut_ref_fn,
@@ -71,8 +71,8 @@ fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
 }
 
 /// Get the `\countdef` command.
-pub fn get_countdef<S: HasComponent<Component<N>>, const N: usize>() -> command::Command<S> {
-    command::Command::new_execution(countdef_fn)
+pub fn get_countdef<S: HasComponent<Component<N>>, const N: usize>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(countdef_fn)
 }
 
 fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
@@ -144,7 +144,7 @@ mod tests {
         (script::Component, exec),
     ];
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("the", the::get_the()),
             ("count", get_count()),

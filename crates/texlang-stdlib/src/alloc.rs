@@ -173,8 +173,8 @@ impl Component {
 }
 
 /// Get the `\newint` exeuction command.
-pub fn get_newint<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_execution(newint_primitive_fn)
+pub fn get_newint<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(newint_primitive_fn)
 }
 
 fn newint_primitive_fn<S: HasComponent<Component>>(
@@ -223,8 +223,8 @@ fn singleton_mut_ref_fn<S: HasComponent<Component>>(
 }
 
 /// Get the `\newarray` execution command.
-pub fn get_newarray<S: HasComponent<Component>>() -> command::Command<S> {
-    command::Command::new_execution(newarray_primitive_fn)
+pub fn get_newarray<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(newarray_primitive_fn)
 }
 
 fn newarray_primitive_fn<S: HasComponent<Component>>(
@@ -309,7 +309,7 @@ mod test {
 
     implement_has_component![State, (Component, alloc), (script::Component, exec),];
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("newint", get_newint()),
             ("newarray", get_newarray()),

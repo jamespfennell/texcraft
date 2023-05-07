@@ -61,7 +61,7 @@ impl Default for Component {
 }
 
 /// Get the `\time` command.
-pub fn get_time<S: HasComponent<Component>>() -> command::Command<S> {
+pub fn get_time<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     variable::Command::new(
         |state: &S, _: variable::Address| -> &i32 { &state.component().minutes_since_midnight },
         |state: &mut S, _: variable::Address| -> &mut i32 {
@@ -73,7 +73,7 @@ pub fn get_time<S: HasComponent<Component>>() -> command::Command<S> {
 }
 
 /// Get the `\day` command.
-pub fn get_day<S: HasComponent<Component>>() -> command::Command<S> {
+pub fn get_day<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     variable::Command::new(
         |state: &S, _: variable::Address| -> &i32 { &state.component().day },
         |state: &mut S, _: variable::Address| -> &mut i32 { &mut state.component_mut().day },
@@ -83,7 +83,7 @@ pub fn get_day<S: HasComponent<Component>>() -> command::Command<S> {
 }
 
 /// Get the `\month` command.
-pub fn get_month<S: HasComponent<Component>>() -> command::Command<S> {
+pub fn get_month<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     variable::Command::new(
         |state: &S, _: variable::Address| -> &i32 { &state.component().month },
         |state: &mut S, _: variable::Address| -> &mut i32 { &mut state.component_mut().month },
@@ -93,7 +93,7 @@ pub fn get_month<S: HasComponent<Component>>() -> command::Command<S> {
 }
 
 /// Get the `\year` command.
-pub fn get_year<S: HasComponent<Component>>() -> command::Command<S> {
+pub fn get_year<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     variable::Command::new(
         |state: &S, _: variable::Address| -> &i32 { &state.component().year },
         |state: &mut S, _: variable::Address| -> &mut i32 { &mut state.component_mut().year },

@@ -3,8 +3,8 @@
 use texlang_core::prelude::*;
 
 /// Get the `\texcraft` expansion primtive.
-pub fn get_texcraft<S>() -> command::Command<S> {
-    command::Command::new_expansion(texcraft_primitive_fn)
+pub fn get_texcraft<S>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_expansion(texcraft_primitive_fn)
 }
 
 pub fn texcraft_primitive_fn<S>(
@@ -30,7 +30,7 @@ mod tests {
     use super::*;
     use crate::testutil::*;
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::Command<State>> {
+    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([("texcraft", get_texcraft())])
     }
 

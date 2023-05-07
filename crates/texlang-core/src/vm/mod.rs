@@ -7,8 +7,8 @@
 
 use super::token::CsName;
 use crate::command;
+use crate::command::BuiltIn;
 use crate::command::Command;
-use crate::command::Fn;
 use crate::error;
 use crate::texmacro;
 use crate::token;
@@ -50,18 +50,18 @@ pub fn run<S>(
                 }
                 Some(token) => match token.value() {
                     ControlSequence(name) => {
-                        match execution_input.base().commands_map.get_fn(&name) {
-                            Some(Fn::Execution(cmd)) => cmd(token, execution_input),
-                            Some(Fn::Variable(cmd)) => cmd.clone().set_value_using_input(
+                        match execution_input.base().commands_map.get_command(&name) {
+                            Some(Command::Execution(cmd, _)) => cmd(token, execution_input),
+                            Some(Command::Variable(cmd)) => cmd.clone().set_value_using_input(
                                 token,
                                 execution_input,
                                 groupingmap::Scope::Local,
                             ),
-                            Some(Fn::Character(token_value)) => character_handler(
+                            Some(Command::Character(token_value)) => character_handler(
                                 Token::new_from_value(*token_value, token.trace_key()),
                                 execution_input,
                             ),
-                            None | Some(Fn::Expansion(_)) | Some(Fn::Macro(_)) => {
+                            None | Some(Command::Expansion(_, _)) | Some(Command::Macro(_)) => {
                                 undefined_cs_handler(token, execution_input)
                             }
                         }
@@ -135,7 +135,7 @@ pub struct BaseState<S> {
 impl<S> BaseState<S> {
     pub fn new(
         cat_code_map: CatCodeMap,
-        initial_built_ins: HashMap<CsName, Command<S>>,
+        initial_built_ins: HashMap<CsName, BuiltIn<S>>,
     ) -> BaseState<S> {
         BaseState {
             cat_code_map,
@@ -149,7 +149,7 @@ impl<S> VM<S> {
     /// Create a new VM.
     pub fn new(
         initial_cat_codes: CatCodeMap,
-        initial_built_ins: HashMap<&str, Command<S>>,
+        initial_built_ins: HashMap<&str, BuiltIn<S>>,
         state: S,
         tex_macro_hook: Option<fn(texmacro::HookInput<S>)>,
     ) -> VM<S> {
@@ -195,8 +195,8 @@ impl<S> VM<S> {
     /// Return a regular hash map with all the commands as they are currently defined.
     ///
     /// This function is extremely slow and is only intended to be invoked on error paths.
-    pub fn get_commands_as_map_slow(&self) -> HashMap<String, Command<S>> {
-        let map_1: HashMap<CsName, Command<S>> = self.base_state.commands_map.to_hash_map_slow();
+    pub fn get_commands_as_map_slow(&self) -> HashMap<String, BuiltIn<S>> {
+        let map_1: HashMap<CsName, BuiltIn<S>> = self.base_state.commands_map.to_hash_map_slow();
         let mut map = HashMap::new();
         for (cs_name, cmd) in map_1 {
             let cs_name_str = match self.internal.cs_name_interner.resolve(&cs_name) {

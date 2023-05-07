@@ -7,8 +7,8 @@ use texlang_core::variable;
 pub const THE_DOC: &str = "Output text describing some inputted tokens";
 
 /// Get the `\the` expansion primitive.
-pub fn get_the<S>() -> command::Command<S> {
-    command::Command::new_expansion(the_primitive_fn)
+pub fn get_the<S>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_expansion(the_primitive_fn)
 }
 
 fn the_primitive_fn<S>(
@@ -24,7 +24,9 @@ fn the_primitive_fn<S>(
     };
     Ok(match &token.value() {
         ControlSequence(name) => {
-            if let Some(command::Fn::Variable(cmd)) = input.base().commands_map.get_fn(name) {
+            if let Some(command::Command::Variable(cmd)) =
+                input.base().commands_map.get_command(name)
+            {
                 match cmd.clone().value(the_token, input)? {
                     variable::ValueRef::Int(i) => int_to_tokens(the_token, *i),
                     variable::ValueRef::CatCode(i) => int_to_tokens(the_token, i.int().into()),

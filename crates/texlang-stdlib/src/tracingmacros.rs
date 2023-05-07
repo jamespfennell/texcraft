@@ -10,7 +10,7 @@ pub struct Component {
 }
 
 /// Get the `\tracingmacros` command.
-pub fn get_tracingmacros<S: HasComponent<Component>>() -> command::Command<S> {
+pub fn get_tracingmacros<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     variable::Command::new(
         |state: &S, _: variable::Address| -> &i32 { &state.component().tracing_macros },
         |state: &mut S, _: variable::Address| -> &mut i32 {

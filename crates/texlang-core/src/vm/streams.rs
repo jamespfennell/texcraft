@@ -438,18 +438,18 @@ mod stream {
         let (token, command) = match next_unexpanded(vm)? {
             None => return Ok(None),
             Some(token) => match token.value() {
-                ControlSequence(name) => (token, vm.base_state.commands_map.get_fn(&name)),
+                ControlSequence(name) => (token, vm.base_state.commands_map.get_command(&name)),
                 _ => return Ok(Some(token)),
             },
         };
         match command {
-            Some(command::Fn::Expansion(command)) => {
+            Some(command::Command::Expansion(command, _)) => {
                 let command = *command;
                 let output = command(token, ExpansionInput::new(vm))?;
                 vm.internal.push_expansion(&output);
                 next_expanded(vm)
             }
-            Some(command::Fn::Macro(command)) => {
+            Some(command::Command::Macro(command)) => {
                 let command = command.clone();
                 command.call(token, ExpansionInput::new(vm))?;
                 next_expanded(vm)
@@ -464,13 +464,13 @@ mod stream {
             Some(token) => match token.value() {
                 ControlSequence(name) => (
                     unsafe { launder(token) },
-                    vm.base_state.commands_map.get_fn(&name),
+                    vm.base_state.commands_map.get_command(&name),
                 ),
                 _ => return Ok(Some(unsafe { launder(token) })),
             },
         };
         match command {
-            Some(command::Fn::Expansion(command)) => {
+            Some(command::Command::Expansion(command, _)) => {
                 let command = *command;
                 let token = *token;
                 consume_peek(vm);
@@ -478,7 +478,7 @@ mod stream {
                 vm.internal.push_expansion(&output);
                 peek_expanded(vm)
             }
-            Some(command::Fn::Macro(command)) => {
+            Some(command::Command::Macro(command)) => {
                 let command = command.clone();
                 let token = *token;
                 consume_peek(vm);
@@ -495,13 +495,13 @@ mod stream {
             Some(token) => match token.value() {
                 ControlSequence(name) => (
                     unsafe { launder(token) },
-                    vm.base_state.commands_map.get_fn(&name),
+                    vm.base_state.commands_map.get_command(&name),
                 ),
                 _ => return Ok(false),
             },
         };
         match command {
-            Some(command::Fn::Expansion(command)) => {
+            Some(command::Command::Expansion(command, _)) => {
                 let command = *command;
                 let token = *token;
                 consume_peek(vm);
@@ -509,7 +509,7 @@ mod stream {
                 vm.internal.push_expansion(&output);
                 Ok(true)
             }
-            Some(command::Fn::Macro(command)) => {
+            Some(command::Command::Macro(command)) => {
                 let command = command.clone();
                 let token = *token;
                 consume_peek(vm);

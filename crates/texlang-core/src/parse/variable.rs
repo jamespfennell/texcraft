@@ -13,9 +13,9 @@ pub fn parse_variable<S, I: AsMut<vm::ExpansionInput<S>>>(
         )
         .cast()),
         Some(token) => match token.value() {
-            ControlSequence(name) => match input.base().commands_map.get_fn(&name) {
+            ControlSequence(name) => match input.base().commands_map.get_command(&name) {
                 None => Err(error::TokenError::new(token, "Undefined control sequence").cast()),
-                Some(command::Fn::Variable(cmd)) => cmd.clone().resolve(token, input),
+                Some(command::Command::Variable(cmd)) => cmd.clone().resolve(token, input),
                 Some(_) => Err(error::TokenError::new(
                     token,
                     "Expected variable command (register or parameter); found something else",

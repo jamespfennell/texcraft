@@ -67,7 +67,7 @@ implement_has_component![
 
 fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::VM<PlaygroundState> {
     let initial_built_ins = HashMap::from([
-        ("\\", command::Fn::Character(Value::Other('\\')).into()),
+        ("\\", command::Command::Character(Value::Other('\\')).into()),
         //
         ("advance", variableops::get_advance()),
         //
