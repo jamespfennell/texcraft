@@ -28,7 +28,7 @@ use std::collections::HashMap;
 use CatCode::*;
 
 /// Enum representing all 16 category codes in TeX.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub enum CatCode {
     Escape,
     BeginGroup,
@@ -42,6 +42,7 @@ pub enum CatCode {
     Ignored,
     Space,
     Letter,
+    #[default]
     Other,
     Active,
     Comment,
@@ -111,12 +112,6 @@ impl CatCode {
             Comment => "comment",
             Invalid => "invalid",
         }
-    }
-}
-
-impl std::default::Default for CatCode {
-    fn default() -> Self {
-        CatCode::Other
     }
 }
 

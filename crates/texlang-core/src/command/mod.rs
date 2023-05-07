@@ -238,6 +238,9 @@ impl Tag {
     /// let tag_2 = Tag::new();
     /// assert_ne!(tag_1, tag_2);
     /// ```
+    // We suppress the clippy warning because creating a new tag is a global operation and
+    // shouldn't be done without explicit intention.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Tag {
         let mut n = NEXT_TAG_VALUE.lock().unwrap();
         let tag = Tag(num::NonZeroU16::new(*n).unwrap());

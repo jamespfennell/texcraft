@@ -128,7 +128,7 @@ pub fn generate_random_tex_macro(
     num_lines: usize,
     weights: &Weights,
 ) -> String {
-    let dist = rand::distributions::WeightedIndex::new(&[
+    let dist = rand::distributions::WeightedIndex::new([
         weights.begin_group,
         weights.end_group,
         weights.parameter,
