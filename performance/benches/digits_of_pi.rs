@@ -8,7 +8,7 @@ pub fn digits_of_pi_bench(c: &mut Criterion) {
             Ok(val) => val,
             Err(_) => panic!["Failed to parse env var DIGITS_OF_PI={} as an integer", val],
         },
-        Err(_) => 100,
+        Err(_) => 25,
     };
     let tex_input = str::replace(DIGITS_OF_PI_TEX, r"\n = 100", &format![r"\n = {}", n]);
 

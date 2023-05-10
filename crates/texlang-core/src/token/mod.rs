@@ -1,60 +1,44 @@
-//! Defitions of TeX tokens, cat codes and token streams; and the Texcraft lexer.
+//! TeX tokens, cat codes and token streams; and the Texcraft lexer.
 
 pub mod catcode;
 pub mod lexer;
 pub mod trace;
 
 use crate::token::catcode::CatCode;
-use string_interner::{DefaultSymbol, StringInterner, Symbol};
-
-pub struct CsNameInterner {
-    interner: StringInterner,
-}
-
-impl CsNameInterner {
-    pub fn new() -> CsNameInterner {
-        CsNameInterner {
-            interner: StringInterner::new(),
-        }
-    }
-
-    #[inline]
-    pub fn get_or_intern(&mut self, string: &str) -> CsName {
-        CsName(self.interner.get_or_intern(string))
-    }
-
-    #[inline]
-    pub fn get(&self, string: &str) -> Option<CsName> {
-        self.interner.get(string).map(CsName)
-    }
-
-    #[inline]
-    pub fn resolve(&self, cs_name: &CsName) -> Option<&str> {
-        self.interner.resolve(cs_name.0)
-    }
-}
-
-impl Default for CsNameInterner {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+use std::num;
+use texcraft_stdext::collections::interner;
 
 /// Immutable string type used for storing control sequence names.
 ///
 /// The implementation of this type is opaque so that it can be performance optimized
 /// without worrying about downstream consumers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct CsName(DefaultSymbol);
+pub struct CsName(num::NonZeroU32);
 
 impl CsName {
     #[inline]
     pub fn to_usize(&self) -> usize {
-        self.0.to_usize()
+        self.0.get() as usize
     }
 
     pub fn try_from_usize(u: usize) -> Option<CsName> {
-        DefaultSymbol::try_from_usize(u).map(CsName)
+        let u = match u32::try_from(u) {
+            Ok(u) => u,
+            Err(_) => return None,
+        };
+        num::NonZeroU32::new(u).map(CsName)
+    }
+}
+
+pub type CsNameInterner = interner::Interner<CsName>;
+
+impl interner::Key for CsName {
+    fn try_from_usize(index: usize) -> Option<Self> {
+        num::NonZeroU32::try_from_usize(index).map(CsName)
+    }
+
+    fn into_usize(self) -> usize {
+        self.0.into_usize()
     }
 }
 
@@ -232,7 +216,7 @@ where
             Value::ControlSequence(s) => {
                 pending_whitespace.write_out(&mut result);
                 let name = interner
-                    .resolve(s)
+                    .resolve(*s)
                     .unwrap_or("corruptedControlSequenceName");
                 result.push('\\');
                 result.push_str(name);

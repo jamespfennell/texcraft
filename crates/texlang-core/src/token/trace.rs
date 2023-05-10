@@ -168,7 +168,7 @@ impl Tracer {
     pub fn trace(&self, token: Token, cs_name_interner: &CsNameInterner) -> Trace {
         let value = match token.value() {
             Value::ControlSequence(cs_name) => {
-                format!["\\{}", cs_name_interner.resolve(&cs_name).unwrap()]
+                format!["\\{}", cs_name_interner.resolve(cs_name).unwrap()]
             }
             _ => token.char().unwrap().to_string(),
         };

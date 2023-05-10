@@ -4,13 +4,13 @@ This directory contains performance benchmarks for Texcraft.
 By default the benchmarks are also run for pdfTeX so that performance can be compared.
 The general goal of Texcraft to be about as fast as than the original implementions of TeX.
 
-At time of writing (March 2022) Texcraft performs a little bit better than pdfTeX.
-But, we suspect this will regress as Texcraft becomes more feature complete.
-Right now it seems some of the good performance is due to CPU caching effects and
-  Rust compiler inlining decisions, which will change as the binary gets bigger.
+Set the environment variable `SKIP_PDFTEX=1` to skip the pdfTeX comparison.
+
+At time of writing (May 2023) Texcraft performs a little bit better than pdfTeX,
+  but we suspect this may regress as Texcraft becomes more feature complete.
 
 ## Benchmarks
-
+ 
 ### Digits of pi
 
 ```
@@ -35,9 +35,8 @@ The TeX file is a no-op from the execution perspective - it doesn't do any types
   or expand any macros.
 For this reason the processing time is dominated by tokenization.
 
-At time of writing, Texcraft takes 270ms and pdfTeX 450ms in the benchmark.
-There is a bias here, though, because the pdfTeX time includes the time it takes to pipe the file into the input.
-In any case, the takeaway here is that the lexer is not a bottleneck and shouldn't
+At time of writing, both Texcraft and pdfTeX take about ~250ms in the benchmark.
+One takeaway here is that the lexer is not a bottleneck and shouldn't
   be performance optimized quite yet.
 
 Random TeX files like the one used in the test can be generated using the `randomtex`
@@ -67,3 +66,10 @@ Instead, the number below was obtained by running `advance.tex`
 - Texcraft: 80ns, ~300 clock cycles
 
 - pdfTeX: around 80ns
+
+
+## Profiling
+
+```
+SKIP_PDFTEX=1 cargo flamegraph  --bench lexer_throughput -- --bench
+```

@@ -110,7 +110,7 @@ pub fn get_doc<S>() -> command::BuiltIn<S> {
     command::BuiltIn::new_expansion(
         |token: Token, input: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
             let target = texlang_core::parse::parse_command_target("", token, input.unexpanded())?;
-            let cs_name_s = input.vm().cs_name_interner().resolve(&target).unwrap();
+            let cs_name_s = input.vm().cs_name_interner().resolve(target).unwrap();
             let doc = match input.base().commands_map.get_command_slow(&target) {
                 None => format!["Unknown command \\{cs_name_s}"],
                 Some(cmd) => match cmd.doc() {

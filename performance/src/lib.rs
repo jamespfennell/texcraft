@@ -1,5 +1,4 @@
 use rand::Rng;
-use std::io::Write;
 use std::process::Command;
 use std::process::Stdio;
 use texlang_core::token::catcode;
@@ -23,6 +22,19 @@ pub fn run_in_texcraft(input: &str) {
 }
 
 pub fn host_has_pdftex() -> bool {
+    if let Ok(val) = std::env::var("SKIP_PDFTEX") {
+        match val.parse::<usize>() {
+            Ok(u) => {
+                if u != 0 {
+                    println!("Skipping pdftex benchmark because SKIP_PDFTEX={val}");
+                    return false;
+                }
+            }
+            Err(_) => {
+                panic!("cannot parse SKIP_PDFTEX environment variable value {val} as an integer",)
+            }
+        }
+    };
     Command::new("which")
         .arg("pdftex")
         .spawn()
@@ -33,24 +45,22 @@ pub fn host_has_pdftex() -> bool {
 }
 
 pub fn run_in_pdftex(input: &str) {
-    let mut child = Command::new("pdftex")
-        .stdin(Stdio::piped())
+    let mut input_path = std::env::temp_dir();
+    input_path.push("pdftex-input");
+    input_path.set_extension("tex");
+    std::fs::write(&input_path, input).expect("Unable to write file");
+
+    Command::new("pdftex")
+        .arg(&input_path)
+        .stdin(Stdio::null())
         .stdout(Stdio::null())
         .spawn()
-        .expect("pdftex command failed to start");
-    let child_stdin = child.stdin.as_mut().unwrap();
-    child_stdin
-        .write_all(input.as_bytes())
-        .expect("failed to write to pdfTeX");
-    child.wait().expect("Failed to run pdfTeX");
+        .expect("pdftex command failed to start")
+        .wait()
+        .expect("Failed to run pdfTeX");
 }
 
 use rand::prelude::Distribution;
-
-static RANDOM_CS_NAMES: [&str; 19] = [
-    "def", "gdef", "edef", "xdef", "let", "ifcase", "ifnum", "iftrue", "iffalse", "else", "fi",
-    "advance", "multiply", "divide", "time", "day", "month", "year", "end",
-];
 
 pub struct Weights {
     pub begin_group: u32,
@@ -83,6 +93,7 @@ pub fn generate_random_tex_document(
     num_lines: usize,
     macro_length_bounds: (usize, usize),
     line_length_bounds: (usize, usize),
+    num_cs_names: usize,
     weights: &Weights,
 ) -> String {
     let mut result = String::new();
@@ -91,6 +102,7 @@ pub fn generate_random_tex_document(
         "% Running the document is a no-op except that \\macro will be defined at the end.\n",
     );
 
+    let cs_names = generate_random_cs_names(rng, num_cs_names, (5, 15));
     // 2 lines of commments and the final \end are always included
     let mut num_lines_generated: usize = 3;
     loop {
@@ -112,6 +124,7 @@ pub fn generate_random_tex_document(
         let macro_length = rng.gen_range(range);
         result.push_str(&generate_random_tex_macro(
             rng,
+            &cs_names,
             line_length_bounds,
             macro_length,
             weights,
@@ -124,6 +137,7 @@ pub fn generate_random_tex_document(
 
 pub fn generate_random_tex_macro(
     rng: &mut rand::prelude::StdRng,
+    cs_names: &[String],
     line_length_bounds: (usize, usize),
     num_lines: usize,
     weights: &Weights,
@@ -212,10 +226,7 @@ pub fn generate_random_tex_macro(
                     _ => ":",
                 },
                 _ => {
-                    temp = format![
-                        "\\{} ",
-                        RANDOM_CS_NAMES[rng.gen_range(0..RANDOM_CS_NAMES.len())]
-                    ];
+                    temp = format!["\\{} ", cs_names[rng.gen_range(0..cs_names.len())]];
                     &temp
                 }
             };
@@ -229,4 +240,22 @@ pub fn generate_random_tex_macro(
     }
     result.push_str("}\n");
     result
+}
+
+pub fn generate_random_cs_names(
+    rng: &mut rand::prelude::StdRng,
+    n: usize,
+    length_range: (usize, usize),
+) -> Vec<String> {
+    let mut names = Vec::with_capacity(n);
+    for _ in 0..n {
+        let len = rng.gen_range(length_range.0..length_range.1 + 1);
+        let cs_name: String = rng
+            .sample_iter(rand::distributions::Uniform::new_inclusive('a', 'z'))
+            .take(len)
+            .map(char::from)
+            .collect();
+        names.push(cs_name);
+    }
+    names
 }

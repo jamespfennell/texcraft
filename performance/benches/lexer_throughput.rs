@@ -4,8 +4,14 @@ use rand::SeedableRng;
 pub fn lexer_throughput_bench(c: &mut Criterion) {
     let weights = Default::default();
     let mut rng = rand::prelude::StdRng::seed_from_u64(43);
-    let tex_input =
-        performance::generate_random_tex_document(&mut rng, 200000, (20, 50), (80, 100), &weights);
+    let tex_input = performance::generate_random_tex_document(
+        &mut rng,
+        200000,
+        (20, 50),
+        (80, 100),
+        1000,
+        &weights,
+    );
 
     let mut group = c.benchmark_group("lexer-throughput");
 

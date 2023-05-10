@@ -41,6 +41,10 @@ struct Cli {
     /// Maximum number of lines in each macro definition. Default: 30.
     #[clap(long)]
     macro_length_max: Option<usize>,
+
+    /// Number of distinct control sequences. Default: 100.
+    #[clap(long)]
+    num_cs_names: Option<usize>,
 }
 
 fn main() {
@@ -63,6 +67,7 @@ fn main() {
                 args.line_length_min.unwrap_or(80),
                 args.line_length_max.unwrap_or(100)
             ),
+            args.num_cs_names.unwrap_or(100),
             &weights
         )
     ];

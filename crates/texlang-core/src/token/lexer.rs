@@ -270,7 +270,7 @@ mod tests {
                 map.insert('X', EndOfLine);
                 map.insert('Y', Space);
                 map.insert('Z', Ignored);
-                let mut cs_name_interner = CsNameInterner::new();
+                let mut cs_name_interner: CsNameInterner = Default::default();
                 let mut actual = Vec::new();
                 while let Some(t) = lexer.next(&map, &mut cs_name_interner).unwrap() {
                     actual.push(t.value);

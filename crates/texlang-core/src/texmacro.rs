@@ -96,15 +96,13 @@ impl Macro {
         Ok(())
     }
 
-    pub fn doc(&self) -> String {
+    pub fn doc(&self, interner: &CsNameInterner) -> String {
         let mut d = String::default();
-        // TODO: wire up the interner here
-        let interner = CsNameInterner::new();
         d.push_str("User defined macro\n\n");
         d.push_str(&format![
             "{}\n{}",
             "Parameters definition".italic(),
-            pretty_print_prefix_and_parameters(&self.prefix, &self.parameters, &interner),
+            pretty_print_prefix_and_parameters(&self.prefix, &self.parameters, interner),
         ]);
         d.push_str(&format![
             "\n\n{} `{}`\n",

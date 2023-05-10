@@ -199,7 +199,7 @@ impl<S> VM<S> {
         let map_1: HashMap<CsName, BuiltIn<S>> = self.base_state.commands_map.to_hash_map_slow();
         let mut map = HashMap::new();
         for (cs_name, cmd) in map_1 {
-            let cs_name_str = match self.internal.cs_name_interner.resolve(&cs_name) {
+            let cs_name_str = match self.internal.cs_name_interner.resolve(cs_name) {
                 None => continue,
                 Some(cs_name_str) => cs_name_str,
             };
