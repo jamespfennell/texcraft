@@ -1,0 +1,357 @@
+//! Commands that control the expansion process
+
+use texlang_core::command;
+use texlang_core::error;
+use texlang_core::token;
+use texlang_core::vm;
+use texlang_core::vm::ExpandedStream;
+use texlang_core::vm::TokenStream;
+
+/// Get the simple `\expandafter` command.
+///
+/// This is the simplest implementation of the command, and the
+///     same implementation as in the original TeX.
+pub fn get_expandafter_simple<S>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_expansion(expandafter_simple_fn)
+}
+
+/// Get the optimized `\expandafter` command.
+///
+/// This is a more complex implementation of `\expandafter` that is optimized for handling
+/// repeated `\expandafter` tokens.
+/// It contains two optimizations, as described below.
+/// These optimizations where developed "theoretically" and with no benchmarking, so it
+/// remains to be seen if they actually make expansion faster.
+/// For this reason both the optimized and simple `\expandafter` implementations are maintained.
+///
+/// We now describe the two optimizations.
+///  
+/// **First**, `\expandafter` control sequences are often linked together in the following format:
+///
+/// ```tex
+/// \expandafter<token 1>\expandafter<token 2>...\expandafter<token n><token n+1>
+/// ```
+///
+/// Here, to expand the first `\expandafter` we just need to expand `<token n+1>`.
+/// In the original implementation of TeX this works via recursion: the ith `\expandafter`
+/// requests expansion of the second-to-next token, which is the (i+1)th `\expandafter`.
+/// After n recursions, the last token is finally expanded.
+/// In the optimized implementation here, the token stream is scanned ahead for as long as the pattern
+/// `\expandafter<token i>` repeats.
+/// The token `<token n+1>` is expanded and the intermediate `\expandafter` tokens are dropped from the input.
+/// This is still an O(n) operation, but results in only 1 Rust function stack being used, rather than n.
+///
+/// **Second**, `\expandafter` commands are often grouped together like this:
+///
+/// ```tex
+/// \expandafter\expandafter\expandafter\A\expandafter\B\C
+/// ```
+///
+/// This TeX code causes `\C` to be expanded first, then `\B\` and finally `\A`.
+/// When the leading `\expandafter` is expanded, the first optimization kicks in and `\C` will be expanded, leaving:
+///
+/// ```tex
+/// \expandafter\A\B\Cexpanded
+/// ```
+///
+/// The second optimization is that the leading `\expandafter` that is left over will also be expanded
+///     without yielding control to the main expansion loop.
+/// If, after this pass, the leading token is again an `\expandafter` token, it will be expanded too.
+/// This process continues repeatedly until no `\expandafter` tokens are left at the start of the token stream.
+pub fn get_expandafter_optimized<S>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_expansion(expandafter_optimized_fn)
+}
+
+fn expandafter_simple_fn<S>(
+    expandafter_token: token::Token,
+    input: &mut vm::ExpansionInput<S>,
+) -> anyhow::Result<Vec<token::Token>> {
+    let next = match input.unexpanded().next()? {
+        None => {
+            return Err(expandafter_missing_first_token_error(expandafter_token));
+        }
+        Some(next) => next,
+    };
+    if input.unexpanded().peek()?.is_none() {
+        return Err(expandafter_missing_second_token_error(
+            expandafter_token,
+            next,
+        ));
+    }
+    input.expand_once()?;
+    input.expansions_mut().push(next);
+    Ok(vec![])
+}
+
+fn expandafter_optimized_fn<S>(
+    expandafter_token: token::Token,
+    input: &mut vm::ExpansionInput<S>,
+) -> anyhow::Result<Vec<token::Token>> {
+    let mut buffer: Vec<token::Token> = input.checkout_token_buffer();
+    let unexpanded_input = input.unexpanded();
+    loop {
+        match unexpanded_input.next()? {
+            None => return Err(expandafter_missing_first_token_error(expandafter_token)),
+            Some(next) => buffer.push(next),
+        };
+        let token = match unexpanded_input.peek()? {
+            None => {
+                return Err(expandafter_missing_second_token_error(
+                    expandafter_token,
+                    *buffer.last().unwrap(),
+                ))
+            }
+            Some(token) => *token,
+        };
+        if token.value() != expandafter_token.value() {
+            break;
+        }
+        // Remove the \expandafter token from the stream
+        _ = unexpanded_input.next()?;
+    }
+    input.expand_once()?;
+
+    while let Some(&root) = buffer.first() {
+        if root.value() != expandafter_token.value() {
+            input.expansions_mut().extend(buffer.iter().rev());
+            break;
+        }
+        let mut last_expandafter_index = 0;
+        while let Some(next) = buffer.get(last_expandafter_index + 2) {
+            if next.value() != root.value() {
+                break;
+            }
+            last_expandafter_index += 2;
+        }
+        // We need to ensure that the buffer ends exactly one token after the last \expandafter token.
+        // There are three cases depending on whether the buffer is under-full, overfull, or exactly right.
+        match buffer
+            .len()
+            .checked_sub(last_expandafter_index + 1)
+            .unwrap()
+        {
+            // Under-full
+            0 => {
+                let next = match input.unexpanded().next()? {
+                    None => return Err(expandafter_missing_first_token_error(root)),
+                    Some(next) => next,
+                };
+                buffer.push(next);
+            }
+            // Exactly right
+            1 => {}
+            // Overfull
+            _ => {
+                input
+                    .expansions_mut()
+                    .extend(buffer[last_expandafter_index + 2..].iter().rev());
+                buffer.truncate(last_expandafter_index + 2);
+            }
+        }
+        // Check there is another token in the input. This is only relevant in the under-full and
+        // exactly right cases, but it's easier to put it here.
+        if input.unexpanded().peek()?.is_none() {
+            return Err(expandafter_missing_second_token_error(
+                root,
+                *buffer.last().unwrap(),
+            ));
+        }
+        input.expand_once()?;
+        remove_even_indices(&mut buffer);
+    }
+    input.return_token_buffer(buffer);
+    Ok(vec![])
+}
+
+fn remove_even_indices(v: &mut Vec<token::Token>) {
+    let mut src = 1;
+    let mut dest = 0;
+    while let Some(token) = v.get(src) {
+        v[dest] = *token;
+        dest += 1;
+        src += 2;
+    }
+    v.truncate(dest);
+}
+
+fn expandafter_missing_first_token_error(expandafter_token: token::Token) -> anyhow::Error {
+    error::TokenError::new(
+        expandafter_token,
+        "unexpected end of input while expanding an `expandafter` command",
+    )
+    .add_note("each `expandafter` command must be followed by 2 tokens")
+    .add_note("no more tokens were found")
+    .cast()
+}
+
+fn expandafter_missing_second_token_error(
+    expandafter_token: token::Token,
+    first_token: token::Token,
+) -> anyhow::Error {
+    _ = first_token;
+    error::TokenError::new(
+        expandafter_token,
+        "unexpected end of input while expanding an `expandafter` command",
+    )
+    .add_note("each `expandafter` command must be followed by 2 tokens")
+    .add_note("only 1 more tokens was found")
+    .cast()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::testutil::*;
+    use std::collections::HashMap;
+
+    fn setup_expansion_test(optimized: bool) -> HashMap<&'static str, command::BuiltIn<State>> {
+        HashMap::from([
+            ("def", crate::def::get_def()),
+            (
+                "xa",
+                match optimized {
+                    true => get_expandafter_optimized(),
+                    false => get_expandafter_simple(),
+                },
+            ),
+        ])
+    }
+
+    fn run_expandafter_test(lhs: &str, rhs: &str, optimized: bool) {
+        static PREFIX: &str = r"\def\mk#1#2{\def#1##1\notes##2\end{##1\notes##2#2\end}}\mk\a a\mk\b b\mk\c c\mk\d d\def\notes#1\end{#1}";
+        static POSTFIX: &str = r"\notes\end";
+        let lhs = format!("{}{}{}", PREFIX, lhs, POSTFIX);
+        run_expansion_test(|| setup_expansion_test(optimized), None, &lhs, rhs);
+    }
+
+    #[macro_export]
+    macro_rules! expandafter_test {
+        ($( ( $name: ident, $lhs: expr, $rhs: expr), )+) => {
+            $(
+            mod $name {
+                #[test]
+                fn simple() {
+                    super::run_expandafter_test($lhs, $rhs, false);
+                }
+                #[test]
+                fn optimized() {
+                    super::run_expandafter_test($lhs, $rhs, true);
+                }
+            }
+            )+
+        };
+    }
+
+    expandafter_test![
+        (texbook_p374_3, r"\xa\a\b", r"ba"),
+        (texbook_p374_4, r"\xa\xa\xa\a\xa\b\c", "cba"),
+        (
+            texbook_p374_5,
+            r"\xa\xa\xa\xa\xa\xa\xa\a\xa\xa\xa\b\xa\c\d",
+            "dcba"
+        ),
+        /*
+        All of the following permutation cases were generated by hand, but there's actually
+        an algorithmic way to generate them. For each macro, count the number of \expandafter=\xa
+        tokens that come before. Then calculate the shift:
+        - if #\xa is 0, the shift is 0.
+        - if #\xa is 1, the shift is 1.
+        - if #\xa is 3, the shift is 2.
+        - if #\xa is 7, the shift is 3.
+        (In general if #\xa is 2^n-1, the shift is n-1.)
+        Now work backwards through the tokens `\a\b\c\d`. For each token, move it right by the associated
+        shift. You then get the result of the expansion.
+
+        For example: `\xa\xa\xa\a\xa\b\c\d`.
+        The #\xa numbers are: 3 1 0 0
+        The shifts are: 2 1 0 0
+        Then
+        - start:         `\a\b\c\d`
+        - shift \d by 0: `\a\b\c\d`
+        - shift \c by 0: `\a\b\c\d`
+        - shift \b by 1: `\a\c\b\d`
+        - shift \a by 2: `\c\b\a\d` <- this is the expansion
+        */
+        (permutation_abcd, r"\a\b\c\d", "abcd"),
+        (permutation_abdc, r"\a\b\xa\c\d", "abdc"),
+        (permutation_acbd, r"\a\xa\b\c\d", "acbd"),
+        (permutation_acdb, r"\a\xa\xa\xa\b\c\d", "acdb"),
+        (permutation_adbc, r"\a\xa\b\xa\c\d", "adbc"),
+        (permutation_adcb, r"\a\xa\xa\xa\b\xa\c\d", "adcb"),
+        (permutation_bacd, r"\xa\a\b\c\d", "bacd"),
+        (permutation_badc, r"\xa\a\b\xa\c\d", "badc"),
+        (permutation_bcad, r"\xa\xa\xa\a\b\c\d", "bcad"),
+        (permutation_bcda, r"\xa\xa\xa\xa\xa\xa\xa\a\b\c\d", "bcda"),
+        (permutation_bdac, r"\xa\xa\xa\a\b\xa\c\d", "bdac"),
+        (
+            permutation_bdca,
+            r"\xa\xa\xa\xa\xa\xa\xa\a\b\xa\c\d",
+            "bdca"
+        ),
+        (permutation_cabd, r"\xa\a\xa\b\c\d", "cabd"),
+        (permutation_cadb, r"\xa\a\xa\xa\xa\b\c\d", "cadb"),
+        (permutation_cbad, r"\xa\xa\xa\a\xa\b\c\d", "cbad"),
+        (
+            permutation_cbda,
+            r"\xa\xa\xa\xa\xa\xa\xa\a\xa\xa\xa\b\c\d",
+            "cdba"
+        ),
+        (permutation_cdab, r"\xa\xa\xa\a\xa\xa\xa\b\c\d", "cdab"),
+        (
+            permutation_cdba,
+            r"\xa\xa\xa\xa\xa\xa\xa\a\xa\xa\xa\b\c\d",
+            "cdba"
+        ),
+        (permutation_dabc, r"\xa\a\xa\b\xa\c\d", "dabc"),
+        (permutation_dacb, r"\xa\a\xa\xa\xa\b\xa\c\d", "dacb"),
+        (permutation_dbac, r"\xa\xa\xa\a\xa\b\xa\c\d", "dbac"),
+        (
+            permutation_dbca,
+            r"\xa\xa\xa\xa\xa\xa\xa\a\xa\b\xa\c\d",
+            "dbca"
+        ),
+        (permutation_dcab, r"\xa\xa\xa\a\xa\xa\xa\b\xa\c\d", "dcab"),
+        (
+            permutation_dcba,
+            r"\xa\xa\xa\xa\xa\xa\xa\a\xa\xa\xa\b\xa\c\d",
+            "dcba"
+        ),
+        (
+            expandafter_last_after_first_pass,
+            r"\xa\xa\xa\a\xa\xa\b\c\d",
+            "bdac"
+        ),
+    ];
+
+    fn run_expandafter_failure_test(input: &str, optimized: bool) {
+        crate::testutil::run_expansion_failure_test(|| setup_expansion_test(optimized), &input);
+    }
+
+    #[macro_export]
+    macro_rules! expandafter_failure_test {
+        ($( ( $name: ident, $input: expr), )+) => {
+            $(
+            mod $name {
+                #[test]
+                fn simple() {
+                    super::run_expandafter_failure_test($input, false);
+                }
+                #[test]
+                fn optimized() {
+                    super::run_expandafter_failure_test($input, true);
+                }
+            }
+            )+
+        };
+    }
+
+    expandafter_failure_test![
+        (expandafter_missing_1st_token, r"\xa"),
+        (expandafter_missing_2nd_token, r"\xa\a"),
+        (expandafter_missing_1st_token_nested, r"\xa\xa\xa\a\xa\xa\b"),
+        (
+            expandafter_missing_2nd_token_nested,
+            r"\def\A{}\xa\xa\xa\A\A"
+        ),
+    ];
+}

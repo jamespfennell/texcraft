@@ -20,16 +20,10 @@ use crate::token::Token;
 use crate::token::Value::ControlSequence;
 use crate::variable;
 use std::collections::HashMap;
+use texcraft_stdext::collections::groupingmap;
 
 mod streams;
 pub use streams::*;
-/*
-ExecutionInput;
-pub use streams::ExpandedInput;
-pub use streams::HasExpansionState;
-pub use streams::TokenStream;
-pub use streams::UnexpandedStream;
-*/
 
 /// Run the Texlang interpreter for the provided VM.
 ///
@@ -258,7 +252,7 @@ struct Internal<S> {
 
     tracer: trace::Tracer,
 
-    token_buffer: Vec<Token>,
+    token_buffers: std::collections::BinaryHeap<TokenBuffer>,
 
     groups: Vec<variable::internal::RestoreValues<S>>,
     tex_macro_hook: fn(texmacro::HookInput<S>),
@@ -278,7 +272,7 @@ impl<S> Default for Internal<S> {
             },
             cs_name_interner: Default::default(),
             tracer: Default::default(),
-            token_buffer: Default::default(),
+            token_buffers: Default::default(),
             groups: Default::default(),
             tex_macro_hook: texmacro::no_op_hook,
         }
@@ -358,6 +352,29 @@ impl Source {
 impl Default for Source {
     fn default() -> Self {
         Source::new("".to_string(), trace::KeyRange::empty())
+    }
+}
+
+#[derive(Default)]
+struct TokenBuffer(Vec<Token>);
+
+impl PartialEq for TokenBuffer {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.capacity() == other.0.capacity()
+    }
+}
+
+impl Eq for TokenBuffer {}
+
+impl PartialOrd for TokenBuffer {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.capacity().partial_cmp(&other.0.capacity())
+    }
+}
+
+impl Ord for TokenBuffer {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.capacity().cmp(&other.0.capacity())
     }
 }
 
@@ -480,4 +497,3 @@ macro_rules! implement_has_component {
 }
 
 pub use implement_has_component;
-use texcraft_stdext::collections::groupingmap;

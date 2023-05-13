@@ -8,13 +8,14 @@ extern crate texlang_core;
 use std::collections::HashMap;
 
 use texlang_core::token::catcode::CatCodeMap;
+use texlang_core::vm;
 use texlang_core::vm::implement_has_component;
-use texlang_core::vm::VM;
 
 pub mod alloc;
 pub mod catcodecmd;
 pub mod conditional;
 pub mod def;
+pub mod expansion;
 pub mod io;
 pub mod letassignment;
 pub mod prefix;
@@ -58,6 +59,7 @@ impl StdLibState {
             ("divide", variableops::get_divide()),
             //
             ("else", conditional::get_else()),
+            ("expandafter", expansion::get_expandafter_optimized()),
             //
             ("fi", conditional::get_fi()),
             //
@@ -93,8 +95,8 @@ impl StdLibState {
         ])
     }
 
-    pub fn new() -> VM<StdLibState> {
-        VM::<StdLibState>::new(
+    pub fn new() -> vm::VM<StdLibState> {
+        vm::VM::<StdLibState>::new(
             CatCodeMap::new_with_tex_defaults(),
             StdLibState::all_initial_built_ins(),
             Default::default(),

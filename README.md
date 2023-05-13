@@ -1,10 +1,10 @@
 # Texcraft
 
-Texcraft is a project to create a composible, LLVM-style infrastructure for building TeX engines and distributions.
+Texcraft is a project to create a composable, LLVM-style infrastructure for building TeX engines and distributions.
 
 The big picture goals are:
 
-- Creating modern reimplementations of existing TeX distributions (TeX, pdfTeX, XeTeX, etc.)
+- Creating modern re-implementations of existing TeX distributions (TeX, pdfTeX, XeTeX, etc.)
     with a focus on modularity and code reuse.
     For example, 
     [the single Texcraft implementation of TeX registers](https://texcraft.dev/rustdoc/texlang_stdlib/registers/index.html) 

@@ -156,6 +156,15 @@ impl<S> TokenStream for UnexpandedStream<S> {
     }
 }
 
+impl<S> RefVM for UnexpandedStream<S> {
+    type S = S;
+
+    #[inline]
+    fn vm(&self) -> &vm::VM<S> {
+        &self.0
+    }
+}
+
 /// Input type for expansion primitives.
 ///
 /// This type provides:
@@ -171,13 +180,14 @@ impl<S> TokenStream for UnexpandedStream<S> {
 ///     For source code use [ExpansionInput::push_source];
 ///     for tokens use [ExpansionInput::push_expansion] or [ExpansionInput::expansions_mut].
 ///
-/// - Access to a token buffer the [ExpansionInput::take_token_buffer] and
+/// - Access to token buffers using the [ExpansionInput::checkout_token_buffer] and
 ///     [ExpansionInput::return_token_buffer] methods.
 ///
 /// This type is also used in the parsing code for situations where both an
 /// [ExpansionInput] or [ExecutionInput] is accepted. We use this type because
 /// it has only read access to the VM, and so casting does not escalate priviliges.
 #[repr(transparent)]
+// TODO: shouldn't this be in the command module no vm module?
 pub struct ExpansionInput<S>(vm::VM<S>);
 
 impl<S> RefVM for ExpansionInput<S> {
@@ -261,32 +271,28 @@ impl<S> ExpansionInput<S> {
     ///
     /// The returned vector is empty, but will generally have non-zero capacity from previous uses of the buffer.
     /// Reusing the allocated memory results in fewer allocations overall.
-    /// This buffer mechanism was introduced in a successful attempt to improve the performance of the
+    /// This buffer mechanism was first introduced in a successful attempt to improve the performance of the
     /// TeX macros implementation.
     ///
-    /// When finished with the buffer, return it using [return_token_buffer](ExpansionInput::return_token_buffer).
+    /// When finished with the buffer, please return it using [return_token_buffer](ExpansionInput::return_token_buffer).
     ///
-    /// The current API in which a buffer is taken and then returned allows for multiple buffers to be taken
-    /// out at once.
-    /// If this happens, much of the performance benefit may be lost due to the current implementation.
-    /// Thus, you are strongly encouraged to structure your code such that no other buffer is taken out
-    ///     during the lifetime of the buffer you take out..
-    /// A simple way to guarantee this is to return the token buffer in the same function that you take it.
-    ///
-    /// This API exists mainly because it keeps the borrow checker happy, and may be changed in the future.
-    /// A previous API returned a mutable reference to the buffer, which introduced all kinds of lifetime issues,
-    /// though benchmarking indicated it was ~3% more performant.
-    pub fn take_token_buffer(&mut self) -> Vec<Token> {
-        std::mem::take(&mut self.0.internal.token_buffer)
+    /// This API may feel a bit janky - it would seem nicer to return a mutable reference to a buffer instead.
+    /// Doing this while keeping the borrow checker happy is very difficult and (as is often the case) for good reason.
+    /// Token buffers are often used in macro expansion, and at any point in time multple macros may be in
+    ///     the process of expansion.
+    /// This getting "the" token buffer to use for expansion would be incorrect, as the multiple expansions
+    /// would step on each other.
+    pub fn checkout_token_buffer(&mut self) -> Vec<Token> {
+        self.0.internal.token_buffers.pop().unwrap_or_default().0
     }
 
     /// Return a token buffer, allowing it to be reused.
     pub fn return_token_buffer(&mut self, mut token_buffer: Vec<Token>) {
-        if token_buffer.capacity() <= self.0.internal.token_buffer.capacity() {
-            return;
-        }
         token_buffer.clear();
-        std::mem::swap(&mut token_buffer, &mut self.0.internal.token_buffer);
+        self.0
+            .internal
+            .token_buffers
+            .push(super::TokenBuffer(token_buffer))
     }
 }
 

@@ -33,7 +33,9 @@ macro_rules! expansion_test {
     ($name: ident, $lhs: expr, $rhs: expr, $setup_fn: ident, $a: expr) => {
         #[test]
         fn $name() {
-            crate::testutil::run_expansion_test($setup_fn, $a, $lhs.to_string(), $rhs.to_string());
+            let lhs = $lhs;
+            let rhs = $rhs;
+            crate::testutil::run_expansion_test($setup_fn, $a, &lhs, &rhs);
         }
     };
 }
@@ -45,19 +47,23 @@ macro_rules! expansion_failure_test {
     ($name: ident, $input: expr) => {
         #[test]
         fn $name() {
-            crate::testutil::run_expansion_failure_test(setup_expansion_test, $input.to_string());
+            let input = $input;
+            crate::testutil::run_expansion_failure_test(setup_expansion_test, &input);
         }
     };
 }
 
 pub use expansion_failure_test;
 
-pub fn run_expansion_test<S: Default + HasComponent<script::Component>>(
-    setup_fn: fn() -> HashMap<&'static str, command::BuiltIn<S>>,
+pub fn run_expansion_test<F, S>(
+    setup_fn: F,
     post_setup_vm_fn: Option<fn(&mut VM<S>)>,
-    lhs: String,
-    rhs: String,
-) {
+    lhs: &str,
+    rhs: &str,
+) where
+    F: Fn() -> HashMap<&'static str, command::BuiltIn<S>> + Copy,
+    S: Default + HasComponent<script::Component> + 'static,
+{
     use ::texlang_core::token::Value::ControlSequence;
 
     let (output_1, vm_1) = crate::testutil::run(setup_fn, post_setup_vm_fn, lhs);
@@ -113,10 +119,11 @@ pub fn run_expansion_test<S: Default + HasComponent<script::Component>>(
     }
 }
 
-pub fn run_expansion_failure_test<S: Default + HasComponent<script::Component>>(
-    setup_fn: fn() -> HashMap<&'static str, command::BuiltIn<S>>,
-    input: String,
-) {
+pub fn run_expansion_failure_test<F, S>(setup_fn: F, input: &str)
+where
+    F: Fn() -> HashMap<&'static str, command::BuiltIn<S>>,
+    S: Default + HasComponent<script::Component> + 'static,
+{
     let (result, vm) = run(setup_fn, None, input);
     if let Ok(output) = result {
         println!("Expansion succeeded:");
@@ -128,21 +135,26 @@ pub fn run_expansion_failure_test<S: Default + HasComponent<script::Component>>(
     }
 }
 
-fn run<S: Default + HasComponent<script::Component>>(
-    setup_fn: fn() -> HashMap<&'static str, command::BuiltIn<S>>,
+fn run<F, S>(
+    setup_fn: F,
     post_setup_vm_fn: Option<fn(&mut VM<S>)>,
-    source: String,
-) -> (Result<Vec<token::Token>>, VM<S>) {
+    source: &str,
+) -> (Result<Vec<token::Token>>, VM<S>)
+where
+    F: Fn() -> HashMap<&'static str, command::BuiltIn<S>>,
+    S: Default + HasComponent<script::Component> + 'static,
+{
     let mut vm = VM::<S>::new(
         catcode::CatCodeMap::new_with_tex_defaults(),
         setup_fn(),
         Default::default(),
-        None,
+        Default::default(),
     );
     if let Some(post_set_vm_fn) = post_setup_vm_fn {
         post_set_vm_fn(&mut vm)
     }
-    vm.push_source("testutil.tex".to_string(), source).unwrap();
+    vm.push_source("testutil.tex".to_string(), source.to_string())
+        .unwrap();
     let output = script::run(&mut vm, false);
     (output, vm)
 }
