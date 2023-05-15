@@ -1,4 +1,4 @@
-//! Macro tracing facility
+//! TeX macro debugging
 
 use colored::*;
 use texlang_core::{command, texmacro, token::write_tokens, variable, vm::HasComponent};

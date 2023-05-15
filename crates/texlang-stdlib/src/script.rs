@@ -1,9 +1,10 @@
-/// TeX as a scripting language
-///
-/// This module enables using TeX as a scripting language.
-/// TeX files are processed using the usual TeX semantics, but instead
-/// of typesetting the result and outputing it to PDF (say), the output is returned as a list of tokens.
-/// These can be easily converted to a string using [texlang_core::token::write_tokens].
+//! Support for running TeX scripts.
+//!
+//! This module enables using TeX as a scripting language.
+//! TeX files are processed using the usual TeX semantics, but instead
+//! of typesetting the result and outputting it to PDF (say), the output is returned as a list of tokens.
+//! These can be easily converted to a string using [texlang_core::token::write_tokens].
+
 use texlang_core::prelude::*;
 
 #[derive(Default)]
@@ -99,12 +100,10 @@ mod tests {
 
     use super::*;
     use crate::def;
-    use crate::testutil::*;
+    use crate::testing::*;
     use texlang_core::token;
-    use texlang_core::token::catcode;
-    use texlang_core::vm;
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("par", get_par()),
             ("def", def::get_def()),
@@ -112,20 +111,15 @@ mod tests {
         ])
     }
 
-    macro_rules! script_test {
-        ($name: ident, $input: expr, $want: expr) => {
+    macro_rules! script_tests {
+        ( $( ($name: ident, $input: expr, $want: expr) ),* $(,)? ) => {
+            $(
             #[test]
             fn $name() {
-                let mut vm = vm::VM::<State>::new(
-                    catcode::CatCodeMap::new_with_tex_defaults(),
-                    setup_expansion_test(),
-                    Default::default(),
-                    None,
-                );
-                vm.push_source("testutil.tex".to_string(), $input.to_string())
-                    .unwrap();
-                let tokens = run(&mut vm, false).unwrap();
-                let got = token::write_tokens(&tokens, vm.cs_name_interner());
+                let options = vec![TestOption::InitialCommands(initial_commands)];
+                let input = $input;
+                let (got_tokens, vm) = execute_source_code(&input, &options);
+                let got = token::write_tokens(&got_tokens.unwrap(), vm.cs_name_interner());
                 let want = $want.to_string();
 
                 if got != want {
@@ -138,13 +132,16 @@ mod tests {
                     panic!("write_tokens test failed");
                 }
             }
+            )*
         };
     }
 
-    script_test!(char_newline_1, "H\nW", "H W");
-    script_test!(newline_1, "H\\newline W", "H\nW");
-    script_test!(newline_2, "H\\newline \\newline W", "H\n\nW");
-    script_test!(newline_3, "H\\newline \\newline \\newline W", "H\n\n\nW");
-    script_test!(par_1, "H\n\n\nW", "H\n\nW");
-    script_test!(par_2, "H\n\n\n\n\nW", "H\n\nW");
+    script_tests![
+        (char_newline_1, "H\nW", "H W"),
+        (newline_1, "H\\newline W", "H\nW"),
+        (newline_2, "H\\newline \\newline W", "H\n\nW"),
+        (newline_3, "H\\newline \\newline \\newline W", "H\n\n\nW"),
+        (par_1, "H\n\n\nW", "H\n\nW"),
+        (par_2, "H\n\n\n\n\nW", "H\n\nW"),
+    ];
 }

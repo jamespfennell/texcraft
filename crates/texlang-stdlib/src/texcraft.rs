@@ -1,4 +1,7 @@
-//! The Texcraft primitive, which returns the word Texcraft as 8 letter tokens.
+//! The Texcraft primitive, which returns the word Texcraft as eight separate letter tokens
+//!
+//! This primitive is essentially equivalent to `\def\Texcraft{Texcraft}`.
+//! It was implemented to be a simple example of a custom expansion primitive.
 
 use texlang_core::prelude::*;
 
@@ -28,11 +31,15 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::testutil::*;
+    use crate::testing::*;
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([("texcraft", get_texcraft())])
     }
 
-    expansion_test![texcraft, r"\texcraft", r"Texcraft"];
+    test_suite![expansion_equality_tests((
+        texcraft,
+        r"\texcraft",
+        r"Texcraft"
+    ),),];
 }

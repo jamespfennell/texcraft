@@ -1,4 +1,4 @@
-//! TeX registers and commands to access them
+//! Register variables (`\count`, `\countdef`)
 
 use texcraft_stdext::collections::groupingmap;
 use texlang_core::parse;
@@ -128,7 +128,7 @@ mod tests {
 
     use super::*;
     use crate::script;
-    use crate::testutil::*;
+    use crate::testing::*;
     use crate::the;
     use texlang_core::vm::implement_has_component;
 
@@ -144,7 +144,7 @@ mod tests {
         (script::Component, exec),
     ];
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("the", the::get_the()),
             ("count", get_count()),
@@ -152,26 +152,31 @@ mod tests {
         ])
     }
 
-    expansion_test![write_and_read_register, r"\count 23 4 \the\count 23", r"4"];
-    expansion_test![
-        write_and_read_register_eq,
-        r"\count 23 = 4 \the\count 23",
-        r"4"
+    test_suite![
+        expansion_equality_tests(
+            (write_and_read_register, r"\count 23 4 \the\count 23", r"4"),
+            (
+                write_and_read_register_eq,
+                r"\count 23 = 4 \the\count 23",
+                r"4"
+            ),
+            (countdef_base_case, r"\countdef\A 23\A 4 \the\A", r"4"),
+            (countdef_base_case_eq, r"\countdef\A = 23\A 4 \the\A", r"4"),
+            (
+                countdef_with_count,
+                r"\countdef\A 23\A 4\count 1 0 \the\A",
+                r"4"
+            ),
+            (
+                countdef_with_same_count,
+                r"\countdef\A 23\A 4\count 23 5 \the\A",
+                r"5"
+            ),
+        ),
+        failure_tests(
+            (write_register_index_too_big, r"\count 260 = 4"),
+            (write_register_negative_index, r"\count -1 = 4"),
+            (countdef_register_index_too_big, r"\countdef\A 260 \A= 4"),
+        ),
     ];
-    expansion_failure_test![write_register_index_too_big, r"\count 260 = 4"];
-    expansion_failure_test![write_register_negative_index, r"\count -1 = 4"];
-
-    expansion_test![countdef_base_case, r"\countdef\A 23\A 4 \the\A", r"4"];
-    expansion_test![countdef_base_case_eq, r"\countdef\A = 23\A 4 \the\A", r"4"];
-    expansion_test![
-        countdef_with_count,
-        r"\countdef\A 23\A 4\count 1 0 \the\A",
-        r"4"
-    ];
-    expansion_test![
-        countdef_with_same_count,
-        r"\countdef\A 23\A 4\count 23 5 \the\A",
-        r"5"
-    ];
-    expansion_failure_test![countdef_register_index_too_big, r"\countdef\A 260 \A= 4"];
 }

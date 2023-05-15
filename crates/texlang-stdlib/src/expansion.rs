@@ -1,4 +1,4 @@
-//! Commands that control the expansion process
+//! Commands that alter the expansion process
 
 use texlang_core::command;
 use texlang_core::error;
@@ -201,10 +201,10 @@ fn expandafter_missing_second_token_error(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::testutil::*;
+    use crate::testing::*;
     use std::collections::HashMap;
 
-    fn setup_expansion_test(optimized: bool) -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn initial_commands(optimized: bool) -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("def", crate::def::get_def()),
             (
@@ -217,28 +217,34 @@ mod test {
         ])
     }
 
-    fn run_expandafter_test(lhs: &str, rhs: &str, optimized: bool) {
-        static PREFIX: &str = r"\def\mk#1#2{\def#1##1\notes##2\end{##1\notes##2#2\end}}\mk\a a\mk\b b\mk\c c\mk\d d\def\notes#1\end{#1}";
-        static POSTFIX: &str = r"\notes\end";
-        let lhs = format!("{}{}{}", PREFIX, lhs, POSTFIX);
-        run_expansion_test(|| setup_expansion_test(optimized), None, &lhs, rhs);
-    }
+    static PREFIX: &str = r"\def\mk#1#2{\def#1##1\notes##2\end{##1\notes##2#2\end}}\mk\a a\mk\b b\mk\c c\mk\d d\def\notes#1\end{#1}";
+    static POSTFIX: &str = r"\notes\end";
 
     #[macro_export]
     macro_rules! expandafter_test {
-        ($( ( $name: ident, $lhs: expr, $rhs: expr), )+) => {
-            $(
-            mod $name {
-                #[test]
-                fn simple() {
-                    super::run_expandafter_test($lhs, $rhs, false);
-                }
-                #[test]
-                fn optimized() {
-                    super::run_expandafter_test($lhs, $rhs, true);
-                }
+        ( $( ( $name: ident, $lhs: expr, $rhs: expr ) ),* $(,)? ) => {
+            mod expandafter_simple {
+                use super::*;
+                test_suite![
+                    options(TestOption::InitialCommandsDyn(Box::new(|| { initial_commands(false) }))),
+                    expansion_equality_tests(
+                        $(
+                            ( $name, format!("{}{}{}", PREFIX, $lhs, POSTFIX), $rhs ),
+                        )*
+                    ),
+                ];
             }
-            )+
+            mod expandafter_optimized {
+                use super::*;
+                test_suite![
+                    options(TestOption::InitialCommandsDyn(Box::new(|| { initial_commands(true) }))),
+                    expansion_equality_tests(
+                        $(
+                            ( $name, format!("{}{}{}", PREFIX, $lhs, POSTFIX), $rhs ),
+                        )*
+                    ),
+                ];
+            }
         };
     }
 
@@ -324,7 +330,10 @@ mod test {
     ];
 
     fn run_expandafter_failure_test(input: &str, optimized: bool) {
-        crate::testutil::run_expansion_failure_test(|| setup_expansion_test(optimized), &input);
+        let options = vec![crate::testing::TestOption::InitialCommandsDyn(Box::new(
+            || initial_commands(optimized),
+        ))];
+        crate::testing::run_failure_test(&input, &options);
     }
 
     #[macro_export]

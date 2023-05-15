@@ -1,3 +1,5 @@
+//! The `\the` primitive
+
 use std::char;
 use std::convert::TryInto;
 /// The `\the` expansion primitive.

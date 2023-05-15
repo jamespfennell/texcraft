@@ -1,6 +1,5 @@
-//! Conditional primitives (if, else, fi, and switch)
+//! Control flow primitives (if, else, switch)
 //!
-//! # Writing new conditional primitives
 
 use std::cell::RefCell;
 use texlang_core::command;
@@ -412,7 +411,7 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::{script, testutil::*};
+    use crate::{script, testing::*};
     use texlang_core::vm::implement_has_component;
 
     #[derive(Default)]
@@ -423,7 +422,7 @@ mod tests {
 
     implement_has_component![State, (Component, conditional), (script::Component, exec),];
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("else", get_else()),
             ("fi", get_fi()),
@@ -436,60 +435,63 @@ mod tests {
         ])
     }
 
-    expansion_test![iftrue_base_case, r"\iftrue a\else b\fi c", r"ac"];
-    expansion_test![iftrue_no_else, r"\iftrue a\fi c", r"ac"];
-    expansion_test![
-        iftrue_skip_nested_ifs,
-        r"\iftrue a\else b\iftrue \else c\fi d\fi e",
-        r"ae"
-    ];
-    expansion_failure_test![iftrue_end_of_input, r"\iftrue a\else b"];
-    expansion_test![iffalse_base_case, r"\iffalse a\else b\fi c", r"bc"];
-    expansion_test![iffalse_no_else, r"\iffalse a\fi c", r"c"];
-    expansion_test![
-        iffalse_skip_nested_ifs,
-        r"\iffalse \iftrue a\else b\fi c\else d\fi e",
-        r"de"
-    ];
-    expansion_test![
-        iffalse_and_iftrue_1,
-        r"\iffalse a\else b\iftrue c\else d\fi e\fi f",
-        r"bcef"
-    ];
-    expansion_test![
-        iffalse_and_iftrue_2,
-        r"\iftrue a\iffalse b\else c\fi d\else e\fi f",
-        r"acdf"
-    ];
-    expansion_failure_test![iffalse_end_of_input, r"\iffalse a"];
-    expansion_failure_test![else_not_expected, r"a\else"];
-    expansion_failure_test![fi_not_expected, r"a\fi"];
-    expansion_failure_test![or_not_expected, r"a\or"];
-
-    expansion_test![ifnum_less_than_true, r"\ifnum 4<5a\else b\fi c", r"ac"];
-    expansion_test![ifnum_less_than_false, r"\ifnum 5<4a\else b\fi c", r"bc"];
-    expansion_test![ifnum_equal_true, r"\ifnum 4=4a\else b\fi c", r"ac"];
-    expansion_test![ifnum_equal_false, r"\ifnum 5=4a\else b\fi c", r"bc"];
-    expansion_test![ifnum_greater_than_true, r"\ifnum 5>4a\else b\fi c", r"ac"];
-    expansion_test![ifnum_greater_than_false, r"\ifnum 4>5a\else b\fi c", r"bc"];
-
-    expansion_test![ifodd_odd, r"\ifodd 3a\else b\fi c", r"ac"];
-    expansion_test![ifodd_even, r"\ifodd 4a\else b\fi c", r"bc"];
-
-    expansion_test![ifcase_zero_no_ors, r"\ifcase 0 a\else b\fi c", r"ac"];
-    expansion_test![ifcase_zero_one_or, r"\ifcase 0 a\or b\else c\fi d", r"ad"];
-    expansion_test![ifcase_one, r"\ifcase 1 a\or b\else c\fi d", r"bd"];
-    expansion_test![
-        ifcase_one_more_cases,
-        r"\ifcase 1 a\or b\or c\else d\fi e",
-        r"be"
-    ];
-    expansion_test![ifcase_else_no_ors, r"\ifcase 1 a\else b\fi c", r"bc"];
-    expansion_test![ifcase_else_one_or, r"\ifcase 2 a\or b\else c\fi d", r"cd"];
-    expansion_test![ifcase_no_matching_case, r"\ifcase 3 a\or b\or c\fi d", r"d"];
-    expansion_test![
-        ifcase_nested,
-        r"\ifcase 1 a\or b\ifcase 1 c\or d\or e\else f\fi g\or h\fi i",
-        r"bdgi"
+    test_suite![
+        expansion_equality_tests(
+            (iftrue_base_case, r"\iftrue a\else b\fi c", r"ac"),
+            (iftrue_no_else, r"\iftrue a\fi c", r"ac"),
+            (
+                iftrue_skip_nested_ifs,
+                r"\iftrue a\else b\iftrue \else c\fi d\fi e",
+                r"ae"
+            ),
+            (iffalse_base_case, r"\iffalse a\else b\fi c", r"bc"),
+            (iffalse_no_else, r"\iffalse a\fi c", r"c"),
+            (
+                iffalse_skip_nested_ifs,
+                r"\iffalse \iftrue a\else b\fi c\else d\fi e",
+                r"de"
+            ),
+            (
+                iffalse_and_iftrue_1,
+                r"\iffalse a\else b\iftrue c\else d\fi e\fi f",
+                r"bcef"
+            ),
+            (
+                iffalse_and_iftrue_2,
+                r"\iftrue a\iffalse b\else c\fi d\else e\fi f",
+                r"acdf"
+            ),
+            (ifnum_less_than_true, r"\ifnum 4<5a\else b\fi c", r"ac"),
+            (ifnum_less_than_false, r"\ifnum 5<4a\else b\fi c", r"bc"),
+            (ifnum_equal_true, r"\ifnum 4=4a\else b\fi c", r"ac"),
+            (ifnum_equal_false, r"\ifnum 5=4a\else b\fi c", r"bc"),
+            (ifnum_greater_than_true, r"\ifnum 5>4a\else b\fi c", r"ac"),
+            (ifnum_greater_than_false, r"\ifnum 4>5a\else b\fi c", r"bc"),
+            (ifodd_odd, r"\ifodd 3a\else b\fi c", r"ac"),
+            (ifodd_even, r"\ifodd 4a\else b\fi c", r"bc"),
+            (ifcase_zero_no_ors, r"\ifcase 0 a\else b\fi c", r"ac"),
+            (ifcase_zero_one_or, r"\ifcase 0 a\or b\else c\fi d", r"ad"),
+            (ifcase_one, r"\ifcase 1 a\or b\else c\fi d", r"bd"),
+            (
+                ifcase_one_more_cases,
+                r"\ifcase 1 a\or b\or c\else d\fi e",
+                r"be"
+            ),
+            (ifcase_else_no_ors, r"\ifcase 1 a\else b\fi c", r"bc"),
+            (ifcase_else_one_or, r"\ifcase 2 a\or b\else c\fi d", r"cd"),
+            (ifcase_no_matching_case, r"\ifcase 3 a\or b\or c\fi d", r"d"),
+            (
+                ifcase_nested,
+                r"\ifcase 1 a\or b\ifcase 1 c\or d\or e\else f\fi g\or h\fi i",
+                r"bdgi"
+            ),
+        ),
+        failure_tests(
+            (iftrue_end_of_input, r"\iftrue a\else b"),
+            (iffalse_end_of_input, r"\iffalse a"),
+            (else_not_expected, r"a\else"),
+            (fi_not_expected, r"a\fi"),
+            (or_not_expected, r"a\or"),
+        ),
     ];
 }

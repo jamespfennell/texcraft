@@ -1,3 +1,5 @@
+//! Primitive that pauses execution for a duration of time
+
 use core::time;
 use std::thread;
 use texlang_core::parse;

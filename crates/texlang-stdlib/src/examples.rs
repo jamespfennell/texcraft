@@ -49,7 +49,7 @@ macro_rules! exercises {
                     State{}
                 }
 
-                fn setup_expansion_test(s: &mut Base<State>) {
+                fn initial_commands(s: &mut Base<State>) {
                     s.set_command("catcode", catcodecmd::get_catcode());
                     s.set_command("def", def::get_def());
                 }

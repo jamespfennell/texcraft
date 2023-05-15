@@ -277,7 +277,7 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::parse::testutil;
+    use crate::parse::testing;
     use crate::token::catcode;
 
     macro_rules! parse_number_tests {
@@ -285,7 +285,7 @@ mod tests {
             $(
             #[test]
             fn $name() {
-                let mut vm = testutil::new_vm($input);
+                let mut vm = testing::new_vm($input);
                 let result: i32 = parse_number(vm::ExpansionInput::new(&mut vm)).unwrap();
                 assert_eq![result, $number];
             }

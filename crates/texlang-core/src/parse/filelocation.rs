@@ -54,14 +54,14 @@ pub fn parse_file_location<S>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Res
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parse::testutil;
+    use crate::parse::testing;
 
     macro_rules! parse_file_path_tests {
         ($(($name: ident, $input: expr, $file_path: expr, ),)+) => {
             $(
             #[test]
             fn $name() {
-                let mut vm = testutil::new_vm($input);
+                let mut vm = testing::new_vm($input);
                 let result = parse_file_location(vm::ExpansionInput::new(&mut vm)).unwrap();
                 assert_eq![result, $file_path];
             }

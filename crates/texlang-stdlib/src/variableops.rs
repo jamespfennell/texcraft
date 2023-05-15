@@ -143,7 +143,7 @@ mod tests {
     use crate::catcodecmd;
     use crate::registers;
     use crate::script;
-    use crate::testutil::*;
+    use crate::testing::*;
     use crate::the;
     use texlang_core::vm::implement_has_component;
 
@@ -161,7 +161,7 @@ mod tests {
         (prefix::Component, prefix),
     ];
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("advance", get_advance()),
             ("advancechk", get_advancechk()),
@@ -176,80 +176,93 @@ mod tests {
         ])
     }
 
-    macro_rules! arithmetic_test {
-        ($name: ident, $op: expr, $lhs: expr, $rhs: expr, $expected: expr) => {
-            expansion_test![
-                $name,
-                format![r"\count 1 {} {} \count 1 {} \the\count 1", $lhs, $op, $rhs],
-                $expected
+    macro_rules! arithmetic_tests {
+        ( $( ($name: ident, $op: expr, $lhs: expr, $rhs: expr, $expected: expr) ),* $(,)? ) => {
+            test_suite![
+                expansion_equality_tests(
+                    $(
+                        (
+                            $name,
+                            format![r"\count 1 {} {} \count 1 {} \the\count 1", $lhs, $op, $rhs],
+                            $expected
+                        ),
+                    )*
+                )
             ];
         };
     }
 
-    arithmetic_test![advance_base_case, r"\advance", "1", "2", "3"];
-    arithmetic_test![advance_base_case_with_by, r"\advance", "1", "by 2", "3"];
-    arithmetic_test![advance_negative_summand, r"\advance", "10", "-2", "8"];
-    arithmetic_test![
-        advance_overflow_case,
-        r"\advance",
-        "2147483647",
-        "1",
-        "-2147483648"
-    ];
-    expansion_failure_test![
-        advance_incorrect_keyword_1,
-        r"\count 1 1\advance\count 1 fy 2 \the \count 1"
-    ];
-    expansion_failure_test![
-        advance_incorrect_keyword_2,
-        r"\count 1 1\advance\count 1 be 2 \the \count 1"
-    ];
-    expansion_failure_test![advance_catcode_not_supported, r"\advance\catcode 100 by 2"];
-    arithmetic_test![advancechk_base_case, r"\advancechk", "1", "2", "3"];
-    arithmetic_test![advancechk_negative_summand, r"\advancechk", "10", "-2", "8"];
-    expansion_failure_test![
-        advancechk_overflow,
-        r"\count 1 2147483647 \advancechk\count 1 by 1"
-    ];
-    expansion_test![
-        advance_x_by_x,
-        r"\count 1 200 \advance \count 1 by \count 1 a\the\count 1",
-        r"a400"
-    ];
-    arithmetic_test![multiply_base_case, r"\multiply", "5", "4", "20"];
-    arithmetic_test![multiply_base_case_with_by, r"\multiply", "5", "by 4", "20"];
-    arithmetic_test![multiply_pos_neg, r"\multiply", "-5", "4", "-20"];
-    arithmetic_test![multiply_neg_pos, r"\multiply", "5", "-4", "-20"];
-    arithmetic_test![multiply_neg_neg, r"\multiply", "-5", "-4", "20"];
-    arithmetic_test![
-        multiply_overflow,
-        r"\multiply",
-        "100000",
-        "100000",
-        "1410065408"
-    ];
-    arithmetic_test![multiplychk_base_case, r"\multiplychk", "5", "4", "20"];
-    expansion_failure_test![
-        multiplychk_overflow,
-        r"\count 1 100000 \multiplychk\count 1 by 100000"
+    arithmetic_tests![
+        (advance_base_case, r"\advance", "1", "2", "3"),
+        (advance_base_case_with_by, r"\advance", "1", "by 2", "3"),
+        (advance_negative_summand, r"\advance", "10", "-2", "8"),
+        (
+            advance_overflow_case,
+            r"\advance",
+            "2147483647",
+            "1",
+            "-2147483648"
+        ),
+        (multiply_base_case, r"\multiply", "5", "4", "20"),
+        (multiply_base_case_with_by, r"\multiply", "5", "by 4", "20"),
+        (multiply_pos_neg, r"\multiply", "-5", "4", "-20"),
+        (multiply_neg_pos, r"\multiply", "5", "-4", "-20"),
+        (multiply_neg_neg, r"\multiply", "-5", "-4", "20"),
+        (
+            multiply_overflow,
+            r"\multiply",
+            "100000",
+            "100000",
+            "1410065408"
+        ),
+        (multiplychk_base_case, r"\multiplychk", "5", "4", "20"),
+        (divide_base_case, r"\divide", "9", "4", "2"),
+        (divide_with_by, r"\divide", "9", "by 4", "2"),
+        (divide_pos_neg, r"\divide", "-9", "4", "-2"),
+        (divide_neg_pos, r"\divide", "9", "-4", "-2"),
+        (divide_neg_neg, r"\divide", "-9", "-4", "2"),
+        (divide_exact, r"\divide", "100", "10", "10"),
+        (advancechk_base_case, r"\advancechk", "1", "2", "3"),
+        (advancechk_negative_summand, r"\advancechk", "10", "-2", "8")
     ];
 
-    arithmetic_test![divide_base_case, r"\divide", "9", "4", "2"];
-    arithmetic_test![divide_with_by, r"\divide", "9", "by 4", "2"];
-    arithmetic_test![divide_pos_neg, r"\divide", "-9", "4", "-2"];
-    arithmetic_test![divide_neg_pos, r"\divide", "9", "-4", "-2"];
-    arithmetic_test![divide_neg_neg, r"\divide", "-9", "-4", "2"];
-    arithmetic_test![divide_exact, r"\divide", "100", "10", "10"];
-    expansion_test![
-        local_advance,
-        r"\count 1 5{\advance\count 1 8}\the\count 1",
-        "5"
+    test_suite![
+        expansion_equality_tests(
+            (
+                advance_x_by_x,
+                r"\count 1 200 \advance \count 1 by \count 1 a\the\count 1",
+                r"a400"
+            ),
+            (
+                global_advance,
+                r"\count 1 5{\global\advance\count 1 8}\the\count 1",
+                "13"
+            ),
+            (
+                local_advance,
+                r"\count 1 5{\advance\count 1 8}\the\count 1",
+                "5"
+            ),
+        ),
+        failure_tests(
+            (
+                advance_incorrect_keyword_1,
+                r"\count 1 1\advance\count 1 fy 2 \the \count 1"
+            ),
+            (
+                advance_incorrect_keyword_2,
+                r"\count 1 1\advance\count 1 be 2 \the \count 1"
+            ),
+            (advance_catcode_not_supported, r"\advance\catcode 100 by 2"),
+            (
+                advancechk_overflow,
+                r"\count 1 2147483647 \advancechk\count 1 by 1"
+            ),
+            (
+                multiplychk_overflow,
+                r"\count 1 100000 \multiplychk\count 1 by 100000"
+            ),
+            (divide_by_zero, r"\divide\count 1 by 0"),
+        ),
     ];
-    expansion_test![
-        global_advance,
-        r"\count 1 5{\global\advance\count 1 8}\the\count 1",
-        "13"
-    ];
-
-    expansion_failure_test![divide_by_zero, r"\divide\count 1 by 0"];
 }

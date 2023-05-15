@@ -427,11 +427,7 @@ pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::Buil
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        script,
-        testutil::{self, *},
-        the,
-    };
+    use crate::{script, testing::*, the};
     use std::collections::HashMap;
     use texlang_core::variable;
     use texlang_core::vm::implement_has_component;
@@ -445,7 +441,7 @@ mod test {
 
     implement_has_component![State, (script::Component, exec), (Component, prefix),];
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("global", get_global()),
             ("long", get_long()),
@@ -454,8 +450,14 @@ mod test {
             ("the", the::get_the()),
             ("def", def::get_def()),
             ("advance", variableops::get_advance()),
-            ("noOpExpansion", testutil::get_noop_expansion_cmd()),
-            ("noOpExecution", testutil::get_noop_execution_cmd()),
+            (
+                "noOpExpansion",
+                command::BuiltIn::new_expansion(|_, _| Ok(vec![])),
+            ),
+            (
+                "noOpExecution",
+                command::BuiltIn::new_execution(|_, _| Ok(())),
+            ),
         ])
     }
 
@@ -468,30 +470,35 @@ mod test {
         .into()
     }
 
-    expansion_test![non_global, r"\i=5{\i=8}\the\i", "5"];
-    expansion_test![non_global_2, r"\i=5\i=6{\i=8}\the\i", "6"];
-    expansion_test![non_global_3, r"\i=5{\i=6{\i=8 \the\i}\the\i}\the\i", "865"];
-    expansion_test![global, r"\i=5{\global\i=8}\the\i", "8"];
-    expansion_test![global_squared, r"\i=5{\global\global\i=8}\the\i", "8"];
-    expansion_test![long, r"\long\def\A{Hello}\A", "Hello"];
-    expansion_test![outer, r"\outer\def\A{Hello}\A", "Hello"];
-    expansion_test![
-        many_prefixes,
-        r"\long\outer\global\long\global\outer\def\A{Hello}\A",
-        "Hello"
+    test_suite![
+        expansion_equality_tests(
+            (non_global, r"\i=5{\i=8}\the\i", "5"),
+            (non_global_2, r"\i=5\i=6{\i=8}\the\i", "6"),
+            (non_global_3, r"\i=5{\i=6{\i=8 \the\i}\the\i}\the\i", "865"),
+            (global, r"\i=5{\global\i=8}\the\i", "8"),
+            (global_squared, r"\i=5{\global\global\i=8}\the\i", "8"),
+            (long, r"\long\def\A{Hello}\A", "Hello"),
+            (outer, r"\outer\def\A{Hello}\A", "Hello"),
+            (
+                many_prefixes,
+                r"\long\outer\global\long\global\outer\def\A{Hello}\A",
+                "Hello"
+            ),
+        ),
+        failure_tests(
+            (global_end_of_input, r"\global"),
+            (global_with_character, r"\global a"),
+            (global_with_undefined_command, r"\global \undefinedCommand"),
+            (
+                global_with_no_op_expansion_command,
+                r"\global \noOpExpansion"
+            ),
+            (
+                global_with_no_op_execution_command,
+                r"\global \noOpExecution"
+            ),
+            (long_prefix_when_global_allowed, r"\long\advance\i 0"),
+            (outer_prefix_when_global_allowed, r"\outer\advance\i 0"),
+        ),
     ];
-
-    expansion_failure_test![global_end_of_input, r"\global"];
-    expansion_failure_test![global_with_character, r"\global a"];
-    expansion_failure_test![global_with_undefined_command, r"\global \undefinedCommand"];
-    expansion_failure_test![
-        global_with_no_op_expansion_command,
-        r"\global \noOpExpansion"
-    ];
-    expansion_failure_test![
-        global_with_no_op_execution_command,
-        r"\global \noOpExecution"
-    ];
-    expansion_failure_test![long_prefix_when_global_allowed, r"\long\advance\i 0"];
-    expansion_failure_test![outer_prefix_when_global_allowed, r"\outer\advance\i 0"];
 }

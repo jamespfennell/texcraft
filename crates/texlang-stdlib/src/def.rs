@@ -1,4 +1,4 @@
-//! Primitives for creating user-defined macros (`\def` and friends).
+//! User-defined macros (`\def` and friends)
 
 use crate::prefix;
 use texcraft_stdext::algorithms::substringsearch::KMPMatcherFactory;
@@ -311,9 +311,9 @@ mod test {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::testutil::*;
+    use crate::testing::*;
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("def", get_def()),
             ("gdef", get_gdef()),
@@ -322,210 +322,212 @@ mod test {
         ])
     }
 
-    expansion_test![def_parsed_succesfully, "\\def\\A{abc}", ""];
-    expansion_test![output_is_correct, "\\def\\A{abc}\\A", "abc"];
-    expansion_test![output_twice, "\\def\\A{abc}\\A\\A", "abcabc"];
-    expansion_test![parse_one_parameter, "\\def\\A#1{a-#1-b}", ""];
-
-    expansion_test![one_undelimited_parameter, "\\def\\A#1{a-#1-b}\\A1", "a-1-b"];
-
-    expansion_test![
-        one_undelimited_parameter_multiple_times,
-        "\\def\\A#1{#1 #1 #1}\\A1",
-        "1 1 1"
-    ];
-
-    expansion_test![
-        one_undelimited_parameter_multiple_tokens,
-        "\\def\\A#1{a-#1-b}\\A{123}",
-        "a-123-b"
-    ];
-
-    expansion_test![
-        two_undelimited_parameters,
-        "\\def\\A#1#2{#2-#1}\\A56",
-        "6-5"
-    ];
-
-    expansion_test![
-        two_undelimited_parameters_multiple_token_inputs,
-        "\\def\\A#1#2{#2-#1}\\A{abc}{xyz}",
-        "xyz-abc"
-    ];
-
-    expansion_test![
-        consume_prefix_correctly,
-        "\\def\\A fgh{567}\\A fghi",
-        "567i"
-    ];
-
-    expansion_test![
-        one_undelimited_parameter_with_prefix,
-        "\\def\\A abc#1{y#1z}\\A abcdefg",
-        "ydzefg"
-    ];
-
-    expansion_test![
-        one_undelimited_parameter_with_prefix_multiple_tokens,
-        "\\def\\A abc#1{y#1z}\\A abcdefg",
-        "ydzefg"
-    ];
-
-    expansion_test![
-        one_delimited_parameter,
-        "\\def\\A #1xxx{y#1z}\\A abcxxx",
-        "yabcz"
-    ];
-
-    expansion_test![
-        one_delimited_parameter_empty,
-        "\\def\\A #1xxx{y#1z}\\A xxx",
-        "yz"
-    ];
-
-    expansion_test![
-        one_delimited_parameter_with_scope,
-        "\\def\\A #1xxx{#1}\\A abc{123xxx}xxx",
-        "abc{123xxx}"
-    ];
-
-    expansion_test![
-        one_delimited_parameter_with_prefix,
-        "\\def\\A a#1c{x#1y}\\A abcdef",
-        "xbydef"
-    ];
-
-    expansion_test![
-        two_delimited_parameters_with_prefix,
-        r"\def\A a#1c#2e{x#2y#1z}\A abcdef",
-        "xdybzf"
-    ];
-
-    expansion_test![
-        one_delimited_parameter_grouped_value,
-        r"\def\A #1c{x#1y}\A {Hello}c",
-        "xHelloy"
-    ];
-
-    expansion_test![
-        parameter_brace_special_case,
-        r"\def\A #{Mint says }\A{hello}",
-        "Mint says {hello}"
-    ];
-
-    expansion_test![
-        grouping,
-        r"\def\A{Hello}\A{\def\A{World}\A}\A",
-        r"HelloWorldHello"
-    ];
-
-    expansion_test![
-        grouping_global,
-        r"\def\A{Hello}\A{\global\def\A{World}\A}\A",
-        r"HelloWorldWorld"
-    ];
-
-    expansion_test![
-        gdef,
-        r"\def\A{Hello}\A{\gdef\A{World}\A}\A",
-        r"HelloWorldWorld"
-    ];
-
-    expansion_test![
-        gdef_global,
-        r"\def\A{Hello}\A{\global\gdef\A{World}\A}\A",
-        r"HelloWorldWorld"
-    ];
-
-    expansion_test![
-        def_takes_global,
-        r"\global\def\A{Hello}\assertGlobalIsFalse",
-        r""
-    ];
-
-    expansion_test![
-        gdef_takes_global,
-        r"\global\gdef\A{Hello}\assertGlobalIsFalse",
-        r""
-    ];
-
-    expansion_test![
-        texbook_exercise_20_1,
-        r"\def\mustnt{I must not talk in class.}%
+    test_suite![
+        expansion_equality_tests(
+            (def_parsed_successfully, "\\def\\A{abc}", ""),
+            (output_is_correct, "\\def\\A{abc}\\A", "abc"),
+            (output_twice, "\\def\\A{abc}\\A\\A", "abcabc"),
+            (parse_one_parameter, "\\def\\A#1{a-#1-b}", ""),
+            (one_undelimited_parameter, "\\def\\A#1{a-#1-b}\\A1", "a-1-b"),
+            (
+                one_undelimited_parameter_multiple_times,
+                "\\def\\A#1{#1 #1 #1}\\A1",
+                "1 1 1"
+            ),
+            (
+                one_undelimited_parameter_multiple_tokens,
+                "\\def\\A#1{a-#1-b}\\A{123}",
+                "a-123-b"
+            ),
+            (
+                two_undelimited_parameters,
+                "\\def\\A#1#2{#2-#1}\\A56",
+                "6-5"
+            ),
+            (
+                two_undelimited_parameters_multiple_token_inputs,
+                "\\def\\A#1#2{#2-#1}\\A{abc}{xyz}",
+                "xyz-abc"
+            ),
+            (
+                consume_prefix_correctly,
+                "\\def\\A fgh{567}\\A fghi",
+                "567i"
+            ),
+            (
+                one_undelimited_parameter_with_prefix,
+                "\\def\\A abc#1{y#1z}\\A abcdefg",
+                "ydzefg"
+            ),
+            (
+                one_undelimited_parameter_with_prefix_multiple_tokens,
+                "\\def\\A abc#1{y#1z}\\A abcdefg",
+                "ydzefg"
+            ),
+            (
+                one_delimited_parameter,
+                "\\def\\A #1xxx{y#1z}\\A abcxxx",
+                "yabcz"
+            ),
+            (
+                one_delimited_parameter_empty,
+                "\\def\\A #1xxx{y#1z}\\A xxx",
+                "yz"
+            ),
+            (
+                one_delimited_parameter_with_scope,
+                "\\def\\A #1xxx{#1}\\A abc{123xxx}xxx",
+                "abc{123xxx}"
+            ),
+            (
+                one_delimited_parameter_with_prefix,
+                "\\def\\A a#1c{x#1y}\\A abcdef",
+                "xbydef"
+            ),
+            (
+                two_delimited_parameters_with_prefix,
+                r"\def\A a#1c#2e{x#2y#1z}\A abcdef",
+                "xdybzf"
+            ),
+            (
+                one_delimited_parameter_grouped_value,
+                r"\def\A #1c{x#1y}\A {Hello}c",
+                "xHelloy"
+            ),
+            (
+                parameter_brace_special_case,
+                r"\def\A #{Mint says }\A{hello}",
+                "Mint says {hello}"
+            ),
+            (
+                grouping,
+                r"\def\A{Hello}\A{\def\A{World}\A}\A",
+                r"HelloWorldHello"
+            ),
+            (
+                grouping_global,
+                r"\def\A{Hello}\A{\global\def\A{World}\A}\A",
+                r"HelloWorldWorld"
+            ),
+            (
+                gdef,
+                r"\def\A{Hello}\A{\gdef\A{World}\A}\A",
+                r"HelloWorldWorld"
+            ),
+            (
+                gdef_global,
+                r"\def\A{Hello}\A{\global\gdef\A{World}\A}\A",
+                r"HelloWorldWorld"
+            ),
+            (
+                def_takes_global,
+                r"\global\def\A{Hello}\assertGlobalIsFalse",
+                r""
+            ),
+            (
+                gdef_takes_global,
+                r"\global\gdef\A{Hello}\assertGlobalIsFalse",
+                r""
+            ),
+            (
+                texbook_exercise_20_1,
+                r"\def\mustnt{I must not talk in class.}%
           \def\five{\mustnt\mustnt\mustnt\mustnt\mustnt}%
           \def\twenty{\five\five\five\five}%
           \def\punishment{\twenty\twenty\twenty\twenty\twenty}%
           \punishment",
-        "I must not talk in class.".repeat(100)
-    ];
-
-    expansion_test![
-        texbook_exercise_20_2,
-        r"\def\a{\b}%
+                "I must not talk in class.".repeat(100)
+            ),
+            (
+                texbook_exercise_20_2,
+                r"\def\a{\b}%
           \def\b{A\def\a{B\def\a{C\def\a{\b}}}}%
           \def\puzzle{\a\a\a\a\a}%
           \puzzle",
-        "ABCAB"
-    ];
-    expansion_test![
-        texbook_exercise_20_3_part_1,
-        "\\def\\row#1{(#1_1,\\ldots,#1_n)}\\row{\\bf x}",
-        "(\\bf x_1,\\ldots,\\bf x_n)"
-    ];
-
-    expansion_test![
-        texbook_exercise_20_3_part_2,
-        "\\def\\row#1{(#1_1,\\ldots,#1_n)}\\row{{\\bf x}}",
-        "({\\bf x}_1,\\ldots,{\\bf x}_n)"
-    ];
-
-    expansion_test![
-        texbook_exercise_20_4_part_1,
-        r#"\def\mustnt#1#2{I must not #1 in #2.}%
+                "ABCAB"
+            ),
+            (
+                texbook_exercise_20_3_part_1,
+                "\\def\\row#1{(#1_1,\\ldots,#1_n)}\\row{\\bf x}",
+                "(\\bf x_1,\\ldots,\\bf x_n)"
+            ),
+            (
+                texbook_exercise_20_3_part_2,
+                "\\def\\row#1{(#1_1,\\ldots,#1_n)}\\row{{\\bf x}}",
+                "({\\bf x}_1,\\ldots,{\\bf x}_n)"
+            ),
+            (
+                texbook_exercise_20_4_part_1,
+                r#"\def\mustnt#1#2{I must not #1 in #2.}%
            \def\five#1#2{\mustnt{#1}{#2}\mustnt{#1}{#2}\mustnt{#1}{#2}\mustnt{#1}{#2}\mustnt{#1}{#2}}%
            \def\twenty#1#2{\five{#1}{#2}\five{#1}{#2}\five{#1}{#2}\five{#1}{#2}}%
            \def\punishment#1#2{\twenty{#1}{#2}\twenty{#1}{#2}\twenty{#1}{#2}\twenty{#1}{#2}\twenty{#1}{#2}}%
            \punishment{run}{the halls}"#,
-        "I must not run in the halls.".repeat(100)
-    ];
-
-    expansion_test![
-        texbook_exercise_20_4_part_2,
-        r#"\def\mustnt{I must not \doit\ in \thatplace.}%
+                "I must not run in the halls.".repeat(100)
+            ),
+            (
+                texbook_exercise_20_4_part_2,
+                r#"\def\mustnt{I must not \doit\ in \thatplace.}%
            \def\five{\mustnt\mustnt\mustnt\mustnt\mustnt}%
            \def\twenty{\five\five\five\five}%
            \def\punishment#1#2{\def\doit{#1}\def\thatplace{#2}\twenty\twenty\twenty\twenty\twenty}%
            \punishment{run}{the halls}"#,
-        r"I must not run\ in the halls.".repeat(100)
-    ];
-
-    expansion_test![
-        texbook_exercise_20_5,
-        r"\def\a#1{\def\b##1{##1#1}}\a!\b{Hello}",
-        "Hello!"
-    ];
-
-    expansion_test![
-        texbook_exercise_20_5_temp,
-        r"\def\b#1{#1!}\b{Hello}",
-        "Hello!"
-    ];
-
-    expansion_test![
-        texbook_exercise_20_5_example_below,
-        "\\def\\a#1#{\\hbox to #1}\\a3pt{x}",
-        "\\hbox to 3pt{x}"
-    ];
-
-    expansion_test![
-        texbook_exercise_20_6,
-        r"\def\b#1{And #1, World!}\def\a#{\b}\a{Hello}",
-        "And Hello, World!"
+                r"I must not run\ in the halls.".repeat(100)
+            ),
+            (
+                texbook_exercise_20_5,
+                r"\def\a#1{\def\b##1{##1#1}}\a!\b{Hello}",
+                "Hello!"
+            ),
+            (
+                texbook_exercise_20_5_temp,
+                r"\def\b#1{#1!}\b{Hello}",
+                "Hello!"
+            ),
+            (
+                texbook_exercise_20_5_example_below,
+                "\\def\\a#1#{\\hbox to #1}\\a3pt{x}",
+                "\\hbox to 3pt{x}"
+            ),
+            (
+                texbook_exercise_20_6,
+                r"\def\b#1{And #1, World!}\def\a#{\b}\a{Hello}",
+                "And Hello, World!"
+            ),
+        ),
+        failure_tests(
+            (end_of_input_scanning_target, "\\def"),
+            (end_of_input_scanning_argument_text, "\\def\\A"),
+            (end_of_input_scanning_replacement, "\\def\\A{"),
+            (end_of_input_scanning_nested_replacement, "\\def\\A{{}"),
+            (end_of_input_reading_parameter_number, "\\def\\A#"),
+            (end_of_input_scanning_argument, "\\def\\A#1{} \\A"),
+            (
+                end_of_input_reading_value_for_parameter,
+                "\\def\\A#1{} \\A{this {is parameter 1 but it never ends}"
+            ),
+            (end_of_input_reading_prefix, "\\def\\A abc{} \\A ab"),
+            (
+                end_of_input_reading_delimiter,
+                "\\def\\A #1abc{} \\A {first parameter}ab"
+            ),
+            (unexpected_token_target, "\\def a"),
+            (unexpected_token_argument, "\\def\\A }"),
+            (unexpected_token_parameter_number, "\\def\\A #a}"),
+            (unexpected_parameter_number_in_argument, "\\def\\A #2{}"),
+            (unexpected_parameter_token_in_replacement, "\\def\\A #1{#a}"),
+            (unexpected_parameter_number_in_replacement, "\\def\\A {#2}"),
+            (
+                unexpected_parameter_number_in_replacement_2,
+                "\\def\\A #1{#2}"
+            ),
+            (unexpected_token_in_prefix, "\\def\\A abc{d} \\A abd"),
+        ),
     ];
 
     /* TODO: renable using \catcode
     fn setup_texbook_exercise_20_7<S: TexState<S>>(s: &mut S) {
-        setup_expansion_test(s);
+        initial_commands(s);
         s.cat_code_map_mut().insert(
             '[' as u32,
             catcode::RawCatCode::Regular(catcode::CatCode::BeginGroup),
@@ -547,32 +549,4 @@ mod test {
         setup_texbook_exercise_20_7
     ];
     */
-
-    expansion_failure_test![end_of_input_scanning_target, "\\def"];
-    expansion_failure_test![end_of_input_scanning_argument_text, "\\def\\A"];
-    expansion_failure_test![end_of_input_scanning_replacement, "\\def\\A{"];
-    expansion_failure_test![end_of_input_scanning_nested_replacement, "\\def\\A{{}"];
-    expansion_failure_test![end_of_input_reading_parameter_number, "\\def\\A#"];
-    expansion_failure_test![end_of_input_scanning_argument, "\\def\\A#1{} \\A"];
-    expansion_failure_test![
-        end_of_input_reading_value_for_parameter,
-        "\\def\\A#1{} \\A{this {is parameter 1 but it never ends}"
-    ];
-    expansion_failure_test![end_of_input_reading_prefix, "\\def\\A abc{} \\A ab"];
-    expansion_failure_test![
-        end_of_input_reading_delimiter,
-        "\\def\\A #1abc{} \\A {first parameter}ab"
-    ];
-
-    expansion_failure_test![unexpected_token_target, "\\def a"];
-    expansion_failure_test![unexpected_token_argument, "\\def\\A }"];
-    expansion_failure_test![unexpected_token_parameter_number, "\\def\\A #a}"];
-    expansion_failure_test![unexpected_parameter_number_in_argument, "\\def\\A #2{}"];
-    expansion_failure_test![unexpected_parameter_token_in_replacement, "\\def\\A #1{#a}"];
-    expansion_failure_test![unexpected_parameter_number_in_replacement, "\\def\\A {#2}"];
-    expansion_failure_test![
-        unexpected_parameter_number_in_replacement_2,
-        "\\def\\A #1{#2}"
-    ];
-    expansion_failure_test![unexpected_token_in_prefix, "\\def\\A abc{d} \\A abd"];
 }

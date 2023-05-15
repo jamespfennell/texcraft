@@ -1,6 +1,6 @@
-//! Allocation of variables and arrays
+//! Dynamic allocation of variables and arrays
 //!
-//! This module contains implementions of brand new Texcraft commands
+//! This module contains implementations of brand new Texcraft commands
 //! `\newint` and `\newarray` which perform dynamic memory allocation.
 
 use std::collections::{BTreeMap, HashMap};
@@ -298,7 +298,7 @@ fn array_element_mut_ref_fn<S: HasComponent<Component>>(
 mod test {
     use super::*;
     use crate::the::get_the;
-    use crate::{script, testutil::*};
+    use crate::{script, testing::*};
     use texlang_core::vm::implement_has_component;
 
     #[derive(Default)]
@@ -309,7 +309,7 @@ mod test {
 
     implement_has_component![State, (Component, alloc), (script::Component, exec),];
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("newint", get_newint()),
             ("newarray", get_newarray()),
@@ -317,24 +317,29 @@ mod test {
         ])
     }
 
-    expansion_test![newint_base_case, r"\newint\a \a=3 \the\a", "3"];
-
-    expansion_test![
-        newarray_base_case_0,
-        r"\newarray \a 3 \a 0 = 2 \the\a 0",
-        "2"
+    test_suite![
+        expansion_equality_tests(
+            (newint_base_case, r"\newint\a \a=3 \the\a", "3"),
+            (
+                newarray_base_case_0,
+                r"\newarray \a 3 \a 0 = 2 \the\a 0",
+                "2"
+            ),
+            (
+                newarray_base_case_1,
+                r"\newarray \a 3 \a 1 = 2 \the\a 1",
+                "2"
+            ),
+            (
+                newarray_base_case_2,
+                r"\newarray \a 3 \a 2 = 2 \the\a 2",
+                "2"
+            ),
+        ),
+        failure_tests(
+            (newarray_out_of_bounds, r"\newarray \a 3 \a 3 = 2"),
+            (newarray_negative_index, r"\newarray \a 3 \a -3 = 2"),
+            (newarray_negative_length, r"\newarray \a -3"),
+        ),
     ];
-    expansion_test![
-        newarray_base_case_1,
-        r"\newarray \a 3 \a 1 = 2 \the\a 1",
-        "2"
-    ];
-    expansion_test![
-        newarray_base_case_2,
-        r"\newarray \a 3 \a 2 = 2 \the\a 2",
-        "2"
-    ];
-    expansion_failure_test![newarray_out_of_bounds, r"\newarray \a 3 \a 3 = 2"];
-    expansion_failure_test![newarray_negative_index, r"\newarray \a 3 \a -3 = 2"];
-    expansion_failure_test![newarray_negative_length, r"\newarray \a -3"];
 }

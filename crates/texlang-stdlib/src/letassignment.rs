@@ -59,9 +59,9 @@ mod test {
 
     use super::*;
     use crate::def;
-    use crate::testutil::*;
+    use crate::testing::*;
 
-    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("def", def::get_def()),
             ("global", prefix::get_global()),
@@ -69,13 +69,17 @@ mod test {
         ])
     }
 
-    expansion_test![let_for_macro, r"\def\A{abc}\let\B\A\B", "abc"];
-    expansion_test![local, r"\def\A{a}\def\B{b}\let\C=\A{\let\C=\B \C}\C", "ba"];
-    expansion_test![
-        global,
-        r"\def\A{a}\def\B{b}\let\C=\A{\global\let\C=\B \C}\C",
-        "bb"
+    test_suite![
+        expansion_equality_tests(
+            (let_for_macro, r"\def\A{abc}\let\B\A\B", "abc"),
+            (local, r"\def\A{a}\def\B{b}\let\C=\A{\let\C=\B \C}\C", "ba"),
+            (
+                global,
+                r"\def\A{a}\def\B{b}\let\C=\A{\global\let\C=\B \C}\C",
+                "bb"
+            ),
+            (let_for_macro_equals, r"\def\A{abc}\let\B=\A\B", "abc"),
+        ),
+        failure_tests((let_unknown_cs_name, r"\let \B=\A")),
     ];
-    expansion_test![let_for_macro_equals, r"\def\A{abc}\let\B=\A\B", "abc"];
-    expansion_failure_test!(let_unknown_cs_name, r"\let \B=\A");
 }

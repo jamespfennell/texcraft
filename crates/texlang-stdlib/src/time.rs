@@ -1,4 +1,4 @@
-//! Variable commands related to time.
+//! Time commands (`\year`, `\month`, etc.)
 
 #[cfg(feature = "time")]
 use chrono::prelude::*;

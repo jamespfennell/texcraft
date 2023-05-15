@@ -24,8 +24,7 @@ pub mod registers;
 pub mod repl;
 pub mod script;
 pub mod sleep;
-#[cfg(test)]
-pub mod testutil;
+pub mod testing;
 pub mod texcraft;
 pub mod the;
 pub mod time;
@@ -71,7 +70,7 @@ impl StdLibState {
             ("ifnum", conditional::get_if_num()),
             ("ifodd", conditional::get_if_odd()),
             ("iftrue", conditional::get_if_true()),
-            ("input", io::input::get_input()),
+            ("input", io::get_input()),
             //
             ("let", letassignment::get_let()),
             ("long", prefix::get_long()),
@@ -119,16 +118,18 @@ implement_has_component![
 #[cfg(test)]
 mod tests {
     use super::*;
+    use testing::*;
     use texlang_core::command;
 
     type State = StdLibState;
-    fn setup_expansion_test() -> HashMap<&'static str, command::BuiltIn<State>> {
+
+    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         StdLibState::all_initial_built_ins()
     }
 
-    expansion_test![
+    test_suite![expansion_equality_tests((
         overwrite_else,
         r"\def\else{}\ifodd 2 \else should be skipped \fi",
         r""
-    ];
+    ),),];
 }

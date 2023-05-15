@@ -8,7 +8,7 @@ mod keyword;
 mod number;
 mod relation;
 #[cfg(test)]
-mod testutil;
+mod testing;
 mod variable;
 
 pub use filelocation::{parse_file_location, FileLocation};
