@@ -1,19 +1,6 @@
 {
     "cSpell.words": [
-        "catcode",
-        "catcodes",
-        "expandafter",
-        "ifcase",
-        "iffalse",
-        "ifnum",
-        "ifodd",
-        "iftrue",
-        "interner",
-        "testing",
-        "texbook",
         "Texcraft",
-        "texlang",
-        "texmacro",
-        "tracingmacros"
+        "Texlang"
     ]
 }
