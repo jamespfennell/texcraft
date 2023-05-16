@@ -29,7 +29,7 @@ pub fn run<S: HasComponent<script::Component>>(vm: &mut vm::VM<S>, opts: RunOpti
 
         vm.clear_sources();
         vm.push_source("".to_string(), input).unwrap();
-        let tokens = match script::run(vm, true) {
+        let tokens = match script::run(vm) {
             Ok(s) => s,
             Err(err) => {
                 if let Some(signal) = anyhow::Error::downcast_ref::<Signal>(&err) {

@@ -305,6 +305,8 @@ pub type RefFn<S, T> = fn(state: &S, address: Address) -> &T;
 pub type MutRefFn<S, T> = fn(state: &mut S, address: Address) -> &mut T;
 
 /// Address of a variable.
+/// 
+/// TODO: rename index
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Address(pub usize);
 

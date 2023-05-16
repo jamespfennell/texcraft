@@ -1,4 +1,4 @@
-//! Texlang virtual machine (VM).
+//! The Texlang virtual machine (VM).
 //!
 //! This module contains the definition of the runtime VM,
 //!     various input streams that wrap the VM
@@ -17,7 +17,7 @@ use crate::token::lexer;
 use crate::token::trace;
 use crate::token::CsNameInterner;
 use crate::token::Token;
-use crate::token::Value::ControlSequence;
+use crate::token::Value;
 use crate::variable;
 use std::collections::HashMap;
 use texcraft_stdext::collections::groupingmap;
@@ -25,25 +25,79 @@ use texcraft_stdext::collections::groupingmap;
 mod streams;
 pub use streams::*;
 
-/// Run the Texlang interpreter for the provided VM.
+/// Implementations of this trait determine how the VM handles non-execution-command tokens.
 ///
-/// It is assumed that the VM has been preloaded with TeX source using the
+/// The main loop of the VM reads the next expanded token and performs
+///     some action based on the token.
+/// Many cases are handled automatically based on the semantics of the TeX language:
+///
+/// | token type | example | action |
+/// | -- | -- | -- |
+/// | execution command | `\def` | run the command |
+/// | variable command | `\count` | assign a value to the corresponding variable |
+/// | token alias | `\a` after `\let\a=a` | run the main VM loop for the token that is aliased |
+/// | begin group character | `{` | begin a group
+/// | end group character | `}` | end the current group
+///
+/// Note that the first three rows can arise from both control sequences and active character tokens.
+///
+/// The remaining cases are not specified by the TeX language but instead by
+///     the business logic of the TeX engine being built.
+/// The behavior in these cases is specified by implementing the associated handler.
+/// These cases and handlers are:
+///
+/// | token type | example | handler | default |
+/// | --- | --- | --- | --- |
+/// | character token | `b` | [character_handler](Handlers::character_handler) | do nothing
+/// | undefined command | `\b` where `\b` was never defined | [undefined_command_handler](Handlers::undefined_command_handler) | return an undefined control sequence error
+/// | unexpanded expansion command | `\the` in `\noexpand\the` | [unexpanded_expansion_command](Handlers::unexpanded_expansion_command) | do nothing
+///
+/// Each of the handlers has the same function signature as an execution command.
+pub trait Handlers<S> {
+    /// Handler to invoke for character tokens.
+    ///
+    /// This token is _not_ invoked for tokens whose category code is begin group (1), end group (2) or active character (13).
+    /// These cases are handled automatically by the VM based on the semantics of the TeX language.
+    fn character_handler(token: token::Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()> {
+        _ = (token, input);
+        Ok(())
+    }
+
+    /// Handler to invoke for a control sequence or active character for which no command is defined.
+    fn undefined_command_handler(
+        token: token::Token,
+        input: &mut ExecutionInput<S>,
+    ) -> anyhow::Result<()> {
+        Err(error::new_undefined_command_error(token, input.vm()))
+    }
+
+    /// Handler to invoke for expansion commands that were not expanded.
+    ///
+    /// This handles the `\the` token in `\noexpand\the`.
+    fn unexpanded_expansion_command(
+        token: token::Token,
+        input: &mut ExecutionInput<S>,
+    ) -> anyhow::Result<()> {
+        _ = (token, input);
+        Ok(())
+    }
+}
+
+/// Run the VM.
+///
+/// It is assumed that the VM has been preloaded with TeX source code using the
 /// [VM::push_source] method.
-pub fn run<S>(
-    vm: &mut VM<S>,
-    character_handler: command::ExecutionFn<S>,
-    undefined_cs_handler: command::ExecutionFn<S>,
-) -> anyhow::Result<()> {
+pub fn run<S, H: Handlers<S>>(vm: &mut VM<S>) -> anyhow::Result<()> {
     let execution_input = ExecutionInput::new(vm);
     loop {
-        let fully_expanded_token = execution_input.next();
-        let result = match fully_expanded_token {
+        let token = execution_input.next();
+        let result = match token {
             Ok(token) => match token {
                 None => {
                     break;
                 }
                 Some(token) => match token.value() {
-                    ControlSequence(name) => {
+                    Value::ControlSequence(name) => {
                         match execution_input.base().commands_map.get_command(&name) {
                             Some(Command::Execution(cmd, _)) => cmd(token, execution_input),
                             Some(Command::Variable(cmd)) => cmd.clone().set_value_using_input(
@@ -51,21 +105,37 @@ pub fn run<S>(
                                 execution_input,
                                 groupingmap::Scope::Local,
                             ),
-                            Some(Command::Character(token_value)) => character_handler(
-                                Token::new_from_value(*token_value, token.trace_key()),
-                                execution_input,
-                            ),
-                            None | Some(Command::Expansion(_, _)) | Some(Command::Macro(_)) => {
-                                undefined_cs_handler(token, execution_input)
+                            Some(Command::Character(token_value)) => {
+                                // TODO: the token may be a begin group, end group token, or active character token.
+                                // What to do in this case? Check pdfTeX.
+                                H::character_handler(
+                                    Token::new_from_value(*token_value, token.trace_key()),
+                                    execution_input,
+                                )
                             }
+                            Some(Command::Expansion(_, _)) | Some(Command::Macro(_)) => {
+                                H::unexpanded_expansion_command(token, execution_input)
+                            }
+                            None => H::undefined_command_handler(token, execution_input),
                         }
                     }
-                    token::Value::BeginGroup(_) => {
+                    Value::Active(_) => {
+                        // TODO: look up the command and dispatch
+                        todo!()
+                    },
+                    Value::BeginGroup(_) => {
                         execution_input.begin_group();
                         Ok(())
                     }
-                    token::Value::EndGroup(_) => execution_input.end_group(token),
-                    _ => character_handler(token, execution_input),
+                    Value::EndGroup(_) => execution_input.end_group(token),
+                    Value::MathShift(_)
+                    | Value::AlignmentTab(_)
+                    | Value::Parameter(_)
+                    | Value::Superscript(_)
+                    | Value::Subscript(_)
+                    | Value::Space(_)
+                    | Value::Letter(_)
+                    | Value::Other(_) => H::character_handler(token, execution_input),
                 },
             },
             Err(err) => Err(err),
@@ -78,19 +148,7 @@ pub fn run<S>(
     Ok(())
 }
 
-/// Handler that returns an error when a control sequence is undefined.
-pub fn default_undefined_cs_handler<S>(
-    token: Token,
-    input: &mut streams::ExecutionInput<S>,
-) -> anyhow::Result<()> {
-    Err(error::new_undefined_cs_error(token, input.vm()))
-}
-
-/// The Texlang VM.
-///
-/// This is sort of a God object that is passed around all of Texcraft code.
-/// However we have many strategies for limiting visibility of various parts of it;
-///   see the VM documentation.
+/// The Texlang virtual machine.
 pub struct VM<S> {
     pub base_state: BaseState<S>,
     pub custom_state: S,
@@ -384,7 +442,7 @@ impl Ord for TokenBuffer {
 /// An example of a stateful TeX command is `\year`, which needs to store the current year somewhere.
 /// When the component pattern is used, a stateful TeX command
 ///     can have a single implementation that
-///     is used by multiple TeX enginess built with Texlang.
+///     is used by multiple TeX engines built with Texlang.
 /// Additionally, a specific TeX engine can compose many different
 ///     stateful TeX commands together without worrying about conflicts between their state.
 /// The component pattern is Texlang's main solution to the problem of
@@ -405,7 +463,7 @@ impl Ord for TokenBuffer {
 /// The Rust code defining the
 ///     command specifies the trait in its trait bounds, and uses the trait to access the component.
 ///
-/// The pattern enables composibility of Texlang code as follows.
+/// The pattern enables Texlang code to be composed as follows.
 /// Different VM states can include the same component and thus reuse the same commands.
 /// Combining multiple commands into one state just involves having the
 ///     VM state include all of the relevant components.

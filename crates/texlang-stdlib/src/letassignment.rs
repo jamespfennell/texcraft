@@ -39,7 +39,7 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
                     scope,
                 ) {
                     Ok(()) => Ok(()),
-                    Err(_) => Err(error::new_undefined_cs_error(token, input.vm())),
+                    Err(_) => Err(error::new_undefined_command_error(token, input.vm())),
                 }
             }
             _ => {

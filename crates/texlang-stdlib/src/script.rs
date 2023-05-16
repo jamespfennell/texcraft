@@ -12,6 +12,11 @@ use texlang_core::*;
 pub struct Component {
     exec_output: Vec<token::Token>,
     num_trailing_newlines: usize,
+    allow_undefined_command: bool,
+}
+
+pub fn set_allow_undefined_command<S: HasComponent<Component>>(state: &mut S, value: bool) {
+    state.component_mut().allow_undefined_command = value;
 }
 
 /// Get the `\newline` command.
@@ -65,15 +70,8 @@ fn par_primitive_fn<S: HasComponent<Component>>(
 }
 
 /// Run the Texlang interpreter for the provided VM and return the result as list of tokens.
-pub fn run<S: HasComponent<Component>>(
-    vm: &mut vm::VM<S>,
-    err_for_undefined_cs: bool,
-) -> anyhow::Result<Vec<token::Token>> {
-    let undefined_cs_handler = match err_for_undefined_cs {
-        true => vm::default_undefined_cs_handler,
-        false => handle_character,
-    };
-    vm::run(vm, handle_character, undefined_cs_handler)?;
+pub fn run<S: HasComponent<Component>>(vm: &mut vm::VM<S>) -> anyhow::Result<Vec<token::Token>> {
+    vm::run::<S, Handlers>(vm)?;
     let mut result = Vec::new();
     std::mem::swap(
         &mut result,
@@ -82,17 +80,39 @@ pub fn run<S: HasComponent<Component>>(
     Ok(result)
 }
 
-fn handle_character<S: HasComponent<Component>>(
-    mut token: token::Token,
-    input: &mut vm::ExecutionInput<S>,
-) -> anyhow::Result<()> {
-    let c = input.state_mut().component_mut();
-    if let Some('\n') = token.char() {
-        token = token::Token::new_space(' ', token.trace_key());
+struct Handlers;
+
+impl<S: HasComponent<Component>> vm::Handlers<S> for Handlers {
+    fn character_handler(
+        mut token: token::Token,
+        input: &mut vm::ExecutionInput<S>,
+    ) -> anyhow::Result<()> {
+        let c = input.state_mut().component_mut();
+        if let Some('\n') = token.char() {
+            token = token::Token::new_space(' ', token.trace_key());
+        }
+        c.exec_output.push(token);
+        c.num_trailing_newlines = 0;
+        Ok(())
     }
-    c.exec_output.push(token);
-    c.num_trailing_newlines = 0;
-    Ok(())
+
+    fn undefined_command_handler(
+        token: token::Token,
+        input: &mut vm::ExecutionInput<S>,
+    ) -> anyhow::Result<()> {
+        if input.state().component().allow_undefined_command {
+            Handlers::character_handler(token, input)
+        } else {
+            Err(error::new_undefined_command_error(token, input.vm()))
+        }
+    }
+
+    fn unexpanded_expansion_command(
+        token: token::Token,
+        input: &mut vm::ExecutionInput<S>,
+    ) -> anyhow::Result<()> {
+        Handlers::character_handler(token, input)
+    }
 }
 
 #[cfg(test)]

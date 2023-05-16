@@ -41,9 +41,9 @@ pub trait TokenStream {
 
     /// Peeks at the next token in the stream without removing it.
     ///
-    /// In many sitations it is necessary to examine the next token without consuming it.
+    /// In many situations it is necessary to examine the next token without consuming it.
     /// For example when reading an integer from a stream, one needs to peek at the next token
-    /// to see if it is a digit and thus extends the currently parsed interger.
+    /// to see if it is a digit and thus extends the currently parsed integer.
     /// Consuming the token with [TokenStream::next] is not
     /// correct in this situation if the token is not a digit.
     ///
@@ -61,7 +61,7 @@ pub trait TokenStream {
     /// 1. When performing expansion on a stream, the next token in the stream may need to be expanded
     ///     rather than returned. The next token will be the first token in the expansion in this case,
     ///     or the following token in the remaining stream if the expansion returns no tokens.
-    ///     This mutation is generally irreversable.
+    ///     This mutation is generally irreversible.
     fn peek(&mut self) -> anyhow::Result<Option<&Token>>;
 
     /// Consumes the next token in the stream without returning it.
@@ -171,7 +171,7 @@ impl<S> RefVM for UnexpandedStream<S> {
 ///
 /// - Access to the input stream (with or without expansion). Its implementation of the [TokenStream]
 ///     trait returns expanded tokens.
-///     To read the input strean without performing expansion, use the
+///     To read the input stream without performing expansion, use the
 ///     [unexpanded](ExpandedStream::unexpanded) method.
 ///
 /// - Read only access to the VM using the [RefVM] trait.
@@ -185,7 +185,7 @@ impl<S> RefVM for UnexpandedStream<S> {
 ///
 /// This type is also used in the parsing code for situations where both an
 /// [ExpansionInput] or [ExecutionInput] is accepted. We use this type because
-/// it has only read access to the VM, and so casting does not escalate priviliges.
+/// it has only read access to the VM, and so casting does not escalate privileges.
 #[repr(transparent)]
 // TODO: shouldn't this be in the command module no vm module?
 pub struct ExpansionInput<S>(vm::VM<S>);
@@ -276,9 +276,9 @@ impl<S> ExpansionInput<S> {
     ///
     /// When finished with the buffer, please return it using [return_token_buffer](ExpansionInput::return_token_buffer).
     ///
-    /// This API may feel a bit janky - it would seem nicer to return a mutable reference to a buffer instead.
+    /// This API may feel a bit awkward - it would seem nicer to return a mutable reference to a buffer instead.
     /// Doing this while keeping the borrow checker happy is very difficult and (as is often the case) for good reason.
-    /// Token buffers are often used in macro expansion, and at any point in time multple macros may be in
+    /// Token buffers are often used in macro expansion, and at any point in time multiple macros may be in
     ///     the process of expansion.
     /// This getting "the" token buffer to use for expansion would be incorrect, as the multiple expansions
     /// would step on each other.

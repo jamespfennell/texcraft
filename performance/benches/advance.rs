@@ -21,7 +21,7 @@ pub fn advance_bench(c: &mut Criterion) {
         r"\countdef\k 0 \def\a{\advance\k by 1}".to_string(),
     )
     .unwrap();
-    script::run(&mut vm, true).unwrap();
+    script::run(&mut vm).unwrap();
     let a_cs = token::Token::new_control_sequence(
         vm.cs_name_interner()
             .get("a")
@@ -35,7 +35,7 @@ pub fn advance_bench(c: &mut Criterion) {
     group.bench_function("advance", |b| {
         b.iter(|| {
             vm::ExpansionInput::new(&mut vm).push_expansion(&expansion);
-            script::run(&mut vm, true).unwrap();
+            script::run(&mut vm).unwrap();
         })
     });
 }

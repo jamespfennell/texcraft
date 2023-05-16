@@ -18,7 +18,7 @@ pub fn run_in_texcraft(input: &str) {
         Some(tracingmacros::hook),
     );
     vm.push_source("".to_string(), input.to_string()).unwrap();
-    script::run(&mut vm, true).unwrap();
+    script::run(&mut vm).unwrap();
 }
 
 pub fn host_has_pdftex() -> bool {

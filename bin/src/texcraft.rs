@@ -73,7 +73,7 @@ fn run(mut path: PathBuf) -> Result<(), anyhow::Error> {
     let mut vm = new_vm();
     // The only error possible is input stack size exceeded, which can't be hit.
     let _ = vm.push_source(path.to_string_lossy().to_string(), source_code);
-    let tokens = script::run(&mut vm, true)?;
+    let tokens = script::run(&mut vm)?;
     let pretty = token::write_tokens(&tokens, vm.cs_name_interner());
     println!("{pretty}");
     Ok(())

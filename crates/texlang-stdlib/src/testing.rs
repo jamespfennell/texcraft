@@ -169,7 +169,8 @@ where
     (custom_vm_initialization)(&mut vm);
     vm.push_source("testing.tex".to_string(), source.to_string())
         .unwrap();
-    let output = script::run(&mut vm, false);
+    script::set_allow_undefined_command(&mut vm.custom_state, true);
+    let output = script::run(&mut vm);
     (output, vm)
 }
 
