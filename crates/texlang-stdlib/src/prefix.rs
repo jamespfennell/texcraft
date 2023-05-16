@@ -55,7 +55,9 @@ use crate::letassignment;
 use crate::variableops;
 use std::collections::HashSet;
 use texcraft_stdext::collections::groupingmap;
-use texlang_core::prelude::*;
+use texlang_core::token::trace;
+use texlang_core::traits::*;
+use texlang_core::*;
 
 /// Component for the prefix commands.
 pub struct Component {
@@ -92,13 +94,13 @@ impl Component {
 
 #[derive(Default, Clone, Copy)]
 struct Prefix {
-    global: Option<Token>,
-    long: Option<Token>,
-    outer: Option<Token>,
+    global: Option<token::Token>,
+    long: Option<token::Token>,
+    outer: Option<token::Token>,
 }
 
 impl Prefix {
-    fn get_one(&self) -> (Token, Kind) {
+    fn get_one(&self) -> (token::Token, Kind) {
         if let Some(global_token) = self.global {
             (global_token, Kind::Global)
         } else if let Some(long_token) = self.long {
@@ -145,7 +147,7 @@ fn outer_tag() -> command::Tag {
 }
 
 fn global_primitive_fn<S: HasComponent<Component>>(
-    global_token: Token,
+    global_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     process_prefixes(
@@ -159,7 +161,7 @@ fn global_primitive_fn<S: HasComponent<Component>>(
 }
 
 fn long_primitive_fn<S: HasComponent<Component>>(
-    long_token: Token,
+    long_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     process_prefixes(
@@ -173,7 +175,7 @@ fn long_primitive_fn<S: HasComponent<Component>>(
 }
 
 fn outer_primitive_fn<S: HasComponent<Component>>(
-    outer_token: Token,
+    outer_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     process_prefixes(
@@ -202,7 +204,7 @@ fn process_prefixes<S: HasComponent<Component>>(
             .into())
         }
         Some(&t) => match t.value() {
-            Value::ControlSequence(name) => {
+            token::Value::ControlSequence(name) => {
                 // First check if it's a variable command. If so, assign to the variable at the local or global scope.
                 if let Some(command::Command::Variable(cmd)) =
                     input.base().commands_map.get_command(&name)
@@ -272,7 +274,7 @@ fn complete_prefix<S>(
     let found_prefix = match input.peek()? {
         None => false,
         Some(&t) => match t.value() {
-            Value::ControlSequence(name) => {
+            token::Value::ControlSequence(name) => {
                 let cmd_id = input.base().commands_map.get_tag(&name);
                 // TODO: cache these tags in the component
                 let global_id = global_tag();
@@ -303,7 +305,7 @@ fn complete_prefix<S>(
 }
 
 fn assert_only_global_prefix<S>(
-    token: Token,
+    token: token::Token,
     prefix: Prefix,
     input: &vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
@@ -366,7 +368,7 @@ impl std::fmt::Display for Error {
                     format!("the command {command_token} cannot be prefixed with {prefix_token}"),
                 ).add_note(match prefix_kind {
                     Kind::Global => {
-                        r"see the documention for \global for the list of commands this prefix can be used with"
+                        r"see the documentation for \global for the list of commands this prefix can be used with"
                     }
                     Kind::Long => {
                         r"the \long prefix can only be used with \def, \gdef, \edef and \xdef (or their aliases)"
@@ -413,7 +415,7 @@ impl std::error::Error for Error {}
 /// ```
 pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     fn noop_execution_cmd_fn<S: HasComponent<Component>>(
-        _: Token,
+        _: token::Token,
         input: &mut vm::ExecutionInput<S>,
     ) -> anyhow::Result<()> {
         match input.state_mut().component_mut().read_and_reset_global() {

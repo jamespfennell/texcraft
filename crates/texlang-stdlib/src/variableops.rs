@@ -1,9 +1,8 @@
 //! Operations on variables (add, multiply, divide)
 
 use crate::prefix;
-use texlang_core::parse;
-use texlang_core::prelude::*;
-use texlang_core::variable;
+use texlang_core::traits::*;
+use texlang_core::*;
 
 pub const ADVANCE_DOC: &str = "Add an integer to a variable";
 pub const ADVANCECHK_DOC: &str = "Add an integer to a variable and error on overflow";
@@ -45,7 +44,7 @@ pub fn get_variable_op_tag() -> command::Tag {
 macro_rules! create_arithmetic_primitive {
     ($prim_fn: ident, $arithmetic_op: ident) => {
         fn $prim_fn<S: HasComponent<prefix::Component>>(
-            token: Token,
+            token: token::Token,
             input: &mut vm::ExecutionInput<S>,
         ) -> anyhow::Result<()> {
             let scope = input.state_mut().component_mut().read_and_reset_global();
@@ -64,7 +63,7 @@ macro_rules! create_arithmetic_primitive {
     };
 }
 
-fn invalid_variable_error(token: Token) -> anyhow::Result<()> {
+fn invalid_variable_error(token: token::Token) -> anyhow::Result<()> {
     Err(error::TokenError::new(
         token,
         "arithmetic commands cannot be applied to variables of type X",
@@ -76,12 +75,12 @@ fn invalid_variable_error(token: Token) -> anyhow::Result<()> {
 }
 
 #[inline]
-fn add(_: Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
+fn add(_: token::Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
     // Note: TeX explicitely permits overflow in \advance
     Ok(lhs.wrapping_add(rhs))
 }
 
-fn checked_add(token: Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
+fn checked_add(token: token::Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
     match lhs.checked_add(rhs) {
         Some(result) => Ok(result),
         None => Err(
@@ -99,12 +98,12 @@ fn checked_add(token: Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
 }
 
 #[inline]
-fn multiply(_: Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
+fn multiply(_: token::Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
     // Note: TeX explicitely permits overflow in \multiply
     Ok(lhs.wrapping_mul(rhs))
 }
 
-fn checked_multiply(token: Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
+fn checked_multiply(token: token::Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
     match lhs.checked_mul(rhs) {
         Some(result) => Ok(result),
         None => Err(
@@ -122,7 +121,7 @@ fn checked_multiply(token: Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
 }
 
 #[inline]
-fn divide(token: Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
+fn divide(token: token::Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
     if rhs == 0 {
         return Err(error::TokenError::new(token, "division by zero").cast());
     }

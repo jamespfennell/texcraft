@@ -30,10 +30,10 @@
 //! [^futurelet]: `\futurelet` is an example of an execution command that does this.
 //!
 
-use crate::prelude::*;
 use crate::texmacro;
 use crate::token;
 use crate::variable;
+use crate::vm;
 use once_cell::sync::OnceCell;
 use std::num;
 use std::rc;
@@ -45,10 +45,11 @@ pub use map::Map;
 
 /// The Rust type of expansion primitive functions.
 pub type ExpansionFn<S> =
-    fn(token: Token, input: &mut vm::ExpansionInput<S>) -> anyhow::Result<Vec<Token>>;
+    fn(token: token::Token, input: &mut vm::ExpansionInput<S>) -> anyhow::Result<Vec<token::Token>>;
 
 /// The Rust type of execution primitive functions.
-pub type ExecutionFn<S> = fn(token: Token, input: &mut vm::ExecutionInput<S>) -> anyhow::Result<()>;
+pub type ExecutionFn<S> =
+    fn(token: token::Token, input: &mut vm::ExecutionInput<S>) -> anyhow::Result<()>;
 
 /// A TeX command.
 pub enum Command<S> {

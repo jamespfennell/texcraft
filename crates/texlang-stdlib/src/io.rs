@@ -2,8 +2,8 @@
 //!
 
 use std::path;
-use texlang_core::parse;
-use texlang_core::prelude::*;
+use texlang_core::traits::*;
+use texlang_core::*;
 
 /// Get the `\input` expansion primitive.
 pub fn get_input<S>() -> command::BuiltIn<S> {
@@ -11,9 +11,9 @@ pub fn get_input<S>() -> command::BuiltIn<S> {
 }
 
 fn input_fn<S>(
-    input_token: Token,
+    input_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<Token>> {
+) -> anyhow::Result<Vec<token::Token>> {
     let file_location = parse::parse_file_location(input)?;
     let (file_path, source_code) = read_file(input_token, input.vm(), file_location, ".tex")?;
     input.push_source(input_token, file_path, source_code)?;
@@ -21,7 +21,7 @@ fn input_fn<S>(
 }
 
 fn read_file<S>(
-    t: Token,
+    t: token::Token,
     vm: &vm::VM<S>,
     file_location: parse::FileLocation,
     default_extension: &str,

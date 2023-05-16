@@ -2,10 +2,10 @@
 
 use crate::error;
 use crate::parse;
-use crate::prelude::*;
-use crate::token::write_tokens;
-use crate::token::CsNameInterner;
+use crate::token;
 use crate::token::Token;
+use crate::vm;
+use crate::vm::ExpandedStream;
 use crate::vm::RefVM;
 use colored::*;
 use texcraft_stdext::algorithms::substringsearch::KMPMatcherFactory;
@@ -96,7 +96,7 @@ impl Macro {
         Ok(())
     }
 
-    pub fn doc(&self, interner: &CsNameInterner) -> String {
+    pub fn doc(&self, interner: &token::CsNameInterner) -> String {
         let mut d = String::default();
         d.push_str("User defined macro\n\n");
         d.push_str(&format![
@@ -153,7 +153,7 @@ impl Macro {
 }
 
 impl Parameter {
-    pub fn parse_argument<S: TokenStream>(
+    pub fn parse_argument<S: vm::TokenStream>(
         &self,
         macro_token: &Token,
         stream: &mut S,
@@ -177,7 +177,7 @@ impl Parameter {
 
     fn parse_delimited_argument(
         macro_token: &Token,
-        stream: &mut dyn TokenStream,
+        stream: &mut dyn vm::TokenStream,
         matcher_factory: &KMPMatcherFactory<Token>,
         param_num: usize,
         result: &mut Vec<Token>,
@@ -189,16 +189,16 @@ impl Parameter {
         // will end with a scope depth of 1, because the last token parsed will be the { and all braces before that will
         // be balanced.
         let closing_scope_depth = match matcher_factory.substring().last().value() {
-            Value::BeginGroup(_) => 1,
+            token::Value::BeginGroup(_) => 1,
             _ => 0,
         };
         let start_index = result.len();
         while let Some(token) = stream.next()? {
             match token.value() {
-                Value::BeginGroup(_) => {
+                token::Value::BeginGroup(_) => {
                     scope_depth += 1;
                 }
-                Value::EndGroup(_) => {
+                token::Value::EndGroup(_) => {
                     scope_depth -= 1;
                 }
                 _ => (),
@@ -241,13 +241,13 @@ impl Parameter {
             return false;
         }
         match list[0].value() {
-            Value::BeginGroup(_) => (),
+            token::Value::BeginGroup(_) => (),
             _ => {
                 return false;
             }
         }
         match list[list.len() - 1].value() {
-            Value::EndGroup(_) => (),
+            token::Value::EndGroup(_) => (),
             _ => {
                 return false;
             }
@@ -255,7 +255,7 @@ impl Parameter {
         true
     }
 
-    fn parse_undelimited_argument<S: TokenStream>(
+    fn parse_undelimited_argument<S: vm::TokenStream>(
         macro_token: &Token,
         stream: &mut S,
         param_num: usize,
@@ -270,7 +270,7 @@ impl Parameter {
                 .cast());
             }
             Some(token) => match token.value() {
-                Value::BeginGroup(_) => token,
+                token::Value::BeginGroup(_) => token,
                 _ => {
                     result.push(token);
                     return Ok(());
@@ -307,7 +307,7 @@ fn colored_parameter_number(n: usize) -> String {
 pub fn pretty_print_prefix_and_parameters(
     prefix: &[Token],
     parameters: &[Parameter],
-    interner: &CsNameInterner,
+    interner: &token::CsNameInterner,
 ) -> String {
     let mut d = String::default();
     if prefix.is_empty() {
@@ -315,7 +315,7 @@ pub fn pretty_print_prefix_and_parameters(
     } else {
         d.push_str(&format![
             " . Prefix: `{}`\n",
-            write_tokens(prefix, interner)
+            token::write_tokens(prefix, interner)
         ]);
     }
 
@@ -333,7 +333,7 @@ pub fn pretty_print_prefix_and_parameters(
                 d.push_str(&format![
                     "    {}: delimited by `{}`\n",
                     colored_parameter_number(parameter_number),
-                    write_tokens(factory.substring(), interner)
+                    token::write_tokens(factory.substring(), interner)
                 ]);
             }
         }
@@ -341,12 +341,12 @@ pub fn pretty_print_prefix_and_parameters(
     }
 
     d.push_str(" . Full argument specification: `");
-    d.push_str(&write_tokens(prefix, interner));
+    d.push_str(&token::write_tokens(prefix, interner));
     let mut parameter_number = 1;
     for parameter in parameters {
         d.push_str(&colored_parameter_number(parameter_number));
         if let Parameter::Delimited(factory) = parameter {
-            d.push_str(write_tokens(factory.substring(), interner).as_str());
+            d.push_str(token::write_tokens(factory.substring(), interner).as_str());
         }
         parameter_number += 1;
     }
@@ -374,7 +374,7 @@ pub fn pretty_print_replacement_text(replacements: &[Replacement]) -> String {
 /// Returns an error if the stream does not start with the tokens.
 pub fn remove_tokens_from_stream(
     tokens: &[Token],
-    stream: &mut dyn TokenStream,
+    stream: &mut dyn vm::TokenStream,
     action: &str,
 ) -> anyhow::Result<()> {
     for prefix_token in tokens.iter() {

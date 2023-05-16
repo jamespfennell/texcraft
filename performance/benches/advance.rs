@@ -1,8 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use texlang_core::prelude::*;
 use texlang_core::token::catcode;
-use texlang_core::vm::ExpansionInput;
-use texlang_core::vm::VM;
+use texlang_core::token::trace;
+use texlang_core::*;
 use texlang_stdlib::script;
 use texlang_stdlib::tracingmacros;
 use texlang_stdlib::StdLibState;
@@ -11,7 +10,7 @@ pub fn advance_bench(c: &mut Criterion) {
     let mut initial_built_ins = StdLibState::all_initial_built_ins();
     initial_built_ins.insert("par", script::get_par());
     initial_built_ins.insert("end", script::get_newline());
-    let mut vm = VM::<StdLibState>::new(
+    let mut vm = vm::VM::<StdLibState>::new(
         catcode::CatCodeMap::new_with_tex_defaults(),
         initial_built_ins,
         Default::default(),
@@ -23,7 +22,7 @@ pub fn advance_bench(c: &mut Criterion) {
     )
     .unwrap();
     script::run(&mut vm, true).unwrap();
-    let a_cs = Token::new_control_sequence(
+    let a_cs = token::Token::new_control_sequence(
         vm.cs_name_interner()
             .get("a")
             .expect("a should have been interned already"),
@@ -35,7 +34,7 @@ pub fn advance_bench(c: &mut Criterion) {
     let expansion = vec![a_cs; 1000];
     group.bench_function("advance", |b| {
         b.iter(|| {
-            ExpansionInput::new(&mut vm).push_expansion(&expansion);
+            vm::ExpansionInput::new(&mut vm).push_expansion(&expansion);
             script::run(&mut vm, true).unwrap();
         })
     });

@@ -3,7 +3,7 @@
 //! This primitive is essentially equivalent to `\def\Texcraft{Texcraft}`.
 //! It was implemented to be a simple example of a custom expansion primitive.
 
-use texlang_core::prelude::*;
+use texlang_core::*;
 
 /// Get the `\texcraft` expansion primtive.
 pub fn get_texcraft<S>() -> command::BuiltIn<S> {
@@ -11,18 +11,18 @@ pub fn get_texcraft<S>() -> command::BuiltIn<S> {
 }
 
 pub fn texcraft_primitive_fn<S>(
-    t: Token,
+    t: token::Token,
     _: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<Token>> {
+) -> anyhow::Result<Vec<token::Token>> {
     Ok(vec![
-        Token::new_letter('T', t.trace_key()),
-        Token::new_letter('e', t.trace_key()),
-        Token::new_letter('x', t.trace_key()),
-        Token::new_letter('c', t.trace_key()),
-        Token::new_letter('r', t.trace_key()),
-        Token::new_letter('a', t.trace_key()),
-        Token::new_letter('f', t.trace_key()),
-        Token::new_letter('t', t.trace_key()),
+        token::Token::new_letter('T', t.trace_key()),
+        token::Token::new_letter('e', t.trace_key()),
+        token::Token::new_letter('x', t.trace_key()),
+        token::Token::new_letter('c', t.trace_key()),
+        token::Token::new_letter('r', t.trace_key()),
+        token::Token::new_letter('a', t.trace_key()),
+        token::Token::new_letter('f', t.trace_key()),
+        token::Token::new_letter('t', t.trace_key()),
     ])
 }
 

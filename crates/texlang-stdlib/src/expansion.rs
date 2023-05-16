@@ -1,11 +1,7 @@
 //! Commands that alter the expansion process
 
-use texlang_core::command;
-use texlang_core::error;
-use texlang_core::token;
-use texlang_core::vm;
-use texlang_core::vm::ExpandedStream;
-use texlang_core::vm::TokenStream;
+use texlang_core::traits::*;
+use texlang_core::*;
 
 /// Get the simple `\expandafter` command.
 ///

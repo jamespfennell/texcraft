@@ -1,15 +1,17 @@
 use std::rc;
 
-use crate::token::catcode::CatCode;
+use crate::token::catcode;
+use crate::token::Value;
 use crate::variable;
 use crate::vm::RefVM;
-use crate::{prelude::*, token};
+use crate::vm::TokenStream;
+use crate::{command, error, token, vm};
 use num_traits::PrimInt;
 
 /// Parses a number from the provided stream.
 ///
 /// The number may be octal, decimal_, hexadecimal_, cast from a character token, or read
-/// from an internal registers. The full definition of a number in the TeX grammer
+/// from an internal registers. The full definition of a number in the TeX grammar
 /// is given on page X of the TeXBook.
 #[inline]
 pub fn parse_number<S, I: AsMut<vm::ExpansionInput<S>>, T: PrimInt>(
@@ -36,7 +38,7 @@ fn parse_number_internal<S, T: PrimInt>(stream: &mut vm::ExpansionInput<S>) -> a
             Value::Other('\'') => parse_octal(stream)?,
             Value::Other('"') => parse_hexadecimal(stream)?,
             Value::Other('`') => parse_character(stream)?,
-            ControlSequence(name) => {
+            Value::ControlSequence(name) => {
                 let cmd = stream.base().commands_map.get_command(&name);
                 if let Some(command::Command::Variable(cmd)) = cmd {
                     read_number_from_variable(token, cmd.clone(), stream)?
@@ -60,14 +62,16 @@ fn parse_number_internal<S, T: PrimInt>(stream: &mut vm::ExpansionInput<S>) -> a
 #[inline]
 pub fn parse_catcode<S, I: AsMut<vm::ExpansionInput<S>>>(
     stream: &mut I,
-) -> anyhow::Result<CatCode> {
+) -> anyhow::Result<catcode::CatCode> {
     parse_catcode_internal(stream.as_mut())
 }
 
-fn parse_catcode_internal<S>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<CatCode> {
+fn parse_catcode_internal<S>(
+    stream: &mut vm::ExpansionInput<S>,
+) -> anyhow::Result<catcode::CatCode> {
     let val: usize = parse_number(stream)?;
     if let Ok(val_u8) = u8::try_from(val) {
-        if let Some(cat_code) = CatCode::from_int(val_u8) {
+        if let Some(cat_code) = catcode::CatCode::from_int(val_u8) {
             return Ok(cat_code);
         }
     }
@@ -82,7 +86,9 @@ fn parse_catcode_internal<S>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Resu
 ///
 /// If the combination of the signs is positive, [None] is returned.
 /// Otherwise, the Token corresponding to the last negative sign is returned.
-fn parse_optional_signs<S>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<Option<Token>> {
+fn parse_optional_signs<S>(
+    stream: &mut vm::ExpansionInput<S>,
+) -> anyhow::Result<Option<token::Token>> {
     let mut result = None;
     while let Some((sign, token)) = get_optional_element_with_token![
         stream,
@@ -100,13 +106,13 @@ fn parse_optional_signs<S>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result
     Ok(result)
 }
 
-fn parse_number_error(token: Option<Token>) -> anyhow::Error {
+fn parse_number_error(token: Option<token::Token>) -> anyhow::Error {
     match token {
         None => {
             error::EndOfInputError::new("unexpected end of input while parsing a relation").cast()
         }
         Some(token) => match token.value() {
-            ControlSequence(..) => {
+            Value::ControlSequence(..) => {
                 error::TokenError::new(token, "unexpected control sequence while parsing a number")
                     .cast()
             }
@@ -127,7 +133,7 @@ fn read_number_from_variable<S, T: PrimInt>(
             Ok(num_traits::cast::cast(*i).unwrap())
         }
         variable::ValueRef::CatCode(c) => {
-            // This will always work becuase cat codes are between 0 and 15 inclusive and can
+            // This will always work because cat codes are between 0 and 15 inclusive and can
             // fit in any integral type.
             // TODO: implement From on catcode directly
             Ok(num_traits::cast::cast(c.int()).unwrap())
@@ -142,7 +148,7 @@ fn parse_character<S, T: PrimInt>(stream: &mut vm::ExpansionInput<S>) -> anyhow:
         )
         .cast()),
         Some(token) => match token.value() {
-            ControlSequence(..) => Err(error::TokenError::new(
+            Value::ControlSequence(..) => Err(error::TokenError::new(
                 token,
                 "unexpected control sequence while parsing a character number",
             )
@@ -376,7 +382,7 @@ mod tests {
 
     #[test]
     fn number_with_letter_catcode() {
-        let mut map = CatCodeMap::new_with_tex_defaults();
+        let mut map = catcode::CatCodeMap::new_with_tex_defaults();
         map.insert('1', catcode::CatCode::Letter);
         let mut vm = vm::VM::<()>::new(map, HashMap::new(), (), None);
         vm.push_source("".to_string(), r"1".to_string()).unwrap();

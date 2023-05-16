@@ -7,9 +7,8 @@ use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound::Included;
 use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
-use texlang_core::prelude::*;
-use texlang_core::vm::HasComponent;
-use texlang_core::{parse, variable};
+use texlang_core::traits::*;
+use texlang_core::*;
 
 pub const NEWINT_DOC: &str = r"Allocate a new integer variable
 
@@ -178,7 +177,7 @@ pub fn get_newint<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 }
 
 fn newint_primitive_fn<S: HasComponent<Component>>(
-    newint_token: Token,
+    newint_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let name = parse::parse_command_target("newint allocation", newint_token, input.unexpanded())?;
@@ -228,7 +227,7 @@ pub fn get_newarray<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 }
 
 fn newarray_primitive_fn<S: HasComponent<Component>>(
-    newarray_token: Token,
+    newarray_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let name =

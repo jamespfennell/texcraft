@@ -20,22 +20,23 @@ pub use relation::Relation;
 pub use variable::parse_optional_equals;
 pub use variable::parse_variable;
 
-use crate::prelude::*;
-
-use super::token::CsName;
+use crate::error;
+use crate::token;
+use crate::vm;
+use crate::vm::TokenStream;
 
 pub fn parse_optional_space<S>(input: &mut vm::ExpansionInput<S>) -> anyhow::Result<()> {
-    get_optional_element![input, Value::Space(_) => (),];
+    get_optional_element![input, token::Value::Space(_) => (),];
     Ok(())
 }
 
 // TODO: just take execution input as input - this shouldn't be called with expanded input!!!!!!!
 // TODO: destroy the target description?
-pub fn parse_command_target<S: TokenStream>(
+pub fn parse_command_target<S: vm::TokenStream>(
     target_description: &str,
-    token: Token,
+    token: token::Token,
     input: &mut S,
-) -> anyhow::Result<CsName> {
+) -> anyhow::Result<token::CsName> {
     Ok(match input.next()? {
         None => {
             return Err(error::TokenError::new(
@@ -47,7 +48,7 @@ pub fn parse_command_target<S: TokenStream>(
             .cast());
         }
         Some(token) => match token.value() {
-            ControlSequence(name) => name,
+            token::Value::ControlSequence(name) => name,
             _ => {
                 return Err(error::TokenError::new(
                     token,
@@ -65,17 +66,17 @@ pub fn parse_command_target<S: TokenStream>(
 /// Parses balanced tokens from the stream.
 ///
 /// Returns false if the input ended before balanced tokens completed.
-pub fn parse_balanced_tokens<S: TokenStream>(
+pub fn parse_balanced_tokens<S: vm::TokenStream>(
     stream: &mut S,
-    result: &mut Vec<Token>,
+    result: &mut Vec<token::Token>,
 ) -> anyhow::Result<bool> {
     let mut scope_depth = 0;
     while let Some(token) = stream.next()? {
         match token.value() {
-            Value::BeginGroup(_) => {
+            token::Value::BeginGroup(_) => {
                 scope_depth += 1;
             }
-            Value::EndGroup(_) => {
+            token::Value::EndGroup(_) => {
                 if scope_depth == 0 {
                     return Ok(true);
                 }

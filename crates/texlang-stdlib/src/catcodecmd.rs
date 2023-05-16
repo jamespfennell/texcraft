@@ -1,20 +1,18 @@
 //! The `\catcode` primitive
 
-use texlang_core::parse;
-use texlang_core::prelude::*;
-use texlang_core::token;
-use texlang_core::variable;
+use texlang_core::token::catcode;
+use texlang_core::*;
 
 pub const CATCODE_DOC: &str = "Get or set a catcode register";
 
 /// Get the `\catcode` command.
 pub fn get_catcode<S>() -> command::BuiltIn<S> {
     variable::Command::new_base(
-        |state: &vm::BaseState<S>, addr: variable::Address| -> &CatCode {
+        |state: &vm::BaseState<S>, addr: variable::Address| -> &catcode::CatCode {
             let addr = char::from_u32(addr.0.try_into().unwrap()).unwrap();
             state.cat_code_map.get(&addr)
         },
-        |state: &mut vm::BaseState<S>, addr: variable::Address| -> &mut CatCode {
+        |state: &mut vm::BaseState<S>, addr: variable::Address| -> &mut catcode::CatCode {
             let addr = char::from_u32(addr.0.try_into().unwrap()).unwrap();
             state.cat_code_map.get_mut(&addr)
         },
@@ -43,16 +41,12 @@ pub fn get_catcode<S>() -> command::BuiltIn<S> {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::catcodecmd;
+    use super::*;
     use crate::testing::*;
     use crate::the;
-    use texlang_core::prelude::*;
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
-        HashMap::from([
-            ("the", the::get_the()),
-            ("catcode", catcodecmd::get_catcode()),
-        ])
+        HashMap::from([("the", the::get_the()), ("catcode", get_catcode())])
     }
 
     test_suite![

@@ -31,7 +31,7 @@ use texcraft_stdext::collections::groupingmap::GroupingVec;
 ///     alias_registered_built_in(cs_name, cmd_id, variable_addr)
 ///     alias_character(cs_name, token::Token)
 pub struct Map<S> {
-    commands: GroupingVec<command::Command<S>>,
+    commands: GroupingVec<Command<S>>,
 
     built_ins: HashMap<BuiltInKey, BuiltIn<S>>,
     key_to_built_in: HashMap<Key, BuiltInKey>,
@@ -42,8 +42,8 @@ pub struct Map<S> {
 // and add an actual new function not some indirect try_from thing.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Key {
-    Execution(usize, Option<command::Tag>),
-    Expansion(usize, Option<command::Tag>),
+    Execution(usize, Option<Tag>),
+    Expansion(usize, Option<Tag>),
     // Maybe have a variable:Key
     VariableNoAddress(variable::GetterKey),
     VariableStaticAddress(variable::GetterKey, variable::Address),
@@ -58,10 +58,10 @@ impl<S> TryFrom<&BuiltIn<S>> for Key {
     }
 }
 
-impl<S> TryFrom<&command::Command<S>> for Key {
+impl<S> TryFrom<&Command<S>> for Key {
     type Error = ();
 
-    fn try_from(value: &command::Command<S>) -> Result<Self, Self::Error> {
+    fn try_from(value: &Command<S>) -> Result<Self, Self::Error> {
         match &value {
             Command::Expansion(f, tag) => Ok(Key::Expansion(*f as usize, *tag)),
             Command::Execution(f, tag) => Ok(Key::Execution(*f as usize, *tag)),
@@ -106,10 +106,10 @@ enum BuiltInKey {
 
 impl<S> Map<S> {
     pub(crate) fn new(
-        initial_built_ins: HashMap<CsName, BuiltIn<S>>,
+        initial_built_ins: HashMap<token::CsName, BuiltIn<S>>,
         additional_built_ins: HashMap<rc::Rc<str>, BuiltIn<S>>,
     ) -> Map<S> {
-        let mut commands: GroupingVec<command::Command<S>> = Default::default();
+        let mut commands: GroupingVec<Command<S>> = Default::default();
         let mut built_ins: HashMap<BuiltInKey, BuiltIn<S>> = Default::default();
         let mut key_to_built_in: HashMap<Key, BuiltInKey> = Default::default();
         let mut getter_key_to_built_in: HashMap<variable::GetterKey, BuiltInKey> =
@@ -142,18 +142,18 @@ impl<S> Map<S> {
     }
 
     #[inline]
-    pub fn get_command(&self, name: &token::CsName) -> Option<&command::Command<S>> {
+    pub fn get_command(&self, name: &token::CsName) -> Option<&Command<S>> {
         self.commands.get(&name.to_usize())
     }
 
-    pub fn get_tag(&self, name: &token::CsName) -> Option<command::Tag> {
+    pub fn get_tag(&self, name: &token::CsName) -> Option<Tag> {
         match self.commands.get(&name.to_usize()) {
             None => None,
             Some(cmd) => cmd.tag(),
         }
     }
 
-    pub fn get_command_slow(&self, name: &token::CsName) -> Option<command::BuiltIn<S>> {
+    pub fn get_command_slow(&self, name: &token::CsName) -> Option<BuiltIn<S>> {
         let command = match self.get_command(name) {
             None => return None,
             Some(t) => t,
@@ -163,7 +163,7 @@ impl<S> Map<S> {
                 return self.built_ins.get(built_in).cloned();
             }
         }
-        Some(command::BuiltIn {
+        Some(BuiltIn {
             cmd: command.clone(),
             doc: None,
         })
@@ -178,7 +178,7 @@ impl<S> Map<S> {
     ) {
         self.insert(
             name,
-            command::Command::Variable(rc::Rc::new(variable_command)),
+            Command::Variable(rc::Rc::new(variable_command)),
             scope,
         );
     }
@@ -190,7 +190,7 @@ impl<S> Map<S> {
         texmacro: texmacro::Macro,
         scope: groupingmap::Scope,
     ) {
-        self.insert(name, command::Command::Macro(rc::Rc::new(texmacro)), scope);
+        self.insert(name, Command::Macro(rc::Rc::new(texmacro)), scope);
     }
 
     pub fn alias_control_sequence(
@@ -213,23 +213,18 @@ impl<S> Map<S> {
         token: token::Token,
         scope: groupingmap::Scope,
     ) {
-        self.insert(alias, command::Command::Character(token.value()), scope);
+        self.insert(alias, Command::Character(token.value()), scope);
     }
 
-    fn insert(
-        &mut self,
-        name: token::CsName,
-        func: command::Command<S>,
-        scope: groupingmap::Scope,
-    ) {
+    fn insert(&mut self, name: token::CsName, func: Command<S>, scope: groupingmap::Scope) {
         let key = name.to_usize();
         self.commands.insert(key, func, scope);
     }
 
-    pub fn to_hash_map_slow(&self) -> HashMap<CsName, command::BuiltIn<S>> {
+    pub fn to_hash_map_slow(&self) -> HashMap<token::CsName, BuiltIn<S>> {
         let mut result = HashMap::new();
         for (key, _value) in self.commands.backing_container().iter().enumerate() {
-            let cs_name = match CsName::try_from_usize(key) {
+            let cs_name = match token::CsName::try_from_usize(key) {
                 None => continue,
                 Some(cs_name) => cs_name,
             };

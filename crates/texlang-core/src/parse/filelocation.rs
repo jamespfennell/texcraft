@@ -2,7 +2,9 @@
 //!
 //! See section 511 of the TeXBook.
 
-use crate::prelude::*;
+use crate::token;
+use crate::vm;
+use crate::vm::TokenStream;
 
 /// Representation of a file location in TeX
 #[derive(PartialEq, Eq, Debug)]
@@ -21,7 +23,7 @@ pub fn parse_file_location<S>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Res
             None => break,
             Some(t) => t,
         };
-        if let Value::Space(_) = t.value() {
+        if let token::Value::Space(_) = t.value() {
             let _ = stream.consume();
             break;
         }

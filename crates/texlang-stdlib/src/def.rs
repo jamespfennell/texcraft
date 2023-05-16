@@ -5,10 +5,8 @@ use texcraft_stdext::algorithms::substringsearch::KMPMatcherFactory;
 use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
 use texcraft_stdext::nevec;
-use texlang_core::error;
-use texlang_core::parse;
-use texlang_core::prelude::*;
-use texlang_core::texmacro::*;
+use texlang_core::traits::*;
+use texlang_core::*;
 
 pub const DEF_DOC: &str = "Define a custom macro";
 
@@ -29,21 +27,21 @@ pub fn def_tag() -> command::Tag {
 }
 
 fn def_primitive_fn<S: HasComponent<prefix::Component>>(
-    def_token: Token,
+    def_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     parse_and_set_macro(def_token, input, false)
 }
 
 fn gdef_primitive_fn<S: HasComponent<prefix::Component>>(
-    def_token: Token,
+    def_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     parse_and_set_macro(def_token, input, true)
 }
 
 fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
-    def_token: Token,
+    def_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
     set_globally_override: bool,
 ) -> anyhow::Result<()> {
@@ -54,21 +52,23 @@ fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
     let name = parse::parse_command_target("macro definition", def_token, input.unexpanded())?;
     let (prefix, raw_parameters, replacement_end_token) =
         parse_prefix_and_parameters(input.unexpanded())?;
-    let parameters: Vec<Parameter> = raw_parameters
+    let parameters: Vec<texmacro::Parameter> = raw_parameters
         .into_iter()
         .map(|a| match a {
-            RawParameter::Undelimited => Parameter::Undelimited,
-            RawParameter::Delimited(vec) => Parameter::Delimited(KMPMatcherFactory::new(vec)),
+            RawParameter::Undelimited => texmacro::Parameter::Undelimited,
+            RawParameter::Delimited(vec) => {
+                texmacro::Parameter::Delimited(KMPMatcherFactory::new(vec))
+            }
         })
         .collect();
     let mut replacement =
         parse_replacement_text(input.unexpanded(), replacement_end_token, parameters.len())?;
     for r in replacement.iter_mut() {
-        if let Replacement::Tokens(tokens) = r {
+        if let texmacro::Replacement::Tokens(tokens) = r {
             tokens.reverse();
         }
     }
-    let user_defined_macro = Macro::new(prefix, parameters, replacement);
+    let user_defined_macro = texmacro::Macro::new(prefix, parameters, replacement);
     input
         .base_mut()
         .commands_map
@@ -78,11 +78,11 @@ fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
 
 enum RawParameter {
     Undelimited,
-    Delimited(Nevec<Token>),
+    Delimited(Nevec<token::Token>),
 }
 
 impl RawParameter {
-    fn push(&mut self, t: Token) {
+    fn push(&mut self, t: token::Token) {
         match self {
             RawParameter::Undelimited => {
                 *self = RawParameter::Delimited(nevec![t]);
@@ -111,24 +111,24 @@ fn char_to_parameter_index(c: char) -> Option<usize> {
 
 fn parse_prefix_and_parameters(
     input: &mut dyn TokenStream,
-) -> anyhow::Result<(Vec<Token>, Vec<RawParameter>, Option<Token>)> {
+) -> anyhow::Result<(Vec<token::Token>, Vec<RawParameter>, Option<token::Token>)> {
     let mut prefix = Vec::new();
     let mut parameters = Vec::new();
     let mut replacement_end_token = None;
 
     while let Some(token) = input.next()? {
         match token.value() {
-            Value::BeginGroup(_) => {
+            token::Value::BeginGroup(_) => {
                 return Ok((prefix, parameters, replacement_end_token));
             }
-            Value::EndGroup(_) => {
+            token::Value::EndGroup(_) => {
                 return Err(error::TokenError::new(
                     token,
                     "unexpected end group token while parsing the parameter of a macro definition",
                 )
                 .cast());
             }
-            Value::Parameter(_) => {
+            token::Value::Parameter(_) => {
                 let parameter_token = match input.next()? {
                     None => {
                         return Err(error::EndOfInputError::new(
@@ -139,7 +139,7 @@ fn parse_prefix_and_parameters(
                     Some(token) => token,
                 };
                 match parameter_token.value() {
-                    Value::BeginGroup(_) => {
+                    token::Value::BeginGroup(_) => {
                         // In this case we end the group according to the special #{ rule
                         replacement_end_token = Some(parameter_token);
                         match parameters.last_mut() {
@@ -152,7 +152,7 @@ fn parse_prefix_and_parameters(
                         }
                         return Ok((prefix, parameters, replacement_end_token));
                     }
-                    ControlSequence(..) => {
+                    token::Value::ControlSequence(..) => {
                         return Err(error::TokenError::new(
                                     parameter_token,
                                     "unexpected control sequence after a parameter token")
@@ -203,27 +203,27 @@ fn parse_prefix_and_parameters(
 
 fn parse_replacement_text(
     input: &mut dyn TokenStream,
-    opt_final_token: Option<Token>,
+    opt_final_token: Option<token::Token>,
     num_parameters: usize,
-) -> anyhow::Result<Vec<Replacement>> {
+) -> anyhow::Result<Vec<texmacro::Replacement>> {
     // TODO: could we use a pool of vectors to avoid some of the allocations here?
     let mut result = vec![];
     let mut scope_depth = 0;
-    let push = |result: &mut Vec<Replacement>, token| match result.last_mut() {
-        Some(Replacement::Tokens(tokens)) => {
+    let push = |result: &mut Vec<texmacro::Replacement>, token| match result.last_mut() {
+        Some(texmacro::Replacement::Tokens(tokens)) => {
             tokens.push(token);
         }
         _ => {
-            result.push(Replacement::Tokens(vec![token]));
+            result.push(texmacro::Replacement::Tokens(vec![token]));
         }
     };
 
     while let Some(token) = input.next()? {
         match token.value() {
-            Value::BeginGroup(_) => {
+            token::Value::BeginGroup(_) => {
                 scope_depth += 1;
             }
-            Value::EndGroup(_) => {
+            token::Value::EndGroup(_) => {
                 if scope_depth == 0 {
                     if let Some(final_token) = opt_final_token {
                         push(&mut result, final_token);
@@ -232,7 +232,7 @@ fn parse_replacement_text(
                 }
                 scope_depth -= 1;
             }
-            Value::Parameter(_) => {
+            token::Value::Parameter(_) => {
                 let parameter_token = match input.next()? {
                     None => {
                         return Err(error::EndOfInputError::new(
@@ -243,7 +243,7 @@ fn parse_replacement_text(
                     Some(token) => token,
                 };
                 let c = match parameter_token.value() {
-                    ControlSequence(..) => {
+                    token::Value::ControlSequence(..) => {
                         return Err(error::TokenError::new(
                             parameter_token,
                             "unexpected character while reading a parameter number",
@@ -251,7 +251,7 @@ fn parse_replacement_text(
                         .add_note("expected a number between 1 and 9 inclusive")
                         .cast());
                     }
-                    Value::Parameter(_) => {
+                    token::Value::Parameter(_) => {
                         push(&mut result, parameter_token);
                         continue;
                     }
@@ -291,7 +291,7 @@ fn parse_replacement_text(
                             return nil, errors.NewUnexpectedTokenError(t, msg, "the number "+t.Value(), parsingArgumentTemplate)
                     */
                 }
-                result.push(Replacement::Parameter(parameter_index));
+                result.push(texmacro::Replacement::Parameter(parameter_index));
                 continue;
             }
             _ => {}
@@ -538,7 +538,7 @@ mod test {
         );
         s.cat_code_map_mut().insert(
             '!' as u32,
-            catcode::RawCatCode::Regular(catcode::CatCode::Parameter),
+            catcode::RawCatCode::Regular(catcode::CatCode::texmacro::Parameter),
         );
     }
 

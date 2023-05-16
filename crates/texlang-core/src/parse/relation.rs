@@ -1,6 +1,7 @@
 //! Parsing of relations (<, = and >)
 
-use crate::prelude::*;
+use crate::vm::TokenStream;
+use crate::{error, token, vm};
 
 /// Simple enum representing the three types of relation: <, = and >.
 #[derive(Debug, PartialEq, Eq)]
@@ -20,13 +21,13 @@ pub fn parse_relation<S, I: AsMut<vm::ExpansionInput<S>>>(
     get_element![
         stream.as_mut(),
         parse_relation_error,
-        Value::Other('<') => Relation::LessThan,
-        Value::Other('=') => Relation::Equal,
-        Value::Other('>') => Relation::GreaterThan,
+        token::Value::Other('<') => Relation::LessThan,
+        token::Value::Other('=') => Relation::Equal,
+        token::Value::Other('>') => Relation::GreaterThan,
     ]
 }
 
-fn parse_relation_error(token: Option<Token>) -> anyhow::Error {
+fn parse_relation_error(token: Option<token::Token>) -> anyhow::Error {
     match token {
       None => error::EndOfInputError::new(
           "unexpected end of input while parsing a relation").cast(),
@@ -50,7 +51,7 @@ mod tests {
             #[test]
             fn $name() {
                 let mut vm = vm::VM::<()>::new(
-                    CatCodeMap::new_with_tex_defaults(),
+                    catcode::CatCodeMap::new_with_tex_defaults(),
                     HashMap::new(),
                     (),
                     None,
@@ -75,7 +76,7 @@ mod tests {
             $(
             #[test]
             fn $name() {
-                let mut map = CatCodeMap::new_with_tex_defaults();
+                let mut map = catcode::CatCodeMap::new_with_tex_defaults();
                 map.insert('<', catcode::CatCode::Letter);
                 let mut vm = vm::VM::<()>::new(map, HashMap::new(), (), None);
                 vm.push_source("".to_string(), $input.to_string()).unwrap();

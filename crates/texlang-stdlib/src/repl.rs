@@ -5,8 +5,8 @@ use linefeed::{Interface, ReadResult};
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::sync::Arc;
-use texlang_core::prelude::*;
-use texlang_core::token;
+use texlang_core::traits::*;
+use texlang_core::*;
 
 pub struct RunOptions<'a> {
     pub prompt: &'a str,
@@ -86,7 +86,7 @@ impl std::error::Error for Signal {}
 /// This exits the REPL.
 pub fn get_exit<S>() -> command::BuiltIn<S> {
     command::BuiltIn::new_expansion(
-        |_: Token, _: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
+        |_: token::Token, _: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<token::Token>> {
             Err(Signal::Exit.into())
         },
     )
@@ -97,7 +97,7 @@ pub fn get_exit<S>() -> command::BuiltIn<S> {
 /// This prints help text for the REPL.
 pub fn get_help<S>() -> command::BuiltIn<S> {
     command::BuiltIn::new_expansion(
-        |_: Token, _: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
+        |_: token::Token, _: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<token::Token>> {
             Err(Signal::Help.into())
         },
     )
@@ -108,7 +108,9 @@ pub fn get_help<S>() -> command::BuiltIn<S> {
 /// This prints the documentation for a TeX command.
 pub fn get_doc<S>() -> command::BuiltIn<S> {
     command::BuiltIn::new_expansion(
-        |token: Token, input: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<Token>> {
+        |token: token::Token,
+         input: &mut vm::ExpansionInput<S>|
+         -> anyhow::Result<Vec<token::Token>> {
             let target = texlang_core::parse::parse_command_target("", token, input.unexpanded())?;
             let cs_name_s = input.vm().cs_name_interner().resolve(target).unwrap();
             let doc = match input.base().commands_map.get_command_slow(&target) {

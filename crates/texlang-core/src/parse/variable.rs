@@ -1,6 +1,10 @@
-use crate::prelude::*;
+use crate::command;
+use crate::error;
+use crate::token;
 use crate::variable;
+use crate::vm;
 use crate::vm::RefVM;
+use crate::vm::TokenStream;
 
 /// Parses a variable.
 pub fn parse_variable<S, I: AsMut<vm::ExpansionInput<S>>>(
@@ -13,15 +17,17 @@ pub fn parse_variable<S, I: AsMut<vm::ExpansionInput<S>>>(
         )
         .cast()),
         Some(token) => match token.value() {
-            ControlSequence(name) => match input.base().commands_map.get_command(&name) {
-                None => Err(error::TokenError::new(token, "Undefined control sequence").cast()),
-                Some(command::Command::Variable(cmd)) => cmd.clone().resolve(token, input),
-                Some(_) => Err(error::TokenError::new(
-                    token,
-                    "Expected variable command (register or parameter); found something else",
-                )
-                .cast()),
-            },
+            token::Value::ControlSequence(name) => {
+                match input.base().commands_map.get_command(&name) {
+                    None => Err(error::TokenError::new(token, "Undefined control sequence").cast()),
+                    Some(command::Command::Variable(cmd)) => cmd.clone().resolve(token, input),
+                    Some(_) => Err(error::TokenError::new(
+                        token,
+                        "Expected variable command (register or parameter); found something else",
+                    )
+                    .cast()),
+                }
+            }
             _ => Err(error::TokenError::new(
                 token,
                 "Unexpected character token while reading in a variable",
@@ -32,11 +38,11 @@ pub fn parse_variable<S, I: AsMut<vm::ExpansionInput<S>>>(
 }
 
 /// Parses an optional equal signs, and optional spaces on either side.
-pub fn parse_optional_equals<T: TokenStream>(input: &mut T) -> anyhow::Result<()> {
+pub fn parse_optional_equals<T: vm::TokenStream>(input: &mut T) -> anyhow::Result<()> {
     while let Some(found_equals) = get_optional_element![
         input,
-        Value::Other('=') => false,
-        Value::Space(_) => true,
+        token::Value::Other('=') => false,
+        token::Value::Space(_) => true,
     ] {
         if found_equals {
             break;
@@ -44,7 +50,7 @@ pub fn parse_optional_equals<T: TokenStream>(input: &mut T) -> anyhow::Result<()
     }
     while get_optional_element![
         input,
-        Value::Space(_) => (),
+        token::Value::Space(_) => (),
     ]
     .is_some()
     {}

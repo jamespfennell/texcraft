@@ -5,11 +5,12 @@
 //! of typesetting the result and outputting it to PDF (say), the output is returned as a list of tokens.
 //! These can be easily converted to a string using [texlang_core::token::write_tokens].
 
-use texlang_core::prelude::*;
+use texlang_core::traits::*;
+use texlang_core::*;
 
 #[derive(Default)]
 pub struct Component {
-    exec_output: Vec<Token>,
+    exec_output: Vec<token::Token>,
     num_trailing_newlines: usize,
 }
 
@@ -21,11 +22,11 @@ pub fn get_newline<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 }
 
 fn newline_primitive_fn<S: HasComponent<Component>>(
-    t: Token,
+    t: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let c = input.state_mut().component_mut();
-    let newline_token = Token::new_space('\n', t.trace_key());
+    let newline_token = token::Token::new_space('\n', t.trace_key());
     c.exec_output.push(newline_token);
     c.num_trailing_newlines += 1;
     Ok(())
@@ -40,14 +41,14 @@ pub fn get_par<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 }
 
 fn par_primitive_fn<S: HasComponent<Component>>(
-    t: Token,
+    t: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let c = input.state_mut().component_mut();
     if c.exec_output.is_empty() {
         return Ok(());
     }
-    let par_token = Token::new_space('\n', t.trace_key());
+    let par_token = token::Token::new_space('\n', t.trace_key());
     match c.num_trailing_newlines {
         0 => {
             c.exec_output.push(par_token);
@@ -67,7 +68,7 @@ fn par_primitive_fn<S: HasComponent<Component>>(
 pub fn run<S: HasComponent<Component>>(
     vm: &mut vm::VM<S>,
     err_for_undefined_cs: bool,
-) -> anyhow::Result<Vec<Token>> {
+) -> anyhow::Result<Vec<token::Token>> {
     let undefined_cs_handler = match err_for_undefined_cs {
         true => vm::default_undefined_cs_handler,
         false => handle_character,
@@ -82,12 +83,12 @@ pub fn run<S: HasComponent<Component>>(
 }
 
 fn handle_character<S: HasComponent<Component>>(
-    mut token: Token,
+    mut token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let c = input.state_mut().component_mut();
     if let Some('\n') = token.char() {
-        token = Token::new_space(' ', token.trace_key());
+        token = token::Token::new_space(' ', token.trace_key());
     }
     c.exec_output.push(token);
     c.num_trailing_newlines = 0;

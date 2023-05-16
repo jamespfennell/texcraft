@@ -2,10 +2,8 @@
 //!
 
 use std::cell::RefCell;
-use texlang_core::command;
-use texlang_core::parse;
-use texlang_core::prelude::*;
-use texlang_core::vm::HasComponent;
+use texlang_core::traits::*;
+use texlang_core::*;
 
 pub const ELSE_DOC: &str = "Start the else branch of a conditional or switch statement";
 pub const IFCASE_DOC: &str = "Begin a switch statement";
@@ -52,7 +50,7 @@ enum BranchKind {
 
 #[derive(Debug)]
 struct Branch {
-    _token: Token,
+    _token: token::Token,
     kind: BranchKind,
 }
 
@@ -89,9 +87,9 @@ static FI_TAG: command::StaticTag = command::StaticTag::new();
 
 // The `true_case` function is executed whenever a conditional evaluates to true.
 fn true_case<S: HasComponent<Component>>(
-    token: Token,
+    token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<Token>> {
+) -> anyhow::Result<Vec<token::Token>> {
     push_branch(
         input,
         Branch {
@@ -107,13 +105,13 @@ fn true_case<S: HasComponent<Component>>(
 // The function scans forward in the input stream, discarding all tokens, until it encounters
 // either a \else or \fi command.
 fn false_case<S: HasComponent<Component>>(
-    original_token: Token,
+    original_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<Token>> {
+) -> anyhow::Result<Vec<token::Token>> {
     let mut depth = 0;
     let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
-        if let ControlSequence(name) = &token.value() {
+        if let token::Value::ControlSequence(name) = &token.value() {
             // TODO: use switch
             let tag = input.base().commands_map.get_tag(name);
             if tag == Some(input.state().component().else_tag) && depth == 0 {
@@ -157,9 +155,9 @@ fn false_case<S: HasComponent<Component>>(
 macro_rules! create_if_primitive {
     ($if_fn: ident, $if_primitive_fn: ident, $get_if: ident, $docs: expr) => {
         fn $if_primitive_fn<S: HasComponent<Component>>(
-            token: Token,
+            token: token::Token,
             input: &mut vm::ExpansionInput<S>,
-        ) -> anyhow::Result<Vec<Token>> {
+        ) -> anyhow::Result<Vec<token::Token>> {
             match $if_fn(input)? {
                 true => true_case(token, input),
                 false => false_case(token, input),
@@ -203,9 +201,9 @@ create_if_primitive![if_num, if_num_primitive_fn, get_if_num, IFNUM_DOC];
 create_if_primitive![if_odd, if_odd_primitive_fn, get_if_odd, IFODD_DOC];
 
 fn if_case_primitive_fn<S: HasComponent<Component>>(
-    ifcase_token: Token,
+    ifcase_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<Token>> {
+) -> anyhow::Result<Vec<token::Token>> {
     // TODO: should we reading the number from the unexpanded stream? Probably!
     let mut cases_to_skip: i32 = parse::parse_number(input)?;
     if cases_to_skip == 0 {
@@ -221,7 +219,7 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
     let mut depth = 0;
     let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
-        if let ControlSequence(name) = &token.value() {
+        if let token::Value::ControlSequence(name) = &token.value() {
             // TODO: switch
             let tag = input.base().commands_map.get_tag(name);
             if tag == Some(input.state().component().or_tag) && depth == 0 {
@@ -279,9 +277,9 @@ pub fn get_if_case<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 }
 
 fn or_primitive_fn<S: HasComponent<Component>>(
-    ifcase_token: Token,
+    ifcase_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<Token>> {
+) -> anyhow::Result<Vec<token::Token>> {
     let branch = pop_branch(input);
     // For an or command to be valid, we must be in a switch statement
     let is_valid = match branch {
@@ -295,7 +293,7 @@ fn or_primitive_fn<S: HasComponent<Component>>(
     let mut depth = 0;
     let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
-        if let ControlSequence(name) = &token.value() {
+        if let token::Value::ControlSequence(name) = &token.value() {
             // TODO: switch
             let tag = input.base().commands_map.get_tag(name);
             if tag == Some(input.state().component().if_tag) {
@@ -335,9 +333,9 @@ pub fn get_or<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 }
 
 fn else_primitive_fn<S: HasComponent<Component>>(
-    else_token: Token,
+    else_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<Token>> {
+) -> anyhow::Result<Vec<token::Token>> {
     let branch = pop_branch(input);
     // For else token to be valid, we must be in the true branch of a conditional
     let is_valid = match branch {
@@ -352,7 +350,7 @@ fn else_primitive_fn<S: HasComponent<Component>>(
     let mut depth = 0;
     let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
-        if let ControlSequence(name) = &token.value() {
+        if let token::Value::ControlSequence(name) = &token.value() {
             // TODO: switch
             let tag = input.base().commands_map.get_tag(name);
             if tag == Some(input.state().component().if_tag) {
@@ -388,9 +386,9 @@ pub fn get_else<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 
 /// Get the `\fi` primitive.
 fn fi_primitive_fn<S: HasComponent<Component>>(
-    token: Token,
+    token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<Token>> {
+) -> anyhow::Result<Vec<token::Token>> {
     let branch = pop_branch(input);
     // For a \fi primitive to be valid, we must be in a conditional.
     // Note that we could be in the false branch: \iftrue\else\fi

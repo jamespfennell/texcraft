@@ -1,10 +1,8 @@
 //! Register variables (`\count`, `\countdef`)
 
 use texcraft_stdext::collections::groupingmap;
-use texlang_core::parse;
-use texlang_core::prelude::*;
-use texlang_core::variable;
-use texlang_core::vm::HasComponent;
+use texlang_core::traits::*;
+use texlang_core::*;
 
 pub const COUNT_DOC: &str = "Get or set an integer register";
 pub const COUNTDEF_DOC: &str = "Bind an integer register to a control sequence";
@@ -60,7 +58,7 @@ pub fn get_count<S: HasComponent<Component<N>>, const N: usize>() -> command::Bu
 }
 
 fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
-    count_token: Token,
+    count_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<variable::Address> {
     let address: usize = parse::parse_number(input)?;
@@ -76,7 +74,7 @@ pub fn get_countdef<S: HasComponent<Component<N>>, const N: usize>() -> command:
 }
 
 fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
-    countdef_token: Token,
+    countdef_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let cs_name = parse::parse_command_target("countdef", countdef_token, input.unexpanded())?;
@@ -112,7 +110,7 @@ fn int_register_mut_ref_fn<S: HasComponent<Component<N>>, const N: usize>(
     state.component_mut().int_registers.write(addr.0)
 }
 
-fn integer_register_too_large_error(token: Token, addr: usize, num: usize) -> anyhow::Error {
+fn integer_register_too_large_error(token: token::Token, addr: usize, num: usize) -> anyhow::Error {
     error::TokenError::new(
         token,
         format![

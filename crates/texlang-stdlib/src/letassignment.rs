@@ -1,8 +1,8 @@
 //! `\let` assignments
 
 use crate::prefix;
-use texlang_core::parse;
-use texlang_core::prelude::*;
+use texlang_core::traits::*;
+use texlang_core::*;
 
 pub const LET_DOC: &str = "Assign a command or character to a control sequence";
 
@@ -20,7 +20,7 @@ pub fn let_tag() -> command::Tag {
 }
 
 fn let_primitive_fn<S: HasComponent<prefix::Component>>(
-    let_token: Token,
+    let_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let scope = input.state_mut().component_mut().read_and_reset_global();
@@ -32,7 +32,7 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
         )
         .cast()),
         Some(token) => match token.value() {
-            ControlSequence(control_sequence) => {
+            token::Value::ControlSequence(control_sequence) => {
                 match input.base_mut().commands_map.alias_control_sequence(
                     alias,
                     control_sequence,

@@ -3,10 +3,8 @@ use colored::Colorize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use texlang_core::command::BuiltIn;
-use texlang_core::prelude::*;
-use texlang_core::token;
 use texlang_core::token::catcode;
+use texlang_core::*;
 use texlang_stdlib::repl;
 use texlang_stdlib::script;
 use texlang_stdlib::tracingmacros;
@@ -196,10 +194,13 @@ fn new_repl_vm() -> vm::VM<StdLibState> {
     )
 }
 
-fn initial_built_ins() -> HashMap<&'static str, BuiltIn<StdLibState>> {
+fn initial_built_ins() -> HashMap<&'static str, command::BuiltIn<StdLibState>> {
     let mut m = StdLibState::all_initial_built_ins();
     m.insert("par", script::get_par());
     m.insert("newline", script::get_newline());
-    m.insert("\\", command::Command::Character(Value::Other('\\')).into());
+    m.insert(
+        "\\",
+        command::Command::Character(token::Value::Other('\\')).into(),
+    );
     m
 }
