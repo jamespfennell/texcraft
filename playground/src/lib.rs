@@ -11,13 +11,13 @@ use texlang_stdlib::alloc;
 use texlang_stdlib::catcodecmd;
 use texlang_stdlib::conditional;
 use texlang_stdlib::def;
-use texlang_stdlib::letassignment;
+use texlang_stdlib::alias;
 use texlang_stdlib::prefix;
 use texlang_stdlib::registers;
 use texlang_stdlib::script;
 use texlang_stdlib::the;
 use texlang_stdlib::time;
-use texlang_stdlib::variableops;
+use texlang_stdlib::math;
 
 #[wasm_bindgen(start)]
 pub fn main_js() -> Result<(), JsValue> {
@@ -71,7 +71,7 @@ fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::V
             command::Command::Character(token::Value::Other('\\')).into(),
         ),
         //
-        ("advance", variableops::get_advance()),
+        ("advance", math::get_advance()),
         //
         ("catcode", catcodecmd::get_catcode()),
         ("count", registers::get_count()),
@@ -79,7 +79,7 @@ fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::V
         //
         ("day", time::get_day()),
         ("def", def::get_def()),
-        ("divide", variableops::get_divide()),
+        ("divide", math::get_divide()),
         //
         ("else", conditional::get_else()),
         //
@@ -94,10 +94,10 @@ fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::V
         ("ifodd", conditional::get_if_odd()),
         ("iftrue", conditional::get_if_true()),
         //
-        ("let", letassignment::get_let()),
+        ("let", alias::get_let()),
         //
         ("month", time::get_month()),
-        ("multiply", variableops::get_multiply()),
+        ("multiply", math::get_multiply()),
         //
         ("newarray", alloc::get_newarray()),
         ("newint", alloc::get_newint()),

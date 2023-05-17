@@ -1,7 +1,7 @@
 //! User-defined macros (`\def` and friends)
 
 use crate::prefix;
-use texcraft_stdext::algorithms::substringsearch::KMPMatcherFactory;
+use texcraft_stdext::algorithms::substringsearch::Matcher;
 use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
 use texcraft_stdext::nevec;
@@ -57,7 +57,7 @@ fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
         .map(|a| match a {
             RawParameter::Undelimited => texmacro::Parameter::Undelimited,
             RawParameter::Delimited(vec) => {
-                texmacro::Parameter::Delimited(KMPMatcherFactory::new(vec))
+                texmacro::Parameter::Delimited(Matcher::new(vec))
             }
         })
         .collect();

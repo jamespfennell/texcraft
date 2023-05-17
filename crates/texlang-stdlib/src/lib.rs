@@ -17,7 +17,7 @@ pub mod conditional;
 pub mod def;
 pub mod expansion;
 pub mod io;
-pub mod letassignment;
+pub mod alias;
 pub mod prefix;
 pub mod registers;
 #[cfg(feature = "repl")]
@@ -29,7 +29,7 @@ pub mod texcraft;
 pub mod the;
 pub mod time;
 pub mod tracingmacros;
-pub mod variableops;
+pub mod math;
 
 /// A state struct that is compatible with every primitive in the Texlang standard library.
 #[derive(Default)]
@@ -58,7 +58,7 @@ impl StdLibState {
     pub fn all_initial_built_ins(
     ) -> HashMap<&'static str, texlang_core::command::BuiltIn<StdLibState>> {
         HashMap::from([
-            ("advance", variableops::get_advance()),
+            ("advance", math::get_advance()),
             //
             ("catcode", catcodecmd::get_catcode()),
             ("count", registers::get_count()),
@@ -66,7 +66,7 @@ impl StdLibState {
             //
             ("day", time::get_day()),
             ("def", def::get_def()),
-            ("divide", variableops::get_divide()),
+            ("divide", math::get_divide()),
             //
             ("else", conditional::get_else()),
             ("expandafter", expansion::get_expandafter_optimized()),
@@ -83,11 +83,11 @@ impl StdLibState {
             ("iftrue", conditional::get_if_true()),
             ("input", io::get_input()),
             //
-            ("let", letassignment::get_let()),
+            ("let", alias::get_let()),
             ("long", prefix::get_long()),
             //
             ("month", time::get_month()),
-            ("multiply", variableops::get_multiply()),
+            ("multiply", math::get_multiply()),
             //
             ("newint", alloc::get_newint()),
             ("newarray", alloc::get_newarray()),

@@ -51,8 +51,8 @@
 //!   allowed to be prefixed by it.
 
 use crate::def;
-use crate::letassignment;
-use crate::variableops;
+use crate::alias;
+use crate::math;
 use std::collections::HashSet;
 use texcraft_stdext::collections::groupingmap;
 use texlang_core::token::trace;
@@ -72,8 +72,8 @@ impl Default for Component {
             scope: groupingmap::Scope::Local,
             prefixable_with_any: vec![def::def_tag()].into_iter().collect(),
             prefixable_with_global: vec![
-                variableops::get_variable_op_tag(),
-                letassignment::let_tag(),
+                math::get_variable_op_tag(),
+                alias::let_tag(),
             ]
             .into_iter()
             .collect(),
@@ -451,7 +451,7 @@ mod test {
             ("i", get_integer()),
             ("the", the::get_the()),
             ("def", def::get_def()),
-            ("advance", variableops::get_advance()),
+            ("advance", math::get_advance()),
             (
                 "noOpExpansion",
                 command::BuiltIn::new_expansion(|_, _| Ok(vec![])),

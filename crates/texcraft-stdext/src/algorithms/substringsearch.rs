@@ -14,14 +14,14 @@
 //!
 //! ## Example
 //!
-//! To use the algorithm, a matcher factory is first created.
+//! To use the algorithm, a [Matcher] is first created.
 //! This factory takes ownership of the substring.
-//! On initialization the factory computes a number of internal
+//! On initialization the matcher computes a number of internal
 //! quantities which make the subsequent matching fast.
-//! These quantites depend on the substring, so mutating the substring
-//! after it has been passed to the factory is statically prevented.
+//! These quantities depend on the substring, so mutating the substring
+//! after it has been passed to the matcher is statically prevented.
 //!
-//! To match a string, a new matcher instance is created. Elements
+//! To match a string, a new [Search] instance is created by calling [Matcher::start]. Elements
 //! of the string are passed in one at a time to the `next` method
 //! of the matcher.
 //! If the substring has length `m` and matches the last `m` elements that
@@ -31,32 +31,32 @@
 //! in the same string.
 //!
 //! ```
-//! # use texcraft_stdext::algorithms::substringsearch::{KMPMatcherFactory};
+//! # use texcraft_stdext::algorithms::substringsearch::Matcher;
 //! # use texcraft_stdext::collections::nevec::Nevec;
 //! # use texcraft_stdext::nevec;
 //!
 //! let substring = nevec![2, 3, 2];
-//! let factory = KMPMatcherFactory::new(substring);
-//! let mut matcher = factory.matcher();
-//! assert_eq![matcher.next(&1), false];
-//! assert_eq![matcher.next(&2), false];
-//! assert_eq![matcher.next(&3), false];
-//! assert_eq![matcher.next(&2), true];
-//! assert_eq![matcher.next(&3), false];
-//! assert_eq![matcher.next(&2), true];
+//! let matcher = Matcher::new(substring);
+//! let mut search = matcher.start();
+//! assert_eq![search.next(&1), false];
+//! assert_eq![search.next(&2), false];
+//! assert_eq![search.next(&3), false];
+//! assert_eq![search.next(&2), true];
+//! assert_eq![search.next(&3), false];
+//! assert_eq![search.next(&2), true];
 //! ```
 //!
 use crate::collections::nevec::Nevec;
 
-/// Factory for creating KMP matchers for a specific substring.
-pub struct KMPMatcherFactory<T: PartialEq> {
+/// Data structure used to match a specific substring in many strings.
+pub struct Matcher<T: PartialEq> {
     substring: Nevec<T>,
     prefix_fn: Nevec<usize>,
 }
 
-impl<T: PartialEq> KMPMatcherFactory<T> {
-    /// Create a new KMP matcher factory.
-    pub fn new(substring: Nevec<T>) -> KMPMatcherFactory<T> {
+impl<T: PartialEq> Matcher<T> {
+    /// Create a new matcher that searches for the provide substring.
+    pub fn new(substring: Nevec<T>) -> Matcher<T> {
         let mut prefix_fn = Nevec::with_capacity(0, substring.len());
         let mut k = 0;
         for i in 1..substring.len() {
@@ -69,15 +69,15 @@ impl<T: PartialEq> KMPMatcherFactory<T> {
             prefix_fn.push(k);
         }
 
-        KMPMatcherFactory {
+        Matcher {
             substring,
             prefix_fn,
         }
     }
 
-    /// Create a new KMP matcher from the factory.
-    pub fn matcher(&self) -> KMPMatcher<T> {
-        KMPMatcher {
+    /// Start a new substring search.
+    pub fn start(&self) -> Search<T> {
+        Search {
             factory: self,
             q: 0,
         }
@@ -97,13 +97,13 @@ impl<T: PartialEq> KMPMatcherFactory<T> {
     }
 }
 
-/// Data structure for matching a substring in a string.
-pub struct KMPMatcher<'a, T: PartialEq> {
-    factory: &'a KMPMatcherFactory<T>,
+/// Data structure used to search for specific substring within a specific string.
+pub struct Search<'a, T: PartialEq> {
+    factory: &'a Matcher<T>,
     q: usize,
 }
 
-impl<'a, T: PartialEq> KMPMatcher<'a, T> {
+impl<'a, T: PartialEq> Search<'a, T> {
     /// Provide the next element of the string to the matcher.
     /// This returns true if the last `m` elements of the string match the substring, where
     /// `m` is the length of the substring.

@@ -8,7 +8,7 @@ use crate::vm;
 use crate::vm::ExpandedStream;
 use crate::vm::RefVM;
 use colored::*;
-use texcraft_stdext::algorithms::substringsearch::KMPMatcherFactory;
+use texcraft_stdext::algorithms::substringsearch::Matcher;
 
 /// A TeX Macro.
 pub struct Macro {
@@ -37,7 +37,7 @@ pub enum Replacement {
 
 pub enum Parameter {
     Undelimited,
-    Delimited(KMPMatcherFactory<Token>),
+    Delimited(Matcher<Token>),
 }
 
 // Input type for macro hooks
@@ -177,11 +177,11 @@ impl Parameter {
     fn parse_delimited_argument(
         macro_token: &Token,
         stream: &mut dyn vm::TokenStream,
-        matcher_factory: &KMPMatcherFactory<Token>,
+        matcher_factory: &Matcher<Token>,
         param_num: usize,
         result: &mut Vec<Token>,
     ) -> anyhow::Result<bool> {
-        let mut matcher = matcher_factory.matcher();
+        let mut matcher = matcher_factory.start();
         let mut scope_depth = 0;
 
         // This handles the case of a macro whose argument ends with the special #{ tokens. In this special case the parsing

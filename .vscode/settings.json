@@ -1,18 +1,22 @@
 {
     "cSpell.words": [
         "catcode",
+        "catcodecmd",
         "countdef",
         "expandafter",
         "groupingmap",
         "Interner",
         "makeatletter",
+        "nevec",
         "noexpand",
         "repr",
         "stdext",
+        "substringsearch",
         "texbook",
         "Texcraft",
         "Texlang",
         "texmacro",
-        "tracingmacros"
+        "tracingmacros",
+        "Undelimited"
     ]
 }

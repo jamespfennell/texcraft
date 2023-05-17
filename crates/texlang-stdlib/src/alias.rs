@@ -1,4 +1,4 @@
-//! `\let` assignments
+//! `\let` aliasing command
 
 use crate::prefix;
 use texlang_core::traits::*;
