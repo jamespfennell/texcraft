@@ -12,6 +12,7 @@
         "texbook",
         "Texcraft",
         "Texlang",
-        "texmacro"
+        "texmacro",
+        "tracingmacros"
     ]
 }

@@ -83,14 +83,13 @@ impl Macro {
 
         // To keep the borrow checker happy we need to downgrade result to a shared reference.
         let result = input.expansions();
-        let hook = input.vm().tex_macro_hook();
-        hook(HookInput {
-            vm: input.vm(),
+        (input.vm().hooks().post_macro_expansion_hook)(
             token,
-            tex_macro: self,
-            arguments: &arguments,
-            reverse_expansion: &result[result.len() - num_tokens..result.len()],
-        });
+            input,
+            self,
+            &arguments,
+            &result[result.len() - num_tokens..result.len()],
+        );
 
         input.return_token_buffer(argument_tokens);
         Ok(())

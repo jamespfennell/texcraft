@@ -3,7 +3,6 @@ use texlang_core::token::catcode;
 use texlang_core::token::trace;
 use texlang_core::*;
 use texlang_stdlib::script;
-use texlang_stdlib::tracingmacros;
 use texlang_stdlib::StdLibState;
 
 pub fn advance_bench(c: &mut Criterion) {
@@ -14,7 +13,7 @@ pub fn advance_bench(c: &mut Criterion) {
         catcode::CatCodeMap::new_with_tex_defaults(),
         initial_built_ins,
         Default::default(),
-        Some(tracingmacros::hook),
+        Default::default(),
     );
     vm.push_source(
         "".to_string(),

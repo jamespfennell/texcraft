@@ -55,7 +55,7 @@ pub trait TokenStream {
     /// what the next token is. For example:
     ///
     /// 1. When reading tokens from a file, peeking at the next token may involve reading more bytes
-    ///     from the file and thus mutating the file pointer. This mutations is easy to undo in
+    ///     from the file and thus mutating the file pointer. sThis mutations is easy to undo in
     ///     general.
     ///
     /// 1. When performing expansion on a stream, the next token in the stream may need to be expanded
@@ -449,8 +449,14 @@ mod stream {
             },
         };
         match command {
-            Some(command::Command::Expansion(command, _)) => {
+            Some(command::Command::Expansion(command, tag)) => {
                 let command = *command;
+                let tag = *tag;
+                if let Some(override_expansion) =
+                    (vm.hooks().expansion_override_hook)(token, ExpansionInput::new(vm), tag)?
+                {
+                    return Ok(Some(override_expansion));
+                }
                 let output = command(token, ExpansionInput::new(vm))?;
                 vm.internal.push_expansion(&output);
                 next_expanded(vm)
@@ -476,10 +482,17 @@ mod stream {
             },
         };
         match command {
-            Some(command::Command::Expansion(command, _)) => {
+            Some(command::Command::Expansion(command, tag)) => {
                 let command = *command;
                 let token = *token;
+                let tag = *tag;
                 consume_peek(vm);
+                if let Some(override_expansion) =
+                    (vm.hooks().expansion_override_hook)(token, ExpansionInput::new(vm), tag)?
+                {
+                    vm.internal.expansions_mut().push(override_expansion);
+                    return Ok(vm.internal.expansions().last());
+                }
                 let output = command(token, ExpansionInput::new(vm))?;
                 vm.internal.push_expansion(&output);
                 peek_expanded(vm)
@@ -507,10 +520,17 @@ mod stream {
             },
         };
         match command {
-            Some(command::Command::Expansion(command, _)) => {
+            Some(command::Command::Expansion(command, tag)) => {
                 let command = *command;
                 let token = *token;
+                let tag = *tag;
                 consume_peek(vm);
+                if let Some(override_expansion) =
+                    (vm.hooks().expansion_override_hook)(token, ExpansionInput::new(vm), tag)?
+                {
+                    vm.internal.expansions_mut().push(override_expansion);
+                    return Ok(true);
+                }
                 let output = command(token, ExpansionInput::new(vm))?;
                 vm.internal.push_expansion(&output);
                 Ok(true)

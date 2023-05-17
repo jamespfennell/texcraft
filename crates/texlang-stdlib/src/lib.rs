@@ -43,6 +43,17 @@ pub struct StdLibState {
     tracing_macros: tracingmacros::Component,
 }
 
+/// Hooks returns the standard library's hooks.
+pub fn hooks<S>() -> vm::Hooks<S>
+where
+    S: vm::HasComponent<tracingmacros::Component>,
+{
+    vm::Hooks {
+        post_macro_expansion_hook: tracingmacros::hook,
+        expansion_override_hook: expansion::noexpand_hook,
+    }
+}
+
 impl StdLibState {
     pub fn all_initial_built_ins(
     ) -> HashMap<&'static str, texlang_core::command::BuiltIn<StdLibState>> {
@@ -80,9 +91,12 @@ impl StdLibState {
             //
             ("newint", alloc::get_newint()),
             ("newarray", alloc::get_newarray()),
+            ("noexpand", expansion::get_noexpand()),
             //
             ("or", conditional::get_or()),
             ("outer", prefix::get_outer()),
+            //
+            ("relax", expansion::get_relax()),
             //
             ("sleep", sleep::get_sleep()),
             //
@@ -99,7 +113,7 @@ impl StdLibState {
             CatCodeMap::new_with_tex_defaults(),
             StdLibState::all_initial_built_ins(),
             Default::default(),
-            Some(tracingmacros::hook),
+            hooks(),
         )
     }
 }

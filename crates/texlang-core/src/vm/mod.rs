@@ -197,18 +197,58 @@ impl<S> BaseState<S> {
     }
 }
 
+/// Signature of the post macro expansion hook.
+pub type PostMacroExpansionHook<S> = fn(
+    token: Token,
+    input: &ExpansionInput<S>,
+    tex_macro: &texmacro::Macro,
+    arguments: &[&[Token]],
+    reversed_expansion: &[Token],
+);
+
+/// Signature of the expansion override hook.
+pub type ExpansionOverrideHook<S> = fn(
+    token: token::Token,
+    input: &mut ExpansionInput<S>,
+    tag: Option<command::Tag>,
+) -> anyhow::Result<Option<Token>>;
+
+/// Hooks are functions that are invoked by the VM at certain points of execution.
+pub struct Hooks<S> {
+    /// Hook that is invoked after a TeX macro is expanded.
+    ///
+    /// This hook is designed to support the `\tracingmacros` primitive.
+    pub post_macro_expansion_hook: PostMacroExpansionHook<S>,
+
+    /// Hook that potentially overrides the expansion of a command.
+    ///
+    /// This hook is invoked before an expandable token is expanded.
+    /// If the result of the hook is a non-empty, that result is considered the expansion of
+    ///   the token
+    /// The result of the hook is not expanded before being returned.
+    ///
+    /// This hook is designed to support the `\noexpand` primitive.
+    pub expansion_override_hook: ExpansionOverrideHook<S>,
+}
+
+impl<S> Default for Hooks<S> {
+    fn default() -> Self {
+        Hooks {
+            post_macro_expansion_hook: |_, _, _, _, _| {},
+            expansion_override_hook: |_, _, _| Ok(None),
+        }
+    }
+}
+
 impl<S> VM<S> {
     /// Create a new VM.
     pub fn new(
         initial_cat_codes: CatCodeMap,
         initial_built_ins: HashMap<&str, BuiltIn<S>>,
         state: S,
-        tex_macro_hook: Option<fn(texmacro::HookInput<S>)>,
+        hooks: Hooks<S>,
     ) -> VM<S> {
-        let mut internal: Internal<S> = Default::default();
-        if let Some(tex_macro_hook) = tex_macro_hook {
-            internal.tex_macro_hook = tex_macro_hook;
-        }
+        let mut internal = Internal::new(hooks);
         let initial_built_ins = initial_built_ins
             .into_iter()
             .map(|(key, value)| (internal.cs_name_interner.get_or_intern(key), value))
@@ -270,8 +310,8 @@ impl<S> VM<S> {
 
     /// Return the VM's TeX macro hook.
     #[inline]
-    pub fn tex_macro_hook(&self) -> fn(texmacro::HookInput<S>) {
-        self.internal.tex_macro_hook
+    pub(crate) fn hooks(&self) -> &Hooks<S> {
+        &self.internal.hooks
     }
 
     fn begin_group(&mut self) {
@@ -313,11 +353,11 @@ struct Internal<S> {
     token_buffers: std::collections::BinaryHeap<TokenBuffer>,
 
     groups: Vec<variable::internal::RestoreValues<S>>,
-    tex_macro_hook: fn(texmacro::HookInput<S>),
+    hooks: Hooks<S>,
 }
 
-impl<S> Default for Internal<S> {
-    fn default() -> Self {
+impl<S> Internal<S> {
+    fn new(hooks: Hooks<S>) -> Self {
         Internal {
             current_source: Default::default(),
             sources: Default::default(),
@@ -332,12 +372,10 @@ impl<S> Default for Internal<S> {
             tracer: Default::default(),
             token_buffers: Default::default(),
             groups: Default::default(),
-            tex_macro_hook: texmacro::no_op_hook,
+            hooks,
         }
     }
-}
 
-impl<S> Internal<S> {
     fn push_source(
         &mut self,
         token: Option<Token>,

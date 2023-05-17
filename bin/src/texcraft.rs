@@ -7,7 +7,6 @@ use texlang_core::token::catcode;
 use texlang_core::*;
 use texlang_stdlib::repl;
 use texlang_stdlib::script;
-use texlang_stdlib::tracingmacros;
 use texlang_stdlib::StdLibState;
 
 /// This is a "portfolio binary" that demonstrates some of the features of the
@@ -175,7 +174,7 @@ fn new_vm() -> vm::VM<StdLibState> {
         catcode::CatCodeMap::new_with_tex_defaults(),
         initial_built_ins(),
         Default::default(),
-        Some(tracingmacros::hook),
+        texlang_stdlib::hooks(),
     )
 }
 
@@ -190,7 +189,7 @@ fn new_repl_vm() -> vm::VM<StdLibState> {
         catcode::CatCodeMap::new_with_tex_defaults(),
         m,
         Default::default(),
-        Some(tracingmacros::hook),
+        texlang_stdlib::hooks(),
     )
 }
 

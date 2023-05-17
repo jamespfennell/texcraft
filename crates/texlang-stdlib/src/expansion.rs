@@ -3,6 +3,44 @@
 use texlang_core::traits::*;
 use texlang_core::*;
 
+/// Get the `\noexpand` command.
+pub fn get_noexpand<S>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_expansion(noexpand_fn).with_tag(NO_EXPAND_TAG.get())
+}
+
+static NO_EXPAND_TAG: command::StaticTag = command::StaticTag::new();
+
+fn noexpand_fn<S>(
+    _: token::Token,
+    _: &mut vm::ExpansionInput<S>,
+) -> anyhow::Result<Vec<token::Token>> {
+    panic!(
+        "The \\noexpand expansion function is never invoked directly. \
+         Instead, the primitive operates through the \\noexpand hook. \
+         Ensure your Texcraft VM is configured to use this hook."
+    )
+}
+
+pub fn noexpand_hook<S>(
+    token: token::Token,
+    input: &mut vm::ExpansionInput<S>,
+    tag: Option<command::Tag>,
+) -> anyhow::Result<Option<token::Token>> {
+    if tag != Some(NO_EXPAND_TAG.get()) {
+        return Ok(None);
+    }
+    match input.unexpanded().next()? {
+        None => Err(error::TokenError::new(
+            token,
+            "unexpected end of input while expanding a `\\noexpand` command",
+        )
+        .add_note("the `\\noexpand` command must be followed by 1 token")
+        .cast()),
+        Some(token) => Ok(Some(token)),
+    }
+}
+
+/// Get the simple `\expandafter` command.
 /// Get the simple `\expandafter` command.
 ///
 /// This is the simplest implementation of the command, and the
@@ -173,9 +211,9 @@ fn remove_even_indices(v: &mut Vec<token::Token>) {
 fn expandafter_missing_first_token_error(expandafter_token: token::Token) -> anyhow::Error {
     error::TokenError::new(
         expandafter_token,
-        "unexpected end of input while expanding an `expandafter` command",
+        "unexpected end of input while expanding an `\\expandafter` command",
     )
-    .add_note("each `expandafter` command must be followed by 2 tokens")
+    .add_note("the `\\expandafter` command must be followed by 2 tokens")
     .add_note("no more tokens were found")
     .cast()
 }
@@ -187,11 +225,16 @@ fn expandafter_missing_second_token_error(
     _ = first_token;
     error::TokenError::new(
         expandafter_token,
-        "unexpected end of input while expanding an `expandafter` command",
+        "unexpected end of input while expanding an `\\expandafter` command",
     )
-    .add_note("each `expandafter` command must be followed by 2 tokens")
+    .add_note("the `\\expandafter` command must be followed by 2 tokens")
     .add_note("only 1 more tokens was found")
     .cast()
+}
+
+/// Get the `\relax` command.
+pub fn get_relax<S>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(|_, _| Ok(()))
 }
 
 #[cfg(test)]
@@ -203,6 +246,8 @@ mod test {
     fn initial_commands(optimized: bool) -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("def", crate::def::get_def()),
+            ("noexpand", get_noexpand()),
+            ("integer", State::get_integer()),
             (
                 "xa",
                 match optimized {
@@ -212,6 +257,60 @@ mod test {
             ),
         ])
     }
+
+    fn hooks() -> vm::Hooks<State> {
+        let mut hooks: vm::Hooks<State> = Default::default();
+        hooks.expansion_override_hook = noexpand_hook;
+        hooks
+    }
+
+    test_suite![
+        options(
+            TestOption::InitialCommandsDyn(Box::new(|| { initial_commands(true) })),
+            TestOption::Hooks(hooks),
+        ),
+        expansion_equality_tests(
+            (simple_case, r"\def\a{Hello}\noexpand\a", r"\a"),
+            (
+                expandafter_and_noexpand_1,
+                r"\def\a#1\b{Hello '#1'}\def\b{World} \a\b",
+                " Hello ''"
+            ),
+            (
+                expandafter_and_noexpand_2,
+                r"\def\a#1\b{Hello '#1'}\def\b{World} \a\b\b",
+                " Hello ''World"
+            ),
+            (
+                expandafter_and_noexpand_3,
+                r"\def\a#1\b{Hello '#1'}\def\b{World} \xa\a\b\b",
+                " Hello 'World'"
+            ),
+            (
+                expandafter_and_noexpand_4,
+                r"\def\a#1\b{Hello '#1'}\def\b{World} \xa\a\noexpand\b\b",
+                " Hello ''World"
+            ),
+            (
+                only_expands_once,
+                r"\def\A{\B}\def\B{Hello}\xa\noexpand\A",
+                r"\B",
+            ),          
+            (
+                peek_consumes_noexpand_1,
+                r"\def\A{\B}\def\B{Hello}\integer = 1 \noexpand\A",
+                r"\A",
+            ),
+            (
+                peek_consumes_noexpand_2,
+                r"\def\A{\B}\def\B{Hello}\integer = 1\noexpand\A",
+                r"Hello",
+            ),
+        
+            // peek
+        ),
+        failure_tests((end_of_input, r"\noexpand"),),
+    ];
 
     static PREFIX: &str = r"\def\mk#1#2{\def#1##1\notes##2\end{##1\notes##2#2\end}}\mk\a a\mk\b b\mk\c c\mk\d d\def\notes#1\end{#1}";
     static POSTFIX: &str = r"\notes\end";

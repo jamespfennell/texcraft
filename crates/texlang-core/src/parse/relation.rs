@@ -54,7 +54,7 @@ mod tests {
                     catcode::CatCodeMap::new_with_tex_defaults(),
                     HashMap::new(),
                     (),
-                    None,
+                    Default::default(),
                 );
                 vm.push_source("".to_string(), $input.to_string()).unwrap();
                 let input = vm::ExecutionInput::new(&mut vm);
@@ -78,7 +78,7 @@ mod tests {
             fn $name() {
                 let mut map = catcode::CatCodeMap::new_with_tex_defaults();
                 map.insert('<', catcode::CatCode::Letter);
-                let mut vm = vm::VM::<()>::new(map, HashMap::new(), (), None);
+                let mut vm = vm::VM::<()>::new(map, HashMap::new(), (), Default::default());
                 vm.push_source("".to_string(), $input.to_string()).unwrap();
                 let input = vm::ExecutionInput::new(&mut vm);
                 let result = parse_relation(input);

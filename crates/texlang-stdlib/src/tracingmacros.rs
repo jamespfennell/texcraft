@@ -1,7 +1,13 @@
 //! TeX macro debugging
 
 use colored::*;
-use texlang_core::{command, texmacro, token::write_tokens, variable, vm::HasComponent};
+use texlang_core::{
+    command, texmacro,
+    token::write_tokens,
+    variable,
+    vm::HasComponent,
+    vm::{self, RefVM},
+};
 
 /// Component for storing state related to macro tracing.
 #[derive(Default)]
@@ -21,24 +27,30 @@ pub fn get_tracingmacros<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     .into()
 }
 
-pub fn hook<S: HasComponent<Component>>(input: texmacro::HookInput<S>) {
-    if input.vm.custom_state.component().tracing_macros <= 0 {
+pub fn hook<S: HasComponent<Component>>(
+    token: texlang_core::token::Token,
+    input: &vm::ExpansionInput<S>,
+    tex_macro: &texlang_core::texmacro::Macro,
+    arguments: &[&[texlang_core::token::Token]],
+    reversed_expansion: &[texlang_core::token::Token],
+) {
+    if input.state().component().tracing_macros <= 0 {
         return;
     }
-    let trace = input.vm.trace(input.token);
+    let trace = input.trace(token);
     println!(
         "{}{}",
         "Macro expansion trace of ".bold(),
         trace.value.bold()
     );
     println!("{trace}");
-    let interner = input.vm.cs_name_interner();
+    let interner = input.vm().cs_name_interner();
     println!["                        ┌──",];
     print!["              arguments "];
-    if input.arguments.is_empty() {
+    if arguments.is_empty() {
         print!["│ (none)\n                        "];
     }
-    for (i, argument) in input.arguments.iter().enumerate() {
+    for (i, argument) in arguments.iter().enumerate() {
         print![
             "│ {}{}={} \n                        ",
             "#".bright_yellow(),
@@ -48,7 +60,7 @@ pub fn hook<S: HasComponent<Component>>(input: texmacro::HookInput<S>) {
     }
 
     print!["├──\n replacement definition │ ",];
-    for replacement in input.tex_macro.replacements() {
+    for replacement in tex_macro.replacements() {
         match replacement {
             texmacro::Replacement::Tokens(tokens) => {
                 print!("{}", write_tokens(tokens.iter().rev(), interner))
@@ -65,7 +77,7 @@ pub fn hook<S: HasComponent<Component>>(input: texmacro::HookInput<S>) {
 
     println![
         "\n                        ├──\n              expansion │ {}",
-        write_tokens(input.reverse_expansion.iter().rev(), interner)
+        write_tokens(reversed_expansion.iter().rev(), interner)
     ];
     println!["                        └──"];
 }

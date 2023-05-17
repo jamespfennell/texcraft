@@ -7,7 +7,7 @@ pub fn new_vm(source: &str) -> vm::VM<()> {
         CatCodeMap::new_with_tex_defaults(),
         HashMap::new(),
         (),
-        None,
+        Default::default(),
     );
     vm.push_source("".to_string(), source.to_string()).unwrap();
     vm

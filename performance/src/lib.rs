@@ -4,7 +4,6 @@ use std::process::Stdio;
 use texlang_core::token::catcode;
 use texlang_core::vm::VM;
 use texlang_stdlib::script;
-use texlang_stdlib::tracingmacros;
 use texlang_stdlib::StdLibState;
 
 pub fn run_in_texcraft(input: &str) {
@@ -15,7 +14,7 @@ pub fn run_in_texcraft(input: &str) {
         catcode::CatCodeMap::new_with_tex_defaults(),
         initial_built_ins,
         Default::default(),
-        Some(tracingmacros::hook),
+        texlang_stdlib::hooks(),
     );
     vm.push_source("".to_string(), input.to_string()).unwrap();
     script::run(&mut vm).unwrap();

@@ -17,6 +17,7 @@ use texlang_core::command;
 use texlang_core::token;
 use texlang_core::token::catcode;
 use texlang_core::vm;
+use texlang_core::variable;
 use texlang_core::vm::implement_has_component;
 use texlang_core::vm::HasComponent;
 use texlang_core::vm::VM;
@@ -29,6 +30,7 @@ use texlang_core::vm::VM;
 pub struct State {
     exec: script::Component,
     prefix: prefix::Component,
+    integer: i32,
 }
 
 implement_has_component![
@@ -37,21 +39,40 @@ implement_has_component![
     (prefix::Component, prefix),
 ];
 
+impl State {
+    pub fn get_integer() -> command::BuiltIn<State> {
+        variable::Command::new(
+            |state: &State, _: variable::Address| -> &i32 { &state.integer },
+            |state: &mut State, _: variable::Address| -> &mut i32 { &mut state.integer },
+            variable::AddressSpec::NoAddress,
+        )
+        .into()
+    }
+}
+
 /// Option passed to a test runner.
 pub enum TestOption<'a, S> {
     /// The initial commands are the result of invoking the provided static function.
     ///
     /// Overrides previous `InitialCommands` or `InitialCommandsDyn` options.
     InitialCommands(fn() -> HashMap<&'static str, command::BuiltIn<S>>),
+
     /// The initial commands are the result of invoking the provided closure.
     ///
     /// Overrides previous `InitialCommands` or `InitialCommandsDyn` options.
     InitialCommandsDyn(Box<dyn Fn() -> HashMap<&'static str, command::BuiltIn<S>> + 'a>),
+
+    /// The VM hooks to use.
+    ///
+    /// Overrides previous `Hooks` options.
+    Hooks(fn() -> vm::Hooks<S>),
+
     /// The provided static function is invoked after the VM is created and before execution starts.
     /// This can be used to provide more custom VM initialization.
     ///
     /// Overrides previous `CustomVMInitialization` or `CustomVMInitializationDyn` options.
     CustomVMInitialization(fn(&mut VM<S>)),
+
     /// The provided closure is invoked after the VM is created and before execution starts.
     /// This can be used to provide more custom VM initialization.
     ///
@@ -150,11 +171,13 @@ where
 {
     let mut initial_commands: &dyn Fn() -> HashMap<&'static str, command::BuiltIn<S>> =
         &HashMap::new;
+    let mut hooks: &dyn Fn() -> vm::Hooks<S> = &Default::default;
     let mut custom_vm_initialization: &dyn Fn(&mut VM<S>) = &|_| {};
     for option in options {
         match option {
             TestOption::InitialCommands(f) => initial_commands = f,
             TestOption::InitialCommandsDyn(f) => initial_commands = f,
+            TestOption::Hooks(f) => hooks = f,
             TestOption::CustomVMInitialization(f) => custom_vm_initialization = f,
             TestOption::CustomVMInitializationDyn(f) => custom_vm_initialization = f,
         }
@@ -164,7 +187,7 @@ where
         catcode::CatCodeMap::new_with_tex_defaults(),
         (initial_commands)(),
         Default::default(),
-        Default::default(),
+        hooks(),
     );
     (custom_vm_initialization)(&mut vm);
     vm.push_source("testing.tex".to_string(), source.to_string())
