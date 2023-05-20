@@ -25,6 +25,5 @@ pub mod vm;
 pub mod traits {
     pub use super::vm::ExpandedStream;
     pub use super::vm::HasComponent;
-    pub use super::vm::RefVM;
     pub use super::vm::TokenStream;
 }

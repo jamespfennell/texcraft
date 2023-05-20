@@ -112,7 +112,7 @@ fn expandafter_simple_fn<S>(
             next,
         ));
     }
-    input.expand_once()?;
+    input.expanded().expand_once()?;
     input.expansions_mut().push(next);
     Ok(vec![])
 }
@@ -143,7 +143,7 @@ fn expandafter_optimized_fn<S>(
         // Remove the \expandafter token from the stream
         _ = unexpanded_input.next()?;
     }
-    input.expand_once()?;
+    input.expanded().expand_once()?;
 
     while let Some(&root) = buffer.first() {
         if root.value() != expandafter_token.value() {
@@ -190,7 +190,7 @@ fn expandafter_optimized_fn<S>(
                 *buffer.last().unwrap(),
             ));
         }
-        input.expand_once()?;
+        input.expanded().expand_once()?;
         remove_even_indices(&mut buffer);
     }
     input.return_token_buffer(buffer);
@@ -295,7 +295,7 @@ mod test {
                 only_expands_once,
                 r"\def\A{\B}\def\B{Hello}\xa\noexpand\A",
                 r"\B",
-            ),          
+            ),
             (
                 peek_consumes_noexpand_1,
                 r"\def\A{\B}\def\B{Hello}\integer = 1 \noexpand\A",
@@ -306,7 +306,6 @@ mod test {
                 r"\def\A{\B}\def\B{Hello}\integer = 1\noexpand\A",
                 r"Hello",
             ),
-        
             // peek
         ),
         failure_tests((end_of_input, r"\noexpand"),),

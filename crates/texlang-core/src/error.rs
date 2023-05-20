@@ -3,10 +3,10 @@
 use crate::token;
 use crate::token::trace;
 use crate::token::Token;
+use crate::traits::*;
 use crate::vm;
 use colored::*;
 use texcraft_stdext::algorithms::spellcheck;
-use vm::RefVM;
 
 pub struct DisplayBuilder<'a> {
     token: &'a trace::Trace,

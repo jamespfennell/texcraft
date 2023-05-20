@@ -28,7 +28,7 @@ fn the_primitive_fn<S>(
             if let Some(command::Command::Variable(cmd)) =
                 input.base().commands_map.get_command(name)
             {
-                match cmd.clone().value(the_token, input)? {
+                match cmd.clone().value(the_token, input.as_mut())? {
                     variable::ValueRef::Int(i) => int_to_tokens(the_token, *i),
                     variable::ValueRef::CatCode(i) => int_to_tokens(the_token, i.int().into()),
                 }

@@ -3,7 +3,7 @@ use crate::token;
 use crate::vm;
 use crate::vm::TokenStream;
 
-pub fn parse_optional_by<S, I: AsMut<vm::ExpansionInput<S>>>(stream: &mut I) -> anyhow::Result<()> {
+pub fn parse_optional_by<S, I: AsMut<vm::ExpandedStream<S>>>(stream: &mut I) -> anyhow::Result<()> {
     let stream = stream.as_mut();
     let next_is_b = get_optional_element![
         stream,

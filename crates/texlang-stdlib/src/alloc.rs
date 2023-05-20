@@ -200,7 +200,7 @@ impl<S> variable::DynamicAddressSpec<S> for SingletonAddressSpec {
     fn resolve(
         &self,
         _: texlang_core::token::Token,
-        _: &mut vm::ExpansionInput<S>,
+        _: &mut vm::ExpandedStream<S>,
     ) -> anyhow::Result<variable::Address> {
         Ok(self.0)
     }
@@ -253,7 +253,7 @@ impl<S: HasComponent<Component>> variable::DynamicAddressSpec<S> for ArrayAddres
     fn resolve(
         &self,
         token: texlang_core::token::Token,
-        input: &mut vm::ExpansionInput<S>,
+        input: &mut vm::ExpandedStream<S>,
     ) -> anyhow::Result<variable::Address> {
         let array_addr = self.0;
         let array_index: usize = parse::parse_number(input)?;

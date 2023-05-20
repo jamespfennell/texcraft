@@ -1,13 +1,7 @@
 //! TeX macro debugging
 
 use colored::*;
-use texlang_core::{
-    command, texmacro,
-    token::write_tokens,
-    variable,
-    vm::HasComponent,
-    vm::{self, RefVM},
-};
+use texlang_core::{command, texmacro, token::write_tokens, traits::*, variable, vm};
 
 /// Component for storing state related to macro tracing.
 #[derive(Default)]

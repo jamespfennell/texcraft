@@ -50,8 +50,8 @@
 //! This set is used to validate that the command that follows `\global` is
 //!   allowed to be prefixed by it.
 
-use crate::def;
 use crate::alias;
+use crate::def;
 use crate::math;
 use std::collections::HashSet;
 use texcraft_stdext::collections::groupingmap;
@@ -71,12 +71,9 @@ impl Default for Component {
         Component {
             scope: groupingmap::Scope::Local,
             prefixable_with_any: vec![def::def_tag()].into_iter().collect(),
-            prefixable_with_global: vec![
-                math::get_variable_op_tag(),
-                alias::let_tag(),
-            ]
-            .into_iter()
-            .collect(),
+            prefixable_with_global: vec![math::get_variable_op_tag(), alias::let_tag()]
+                .into_iter()
+                .collect(),
         }
     }
 }

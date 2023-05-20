@@ -56,9 +56,7 @@ fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
         .into_iter()
         .map(|a| match a {
             RawParameter::Undelimited => texmacro::Parameter::Undelimited,
-            RawParameter::Delimited(vec) => {
-                texmacro::Parameter::Delimited(Matcher::new(vec))
-            }
+            RawParameter::Delimited(vec) => texmacro::Parameter::Delimited(Matcher::new(vec)),
         })
         .collect();
     let mut replacement =
@@ -109,8 +107,8 @@ fn char_to_parameter_index(c: char) -> Option<usize> {
     }
 }
 
-fn parse_prefix_and_parameters(
-    input: &mut dyn TokenStream,
+fn parse_prefix_and_parameters<S>(
+    input: &mut vm::UnexpandedStream<S>,
 ) -> anyhow::Result<(Vec<token::Token>, Vec<RawParameter>, Option<token::Token>)> {
     let mut prefix = Vec::new();
     let mut parameters = Vec::new();
@@ -201,8 +199,8 @@ fn parse_prefix_and_parameters(
                 .cast())
 }
 
-fn parse_replacement_text(
-    input: &mut dyn TokenStream,
+fn parse_replacement_text<S>(
+    input: &mut vm::UnexpandedStream<S>,
     opt_final_token: Option<token::Token>,
     num_parameters: usize,
 ) -> anyhow::Result<Vec<texmacro::Replacement>> {

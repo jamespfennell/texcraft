@@ -11,13 +11,14 @@ use texlang_core::token::catcode::CatCodeMap;
 use texlang_core::vm;
 use texlang_core::vm::implement_has_component;
 
+pub mod alias;
 pub mod alloc;
 pub mod catcodecmd;
 pub mod conditional;
 pub mod def;
 pub mod expansion;
 pub mod io;
-pub mod alias;
+pub mod math;
 pub mod prefix;
 pub mod registers;
 #[cfg(feature = "repl")]
@@ -29,7 +30,6 @@ pub mod texcraft;
 pub mod the;
 pub mod time;
 pub mod tracingmacros;
-pub mod math;
 
 /// A state struct that is compatible with every primitive in the Texlang standard library.
 #[derive(Default)]

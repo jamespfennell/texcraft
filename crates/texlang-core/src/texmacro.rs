@@ -4,9 +4,8 @@ use crate::error;
 use crate::parse;
 use crate::token;
 use crate::token::Token;
+use crate::traits::*;
 use crate::vm;
-use crate::vm::ExpandedStream;
-use crate::vm::RefVM;
 use colored::*;
 use texcraft_stdext::algorithms::substringsearch::Matcher;
 
@@ -174,9 +173,9 @@ impl Parameter {
         }
     }
 
-    fn parse_delimited_argument(
+    fn parse_delimited_argument<T: vm::TokenStream>(
         macro_token: &Token,
-        stream: &mut dyn vm::TokenStream,
+        stream: &mut T,
         matcher_factory: &Matcher<Token>,
         param_num: usize,
         result: &mut Vec<Token>,
@@ -371,9 +370,9 @@ pub fn pretty_print_replacement_text(replacements: &[Replacement]) -> String {
 /// Removes the provided vector of tokens from the front of the stream.
 ///
 /// Returns an error if the stream does not start with the tokens.
-pub fn remove_tokens_from_stream(
+pub fn remove_tokens_from_stream<T: vm::TokenStream>(
     tokens: &[Token],
-    stream: &mut dyn vm::TokenStream,
+    stream: &mut T,
     action: &str,
 ) -> anyhow::Result<()> {
     for prefix_token in tokens.iter() {

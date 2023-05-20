@@ -122,7 +122,7 @@ pub fn run<S, H: Handlers<S>>(vm: &mut VM<S>) -> anyhow::Result<()> {
                     Value::Active(_) => {
                         // TODO: look up the command and dispatch
                         todo!()
-                    },
+                    }
                     Value::BeginGroup(_) => {
                         execution_input.begin_group();
                         Ok(())

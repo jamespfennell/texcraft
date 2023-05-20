@@ -11,8 +11,8 @@ use super::BaseState;
 /// This trait describes a general stream of tokens where the front of the stream may
 /// retrieved using [TokenStream::next] or peeked at using [TokenStream::peek].
 /// In practice, all [TokenStreams](TokenStream) in Texlang
-/// are either [ExecutionInput], [ExpansionInput] or [UnexpandedStream]. We have a trait
-/// only to make handling of these types uniform.
+/// are either [ExecutionInput], [ExpansionInput] or [UnexpandedStream].
+/// This trait exists to allow a generic function to accept any of these types.
 ///
 /// # Note on lazy loading
 ///
@@ -31,6 +31,9 @@ use super::BaseState;
 /// an admissible character in the name of a control sequence. The correct input is thus
 /// the control sequence `makeatletter` followed by the control sequence `do@`.
 pub trait TokenStream {
+    /// The type of the custom state in the VM.
+    type S;
+
     /// Gets the next token in the stream.
     ///
     /// This method is almost the same
@@ -46,9 +49,6 @@ pub trait TokenStream {
     /// to see if it is a digit and thus extends the currently parsed integer.
     /// Consuming the token with [TokenStream::next] is not
     /// correct in this situation if the token is not a digit.
-    ///
-    /// The [TokenStream::peek] method must be idempotent: consecutive calls to `peek` with no intervening
-    /// change to the state or the stream must return the same result.
     ///
     /// For consumers, it is important to note that the peek method requires a mutable reference
     /// to the stream. This is because some mutable processing may be needed in order to determine
@@ -71,12 +71,6 @@ pub trait TokenStream {
     fn consume(&mut self) -> anyhow::Result<()> {
         self.next().map(|_| ())
     }
-}
-
-/// Trait indicating a type has read only access to the VM.
-pub trait RefVM {
-    // The type of the custom state in the VM.
-    type S;
 
     /// Returns a reference to the VM.
     fn vm(&self) -> &vm::VM<Self::S>;
@@ -87,7 +81,7 @@ pub trait RefVM {
         &self.vm().base_state
     }
 
-    // Returns a reference to the custom state.
+    /// Returns a reference to the custom state.
     #[inline]
     fn state(&self) -> &Self::S {
         &self.vm().custom_state
@@ -106,23 +100,33 @@ pub trait RefVM {
 ///
 /// The unexpanded tokens are retrieved from the unexpanded stream returned by the
 /// [unexpanded](ExpandedStream::unexpanded) method.
-pub trait ExpandedStream {
-    /// The type of the state.
-    type S;
+#[repr(transparent)]
+pub struct ExpandedStream<S>(UnexpandedStream<S>);
 
+impl<S> std::convert::AsMut<ExpandedStream<S>> for ExpandedStream<S> {
+    fn as_mut(&mut self) -> &mut ExpandedStream<S> {
+        self
+    }
+}
+
+impl<S> ExpandedStream<S> {
     /// Returns the underlying unexpanded stream.
-    fn unexpanded(&mut self) -> &mut UnexpandedStream<Self::S>;
+    pub fn unexpanded(&mut self) -> &mut UnexpandedStream<S> {
+        &mut self.0
+    }
 
     /// Expand the next token in the input.
     ///
     /// This method only expands a single token. If, after the expansion, the next token
     /// is expandable it will not be expanded.
-    fn expand_once(&mut self) -> anyhow::Result<bool> {
+    pub fn expand_once(&mut self) -> anyhow::Result<bool> {
         stream::expand_once(&mut self.unexpanded().0)
     }
 }
 
-impl<T: ExpandedStream> TokenStream for T {
+impl<S> TokenStream for ExpandedStream<S> {
+    type S = S;
+
     #[inline]
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
         stream::next_expanded(&mut self.unexpanded().0)
@@ -131,6 +135,11 @@ impl<T: ExpandedStream> TokenStream for T {
     #[inline]
     fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
         stream::peek_expanded(&mut self.unexpanded().0)
+    }
+
+    #[inline]
+    fn vm(&self) -> &vm::VM<Self::S> {
+        &self.0 .0
     }
 }
 
@@ -145,6 +154,8 @@ impl<T: ExpandedStream> TokenStream for T {
 pub struct UnexpandedStream<S>(vm::VM<S>);
 
 impl<S> TokenStream for UnexpandedStream<S> {
+    type S = S;
+
     #[inline]
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
         stream::next_unexpanded(&mut self.0)
@@ -154,10 +165,6 @@ impl<S> TokenStream for UnexpandedStream<S> {
     fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
         stream::peek_unexpanded(&mut self.0)
     }
-}
-
-impl<S> RefVM for UnexpandedStream<S> {
-    type S = S;
 
     #[inline]
     fn vm(&self) -> &vm::VM<S> {
@@ -174,7 +181,7 @@ impl<S> RefVM for UnexpandedStream<S> {
 ///     To read the input stream without performing expansion, use the
 ///     [unexpanded](ExpandedStream::unexpanded) method.
 ///
-/// - Read only access to the VM using the [RefVM] trait.
+/// - Read only access to the VM.
 ///
 /// - The ability to push source code or token expansions to the front of the input stream.
 ///     For source code use [ExpansionInput::push_source];
@@ -188,29 +195,28 @@ impl<S> RefVM for UnexpandedStream<S> {
 /// it has only read access to the VM, and so casting does not escalate privileges.
 #[repr(transparent)]
 // TODO: shouldn't this be in the command module no vm module?
-pub struct ExpansionInput<S>(vm::VM<S>);
+// TODO: it should wrap the ExpandedStream
+pub struct ExpansionInput<S>(ExpandedStream<S>);
 
-impl<S> RefVM for ExpansionInput<S> {
-    type S = S;
-
-    #[inline]
-    fn vm(&self) -> &vm::VM<S> {
-        &self.0
+impl<S> std::convert::AsMut<ExpandedStream<S>> for ExpansionInput<S> {
+    fn as_mut(&mut self) -> &mut ExpandedStream<S> {
+        &mut self.0
     }
 }
 
-impl<S> ExpandedStream for ExpansionInput<S> {
+impl<S> TokenStream for ExpansionInput<S> {
     type S = S;
 
-    #[inline]
-    fn unexpanded(&mut self) -> &mut UnexpandedStream<S> {
-        unsafe { &mut *(self as *mut ExpansionInput<S> as *mut UnexpandedStream<S>) }
+    fn next(&mut self) -> anyhow::Result<Option<Token>> {
+        self.0.next()
     }
-}
 
-impl<S> std::convert::AsMut<ExpansionInput<S>> for ExpansionInput<S> {
-    fn as_mut(&mut self) -> &mut ExpansionInput<S> {
-        self
+    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
+        self.0.peek()
+    }
+
+    fn vm(&self) -> &vm::VM<Self::S> {
+        self.0.vm()
     }
 }
 
@@ -229,12 +235,22 @@ impl<S> ExpansionInput<S> {
         file_name: String,
         source_code: String,
     ) -> anyhow::Result<()> {
-        self.0.internal.push_source(
+        self.0 .0 .0.internal.push_source(
             Some(token),
             file_name,
             source_code,
-            self.0.base_state.max_input_levels,
+            self.0 .0 .0.base_state.max_input_levels,
         )
+    }
+
+    #[inline]
+    pub fn unexpanded(&mut self) -> &mut UnexpandedStream<S> {
+        &mut self.0 .0
+    }
+
+    #[inline]
+    pub fn expanded(&mut self) -> &mut ExpandedStream<S> {
+        &mut self.0
     }
 
     /// Push tokens to the front of the input stream.
@@ -242,7 +258,7 @@ impl<S> ExpansionInput<S> {
     /// The first token in the provided slice will be the next token read.
     #[inline]
     pub fn push_expansion(&mut self, expansion: &[Token]) {
-        self.0.internal.push_expansion(expansion)
+        self.0 .0 .0.internal.push_expansion(expansion)
     }
 
     /// Returns a reference to the expanded tokens stack for the current input source.
@@ -253,7 +269,7 @@ impl<S> ExpansionInput<S> {
     /// than using [ExpansionInput::push_expansion] because an allocation is avoided.
     #[inline]
     pub fn expansions(&self) -> &Vec<Token> {
-        self.0.internal.expansions()
+        self.0 .0 .0.internal.expansions()
     }
 
     /// Returns a mutable reference to the expanded tokens stack for the current input source.
@@ -264,7 +280,7 @@ impl<S> ExpansionInput<S> {
     /// than using [ExpansionInput::push_expansion] because an allocation is avoided.
     #[inline]
     pub fn expansions_mut(&mut self) -> &mut Vec<Token> {
-        self.0.internal.expansions_mut()
+        self.0 .0 .0.internal.expansions_mut()
     }
 
     /// Returns a vector than can be used as a token buffer, potentially without allocating memory.
@@ -283,13 +299,22 @@ impl<S> ExpansionInput<S> {
     /// This getting "the" token buffer to use for expansion would be incorrect, as the multiple expansions
     /// would step on each other.
     pub fn checkout_token_buffer(&mut self) -> Vec<Token> {
-        self.0.internal.token_buffers.pop().unwrap_or_default().0
+        self.0
+             .0
+             .0
+            .internal
+            .token_buffers
+            .pop()
+            .unwrap_or_default()
+            .0
     }
 
     /// Return a token buffer, allowing it to be reused.
     pub fn return_token_buffer(&mut self, mut token_buffer: Vec<Token>) {
         token_buffer.clear();
         self.0
+             .0
+             .0
             .internal
             .token_buffers
             .push(super::TokenBuffer(token_buffer))
@@ -305,28 +330,30 @@ impl<S> ExpansionInput<S> {
 ///     To read the input stream without performing expansion, use the
 ///     [unexpanded](ExpandedStream::unexpanded) method.
 ///
-/// - Read only access to the VM using the [RefVM] trait.
-///
-/// - Mutable access to the base state and custom state using the [ExecutionInput::base]
-///     and [ExecutionInput::state] methods.
+/// - Mutable access to the base state and custom state using the [ExecutionInput::base_mut]
+///     and [ExecutionInput::state_mut] methods.
 #[repr(transparent)]
-pub struct ExecutionInput<S>(vm::VM<S>);
+pub struct ExecutionInput<S>(ExpandedStream<S>);
 
-impl<S> RefVM for ExecutionInput<S> {
-    type S = S;
-
-    #[inline]
-    fn vm(&self) -> &vm::VM<S> {
-        &self.0
+impl<S> std::convert::AsMut<ExpandedStream<S>> for ExecutionInput<S> {
+    fn as_mut(&mut self) -> &mut ExpandedStream<S> {
+        &mut self.0
     }
 }
 
-impl<S> ExpandedStream for ExecutionInput<S> {
+impl<S> TokenStream for ExecutionInput<S> {
     type S = S;
 
-    #[inline]
-    fn unexpanded(&mut self) -> &mut UnexpandedStream<S> {
-        unsafe { &mut *(self as *mut ExecutionInput<S> as *mut UnexpandedStream<S>) }
+    fn next(&mut self) -> anyhow::Result<Option<Token>> {
+        self.0.next()
+    }
+
+    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
+        self.0.peek()
+    }
+
+    fn vm(&self) -> &vm::VM<Self::S> {
+        self.0.vm()
     }
 }
 
@@ -337,44 +364,43 @@ impl<S> ExecutionInput<S> {
         unsafe { &mut *(state as *mut vm::VM<S> as *mut ExecutionInput<S>) }
     }
 
+    #[inline]
+    pub fn unexpanded(&mut self) -> &mut UnexpandedStream<S> {
+        &mut self.0 .0
+    }
+
     /// Returns a mutable reference to the base state.
     #[inline]
     pub fn base_mut(&mut self) -> &mut vm::BaseState<S> {
-        &mut self.0.base_state
+        &mut self.0 .0 .0.base_state
     }
 
     /// Returns a mutable reference to the custom state.
     #[inline]
     pub fn state_mut(&mut self) -> &mut S {
-        &mut self.0.custom_state
+        &mut self.0 .0 .0.custom_state
     }
 
     // TODO: pass in the token and keep it as a reference
     pub fn begin_group(&mut self) {
-        self.0.begin_group()
+        self.0 .0 .0.begin_group()
     }
 
     pub fn end_group(&mut self, token: Token) -> anyhow::Result<()> {
-        self.0.end_group(token)
+        self.0 .0 .0.end_group(token)
     }
 
     pub fn groups(&mut self) -> &mut [variable::internal::RestoreValues<S>] {
-        &mut self.0.internal.groups
+        &mut self.0 .0 .0.internal.groups
     }
 
     pub fn current_group_mut(
         &mut self,
     ) -> Option<(&mut variable::internal::RestoreValues<S>, &BaseState<S>, &S)> {
-        match self.0.internal.groups.last_mut() {
+        match self.0 .0 .0.internal.groups.last_mut() {
             None => None,
-            Some(g) => Some((g, &self.0.base_state, &self.0.custom_state)),
+            Some(g) => Some((g, &self.0 .0 .0.base_state, &self.0 .0 .0.custom_state)),
         }
-    }
-}
-
-impl<S> std::convert::AsMut<ExpansionInput<S>> for ExecutionInput<S> {
-    fn as_mut(&mut self) -> &mut ExpansionInput<S> {
-        unsafe { &mut *(self as *mut ExecutionInput<S> as *mut ExpansionInput<S>) }
     }
 }
 

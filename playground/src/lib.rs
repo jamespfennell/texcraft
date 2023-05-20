@@ -7,17 +7,17 @@ use web_sys::console;
 
 use texlang_core::token::catcode;
 use texlang_core::*;
+use texlang_stdlib::alias;
 use texlang_stdlib::alloc;
 use texlang_stdlib::catcodecmd;
 use texlang_stdlib::conditional;
 use texlang_stdlib::def;
-use texlang_stdlib::alias;
+use texlang_stdlib::math;
 use texlang_stdlib::prefix;
 use texlang_stdlib::registers;
 use texlang_stdlib::script;
 use texlang_stdlib::the;
 use texlang_stdlib::time;
-use texlang_stdlib::math;
 
 #[wasm_bindgen(start)]
 pub fn main_js() -> Result<(), JsValue> {

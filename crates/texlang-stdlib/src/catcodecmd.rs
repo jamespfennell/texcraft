@@ -18,7 +18,7 @@ pub fn get_catcode<S>() -> command::BuiltIn<S> {
         },
         variable::AddressSpec::Dynamic(
             |token: token::Token,
-             input: &mut vm::ExpansionInput<S>|
+             input: &mut vm::ExpandedStream<S>|
              -> anyhow::Result<variable::Address> {
                 let address: u32 = parse::parse_number(input)?;
                 match char::from_u32(address) {

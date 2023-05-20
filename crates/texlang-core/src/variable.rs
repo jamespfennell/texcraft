@@ -186,7 +186,7 @@
 //! ```
 //!
 //! The above listing raises an important question: what if the array access is out of bounds?
-//! The Rust code here will panic, and in Texlang this is the correct behaviour.
+//! The Rust code here will panic, and in Texlang this is the correct behavior.
 //! Texlang always assumes that variable getters are infallible.
 //! This is the same as assuming that an instantiated [Variable] type points to a valid piece of memory
 //! and is not (say) dangling.
@@ -200,7 +200,7 @@
 //! use texlang_core::{parse, token, variable, vm};
 //! use anyhow;
 //!
-//! fn address<S>(token: token::Token, input: &mut vm::ExpansionInput<S>) -> anyhow::Result<variable::Address> {
+//! fn address<S>(token: token::Token, input: &mut vm::ExpandedStream<S>) -> anyhow::Result<variable::Address> {
 //!     let address: usize = parse::parse_number(input)?;
 //!     if address >= 10 {
 //!         // for simplicity we panic, but in real code we should return an error
@@ -223,7 +223,7 @@
 //! # fn mut_getter<S: HasComponent<MyComponent>>(state: &mut S, address: variable::Address) -> &mut i32 {
 //! #   panic![""]
 //! # }
-//! # fn address<S>(token: token::Token, input: &mut vm::ExpansionInput<S>) -> anyhow::Result<variable::Address> {
+//! # fn address<S>(token: token::Token, input: &mut vm::ExpandedStream<S>) -> anyhow::Result<variable::Address> {
 //! #   panic![""]
 //! # }
 //! # pub struct MyComponent {
@@ -281,12 +281,12 @@
 //!
 
 use crate::token::catcode::CatCode;
+use crate::traits::*;
 use crate::vm;
 use crate::{parse, token};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use texcraft_stdext::collections::groupingmap;
-use vm::RefVM;
 
 /// Function signature for a variable's immutable getter.
 ///
@@ -305,7 +305,7 @@ pub type RefFn<S, T> = fn(state: &S, address: Address) -> &T;
 pub type MutRefFn<S, T> = fn(state: &mut S, address: Address) -> &mut T;
 
 /// Address of a variable.
-/// 
+///
 /// TODO: rename index
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Address(pub usize);
@@ -330,7 +330,7 @@ pub enum AddressSpec<S> {
     ///
     /// For example, in `\count 4` the address of `4` is determined by parsing a number
     /// from the input token stream.
-    Dynamic(fn(token::Token, &mut vm::ExpansionInput<S>) -> anyhow::Result<Address>),
+    Dynamic(fn(token::Token, &mut vm::ExpandedStream<S>) -> anyhow::Result<Address>),
     /// A dynamic address, but determined using virtual method dispatch.
     ///
     /// This method is more flexible than the Dynamic variant, but less performant.
@@ -343,7 +343,7 @@ pub trait DynamicAddressSpec<S> {
     fn resolve(
         &self,
         token: token::Token,
-        input: &mut vm::ExpansionInput<S>,
+        input: &mut vm::ExpandedStream<S>,
     ) -> anyhow::Result<Address>;
 }
 
@@ -352,7 +352,7 @@ impl<S> AddressSpec<S> {
     fn determine_address(
         &self,
         token: token::Token,
-        input: &mut vm::ExpansionInput<S>,
+        input: &mut vm::ExpandedStream<S>,
     ) -> anyhow::Result<Address> {
         match self {
             AddressSpec::NoAddress => Ok(Address(0)),
@@ -407,7 +407,7 @@ impl<S> Command<S> {
     pub fn resolve(
         &self,
         token: token::Token,
-        input: &mut vm::ExpansionInput<S>,
+        input: &mut vm::ExpandedStream<S>,
     ) -> anyhow::Result<Variable<S>> {
         let address = self.address.determine_address(token, input)?;
         Ok(match self.getter {
@@ -420,7 +420,7 @@ impl<S> Command<S> {
     pub fn value<'a>(
         &self,
         token: token::Token,
-        input: &'a mut vm::ExpansionInput<S>,
+        input: &'a mut vm::ExpandedStream<S>,
     ) -> anyhow::Result<ValueRef<'a>> {
         Ok(self.resolve(token, input)?.value(input))
     }
@@ -482,7 +482,7 @@ pub enum Variable<S> {
 
 impl<S> Variable<S> {
     /// Return a reference to the value of the variable.
-    pub fn value<'a>(&self, input: &'a mut vm::ExpansionInput<S>) -> ValueRef<'a> {
+    pub fn value<'a>(&self, input: &'a mut vm::ExpandedStream<S>) -> ValueRef<'a> {
         match self {
             Variable::Int(variable) => ValueRef::Int(variable.value(input.state())),
             Variable::CatCode(variable) => ValueRef::CatCode(variable.value(input.base())),

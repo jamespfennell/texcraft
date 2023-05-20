@@ -59,7 +59,7 @@ pub fn get_count<S: HasComponent<Component<N>>, const N: usize>() -> command::Bu
 
 fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
     count_token: token::Token,
-    input: &mut vm::ExpansionInput<S>,
+    input: &mut vm::ExpandedStream<S>,
 ) -> anyhow::Result<variable::Address> {
     let address: usize = parse::parse_number(input)?;
     if address >= N {
