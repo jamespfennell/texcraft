@@ -46,7 +46,7 @@ enum Key {
     Expansion(usize, Option<Tag>),
     // Maybe have a variable:Key
     VariableNoAddress(variable::GetterKey),
-    VariableStaticAddress(variable::GetterKey, variable::Address),
+    VariableStaticAddress(variable::GetterKey, variable::Index),
     VariableDynamic(variable::GetterKey, usize),
 }
 
@@ -67,15 +67,17 @@ impl<S> TryFrom<&Command<S>> for Key {
             Command::Execution(f, tag) => Ok(Key::Execution(*f as usize, *tag)),
             Command::Variable(v) => {
                 let v_id = v.getter_key();
-                match v.address_spec() {
-                    variable::AddressSpec::NoAddress => Ok(Key::VariableNoAddress(v_id)),
-                    variable::AddressSpec::StaticAddress(a) => {
-                        Ok(Key::VariableStaticAddress(v_id, *a))
-                    }
-                    variable::AddressSpec::Dynamic(f) => {
-                        Ok(Key::VariableDynamic(v_id, *f as usize))
-                    }
-                    variable::AddressSpec::DynamicVirtual(_) => todo!(),
+                match v.index_resolver() {
+                    None => Ok(Key::VariableNoAddress(v_id)),
+                    Some(index_resolver) => match index_resolver {
+                        variable::IndexResolver::Static(a) => {
+                            Ok(Key::VariableStaticAddress(v_id, *a))
+                        }
+                        variable::IndexResolver::Dynamic(f) => {
+                            Ok(Key::VariableDynamic(v_id, *f as usize))
+                        }
+                        variable::IndexResolver::DynamicVirtual(_) => todo!(),
+                    },
                 }
             }
             Command::Macro(_) => Err(()),

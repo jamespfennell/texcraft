@@ -41,10 +41,9 @@ implement_has_component![
 
 impl State {
     pub fn get_integer() -> command::BuiltIn<State> {
-        variable::Command::new(
-            |state: &State, _: variable::Address| -> &i32 { &state.integer },
-            |state: &mut State, _: variable::Address| -> &mut i32 { &mut state.integer },
-            variable::AddressSpec::NoAddress,
+        variable::Command::new_singleton(
+            |state: &State, _: variable::Index| -> &i32 { &state.integer },
+            |state: &mut State, _: variable::Index| -> &mut i32 { &mut state.integer },
         )
         .into()
     }

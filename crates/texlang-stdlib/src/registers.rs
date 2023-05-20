@@ -18,12 +18,12 @@ impl<T: Copy + Default, const N: usize> Registers<T, N> {
         }
     }
 
-    fn read(&self, addr: usize) -> &T {
-        self.values.get(addr).unwrap()
+    fn read(&self, index: usize) -> &T {
+        self.values.get(index).unwrap()
     }
 
-    fn write(&mut self, addr: usize) -> &mut T {
-        self.values.get_mut(addr).unwrap()
+    fn write(&mut self, index: usize) -> &mut T {
+        self.values.get_mut(index).unwrap()
     }
 }
 
@@ -49,10 +49,10 @@ impl<const N: usize> Default for Component<N> {
 
 /// Get the `\count` command.
 pub fn get_count<S: HasComponent<Component<N>>, const N: usize>() -> command::BuiltIn<S> {
-    variable::Command::new(
+    variable::Command::new_array(
         int_register_ref_fn,
         int_register_mut_ref_fn,
-        variable::AddressSpec::Dynamic(count_fn),
+        variable::IndexResolver::Dynamic(count_fn),
     )
     .into()
 }
@@ -60,12 +60,12 @@ pub fn get_count<S: HasComponent<Component<N>>, const N: usize>() -> command::Bu
 fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
     count_token: token::Token,
     input: &mut vm::ExpandedStream<S>,
-) -> anyhow::Result<variable::Address> {
-    let address: usize = parse::parse_number(input)?;
-    if address >= N {
-        return Err(integer_register_too_large_error(count_token, address, N));
+) -> anyhow::Result<variable::Index> {
+    let index: usize = parse::parse_number(input)?;
+    if index >= N {
+        return Err(integer_register_too_large_error(count_token, index, N));
     }
-    Ok(address.into())
+    Ok(index.into())
 }
 
 /// Get the `\countdef` command.
@@ -79,17 +79,17 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
 ) -> anyhow::Result<()> {
     let cs_name = parse::parse_command_target("countdef", countdef_token, input.unexpanded())?;
     parse::parse_optional_equals(input)?;
-    let addr: usize = parse::parse_number(input)?;
-    if addr >= N {
-        return Err(integer_register_too_large_error(countdef_token, addr, N));
+    let index: usize = parse::parse_number(input)?;
+    if index >= N {
+        return Err(integer_register_too_large_error(countdef_token, index, N));
     }
     // TODO: I suspect \countdef should honor \global, but haven't checked pdfTeX.
     input.base_mut().commands_map.insert_variable_command(
         cs_name,
-        variable::Command::new(
+        variable::Command::new_array(
             int_register_ref_fn,
             int_register_mut_ref_fn,
-            variable::AddressSpec::StaticAddress(addr.into()),
+            variable::IndexResolver::Static(index.into()),
         ),
         groupingmap::Scope::Local,
     );
@@ -98,23 +98,27 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
 
 fn int_register_ref_fn<S: HasComponent<Component<N>>, const N: usize>(
     state: &S,
-    addr: variable::Address,
+    index: variable::Index,
 ) -> &i32 {
-    state.component().int_registers.read(addr.0)
+    state.component().int_registers.read(index.0)
 }
 
 fn int_register_mut_ref_fn<S: HasComponent<Component<N>>, const N: usize>(
     state: &mut S,
-    addr: variable::Address,
+    index: variable::Index,
 ) -> &mut i32 {
-    state.component_mut().int_registers.write(addr.0)
+    state.component_mut().int_registers.write(index.0)
 }
 
-fn integer_register_too_large_error(token: token::Token, addr: usize, num: usize) -> anyhow::Error {
+fn integer_register_too_large_error(
+    token: token::Token,
+    index: usize,
+    num: usize,
+) -> anyhow::Error {
     error::TokenError::new(
         token,
         format![
-            "Register number {addr} passed to {token} is too large; there are only {num} integer registers"
+            "Register number {index} passed to {token} is too large; there are only {num} integer registers"
         ],
     )
     .cast()

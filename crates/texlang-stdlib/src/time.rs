@@ -62,42 +62,38 @@ impl Default for Component {
 
 /// Get the `\time` command.
 pub fn get_time<S: HasComponent<Component>>() -> command::BuiltIn<S> {
-    variable::Command::new(
-        |state: &S, _: variable::Address| -> &i32 { &state.component().minutes_since_midnight },
-        |state: &mut S, _: variable::Address| -> &mut i32 {
+    variable::Command::new_singleton(
+        |state: &S, _: variable::Index| -> &i32 { &state.component().minutes_since_midnight },
+        |state: &mut S, _: variable::Index| -> &mut i32 {
             &mut state.component_mut().minutes_since_midnight
         },
-        variable::AddressSpec::NoAddress,
     )
     .into()
 }
 
 /// Get the `\day` command.
 pub fn get_day<S: HasComponent<Component>>() -> command::BuiltIn<S> {
-    variable::Command::new(
-        |state: &S, _: variable::Address| -> &i32 { &state.component().day },
-        |state: &mut S, _: variable::Address| -> &mut i32 { &mut state.component_mut().day },
-        variable::AddressSpec::NoAddress,
+    variable::Command::new_singleton(
+        |state: &S, _: variable::Index| -> &i32 { &state.component().day },
+        |state: &mut S, _: variable::Index| -> &mut i32 { &mut state.component_mut().day },
     )
     .into()
 }
 
 /// Get the `\month` command.
 pub fn get_month<S: HasComponent<Component>>() -> command::BuiltIn<S> {
-    variable::Command::new(
-        |state: &S, _: variable::Address| -> &i32 { &state.component().month },
-        |state: &mut S, _: variable::Address| -> &mut i32 { &mut state.component_mut().month },
-        variable::AddressSpec::NoAddress,
+    variable::Command::new_singleton(
+        |state: &S, _: variable::Index| -> &i32 { &state.component().month },
+        |state: &mut S, _: variable::Index| -> &mut i32 { &mut state.component_mut().month },
     )
     .into()
 }
 
 /// Get the `\year` command.
 pub fn get_year<S: HasComponent<Component>>() -> command::BuiltIn<S> {
-    variable::Command::new(
-        |state: &S, _: variable::Address| -> &i32 { &state.component().year },
-        |state: &mut S, _: variable::Address| -> &mut i32 { &mut state.component_mut().year },
-        variable::AddressSpec::NoAddress,
+    variable::Command::new_singleton(
+        |state: &S, _: variable::Index| -> &i32 { &state.component().year },
+        |state: &mut S, _: variable::Index| -> &mut i32 { &mut state.component_mut().year },
     )
     .into()
 }

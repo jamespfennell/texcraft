@@ -10,7 +10,7 @@ use rand::SeedableRng;
 /// The program was developed in order to compare the speeds of the
 ///   lexers in Texcraft and pdfTeX.
 ///
-/// This program is a part of the Texcraft project: https://texcraft.dev.
+/// This program is a part of the Texcraft project: `<https://texcraft.dev>`.
 #[derive(Parser)]
 #[clap(version, name = "randtex")]
 struct Cli {
@@ -26,7 +26,7 @@ struct Cli {
     #[clap(short, long)]
     num_lines: Option<usize>,
 
-    /// Minimum width of lines within the macro definitiom in the output. Default: 80.
+    /// Minimum width of lines within the macro definition in the output. Default: 80.
     #[clap(long)]
     line_length_min: Option<usize>,
 

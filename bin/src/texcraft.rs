@@ -13,7 +13,7 @@ use texlang_stdlib::StdLibState;
 ///   Texcraft project.
 /// See the subcommands for things it can do.
 ///
-/// Website: https://texcraft.dev.
+/// Website: `<https://texcraft.dev>`.
 #[derive(Parser)]
 #[clap(version)]
 struct Cli {

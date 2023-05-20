@@ -8,28 +8,28 @@ pub const CATCODE_DOC: &str = "Get or set a catcode register";
 /// Get the `\catcode` command.
 pub fn get_catcode<S>() -> command::BuiltIn<S> {
     variable::Command::new_base(
-        |state: &vm::BaseState<S>, addr: variable::Address| -> &catcode::CatCode {
-            let addr = char::from_u32(addr.0.try_into().unwrap()).unwrap();
-            state.cat_code_map.get(&addr)
+        |state: &vm::BaseState<S>, index: variable::Index| -> &catcode::CatCode {
+            let index = char::from_u32(index.0.try_into().unwrap()).unwrap();
+            state.cat_code_map.get(&index)
         },
-        |state: &mut vm::BaseState<S>, addr: variable::Address| -> &mut catcode::CatCode {
-            let addr = char::from_u32(addr.0.try_into().unwrap()).unwrap();
-            state.cat_code_map.get_mut(&addr)
+        |state: &mut vm::BaseState<S>, index: variable::Index| -> &mut catcode::CatCode {
+            let index = char::from_u32(index.0.try_into().unwrap()).unwrap();
+            state.cat_code_map.get_mut(&index)
         },
-        variable::AddressSpec::Dynamic(
+        variable::IndexResolver::Dynamic(
             |token: token::Token,
              input: &mut vm::ExpandedStream<S>|
-             -> anyhow::Result<variable::Address> {
-                let address: u32 = parse::parse_number(input)?;
-                match char::from_u32(address) {
+             -> anyhow::Result<variable::Index> {
+                let index: u32 = parse::parse_number(input)?;
+                match char::from_u32(index) {
                     None => Err(error::TokenError::new(
                         token,
                         format![
-                            "Argument {address} passed to {token} is not a valid UTF-8 codepoint"
+                            "Argument {index} passed to {token} is not a valid UTF-8 codepoint"
                         ],
                     )
                     .cast()),
-                    Some(_) => Ok((address as usize).into()),
+                    Some(_) => Ok((index as usize).into()),
                 }
             },
         ),
