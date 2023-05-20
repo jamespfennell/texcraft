@@ -390,13 +390,13 @@ impl<S> ExecutionInput<S> {
         self.0 .0 .0.end_group(token)
     }
 
-    pub fn groups(&mut self) -> &mut [variable::internal::RestoreValues<S>] {
+    pub(crate) fn groups(&mut self) -> &mut [variable::RestoreValues<S>] {
         &mut self.0 .0 .0.internal.groups
     }
 
-    pub fn current_group_mut(
+    pub(crate) fn current_group_mut(
         &mut self,
-    ) -> Option<(&mut variable::internal::RestoreValues<S>, &BaseState<S>, &S)> {
+    ) -> Option<(&mut variable::RestoreValues<S>, &BaseState<S>, &S)> {
         match self.0 .0 .0.internal.groups.last_mut() {
             None => None,
             Some(g) => Some((g, &self.0 .0 .0.base_state, &self.0 .0 .0.custom_state)),

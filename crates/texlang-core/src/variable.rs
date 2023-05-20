@@ -385,7 +385,7 @@ impl<S> Command<S> {
         ref_fn: RefFn<S, T>,
         ref_mut_fn: MutRefFn<S, T>,
     ) -> Command<S> {
-        internal::SupportedTypeInternal::new_command(ref_fn, ref_mut_fn, None)
+        SupportedType::new_command(ref_fn, ref_mut_fn, None)
     }
 
     /// Create a new variable command.
@@ -394,7 +394,7 @@ impl<S> Command<S> {
         ref_mut_fn: MutRefFn<S, T>,
         index_resolver: IndexResolver<S>,
     ) -> Command<S> {
-        internal::SupportedTypeInternal::new_command(ref_fn, ref_mut_fn, Some(index_resolver))
+        SupportedType::new_command(ref_fn, ref_mut_fn, Some(index_resolver))
     }
 
     /// Create a new base variable command.
@@ -403,7 +403,7 @@ impl<S> Command<S> {
         ref_mut_fn: MutRefFn<vm::BaseState<S>, T>,
         index_resolver: IndexResolver<S>,
     ) -> Command<S> {
-        internal::SupportedBaseTypeInternal::new_command(ref_fn, ref_mut_fn, Some(index_resolver))
+        SupportedBaseType::new_command(ref_fn, ref_mut_fn, Some(index_resolver))
     }
 
     /// Resolve the command to obtain a [Variable].
@@ -586,13 +586,12 @@ where
         match scope {
             groupingmap::Scope::Global => {
                 for group in input.groups() {
-                    internal::SupportedTypeInternal::restore_map_mut(group).remove(self)
+                    SupportedType::restore_map_mut(group).remove(self)
                 }
             }
             groupingmap::Scope::Local => {
                 if let Some((group, _, _)) = input.current_group_mut() {
-                    internal::SupportedTypeInternal::restore_map_mut(group)
-                        .save(*self, current_value);
+                    SupportedType::restore_map_mut(group).save(*self, current_value);
                 }
             }
         }
@@ -616,13 +615,12 @@ where
         match scope {
             groupingmap::Scope::Global => {
                 for group in input.groups() {
-                    internal::SupportedBaseTypeInternal::restore_map_mut(group).remove(self)
+                    SupportedBaseType::restore_map_mut(group).remove(self)
                 }
             }
             groupingmap::Scope::Local => {
                 if let Some((group, _, _)) = input.current_group_mut() {
-                    internal::SupportedBaseTypeInternal::restore_map_mut(group)
-                        .save(*self, current_value);
+                    SupportedBaseType::restore_map_mut(group).save(*self, current_value);
                 }
             }
         }
@@ -649,136 +647,130 @@ impl<S, T> Hash for TypedVariable<S, T> {
 
 /// Trait satisfied by all Rust types that can be used as TeX variables.
 ///
-/// It is not possible to implement this trait outside of the Texlang core create.
-/// It exists only to make the variables API more ergonomic;
+/// It exists to make the variables API more ergonomic;
 ///     for example, it is used to provide a uniform constructor [Command::new_array] for commands.
-pub trait SupportedType: internal::SupportedTypeInternal {}
+pub trait SupportedType: Sized {
+    /// This method exists so that the trait cannot be be implemented without changing the variable enum.
+    fn new_variable<S>(ref_fn: RefFn<S, Self>, mut_fn: MutRefFn<S, Self>) -> Variable<S>;
 
-impl SupportedType for i32 {}
+    fn restore_map_mut<S>(_: &mut RestoreValues<S>) -> &mut RestoreMap<S, Self>;
+
+    fn new_command<S>(
+        ref_fn: RefFn<S, Self>,
+        ref_mut_fn: MutRefFn<S, Self>,
+        _: Option<IndexResolver<S>>,
+    ) -> Command<S>;
+}
+
+impl SupportedType for i32 {
+    fn new_variable<S>(ref_fn: RefFn<S, Self>, mut_fn: MutRefFn<S, Self>) -> Variable<S> {
+        Variable::Int(TypedVariable(ref_fn, mut_fn, Index(0)))
+    }
+
+    fn restore_map_mut<S>(m: &mut RestoreValues<S>) -> &mut RestoreMap<S, Self> {
+        &mut m.i32
+    }
+    fn new_command<S>(
+        ref_fn: RefFn<S, Self>,
+        ref_mut_fn: MutRefFn<S, Self>,
+        index_resolver: Option<IndexResolver<S>>,
+    ) -> Command<S> {
+        Command {
+            getters: Getters::Int(ref_fn, ref_mut_fn),
+            index_resolver,
+        }
+    }
+}
 
 /// Trait satisfied by all Rust types that can be used as TeX base variables
-pub trait SupportedBaseType: internal::SupportedBaseTypeInternal {}
+pub trait SupportedBaseType: Sized {
+    /// This method exists so that the trait cannot be be implemented without changing the variable enum.
+    fn new_variable<S>(
+        ref_fn: RefFn<vm::BaseState<S>, Self>,
+        mut_fn: MutRefFn<vm::BaseState<S>, Self>,
+    ) -> Variable<S>;
 
-impl SupportedBaseType for CatCode {}
+    fn restore_map_mut<S>(_: &mut RestoreValues<S>) -> &mut RestoreMap<vm::BaseState<S>, Self>;
 
-/// Parts of the variable system that are private to the Texlang core crate.
+    fn new_command<S>(
+        _: RefFn<vm::BaseState<S>, Self>,
+        _: MutRefFn<vm::BaseState<S>, Self>,
+        _: Option<IndexResolver<S>>,
+    ) -> Command<S>;
+}
+
+impl SupportedBaseType for CatCode {
+    fn new_variable<S>(
+        ref_fn: RefFn<vm::BaseState<S>, Self>,
+        mut_fn: MutRefFn<vm::BaseState<S>, Self>,
+    ) -> Variable<S> {
+        Variable::CatCode(TypedVariable(ref_fn, mut_fn, Index(0)))
+    }
+
+    fn restore_map_mut<S>(m: &mut RestoreValues<S>) -> &mut RestoreMap<vm::BaseState<S>, Self> {
+        &mut m.catcode_base
+    }
+
+    fn new_command<S>(
+        ref_fn: RefFn<vm::BaseState<S>, Self>,
+        ref_mut_fn: MutRefFn<vm::BaseState<S>, Self>,
+        index_resolver: Option<IndexResolver<S>>,
+    ) -> Command<S> {
+        Command {
+            getters: Getters::CatCode(ref_fn, ref_mut_fn),
+            index_resolver,
+        }
+    }
+}
+
+/// Internal VM data structure used to implement TeX's grouping semantics.
 ///
-/// This is basically a hack, and may not work in future versions of Rust.
-/// The basic problem it solves is that for the variables API it's really nice to have the public [SupportedType]
-///     trait.
-/// Necessarily this trait encodes internal implementation details about Texlang core, like how to get
-///     the restore values for variables of a particular type.
-/// Because [SupportedType] is public, it's hard to do this without making some of these implementation
-///     details public too.
-/// This is because the Rust compiler (reasonably) enforces that public traits don't reference or leak private types.
+/// This is not intended to be used outside of the VM.
+// TODO: make this private somehow. Maybe the restore values doesn't need to be a part of the SupportedType trait.
+pub struct RestoreValues<S> {
+    i32: RestoreMap<S, i32>,
+    catcode_base: RestoreMap<vm::BaseState<S>, CatCode>,
+}
+
+impl<S> Default for RestoreValues<S> {
+    fn default() -> Self {
+        Self {
+            i32: Default::default(),
+            catcode_base: Default::default(),
+        }
+    }
+}
+
+impl<S> RestoreValues<S> {
+    pub fn restore(self, base: &mut vm::BaseState<S>, state: &mut S) {
+        self.i32.restore(state);
+        self.catcode_base.restore(base);
+    }
+}
+
+/// Internal VM data structure used to implement TeX's grouping semantics.
 ///
-/// The loophole is that placing all of this stuff as _public_ items in a _private_ module is allowed!
-/// And it hides all of the stuff from end users.
-/// Shhhhh! Don't tell the Rust team, they may fix the bug.
-pub(crate) mod internal {
-    use super::*;
+/// This is not intended to be used outside of the VM.
+pub struct RestoreMap<S, T>(HashMap<TypedVariable<S, T>, T>);
 
-    /// Internal VM data structure used to implement TeX's grouping semantics.
-    ///
-    /// This is not intended to be used outside of the VM.
-    pub struct RestoreValues<S> {
-        i32: RestoreMap<S, i32>,
-        catcode_base: RestoreMap<vm::BaseState<S>, CatCode>,
+impl<S, T> Default for RestoreMap<S, T> {
+    fn default() -> Self {
+        Self(HashMap::new())
+    }
+}
+
+impl<S, T> RestoreMap<S, T> {
+    pub(super) fn save(&mut self, variable: TypedVariable<S, T>, val: T) {
+        self.0.entry(variable).or_insert(val);
     }
 
-    impl<S> Default for RestoreValues<S> {
-        fn default() -> Self {
-            Self {
-                i32: Default::default(),
-                catcode_base: Default::default(),
-            }
-        }
+    pub(super) fn remove(&mut self, variable: &TypedVariable<S, T>) {
+        self.0.remove(variable);
     }
 
-    impl<S> RestoreValues<S> {
-        pub fn restore(self, base: &mut vm::BaseState<S>, state: &mut S) {
-            self.i32.restore(state);
-            self.catcode_base.restore(base);
-        }
-    }
-
-    /// Internal VM data structure used to implement TeX's grouping semantics.
-    ///
-    /// This is not intended to be used outside of the VM.
-    pub struct RestoreMap<S, T>(HashMap<TypedVariable<S, T>, T>);
-
-    impl<S, T> Default for RestoreMap<S, T> {
-        fn default() -> Self {
-            Self(HashMap::new())
-        }
-    }
-
-    impl<S, T> RestoreMap<S, T> {
-        pub(super) fn save(&mut self, variable: TypedVariable<S, T>, val: T) {
-            self.0.entry(variable).or_insert(val);
-        }
-
-        pub(super) fn remove(&mut self, variable: &TypedVariable<S, T>) {
-            self.0.remove(variable);
-        }
-
-        fn restore(self, state: &mut S) {
-            for (v, restored_value) in self.0 {
-                *(v.1)(state, v.2) = restored_value;
-            }
-        }
-    }
-
-    pub trait SupportedTypeInternal: Sized {
-        fn restore_map_mut<S>(_: &mut RestoreValues<S>) -> &mut RestoreMap<S, Self>;
-
-        fn new_command<S>(
-            ref_fn: RefFn<S, Self>,
-            ref_mut_fn: MutRefFn<S, Self>,
-            _: Option<IndexResolver<S>>,
-        ) -> Command<S>;
-    }
-
-    impl SupportedTypeInternal for i32 {
-        fn restore_map_mut<S>(m: &mut RestoreValues<S>) -> &mut RestoreMap<S, Self> {
-            &mut m.i32
-        }
-        fn new_command<S>(
-            ref_fn: RefFn<S, Self>,
-            ref_mut_fn: MutRefFn<S, Self>,
-            index_resolver: Option<IndexResolver<S>>,
-        ) -> Command<S> {
-            Command {
-                getters: Getters::Int(ref_fn, ref_mut_fn),
-                index_resolver,
-            }
-        }
-    }
-
-    pub trait SupportedBaseTypeInternal: Sized {
-        fn restore_map_mut<S>(_: &mut RestoreValues<S>) -> &mut RestoreMap<vm::BaseState<S>, Self>;
-
-        fn new_command<S>(
-            _: RefFn<vm::BaseState<S>, Self>,
-            _: MutRefFn<vm::BaseState<S>, Self>,
-            _: Option<IndexResolver<S>>,
-        ) -> Command<S>;
-    }
-
-    impl SupportedBaseTypeInternal for CatCode {
-        fn restore_map_mut<S>(m: &mut RestoreValues<S>) -> &mut RestoreMap<vm::BaseState<S>, Self> {
-            &mut m.catcode_base
-        }
-
-        fn new_command<S>(
-            ref_fn: RefFn<vm::BaseState<S>, Self>,
-            ref_mut_fn: MutRefFn<vm::BaseState<S>, Self>,
-            index_resolver: Option<IndexResolver<S>>,
-        ) -> Command<S> {
-            Command {
-                getters: Getters::CatCode(ref_fn, ref_mut_fn),
-                index_resolver,
-            }
+    fn restore(self, state: &mut S) {
+        for (v, restored_value) in self.0 {
+            *(v.1)(state, v.2) = restored_value;
         }
     }
 }

@@ -352,7 +352,7 @@ struct Internal<S> {
 
     token_buffers: std::collections::BinaryHeap<TokenBuffer>,
 
-    groups: Vec<variable::internal::RestoreValues<S>>,
+    groups: Vec<variable::RestoreValues<S>>,
     hooks: Hooks<S>,
 }
 
