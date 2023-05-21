@@ -1,7 +1,7 @@
 //! TeX tokens and category codes.
 
 pub mod catcode;
-pub (crate) mod lexer;
+pub(crate) mod lexer;
 pub mod trace;
 
 use crate::token::catcode::CatCode;

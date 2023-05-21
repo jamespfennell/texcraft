@@ -1,7 +1,7 @@
 //! Tracing system for determining the origin of a token.
 //!
 //! This module implements a [Tracer] for tokens.
-//! When building helpful error messages we need to know the origin of tokens - 
+//! When building helpful error messages we need to know the origin of tokens -
 //!     e.g., the file and line they came from.
 //! The tracing functionality here enables obtaining this information in the form of a [Trace].
 //!
@@ -23,7 +23,7 @@
 //! These keys are returned using the opaque [KeyRange] type, which enables the caller to retrieve
 //!     these keys.
 //! It is assumed that the caller will assign keys in order to each UTF-8 character in the source code.
-//! 
+//!
 //! In addition to returning the range, the tracer associates the key range with the source code in an
 //!     internal data structure.
 //!

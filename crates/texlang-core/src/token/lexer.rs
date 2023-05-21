@@ -16,8 +16,8 @@
 
 use crate::error;
 use crate::token;
+use crate::token::catcode;
 use crate::token::catcode::CatCode;
-use crate::token::catcode::CatCodeMap;
 use crate::token::trace;
 use crate::token::CsNameInterner;
 use crate::token::Token;
@@ -42,6 +42,17 @@ impl fmt::Display for LexerError {
 
 impl std::error::Error for LexerError {}
 
+pub trait CatCodeFn {
+    fn cat_code(&self, c: char) -> CatCode;
+}
+
+impl CatCodeFn for catcode::CatCodeMap {
+    #[inline]
+    fn cat_code(&self, c: char) -> CatCode {
+        *self.get(&c)
+    }
+}
+
 /// The Texlang lexer
 pub struct Lexer {
     raw_lexer: RawLexer,
@@ -59,20 +70,20 @@ impl Lexer {
         }
     }
 
-    pub fn next(
+    pub fn next<F: CatCodeFn>(
         &mut self,
-        cat_code_map: &CatCodeMap,
+        cat_code_fn: &F,
         cs_name_interner: &mut CsNameInterner,
     ) -> Result<Option<token::Token>, LexerError> {
-        while let Some(raw_token) = self.raw_lexer.next(cat_code_map) {
+        while let Some(raw_token) = self.raw_lexer.next(cat_code_fn) {
             let c = raw_token.char;
             let value = match raw_token.code {
                 CatCode::Escape => Token::new_control_sequence(
-                    self.read_control_sequence(&raw_token, cat_code_map, cs_name_interner)?,
+                    self.read_control_sequence(&raw_token, cat_code_fn, cs_name_interner)?,
                     raw_token.trace_key,
                 ),
                 CatCode::EndOfLine | CatCode::Space => {
-                    let num_consumed_new_lines = self.consume_whitespace(cat_code_map)
+                    let num_consumed_new_lines = self.consume_whitespace(cat_code_fn)
                         + match raw_token.code == CatCode::EndOfLine {
                             true => 1, // we consumed an additional new line for the first token
                             false => 0,
@@ -99,7 +110,7 @@ impl Lexer {
                 CatCode::Other => Token::new_other(c, raw_token.trace_key),
                 CatCode::Active => Token::new_active_character(c, raw_token.trace_key),
                 CatCode::Comment => {
-                    while let Some(next_raw_token) = self.raw_lexer.peek(cat_code_map) {
+                    while let Some(next_raw_token) = self.raw_lexer.peek(cat_code_fn) {
                         if next_raw_token.code == CatCode::EndOfLine {
                             break;
                         }
@@ -119,9 +130,9 @@ impl Lexer {
         Ok(None)
     }
 
-    fn consume_whitespace(&mut self, map: &CatCodeMap) -> usize {
+    fn consume_whitespace<F: CatCodeFn>(&mut self, cat_code_fn: &F) -> usize {
         let mut num_new_lines: usize = 0;
-        while let Some(RawToken { code, .. }) = self.raw_lexer.peek(map) {
+        while let Some(RawToken { code, .. }) = self.raw_lexer.peek(cat_code_fn) {
             num_new_lines += match code {
                 CatCode::EndOfLine => 1,
                 CatCode::Space => 0,
@@ -134,14 +145,14 @@ impl Lexer {
         num_new_lines
     }
 
-    fn read_control_sequence(
+    fn read_control_sequence<F: CatCodeFn>(
         &mut self,
         raw_token: &RawToken,
-        cat_code_map: &CatCodeMap,
+        cat_code_fn: &F,
         cs_name_interner: &mut CsNameInterner,
     ) -> Result<token::CsName, LexerError> {
         self.buffer.clear();
-        match self.raw_lexer.next(cat_code_map) {
+        match self.raw_lexer.next(cat_code_fn) {
             None => {
                 // TODO: this should be an end of input error
                 return Err(LexerError::MalformedControlSequence(
@@ -163,7 +174,7 @@ impl Lexer {
                     char: subsequent_char,
                     code: CatCode::Letter,
                     ..
-                }) = self.raw_lexer.peek(cat_code_map)
+                }) = self.raw_lexer.peek(cat_code_fn)
                 {
                     self.raw_lexer.advance();
                     self.buffer.push(subsequent_char);
@@ -196,10 +207,10 @@ impl RawLexer {
         }
     }
 
-    fn next(&mut self, map: &CatCodeMap) -> Option<RawToken> {
+    fn next<F: CatCodeFn>(&mut self, cat_code_fn: &F) -> Option<RawToken> {
         match self.iter.next() {
             Some(c) => {
-                let code = *map.get(&c);
+                let code = cat_code_fn.cat_code(c);
                 Some(RawToken {
                     char: c,
                     code,
@@ -210,10 +221,10 @@ impl RawLexer {
         }
     }
 
-    fn peek(&mut self, map: &CatCodeMap) -> Option<RawToken> {
+    fn peek<F: CatCodeFn>(&mut self, cat_code_fn: &F) -> Option<RawToken> {
         match self.iter.peek() {
             Some(c) => {
-                let code = *map.get(&c);
+                let code = cat_code_fn.cat_code(c);
                 Some(RawToken {
                     char: c,
                     code,
@@ -262,7 +273,7 @@ mod tests {
             #[test]
             fn $name() {
                 let mut lexer = Lexer::new($input.to_string(), trace::KeyRange::for_testing());
-                let mut map = CatCodeMap::new_with_tex_defaults();
+                let mut map = catcode::CatCodeMap::new_with_tex_defaults();
                 map.insert('X', EndOfLine);
                 map.insert('Y', Space);
                 map.insert('Z', Ignored);
