@@ -6,6 +6,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use texlang_core::token::catcode;
+use texlang_core::traits::*;
 use texlang_core::*;
 use texlang_stdlib::alias;
 use texlang_stdlib::alloc;
@@ -53,6 +54,8 @@ struct PlaygroundState {
     time: time::Component,
     conditional: conditional::Component,
 }
+
+impl TexlangState for PlaygroundState {}
 
 implement_has_component![
     PlaygroundState,

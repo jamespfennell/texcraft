@@ -16,10 +16,10 @@ use anyhow::Result;
 use texlang_core::command;
 use texlang_core::token;
 use texlang_core::token::catcode;
+use texlang_core::traits::*;
 use texlang_core::variable;
 use texlang_core::vm;
 use texlang_core::vm::implement_has_component;
-use texlang_core::vm::HasComponent;
 use texlang_core::vm::VM;
 
 /// Simple state type for use in unit tests.
@@ -32,6 +32,8 @@ pub struct State {
     prefix: prefix::Component,
     integer: i32,
 }
+
+impl TexlangState for State {}
 
 implement_has_component![
     State,

@@ -14,13 +14,15 @@ use num_traits::PrimInt;
 /// from an internal registers. The full definition of a number in the TeX grammar
 /// is given on page X of the TeXBook.
 #[inline]
-pub fn parse_number<S, I: AsMut<vm::ExpandedStream<S>>, T: PrimInt>(
+pub fn parse_number<S: TexlangState, I: AsMut<vm::ExpandedStream<S>>, T: PrimInt>(
     stream: &mut I,
 ) -> anyhow::Result<T> {
     parse_number_internal(stream.as_mut())
 }
 
-fn parse_number_internal<S, T: PrimInt>(stream: &mut vm::ExpandedStream<S>) -> anyhow::Result<T> {
+fn parse_number_internal<S: TexlangState, T: PrimInt>(
+    stream: &mut vm::ExpandedStream<S>,
+) -> anyhow::Result<T> {
     let sign = parse_optional_signs(stream)?;
     let modulus: T = match stream.next()? {
         None => return Err(parse_number_error(None)),
@@ -60,13 +62,13 @@ fn parse_number_internal<S, T: PrimInt>(stream: &mut vm::ExpandedStream<S>) -> a
 }
 
 #[inline]
-pub fn parse_catcode<S, I: AsMut<vm::ExpandedStream<S>>>(
+pub fn parse_catcode<S: TexlangState, I: AsMut<vm::ExpandedStream<S>>>(
     stream: &mut I,
 ) -> anyhow::Result<catcode::CatCode> {
     parse_catcode_internal(stream.as_mut())
 }
 
-fn parse_catcode_internal<S>(
+fn parse_catcode_internal<S: TexlangState>(
     stream: &mut vm::ExpandedStream<S>,
 ) -> anyhow::Result<catcode::CatCode> {
     let val: usize = parse_number_internal(stream)?;
@@ -86,7 +88,7 @@ fn parse_catcode_internal<S>(
 ///
 /// If the combination of the signs is positive, [None] is returned.
 /// Otherwise, the Token corresponding to the last negative sign is returned.
-fn parse_optional_signs<S>(
+fn parse_optional_signs<S: TexlangState>(
     stream: &mut vm::ExpandedStream<S>,
 ) -> anyhow::Result<Option<token::Token>> {
     let mut result = None;
@@ -122,7 +124,7 @@ fn parse_number_error(token: Option<token::Token>) -> anyhow::Error {
     }
 }
 
-fn read_number_from_variable<S, T: PrimInt>(
+fn read_number_from_variable<S: TexlangState, T: PrimInt>(
     token: token::Token,
     cmd: rc::Rc<variable::Command<S>>,
     stream: &mut vm::ExpandedStream<S>,
@@ -141,7 +143,9 @@ fn read_number_from_variable<S, T: PrimInt>(
     }
 }
 
-fn parse_character<S, T: PrimInt>(stream: &mut vm::ExpandedStream<S>) -> anyhow::Result<T> {
+fn parse_character<S: TexlangState, T: PrimInt>(
+    stream: &mut vm::ExpandedStream<S>,
+) -> anyhow::Result<T> {
     match stream.next()? {
         None => Err(error::EndOfInputError::new(
             "unexpected end of input while parsing a character token",
@@ -159,7 +163,9 @@ fn parse_character<S, T: PrimInt>(stream: &mut vm::ExpandedStream<S>) -> anyhow:
     }
 }
 
-fn parse_octal<S, T: PrimInt>(stream: &mut vm::ExpandedStream<S>) -> anyhow::Result<T> {
+fn parse_octal<S: TexlangState, T: PrimInt>(
+    stream: &mut vm::ExpandedStream<S>,
+) -> anyhow::Result<T> {
     let mut n = num_traits::cast::cast(get_element![
         stream,
         parse_number_error,
@@ -189,7 +195,7 @@ fn parse_octal<S, T: PrimInt>(stream: &mut vm::ExpandedStream<S>) -> anyhow::Res
     Ok(n)
 }
 
-fn parse_decimal<S, T: PrimInt>(
+fn parse_decimal<S: TexlangState, T: PrimInt>(
     stream: &mut vm::ExpandedStream<S>,
     n_start: i8,
 ) -> anyhow::Result<T> {
@@ -212,7 +218,9 @@ fn parse_decimal<S, T: PrimInt>(
     Ok(n)
 }
 
-fn parse_hexadecimal<S, T: PrimInt>(stream: &mut vm::ExpandedStream<S>) -> anyhow::Result<T> {
+fn parse_hexadecimal<S: TexlangState, T: PrimInt>(
+    stream: &mut vm::ExpandedStream<S>,
+) -> anyhow::Result<T> {
     let mut n: T = num_traits::cast::cast(get_element![
         stream,
         parse_number_error,

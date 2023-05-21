@@ -3,8 +3,8 @@
 //! See section 511 of the TeXBook.
 
 use crate::token;
+use crate::traits::*;
 use crate::vm;
-use crate::vm::TokenStream;
 
 /// Representation of a file location in TeX
 #[derive(PartialEq, Eq, Debug)]
@@ -14,7 +14,9 @@ pub struct FileLocation {
     pub area: Option<String>,
 }
 
-pub fn parse_file_location<S>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<FileLocation> {
+pub fn parse_file_location<S: TexlangState>(
+    stream: &mut vm::ExpansionInput<S>,
+) -> anyhow::Result<FileLocation> {
     let mut raw_string = String::new();
     let mut area_delimiter = None;
     let mut ext_delimiter = None;

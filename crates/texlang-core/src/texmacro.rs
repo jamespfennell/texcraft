@@ -51,7 +51,11 @@ pub struct HookInput<'a, S> {
 pub fn no_op_hook<S>(_: HookInput<S>) {}
 
 impl Macro {
-    pub fn call<S>(&self, token: Token, input: &mut vm::ExpansionInput<S>) -> anyhow::Result<()> {
+    pub fn call<S: TexlangState>(
+        &self,
+        token: Token,
+        input: &mut vm::ExpansionInput<S>,
+    ) -> anyhow::Result<()> {
         remove_tokens_from_stream(
             &self.prefix,
             input.unexpanded(),

@@ -153,6 +153,8 @@ mod tests {
         prefix: prefix::Component,
     }
 
+    impl TexlangState for State {}
+
     implement_has_component![
         State,
         (registers::Component<256>, registers),

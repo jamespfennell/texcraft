@@ -194,10 +194,10 @@
 //! In the variables API, we implement this by providing the following type of function:
 //!
 //! ```
-//! use texlang_core::{parse, token, variable, vm};
+//! use texlang_core::{parse, token, traits::*, variable, vm};
 //! use anyhow;
 //!
-//! fn index<S>(token: token::Token, input: &mut vm::ExpandedStream<S>) -> anyhow::Result<variable::Index> {
+//! fn index<S: TexlangState>(token: token::Token, input: &mut vm::ExpandedStream<S>) -> anyhow::Result<variable::Index> {
 //!     let index: usize = parse::parse_number(input)?;
 //!     if index >= 10 {
 //!         // for simplicity we panic, but in real code we should return an error
@@ -422,6 +422,16 @@ impl<S> Command<S> {
         })
     }
 
+    pub(crate) fn getter_key(&self) -> GetterKey {
+        self.getters.key()
+    }
+
+    pub(crate) fn index_resolver(&self) -> &Option<IndexResolver<S>> {
+        &self.index_resolver
+    }
+}
+
+impl<S: TexlangState> Command<S> {
     /// Resolve the command to a variable and return the value of the variable.
     pub fn value<'a>(
         &self,
@@ -444,14 +454,6 @@ impl<S> Command<S> {
     ) -> anyhow::Result<()> {
         self.resolve(token, input.as_mut())?
             .set_value_using_input(input, scope)
-    }
-
-    pub(crate) fn getter_key(&self) -> GetterKey {
-        self.getters.key()
-    }
-
-    pub(crate) fn index_resolver(&self) -> &Option<IndexResolver<S>> {
-        &self.index_resolver
     }
 }
 
@@ -486,7 +488,7 @@ pub enum Variable<S> {
     CatCode(TypedVariable<vm::BaseState<S>, CatCode>),
 }
 
-impl<S> Variable<S> {
+impl<S: TexlangState> Variable<S> {
     /// Return a reference to the value of the variable.
     pub fn value<'a>(&self, input: &'a mut vm::ExpandedStream<S>) -> ValueRef<'a> {
         match self {
@@ -560,6 +562,7 @@ impl<S, T> TypedVariable<S, T> {
 
 impl<S, T> TypedVariable<S, T>
 where
+    S: TexlangState,
     T: Copy + SupportedType,
 {
     /// Returns a mutable reference to the variable's value. This method is used for regular non-base variables.
@@ -601,6 +604,7 @@ where
 
 impl<S, T> TypedVariable<vm::BaseState<S>, T>
 where
+    S: TexlangState,
     T: Copy + SupportedBaseType,
 {
     /// Returns a mutable reference to the base variable's value. This method is used for base variables.

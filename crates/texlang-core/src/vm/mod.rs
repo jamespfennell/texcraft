@@ -53,7 +53,7 @@ pub use streams::*;
 /// | unexpanded expansion command | `\the` in `\noexpand\the` | [unexpanded_expansion_command](Handlers::unexpanded_expansion_command) | do nothing
 ///
 /// Each of the handlers has the same function signature as an execution command.
-pub trait Handlers<S> {
+pub trait Handlers<S: TexlangState> {
     /// Handler to invoke for character tokens.
     ///
     /// This token is _not_ invoked for tokens whose category code is begin group (1), end group (2) or active character (13).
@@ -87,7 +87,7 @@ pub trait Handlers<S> {
 ///
 /// It is assumed that the VM has been preloaded with TeX source code using the
 /// [VM::push_source] method.
-pub fn run<S, H: Handlers<S>>(vm: &mut VM<S>) -> anyhow::Result<()> {
+pub fn run<S: TexlangState, H: Handlers<S>>(vm: &mut VM<S>) -> anyhow::Result<()> {
     let execution_input = ExecutionInput::new(vm);
     loop {
         let token = execution_input.next();
@@ -239,6 +239,24 @@ impl<S> Default for Hooks<S> {
         }
     }
 }
+
+/// Implementations of this trait may be used as the state in a Texlang VM.
+/// 
+/// The most important thing to know about this trait is that it has no required methods.
+/// For any type it can be implemented trivially:
+/// ```
+/// # use texlang_core::traits::TexlangState;
+/// struct SomeNewType;
+/// 
+/// impl TexlangState for SomeNewType {}
+/// ```
+/// 
+/// Methods of the trait are invoked at certain points when the VM is running,
+///     and in general offer a way of customizing the behavior of the VM.
+/// The trait methods are all dispatched statically, which is important for performance.
+pub trait TexlangState {}
+
+impl TexlangState for () {}
 
 impl<S> VM<S> {
     /// Create a new VM.
@@ -516,14 +534,22 @@ impl Ord for TokenBuffer {
 /// - Commands don't necessarily have state: for example, `\def`, `\advance` and `\the`.
 ///     These commands
 ///     are defined without trait bounds on the state, and work automatically with any TeX
-///     software built with Texlang. (Yay!)
+///     software built with Texlang.
 ///
 /// - The easiest way to include a component in the state is to make it a direct field
 ///     of the state.
 ///     In this case the [implement_has_component] macro can be used to easily implement the
 ///     trait.
 ///     The Texlang standard library uses this approach.
-pub trait HasComponent<C> {
+/// 
+/// ## The [TexlangState] requirement
+/// 
+/// This trait requires that the type also implements [TexlangState].
+/// This is only to reduce the number of trait bounds that need to be explicitly
+///     specified when implementing TeX commands.
+/// In general every command needs to have a bound of the form `S: TexlangState`.
+/// Commands that have a `HasComponent` bound don't need to include this other bound explicitly.
+pub trait HasComponent<C>: TexlangState {
     /// Return a immutable reference to the component.
     fn component(&self) -> &C;
 
@@ -543,10 +569,13 @@ pub trait HasComponent<C> {
 /// #   pub struct Component;
 /// # }
 /// # use texlang_core::vm::implement_has_component;
+/// # use texlang_core::traits::*;
 /// #
 /// struct MyState {
 ///     component: mylibrary::Component,
 /// }
+///
+/// impl TexlangState for MyState {}
 ///
 /// implement_has_component![MyState, mylibrary::Component, component];
 /// ```
@@ -561,11 +590,14 @@ pub trait HasComponent<C> {
 /// #   pub struct Component;
 /// # }
 /// # use texlang_core::vm::implement_has_component;
+/// # use texlang_core::traits::*;
 /// #
 /// struct MyState {
 ///     component_1: mylibrary1::Component,
 ///     component_2: mylibrary2::Component,
 /// }
+///
+/// impl TexlangState for MyState {}
 ///
 /// implement_has_component![
 ///     MyState,

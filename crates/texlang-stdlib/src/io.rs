@@ -6,11 +6,11 @@ use texlang_core::traits::*;
 use texlang_core::*;
 
 /// Get the `\input` expansion primitive.
-pub fn get_input<S>() -> command::BuiltIn<S> {
+pub fn get_input<S: TexlangState>() -> command::BuiltIn<S> {
     command::BuiltIn::new_expansion(input_fn)
 }
 
-fn input_fn<S>(
+fn input_fn<S: TexlangState>(
     input_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<token::Token>> {

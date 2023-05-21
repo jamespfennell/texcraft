@@ -178,7 +178,7 @@ fn if_false<S>(_: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
     Ok(false)
 }
 
-fn if_num<S>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
+fn if_num<S: TexlangState>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
     let a: i32 = parse::parse_number(stream)?;
     let r = parse::parse_relation(stream)?;
     let b: i32 = parse::parse_number(stream)?;
@@ -190,7 +190,7 @@ fn if_num<S>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
     })
 }
 
-fn if_odd<S>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
+fn if_odd<S: TexlangState>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
     let n: i32 = parse::parse_number(stream)?;
     Ok((n % 2) == 1)
 }
@@ -417,6 +417,8 @@ mod tests {
         conditional: Component,
         exec: script::Component,
     }
+
+    impl TexlangState for State {}
 
     implement_has_component![State, (Component, conditional), (script::Component, exec),];
 

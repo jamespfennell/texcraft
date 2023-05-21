@@ -306,6 +306,8 @@ mod test {
         exec: script::Component,
     }
 
+    impl TexlangState for State {}
+
     implement_has_component![State, (Component, alloc), (script::Component, exec),];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {

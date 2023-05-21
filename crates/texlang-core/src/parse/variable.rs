@@ -6,7 +6,7 @@ use crate::variable;
 use crate::vm;
 
 /// Parses a variable.
-pub fn parse_variable<S, I: AsMut<vm::ExpandedStream<S>>>(
+pub fn parse_variable<S: TexlangState, I: AsMut<vm::ExpandedStream<S>>>(
     input: &mut I,
 ) -> anyhow::Result<variable::Variable<S>> {
     let input = input.as_mut();

@@ -143,7 +143,7 @@ impl TokenError {
         anyhow::Error::from(self)
     }
 
-    fn add_context<S>(&mut self, execution_input: &vm::ExecutionInput<S>) {
+    fn add_context<S: TexlangState>(&mut self, execution_input: &vm::ExecutionInput<S>) {
         self.traceback_result = Some(execution_input.trace(self.token))
     }
 }
@@ -201,7 +201,10 @@ impl std::fmt::Display for EndOfInputError {
     }
 }
 
-pub fn add_context<S>(error: &mut anyhow::Error, execution_input: &vm::ExecutionInput<S>) {
+pub fn add_context<S: TexlangState>(
+    error: &mut anyhow::Error,
+    execution_input: &vm::ExecutionInput<S>,
+) {
     if let Some(error) = error.downcast_mut::<EndOfInputError>() {
         error.add_context(execution_input);
     }

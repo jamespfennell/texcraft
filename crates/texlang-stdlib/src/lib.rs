@@ -8,8 +8,8 @@ extern crate texlang_core;
 use std::collections::HashMap;
 
 use texlang_core::token::catcode::CatCodeMap;
-use texlang_core::vm;
 use texlang_core::vm::implement_has_component;
+use texlang_core::vm::{self, TexlangState};
 
 pub mod alias;
 pub mod alloc;
@@ -42,6 +42,8 @@ pub struct StdLibState {
     time: time::Component,
     tracing_macros: tracingmacros::Component,
 }
+
+impl TexlangState for StdLibState {}
 
 /// Hooks returns the standard library's hooks.
 pub fn hooks<S>() -> vm::Hooks<S>

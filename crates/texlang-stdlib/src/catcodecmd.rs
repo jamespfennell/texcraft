@@ -1,12 +1,13 @@
 //! The `\catcode` primitive
 
 use texlang_core::token::catcode;
+use texlang_core::traits::*;
 use texlang_core::*;
 
 pub const CATCODE_DOC: &str = "Get or set a catcode register";
 
 /// Get the `\catcode` command.
-pub fn get_catcode<S>() -> command::BuiltIn<S> {
+pub fn get_catcode<S: TexlangState>() -> command::BuiltIn<S> {
     variable::Command::new_base(
         |state: &vm::BaseState<S>, index: variable::Index| -> &catcode::CatCode {
             let index = char::from_u32(index.0.try_into().unwrap()).unwrap();

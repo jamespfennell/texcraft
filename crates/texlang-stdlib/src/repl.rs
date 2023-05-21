@@ -106,7 +106,7 @@ pub fn get_help<S>() -> command::BuiltIn<S> {
 /// Get the `\doc` command.
 ///
 /// This prints the documentation for a TeX command.
-pub fn get_doc<S>() -> command::BuiltIn<S> {
+pub fn get_doc<S: TexlangState>() -> command::BuiltIn<S> {
     command::BuiltIn::new_expansion(
         |token: token::Token,
          input: &mut vm::ExpansionInput<S>|

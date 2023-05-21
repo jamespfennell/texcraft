@@ -263,7 +263,7 @@ fn process_prefixes<S: HasComponent<Component>>(
     }
 }
 
-fn complete_prefix<S>(
+fn complete_prefix<S: TexlangState>(
     prefix: &mut Prefix,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
@@ -301,7 +301,7 @@ fn complete_prefix<S>(
     complete_prefix(prefix, input)
 }
 
-fn assert_only_global_prefix<S>(
+fn assert_only_global_prefix<S: TexlangState>(
     token: token::Token,
     prefix: Prefix,
     input: &vm::ExecutionInput<S>,
@@ -437,6 +437,8 @@ mod test {
         prefix: Component,
         integer: i32,
     }
+
+    impl TexlangState for State {}
 
     implement_has_component![State, (script::Component, exec), (Component, prefix),];
 

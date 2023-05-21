@@ -8,11 +8,11 @@ use texlang_core::*;
 pub const THE_DOC: &str = "Output text describing some inputted tokens";
 
 /// Get the `\the` expansion primitive.
-pub fn get_the<S>() -> command::BuiltIn<S> {
+pub fn get_the<S: TexlangState>() -> command::BuiltIn<S> {
     command::BuiltIn::new_expansion(the_primitive_fn)
 }
 
-fn the_primitive_fn<S>(
+fn the_primitive_fn<S: TexlangState>(
     the_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<token::Token>> {

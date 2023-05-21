@@ -22,10 +22,12 @@ pub use variable::parse_variable;
 
 use crate::error;
 use crate::token;
+use crate::traits::*;
 use crate::vm;
-use crate::vm::TokenStream;
 
-pub fn parse_optional_space<S>(input: &mut vm::ExpansionInput<S>) -> anyhow::Result<()> {
+pub fn parse_optional_space<S: TexlangState>(
+    input: &mut vm::ExpansionInput<S>,
+) -> anyhow::Result<()> {
     get_optional_element![input, token::Value::Space(_) => (),];
     Ok(())
 }

@@ -5,6 +5,7 @@ use crate::variable;
 use crate::vm;
 
 use super::BaseState;
+use super::TexlangState;
 
 /// A stream of tokens generated on demand.
 ///
@@ -109,7 +110,7 @@ impl<S> std::convert::AsMut<ExpandedStream<S>> for ExpandedStream<S> {
     }
 }
 
-impl<S> ExpandedStream<S> {
+impl<S: TexlangState> ExpandedStream<S> {
     /// Returns the underlying unexpanded stream.
     pub fn unexpanded(&mut self) -> &mut UnexpandedStream<S> {
         &mut self.0
@@ -124,7 +125,7 @@ impl<S> ExpandedStream<S> {
     }
 }
 
-impl<S> TokenStream for ExpandedStream<S> {
+impl<S: TexlangState> TokenStream for ExpandedStream<S> {
     type S = S;
 
     #[inline]
@@ -204,7 +205,7 @@ impl<S> std::convert::AsMut<ExpandedStream<S>> for ExpansionInput<S> {
     }
 }
 
-impl<S> TokenStream for ExpansionInput<S> {
+impl<S: TexlangState> TokenStream for ExpansionInput<S> {
     type S = S;
 
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
@@ -341,7 +342,7 @@ impl<S> std::convert::AsMut<ExpandedStream<S>> for ExecutionInput<S> {
     }
 }
 
-impl<S> TokenStream for ExecutionInput<S> {
+impl<S: TexlangState> TokenStream for ExecutionInput<S> {
     type S = S;
 
     fn next(&mut self) -> anyhow::Result<Option<Token>> {
@@ -466,7 +467,7 @@ mod stream {
         }
     }
 
-    pub fn next_expanded<S>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<Token>> {
+    pub fn next_expanded<S: TexlangState>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<Token>> {
         let (token, command) = match next_unexpanded(vm)? {
             None => return Ok(None),
             Some(token) => match token.value() {
@@ -496,7 +497,7 @@ mod stream {
         }
     }
 
-    pub fn peek_expanded<S>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<&Token>> {
+    pub fn peek_expanded<S: TexlangState>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<&Token>> {
         let (token, command) = match peek_unexpanded(vm)? {
             None => return Ok(None),
             Some(token) => match token.value() {
@@ -534,7 +535,7 @@ mod stream {
         }
     }
 
-    pub fn expand_once<S>(vm: &mut vm::VM<S>) -> anyhow::Result<bool> {
+    pub fn expand_once<S: TexlangState>(vm: &mut vm::VM<S>) -> anyhow::Result<bool> {
         let (token, command) = match peek_unexpanded(vm)? {
             None => return Ok(false),
             Some(token) => match token.value() {

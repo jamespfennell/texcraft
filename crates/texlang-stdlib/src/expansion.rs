@@ -45,7 +45,7 @@ pub fn noexpand_hook<S>(
 ///
 /// This is the simplest implementation of the command, and the
 ///     same implementation as in the original TeX.
-pub fn get_expandafter_simple<S>() -> command::BuiltIn<S> {
+pub fn get_expandafter_simple<S: TexlangState>() -> command::BuiltIn<S> {
     command::BuiltIn::new_expansion(expandafter_simple_fn)
 }
 
@@ -92,11 +92,11 @@ pub fn get_expandafter_simple<S>() -> command::BuiltIn<S> {
 ///     without yielding control to the main expansion loop.
 /// If, after this pass, the leading token is again an `\expandafter` token, it will be expanded too.
 /// This process continues repeatedly until no `\expandafter` tokens are left at the start of the token stream.
-pub fn get_expandafter_optimized<S>() -> command::BuiltIn<S> {
+pub fn get_expandafter_optimized<S: TexlangState>() -> command::BuiltIn<S> {
     command::BuiltIn::new_expansion(expandafter_optimized_fn)
 }
 
-fn expandafter_simple_fn<S>(
+fn expandafter_simple_fn<S: TexlangState>(
     expandafter_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<token::Token>> {
@@ -117,7 +117,7 @@ fn expandafter_simple_fn<S>(
     Ok(vec![])
 }
 
-fn expandafter_optimized_fn<S>(
+fn expandafter_optimized_fn<S: TexlangState>(
     expandafter_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<token::Token>> {
