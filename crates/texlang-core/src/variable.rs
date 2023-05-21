@@ -268,17 +268,16 @@
 //! | Glue      | TBD            | `\skip`                  | Not implemented
 //! | Muglue    | TBD            | `\muskip`                | Not implemented
 //! | Box       | TBD            | `\box` and `\setbox`     | Not implemented
-//! | Category code  | [CatCode](super::token::catcode::CatCode) | `\catcode` | Implemented
+//! | Category code  | [CatCode](super::token::CatCode) | `\catcode` | Implemented
 //! | Math code | TBD            | `\mathcode`              | Not implemented
 //! | Delimiter code | TBD       | `\delcode`               | Not implemented
 //! | Space factor code | TBD    | `\sfcode`                | Not implemented
 //! | Token list | TBD, but presumably a [Vec] of [Tokens](super::token::Token)    | `\toks`                | Not implemented
 //!
 
-use crate::token::catcode::CatCode;
 use crate::traits::*;
 use crate::vm;
-use crate::{parse, token};
+use crate::{parse, token, token::CatCode};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use texcraft_stdext::collections::groupingmap;

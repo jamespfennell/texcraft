@@ -1,8 +1,8 @@
 //! The `\catcode` primitive
 
 use std::collections::HashMap;
-use texlang_core::token::catcode;
-use texlang_core::token::catcode::CatCode;
+use texlang_core::token;
+use texlang_core::token::CatCode;
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -33,7 +33,7 @@ impl Component {
 impl Default for Component {
     fn default() -> Self {
         Self {
-            low: catcode::CatCode::PLAIN_TEX_DEFAULTS,
+            low: CatCode::PLAIN_TEX_DEFAULTS,
             high: Default::default(),
             default: Default::default(),
         }
@@ -41,7 +41,7 @@ impl Default for Component {
 }
 
 #[inline]
-pub fn cat_code<S: HasComponent<Component>>(state: &S, c: char) -> catcode::CatCode {
+pub fn cat_code<S: HasComponent<Component>>(state: &S, c: char) -> CatCode {
     *state.component().get(c as usize)
 }
 
@@ -50,8 +50,8 @@ pub const CATCODE_DOC: &str = "Get or set a catcode register";
 /// Get the `\catcode` command.
 pub fn get_catcode<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     variable::Command::new_array(
-        |state: &S, index: variable::Index| -> &catcode::CatCode { state.component().get(index.0) },
-        |state: &mut S, index: variable::Index| -> &mut catcode::CatCode {
+        |state: &S, index: variable::Index| -> &CatCode { state.component().get(index.0) },
+        |state: &mut S, index: variable::Index| -> &mut CatCode {
             state.component_mut().get_mut(index.0)
         },
         variable::IndexResolver::Dynamic(

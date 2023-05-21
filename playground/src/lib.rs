@@ -9,7 +9,7 @@ use texlang_core::traits::*;
 use texlang_core::*;
 use texlang_stdlib::alias;
 use texlang_stdlib::alloc;
-use texlang_stdlib::catcodecmd;
+use texlang_stdlib::catcode;
 use texlang_stdlib::conditional;
 use texlang_stdlib::def;
 use texlang_stdlib::math;
@@ -47,7 +47,7 @@ pub fn run(
 
 struct PlaygroundState {
     alloc: alloc::Component,
-    catcode: catcodecmd::Component,
+    catcode: catcode::Component,
     conditional: conditional::Component,
     prefix: prefix::Component,
     registers: registers::Component<256>,
@@ -60,7 +60,7 @@ impl TexlangState for PlaygroundState {}
 implement_has_component![
     PlaygroundState,
     (alloc::Component, alloc),
-    (catcodecmd::Component, catcode),
+    (catcode::Component, catcode),
     (conditional::Component, conditional),
     (prefix::Component, prefix),
     (registers::Component<256>, registers),
@@ -77,7 +77,7 @@ fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::V
         //
         ("advance", math::get_advance()),
         //
-        ("catcode", catcodecmd::get_catcode()),
+        ("catcode", catcode::get_catcode()),
         ("count", registers::get_count()),
         ("countdef", registers::get_countdef()),
         //

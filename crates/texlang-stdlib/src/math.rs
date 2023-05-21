@@ -139,7 +139,7 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::catcodecmd;
+    use crate::catcode;
     use crate::registers;
     use crate::script;
     use crate::testing::*;
@@ -148,7 +148,7 @@ mod tests {
 
     #[derive(Default)]
     struct State {
-        catcode: catcodecmd::Component,
+        catcode: catcode::Component,
         prefix: prefix::Component,
         registers: registers::Component<256>,
         script: script::Component,
@@ -158,7 +158,7 @@ mod tests {
 
     implement_has_component![
         State,
-        (catcodecmd::Component, catcode),
+        (catcode::Component, catcode),
         (prefix::Component, prefix),
         (registers::Component<256>, registers),
         (script::Component, script),
@@ -172,7 +172,7 @@ mod tests {
             ("multiplychk", get_multiplychk()),
             ("divide", get_divide()),
             //
-            ("catcode", catcodecmd::get_catcode()),
+            ("catcode", catcode::get_catcode()),
             ("count", registers::get_count()),
             ("global", prefix::get_global()),
             ("the", the::get_the()),

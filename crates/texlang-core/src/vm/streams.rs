@@ -424,7 +424,7 @@ mod stream {
 
     impl<T: TexlangState> CatCodeFn for T {
         #[inline]
-        fn cat_code(&self, c: char) -> crate::token::catcode::CatCode {
+        fn cat_code(&self, c: char) -> crate::token::CatCode {
             self.cat_code(c)
         }
     }

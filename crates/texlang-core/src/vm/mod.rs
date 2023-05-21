@@ -12,8 +12,6 @@ use crate::command::Command;
 use crate::error;
 use crate::texmacro;
 use crate::token;
-use crate::token::catcode;
-use crate::token::catcode::CatCode;
 use crate::token::lexer;
 use crate::token::trace;
 use crate::token::CsNameInterner;
@@ -254,8 +252,8 @@ pub trait TexlangState {
     /// Get the cat code for the provided character.
     ///
     /// The default implementation returns the cat code used in plainTeX.
-    fn cat_code(&self, c: char) -> CatCode {
-        catcode::CatCode::PLAIN_TEX_DEFAULTS
+    fn cat_code(&self, c: char) -> token::CatCode {
+        token::CatCode::PLAIN_TEX_DEFAULTS
             .get(c as usize)
             .copied()
             .unwrap_or_default()

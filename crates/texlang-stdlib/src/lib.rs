@@ -13,7 +13,7 @@ use texlang_core::vm::implement_has_component;
 
 pub mod alias;
 pub mod alloc;
-pub mod catcodecmd;
+pub mod catcode;
 pub mod conditional;
 pub mod def;
 pub mod expansion;
@@ -35,7 +35,7 @@ pub mod tracingmacros;
 #[derive(Default)]
 pub struct StdLibState {
     alloc: alloc::Component,
-    catcode: catcodecmd::Component,
+    catcode: catcode::Component,
     conditional: conditional::Component,
     prefix: prefix::Component,
     registers: registers::Component<32768>,
@@ -46,15 +46,15 @@ pub struct StdLibState {
 
 impl TexlangState for StdLibState {
     #[inline]
-    fn cat_code(&self, c: char) -> texlang_core::token::catcode::CatCode {
-        catcodecmd::cat_code(self, c)
+    fn cat_code(&self, c: char) -> texlang_core::token::CatCode {
+        catcode::cat_code(self, c)
     }
 }
 
 /// Hooks returns the standard library's hooks.
 pub fn hooks<S>() -> vm::Hooks<S>
 where
-    S: vm::HasComponent<tracingmacros::Component> + vm::HasComponent<catcodecmd::Component>,
+    S: vm::HasComponent<tracingmacros::Component> + vm::HasComponent<catcode::Component>,
 {
     vm::Hooks {
         post_macro_expansion_hook: tracingmacros::hook,
@@ -68,7 +68,7 @@ impl StdLibState {
         HashMap::from([
             ("advance", math::get_advance()),
             //
-            ("catcode", catcodecmd::get_catcode()),
+            ("catcode", catcode::get_catcode()),
             ("count", registers::get_count()),
             ("countdef", registers::get_countdef()),
             //
@@ -128,7 +128,7 @@ impl StdLibState {
 implement_has_component![
     StdLibState,
     (alloc::Component, alloc),
-    (catcodecmd::Component, catcode),
+    (catcode::Component, catcode),
     (conditional::Component, conditional),
     (prefix::Component, prefix),
     (registers::Component<32768>, registers),

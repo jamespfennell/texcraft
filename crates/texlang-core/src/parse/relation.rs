@@ -42,7 +42,7 @@ fn parse_relation_error(token: Option<token::Token>) -> anyhow::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::token::catcode;
+    use crate::token;
     use std::collections::HashMap;
 
     macro_rules! relation_success_tests {
@@ -73,11 +73,11 @@ mod tests {
     struct State;
 
     impl TexlangState for State {
-        fn cat_code(&self, c: char) -> catcode::CatCode {
+        fn cat_code(&self, c: char) -> token::CatCode {
             if c == '<' {
-                return catcode::CatCode::Letter;
+                return token::CatCode::Letter;
             }
-            catcode::CatCode::PLAIN_TEX_DEFAULTS
+            token::CatCode::PLAIN_TEX_DEFAULTS
                 .get(c as usize)
                 .copied()
                 .unwrap_or_default()

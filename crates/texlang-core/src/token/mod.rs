@@ -1,10 +1,10 @@
 //! TeX tokens and category codes.
 
-pub mod catcode;
+mod catcode;
 pub(crate) mod lexer;
 pub mod trace;
+pub use catcode::CatCode;
 
-use crate::token::catcode::CatCode;
 use std::num;
 use texcraft_stdext::collections::interner;
 

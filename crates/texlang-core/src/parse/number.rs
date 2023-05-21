@@ -1,7 +1,5 @@
 use std::rc;
 
-use crate::token::catcode;
-use crate::token::catcode::CatCode;
 use crate::token::Value;
 use crate::traits::*;
 use crate::variable;
@@ -64,16 +62,16 @@ fn parse_number_internal<S: TexlangState, T: PrimInt>(
 #[inline]
 pub fn parse_catcode<S: TexlangState, I: AsMut<vm::ExpandedStream<S>>>(
     stream: &mut I,
-) -> anyhow::Result<catcode::CatCode> {
+) -> anyhow::Result<token::CatCode> {
     parse_catcode_internal(stream.as_mut())
 }
 
 fn parse_catcode_internal<S: TexlangState>(
     stream: &mut vm::ExpandedStream<S>,
-) -> anyhow::Result<catcode::CatCode> {
+) -> anyhow::Result<token::CatCode> {
     let val: usize = parse_number_internal(stream)?;
     if let Ok(val_u8) = u8::try_from(val) {
-        if let Ok(cat_code) = CatCode::try_from(val_u8) {
+        if let Ok(cat_code) = token::CatCode::try_from(val_u8) {
             return Ok(cat_code);
         }
     }
@@ -292,7 +290,6 @@ mod tests {
 
     use super::*;
     use crate::parse::testing;
-    use crate::token::catcode;
 
     macro_rules! parse_number_tests {
         ($( ($name: ident, $input: expr, $number: expr),)+) => {
@@ -391,11 +388,11 @@ mod tests {
     struct State;
 
     impl TexlangState for State {
-        fn cat_code(&self, c: char) -> CatCode {
+        fn cat_code(&self, c: char) -> token::CatCode {
             if c == '1' {
-                return catcode::CatCode::Letter;
+                return token::CatCode::Letter;
             }
-            catcode::CatCode::PLAIN_TEX_DEFAULTS
+            token::CatCode::PLAIN_TEX_DEFAULTS
                 .get(c as usize)
                 .copied()
                 .unwrap_or_default()
