@@ -1,6 +1,7 @@
 use std::rc;
 
 use crate::token::catcode;
+use crate::token::catcode::CatCode;
 use crate::token::Value;
 use crate::traits::*;
 use crate::variable;
@@ -70,7 +71,7 @@ fn parse_catcode_internal<S>(
 ) -> anyhow::Result<catcode::CatCode> {
     let val: usize = parse_number_internal(stream)?;
     if let Ok(val_u8) = u8::try_from(val) {
-        if let Some(cat_code) = catcode::CatCode::from_int(val_u8) {
+        if let Ok(cat_code) = CatCode::try_from(val_u8) {
             return Ok(cat_code);
         }
     }
@@ -135,7 +136,7 @@ fn read_number_from_variable<S, T: PrimInt>(
             // This will always work because cat codes are between 0 and 15 inclusive and can
             // fit in any integral type.
             // TODO: implement From on catcode directly
-            Ok(num_traits::cast::cast(c.int()).unwrap())
+            Ok(num_traits::cast::cast(*c as u8).unwrap())
         }
     }
 }

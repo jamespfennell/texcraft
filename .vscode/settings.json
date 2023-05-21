@@ -5,6 +5,7 @@
         "countdef",
         "expandafter",
         "groupingmap",
+        "INITEX",
         "Interner",
         "lastpenalty",
         "linepenalty",

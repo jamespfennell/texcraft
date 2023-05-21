@@ -30,7 +30,7 @@ fn the_primitive_fn<S>(
             {
                 match cmd.clone().value(the_token, input.as_mut())? {
                     variable::ValueRef::Int(i) => int_to_tokens(the_token, *i),
-                    variable::ValueRef::CatCode(i) => int_to_tokens(the_token, i.int().into()),
+                    variable::ValueRef::CatCode(i) => int_to_tokens(the_token, (*i as u8).into()),
                 }
             } else {
                 // TODO: push straight onto the expansions stack?

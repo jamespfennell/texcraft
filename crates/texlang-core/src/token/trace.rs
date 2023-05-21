@@ -1,17 +1,16 @@
-//! Token tracing system.
+//! Tracing system for determining the origin of a token.
 //!
 //! This module implements a [Tracer] for tokens.
-//! When building helpful error messages we need to know where tokens involved in the error came from.
+//! When building helpful error messages we need to know the origin of tokens - 
+//!     e.g., the file and line they came from.
 //! The tracing functionality here enables obtaining this information in the form of a [Trace].
 //!
-//! Rather than a custom system,
+//! Rather than the custom system here,
 //!     a simpler solution would be to include this information on the token itself.
 //! The token could include a line position number and a reference
 //!     counting pointer to some data structure containing information about the line.
-//! The initial tracing system for Texlang did exactly this.
 //! The problem with this solution is that it makes the [Token] type very large, and
 //!     this causes unacceptably poor performance in Texlang's tight inner loops.
-//!
 //! With the tracer here, each token only needs to hold onto a 32-bit [Key] which is enough
 //!     to perform a full trace.
 //!
@@ -21,18 +20,19 @@
 //!     [register_source_code](Tracer::register_source_code) method.
 //! The tracer allocates a contiguous range of [Keys](Key) that is large enough
 //!     to give each UTF-8 character in the input a unique key.
-//! These keys are returned using the opaque [KeyRange] type, which enables the caller to generate
+//! These keys are returned using the opaque [KeyRange] type, which enables the caller to retrieve
 //!     these keys.
 //! It is assumed that the caller will assign keys in order to each UTF-8 character in the source code.
-//! As well as returning the range, the tracer associates this key range with the source code in an
+//! 
+//! In addition to returning the range, the tracer associates the key range with the source code in an
 //!     internal data structure.
 //!
-//! Then, when tracing a token (using [trace](Tracer::trace)), the token's key is used to identify
+//! When tracing a token (using [trace](Tracer::trace)), the token's key is used to identify
 //!     which key range the key came from.
 //! This key range is then used to identify the source code associated to the token.
 //! The difference between the token's key and the first key for the source code is the UTF-8 offset
 //!     into the source code.
-//! Thus we can uniquely identify the UTF-8 character the key is a associated to.
+//! Thus we can uniquely identify the UTF-8 character the token is a associated to.
 use crate::token::{CsNameInterner, Token, Value};
 use colored::*;
 use std::collections::BTreeMap;

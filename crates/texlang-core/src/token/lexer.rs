@@ -3,7 +3,7 @@
 //! Because of restrictions of the TeX language itself, the lexer is "just in time". It only
 //! produces the next token when that token is requested. In general, it is an error to request
 //! many TeX tokens and process them as batch. This is because lexing in TeX is controlled by
-//! catcodes which can dynamically change at runtime based on the results of the lexer. Let's
+//! cat codes which can dynamically change at runtime based on the results of the lexer. Let's
 //! consider a TeX snippet and assume that the catcode mappings are at their default:
 //! ```tex
 //! \change_catcode_of_A_to_whitespace AB
@@ -143,7 +143,7 @@ impl Lexer {
         self.buffer.clear();
         match self.raw_lexer.next(cat_code_map) {
             None => {
-                // TODO: this should be an end of input errro
+                // TODO: this should be an end of input error
                 return Err(LexerError::MalformedControlSequence(
                     error::TokenError::new(
                         token::Token::new_other(raw_token.char, raw_token.trace_key),
@@ -174,10 +174,6 @@ impl Lexer {
             }
         };
         Ok(cs_name_interner.get_or_intern(&self.buffer))
-    }
-
-    pub fn source_code(&self) -> &str {
-        self.raw_lexer.iter.str()
     }
 }
 

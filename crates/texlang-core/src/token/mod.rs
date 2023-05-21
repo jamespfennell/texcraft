@@ -1,14 +1,14 @@
-//! TeX tokens, cat codes and token streams; and the Texcraft lexer.
+//! TeX tokens and category codes.
 
 pub mod catcode;
-pub mod lexer;
+pub (crate) mod lexer;
 pub mod trace;
 
 use crate::token::catcode::CatCode;
 use std::num;
 use texcraft_stdext::collections::interner;
 
-/// Immutable string type used for storing control sequence names.
+/// String type used to represent control sequence names in Texlang.
 ///
 /// The implementation of this type is opaque so that it can be performance optimized
 /// without worrying about downstream consumers.
@@ -30,6 +30,7 @@ impl CsName {
     }
 }
 
+/// String interner for control sequence names.
 pub type CsNameInterner = interner::Interner<CsName>;
 
 impl interner::Key for CsName {
@@ -42,6 +43,7 @@ impl interner::Key for CsName {
     }
 }
 
+/// The value of a token.
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum Value {
     BeginGroup(char),
@@ -77,6 +79,7 @@ impl Value {
     }
 }
 
+/// A TeX token.
 #[derive(Debug, Eq, Clone, Copy)]
 pub struct Token {
     value: Value,
