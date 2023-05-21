@@ -9,11 +9,7 @@ pub fn run_in_texcraft(input: &str) {
     let mut initial_built_ins = StdLibState::all_initial_built_ins();
     initial_built_ins.insert("par", script::get_par());
     initial_built_ins.insert("end", script::get_newline());
-    let mut vm = VM::<StdLibState>::new(
-        initial_built_ins,
-        Default::default(),
-        texlang_stdlib::hooks(),
-    );
+    let mut vm = VM::<StdLibState>::new(initial_built_ins, Default::default());
     vm.push_source("".to_string(), input.to_string()).unwrap();
     script::run(&mut vm).unwrap();
 }

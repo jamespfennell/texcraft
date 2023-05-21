@@ -12,6 +12,7 @@ use texlang_stdlib::alloc;
 use texlang_stdlib::catcode;
 use texlang_stdlib::conditional;
 use texlang_stdlib::def;
+use texlang_stdlib::expansion;
 use texlang_stdlib::math;
 use texlang_stdlib::prefix;
 use texlang_stdlib::registers;
@@ -55,7 +56,19 @@ struct PlaygroundState {
     time: time::Component,
 }
 
-impl TexlangState for PlaygroundState {}
+impl TexlangState for PlaygroundState {
+    fn cat_code(&self, c: char) -> texlang_core::token::CatCode {
+        catcode::cat_code(self, c)
+    }
+
+    fn expansion_override_hook(
+        token: texlang_core::token::Token,
+        input: &mut vm::ExpansionInput<Self>,
+        tag: Option<texlang_core::command::Tag>,
+    ) -> anyhow::Result<Option<texlang_core::token::Token>> {
+        expansion::noexpand_hook(token, input, tag)
+    }
+}
 
 implement_has_component![
     PlaygroundState,
@@ -127,6 +140,5 @@ fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::V
             script: Default::default(),
             time: time::Component::new_with_values(minutes_since_midnight, day, month, year),
         },
-        Default::default(),
     )
 }

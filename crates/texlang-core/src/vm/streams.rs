@@ -495,7 +495,7 @@ mod stream {
                 let command = *command;
                 let tag = *tag;
                 if let Some(override_expansion) =
-                    (vm.hooks().expansion_override_hook)(token, ExpansionInput::new(vm), tag)?
+                    S::expansion_override_hook(token, ExpansionInput::new(vm), tag)?
                 {
                     return Ok(Some(override_expansion));
                 }
@@ -530,7 +530,7 @@ mod stream {
                 let tag = *tag;
                 consume_peek(vm);
                 if let Some(override_expansion) =
-                    (vm.hooks().expansion_override_hook)(token, ExpansionInput::new(vm), tag)?
+                    S::expansion_override_hook(token, ExpansionInput::new(vm), tag)?
                 {
                     vm.internal.expansions_mut().push(override_expansion);
                     return Ok(vm.internal.expansions().last());
@@ -568,7 +568,7 @@ mod stream {
                 let tag = *tag;
                 consume_peek(vm);
                 if let Some(override_expansion) =
-                    (vm.hooks().expansion_override_hook)(token, ExpansionInput::new(vm), tag)?
+                    S::expansion_override_hook(token, ExpansionInput::new(vm), tag)?
                 {
                     vm.internal.expansions_mut().push(override_expansion);
                     return Ok(true);

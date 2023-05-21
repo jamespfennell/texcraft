@@ -49,16 +49,25 @@ impl TexlangState for StdLibState {
     fn cat_code(&self, c: char) -> texlang_core::token::CatCode {
         catcode::cat_code(self, c)
     }
-}
 
-/// Hooks returns the standard library's hooks.
-pub fn hooks<S>() -> vm::Hooks<S>
-where
-    S: vm::HasComponent<tracingmacros::Component> + vm::HasComponent<catcode::Component>,
-{
-    vm::Hooks {
-        post_macro_expansion_hook: tracingmacros::hook,
-        expansion_override_hook: expansion::noexpand_hook,
+    #[inline]
+    fn post_macro_expansion_hook(
+        token: texlang_core::token::Token,
+        input: &vm::ExpansionInput<Self>,
+        tex_macro: &texlang_core::texmacro::Macro,
+        arguments: &[&[texlang_core::token::Token]],
+        reversed_expansion: &[texlang_core::token::Token],
+    ) {
+        tracingmacros::hook(token, input, tex_macro, arguments, reversed_expansion)
+    }
+
+    #[inline]
+    fn expansion_override_hook(
+        token: texlang_core::token::Token,
+        input: &mut vm::ExpansionInput<Self>,
+        tag: Option<texlang_core::command::Tag>,
+    ) -> anyhow::Result<Option<texlang_core::token::Token>> {
+        expansion::noexpand_hook(token, input, tag)
     }
 }
 
@@ -117,11 +126,7 @@ impl StdLibState {
     }
 
     pub fn new() -> vm::VM<StdLibState> {
-        vm::VM::<StdLibState>::new(
-            StdLibState::all_initial_built_ins(),
-            Default::default(),
-            hooks(),
-        )
+        vm::VM::<StdLibState>::new(StdLibState::all_initial_built_ins(), Default::default())
     }
 }
 

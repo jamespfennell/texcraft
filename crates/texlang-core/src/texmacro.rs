@@ -86,7 +86,7 @@ impl Macro {
 
         // To keep the borrow checker happy we need to downgrade result to a shared reference.
         let result = input.expansions();
-        (input.vm().hooks().post_macro_expansion_hook)(
+        S::post_macro_expansion_hook(
             token,
             input,
             self,

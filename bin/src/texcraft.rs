@@ -169,11 +169,7 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
 }
 
 fn new_vm() -> vm::VM<StdLibState> {
-    vm::VM::<StdLibState>::new(
-        initial_built_ins(),
-        Default::default(),
-        texlang_stdlib::hooks(),
-    )
+    vm::VM::<StdLibState>::new(initial_built_ins(), Default::default())
 }
 
 fn new_repl_vm() -> vm::VM<StdLibState> {
@@ -183,7 +179,7 @@ fn new_repl_vm() -> vm::VM<StdLibState> {
     m.insert("exit", repl::get_exit());
     m.insert("quit", repl::get_exit());
     m.insert("q", repl::get_exit());
-    vm::VM::<StdLibState>::new(m, Default::default(), texlang_stdlib::hooks())
+    vm::VM::<StdLibState>::new(m, Default::default())
 }
 
 fn initial_built_ins() -> HashMap<&'static str, command::BuiltIn<StdLibState>> {

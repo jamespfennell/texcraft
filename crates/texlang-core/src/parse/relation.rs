@@ -53,7 +53,6 @@ mod tests {
                 let mut vm = vm::VM::<()>::new(
                     HashMap::new(),
                     (),
-                    Default::default(),
                 );
                 vm.push_source("".to_string(), $input.to_string()).unwrap();
                 let input = vm::ExecutionInput::new(&mut vm);
@@ -89,7 +88,7 @@ mod tests {
             $(
             #[test]
             fn $name() {
-                let mut vm = vm::VM::<State>::new(HashMap::new(), State{}, Default::default());
+                let mut vm = vm::VM::<State>::new(HashMap::new(), State{});
                 vm.push_source("".to_string(), $input.to_string()).unwrap();
                 let input = vm::ExecutionInput::new(&mut vm);
                 let result = parse_relation(input);

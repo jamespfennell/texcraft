@@ -27,8 +27,8 @@ use texlang_core::vm::VM;
 /// other pieces in the state, it is easier to use this type rather than defining a custom one.
 #[derive(Default)]
 pub struct State {
-    exec: script::Component,
     prefix: prefix::Component,
+    script: script::Component,
     integer: i32,
 }
 
@@ -36,8 +36,8 @@ impl TexlangState for State {}
 
 implement_has_component![
     State,
-    (script::Component, exec),
     (prefix::Component, prefix),
+    (script::Component, script),
 ];
 
 impl State {
@@ -61,11 +61,6 @@ pub enum TestOption<'a, S> {
     ///
     /// Overrides previous `InitialCommands` or `InitialCommandsDyn` options.
     InitialCommandsDyn(Box<dyn Fn() -> HashMap<&'static str, command::BuiltIn<S>> + 'a>),
-
-    /// The VM hooks to use.
-    ///
-    /// Overrides previous `Hooks` options.
-    Hooks(fn() -> vm::Hooks<S>),
 
     /// The provided static function is invoked after the VM is created and before execution starts.
     /// This can be used to provide more custom VM initialization.
@@ -171,19 +166,17 @@ where
 {
     let mut initial_commands: &dyn Fn() -> HashMap<&'static str, command::BuiltIn<S>> =
         &HashMap::new;
-    let mut hooks: &dyn Fn() -> vm::Hooks<S> = &Default::default;
     let mut custom_vm_initialization: &dyn Fn(&mut VM<S>) = &|_| {};
     for option in options {
         match option {
             TestOption::InitialCommands(f) => initial_commands = f,
             TestOption::InitialCommandsDyn(f) => initial_commands = f,
-            TestOption::Hooks(f) => hooks = f,
             TestOption::CustomVMInitialization(f) => custom_vm_initialization = f,
             TestOption::CustomVMInitializationDyn(f) => custom_vm_initialization = f,
         }
     }
 
-    let mut vm = VM::<S>::new((initial_commands)(), Default::default(), hooks());
+    let mut vm = VM::<S>::new((initial_commands)(), Default::default());
     (custom_vm_initialization)(&mut vm);
     vm.push_source("testing.tex".to_string(), source.to_string())
         .unwrap();
@@ -206,7 +199,6 @@ where
 /// let mut vm = vm::VM::<State>::new(
 ///     Default::default(),  // initial commands
 ///     Default::default(),  // initial state
-///     Default::default(),  // hooks
 /// );
 /// let mock_file_system_ops: InMemoryFileSystem = Default::default();
 /// vm.file_system_ops = Box::new(mock_file_system_ops);

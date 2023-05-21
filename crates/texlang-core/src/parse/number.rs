@@ -401,7 +401,7 @@ mod tests {
 
     #[test]
     fn number_with_letter_catcode() {
-        let mut vm = vm::VM::<State>::new(HashMap::new(), State {}, Default::default());
+        let mut vm = vm::VM::<State>::new(HashMap::new(), State {});
         vm.push_source("".to_string(), r"1".to_string()).unwrap();
         let input = crate::vm::ExecutionInput::new(&mut vm);
         let result: anyhow::Result<i32> = parse_number(input);

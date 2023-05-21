@@ -16,19 +16,32 @@ fn noexpand_fn<S>(
 ) -> anyhow::Result<Vec<token::Token>> {
     panic!(
         "The \\noexpand expansion function is never invoked directly. \
-         Instead, the primitive operates through the \\noexpand hook. \
+         Instead, the primitive operates through the \\noexpand hook, \
+         which is a method on the `TexlangState` trait. \
          Ensure your Texcraft VM is configured to use this hook."
     )
 }
 
+#[inline]
 pub fn noexpand_hook<S: TexlangState>(
     token: token::Token,
     input: &mut vm::ExpansionInput<S>,
     tag: Option<command::Tag>,
 ) -> anyhow::Result<Option<token::Token>> {
+    // Fast path: this is not the \noexpand command.
+    // We want this check to be inlined into the VM functions that perform
     if tag != Some(NO_EXPAND_TAG.get()) {
         return Ok(None);
     }
+    // Slow path: this is not the \noexpand command.
+    // We don't want this check to be inlined because it will take up space in the instruction cache.
+    noexpand_hook_finish(token, input)
+}
+
+fn noexpand_hook_finish<S: TexlangState>(
+    token: token::Token,
+    input: &mut vm::ExpansionInput<S>,
+) -> anyhow::Result<Option<token::Token>> {
     match input.unexpanded().next()? {
         None => Err(error::TokenError::new(
             token,
@@ -240,8 +253,43 @@ pub fn get_relax<S>() -> command::BuiltIn<S> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::prefix;
+    use crate::script;
     use crate::testing::*;
     use std::collections::HashMap;
+
+    #[derive(Default)]
+    pub struct State {
+        prefix: prefix::Component,
+        script: script::Component,
+        integer: i32,
+    }
+
+    impl State {
+        pub fn get_integer() -> command::BuiltIn<State> {
+            variable::Command::new_singleton(
+                |state: &State, _: variable::Index| -> &i32 { &state.integer },
+                |state: &mut State, _: variable::Index| -> &mut i32 { &mut state.integer },
+            )
+            .into()
+        }
+    }
+
+    impl TexlangState for State {
+        fn expansion_override_hook(
+            token: token::Token,
+            input: &mut vm::ExpansionInput<Self>,
+            tag: Option<command::Tag>,
+        ) -> anyhow::Result<Option<token::Token>> {
+            noexpand_hook(token, input, tag)
+        }
+    }
+
+    implement_has_component![
+        State,
+        (script::Component, script),
+        (prefix::Component, prefix),
+    ];
 
     fn initial_commands(optimized: bool) -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
@@ -258,17 +306,10 @@ mod test {
         ])
     }
 
-    fn hooks() -> vm::Hooks<State> {
-        let mut hooks: vm::Hooks<State> = Default::default();
-        hooks.expansion_override_hook = noexpand_hook;
-        hooks
-    }
-
     test_suite![
-        options(
-            TestOption::InitialCommandsDyn(Box::new(|| { initial_commands(true) })),
-            TestOption::Hooks(hooks),
-        ),
+        options(TestOption::InitialCommandsDyn(Box::new(|| {
+            initial_commands(true)
+        })),),
         expansion_equality_tests(
             (simple_case, r"\def\a{Hello}\noexpand\a", r"\a"),
             (
