@@ -7,9 +7,9 @@ extern crate texlang_core;
 
 use std::collections::HashMap;
 
-use texlang_core::token::catcode::CatCodeMap;
+use texlang_core::traits::*;
+use texlang_core::vm;
 use texlang_core::vm::implement_has_component;
-use texlang_core::vm::{self, TexlangState};
 
 pub mod alias;
 pub mod alloc;
@@ -35,6 +35,7 @@ pub mod tracingmacros;
 #[derive(Default)]
 pub struct StdLibState {
     alloc: alloc::Component,
+    catcode: catcodecmd::Component,
     conditional: conditional::Component,
     prefix: prefix::Component,
     registers: registers::Component<32768>,
@@ -43,12 +44,17 @@ pub struct StdLibState {
     tracing_macros: tracingmacros::Component,
 }
 
-impl TexlangState for StdLibState {}
+impl TexlangState for StdLibState {
+    #[inline]
+    fn cat_code(&self, c: char) -> texlang_core::token::catcode::CatCode {
+        catcodecmd::cat_code(self, c)
+    }
+}
 
 /// Hooks returns the standard library's hooks.
 pub fn hooks<S>() -> vm::Hooks<S>
 where
-    S: vm::HasComponent<tracingmacros::Component>,
+    S: vm::HasComponent<tracingmacros::Component> + vm::HasComponent<catcodecmd::Component>,
 {
     vm::Hooks {
         post_macro_expansion_hook: tracingmacros::hook,
@@ -112,7 +118,6 @@ impl StdLibState {
 
     pub fn new() -> vm::VM<StdLibState> {
         vm::VM::<StdLibState>::new(
-            CatCodeMap::new_with_tex_defaults(),
             StdLibState::all_initial_built_ins(),
             Default::default(),
             hooks(),
@@ -123,6 +128,7 @@ impl StdLibState {
 implement_has_component![
     StdLibState,
     (alloc::Component, alloc),
+    (catcodecmd::Component, catcode),
     (conditional::Component, conditional),
     (prefix::Component, prefix),
     (registers::Component<32768>, registers),

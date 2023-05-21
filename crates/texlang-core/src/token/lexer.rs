@@ -16,7 +16,6 @@
 
 use crate::error;
 use crate::token;
-use crate::token::catcode;
 use crate::token::catcode::CatCode;
 use crate::token::trace;
 use crate::token::CsNameInterner;
@@ -46,10 +45,9 @@ pub trait CatCodeFn {
     fn cat_code(&self, c: char) -> CatCode;
 }
 
-impl CatCodeFn for catcode::CatCodeMap {
-    #[inline]
+impl CatCodeFn for std::collections::HashMap<char, CatCode> {
     fn cat_code(&self, c: char) -> CatCode {
-        *self.get(&c)
+        self.get(&c).copied().unwrap_or_default()
     }
 }
 
@@ -250,6 +248,7 @@ mod tests {
     use crate::token::catcode::CatCode::*;
     use crate::token::CsNameInterner;
     use crate::token::Value;
+    use std::collections::HashMap;
 
     enum TokenValue {
         Character(char, catcode::CatCode),
@@ -273,7 +272,9 @@ mod tests {
             #[test]
             fn $name() {
                 let mut lexer = Lexer::new($input.to_string(), trace::KeyRange::for_testing());
-                let mut map = catcode::CatCodeMap::new_with_tex_defaults();
+                let mut map: HashMap<char, CatCode> = CatCode::PLAIN_TEX_DEFAULTS.iter().enumerate().map(|(a, b)| {
+                    (char::from_u32(a.try_into().unwrap()).unwrap(), *b)
+                }).collect();
                 map.insert('X', EndOfLine);
                 map.insert('Y', Space);
                 map.insert('Z', Ignored);

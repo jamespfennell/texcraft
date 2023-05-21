@@ -12,7 +12,8 @@ use crate::command::Command;
 use crate::error;
 use crate::texmacro;
 use crate::token;
-use crate::token::catcode::CatCodeMap;
+use crate::token::catcode;
+use crate::token::catcode::CatCode;
 use crate::token::lexer;
 use crate::token::trace;
 use crate::token::CsNameInterner;
@@ -179,18 +180,13 @@ impl FileSystemOps for RealFileSystemOps {
 /// Note that state means specifically parts of the VM that can be modified by
 /// execution commands.
 pub struct BaseState<S> {
-    pub cat_code_map: CatCodeMap,
     pub commands_map: command::Map<S>,
     pub max_input_levels: i32,
 }
 
 impl<S> BaseState<S> {
-    pub fn new(
-        cat_code_map: CatCodeMap,
-        initial_built_ins: HashMap<CsName, BuiltIn<S>>,
-    ) -> BaseState<S> {
+    pub fn new(initial_built_ins: HashMap<CsName, BuiltIn<S>>) -> BaseState<S> {
         BaseState {
-            cat_code_map,
             commands_map: command::Map::new(initial_built_ins, Default::default()),
             max_input_levels: 500,
         }
@@ -241,31 +237,36 @@ impl<S> Default for Hooks<S> {
 }
 
 /// Implementations of this trait may be used as the state in a Texlang VM.
-/// 
+///
 /// The most important thing to know about this trait is that it has no required methods.
 /// For any type it can be implemented trivially:
 /// ```
 /// # use texlang_core::traits::TexlangState;
 /// struct SomeNewType;
-/// 
+///
 /// impl TexlangState for SomeNewType {}
 /// ```
-/// 
+///
 /// Methods of the trait are invoked at certain points when the VM is running,
 ///     and in general offer a way of customizing the behavior of the VM.
 /// The trait methods are all dispatched statically, which is important for performance.
-pub trait TexlangState {}
+pub trait TexlangState {
+    /// Get the cat code for the provided character.
+    ///
+    /// The default implementation returns the cat code used in plainTeX.
+    fn cat_code(&self, c: char) -> CatCode {
+        catcode::CatCode::PLAIN_TEX_DEFAULTS
+            .get(c as usize)
+            .copied()
+            .unwrap_or_default()
+    }
+}
 
 impl TexlangState for () {}
 
 impl<S> VM<S> {
     /// Create a new VM.
-    pub fn new(
-        initial_cat_codes: CatCodeMap,
-        initial_built_ins: HashMap<&str, BuiltIn<S>>,
-        state: S,
-        hooks: Hooks<S>,
-    ) -> VM<S> {
+    pub fn new(initial_built_ins: HashMap<&str, BuiltIn<S>>, state: S, hooks: Hooks<S>) -> VM<S> {
         let mut internal = Internal::new(hooks);
         let initial_built_ins = initial_built_ins
             .into_iter()
@@ -273,7 +274,7 @@ impl<S> VM<S> {
             .collect();
         VM {
             custom_state: state,
-            base_state: BaseState::new(initial_cat_codes, initial_built_ins),
+            base_state: BaseState::new(initial_built_ins),
             internal,
             file_system_ops: Box::new(RealFileSystemOps {}),
         }
@@ -342,7 +343,7 @@ impl<S> VM<S> {
             None => Err(error::TokenError::new(token, "unexpected end of group").into()),
             Some(group) => {
                 assert![self.base_state.commands_map.end_group()];
-                group.restore(&mut self.base_state, &mut self.custom_state);
+                group.restore(&mut self.custom_state);
                 Ok(())
             }
         }
@@ -541,9 +542,9 @@ impl Ord for TokenBuffer {
 ///     In this case the [implement_has_component] macro can be used to easily implement the
 ///     trait.
 ///     The Texlang standard library uses this approach.
-/// 
+///
 /// ## The [TexlangState] requirement
-/// 
+///
 /// This trait requires that the type also implements [TexlangState].
 /// This is only to reduce the number of trait bounds that need to be explicitly
 ///     specified when implementing TeX commands.

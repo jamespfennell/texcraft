@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
-use texlang_core::token::catcode;
 use texlang_core::traits::*;
 use texlang_core::*;
 use texlang_stdlib::alias;
@@ -48,11 +47,12 @@ pub fn run(
 
 struct PlaygroundState {
     alloc: alloc::Component,
-    exec: script::Component,
-    registers: registers::Component<256>,
-    prefix: prefix::Component,
-    time: time::Component,
+    catcode: catcodecmd::Component,
     conditional: conditional::Component,
+    prefix: prefix::Component,
+    registers: registers::Component<256>,
+    script: script::Component,
+    time: time::Component,
 }
 
 impl TexlangState for PlaygroundState {}
@@ -60,11 +60,12 @@ impl TexlangState for PlaygroundState {}
 implement_has_component![
     PlaygroundState,
     (alloc::Component, alloc),
-    (script::Component, exec),
-    (registers::Component<256>, registers),
-    (prefix::Component, prefix),
-    (time::Component, time),
+    (catcodecmd::Component, catcode),
     (conditional::Component, conditional),
+    (prefix::Component, prefix),
+    (registers::Component<256>, registers),
+    (script::Component, script),
+    (time::Component, time),
 ];
 
 fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::VM<PlaygroundState> {
@@ -116,15 +117,15 @@ fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::V
         ("year", time::get_year()),
     ]);
     vm::VM::<PlaygroundState>::new(
-        catcode::CatCodeMap::new_with_tex_defaults(),
         initial_built_ins,
         PlaygroundState {
             alloc: Default::default(),
-            exec: Default::default(),
-            registers: Default::default(),
-            prefix: Default::default(),
-            time: time::Component::new_with_values(minutes_since_midnight, day, month, year),
+            catcode: Default::default(),
             conditional: Default::default(),
+            prefix: Default::default(),
+            registers: Default::default(),
+            script: Default::default(),
+            time: time::Component::new_with_values(minutes_since_midnight, day, month, year),
         },
         Default::default(),
     )

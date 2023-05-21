@@ -154,7 +154,7 @@ impl<S: TexlangState> TokenStream for ExpandedStream<S> {
 #[repr(transparent)]
 pub struct UnexpandedStream<S>(vm::VM<S>);
 
-impl<S> TokenStream for UnexpandedStream<S> {
+impl<S: TexlangState> TokenStream for UnexpandedStream<S> {
     type S = S;
 
     #[inline]
@@ -420,23 +420,34 @@ unsafe fn launder<'a>(token: &Token) -> &'a Token {
 
 mod stream {
     use super::*;
-    use crate::token::Value::ControlSequence;
+    use crate::token::{lexer::CatCodeFn, Value::ControlSequence};
+
+    impl<T: TexlangState> CatCodeFn for T {
+        #[inline]
+        fn cat_code(&self, c: char) -> crate::token::catcode::CatCode {
+            self.cat_code(c)
+        }
+    }
 
     #[inline]
-    pub fn next_unexpanded<S>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<Token>> {
+    pub fn next_unexpanded<S: TexlangState>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<Token>> {
         if let Some(token) = vm.internal.current_source.expansions.pop() {
             return Ok(Some(token));
         }
-        if let Some(token) = vm.internal.current_source.root.next(
-            &vm.base_state.cat_code_map,
-            &mut vm.internal.cs_name_interner,
-        )? {
+        if let Some(token) = vm
+            .internal
+            .current_source
+            .root
+            .next(&vm.custom_state, &mut vm.internal.cs_name_interner)?
+        {
             return Ok(Some(token));
         }
         next_unexpanded_recurse(vm)
     }
 
-    fn next_unexpanded_recurse<S>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<Token>> {
+    fn next_unexpanded_recurse<S: TexlangState>(
+        vm: &mut vm::VM<S>,
+    ) -> anyhow::Result<Option<Token>> {
         if vm.internal.pop_source() {
             next_unexpanded(vm)
         } else {
@@ -445,21 +456,25 @@ mod stream {
     }
 
     #[inline]
-    pub fn peek_unexpanded<S>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<&Token>> {
+    pub fn peek_unexpanded<S: TexlangState>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<&Token>> {
         if let Some(token) = vm.internal.current_source.expansions.last() {
             return Ok(Some(unsafe { launder(token) }));
         }
-        if let Some(token) = vm.internal.current_source.root.next(
-            &vm.base_state.cat_code_map,
-            &mut vm.internal.cs_name_interner,
-        )? {
+        if let Some(token) = vm
+            .internal
+            .current_source
+            .root
+            .next(&vm.custom_state, &mut vm.internal.cs_name_interner)?
+        {
             vm.internal.current_source.expansions.push(token);
             return Ok(vm.internal.current_source.expansions.last());
         }
         peek_unexpanded_recurse(vm)
     }
 
-    fn peek_unexpanded_recurse<S>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<&Token>> {
+    fn peek_unexpanded_recurse<S: TexlangState>(
+        vm: &mut vm::VM<S>,
+    ) -> anyhow::Result<Option<&Token>> {
         if vm.internal.pop_source() {
             peek_unexpanded(vm)
         } else {

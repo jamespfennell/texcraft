@@ -21,7 +21,7 @@ fn noexpand_fn<S>(
     )
 }
 
-pub fn noexpand_hook<S>(
+pub fn noexpand_hook<S: TexlangState>(
     token: token::Token,
     input: &mut vm::ExpansionInput<S>,
     tag: Option<command::Tag>,

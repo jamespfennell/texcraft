@@ -14,8 +14,7 @@ pub const IFFALSE_DOC: &str = "Evaluate the false branch";
 pub const FI_DOC: &str = "End a conditional or switch statement";
 pub const OR_DOC: &str = "Begin the next branch of a switch statement";
 
-/// A component that is attached to the input unit for keeping track of conditional branches
-/// as they are expanded.
+/// A component for keeping track of conditional branches as they are expanded.
 pub struct Component {
     // Branches is a stack where each element corresponds to a conditional that is currently
     // expanding. A nested conditional is further up the stack than the conditional it is

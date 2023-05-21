@@ -107,7 +107,7 @@ fn char_to_parameter_index(c: char) -> Option<usize> {
     }
 }
 
-fn parse_prefix_and_parameters<S>(
+fn parse_prefix_and_parameters<S: TexlangState>(
     input: &mut vm::UnexpandedStream<S>,
 ) -> anyhow::Result<(Vec<token::Token>, Vec<RawParameter>, Option<token::Token>)> {
     let mut prefix = Vec::new();
@@ -199,7 +199,7 @@ fn parse_prefix_and_parameters<S>(
                 .cast())
 }
 
-fn parse_replacement_text<S>(
+fn parse_replacement_text<S: TexlangState>(
     input: &mut vm::UnexpandedStream<S>,
     opt_final_token: Option<token::Token>,
     num_parameters: usize,

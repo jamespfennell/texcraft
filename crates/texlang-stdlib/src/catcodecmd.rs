@@ -1,21 +1,58 @@
 //! The `\catcode` primitive
 
+use std::collections::HashMap;
 use texlang_core::token::catcode;
+use texlang_core::token::catcode::CatCode;
 use texlang_core::traits::*;
 use texlang_core::*;
+
+pub struct Component {
+    low: [CatCode; 128],
+    high: HashMap<usize, CatCode>,
+    default: CatCode,
+}
+
+impl Component {
+    #[inline]
+    pub fn get(&self, u: usize) -> &CatCode {
+        match self.low.get(u) {
+            None => self.high.get(&u).unwrap_or(&self.default),
+            Some(cat_code) => cat_code,
+        }
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self, u: usize) -> &mut CatCode {
+        match self.low.get_mut(u) {
+            None => self.high.entry(u).or_insert(self.default),
+            Some(cat_code) => cat_code,
+        }
+    }
+}
+
+impl Default for Component {
+    fn default() -> Self {
+        Self {
+            low: catcode::CatCode::PLAIN_TEX_DEFAULTS,
+            high: Default::default(),
+            default: Default::default(),
+        }
+    }
+}
+
+#[inline]
+pub fn cat_code<S: HasComponent<Component>>(state: &S, c: char) -> catcode::CatCode {
+    *state.component().get(c as usize)
+}
 
 pub const CATCODE_DOC: &str = "Get or set a catcode register";
 
 /// Get the `\catcode` command.
-pub fn get_catcode<S: TexlangState>() -> command::BuiltIn<S> {
-    variable::Command::new_base(
-        |state: &vm::BaseState<S>, index: variable::Index| -> &catcode::CatCode {
-            let index = char::from_u32(index.0.try_into().unwrap()).unwrap();
-            state.cat_code_map.get(&index)
-        },
-        |state: &mut vm::BaseState<S>, index: variable::Index| -> &mut catcode::CatCode {
-            let index = char::from_u32(index.0.try_into().unwrap()).unwrap();
-            state.cat_code_map.get_mut(&index)
+pub fn get_catcode<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    variable::Command::new_array(
+        |state: &S, index: variable::Index| -> &catcode::CatCode { state.component().get(index.0) },
+        |state: &mut S, index: variable::Index| -> &mut catcode::CatCode {
+            state.component_mut().get_mut(index.0)
         },
         variable::IndexResolver::Dynamic(
             |token: token::Token,
@@ -26,7 +63,7 @@ pub fn get_catcode<S: TexlangState>() -> command::BuiltIn<S> {
                     None => Err(error::TokenError::new(
                         token,
                         format![
-                            "Argument {index} passed to {token} is not a valid UTF-8 codepoint"
+                            "Argument {index} passed to {token} is not a valid UTF-8 code point"
                         ],
                     )
                     .cast()),
@@ -43,8 +80,19 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
+    use crate::script;
     use crate::testing::*;
     use crate::the;
+
+    #[derive(Default)]
+    struct State {
+        catcode: Component,
+        script: script::Component,
+    }
+
+    impl TexlangState for State {}
+
+    implement_has_component![State, (Component, catcode), (script::Component, script),];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([("the", the::get_the()), ("catcode", get_catcode())])

@@ -51,7 +51,6 @@ mod tests {
             #[test]
             fn $name() {
                 let mut vm = vm::VM::<()>::new(
-                    catcode::CatCodeMap::new_with_tex_defaults(),
                     HashMap::new(),
                     (),
                     Default::default(),
@@ -71,19 +70,31 @@ mod tests {
         (greater_than, r">a", Relation::GreaterThan),
     ];
 
+    struct State;
+
+    impl TexlangState for State {
+        fn cat_code(&self, c: char) -> catcode::CatCode {
+            if c == '<' {
+                return catcode::CatCode::Letter;
+            }
+            catcode::CatCode::PLAIN_TEX_DEFAULTS
+                .get(c as usize)
+                .copied()
+                .unwrap_or_default()
+        }
+    }
+
     macro_rules! relation_failure_tests {
         ($( ($name: ident, $input: expr), )+) => {
             $(
             #[test]
             fn $name() {
-                let mut map = catcode::CatCodeMap::new_with_tex_defaults();
-                map.insert('<', catcode::CatCode::Letter);
-                let mut vm = vm::VM::<()>::new(map, HashMap::new(), (), Default::default());
+                let mut vm = vm::VM::<State>::new(HashMap::new(), State{}, Default::default());
                 vm.push_source("".to_string(), $input.to_string()).unwrap();
                 let input = vm::ExecutionInput::new(&mut vm);
                 let result = parse_relation(input);
-                if let Ok(_) = result {
-                    panic!["Parsed a relation from invalid input"];
+                if let Ok(result) = result {
+                    panic!["Parsed a relation {result:?} from invalid input"];
                 }
             }
             )+

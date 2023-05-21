@@ -148,18 +148,20 @@ mod tests {
 
     #[derive(Default)]
     struct State {
-        registers: registers::Component<256>,
-        exec: script::Component,
+        catcode: catcodecmd::Component,
         prefix: prefix::Component,
+        registers: registers::Component<256>,
+        script: script::Component,
     }
 
     impl TexlangState for State {}
 
     implement_has_component![
         State,
-        (registers::Component<256>, registers),
-        (script::Component, exec),
+        (catcodecmd::Component, catcode),
         (prefix::Component, prefix),
+        (registers::Component<256>, registers),
+        (script::Component, script),
     ];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {

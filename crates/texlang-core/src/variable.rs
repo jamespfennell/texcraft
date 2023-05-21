@@ -397,15 +397,6 @@ impl<S> Command<S> {
         SupportedType::new_command(ref_fn, ref_mut_fn, Some(index_resolver))
     }
 
-    /// Create a new base variable command.
-    pub fn new_base<T: SupportedBaseType>(
-        ref_fn: RefFn<vm::BaseState<S>, T>,
-        ref_mut_fn: MutRefFn<vm::BaseState<S>, T>,
-        index_resolver: IndexResolver<S>,
-    ) -> Command<S> {
-        SupportedBaseType::new_command(ref_fn, ref_mut_fn, Some(index_resolver))
-    }
-
     /// Resolve the command to obtain a [Variable].
     pub fn resolve(
         &self,
@@ -485,7 +476,7 @@ pub enum ValueRef<'a> {
 ///     
 pub enum Variable<S> {
     Int(TypedVariable<S, i32>),
-    CatCode(TypedVariable<vm::BaseState<S>, CatCode>),
+    CatCode(TypedVariable<S, CatCode>),
 }
 
 impl<S: TexlangState> Variable<S> {
@@ -493,7 +484,7 @@ impl<S: TexlangState> Variable<S> {
     pub fn value<'a>(&self, input: &'a mut vm::ExpandedStream<S>) -> ValueRef<'a> {
         match self {
             Variable::Int(variable) => ValueRef::Int(variable.value(input.state())),
-            Variable::CatCode(variable) => ValueRef::CatCode(variable.value(input.base())),
+            Variable::CatCode(variable) => ValueRef::CatCode(variable.value(input.state())),
         }
     }
 
@@ -511,7 +502,7 @@ impl<S: TexlangState> Variable<S> {
             }
             Variable::CatCode(variable) => {
                 let value = parse::parse_catcode(input)?;
-                *variable.value_mut_base(input, scope) = value;
+                *variable.value_mut(input, scope) = value;
             }
         };
         Ok(())
@@ -523,10 +514,7 @@ pub(crate) struct GetterKey(usize, usize);
 
 enum Getters<S> {
     Int(RefFn<S, i32>, MutRefFn<S, i32>),
-    CatCode(
-        RefFn<vm::BaseState<S>, CatCode>,
-        MutRefFn<vm::BaseState<S>, CatCode>,
-    ),
+    CatCode(RefFn<S, CatCode>, MutRefFn<S, CatCode>),
 }
 
 impl<S> Getters<S> {
@@ -602,36 +590,6 @@ where
     }
 }
 
-impl<S, T> TypedVariable<vm::BaseState<S>, T>
-where
-    S: TexlangState,
-    T: Copy + SupportedBaseType,
-{
-    /// Returns a mutable reference to the base variable's value. This method is used for base variables.
-    ///
-    /// See the documentation on [TypedVariable::value_mut] for information on this method.
-    pub fn value_mut_base<'a>(
-        &self,
-        input: &'a mut vm::ExecutionInput<S>,
-        scope: groupingmap::Scope,
-    ) -> &'a mut T {
-        let current_value = *(self.0)(input.base(), self.2);
-        match scope {
-            groupingmap::Scope::Global => {
-                for group in input.groups() {
-                    SupportedBaseType::restore_map_mut(group).remove(self)
-                }
-            }
-            groupingmap::Scope::Local => {
-                if let Some((group, _, _)) = input.current_group_mut() {
-                    SupportedBaseType::restore_map_mut(group).save(*self, current_value);
-                }
-            }
-        }
-        (self.1)(input.base_mut(), self.2)
-    }
-}
-
 impl<S, T> PartialEq for TypedVariable<S, T> {
     fn eq(&self, rhs: &TypedVariable<S, T>) -> bool {
         self.key() == rhs.key()
@@ -686,38 +644,18 @@ impl SupportedType for i32 {
     }
 }
 
-/// Trait satisfied by all Rust types that can be used as TeX base variables
-pub trait SupportedBaseType: Sized {
-    /// This method exists so that the trait cannot be be implemented without changing the variable enum.
-    fn new_variable<S>(
-        ref_fn: RefFn<vm::BaseState<S>, Self>,
-        mut_fn: MutRefFn<vm::BaseState<S>, Self>,
-    ) -> Variable<S>;
-
-    fn restore_map_mut<S>(_: &mut RestoreValues<S>) -> &mut RestoreMap<vm::BaseState<S>, Self>;
-
-    fn new_command<S>(
-        _: RefFn<vm::BaseState<S>, Self>,
-        _: MutRefFn<vm::BaseState<S>, Self>,
-        _: Option<IndexResolver<S>>,
-    ) -> Command<S>;
-}
-
-impl SupportedBaseType for CatCode {
-    fn new_variable<S>(
-        ref_fn: RefFn<vm::BaseState<S>, Self>,
-        mut_fn: MutRefFn<vm::BaseState<S>, Self>,
-    ) -> Variable<S> {
+impl SupportedType for CatCode {
+    fn new_variable<S>(ref_fn: RefFn<S, Self>, mut_fn: MutRefFn<S, Self>) -> Variable<S> {
         Variable::CatCode(TypedVariable(ref_fn, mut_fn, Index(0)))
     }
 
-    fn restore_map_mut<S>(m: &mut RestoreValues<S>) -> &mut RestoreMap<vm::BaseState<S>, Self> {
-        &mut m.catcode_base
+    fn restore_map_mut<S>(m: &mut RestoreValues<S>) -> &mut RestoreMap<S, Self> {
+        &mut m.catcode
     }
 
     fn new_command<S>(
-        ref_fn: RefFn<vm::BaseState<S>, Self>,
-        ref_mut_fn: MutRefFn<vm::BaseState<S>, Self>,
+        ref_fn: RefFn<S, Self>,
+        ref_mut_fn: MutRefFn<S, Self>,
         index_resolver: Option<IndexResolver<S>>,
     ) -> Command<S> {
         Command {
@@ -733,22 +671,22 @@ impl SupportedBaseType for CatCode {
 // TODO: make this private somehow. Maybe the restore values doesn't need to be a part of the SupportedType trait.
 pub struct RestoreValues<S> {
     i32: RestoreMap<S, i32>,
-    catcode_base: RestoreMap<vm::BaseState<S>, CatCode>,
+    catcode: RestoreMap<S, CatCode>,
 }
 
 impl<S> Default for RestoreValues<S> {
     fn default() -> Self {
         Self {
             i32: Default::default(),
-            catcode_base: Default::default(),
+            catcode: Default::default(),
         }
     }
 }
 
 impl<S> RestoreValues<S> {
-    pub fn restore(self, base: &mut vm::BaseState<S>, state: &mut S) {
+    pub fn restore(self, state: &mut S) {
         self.i32.restore(state);
-        self.catcode_base.restore(base);
+        self.catcode.restore(state);
     }
 }
 

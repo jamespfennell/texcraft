@@ -1,5 +1,4 @@
 //! Data structures representing category codes and operations on them.
-use std::collections::HashMap;
 
 use CatCode::*;
 
@@ -321,70 +320,6 @@ impl CatCode {
         Active,   // ~
         Invalid,  // ASCII delete
     ];
-}
-
-// TODO: should this just be called Map?
-pub struct CatCodeMap {
-    low: [CatCode; 128],
-    high: HashMap<char, CatCode>,
-    default: CatCode,
-}
-
-impl CatCodeMap {
-    pub fn new() -> CatCodeMap {
-        CatCodeMap {
-            low: [Default::default(); 128],
-            high: HashMap::new(),
-            default: CatCode::default(),
-        }
-    }
-
-    pub fn new_with_tex_defaults() -> CatCodeMap {
-        let mut cat_code_map = CatCodeMap::new();
-        set_tex_defaults(&mut cat_code_map);
-        cat_code_map
-    }
-
-    #[inline]
-    pub fn get(&self, c: &char) -> &CatCode {
-        if (*c as u32) < 128 {
-            self.low.get(*c as usize).unwrap()
-        } else {
-            self.high.get(c).unwrap_or(&self.default)
-        }
-    }
-
-    #[inline]
-    pub fn get_mut(&mut self, c: &char) -> &mut CatCode {
-        if (*c as u32) < 128 {
-            self.low.get_mut(*c as usize).unwrap()
-        } else {
-            self.high.entry(*c).or_insert_with(|| CatCode::Other)
-        }
-    }
-
-    pub fn insert(&mut self, c: char, code: CatCode) {
-        if (c as u32) < 128 {
-            self.low[c as usize] = code
-        } else {
-            self.high.insert(c, code);
-        }
-    }
-}
-
-impl Default for CatCodeMap {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-fn set_tex_defaults(cat_code_map: &mut CatCodeMap) {
-    let mut u: u8 = 0;
-    for code in CatCode::PLAIN_TEX_DEFAULTS {
-        let c: char = u.try_into().unwrap();
-        cat_code_map.insert(c, code);
-        u = u.wrapping_add(1);
-    }
 }
 
 #[cfg(test)]

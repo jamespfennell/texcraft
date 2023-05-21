@@ -3,13 +3,12 @@ use colored::Colorize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use texlang_core::token::catcode;
 use texlang_core::*;
 use texlang_stdlib::repl;
 use texlang_stdlib::script;
 use texlang_stdlib::StdLibState;
 
-/// This is a "portfolio binary" that demonstrates some of the features of the
+/// This is a program that demonstrates some of the features of the
 ///   Texcraft project.
 /// See the subcommands for things it can do.
 ///
@@ -171,7 +170,6 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
 
 fn new_vm() -> vm::VM<StdLibState> {
     vm::VM::<StdLibState>::new(
-        catcode::CatCodeMap::new_with_tex_defaults(),
         initial_built_ins(),
         Default::default(),
         texlang_stdlib::hooks(),
@@ -185,12 +183,7 @@ fn new_repl_vm() -> vm::VM<StdLibState> {
     m.insert("exit", repl::get_exit());
     m.insert("quit", repl::get_exit());
     m.insert("q", repl::get_exit());
-    vm::VM::<StdLibState>::new(
-        catcode::CatCodeMap::new_with_tex_defaults(),
-        m,
-        Default::default(),
-        texlang_stdlib::hooks(),
-    )
+    vm::VM::<StdLibState>::new(m, Default::default(), texlang_stdlib::hooks())
 }
 
 fn initial_built_ins() -> HashMap<&'static str, command::BuiltIn<StdLibState>> {

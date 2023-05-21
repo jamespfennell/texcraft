@@ -15,7 +15,6 @@ use crate::script;
 use anyhow::Result;
 use texlang_core::command;
 use texlang_core::token;
-use texlang_core::token::catcode;
 use texlang_core::traits::*;
 use texlang_core::variable;
 use texlang_core::vm;
@@ -184,12 +183,7 @@ where
         }
     }
 
-    let mut vm = VM::<S>::new(
-        catcode::CatCodeMap::new_with_tex_defaults(),
-        (initial_commands)(),
-        Default::default(),
-        hooks(),
-    );
+    let mut vm = VM::<S>::new((initial_commands)(), Default::default(), hooks());
     (custom_vm_initialization)(&mut vm);
     vm.push_source("testing.tex".to_string(), source.to_string())
         .unwrap();
@@ -210,7 +204,6 @@ where
 /// # use texlang_core::vm;
 /// # use texlang_stdlib::testing::*;
 /// let mut vm = vm::VM::<State>::new(
-///     Default::default(),  // initial catcodes
 ///     Default::default(),  // initial commands
 ///     Default::default(),  // initial state
 ///     Default::default(),  // hooks

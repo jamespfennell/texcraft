@@ -1,5 +1,4 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use texlang_core::token::catcode;
 use texlang_core::token::trace;
 use texlang_core::*;
 use texlang_stdlib::script;
@@ -9,12 +8,8 @@ pub fn advance_bench(c: &mut Criterion) {
     let mut initial_built_ins = StdLibState::all_initial_built_ins();
     initial_built_ins.insert("par", script::get_par());
     initial_built_ins.insert("end", script::get_newline());
-    let mut vm = vm::VM::<StdLibState>::new(
-        catcode::CatCodeMap::new_with_tex_defaults(),
-        initial_built_ins,
-        Default::default(),
-        Default::default(),
-    );
+    let mut vm =
+        vm::VM::<StdLibState>::new(initial_built_ins, Default::default(), Default::default());
     vm.push_source(
         "".to_string(),
         r"\countdef\k 0 \def\a{\advance\k by 1}".to_string(),
