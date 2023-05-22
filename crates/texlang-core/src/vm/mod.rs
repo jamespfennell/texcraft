@@ -179,14 +179,12 @@ impl FileSystemOps for RealFileSystemOps {
 /// execution commands.
 pub struct BaseState<S> {
     pub commands_map: command::Map<S>,
-    pub max_input_levels: i32,
 }
 
 impl<S> BaseState<S> {
     pub fn new(initial_built_ins: HashMap<CsName, BuiltIn<S>>) -> BaseState<S> {
         BaseState {
             commands_map: command::Map::new(initial_built_ins, Default::default()),
-            max_input_levels: 500,
         }
     }
 }
@@ -245,6 +243,23 @@ pub trait TexlangState: Sized {
         _ = (token, input, tag);
         Ok(None)
     }
+
+    /// Hook that runs before new source code is added.
+    ///
+    /// This hook is designed to support the max input levels constant.
+    fn pre_source_code_addition_hook(
+        token: Option<token::Token>,
+        num_existing_sources: usize,
+    ) -> anyhow::Result<()> {
+        _ = token;
+        // TODO: make this a token error
+        if num_existing_sources + 1 >= 100 {
+            return Err(anyhow::anyhow!(
+                "maximum number of input levels (100) exceeded",
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl TexlangState for () {}
@@ -264,7 +279,9 @@ impl<S> VM<S> {
             file_system_ops: Box::new(RealFileSystemOps {}),
         }
     }
+}
 
+impl<S: TexlangState> VM<S> {
     /// Add new source code to the VM.
     ///
     /// TeX input source code is organized as a stack.
@@ -274,10 +291,11 @@ impl<S> VM<S> {
             None,
             file_name,
             source_code,
-            self.base_state.max_input_levels,
         )
     }
+}
 
+impl<S> VM<S> {
     /// Clear all source code from the VM.
     pub fn clear_sources(&mut self) {
         self.internal.clear_sources()
@@ -371,20 +389,15 @@ impl<S> Internal<S> {
             groups: Default::default(),
         }
     }
-
+}
+impl<S: TexlangState> Internal<S> {
     fn push_source(
         &mut self,
         token: Option<Token>,
         file_name: String,
         source_code: String,
-        max_input_levels: i32,
     ) -> anyhow::Result<()> {
-        if self.sources.len() + 1 >= max_input_levels.try_into().unwrap() {
-            return Err(anyhow::anyhow!(
-                "maximum number of input levels ({}) exceeded",
-                max_input_levels
-            ));
-        }
+        S::pre_source_code_addition_hook(token, self.sources.len())?;
         let trace_key_range = self
             .tracer
             .register_source_code(token, file_name, &source_code);
@@ -393,7 +406,8 @@ impl<S> Internal<S> {
         self.sources.push(new_source);
         Ok(())
     }
-
+}
+impl<S> Internal<S> {
     fn clear_sources(&mut self) {
         self.current_source = Default::default();
         self.sources.clear();

@@ -227,7 +227,8 @@ impl<S> ExpansionInput<S> {
     pub fn new(vm: &mut vm::VM<S>) -> &mut ExpansionInput<S> {
         unsafe { &mut *(vm as *mut vm::VM<S> as *mut ExpansionInput<S>) }
     }
-
+}
+impl<S: TexlangState> ExpansionInput<S> {
     /// Push source code to the front of the input stream.
     #[inline]
     pub fn push_source(
@@ -240,10 +241,10 @@ impl<S> ExpansionInput<S> {
             Some(token),
             file_name,
             source_code,
-            self.0 .0 .0.base_state.max_input_levels,
         )
     }
-
+}
+impl<S> ExpansionInput<S> {
     #[inline]
     pub fn unexpanded(&mut self) -> &mut UnexpandedStream<S> {
         &mut self.0 .0
