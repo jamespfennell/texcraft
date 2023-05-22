@@ -2,6 +2,7 @@
 //!
 
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -179,14 +180,9 @@ fn if_false<S>(_: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
 
 fn if_num<S: TexlangState>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
     let a: i32 = parse::parse_number(stream)?;
-    let r = parse::parse_relation(stream)?;
+    let r = Ordering::parse(stream)?;
     let b: i32 = parse::parse_number(stream)?;
-    // println!("Cmp {} {:?} {}", a, r, b);
-    Ok(match r {
-        parse::Relation::LessThan => a < b,
-        parse::Relation::Equal => a == b,
-        parse::Relation::GreaterThan => a > b,
-    })
+    Ok(a.cmp(&b) == r)
 }
 
 fn if_odd<S: TexlangState>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {

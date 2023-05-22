@@ -1,30 +1,22 @@
 //! Parsing of relations (<, = and >)
+//!
+//! A relation is defined on p209 of the TeXBook to be a character token with
+//! catcode 12 (other) and value <, = or >.
 
 use crate::traits::*;
 use crate::{error, token, vm};
+use std::cmp::Ordering;
 
-/// Simple enum representing the three types of relation: <, = and >.
-#[derive(Debug, PartialEq, Eq)]
-pub enum Relation {
-    LessThan,
-    Equal,
-    GreaterThan,
-}
-
-/// Parses a `Relation` from the provided stream.
-///
-/// A relation is defined on p209 of the TeXBook to be a character token with
-/// catcode 12 (other) and value <, = or >.
-pub fn parse_relation<S: TexlangState, I: AsMut<vm::ExpandedStream<S>>>(
-    stream: &mut I,
-) -> anyhow::Result<Relation> {
-    get_element![
-        stream.as_mut(),
-        parse_relation_error,
-        token::Value::Other('<') => Relation::LessThan,
-        token::Value::Other('=') => Relation::Equal,
-        token::Value::Other('>') => Relation::GreaterThan,
-    ]
+impl Parsable for Ordering {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self> {
+        get_element![
+            input,
+            parse_relation_error,
+            token::Value::Other('<') => Ordering::Less,
+            token::Value::Other('=') => Ordering::Equal,
+            token::Value::Other('>') => Ordering::Greater,
+        ]
+    }
 }
 
 fn parse_relation_error(token: Option<token::Token>) -> anyhow::Error {
@@ -42,33 +34,15 @@ fn parse_relation_error(token: Option<token::Token>) -> anyhow::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::token;
-    use std::collections::HashMap;
+    use crate::parse::testing::*;
 
-    macro_rules! relation_success_tests {
-        ($( ($name: ident, $input: expr, $expected: expr), )+) => {
-            $(
-            #[test]
-            fn $name() {
-                let mut vm = vm::VM::<()>::new(
-                    HashMap::new(),
-                    (),
-                );
-                vm.push_source("".to_string(), $input.to_string()).unwrap();
-                let input = vm::ExecutionInput::new(&mut vm);
-                let result = parse_relation(input).unwrap();
-                assert_eq![result, $expected];
-            }
-            )+
-        };
-    }
-
-    relation_success_tests![
-        (less_than, r"<a", Relation::LessThan),
-        (equals, r"=a", Relation::Equal),
-        (greater_than, r">a", Relation::GreaterThan),
+    parse_success_tests![
+        (less_than, r"<a", Ordering::Less),
+        (equals, r"=a", Ordering::Equal),
+        (greater_than, r">a", Ordering::Greater),
     ];
 
+    #[derive(Default)]
     struct State;
 
     impl TexlangState for State {
@@ -83,24 +57,9 @@ mod tests {
         }
     }
 
-    macro_rules! relation_failure_tests {
-        ($( ($name: ident, $input: expr), )+) => {
-            $(
-            #[test]
-            fn $name() {
-                let mut vm = vm::VM::<State>::new(HashMap::new(), State{});
-                vm.push_source("".to_string(), $input.to_string()).unwrap();
-                let input = vm::ExecutionInput::new(&mut vm);
-                let result = parse_relation(input);
-                if let Ok(result) = result {
-                    panic!["Parsed a relation {result:?} from invalid input"];
-                }
-            }
-            )+
-        };
-    }
-
-    relation_failure_tests![
+    parse_failure_tests![
+        Ordering,
+        State,
         (empty_input, ""),
         (letter, "a"),
         (control_sequence, r"\A"),

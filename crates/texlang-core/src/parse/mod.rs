@@ -1,4 +1,8 @@
-//! Logic for parsing elements of the TeX grammer from token streams.
+//! Logic for parsing elements of the TeX grammar from token streams.
+//! 
+//! This parsing module is based around the [Parsable] trait.
+//! This trait is implemented by Rust types that correspond to elements of the TeX grammar.
+//! The trait implementation provides a way to parse grammar elements out of the input stream.
 
 #[macro_use]
 mod helpers;
@@ -15,8 +19,6 @@ pub use filelocation::{parse_file_location, FileLocation};
 pub use keyword::parse_optional_by;
 pub use number::parse_catcode;
 pub use number::parse_number;
-pub use relation::parse_relation;
-pub use relation::Relation;
 pub use variable::parse_optional_equals;
 pub use variable::parse_variable;
 
@@ -25,11 +27,22 @@ use crate::token;
 use crate::traits::*;
 use crate::vm;
 
-pub fn parse_optional_space<S: TexlangState>(
-    input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<()> {
-    get_optional_element![input, token::Value::Space(_) => (),];
-    Ok(())
+/// Implementations of this trait are elements of the TeX grammar than can be parsed from a stream of tokens.
+pub trait Parsable: Sized {
+    /// Parses a value from an input stream.
+    ///
+    /// This method just delegates to [Parsable::parse_impl].
+    #[inline]
+    fn parse<S, I>(input: &mut I) -> anyhow::Result<Self>
+    where
+        S: TexlangState,
+        I: AsMut<vm::ExpandedStream<S>>,
+    {
+        Parsable::parse_impl(input.as_mut())
+    }
+
+    /// Parses a value from the [vm::ExpandedStream].
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self>;
 }
 
 // TODO: just take execution input as input - this shouldn't be called with expanded input!!!!!!!

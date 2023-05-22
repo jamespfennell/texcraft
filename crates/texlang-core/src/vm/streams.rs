@@ -330,8 +330,9 @@ impl<S> ExpansionInput<S> {
 ///     To read the input stream without performing expansion, use the
 ///     [unexpanded](ExpandedStream::unexpanded) method.
 ///
-/// - Mutable access to the base state and custom state using the [ExecutionInput::base_mut]
-///     and [ExecutionInput::state_mut] methods.
+/// - Mutable access to the state and the commands map 
+///     the [ExecutionInput::state_mut]
+///     and [ExecutionInput::commands_map_mut] methods.
 #[repr(transparent)]
 pub struct ExecutionInput<S>(ExpandedStream<S>);
 
