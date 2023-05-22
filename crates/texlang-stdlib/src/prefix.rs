@@ -204,7 +204,7 @@ fn process_prefixes<S: HasComponent<Component>>(
             token::Value::ControlSequence(name) => {
                 // First check if it's a variable command. If so, assign to the variable at the local or global scope.
                 if let Some(command::Command::Variable(cmd)) =
-                    input.base().commands_map.get_command(&name)
+                    input.commands_map_mut().get_command(&name)
                 {
                     let cmd = cmd.clone();
                     assert_only_global_prefix(t, prefix, input)?;
@@ -221,7 +221,7 @@ fn process_prefixes<S: HasComponent<Component>>(
                 }
                 // Next check if it's a command that can be prefixed by any of the prefix command.
                 let component = input.state().component();
-                let tag = input.base().commands_map.get_tag(&name);
+                let tag = input.commands_map().get_tag(&name);
                 if let Some(tag) = tag {
                     if component.prefixable_with_any.contains(&tag) {
                         input.state_mut().component_mut().scope = match prefix.global {
@@ -272,7 +272,7 @@ fn complete_prefix<S: TexlangState>(
         None => false,
         Some(&t) => match t.value() {
             token::Value::ControlSequence(name) => {
-                let cmd_id = input.base().commands_map.get_tag(&name);
+                let cmd_id = input.commands_map().get_tag(&name);
                 // TODO: cache these tags in the component
                 let global_id = global_tag();
                 let outer_id = outer_tag();

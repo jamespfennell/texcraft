@@ -68,8 +68,7 @@ fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
     }
     let user_defined_macro = texmacro::Macro::new(prefix, parameters, replacement);
     input
-        .base_mut()
-        .commands_map
+        .commands_map_mut()
         .insert_macro(name, user_defined_macro, scope);
     Ok(())
 }

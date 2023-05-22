@@ -5,6 +5,7 @@
         "countdef",
         "expandafter",
         "groupingmap",
+        "ifnum",
         "ifodd",
         "INITEX",
         "Interner",

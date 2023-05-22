@@ -97,7 +97,7 @@ pub fn run<S: TexlangState, H: Handlers<S>>(vm: &mut VM<S>) -> anyhow::Result<()
                 }
                 Some(token) => match token.value() {
                     Value::ControlSequence(name) => {
-                        match execution_input.base().commands_map.get_command(&name) {
+                        match execution_input.commands_map().get_command(&name) {
                             Some(Command::Execution(cmd, _)) => cmd(token, execution_input),
                             Some(Command::Variable(cmd)) => cmd.clone().set_value_using_input(
                                 token,
@@ -149,8 +149,8 @@ pub fn run<S: TexlangState, H: Handlers<S>>(vm: &mut VM<S>) -> anyhow::Result<()
 
 /// The Texlang virtual machine.
 pub struct VM<S> {
-    pub base_state: BaseState<S>,
     pub custom_state: S,
+    pub commands_map: command::Map<S>,
     pub file_system_ops: Box<dyn FileSystemOps>,
     internal: Internal<S>,
 }
@@ -170,22 +170,6 @@ struct RealFileSystemOps;
 impl FileSystemOps for RealFileSystemOps {
     fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String> {
         std::fs::read_to_string(path)
-    }
-}
-
-/// Parts of the state that are required in every Texlang VM, such as the commands map.
-///
-/// Note that state means specifically parts of the VM that can be modified by
-/// execution commands.
-pub struct BaseState<S> {
-    pub commands_map: command::Map<S>,
-}
-
-impl<S> BaseState<S> {
-    pub fn new(initial_built_ins: HashMap<CsName, BuiltIn<S>>) -> BaseState<S> {
-        BaseState {
-            commands_map: command::Map::new(initial_built_ins, Default::default()),
-        }
     }
 }
 
@@ -274,7 +258,7 @@ impl<S> VM<S> {
             .collect();
         VM {
             custom_state: state,
-            base_state: BaseState::new(initial_built_ins),
+            commands_map: command::Map::new(initial_built_ins, Default::default()),
             internal,
             file_system_ops: Box::new(RealFileSystemOps {}),
         }
@@ -287,11 +271,7 @@ impl<S: TexlangState> VM<S> {
     /// TeX input source code is organized as a stack.
     /// Pushing source code onto the stack will mean it is executed first.
     pub fn push_source(&mut self, file_name: String, source_code: String) -> anyhow::Result<()> {
-        self.internal.push_source(
-            None,
-            file_name,
-            source_code,
-        )
+        self.internal.push_source(None, file_name, source_code)
     }
 }
 
@@ -310,7 +290,7 @@ impl<S> VM<S> {
     ///
     /// This function is extremely slow and is only intended to be invoked on error paths.
     pub fn get_commands_as_map_slow(&self) -> HashMap<String, BuiltIn<S>> {
-        let map_1: HashMap<CsName, BuiltIn<S>> = self.base_state.commands_map.to_hash_map_slow();
+        let map_1: HashMap<CsName, BuiltIn<S>> = self.commands_map.to_hash_map_slow();
         let mut map = HashMap::new();
         for (cs_name, cmd) in map_1 {
             let cs_name_str = match self.internal.cs_name_interner.resolve(cs_name) {
@@ -331,7 +311,7 @@ impl<S> VM<S> {
     }
 
     fn begin_group(&mut self) {
-        self.base_state.commands_map.begin_group();
+        self.commands_map.begin_group();
         self.internal.groups.push(Default::default());
     }
 
@@ -339,7 +319,7 @@ impl<S> VM<S> {
         match self.internal.groups.pop() {
             None => Err(error::TokenError::new(token, "unexpected end of group").into()),
             Some(group) => {
-                assert![self.base_state.commands_map.end_group()];
+                assert![self.commands_map.end_group()];
                 group.restore(&mut self.custom_state);
                 Ok(())
             }

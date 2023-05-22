@@ -33,7 +33,7 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
         .cast()),
         Some(token) => match token.value() {
             token::Value::ControlSequence(control_sequence) => {
-                match input.base_mut().commands_map.alias_control_sequence(
+                match input.commands_map_mut().alias_control_sequence(
                     alias,
                     control_sequence,
                     scope,
@@ -43,10 +43,7 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
                 }
             }
             _ => {
-                input
-                    .base_mut()
-                    .commands_map
-                    .alias_token(alias, token, scope);
+                input.commands_map_mut().alias_token(alias, token, scope);
                 Ok(())
             }
         },

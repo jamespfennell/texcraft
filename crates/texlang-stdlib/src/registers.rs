@@ -84,7 +84,7 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
         return Err(integer_register_too_large_error(countdef_token, index, N));
     }
     // TODO: I suspect \countdef should honor \global, but haven't checked pdfTeX.
-    input.base_mut().commands_map.insert_variable_command(
+    input.commands_map_mut().insert_variable_command(
         cs_name,
         variable::Command::new_array(
             int_register_ref_fn,

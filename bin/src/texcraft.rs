@@ -17,7 +17,7 @@ use texlang_stdlib::StdLibState;
 #[clap(version)]
 struct Cli {
     #[clap(subcommand)]
-    subcmd: SubCommand,
+    sub_command: SubCommand,
 }
 
 #[derive(Parser)]
@@ -44,7 +44,7 @@ struct Run {
 
 fn main() {
     let args: Cli = Cli::parse();
-    let result = match args.subcmd {
+    let result = match args.sub_command {
         SubCommand::Doc(d) => doc(d.name),
         SubCommand::Repl => {
             repl();
@@ -142,7 +142,7 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
                     None => continue,
                     Some(s) => s,
                 };
-                let doc = match vm.base_state.commands_map.get_command_slow(&cs_name_s) {
+                let doc = match vm.commands_map.get_command_slow(&cs_name_s) {
                     None => "",
                     Some(cmd) => cmd.doc().unwrap_or(""),
                 };
@@ -156,7 +156,7 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
                 None => return Err(anyhow::anyhow!("Unknown command \\{}", cs_name)),
                 Some(s) => s,
             };
-            let cmd = match vm.base_state.commands_map.get_command_slow(&cs_name_s) {
+            let cmd = match vm.commands_map.get_command_slow(&cs_name_s) {
                 None => {
                     return Err(anyhow::anyhow!("Unknown command \\{}", cs_name));
                 }

@@ -16,17 +16,15 @@ pub fn parse_variable<S: TexlangState, I: AsMut<vm::ExpandedStream<S>>>(
         )
         .cast()),
         Some(token) => match token.value() {
-            token::Value::ControlSequence(name) => {
-                match input.base().commands_map.get_command(&name) {
-                    None => Err(error::TokenError::new(token, "Undefined control sequence").cast()),
-                    Some(command::Command::Variable(cmd)) => cmd.clone().resolve(token, input),
-                    Some(_) => Err(error::TokenError::new(
-                        token,
-                        "Expected variable command (register or parameter); found something else",
-                    )
-                    .cast()),
-                }
-            }
+            token::Value::ControlSequence(name) => match input.commands_map().get_command(&name) {
+                None => Err(error::TokenError::new(token, "Undefined control sequence").cast()),
+                Some(command::Command::Variable(cmd)) => cmd.clone().resolve(token, input),
+                Some(_) => Err(error::TokenError::new(
+                    token,
+                    "Expected variable command (register or parameter); found something else",
+                )
+                .cast()),
+            },
             _ => Err(error::TokenError::new(
                 token,
                 "Unexpected character token while reading in a variable",

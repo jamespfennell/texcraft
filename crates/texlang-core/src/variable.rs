@@ -580,7 +580,7 @@ where
                 }
             }
             groupingmap::Scope::Local => {
-                if let Some((group, _, _)) = input.current_group_mut() {
+                if let Some((group, _)) = input.current_group_mut() {
                     SupportedType::restore_map_mut(group).save(*self, current_value);
                 }
             }

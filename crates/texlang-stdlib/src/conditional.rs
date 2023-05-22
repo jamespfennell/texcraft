@@ -112,7 +112,7 @@ fn false_case<S: HasComponent<Component>>(
     while let Some(token) = input.unexpanded().next()? {
         if let token::Value::ControlSequence(name) = &token.value() {
             // TODO: use switch
-            let tag = input.base().commands_map.get_tag(name);
+            let tag = input.commands_map().get_tag(name);
             if tag == Some(input.state().component().else_tag) && depth == 0 {
                 push_branch(
                     input,
@@ -220,7 +220,7 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
     while let Some(token) = input.unexpanded().next()? {
         if let token::Value::ControlSequence(name) = &token.value() {
             // TODO: switch
-            let tag = input.base().commands_map.get_tag(name);
+            let tag = input.commands_map().get_tag(name);
             if tag == Some(input.state().component().or_tag) && depth == 0 {
                 cases_to_skip -= 1;
                 if cases_to_skip == 0 {
@@ -294,7 +294,7 @@ fn or_primitive_fn<S: HasComponent<Component>>(
     while let Some(token) = input.unexpanded().next()? {
         if let token::Value::ControlSequence(name) = &token.value() {
             // TODO: switch
-            let tag = input.base().commands_map.get_tag(name);
+            let tag = input.commands_map().get_tag(name);
             if tag == Some(input.state().component().if_tag) {
                 depth += 1;
             }
@@ -351,7 +351,7 @@ fn else_primitive_fn<S: HasComponent<Component>>(
     while let Some(token) = input.unexpanded().next()? {
         if let token::Value::ControlSequence(name) = &token.value() {
             // TODO: switch
-            let tag = input.base().commands_map.get_tag(name);
+            let tag = input.commands_map().get_tag(name);
             if tag == Some(input.state().component().if_tag) {
                 depth += 1;
             }

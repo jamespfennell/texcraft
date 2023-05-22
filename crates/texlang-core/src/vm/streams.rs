@@ -1,11 +1,9 @@
+use super::TexlangState;
 use crate::command;
 use crate::token::trace;
 use crate::token::Token;
 use crate::variable;
 use crate::vm;
-
-use super::BaseState;
-use super::TexlangState;
 
 /// A stream of tokens generated on demand.
 ///
@@ -76,10 +74,10 @@ pub trait TokenStream {
     /// Returns a reference to the VM.
     fn vm(&self) -> &vm::VM<Self::S>;
 
-    /// Returns a reference to the base state.
+    /// Returns a reference to the commands map.
     #[inline]
-    fn base(&self) -> &vm::BaseState<Self::S> {
-        &self.vm().base_state
+    fn commands_map(&self) -> &command::Map<Self::S> {
+        &self.vm().commands_map
     }
 
     /// Returns a reference to the custom state.
@@ -237,11 +235,11 @@ impl<S: TexlangState> ExpansionInput<S> {
         file_name: String,
         source_code: String,
     ) -> anyhow::Result<()> {
-        self.0 .0 .0.internal.push_source(
-            Some(token),
-            file_name,
-            source_code,
-        )
+        self.0
+             .0
+             .0
+            .internal
+            .push_source(Some(token), file_name, source_code)
     }
 }
 impl<S> ExpansionInput<S> {
@@ -371,10 +369,9 @@ impl<S> ExecutionInput<S> {
         &mut self.0 .0
     }
 
-    /// Returns a mutable reference to the base state.
     #[inline]
-    pub fn base_mut(&mut self) -> &mut vm::BaseState<S> {
-        &mut self.0 .0 .0.base_state
+    pub fn commands_map_mut(&mut self) -> &mut command::Map<S> {
+        &mut self.0 .0 .0.commands_map
     }
 
     /// Returns a mutable reference to the custom state.
@@ -396,12 +393,10 @@ impl<S> ExecutionInput<S> {
         &mut self.0 .0 .0.internal.groups
     }
 
-    pub(crate) fn current_group_mut(
-        &mut self,
-    ) -> Option<(&mut variable::RestoreValues<S>, &BaseState<S>, &S)> {
+    pub(crate) fn current_group_mut(&mut self) -> Option<(&mut variable::RestoreValues<S>, &S)> {
         match self.0 .0 .0.internal.groups.last_mut() {
             None => None,
-            Some(g) => Some((g, &self.0 .0 .0.base_state, &self.0 .0 .0.custom_state)),
+            Some(g) => Some((g, &self.0 .0 .0.custom_state)),
         }
     }
 }
@@ -487,7 +482,7 @@ mod stream {
         let (token, command) = match next_unexpanded(vm)? {
             None => return Ok(None),
             Some(token) => match token.value() {
-                ControlSequence(name) => (token, vm.base_state.commands_map.get_command(&name)),
+                ControlSequence(name) => (token, vm.commands_map.get_command(&name)),
                 _ => return Ok(Some(token)),
             },
         };
@@ -519,7 +514,7 @@ mod stream {
             Some(token) => match token.value() {
                 ControlSequence(name) => (
                     unsafe { launder(token) },
-                    vm.base_state.commands_map.get_command(&name),
+                    vm.commands_map.get_command(&name),
                 ),
                 _ => return Ok(Some(unsafe { launder(token) })),
             },
@@ -557,7 +552,7 @@ mod stream {
             Some(token) => match token.value() {
                 ControlSequence(name) => (
                     unsafe { launder(token) },
-                    vm.base_state.commands_map.get_command(&name),
+                    vm.commands_map.get_command(&name),
                 ),
                 _ => return Ok(false),
             },

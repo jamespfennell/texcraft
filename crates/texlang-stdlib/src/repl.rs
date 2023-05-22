@@ -56,7 +56,7 @@ pub fn run<S: HasComponent<script::Component>>(vm: &mut vm::VM<S>, opts: RunOpti
             println!("{pretty}\n");
         }
 
-        if vm.base_state.commands_map.len() != num_names {
+        if vm.commands_map.len() != num_names {
             let mut names: Vec<String> = vm.get_commands_as_map_slow().into_keys().collect();
             names.sort();
             num_names = names.len();
@@ -113,7 +113,7 @@ pub fn get_doc<S: TexlangState>() -> command::BuiltIn<S> {
          -> anyhow::Result<Vec<token::Token>> {
             let target = texlang_core::parse::parse_command_target("", token, input.unexpanded())?;
             let cs_name_s = input.vm().cs_name_interner().resolve(target).unwrap();
-            let doc = match input.base().commands_map.get_command_slow(&target) {
+            let doc = match input.commands_map().get_command_slow(&target) {
                 None => format!["Unknown command \\{cs_name_s}"],
                 Some(cmd) => match cmd.doc() {
                     None => format!["No documentation available for the \\{cs_name_s} command"],

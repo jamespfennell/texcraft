@@ -182,7 +182,7 @@ fn newint_primitive_fn<S: HasComponent<Component>>(
 ) -> anyhow::Result<()> {
     let name = parse::parse_command_target("newint allocation", newint_token, input.unexpanded())?;
     let addr = input.state_mut().component_mut().alloc_int();
-    input.base_mut().commands_map.insert_variable_command(
+    input.commands_map_mut().insert_variable_command(
         name,
         variable::Command::new_array(
             singleton_ref_fn,
@@ -234,7 +234,7 @@ fn newarray_primitive_fn<S: HasComponent<Component>>(
         parse::parse_command_target("newarray allocation", newarray_token, input.unexpanded())?;
     let len: usize = parse::parse_number(input)?;
     let addr = input.state_mut().component_mut().alloc_array(len);
-    input.base_mut().commands_map.insert_variable_command(
+    input.commands_map_mut().insert_variable_command(
         name,
         variable::Command::new_array(
             array_element_ref_fn,

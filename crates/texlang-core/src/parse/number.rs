@@ -39,7 +39,7 @@ fn parse_number_internal<S: TexlangState, T: PrimInt>(
             Value::Other('"') => parse_hexadecimal(stream)?,
             Value::Other('`') => parse_character(stream)?,
             Value::ControlSequence(name) => {
-                let cmd = stream.base().commands_map.get_command(&name);
+                let cmd = stream.commands_map().get_command(&name);
                 if let Some(command::Command::Variable(cmd)) = cmd {
                     read_number_from_variable(token, cmd.clone(), stream)?
                 } else {
