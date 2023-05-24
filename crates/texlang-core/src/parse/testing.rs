@@ -3,13 +3,7 @@ use crate::vm;
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-pub fn new_vm(source: &str) -> vm::VM<()> {
-    let mut vm = vm::VM::<()>::new(HashMap::new(), ());
-    vm.push_source("".to_string(), source.to_string()).unwrap();
-    vm
-}
-
-pub fn run_parse_success_test<S: TexlangState + Default, T: Parsable + Debug + Eq>(
+pub fn run_parse_success_test<S: TexlangState + Default, T: Parsable<S> + Debug + Eq>(
     source: &str,
     want: T,
 ) {
@@ -20,7 +14,7 @@ pub fn run_parse_success_test<S: TexlangState + Default, T: Parsable + Debug + E
     assert_eq!(got, want);
 }
 
-pub fn run_parse_failure_test<S: TexlangState + Default, T: Parsable + Debug>(source: &str) {
+pub fn run_parse_failure_test<S: TexlangState + Default, T: Parsable<S> + Debug>(source: &str) {
     let mut vm = vm::VM::<S>::new(HashMap::new(), Default::default());
     vm.push_source("".to_string(), source.to_string()).unwrap();
     let input = vm::ExecutionInput::new(&mut vm);
@@ -34,7 +28,7 @@ pub fn run_parse_failure_test<S: TexlangState + Default, T: Parsable + Debug>(so
 }
 
 macro_rules! parse_success_tests {
-    ($( ($name: ident, $input: expr, $expected: expr), )+) => {
+    ($( ($name: ident, $input: expr, $expected: expr $(,)? ) ),+ $(,)? ) => {
         $(
         #[test]
         fn $name() {

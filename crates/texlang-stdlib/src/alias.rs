@@ -1,6 +1,7 @@
 //! `\let` aliasing command
 
 use crate::prefix;
+use texlang_core::parse::{CommandTarget, OptionalEqualsUnexpanded};
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -20,12 +21,12 @@ pub fn let_tag() -> command::Tag {
 }
 
 fn let_primitive_fn<S: HasComponent<prefix::Component>>(
-    let_token: token::Token,
+    _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
     let scope = input.state_mut().component_mut().read_and_reset_global();
-    let alias = parse::parse_command_target("\\let assignment", let_token, input.unexpanded())?;
-    parse::parse_optional_equals(input.unexpanded())?;
+    let CommandTarget::ControlSequence(alias) = CommandTarget::parse(input)?;
+    OptionalEqualsUnexpanded::parse(input)?;
     match input.unexpanded().next()? {
         None => Err(error::EndOfInputError::new(
             "unexpected end of input while reading the right hand side of a \\let assignment",

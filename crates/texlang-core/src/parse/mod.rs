@@ -1,8 +1,17 @@
 //! Logic for parsing elements of the TeX grammar from token streams.
-//! 
-//! This parsing module is based around the [Parsable] trait.
+//!
+//! This parsing module is based around the [Parsable] trait, which is the most important type in the module.
 //! This trait is implemented by Rust types that correspond to elements of the TeX grammar.
 //! The trait implementation provides a way to parse grammar elements out of the input stream.
+//!
+//! The module contains implementations of [Parsable] for tuples where each element is parsable.
+//! This allows expressions like `<integer><relation><integer>` to be parsed by one invocation
+//!     of [Parsable::parse], in this case on the type `(i32, std::cmp::Ordering, i32)`.
+//!
+//! The second most important thing is the collection of custom Rust types like [OptionalBy] and
+//!     [FileLocation] which correspond to Rust grammar elements.
+//!
+//! Finally this module contains some functions for special situation like parsing lists of tokens.
 
 #[macro_use]
 mod helpers;
@@ -15,12 +24,10 @@ mod relation;
 mod testing;
 mod variable;
 
-pub use filelocation::{parse_file_location, FileLocation};
-pub use keyword::parse_optional_by;
-pub use number::parse_catcode;
-pub use number::parse_number;
-pub use variable::parse_optional_equals;
-pub use variable::parse_variable;
+pub use filelocation::FileLocation;
+pub use keyword::OptionalBy;
+pub use variable::OptionalEquals;
+pub use variable::OptionalEqualsUnexpanded;
 
 use crate::error;
 use crate::token;
@@ -28,54 +35,59 @@ use crate::traits::*;
 use crate::vm;
 
 /// Implementations of this trait are elements of the TeX grammar than can be parsed from a stream of tokens.
-pub trait Parsable: Sized {
+pub trait Parsable<S: TexlangState>: Sized {
     /// Parses a value from an input stream.
     ///
     /// This method just delegates to [Parsable::parse_impl].
     #[inline]
-    fn parse<S, I>(input: &mut I) -> anyhow::Result<Self>
+    fn parse<I>(input: &mut I) -> anyhow::Result<Self>
     where
-        S: TexlangState,
         I: AsMut<vm::ExpandedStream<S>>,
     {
         Parsable::parse_impl(input.as_mut())
     }
 
     /// Parses a value from the [vm::ExpandedStream].
-    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self>;
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self>;
 }
 
-// TODO: just take execution input as input - this shouldn't be called with expanded input!!!!!!!
-// TODO: destroy the target description?
-pub fn parse_command_target<S: vm::TokenStream>(
-    target_description: &str,
-    token: token::Token,
-    input: &mut S,
-) -> anyhow::Result<token::CsName> {
-    Ok(match input.next()? {
-        None => {
-            return Err(error::TokenError::new(
-                token,
-                format![
-                    "unexpected end of input while reading the target of a {target_description}"
-                ],
-            )
-            .cast());
-        }
-        Some(token) => match token.value() {
-            token::Value::ControlSequence(name) => name,
-            _ => {
-                return Err(error::TokenError::new(
-                    token,
-                    format!["unexpected target of a {target_description}"],
-                )
-                .add_note(format![
-                    "the target of a {target_description} must be a control sequence"
-                ])
-                .cast());
+macro_rules! generate_tuple_impls {
+    ( $first: ident ) => {};
+    ( $first: ident, $( $name: ident ),+ ) => {
+        generate_tuple_impls![ $( $name ),+];
+
+        impl<S: TexlangState, $first : Parsable<S>, $( $name : Parsable<S> ),+> Parsable<S> for ($first, $( $name ),+) {
+            fn parse_impl(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self> {
+                Ok(($first::parse(input)?, $( $name::parse(input)? ),+))
             }
-        },
-    })
+        }
+    };
+}
+
+generate_tuple_impls![T1, T2, T3, T4, T5];
+
+/// The target of a command like `\let` or `\def`.
+pub enum CommandTarget {
+    ControlSequence(token::CsName),
+}
+
+impl<S: TexlangState> Parsable<S> for CommandTarget {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self> {
+        match input.unexpanded().next()? {
+            None => Err(error::EndOfInputError::new(
+                "unexpected end of input while reading a command target".to_string(),
+            )
+            .cast()),
+            Some(token) => match token.value() {
+                token::Value::ControlSequence(name) => Ok(CommandTarget::ControlSequence(name)),
+                _ => Err(
+                    error::TokenError::new(token, "unexpected command target".to_string())
+                        .add_note("a command target must be a control sequence".to_string())
+                        .cast(),
+                ),
+            },
+        }
+    }
 }
 
 /// Parses balanced tokens from the stream.

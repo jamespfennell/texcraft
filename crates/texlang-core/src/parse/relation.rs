@@ -7,8 +7,8 @@ use crate::traits::*;
 use crate::{error, token, vm};
 use std::cmp::Ordering;
 
-impl Parsable for Ordering {
-    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self> {
+impl<S: TexlangState> Parsable<S> for Ordering {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self> {
         get_element![
             input,
             parse_relation_error,

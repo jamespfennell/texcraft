@@ -2,6 +2,7 @@
 //!
 
 use std::path;
+use texlang_core::parse::FileLocation;
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -14,7 +15,7 @@ fn input_fn<S: TexlangState>(
     input_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<token::Token>> {
-    let file_location = parse::parse_file_location(input)?;
+    let file_location = FileLocation::parse(input)?;
     let (file_path, source_code) = read_file(input_token, input.vm(), file_location, ".tex")?;
     input.push_source(input_token, file_path, source_code)?;
     Ok(Vec::new())

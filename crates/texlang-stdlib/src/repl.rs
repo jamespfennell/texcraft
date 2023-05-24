@@ -5,6 +5,7 @@ use linefeed::{Interface, ReadResult};
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::sync::Arc;
+use texlang_core::parse::CommandTarget;
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -108,12 +109,10 @@ pub fn get_help<S>() -> command::BuiltIn<S> {
 /// This prints the documentation for a TeX command.
 pub fn get_doc<S: TexlangState>() -> command::BuiltIn<S> {
     command::BuiltIn::new_expansion(
-        |token: token::Token,
-         input: &mut vm::ExpansionInput<S>|
-         -> anyhow::Result<Vec<token::Token>> {
-            let target = texlang_core::parse::parse_command_target("", token, input.unexpanded())?;
-            let cs_name_s = input.vm().cs_name_interner().resolve(target).unwrap();
-            let doc = match input.commands_map().get_command_slow(&target) {
+        |_: token::Token, input: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<token::Token>> {
+            let CommandTarget::ControlSequence(cs_name) = CommandTarget::parse(input)?;
+            let cs_name_s = input.vm().cs_name_interner().resolve(cs_name).unwrap();
+            let doc = match input.commands_map().get_command_slow(&cs_name) {
                 None => format!["Unknown command \\{cs_name_s}"],
                 Some(cmd) => match cmd.doc() {
                     None => format!["No documentation available for the \\{cs_name_s} command"],

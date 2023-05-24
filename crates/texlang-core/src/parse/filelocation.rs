@@ -14,66 +14,54 @@ pub struct FileLocation {
     pub area: Option<String>,
 }
 
-pub fn parse_file_location<S: TexlangState>(
-    stream: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<FileLocation> {
-    let mut raw_string = String::new();
-    let mut area_delimiter = None;
-    let mut ext_delimiter = None;
-    loop {
-        let t = match stream.peek()? {
-            None => break,
-            Some(t) => t,
-        };
-        if let token::Value::Space(_) = t.value() {
-            let _ = stream.consume();
-            break;
-        }
-        let c = match t.char() {
-            None => break,
-            Some(c) => c,
-        };
-        let _ = stream.consume();
-        match c {
-            '>' | ':' => {
-                area_delimiter = Some(raw_string.len() + 1);
-                ext_delimiter = None;
+impl<S: TexlangState> Parsable<S> for FileLocation {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self> {
+        let mut raw_string = String::new();
+        let mut area_delimiter = None;
+        let mut ext_delimiter = None;
+        loop {
+            let t = match input.peek()? {
+                None => break,
+                Some(t) => t,
+            };
+            if let token::Value::Space(_) = t.value() {
+                let _ = input.consume();
+                break;
             }
-            '.' => {
-                ext_delimiter = Some(raw_string.len());
+            let c = match t.char() {
+                None => break,
+                Some(c) => c,
+            };
+            let _ = input.consume();
+            match c {
+                '>' | ':' => {
+                    area_delimiter = Some(raw_string.len() + 1);
+                    ext_delimiter = None;
+                }
+                '.' => {
+                    ext_delimiter = Some(raw_string.len());
+                }
+                _ => (),
             }
-            _ => (),
+            raw_string.push(c);
         }
-        raw_string.push(c);
-    }
 
-    Ok(FileLocation {
-        path: raw_string[area_delimiter.unwrap_or(0)..ext_delimiter.unwrap_or(raw_string.len())]
-            .into(),
-        extension: ext_delimiter.map(|j| raw_string[j..].into()),
-        area: area_delimiter.map(|i| raw_string[..i].into()),
-    })
+        Ok(FileLocation {
+            path: raw_string
+                [area_delimiter.unwrap_or(0)..ext_delimiter.unwrap_or(raw_string.len())]
+                .into(),
+            extension: ext_delimiter.map(|j| raw_string[j..].into()),
+            area: area_delimiter.map(|i| raw_string[..i].into()),
+        })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parse::testing;
+    use crate::parse::testing::*;
 
-    macro_rules! parse_file_path_tests {
-        ($(($name: ident, $input: expr, $file_path: expr, ),)+) => {
-            $(
-            #[test]
-            fn $name() {
-                let mut vm = testing::new_vm($input);
-                let result = parse_file_location(vm::ExpansionInput::new(&mut vm)).unwrap();
-                assert_eq![result, $file_path];
-            }
-            )+
-        };
-    }
-
-    parse_file_path_tests![
+    parse_success_tests![
         (
             path_only,
             "path/to/file",

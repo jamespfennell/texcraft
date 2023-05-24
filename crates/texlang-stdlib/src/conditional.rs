@@ -179,14 +179,12 @@ fn if_false<S>(_: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
 }
 
 fn if_num<S: TexlangState>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
-    let a: i32 = parse::parse_number(stream)?;
-    let r = Ordering::parse(stream)?;
-    let b: i32 = parse::parse_number(stream)?;
-    Ok(a.cmp(&b) == r)
+    let (a, o, b) = <(i32, Ordering, i32)>::parse(stream)?;
+    Ok(a.cmp(&b) == o)
 }
 
 fn if_odd<S: TexlangState>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
-    let n: i32 = parse::parse_number(stream)?;
+    let n = i32::parse(stream)?;
     Ok((n % 2) == 1)
 }
 
@@ -200,7 +198,7 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
     input: &mut vm::ExpansionInput<S>,
 ) -> anyhow::Result<Vec<token::Token>> {
     // TODO: should we reading the number from the unexpanded stream? Probably!
-    let mut cases_to_skip: i32 = parse::parse_number(input)?;
+    let mut cases_to_skip = i32::parse(input)?;
     if cases_to_skip == 0 {
         push_branch(
             input,

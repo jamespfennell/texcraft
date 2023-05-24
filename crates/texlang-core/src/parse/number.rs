@@ -1,3 +1,9 @@
+//! Number parsing.
+//!
+//! The number may be octal, decimal_, hexadecimal_, cast from a character token, or read
+//! from an internal registers. The full definition of a number in the TeX grammar
+//! is given on page X of the TeXBook.
+
 use std::rc;
 
 use crate::token::Value;
@@ -6,16 +12,32 @@ use crate::variable;
 use crate::{command, error, token, vm};
 use num_traits::PrimInt;
 
-/// Parses a number from the provided stream.
-///
-/// The number may be octal, decimal_, hexadecimal_, cast from a character token, or read
-/// from an internal registers. The full definition of a number in the TeX grammar
-/// is given on page X of the TeXBook.
-#[inline]
-pub fn parse_number<S: TexlangState, I: AsMut<vm::ExpandedStream<S>>, T: PrimInt>(
-    stream: &mut I,
-) -> anyhow::Result<T> {
-    parse_number_internal(stream.as_mut())
+impl<S: TexlangState> Parsable<S> for i32 {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self> {
+        parse_number_internal(input)
+    }
+}
+
+impl<S: TexlangState> Parsable<S> for usize {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self> {
+        parse_number_internal(input)
+    }
+}
+
+impl<S: TexlangState> Parsable<S> for token::CatCode {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self> {
+        let val: usize = parse_number_internal(input)?;
+        if let Ok(val_u8) = u8::try_from(val) {
+            if let Ok(cat_code) = token::CatCode::try_from(val_u8) {
+                return Ok(cat_code);
+            }
+        }
+        // TODO: this should be a token error with the last digit as the token
+        Err(anyhow::anyhow!(
+            "the number {} is not a valid category code",
+            val
+        ))
+    }
 }
 
 fn parse_number_internal<S: TexlangState, T: PrimInt>(
@@ -57,29 +79,6 @@ fn parse_number_internal<S: TexlangState, T: PrimInt>(
             Some(sign) => Ok(sign * modulus),
         },
     }
-}
-
-#[inline]
-pub fn parse_catcode<S: TexlangState, I: AsMut<vm::ExpandedStream<S>>>(
-    stream: &mut I,
-) -> anyhow::Result<token::CatCode> {
-    parse_catcode_internal(stream.as_mut())
-}
-
-fn parse_catcode_internal<S: TexlangState>(
-    stream: &mut vm::ExpandedStream<S>,
-) -> anyhow::Result<token::CatCode> {
-    let val: usize = parse_number_internal(stream)?;
-    if let Ok(val_u8) = u8::try_from(val) {
-        if let Ok(cat_code) = token::CatCode::try_from(val_u8) {
-            return Ok(cat_code);
-        }
-    }
-    // TODO: this should be a token error with the last digit as the token
-    Err(anyhow::anyhow!(
-        "the number {} is not a valid category code",
-        val
-    ))
 }
 
 /// Parses optional signs and spaces.
@@ -286,25 +285,10 @@ fn add_lsd<T: PrimInt>(n: T, base: i32, lsd: i32) -> T {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use super::*;
-    use crate::parse::testing;
+    use crate::parse::testing::*;
 
-    macro_rules! parse_number_tests {
-        ($( ($name: ident, $input: expr, $number: expr),)+) => {
-            $(
-            #[test]
-            fn $name() {
-                let mut vm = testing::new_vm($input);
-                let result: i32 = parse_number(vm::ExpansionInput::new(&mut vm)).unwrap();
-                assert_eq![result, $number];
-            }
-            )+
-        };
-    }
-
-    parse_number_tests![
+    parse_success_tests![
         (octal_0, "'0", 0),
         (octal_1, "'1", 1),
         (octal_2, "'2", 2),
@@ -385,6 +369,7 @@ mod tests {
         (signs_minus_minus_spaces, r"  -  - 4", 4),
     ];
 
+    #[derive(Default)]
     struct State;
 
     impl TexlangState for State {
@@ -399,14 +384,5 @@ mod tests {
         }
     }
 
-    #[test]
-    fn number_with_letter_catcode() {
-        let mut vm = vm::VM::<State>::new(HashMap::new(), State {});
-        vm.push_source("".to_string(), r"1".to_string()).unwrap();
-        let input = crate::vm::ExecutionInput::new(&mut vm);
-        let result: anyhow::Result<i32> = parse_number(input);
-        if let Ok(_) = result {
-            panic!["Parsed a relation from invalid input"];
-        }
-    }
+    parse_failure_tests![i32, State, (number_with_letter_catcode, "1"),];
 }

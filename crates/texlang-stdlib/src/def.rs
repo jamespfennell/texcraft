@@ -5,6 +5,7 @@ use texcraft_stdext::algorithms::substringsearch::Matcher;
 use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
 use texcraft_stdext::nevec;
+use texlang_core::parse::CommandTarget;
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -41,7 +42,7 @@ fn gdef_primitive_fn<S: HasComponent<prefix::Component>>(
 }
 
 fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
-    def_token: token::Token,
+    _: token::Token,
     input: &mut vm::ExecutionInput<S>,
     set_globally_override: bool,
 ) -> anyhow::Result<()> {
@@ -49,7 +50,7 @@ fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
     if set_globally_override {
         scope = groupingmap::Scope::Global;
     }
-    let name = parse::parse_command_target("macro definition", def_token, input.unexpanded())?;
+    let CommandTarget::ControlSequence(name) = CommandTarget::parse(input)?;
     let (prefix, raw_parameters, replacement_end_token) =
         parse_prefix_and_parameters(input.unexpanded())?;
     let parameters: Vec<texmacro::Parameter> = raw_parameters

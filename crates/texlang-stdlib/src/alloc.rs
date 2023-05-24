@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound::Included;
 use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
+use texlang_core::parse::CommandTarget;
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -177,10 +178,10 @@ pub fn get_newint<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 }
 
 fn newint_primitive_fn<S: HasComponent<Component>>(
-    newint_token: token::Token,
+    _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    let name = parse::parse_command_target("newint allocation", newint_token, input.unexpanded())?;
+    let CommandTarget::ControlSequence(name) = CommandTarget::parse(input)?;
     let addr = input.state_mut().component_mut().alloc_int();
     input.commands_map_mut().insert_variable_command(
         name,
@@ -227,12 +228,11 @@ pub fn get_newarray<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 }
 
 fn newarray_primitive_fn<S: HasComponent<Component>>(
-    newarray_token: token::Token,
+    _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    let name =
-        parse::parse_command_target("newarray allocation", newarray_token, input.unexpanded())?;
-    let len: usize = parse::parse_number(input)?;
+    let CommandTarget::ControlSequence(name) = CommandTarget::parse(input)?;
+    let len = usize::parse(input)?;
     let addr = input.state_mut().component_mut().alloc_array(len);
     input.commands_map_mut().insert_variable_command(
         name,
@@ -256,7 +256,7 @@ impl<S: HasComponent<Component>> variable::DynamicIndexResolver<S> for ArrayInde
         input: &mut vm::ExpandedStream<S>,
     ) -> anyhow::Result<variable::Index> {
         let array_addr = self.0;
-        let array_index: usize = parse::parse_number(input)?;
+        let array_index = usize::parse(input)?;
         let (allocations_i, inner_i) = input.state().component().array_addr_map[&array_addr];
         let array_len = input.state().component().allocations[allocations_i].arrays[inner_i]
             .value

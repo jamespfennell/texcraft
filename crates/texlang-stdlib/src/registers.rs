@@ -1,6 +1,7 @@
 //! Register variables (`\count`, `\countdef`)
 
 use texcraft_stdext::collections::groupingmap;
+use texlang_core::parse::{CommandTarget, OptionalEquals};
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -61,7 +62,7 @@ fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
     count_token: token::Token,
     input: &mut vm::ExpandedStream<S>,
 ) -> anyhow::Result<variable::Index> {
-    let index: usize = parse::parse_number(input)?;
+    let index = usize::parse(input)?;
     if index >= N {
         return Err(integer_register_too_large_error(count_token, index, N));
     }
@@ -77,9 +78,8 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
     countdef_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
-    let cs_name = parse::parse_command_target("countdef", countdef_token, input.unexpanded())?;
-    parse::parse_optional_equals(input)?;
-    let index: usize = parse::parse_number(input)?;
+    let (target, _, index) = <(CommandTarget, OptionalEquals, usize)>::parse(input)?;
+    let CommandTarget::ControlSequence(cs_name) = target;
     if index >= N {
         return Err(integer_register_too_large_error(countdef_token, index, N));
     }

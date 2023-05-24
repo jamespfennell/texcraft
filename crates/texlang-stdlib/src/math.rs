@@ -1,6 +1,7 @@
 //! Operations on variables (add, multiply, divide)
 
 use crate::prefix;
+use texlang_core::parse::OptionalBy;
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -48,11 +49,11 @@ macro_rules! create_arithmetic_primitive {
             input: &mut vm::ExecutionInput<S>,
         ) -> anyhow::Result<()> {
             let scope = input.state_mut().component_mut().read_and_reset_global();
-            let variable = parse::parse_variable(input)?;
-            parse::parse_optional_by(input)?;
+            let variable = variable::Variable::parse(input)?;
+            OptionalBy::parse(input)?;
             match variable {
                 variable::Variable::Int(variable) => {
-                    let n: i32 = parse::parse_number(input)?;
+                    let n = i32::parse(input)?;
                     let i = variable.value_mut(input, scope);
                     *i = $arithmetic_op(token, *i, n)?;
                     Ok(())
@@ -69,7 +70,7 @@ fn invalid_variable_error(token: token::Token) -> anyhow::Result<()> {
         "arithmetic commands cannot be applied to variables of type X",
     )
     .add_note(
-        "airthmetic commands (\\advance, \\multiply, \\divide) can be applied to integer, dimension, glue and muglue variables",
+        "arithmetic commands (\\advance, \\multiply, \\divide) can be applied to integer, dimension, glue and muglue variables",
     )
     .cast())
 }

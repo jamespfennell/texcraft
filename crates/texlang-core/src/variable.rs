@@ -198,7 +198,7 @@
 //! use anyhow;
 //!
 //! fn index<S: TexlangState>(token: token::Token, input: &mut vm::ExpandedStream<S>) -> anyhow::Result<variable::Index> {
-//!     let index: usize = parse::parse_number(input)?;
+//!     let index = usize::parse(input)?;
 //!     if index >= 10 {
 //!         // for simplicity we panic, but in real code we should return an error
 //!         panic!["out of bounds"]
@@ -248,9 +248,9 @@
 //! for the `\myarray` command implemented above.
 //! The implementation is in 3 steps:
 //!
-//! 1. The target (e.g. `\A`) is read using [crate::parse::parse_command_target].
+//! 1. The target (e.g. `\A`) is read using [crate::parse::CommandTarget::parse].
 //!
-//! 1. The index (e.g. `1`) is read using [crate::parse::parse_number], just like in the previous section.
+//! 1. The index (e.g. `1`) is read using [usize::parse], just like in the previous section.
 //!
 //! 1. A new variable command is then created and added to the commands map.
 //!     This command is created using [Command::new_array] just as above, except in the index
@@ -275,9 +275,10 @@
 //! | Token list | TBD, but presumably a [Vec] of [Tokens](super::token::Token)    | `\toks`                | Not implemented
 //!
 
+use crate::parse::OptionalEquals;
 use crate::traits::*;
 use crate::vm;
-use crate::{parse, token, token::CatCode};
+use crate::{token, token::CatCode};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use texcraft_stdext::collections::groupingmap;
@@ -493,14 +494,14 @@ impl<S: TexlangState> Variable<S> {
         input: &mut vm::ExecutionInput<S>,
         scope: groupingmap::Scope,
     ) -> anyhow::Result<()> {
-        parse::parse_optional_equals(input)?;
+        OptionalEquals::parse(input)?;
         match self {
             Variable::Int(variable) => {
-                let value: i32 = parse::parse_number(input)?;
+                let value = i32::parse(input)?;
                 *variable.value_mut(input, scope) = value;
             }
             Variable::CatCode(variable) => {
-                let value = parse::parse_catcode(input)?;
+                let value = CatCode::parse(input)?;
                 *variable.value_mut(input, scope) = value;
             }
         };

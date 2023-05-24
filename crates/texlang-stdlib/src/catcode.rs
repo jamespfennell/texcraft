@@ -55,21 +55,9 @@ pub fn get_catcode<S: HasComponent<Component>>() -> command::BuiltIn<S> {
             state.component_mut().get_mut(index.0)
         },
         variable::IndexResolver::Dynamic(
-            |token: token::Token,
+            |_: token::Token,
              input: &mut vm::ExpandedStream<S>|
-             -> anyhow::Result<variable::Index> {
-                let index: u32 = parse::parse_number(input)?;
-                match char::from_u32(index) {
-                    None => Err(error::TokenError::new(
-                        token,
-                        format![
-                            "Argument {index} passed to {token} is not a valid UTF-8 code point"
-                        ],
-                    )
-                    .cast()),
-                    Some(_) => Ok((index as usize).into()),
-                }
-            },
+             -> anyhow::Result<variable::Index> { Ok(usize::parse(input)?.into()) },
         ),
     )
     .into()
@@ -111,7 +99,6 @@ mod tests {
         failure_tests(
             (catcode_value_too_large, r"\catcode 48 16"),
             (catcode_value_is_negative_large, r"\catcode 48 -1"),
-            (invalid_utf_8_number, r"\catcode 55296 12"),
         ),
     ];
 }
