@@ -165,7 +165,9 @@ macro_rules! create_if_primitive {
         }
 
         pub fn $get_if<S: HasComponent<Component>>() -> command::BuiltIn<S> {
-            command::BuiltIn::new_expansion($if_primitive_fn).with_tag(IF_TAG.get())
+            command::BuiltIn::new_expansion($if_primitive_fn)
+                .with_tag(IF_TAG.get())
+                .with_doc($docs)
         }
     };
 }

@@ -1,9 +1,8 @@
 //! Support for running TeX REPLs
 
 use super::script;
+use anyhow::anyhow;
 use linefeed::{Interface, ReadResult};
-use std::fmt::Debug;
-use std::fmt::Display;
 use std::sync::Arc;
 use texlang_core::parse::CommandTarget;
 use texlang_core::traits::*;
@@ -14,7 +13,19 @@ pub struct RunOptions<'a> {
     pub help: &'a str,
 }
 
-pub fn run<S: HasComponent<script::Component>>(vm: &mut vm::VM<S>, opts: RunOptions) {
+#[derive(Default)]
+pub struct Component {
+    help: String,
+    quit_requested: bool,
+}
+
+pub fn run<S: HasComponent<script::Component> + HasComponent<Component>>(
+    vm: &mut vm::VM<S>,
+    opts: RunOptions,
+) {
+    let mut c = HasComponent::<Component>::component_mut(&mut vm.custom_state);
+    c.help = opts.help.into();
+    c.quit_requested = false;
     let reader = Interface::new("").unwrap();
 
     reader.set_prompt(opts.prompt).unwrap();
@@ -33,20 +44,8 @@ pub fn run<S: HasComponent<script::Component>>(vm: &mut vm::VM<S>, opts: RunOpti
         let tokens = match script::run(vm) {
             Ok(s) => s,
             Err(err) => {
-                if let Some(signal) = anyhow::Error::downcast_ref::<Signal>(&err) {
-                    match signal {
-                        Signal::Exit => {
-                            return;
-                        }
-                        Signal::Help => {
-                            println!("{}\n", opts.help.trim());
-                            continue;
-                        }
-                        Signal::Doc(doc) => {
-                            println!("{doc}\n");
-                            continue;
-                        }
-                    }
+                if HasComponent::<Component>::component(&vm.custom_state).quit_requested {
+                    return;
                 }
                 println!("{err}");
                 continue;
@@ -67,28 +66,14 @@ pub fn run<S: HasComponent<script::Component>>(vm: &mut vm::VM<S>, opts: RunOpti
     }
 }
 
-#[derive(Debug)]
-enum Signal {
-    Exit,
-    Help,
-    Doc(String),
-}
-
-impl Display for Signal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self, f)
-    }
-}
-
-impl std::error::Error for Signal {}
-
 /// Get the `\exit` command.
 ///
 /// This exits the REPL.
-pub fn get_exit<S>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_expansion(
-        |_: token::Token, _: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<token::Token>> {
-            Err(Signal::Exit.into())
+pub fn get_exit<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(
+        |_: token::Token, input: &mut vm::ExecutionInput<S>| -> anyhow::Result<()> {
+            HasComponent::<Component>::component_mut(input.state_mut()).quit_requested = true;
+            Err(anyhow!(""))
         },
     )
 }
@@ -96,10 +81,14 @@ pub fn get_exit<S>() -> command::BuiltIn<S> {
 /// Get the `\help` command.
 ///
 /// This prints help text for the REPL.
-pub fn get_help<S>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_expansion(
-        |_: token::Token, _: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<token::Token>> {
-            Err(Signal::Help.into())
+pub fn get_help<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(
+        |_: token::Token, input: &mut vm::ExecutionInput<S>| -> anyhow::Result<()> {
+            let help = HasComponent::<Component>::component(input.state())
+                .help
+                .clone();
+            writeln![input.vm().std_err.borrow_mut(), "{help}"]?;
+            Ok(())
         },
     )
 }
@@ -108,8 +97,8 @@ pub fn get_help<S>() -> command::BuiltIn<S> {
 ///
 /// This prints the documentation for a TeX command.
 pub fn get_doc<S: TexlangState>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_expansion(
-        |_: token::Token, input: &mut vm::ExpansionInput<S>| -> anyhow::Result<Vec<token::Token>> {
+    command::BuiltIn::new_execution(
+        |_: token::Token, input: &mut vm::ExecutionInput<S>| -> anyhow::Result<()> {
             let CommandTarget::ControlSequence(cs_name) = CommandTarget::parse(input)?;
             let cs_name_s = input.vm().cs_name_interner().resolve(cs_name).unwrap();
             let doc = match input.commands_map().get_command_slow(&cs_name) {
@@ -119,7 +108,8 @@ pub fn get_doc<S: TexlangState>() -> command::BuiltIn<S> {
                     Some(doc) => format!["\\{cs_name_s}  {doc}"],
                 },
             };
-            Err(Signal::Doc(doc).into())
+            writeln![input.vm().std_err.borrow_mut(), "{doc}"]?;
+            Ok(())
         },
     )
 }

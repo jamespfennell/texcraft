@@ -18,7 +18,9 @@ use crate::token::CsNameInterner;
 use crate::token::Token;
 use crate::token::Value;
 use crate::variable;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use texcraft_stdext::collections::groupingmap;
 
 mod streams;
@@ -152,6 +154,7 @@ pub struct VM<S> {
     pub custom_state: S,
     pub commands_map: command::Map<S>,
     pub file_system_ops: Box<dyn FileSystemOps>,
+    pub std_err: Rc<RefCell<dyn std::io::Write>>,
     internal: Internal<S>,
 }
 
@@ -261,6 +264,7 @@ impl<S> VM<S> {
             commands_map: command::Map::new(initial_built_ins, Default::default()),
             internal,
             file_system_ops: Box::new(RealFileSystemOps {}),
+            std_err: Rc::new(RefCell::new(std::io::stderr())),
         }
     }
 }
