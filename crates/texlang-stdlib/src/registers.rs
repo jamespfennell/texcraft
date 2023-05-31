@@ -8,57 +8,20 @@ use texlang_core::*;
 pub const COUNT_DOC: &str = "Get or set an integer register";
 pub const COUNTDEF_DOC: &str = "Bind an integer register to a control sequence";
 
-struct Registers<T: Copy + Default, const N: usize> {
-    values: [T; N],
-}
+pub struct Component<T, const N: usize>([T; N]);
 
-impl<T: Copy + Default, const N: usize> Registers<T, N> {
-    fn new() -> Registers<T, N> {
-        Registers {
-            values: [Default::default(); N],
-        }
-    }
-
-    fn read(&self, index: usize) -> &T {
-        self.values.get(index).unwrap()
-    }
-
-    fn write(&mut self, index: usize) -> &mut T {
-        self.values.get_mut(index).unwrap()
-    }
-}
-
-/// A component holding the values of all registers.
-pub struct Component<const N: usize> {
-    int_registers: Registers<i32, N>,
-}
-
-impl<const N: usize> Component<N> {
-    /// Creates a new registers component.
-    pub fn new() -> Component<N> {
-        Component {
-            int_registers: Registers::new(),
-        }
-    }
-}
-
-impl<const N: usize> Default for Component<N> {
+impl<T: Default + Copy, const N: usize> Default for Component<T, N> {
     fn default() -> Self {
-        Component::new()
+        Self([Default::default(); N])
     }
 }
 
 /// Get the `\count` command.
-pub fn get_count<S: HasComponent<Component<N>>, const N: usize>() -> command::BuiltIn<S> {
-    variable::Command::new_array(
-        int_register_ref_fn,
-        int_register_mut_ref_fn,
-        variable::IndexResolver::Dynamic(count_fn),
-    )
-    .into()
+pub fn get_count<S: HasComponent<Component<i32, N>>, const N: usize>() -> command::BuiltIn<S> {
+    variable::Command::new_array(ref_fn, mut_fn, variable::IndexResolver::Dynamic(count_fn)).into()
 }
 
-fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
+fn count_fn<T, S: HasComponent<Component<T, N>>, const N: usize>(
     count_token: token::Token,
     input: &mut vm::ExpandedStream<S>,
 ) -> anyhow::Result<variable::Index> {
@@ -70,11 +33,11 @@ fn count_fn<S: HasComponent<Component<N>>, const N: usize>(
 }
 
 /// Get the `\countdef` command.
-pub fn get_countdef<S: HasComponent<Component<N>>, const N: usize>() -> command::BuiltIn<S> {
+pub fn get_countdef<S: HasComponent<Component<i32, N>>, const N: usize>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(countdef_fn)
 }
 
-fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
+fn countdef_fn<T: variable::SupportedType, S: HasComponent<Component<T, N>>, const N: usize>(
     countdef_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> anyhow::Result<()> {
@@ -87,8 +50,8 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
     input.commands_map_mut().insert_variable_command(
         cs_name,
         variable::Command::new_array(
-            int_register_ref_fn,
-            int_register_mut_ref_fn,
+            ref_fn,
+            mut_fn,
             variable::IndexResolver::Static(index.into()),
         ),
         groupingmap::Scope::Local,
@@ -96,18 +59,18 @@ fn countdef_fn<S: HasComponent<Component<N>>, const N: usize>(
     Ok(())
 }
 
-fn int_register_ref_fn<S: HasComponent<Component<N>>, const N: usize>(
+fn ref_fn<T, S: HasComponent<Component<T, N>>, const N: usize>(
     state: &S,
     index: variable::Index,
-) -> &i32 {
-    state.component().int_registers.read(index.0)
+) -> &T {
+    state.component().0.get(index.0).unwrap()
 }
 
-fn int_register_mut_ref_fn<S: HasComponent<Component<N>>, const N: usize>(
+fn mut_fn<T, S: HasComponent<Component<T, N>>, const N: usize>(
     state: &mut S,
     index: variable::Index,
-) -> &mut i32 {
-    state.component_mut().int_registers.write(index.0)
+) -> &mut T {
+    state.component_mut().0.get_mut(index.0).unwrap()
 }
 
 fn integer_register_too_large_error(
@@ -118,7 +81,7 @@ fn integer_register_too_large_error(
     error::TokenError::new(
         token,
         format![
-            "Register number {index} passed to {token} is too large; there are only {num} integer registers"
+            "Register index {index} passed to {token} is too large; there are only {num} registers"
         ],
     )
     .cast()
@@ -136,7 +99,7 @@ mod tests {
 
     #[derive(Default)]
     struct State {
-        registers: Component<256>,
+        registers: Component<i32, 256>,
         exec: script::Component,
     }
 
@@ -144,7 +107,7 @@ mod tests {
 
     implement_has_component![
         State,
-        (Component<256>, registers),
+        (Component<i32, 256>, registers),
         (script::Component, exec),
     ];
 

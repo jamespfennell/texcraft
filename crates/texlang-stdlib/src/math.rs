@@ -151,7 +151,7 @@ mod tests {
     struct State {
         catcode: catcode::Component,
         prefix: prefix::Component,
-        registers: registers::Component<256>,
+        registers: registers::Component<i32, 256>,
         script: script::Component,
     }
 
@@ -161,7 +161,7 @@ mod tests {
         State,
         (catcode::Component, catcode),
         (prefix::Component, prefix),
-        (registers::Component<256>, registers),
+        (registers::Component<i32, 256>, registers),
         (script::Component, script),
     ];
 

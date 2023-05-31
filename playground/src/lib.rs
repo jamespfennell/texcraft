@@ -51,7 +51,7 @@ struct PlaygroundState {
     catcode: catcode::Component,
     conditional: conditional::Component,
     prefix: prefix::Component,
-    registers: registers::Component<256>,
+    registers: registers::Component<i32, 256>,
     script: script::Component,
     time: time::Component,
 }
@@ -76,7 +76,7 @@ implement_has_component![
     (catcode::Component, catcode),
     (conditional::Component, conditional),
     (prefix::Component, prefix),
-    (registers::Component<256>, registers),
+    (registers::Component<i32, 256>, registers),
     (script::Component, script),
     (time::Component, time),
 ];
