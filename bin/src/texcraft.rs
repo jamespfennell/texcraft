@@ -80,7 +80,7 @@ fn run(mut path: PathBuf) -> Result<(), anyhow::Error> {
 fn repl() {
     println!("{}\n", REPL_START.trim());
     let mut vm = new_repl_vm();
-    repl::run(
+    repl::run::run(
         &mut vm,
         repl::RunOptions {
             prompt: "tex> ",

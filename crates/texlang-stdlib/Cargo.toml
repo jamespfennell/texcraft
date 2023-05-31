@@ -22,9 +22,6 @@ anyhow = "1.0"
 # Nice terminal output.
 colored = "2"
 
-# In the macros system
-arrayvec = "0.7.1"
-
 [features]
 default = ["time"]
 time = ["chrono"]

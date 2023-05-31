@@ -2,7 +2,6 @@
 
 use super::script;
 use anyhow::anyhow;
-use linefeed::{Interface, ReadResult};
 use std::sync::Arc;
 use texlang_core::parse::CommandTarget;
 use texlang_core::traits::*;
@@ -19,49 +18,84 @@ pub struct Component {
     quit_requested: bool,
 }
 
-pub fn run<S: HasComponent<script::Component> + HasComponent<Component>>(
-    vm: &mut vm::VM<S>,
-    opts: RunOptions,
-) {
-    let mut c = HasComponent::<Component>::component_mut(&mut vm.custom_state);
-    c.help = opts.help.into();
-    c.quit_requested = false;
-    let reader = Interface::new("").unwrap();
+#[cfg(feature = "repl")]
+pub mod run {
+    use super::*;
+    use linefeed::{Interface, ReadResult};
 
-    reader.set_prompt(opts.prompt).unwrap();
+    pub fn run<S: HasComponent<script::Component> + HasComponent<Component>>(
+        vm: &mut vm::VM<S>,
+        opts: RunOptions,
+    ) {
+        let mut c = HasComponent::<Component>::component_mut(&mut vm.custom_state);
+        c.help = opts.help.into();
+        c.quit_requested = false;
+        let reader = Interface::new("").unwrap();
 
-    let mut names: Vec<String> = vm.get_commands_as_map_slow().into_keys().collect();
-    names.sort();
-    let mut num_names = names.len();
-    let a = Arc::new(ControlSequenceCompleter { names });
-    reader.set_completer(a);
+        reader.set_prompt(opts.prompt).unwrap();
 
-    while let ReadResult::Input(input) = reader.read_line().unwrap() {
-        reader.add_history(input.clone());
+        let mut names: Vec<String> = vm.get_commands_as_map_slow().into_keys().collect();
+        names.sort();
+        let mut num_names = names.len();
+        let a = Arc::new(ControlSequenceCompleter { names });
+        reader.set_completer(a);
 
-        vm.clear_sources();
-        vm.push_source("".to_string(), input).unwrap();
-        let tokens = match script::run(vm) {
-            Ok(s) => s,
-            Err(err) => {
-                if HasComponent::<Component>::component(&vm.custom_state).quit_requested {
-                    return;
+        while let ReadResult::Input(input) = reader.read_line().unwrap() {
+            reader.add_history(input.clone());
+
+            vm.clear_sources();
+            vm.push_source("".to_string(), input).unwrap();
+            let tokens = match script::run(vm) {
+                Ok(s) => s,
+                Err(err) => {
+                    if HasComponent::<Component>::component(&vm.custom_state).quit_requested {
+                        return;
+                    }
+                    println!("{err}");
+                    continue;
                 }
-                println!("{err}");
-                continue;
+            };
+            let pretty = token::write_tokens(&tokens, vm.cs_name_interner());
+            if !pretty.trim().is_empty() {
+                println!("{pretty}\n");
             }
-        };
-        let pretty = token::write_tokens(&tokens, vm.cs_name_interner());
-        if !pretty.trim().is_empty() {
-            println!("{pretty}\n");
-        }
 
-        if vm.commands_map.len() != num_names {
-            let mut names: Vec<String> = vm.get_commands_as_map_slow().into_keys().collect();
-            names.sort();
-            num_names = names.len();
-            let a = Arc::new(ControlSequenceCompleter { names });
-            reader.set_completer(a);
+            if vm.commands_map.len() != num_names {
+                let mut names: Vec<String> = vm.get_commands_as_map_slow().into_keys().collect();
+                names.sort();
+                num_names = names.len();
+                let a = Arc::new(ControlSequenceCompleter { names });
+                reader.set_completer(a);
+            }
+        }
+    }
+
+    struct ControlSequenceCompleter {
+        names: Vec<String>,
+    }
+
+    impl<Term: linefeed::Terminal> linefeed::Completer<Term> for ControlSequenceCompleter {
+        fn complete(
+            &self,
+            word: &str,
+            prompter: &linefeed::Prompter<Term>,
+            start: usize,
+            _end: usize,
+        ) -> Option<Vec<linefeed::Completion>> {
+            if prompter.buffer()[..start].chars().rev().next() != Some('\\') {
+                return None;
+            }
+            let mut completions = Vec::new();
+            for name in &self.names {
+                if name.starts_with(word) {
+                    completions.push(linefeed::Completion {
+                        completion: name.clone(),
+                        display: None,
+                        suffix: linefeed::Suffix::Default,
+                    });
+                }
+            }
+            Some(completions)
         }
     }
 }
@@ -112,33 +146,4 @@ pub fn get_doc<S: TexlangState>() -> command::BuiltIn<S> {
             Ok(())
         },
     )
-}
-
-struct ControlSequenceCompleter {
-    names: Vec<String>,
-}
-
-impl<Term: linefeed::Terminal> linefeed::Completer<Term> for ControlSequenceCompleter {
-    fn complete(
-        &self,
-        word: &str,
-        prompter: &linefeed::Prompter<Term>,
-        start: usize,
-        _end: usize,
-    ) -> Option<Vec<linefeed::Completion>> {
-        if prompter.buffer()[..start].chars().rev().next() != Some('\\') {
-            return None;
-        }
-        let mut completions = Vec::new();
-        for name in &self.names {
-            if name.starts_with(word) {
-                completions.push(linefeed::Completion {
-                    completion: name.clone(),
-                    display: None,
-                    suffix: linefeed::Suffix::Default,
-                });
-            }
-        }
-        Some(completions)
-    }
 }

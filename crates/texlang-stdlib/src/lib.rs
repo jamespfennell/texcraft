@@ -21,7 +21,6 @@ pub mod io;
 pub mod math;
 pub mod prefix;
 pub mod registers;
-#[cfg(feature = "repl")]
 pub mod repl;
 pub mod script;
 pub mod sleep;
