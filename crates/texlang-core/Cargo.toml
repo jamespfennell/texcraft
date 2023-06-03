@@ -6,12 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# Used for the many situations in which multiple integer types are supported: e.g, parsing, variables.
-num-traits = "0.2.14"
-
-# Error handling.
-anyhow = "1.0"
-
 # Nice terminal output.
 colored = "2"
 

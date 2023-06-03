@@ -47,84 +47,105 @@ macro_rules! create_arithmetic_primitive {
         fn $prim_fn<S: HasComponent<prefix::Component>>(
             token: token::Token,
             input: &mut vm::ExecutionInput<S>,
-        ) -> anyhow::Result<()> {
+        ) -> Result<(), Box<error::Error>> {
             let scope = input.state_mut().component_mut().read_and_reset_global();
             let variable = variable::Variable::parse(input)?;
             OptionalBy::parse(input)?;
             match variable {
                 variable::Variable::Int(variable) => {
                     let n = i32::parse(input)?;
-                    let i = variable.value_mut(input, scope);
-                    *i = $arithmetic_op(token, *i, n)?;
+                    let lhs = *variable.value(input.state());
+                    let result = $arithmetic_op(input.vm(), token, lhs, n)?;
+                    *variable.value_mut(input, scope) = result;
                     Ok(())
                 }
-                variable::Variable::CatCode(_) => invalid_variable_error(token),
+                variable::Variable::CatCode(_) => invalid_variable_error(input.vm(), token),
             }
         }
     };
 }
 
-fn invalid_variable_error(token: token::Token) -> anyhow::Result<()> {
-    Err(error::TokenError::new(
+fn invalid_variable_error<S>(vm: &vm::VM<S>, token: token::Token) -> Result<(), Box<error::Error>> {
+    Err(error::SimpleTokenError::new(
+        vm,
         token,
         "arithmetic commands cannot be applied to variables of type X",
     )
-    .add_note(
-        "arithmetic commands (\\advance, \\multiply, \\divide) can be applied to integer, dimension, glue and muglue variables",
-    )
-    .cast())
+    .into())
+    // TODO .add_note(
+    //       "arithmetic commands (\\advance, \\multiply, \\divide) can be applied to integer, dimension, glue and muglue variables",
 }
 
 #[inline]
-fn add(_: token::Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
-    // Note: TeX explicitely permits overflow in \advance
+fn add<S>(_: &vm::VM<S>, _: token::Token, lhs: i32, rhs: i32) -> Result<i32, Box<error::Error>> {
+    // Note: TeX explicitly permits overflow in \advance
     Ok(lhs.wrapping_add(rhs))
 }
 
-fn checked_add(token: token::Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
+fn checked_add<S>(
+    vm: &vm::VM<S>,
+    token: token::Token,
+    lhs: i32,
+    rhs: i32,
+) -> Result<i32, Box<error::Error>> {
     match lhs.checked_add(rhs) {
         Some(result) => Ok(result),
         None => Err(
-            error::TokenError::new(token, "overflow in checked addition")
-                .add_note(format!["left hand side evaluated to {lhs}"])
-                .add_note(format!["right hand side evaluated {rhs}"])
-                .add_note(format![
-                    "overflowed result would be {}",
-                    lhs.wrapping_add(rhs)
-                ])
-                .add_note("use \\advance instead of \\advancechk to permit overflowing")
-                .cast(),
+            error::SimpleTokenError::new(vm, token, "overflow in checked addition").into(), /* TODO
+                                                                                            .add_note(format!["left hand side evaluated to {lhs}"])
+                                                                                            .add_note(format!["right hand side evaluated {rhs}"])
+                                                                                            .add_note(format![
+                                                                                                "overflowed result would be {}",
+                                                                                                lhs.wrapping_add(rhs)
+                                                                                            ])
+                                                                                            .add_note("use \\advance instead of \\advancechk to permit overflowing")
+                                                                                            */
         ),
     }
 }
 
 #[inline]
-fn multiply(_: token::Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
-    // Note: TeX explicitely permits overflow in \multiply
+fn multiply<S>(
+    _: &vm::VM<S>,
+    _: token::Token,
+    lhs: i32,
+    rhs: i32,
+) -> Result<i32, Box<error::Error>> {
+    // Note: TeX explicitly permits overflow in \multiply
     Ok(lhs.wrapping_mul(rhs))
 }
 
-fn checked_multiply(token: token::Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
+fn checked_multiply<S>(
+    vm: &vm::VM<S>,
+    token: token::Token,
+    lhs: i32,
+    rhs: i32,
+) -> Result<i32, Box<error::Error>> {
     match lhs.checked_mul(rhs) {
         Some(result) => Ok(result),
         None => Err(
-            error::TokenError::new(token, "overflow in checked multiplication")
-                .add_note(format!["left hand side evaluated to {lhs}"])
-                .add_note(format!["right hand side evaluated {rhs}"])
-                .add_note(format![
-                    "overflowed result would be {}",
-                    lhs.wrapping_mul(rhs)
-                ])
-                .add_note("use \\multiply instead of \\multiplychk to permit overflowing")
-                .cast(),
+            error::SimpleTokenError::new(vm, token, "overflow in checked multiplication").into(), /* TODO
+                                                                                                     .add_note(format!["left hand side evaluated to {lhs}"])
+                                                                                                     .add_note(format!["right hand side evaluated {rhs}"])
+                                                                                                     .add_note(format![
+                                                                                                         "overflowed result would be {}",
+                                                                                                         lhs.wrapping_mul(rhs)
+                                                                                                     ])
+                                                                                                     .add_note("use \\multiply instead of \\multiplychk to permit overflowing")
+                                                                                                  */
         ),
     }
 }
 
 #[inline]
-fn divide(token: token::Token, lhs: i32, rhs: i32) -> anyhow::Result<i32> {
+fn divide<S>(
+    vm: &vm::VM<S>,
+    token: token::Token,
+    lhs: i32,
+    rhs: i32,
+) -> Result<i32, Box<error::Error>> {
     if rhs == 0 {
-        return Err(error::TokenError::new(token, "division by zero").cast());
+        return Err(error::SimpleTokenError::new(vm, token, "division by zero").into());
     }
     Ok(lhs.wrapping_div(rhs))
 }

@@ -1,33 +1,39 @@
-use crate::command;
-use crate::error;
-use crate::token;
 use crate::traits::*;
-use crate::variable;
-use crate::vm;
+use crate::*;
 
 impl<S: TexlangState> Parsable<S> for variable::Variable<S> {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
         match input.next()? {
-            None => Err(error::EndOfInputError::new(
-                "Unexpected end of input while reading in a variable",
-            )
-            .cast()),
+            None => Err(parse::Error::new(input.vm(), "a variable", None, "").into()),
             Some(token) => match token.value() {
-                token::Value::ControlSequence(name) => match input.commands_map().get_command(&name)
-                {
-                    None => Err(error::TokenError::new(token, "Undefined control sequence").cast()),
-                    Some(command::Command::Variable(cmd)) => cmd.clone().resolve(token, input),
-                    Some(_) => Err(error::TokenError::new(
-                        token,
-                        "Expected variable command (register or parameter); found something else",
-                    )
-                    .cast()),
-                },
-                _ => Err(error::TokenError::new(
-                    token,
-                    "Unexpected character token while reading in a variable",
+                token::Value::ControlSequence(name) => {
+                    match input.commands_map().get_command(&name) {
+                        None => Err(parse::Error::new(
+                            input.vm(),
+                            "a variable (got undefined cs)",
+                            Some(token),
+                            "",
+                        )
+                        .into()),
+                        Some(command::Command::Variable(cmd)) => {
+                            Ok(cmd.clone().resolve(token, input)?)
+                        }
+                        Some(_) => Err(parse::Error::new(
+                            input.vm(),
+                            "a variable (got a different kind of command)",
+                            Some(token),
+                            "",
+                        )
+                        .into()),
+                    }
+                }
+                _ => Err(parse::Error::new(
+                    input.vm(),
+                    "a variable (got a character token)",
+                    Some(token),
+                    "",
                 )
-                .cast()),
+                .into()),
             },
         }
     }
@@ -37,7 +43,7 @@ impl<S: TexlangState> Parsable<S> for variable::Variable<S> {
 pub struct OptionalEquals;
 
 impl<S: TexlangState> Parsable<S> for OptionalEquals {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
         parse_optional_equals(input)?;
         Ok(OptionalEquals {})
     }
@@ -47,7 +53,7 @@ impl<S: TexlangState> Parsable<S> for OptionalEquals {
 pub struct OptionalEqualsUnexpanded;
 
 impl<S: TexlangState> Parsable<S> for OptionalEqualsUnexpanded {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
         parse_optional_equals(input.unexpanded())?;
         Ok(OptionalEqualsUnexpanded {})
     }
@@ -55,7 +61,7 @@ impl<S: TexlangState> Parsable<S> for OptionalEqualsUnexpanded {
 
 fn parse_optional_equals<S: TexlangState, I: TokenStream<S = S>>(
     input: &mut I,
-) -> anyhow::Result<()> {
+) -> Result<(), Box<error::Error>> {
     while let Some(found_equals) = get_optional_element![
         input,
         token::Value::Other('=') => false,

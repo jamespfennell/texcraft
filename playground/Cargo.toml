@@ -22,4 +22,3 @@ console_error_panic_hook = "0.1.5"
 
 texlang-core = { path = "../crates/texlang-core", default-features = false }
 texlang-stdlib = { path = "../crates/texlang-stdlib", default-features = false }
-anyhow = "1.0"

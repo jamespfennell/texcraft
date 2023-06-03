@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound::Included;
 use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
-use texlang_core::parse::CommandTarget;
+use texlang_core::parse::Command;
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -180,8 +180,8 @@ pub fn get_newint<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn newint_primitive_fn<S: HasComponent<Component>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> anyhow::Result<()> {
-    let CommandTarget::ControlSequence(name) = CommandTarget::parse(input)?;
+) -> command::Result<()> {
+    let Command::ControlSequence(name) = Command::parse(input)?;
     let addr = input.state_mut().component_mut().alloc_int();
     input.commands_map_mut().insert_variable_command(
         name,
@@ -202,7 +202,7 @@ impl<S> variable::DynamicIndexResolver<S> for SingletonIndexResolver {
         &self,
         _: texlang_core::token::Token,
         _: &mut vm::ExpandedStream<S>,
-    ) -> anyhow::Result<variable::Index> {
+    ) -> command::Result<variable::Index> {
         Ok(self.0)
     }
 }
@@ -230,8 +230,8 @@ pub fn get_newarray<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn newarray_primitive_fn<S: HasComponent<Component>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> anyhow::Result<()> {
-    let CommandTarget::ControlSequence(name) = CommandTarget::parse(input)?;
+) -> command::Result<()> {
+    let Command::ControlSequence(name) = Command::parse(input)?;
     let len = usize::parse(input)?;
     let addr = input.state_mut().component_mut().alloc_array(len);
     input.commands_map_mut().insert_variable_command(
@@ -254,7 +254,7 @@ impl<S: HasComponent<Component>> variable::DynamicIndexResolver<S> for ArrayInde
         &self,
         token: texlang_core::token::Token,
         input: &mut vm::ExpandedStream<S>,
-    ) -> anyhow::Result<variable::Index> {
+    ) -> command::Result<variable::Index> {
         let array_addr = self.0;
         let array_index = usize::parse(input)?;
         let (allocations_i, inner_i) = input.state().component().array_addr_map[&array_addr];
@@ -262,13 +262,13 @@ impl<S: HasComponent<Component>> variable::DynamicIndexResolver<S> for ArrayInde
             .value
             .len();
         if array_index >= array_len {
-            return Err(error::TokenError::new(
+            return Err(error::SimpleTokenError::new(input.vm(),
             token,
             format![
                 "Array out of bounds: cannot access index {array_index} of array with length {array_len}"
             ],
         )
-        .cast());
+        .into());
         }
         Ok(variable::Index(array_addr.0 + array_index))
     }

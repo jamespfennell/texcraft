@@ -1,7 +1,8 @@
 //! Register variables (`\count`, `\countdef`)
 
 use texcraft_stdext::collections::groupingmap;
-use texlang_core::parse::{CommandTarget, OptionalEquals};
+use texlang_core::parse::{Command, OptionalEquals};
+use texlang_core::token::trace;
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -24,10 +25,15 @@ pub fn get_count<S: HasComponent<Component<i32, N>>, const N: usize>() -> comman
 fn count_fn<T, S: HasComponent<Component<T, N>>, const N: usize>(
     count_token: token::Token,
     input: &mut vm::ExpandedStream<S>,
-) -> anyhow::Result<variable::Index> {
+) -> command::Result<variable::Index> {
     let index = usize::parse(input)?;
     if index >= N {
-        return Err(integer_register_too_large_error(count_token, index, N));
+        return Err(IndexTooLargeError {
+            trace: input.vm().trace(count_token),
+            index,
+            num: N,
+        }
+        .into());
     }
     Ok(index.into())
 }
@@ -40,11 +46,16 @@ pub fn get_countdef<S: HasComponent<Component<i32, N>>, const N: usize>() -> com
 fn countdef_fn<T: variable::SupportedType, S: HasComponent<Component<T, N>>, const N: usize>(
     countdef_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> anyhow::Result<()> {
-    let (target, _, index) = <(CommandTarget, OptionalEquals, usize)>::parse(input)?;
-    let CommandTarget::ControlSequence(cs_name) = target;
+) -> command::Result<()> {
+    let (target, _, index) = <(Command, OptionalEquals, usize)>::parse(input)?;
+    let Command::ControlSequence(cs_name) = target;
     if index >= N {
-        return Err(integer_register_too_large_error(countdef_token, index, N));
+        return Err(IndexTooLargeError {
+            trace: input.vm().trace(countdef_token),
+            index,
+            num: N,
+        }
+        .into());
     }
     // TODO: I suspect \countdef should honor \global, but haven't checked pdfTeX.
     input.commands_map_mut().insert_variable_command(
@@ -73,18 +84,24 @@ fn mut_fn<T, S: HasComponent<Component<T, N>>, const N: usize>(
     state.component_mut().0.get_mut(index.0).unwrap()
 }
 
-fn integer_register_too_large_error(
-    token: token::Token,
+#[derive(Debug)]
+struct IndexTooLargeError {
+    trace: trace::SourceCodeTrace,
     index: usize,
     num: usize,
-) -> anyhow::Error {
-    error::TokenError::new(
-        token,
+}
+
+impl error::TexError for IndexTooLargeError {
+    fn kind(&self) -> error::Kind {
+        error::Kind::Token(&self.trace)
+    }
+
+    fn title(&self) -> String {
         format![
-            "Register index {index} passed to {token} is too large; there are only {num} registers"
-        ],
-    )
-    .cast()
+            "Index {} is too large; there are only {} integer registers",
+            self.index, self.num,
+        ]
+    }
 }
 
 #[cfg(test)]

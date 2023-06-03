@@ -12,7 +12,7 @@
 //! # Developer notes on `\global`
 //!
 //! The `\global` command here is pretty much a nightmare to implement.
-//! One of the core principles of the Texlang implentation is to remove global state,
+//! One of the core principles of the Texlang implementation is to remove global state,
 //!   but `\global` makes this really hard.
 //! The reason is that it changes the behavior, at run time, of a bunch of
 //!   other commands like `\def` and `\advance`, and it also changes the semantics
@@ -55,7 +55,6 @@ use crate::def;
 use crate::math;
 use std::collections::HashSet;
 use texcraft_stdext::collections::groupingmap;
-use texlang_core::token::trace;
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -146,7 +145,7 @@ fn outer_tag() -> command::Tag {
 fn global_primitive_fn<S: HasComponent<Component>>(
     global_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> anyhow::Result<()> {
+) -> command::Result<()> {
     process_prefixes(
         Prefix {
             global: Some(global_token),
@@ -160,7 +159,7 @@ fn global_primitive_fn<S: HasComponent<Component>>(
 fn long_primitive_fn<S: HasComponent<Component>>(
     long_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> anyhow::Result<()> {
+) -> command::Result<()> {
     process_prefixes(
         Prefix {
             global: None,
@@ -174,7 +173,7 @@ fn long_primitive_fn<S: HasComponent<Component>>(
 fn outer_primitive_fn<S: HasComponent<Component>>(
     outer_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> anyhow::Result<()> {
+) -> command::Result<()> {
     process_prefixes(
         Prefix {
             global: None,
@@ -188,16 +187,15 @@ fn outer_primitive_fn<S: HasComponent<Component>>(
 fn process_prefixes<S: HasComponent<Component>>(
     mut prefix: Prefix,
     input: &mut vm::ExecutionInput<S>,
-) -> anyhow::Result<()> {
+) -> command::Result<()> {
     complete_prefix(&mut prefix, input)?;
     match input.peek()? {
         None => {
-            let (prefix_token, prefix_kind) = prefix.get_one();
-            Err(Error::EndOfInputAfterPrefix {
-                end_of_input: input.trace_end_of_input(),
-                prefix_token: input.trace(prefix_token),
-                prefix_kind,
-            }
+            let (_prefix_token, prefix_kind) = prefix.get_one();
+            Err(error::SimpleEndOfInputError::new(
+                input.vm(),
+                format!["{prefix_kind:?} TODO end of input while looking for command to prefix"],
+            )
             .into())
         }
         Some(&t) => match t.value() {
@@ -242,21 +240,21 @@ fn process_prefixes<S: HasComponent<Component>>(
                     }
                 }
                 // If we make it to here, this is not a valid target for the prefix command.
-                let (prefix_token, prefix_kind) = prefix.get_one();
-                Err(Error::CommandCannotBePrefixed {
-                    command_token: input.trace(t),
-                    prefix_token: input.trace(prefix_token),
-                    prefix_kind,
-                }
+                let (_prefix_token, prefix_kind) = prefix.get_one();
+                Err(error::SimpleTokenError::new(
+                    input.vm(),
+                    t,
+                    format!["{prefix_kind:?} TODO not a valid prefix command"],
+                )
                 .into())
             }
             _ => {
-                let (prefix_token, prefix_kind) = prefix.get_one();
-                Err(Error::TokenCannotBePrefixed {
-                    token: input.trace(t),
-                    prefix_token: input.trace(prefix_token),
-                    prefix_kind,
-                }
+                let (_prefix_token, prefix_kind) = prefix.get_one();
+                Err(error::SimpleTokenError::new(
+                    input.vm(),
+                    t,
+                    format!["{prefix_kind:?} TODO not a valid prefix target/token"],
+                )
                 .into())
             }
         },
@@ -266,7 +264,7 @@ fn process_prefixes<S: HasComponent<Component>>(
 fn complete_prefix<S: TexlangState>(
     prefix: &mut Prefix,
     input: &mut vm::ExecutionInput<S>,
-) -> anyhow::Result<()> {
+) -> command::Result<()> {
     // TODO: spaces and \relax are allowed after prefixes per TeX source sections 1211 and 404.
     let found_prefix = match input.peek()? {
         None => false,
@@ -305,20 +303,20 @@ fn assert_only_global_prefix<S: TexlangState>(
     token: token::Token,
     prefix: Prefix,
     input: &vm::ExecutionInput<S>,
-) -> anyhow::Result<()> {
-    if let Some(outer_token) = prefix.outer {
-        Err(Error::CommandCannotBePrefixed {
-            command_token: input.trace(token),
-            prefix_token: input.trace(outer_token),
-            prefix_kind: Kind::Outer,
-        }
+) -> command::Result<()> {
+    if let Some(_outer_token) = prefix.outer {
+        Err(error::SimpleTokenError::new(
+            input.vm(),
+            token,
+            "TODO Outer cannot be applied to this command",
+        )
         .into())
-    } else if let Some(long_token) = prefix.long {
-        Err(Error::CommandCannotBePrefixed {
-            command_token: input.trace(token),
-            prefix_token: input.trace(long_token),
-            prefix_kind: Kind::Long,
-        }
+    } else if let Some(_long_token) = prefix.long {
+        Err(error::SimpleTokenError::new(
+            input.vm(),
+            token,
+            "TODO long cannot be applied to this command",
+        )
         .into())
     } else {
         Ok(())
@@ -332,26 +330,7 @@ pub enum Kind {
     Outer,
 }
 
-/// Error type for the prefix commands.
-#[derive(Debug)]
-pub enum Error {
-    CommandCannotBePrefixed {
-        command_token: trace::Trace,
-        prefix_token: trace::Trace,
-        prefix_kind: Kind,
-    },
-    TokenCannotBePrefixed {
-        token: trace::Trace,
-        prefix_token: trace::Trace,
-        prefix_kind: Kind,
-    },
-    EndOfInputAfterPrefix {
-        end_of_input: trace::Trace,
-        prefix_token: trace::Trace,
-        prefix_kind: Kind,
-    },
-}
-
+/*
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -398,8 +377,7 @@ impl std::fmt::Display for Error {
         }
     }
 }
-
-impl std::error::Error for Error {}
+ */
 
 /// Get an execution command that checks that the global flag is off.
 ///
@@ -412,11 +390,16 @@ impl std::error::Error for Error {}
 /// ```
 pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     fn noop_execution_cmd_fn<S: HasComponent<Component>>(
-        _: token::Token,
+        token: token::Token,
         input: &mut vm::ExecutionInput<S>,
-    ) -> anyhow::Result<()> {
+    ) -> command::Result<()> {
         match input.state_mut().component_mut().read_and_reset_global() {
-            groupingmap::Scope::Global => Err(anyhow::anyhow!("assertion failed: global is true")),
+            groupingmap::Scope::Global => Err(error::SimpleTokenError::new(
+                input.vm(),
+                token,
+                "assertion failed: global is true",
+            )
+            .into()),
             groupingmap::Scope::Local => Ok(()),
         }
     }

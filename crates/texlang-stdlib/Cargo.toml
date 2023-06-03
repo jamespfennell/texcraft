@@ -5,6 +5,10 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name = "texlang-all-errors"
+path = "bin/errors.rs"
+
 [dependencies]
 
 # In the time module for getting the current time on startup.
@@ -14,10 +18,6 @@ linefeed = {version = "0.6", optional = true}
 
 texcraft-stdext = { path = "../texcraft-stdext" }
 texlang-core = { path = "../texlang-core" }
-
-
-# Error handling.
-anyhow = "1.0"
 
 # Nice terminal output.
 colored = "2"

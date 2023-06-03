@@ -164,6 +164,23 @@ impl Token {
             Value::ControlSequence(..) => None,
         }
     }
+
+    pub fn cat_code(&self) -> Option<CatCode> {
+        match self.value {
+            Value::BeginGroup(_) => Some(CatCode::BeginGroup),
+            Value::EndGroup(_) => Some(CatCode::EndGroup),
+            Value::MathShift(_) => Some(CatCode::MathShift),
+            Value::AlignmentTab(_) => Some(CatCode::AlignmentTab),
+            Value::Parameter(_) => Some(CatCode::Parameter),
+            Value::Superscript(_) => Some(CatCode::Superscript),
+            Value::Subscript(_) => Some(CatCode::Subscript),
+            Value::Space(_) => Some(CatCode::Space),
+            Value::Letter(_) => Some(CatCode::Letter),
+            Value::Other(_) => Some(CatCode::Other),
+            Value::Active(_) => Some(CatCode::Other),
+            Value::ControlSequence(..) => None,
+        }
+    }
 }
 
 enum PendingWhitespace {
@@ -244,6 +261,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error;
 
     enum PreInternedToken {
         ControlSequence(&'static str),
@@ -349,6 +367,6 @@ mod tests {
         assert_eq!(std::mem::size_of::<Token>(), 12);
         assert_eq!(std::mem::size_of::<Result<Token, ()>>(), 12);
         assert_eq!(std::mem::size_of::<Result<Option<Token>, ()>>(), 12);
-        assert_eq!(std::mem::size_of::<anyhow::Result<Token>>(), 16);
+        assert_eq!(std::mem::size_of::<Result<Token, Box<error::Error>>>(), 16);
     }
 }

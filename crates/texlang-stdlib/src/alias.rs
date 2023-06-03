@@ -1,7 +1,7 @@
 //! `\let` aliasing command
 
 use crate::prefix;
-use texlang_core::parse::{CommandTarget, OptionalEqualsUnexpanded};
+use texlang_core::parse::{Command, OptionalEqualsUnexpanded};
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -23,15 +23,16 @@ pub fn let_tag() -> command::Tag {
 fn let_primitive_fn<S: HasComponent<prefix::Component>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> anyhow::Result<()> {
+) -> Result<(), Box<error::Error>> {
     let scope = input.state_mut().component_mut().read_and_reset_global();
-    let CommandTarget::ControlSequence(alias) = CommandTarget::parse(input)?;
+    let Command::ControlSequence(alias) = Command::parse(input)?;
     OptionalEqualsUnexpanded::parse(input)?;
     match input.unexpanded().next()? {
-        None => Err(error::EndOfInputError::new(
+        None => Err(error::SimpleEndOfInputError::new(
+            input.vm(),
             "unexpected end of input while reading the right hand side of a \\let assignment",
         )
-        .cast()),
+        .into()),
         Some(token) => match token.value() {
             token::Value::ControlSequence(control_sequence) => {
                 match input.commands_map_mut().alias_control_sequence(
@@ -40,7 +41,7 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
                     scope,
                 ) {
                     Ok(()) => Ok(()),
-                    Err(_) => Err(error::new_undefined_command_error(token, input.vm())),
+                    Err(_) => Err(error::UndefinedCommandError::new(input.vm(), token).into()),
                 }
             }
             _ => {

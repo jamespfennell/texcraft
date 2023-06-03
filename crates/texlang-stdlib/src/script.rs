@@ -29,7 +29,7 @@ pub fn get_newline<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn newline_primitive_fn<S: HasComponent<Component>>(
     t: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> anyhow::Result<()> {
+) -> command::Result<()> {
     let c = input.state_mut().component_mut();
     let newline_token = token::Token::new_space('\n', t.trace_key());
     c.exec_output.push(newline_token);
@@ -48,7 +48,7 @@ pub fn get_par<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn par_primitive_fn<S: HasComponent<Component>>(
     t: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> anyhow::Result<()> {
+) -> command::Result<()> {
     let c = input.state_mut().component_mut();
     if c.exec_output.is_empty() {
         return Ok(());
@@ -70,7 +70,9 @@ fn par_primitive_fn<S: HasComponent<Component>>(
 }
 
 /// Run the Texlang interpreter for the provided VM and return the result as list of tokens.
-pub fn run<S: HasComponent<Component>>(vm: &mut vm::VM<S>) -> anyhow::Result<Vec<token::Token>> {
+pub fn run<S: HasComponent<Component>>(
+    vm: &mut vm::VM<S>,
+) -> Result<Vec<token::Token>, Box<error::Error>> {
     vm::run::<S, Handlers>(vm)?;
     let mut result = Vec::new();
     std::mem::swap(
@@ -86,7 +88,7 @@ impl<S: HasComponent<Component>> vm::Handlers<S> for Handlers {
     fn character_handler(
         mut token: token::Token,
         input: &mut vm::ExecutionInput<S>,
-    ) -> anyhow::Result<()> {
+    ) -> command::Result<()> {
         let c = input.state_mut().component_mut();
         if let Some('\n') = token.char() {
             token = token::Token::new_space(' ', token.trace_key());
@@ -99,18 +101,18 @@ impl<S: HasComponent<Component>> vm::Handlers<S> for Handlers {
     fn undefined_command_handler(
         token: token::Token,
         input: &mut vm::ExecutionInput<S>,
-    ) -> anyhow::Result<()> {
+    ) -> command::Result<()> {
         if input.state().component().allow_undefined_command {
             Handlers::character_handler(token, input)
         } else {
-            Err(error::new_undefined_command_error(token, input.vm()))
+            Err(error::UndefinedCommandError::new(input.vm(), token).into())
         }
     }
 
     fn unexpanded_expansion_command(
         token: token::Token,
         input: &mut vm::ExecutionInput<S>,
-    ) -> anyhow::Result<()> {
+    ) -> command::Result<()> {
         Handlers::character_handler(token, input)
     }
 }

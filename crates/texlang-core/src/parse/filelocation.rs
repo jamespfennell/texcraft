@@ -2,9 +2,8 @@
 //!
 //! See section 511 of the TeXBook.
 
-use crate::token;
 use crate::traits::*;
-use crate::vm;
+use crate::*;
 
 /// Representation of a file location in TeX
 #[derive(PartialEq, Eq, Debug)]
@@ -15,7 +14,7 @@ pub struct FileLocation {
 }
 
 impl<S: TexlangState> Parsable<S> for FileLocation {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
         let mut raw_string = String::new();
         let mut area_delimiter = None;
         let mut ext_delimiter = None;

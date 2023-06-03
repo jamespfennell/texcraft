@@ -14,7 +14,7 @@ pub fn get_input<S: TexlangState>() -> command::BuiltIn<S> {
 fn input_fn<S: TexlangState>(
     input_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<token::Token>> {
+) -> Result<Vec<token::Token>, Box<command::Error>> {
     let file_location = FileLocation::parse(input)?;
     let (file_path, source_code) = read_file(input_token, input.vm(), file_location, ".tex")?;
     input.push_source(input_token, file_path, source_code)?;
@@ -26,7 +26,7 @@ fn read_file<S>(
     vm: &vm::VM<S>,
     file_location: parse::FileLocation,
     default_extension: &str,
-) -> anyhow::Result<(String, String)> {
+) -> command::Result<(String, String)> {
     let raw_file_path = format![
         "{}{}",
         &file_location.path,
@@ -40,27 +40,24 @@ fn read_file<S>(
         false => match file_location.area {
             None => match vm.working_directory() {
                 None => {
-                    return Err(anyhow::anyhow!(
-                      format![  "cannot read from relative path {raw_file_path} because no working directory is set"]
-                    ));
+                    panic!("TODO: handle this error");
                 }
                 Some(working_directory) => working_directory.join(&raw_file_path),
             },
-            Some(area) => {
-                return Err(anyhow::anyhow!(format![
-                    "cannot read from area {area} as areas are not implemented"
-                ]));
+            Some(_area) => {
+                panic!("TODO: handle this error");
             }
         },
     };
 
     match vm.file_system_ops.read_to_string(&file_path) {
         Ok(s) => Ok((raw_file_path, s)),
-        Err(err) => Err(
-            error::TokenError::new(t, format!("could not read from {:?}", &file_path))
-                .add_note(format!("underlying filesystem error: {err}"))
-                .cast(),
-        ),
+        Err(_err) => Err(error::SimpleTokenError::new(
+            vm,
+            t,
+            format!("could not read from {:?}", &file_path),
+        )
+        .into()), // .add_note(format!("underlying filesystem error: {err}"))
     }
 }
 

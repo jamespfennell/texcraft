@@ -7,36 +7,22 @@ use crate::vm;
 pub struct OptionalBy;
 
 impl<S: TexlangState> Parsable<S> for OptionalBy {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
         let next_is_b = get_optional_element![
             input,
             token::Value::Letter('b') => (),
             token::Value::Letter('B') => (),
         ];
         if let Some(()) = next_is_b {
-            get_element![
+            get_required_element![
                 input,
-                optional_by_error,
+                "the letter y or Y",
+                "the `by` keyword consists of two letter tokens, and is case insensitive",
                 token::Value::Letter('y') => OptionalBy{},
                 token::Value::Letter('Y') => OptionalBy{},
             ]
         } else {
             Ok(OptionalBy {})
-        }
-    }
-}
-
-fn optional_by_error(token: Option<token::Token>) -> anyhow::Error {
-    match token {
-        None => {
-            error::EndOfInputError::new("unexpected end of input while parsing the `by` keyword")
-                .add_note("expected the letter `y` or `Y`")
-                .cast()
-        }
-        Some(token) => {
-            error::TokenError::new(token, "unexpected token while parsing the `by` keyword")
-                .add_note("expected the letter `y` or `Y`")
-                .cast()
         }
     }
 }

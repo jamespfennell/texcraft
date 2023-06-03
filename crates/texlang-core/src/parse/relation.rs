@@ -8,27 +8,16 @@ use crate::{error, token, vm};
 use std::cmp::Ordering;
 
 impl<S: TexlangState> Parsable<S> for Ordering {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> anyhow::Result<Self> {
-        get_element![
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+        get_required_element![
             input,
-            parse_relation_error,
+            "a relation", 
+            "a relation is a token with character code other and one of the following values: <, =, >",
             token::Value::Other('<') => Ordering::Less,
             token::Value::Other('=') => Ordering::Equal,
             token::Value::Other('>') => Ordering::Greater,
         ]
     }
-}
-
-fn parse_relation_error(token: Option<token::Token>) -> anyhow::Error {
-    match token {
-      None => error::EndOfInputError::new(
-          "unexpected end of input while parsing a relation").cast(),
-      Some(token) => error::TokenError::new(
-          token,
-          "unexpected control sequence while parsing a relation")
-          .add_note("a relation must be a character token of catcode 12 (other) and value '<', '=', or '<'.")
-          .cast(),
-  }
 }
 
 #[cfg(test)]

@@ -59,7 +59,10 @@ pub trait Handlers<S: TexlangState> {
     ///
     /// This token is _not_ invoked for tokens whose category code is begin group (1), end group (2) or active character (13).
     /// These cases are handled automatically by the VM based on the semantics of the TeX language.
-    fn character_handler(token: token::Token, input: &mut ExecutionInput<S>) -> anyhow::Result<()> {
+    fn character_handler(
+        token: token::Token,
+        input: &mut ExecutionInput<S>,
+    ) -> Result<(), Box<error::Error>> {
         _ = (token, input);
         Ok(())
     }
@@ -68,8 +71,8 @@ pub trait Handlers<S: TexlangState> {
     fn undefined_command_handler(
         token: token::Token,
         input: &mut ExecutionInput<S>,
-    ) -> anyhow::Result<()> {
-        Err(error::new_undefined_command_error(token, input.vm()))
+    ) -> Result<(), Box<error::Error>> {
+        Err(error::UndefinedCommandError::new(input.vm(), token).into())
     }
 
     /// Handler to invoke for expansion commands that were not expanded.
@@ -78,75 +81,99 @@ pub trait Handlers<S: TexlangState> {
     fn unexpanded_expansion_command(
         token: token::Token,
         input: &mut ExecutionInput<S>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), Box<error::Error>> {
         _ = (token, input);
         Ok(())
     }
 }
 
+pub struct DefaultHandlers;
+
+impl<S: TexlangState> Handlers<S> for DefaultHandlers {}
+
 /// Run the VM.
 ///
 /// It is assumed that the VM has been preloaded with TeX source code using the
 /// [VM::push_source] method.
-pub fn run<S: TexlangState, H: Handlers<S>>(vm: &mut VM<S>) -> anyhow::Result<()> {
-    let execution_input = ExecutionInput::new(vm);
+pub fn run<S: TexlangState, H: Handlers<S>>(vm: &mut VM<S>) -> Result<(), Box<error::Error>> {
+    let input = ExecutionInput::new(vm);
     loop {
-        let token = execution_input.next();
-        let result = match token {
-            Ok(token) => match token {
-                None => {
-                    break;
-                }
-                Some(token) => match token.value() {
-                    Value::ControlSequence(name) => {
-                        match execution_input.commands_map().get_command(&name) {
-                            Some(Command::Execution(cmd, _)) => cmd(token, execution_input),
-                            Some(Command::Variable(cmd)) => cmd.clone().set_value_using_input(
+        let token = match input.next()? {
+            None => break,
+            Some(token) => token,
+        };
+        // TODO: propagate all of these
+        match token.value() {
+            Value::ControlSequence(name) => {
+                match input.commands_map().get_command(&name) {
+                    Some(Command::Execution(cmd, _)) => cmd(token, input),
+                    Some(Command::Variable(cmd)) => {
+                        if let Err(err) = cmd.clone().set_value_using_input(
+                            token,
+                            input,
+                            groupingmap::Scope::Local,
+                        ) {
+                            return Err(error::Error::new_propagated(
+                                input.vm(),
+                                error::PropagationContext::VariableWrite,
                                 token,
-                                execution_input,
-                                groupingmap::Scope::Local,
-                            ),
-                            Some(Command::Character(token_value)) => {
-                                // TODO: the token may be a begin group, end group token, or active character token.
-                                // What to do in this case? Check pdfTeX.
-                                H::character_handler(
-                                    Token::new_from_value(*token_value, token.trace_key()),
-                                    execution_input,
-                                )
-                            }
-                            Some(Command::Expansion(_, _)) | Some(Command::Macro(_)) => {
-                                H::unexpanded_expansion_command(token, execution_input)
-                            }
-                            None => H::undefined_command_handler(token, execution_input),
+                                err,
+                            ));
                         }
-                    }
-                    Value::Active(_) => {
-                        // TODO: look up the command and dispatch
-                        todo!()
-                    }
-                    Value::BeginGroup(_) => {
-                        execution_input.begin_group();
                         Ok(())
                     }
-                    Value::EndGroup(_) => execution_input.end_group(token),
-                    Value::MathShift(_)
-                    | Value::AlignmentTab(_)
-                    | Value::Parameter(_)
-                    | Value::Superscript(_)
-                    | Value::Subscript(_)
-                    | Value::Space(_)
-                    | Value::Letter(_)
-                    | Value::Other(_) => H::character_handler(token, execution_input),
-                },
-            },
-            Err(err) => Err(err),
-        };
-        if let Err(mut err) = result {
-            error::add_context(&mut err, execution_input);
-            return Err(err);
-        }
+                    Some(Command::Character(token_value)) => {
+                        // TODO: the token may be a begin group, end group token, or active character token.
+                        // What to do in this case? Check pdfTeX.
+                        H::character_handler(
+                            Token::new_from_value(*token_value, token.trace_key()),
+                            input,
+                        )
+                    }
+                    Some(Command::Expansion(_, _)) | Some(Command::Macro(_)) => {
+                        H::unexpanded_expansion_command(token, input)
+                    }
+                    None => H::undefined_command_handler(token, input),
+                }
+            }
+            Value::Active(_) => {
+                // TODO: look up the command and dispatch
+                todo!()
+            }
+            Value::BeginGroup(_) => {
+                input.begin_group();
+                Ok(())
+            }
+            Value::EndGroup(_) => {
+                input.end_group(token)?;
+                Ok(())
+            }
+            Value::MathShift(_)
+            | Value::AlignmentTab(_)
+            | Value::Parameter(_)
+            | Value::Superscript(_)
+            | Value::Subscript(_)
+            | Value::Space(_)
+            | Value::Letter(_)
+            | Value::Other(_) => H::character_handler(token, input),
+        }?;
     }
     Ok(())
+}
+
+#[derive(Debug)]
+struct EndOfGroupError {
+    trace: trace::SourceCodeTrace,
+}
+
+impl error::TexError for EndOfGroupError {
+    fn kind(&self) -> error::Kind {
+        error::Kind::Token(&self.trace)
+    }
+
+    fn title(&self) -> String {
+        "there is no group to end".into()
+    }
 }
 
 /// The Texlang virtual machine.
@@ -226,7 +253,7 @@ pub trait TexlangState: Sized {
         token: token::Token,
         input: &mut ExpansionInput<Self>,
         tag: Option<command::Tag>,
-    ) -> anyhow::Result<Option<Token>> {
+    ) -> Result<Option<Token>, Box<command::Error>> {
         _ = (token, input, tag);
         Ok(None)
     }
@@ -237,13 +264,12 @@ pub trait TexlangState: Sized {
     fn pre_source_code_addition_hook(
         token: Option<token::Token>,
         num_existing_sources: usize,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), Box<error::Error>> {
         _ = token;
         // TODO: make this a token error
         if num_existing_sources + 1 >= 100 {
-            return Err(anyhow::anyhow!(
-                "maximum number of input levels (100) exceeded",
-            ));
+            /* TODO
+             */
         }
         Ok(())
     }
@@ -274,8 +300,13 @@ impl<S: TexlangState> VM<S> {
     ///
     /// TeX input source code is organized as a stack.
     /// Pushing source code onto the stack will mean it is executed first.
-    pub fn push_source(&mut self, file_name: String, source_code: String) -> anyhow::Result<()> {
-        self.internal.push_source(None, file_name, source_code)
+    pub fn push_source<T1: Into<String>, T2: Into<String>>(
+        &mut self,
+        file_name: T1,
+        source_code: T2,
+    ) -> Result<(), Box<error::Error>> {
+        self.internal
+            .push_source(None, file_name.into(), source_code.into())
     }
 }
 
@@ -319,21 +350,29 @@ impl<S> VM<S> {
         self.internal.groups.push(Default::default());
     }
 
-    fn end_group(&mut self, token: Token) -> anyhow::Result<()> {
-        match self.internal.groups.pop() {
-            None => Err(error::TokenError::new(token, "unexpected end of group").into()),
-            Some(group) => {
-                assert![self.commands_map.end_group()];
-                group.restore(&mut self.custom_state);
-                Ok(())
+    fn end_group(&mut self, token: token::Token) -> Result<(), Box<error::Error>> {
+        match self.commands_map.end_group() {
+            Ok(()) => (),
+            Err(_) => {
+                return Err(EndOfGroupError {
+                    trace: self.trace(token),
+                }
+                .into())
             }
         }
+        let group = self.internal.groups.pop().unwrap();
+        group.restore(&mut self.custom_state);
+        Ok(())
     }
 
-    pub fn trace(&self, token: Token) -> trace::Trace {
+    pub fn trace(&self, token: Token) -> trace::SourceCodeTrace {
         self.internal
             .tracer
             .trace(token, &self.internal.cs_name_interner)
+    }
+
+    pub fn trace_end_of_input(&self) -> trace::SourceCodeTrace {
+        self.internal.tracer.trace_end_of_input()
     }
 }
 
@@ -380,7 +419,8 @@ impl<S: TexlangState> Internal<S> {
         token: Option<Token>,
         file_name: String,
         source_code: String,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), Box<error::Error>> {
+        let source_code: std::rc::Rc<str> = source_code.into();
         S::pre_source_code_addition_hook(token, self.sources.len())?;
         let trace_key_range = self
             .tracer
@@ -431,7 +471,7 @@ struct Source {
 }
 
 impl Source {
-    pub fn new(source_code: String, trace_key_range: trace::KeyRange) -> Source {
+    pub fn new(source_code: std::rc::Rc<str>, trace_key_range: trace::KeyRange) -> Source {
         Source {
             expansions: Vec::with_capacity(32),
             root: lexer::Lexer::new(source_code, trace_key_range),
@@ -441,7 +481,7 @@ impl Source {
 
 impl Default for Source {
     fn default() -> Self {
-        Source::new("".to_string(), trace::KeyRange::empty())
+        Source::new("".into(), trace::KeyRange::empty())
     }
 }
 

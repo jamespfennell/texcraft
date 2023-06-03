@@ -1,5 +1,6 @@
 use super::TexlangState;
 use crate::command;
+use crate::error;
 use crate::token::trace;
 use crate::token::Token;
 use crate::variable;
@@ -39,7 +40,7 @@ pub trait TokenStream {
     /// as the `next` method in Rust's iterator trait, except a stream can return an error.
     ///
     /// As with iterators, a result of `Ok(None)` indicates that the stream is exhausted.
-    fn next(&mut self) -> anyhow::Result<Option<Token>>;
+    fn next(&mut self) -> Result<Option<Token>, Box<error::Error>>;
 
     /// Peeks at the next token in the stream without removing it.
     ///
@@ -61,13 +62,13 @@ pub trait TokenStream {
     ///     rather than returned. The next token will be the first token in the expansion in this case,
     ///     or the following token in the remaining stream if the expansion returns no tokens.
     ///     This mutation is generally irreversible.
-    fn peek(&mut self) -> anyhow::Result<Option<&Token>>;
+    fn peek(&mut self) -> Result<Option<&Token>, Box<error::Error>>;
 
     /// Consumes the next token in the stream without returning it.
     ///
     /// This method is mostly to make code self-documenting. It is typically used in
     /// situations where a peek has already occurred, and the token itself is not needed.
-    fn consume(&mut self) -> anyhow::Result<()> {
+    fn consume(&mut self) -> Result<(), Box<error::Error>> {
         self.next().map(|_| ())
     }
 
@@ -86,11 +87,11 @@ pub trait TokenStream {
         &self.vm().custom_state
     }
 
-    fn trace(&self, token: Token) -> trace::Trace {
+    fn trace(&self, token: Token) -> trace::SourceCodeTrace {
         self.vm().trace(token)
     }
 
-    fn trace_end_of_input(&self) -> trace::Trace {
+    fn trace_end_of_input(&self) -> trace::SourceCodeTrace {
         self.vm().internal.tracer.trace_end_of_input()
     }
 }
@@ -118,7 +119,7 @@ impl<S: TexlangState> ExpandedStream<S> {
     ///
     /// This method only expands a single token. If, after the expansion, the next token
     /// is expandable it will not be expanded.
-    pub fn expand_once(&mut self) -> anyhow::Result<bool> {
+    pub fn expand_once(&mut self) -> Result<bool, Box<error::Error>> {
         stream::expand_once(&mut self.unexpanded().0)
     }
 }
@@ -127,12 +128,12 @@ impl<S: TexlangState> TokenStream for ExpandedStream<S> {
     type S = S;
 
     #[inline]
-    fn next(&mut self) -> anyhow::Result<Option<Token>> {
+    fn next(&mut self) -> Result<Option<Token>, Box<error::Error>> {
         stream::next_expanded(&mut self.unexpanded().0)
     }
 
     #[inline]
-    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
+    fn peek(&mut self) -> Result<Option<&Token>, Box<error::Error>> {
         stream::peek_expanded(&mut self.unexpanded().0)
     }
 
@@ -156,12 +157,12 @@ impl<S: TexlangState> TokenStream for UnexpandedStream<S> {
     type S = S;
 
     #[inline]
-    fn next(&mut self) -> anyhow::Result<Option<Token>> {
+    fn next(&mut self) -> Result<Option<Token>, Box<error::Error>> {
         stream::next_unexpanded(&mut self.0)
     }
 
     #[inline]
-    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
+    fn peek(&mut self) -> Result<Option<&Token>, Box<error::Error>> {
         stream::peek_unexpanded(&mut self.0)
     }
 
@@ -206,11 +207,11 @@ impl<S> std::convert::AsMut<ExpandedStream<S>> for ExpansionInput<S> {
 impl<S: TexlangState> TokenStream for ExpansionInput<S> {
     type S = S;
 
-    fn next(&mut self) -> anyhow::Result<Option<Token>> {
+    fn next(&mut self) -> Result<Option<Token>, Box<error::Error>> {
         self.0.next()
     }
 
-    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
+    fn peek(&mut self) -> Result<Option<&Token>, Box<error::Error>> {
         self.0.peek()
     }
 
@@ -234,7 +235,7 @@ impl<S: TexlangState> ExpansionInput<S> {
         token: Token,
         file_name: String,
         source_code: String,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), Box<error::Error>> {
         self.0
              .0
              .0
@@ -345,11 +346,11 @@ impl<S> std::convert::AsMut<ExpandedStream<S>> for ExecutionInput<S> {
 impl<S: TexlangState> TokenStream for ExecutionInput<S> {
     type S = S;
 
-    fn next(&mut self) -> anyhow::Result<Option<Token>> {
+    fn next(&mut self) -> Result<Option<Token>, Box<error::Error>> {
         self.0.next()
     }
 
-    fn peek(&mut self) -> anyhow::Result<Option<&Token>> {
+    fn peek(&mut self) -> Result<Option<&Token>, Box<error::Error>> {
         self.0.peek()
     }
 
@@ -386,7 +387,7 @@ impl<S> ExecutionInput<S> {
         self.0 .0 .0.begin_group()
     }
 
-    pub fn end_group(&mut self, token: Token) -> anyhow::Result<()> {
+    pub fn end_group(&mut self, token: Token) -> Result<(), Box<error::Error>> {
         self.0 .0 .0.end_group(token)
     }
 
@@ -417,6 +418,8 @@ unsafe fn launder<'a>(token: &Token) -> &'a Token {
 
 mod stream {
     use super::*;
+    use crate::token::lexer;
+    use crate::token::CatCode;
     use crate::token::{lexer::CatCodeFn, Value::ControlSequence};
 
     impl<T: TexlangState> CatCodeFn for T {
@@ -427,24 +430,30 @@ mod stream {
     }
 
     #[inline]
-    pub fn next_unexpanded<S: TexlangState>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<Token>> {
+    pub fn next_unexpanded<S: TexlangState>(
+        vm: &mut vm::VM<S>,
+    ) -> Result<Option<Token>, Box<error::Error>> {
         if let Some(token) = vm.internal.current_source.expansions.pop() {
             return Ok(Some(token));
         }
-        if let Some(token) = vm
+        match vm
             .internal
             .current_source
             .root
-            .next(&vm.custom_state, &mut vm.internal.cs_name_interner)?
+            .next(&vm.custom_state, &mut vm.internal.cs_name_interner)
         {
-            return Ok(Some(token));
+            Ok(None) => {}
+            Ok(Some(token)) => {
+                return Ok(Some(token));
+            }
+            Err(err) => return Err(LexerError::new(vm, err).into()),
         }
         next_unexpanded_recurse(vm)
     }
 
     fn next_unexpanded_recurse<S: TexlangState>(
         vm: &mut vm::VM<S>,
-    ) -> anyhow::Result<Option<Token>> {
+    ) -> Result<Option<Token>, Box<error::Error>> {
         if vm.internal.pop_source() {
             next_unexpanded(vm)
         } else {
@@ -453,25 +462,31 @@ mod stream {
     }
 
     #[inline]
-    pub fn peek_unexpanded<S: TexlangState>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<&Token>> {
+    pub fn peek_unexpanded<S: TexlangState>(
+        vm: &mut vm::VM<S>,
+    ) -> Result<Option<&Token>, Box<error::Error>> {
         if let Some(token) = vm.internal.current_source.expansions.last() {
             return Ok(Some(unsafe { launder(token) }));
         }
-        if let Some(token) = vm
+        match vm
             .internal
             .current_source
             .root
-            .next(&vm.custom_state, &mut vm.internal.cs_name_interner)?
+            .next(&vm.custom_state, &mut vm.internal.cs_name_interner)
         {
-            vm.internal.current_source.expansions.push(token);
-            return Ok(vm.internal.current_source.expansions.last());
+            Ok(None) => {}
+            Ok(Some(token)) => {
+                vm.internal.current_source.expansions.push(token);
+                return Ok(vm.internal.current_source.expansions.last());
+            }
+            Err(err) => return Err(LexerError::new(vm, err).into()),
         }
         peek_unexpanded_recurse(vm)
     }
 
     fn peek_unexpanded_recurse<S: TexlangState>(
         vm: &mut vm::VM<S>,
-    ) -> anyhow::Result<Option<&Token>> {
+    ) -> Result<Option<&Token>, Box<error::Error>> {
         if vm.internal.pop_source() {
             peek_unexpanded(vm)
         } else {
@@ -479,7 +494,9 @@ mod stream {
         }
     }
 
-    pub fn next_expanded<S: TexlangState>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<Token>> {
+    pub fn next_expanded<S: TexlangState>(
+        vm: &mut vm::VM<S>,
+    ) -> Result<Option<Token>, Box<error::Error>> {
         let (token, command) = match next_unexpanded(vm)? {
             None => return Ok(None),
             Some(token) => match token.value() {
@@ -491,25 +508,34 @@ mod stream {
             Some(command::Command::Expansion(command, tag)) => {
                 let command = *command;
                 let tag = *tag;
-                if let Some(override_expansion) =
-                    S::expansion_override_hook(token, ExpansionInput::new(vm), tag)?
-                {
-                    return Ok(Some(override_expansion));
-                }
-                let output = command(token, ExpansionInput::new(vm))?;
+                match S::expansion_override_hook(token, ExpansionInput::new(vm), tag) {
+                    Ok(None) => (),
+                    Ok(Some(override_expansion)) => {
+                        return Ok(Some(override_expansion));
+                    }
+                    Err(err) => return Err(convert_command_error(vm, token, err)),
+                };
+                let output = match command(token, ExpansionInput::new(vm)) {
+                    Ok(output) => output,
+                    Err(err) => return Err(convert_command_error(vm, token, err)),
+                };
                 vm.internal.push_expansion(&output);
                 next_expanded(vm)
             }
             Some(command::Command::Macro(command)) => {
                 let command = command.clone();
-                command.call(token, ExpansionInput::new(vm))?;
+                if let Err(err) = command.call(token, ExpansionInput::new(vm)) {
+                    return Err(convert_command_error(vm, token, err));
+                }
                 next_expanded(vm)
             }
             _ => Ok(Some(token)),
         }
     }
 
-    pub fn peek_expanded<S: TexlangState>(vm: &mut vm::VM<S>) -> anyhow::Result<Option<&Token>> {
+    pub fn peek_expanded<S: TexlangState>(
+        vm: &mut vm::VM<S>,
+    ) -> Result<Option<&Token>, Box<error::Error>> {
         let (token, command) = match peek_unexpanded(vm)? {
             None => return Ok(None),
             Some(token) => match token.value() {
@@ -526,13 +552,18 @@ mod stream {
                 let token = *token;
                 let tag = *tag;
                 consume_peek(vm);
-                if let Some(override_expansion) =
-                    S::expansion_override_hook(token, ExpansionInput::new(vm), tag)?
-                {
-                    vm.internal.expansions_mut().push(override_expansion);
-                    return Ok(vm.internal.expansions().last());
-                }
-                let output = command(token, ExpansionInput::new(vm))?;
+                match S::expansion_override_hook(token, ExpansionInput::new(vm), tag) {
+                    Ok(None) => (),
+                    Ok(Some(override_expansion)) => {
+                        vm.internal.expansions_mut().push(override_expansion);
+                        return Ok(vm.internal.expansions().last());
+                    }
+                    Err(err) => return Err(convert_command_error(vm, token, err)),
+                };
+                let output = match command(token, ExpansionInput::new(vm)) {
+                    Ok(output) => output,
+                    Err(err) => return Err(convert_command_error(vm, token, err)),
+                };
                 vm.internal.push_expansion(&output);
                 peek_expanded(vm)
             }
@@ -540,14 +571,16 @@ mod stream {
                 let command = command.clone();
                 let token = *token;
                 consume_peek(vm);
-                command.call(token, ExpansionInput::new(vm))?;
+                if let Err(err) = command.call(token, ExpansionInput::new(vm)) {
+                    return Err(convert_command_error(vm, token, err));
+                }
                 peek_expanded(vm)
             }
             _ => Ok(Some(unsafe { launder(token) })),
         }
     }
 
-    pub fn expand_once<S: TexlangState>(vm: &mut vm::VM<S>) -> anyhow::Result<bool> {
+    pub fn expand_once<S: TexlangState>(vm: &mut vm::VM<S>) -> Result<bool, Box<error::Error>> {
         let (token, command) = match peek_unexpanded(vm)? {
             None => return Ok(false),
             Some(token) => match token.value() {
@@ -564,13 +597,18 @@ mod stream {
                 let token = *token;
                 let tag = *tag;
                 consume_peek(vm);
-                if let Some(override_expansion) =
-                    S::expansion_override_hook(token, ExpansionInput::new(vm), tag)?
-                {
-                    vm.internal.expansions_mut().push(override_expansion);
-                    return Ok(true);
-                }
-                let output = command(token, ExpansionInput::new(vm))?;
+                match S::expansion_override_hook(token, ExpansionInput::new(vm), tag) {
+                    Ok(None) => (),
+                    Ok(Some(override_expansion)) => {
+                        vm.internal.expansions_mut().push(override_expansion);
+                        return Ok(true);
+                    }
+                    Err(err) => return Err(convert_command_error(vm, token, err)),
+                };
+                let output = match command(token, ExpansionInput::new(vm)) {
+                    Ok(output) => output,
+                    Err(err) => return Err(convert_command_error(vm, token, err)),
+                };
                 vm.internal.push_expansion(&output);
                 Ok(true)
             }
@@ -578,7 +616,9 @@ mod stream {
                 let command = command.clone();
                 let token = *token;
                 consume_peek(vm);
-                command.call(token, ExpansionInput::new(vm))?;
+                if let Err(err) = command.call(token, ExpansionInput::new(vm)) {
+                    return Err(convert_command_error(vm, token, err));
+                }
                 Ok(true)
             }
             _ => Ok(false),
@@ -590,5 +630,76 @@ mod stream {
         // When we peek at a token, it is placed on top of the expansions stack.
         // So to consume the token, we just need to remove it from the stack.
         vm.internal.current_source.expansions.pop();
+    }
+
+    use crate::error::Error;
+
+    fn convert_command_error<S: TexlangState>(
+        vm: &mut vm::VM<S>,
+        token: Token,
+        err: Box<error::Error>,
+    ) -> Box<Error> {
+        Error::new_propagated(vm, error::PropagationContext::Expansion, token, err)
+    }
+
+    #[derive(Debug)]
+    enum LexerError {
+        InvalidCharacter(char, trace::SourceCodeTrace),
+        EmptyControlSequence(trace::SourceCodeTrace),
+    }
+
+    impl LexerError {
+        fn new<S>(vm: &vm::VM<S>, err: lexer::Error) -> LexerError {
+            match err {
+                lexer::Error::InvalidCharacter(c, key) => {
+                    LexerError::InvalidCharacter(c, vm.trace(Token::new_other(c, key)))
+                }
+                lexer::Error::EmptyControlSequence(key) => {
+                    LexerError::EmptyControlSequence(vm.trace(Token::new_other(' ', key)))
+                }
+            }
+        }
+    }
+
+    impl error::TexError for LexerError {
+        fn kind(&self) -> error::Kind {
+            match self {
+                LexerError::InvalidCharacter(_, key) => error::Kind::Token(key),
+                LexerError::EmptyControlSequence(key) => error::Kind::EndOfInput(key),
+            }
+        }
+
+        fn title(&self) -> String {
+            match self {
+                LexerError::InvalidCharacter(c, _) => {
+                    format!["input contains a character {} (Unicode code point {}) with category code {}", *c, *c as u32, CatCode::Invalid]
+                }
+                LexerError::EmptyControlSequence(_) => {
+                    format![
+                        "unexpected end of file after a token with category code {}",
+                        CatCode::Escape
+                    ]
+                }
+            }
+        }
+
+        fn source_annotation(&self) -> String {
+            match self {
+                LexerError::InvalidCharacter(_, _) => "invalid character",
+                LexerError::EmptyControlSequence(_) => "file ended after this token",
+            }
+            .into()
+        }
+
+        fn notes(&self) -> Vec<String> {
+            match self {
+                LexerError::InvalidCharacter(_, _) => vec![
+                  format!["characters with category code {} cannot appear in the input", CatCode::Invalid]
+                ],
+                LexerError::EmptyControlSequence(_) => vec![
+                  "escape tokens start a control sequence and must be followed by at least one character".into(),
+                ],
+            }
+        }
     }
 }

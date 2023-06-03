@@ -1,9 +1,8 @@
 //! Support for running TeX REPLs
 
 use super::script;
-use anyhow::anyhow;
 use std::sync::Arc;
-use texlang_core::parse::CommandTarget;
+use texlang_core::parse::Command;
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -105,9 +104,13 @@ pub mod run {
 /// This exits the REPL.
 pub fn get_exit<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
-        |_: token::Token, input: &mut vm::ExecutionInput<S>| -> anyhow::Result<()> {
+        |_: token::Token, input: &mut vm::ExecutionInput<S>| -> command::Result<()> {
             HasComponent::<Component>::component_mut(input.state_mut()).quit_requested = true;
-            Err(anyhow!(""))
+            Err(error::SimpleEndOfInputError::new(
+                input.vm(),
+                "quitting Texcraft REPL. This error should never be seen!",
+            )
+            .into())
         },
     )
 }
@@ -117,12 +120,19 @@ pub fn get_exit<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 /// This prints help text for the REPL.
 pub fn get_help<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
-        |_: token::Token, input: &mut vm::ExecutionInput<S>| -> anyhow::Result<()> {
+        |token: token::Token, input: &mut vm::ExecutionInput<S>| -> command::Result<()> {
             let help = HasComponent::<Component>::component(input.state())
                 .help
                 .clone();
-            writeln![input.vm().std_err.borrow_mut(), "{help}"]?;
-            Ok(())
+            match writeln![input.vm().std_err.borrow_mut(), "{help}"] {
+                Ok(_) => Ok(()),
+                Err(err) => Err(error::SimpleTokenError::new(
+                    input.vm(),
+                    token,
+                    format!["failed to write help text: {err}"],
+                )
+                .into()),
+            }
         },
     )
 }
@@ -132,8 +142,8 @@ pub fn get_help<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 /// This prints the documentation for a TeX command.
 pub fn get_doc<S: TexlangState>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
-        |_: token::Token, input: &mut vm::ExecutionInput<S>| -> anyhow::Result<()> {
-            let CommandTarget::ControlSequence(cs_name) = CommandTarget::parse(input)?;
+        |token: token::Token, input: &mut vm::ExecutionInput<S>| -> command::Result<()> {
+            let Command::ControlSequence(cs_name) = Command::parse(input)?;
             let cs_name_s = input.vm().cs_name_interner().resolve(cs_name).unwrap();
             let doc = match input.commands_map().get_command_slow(&cs_name) {
                 None => format!["Unknown command \\{cs_name_s}"],
@@ -142,8 +152,15 @@ pub fn get_doc<S: TexlangState>() -> command::BuiltIn<S> {
                     Some(doc) => format!["\\{cs_name_s}  {doc}"],
                 },
             };
-            writeln![input.vm().std_err.borrow_mut(), "{doc}"]?;
-            Ok(())
+            match writeln![input.vm().std_err.borrow_mut(), "{doc}"] {
+                Ok(_) => Ok(()),
+                Err(err) => Err(error::SimpleTokenError::new(
+                    input.vm(),
+                    token,
+                    format!["failed to write doc text: {err}"],
+                )
+                .into()),
+            }
         },
     )
 }

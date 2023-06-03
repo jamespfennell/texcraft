@@ -3,12 +3,6 @@
 version = 3
 
 [[package]]
-name = "anyhow"
-version = "1.0.44"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61604a8f862e1d5c3229fdd78f8b02c68dcf73a4c4b05fd636d12240aaa242c1"
-
-[[package]]
 name = "arrayref"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -980,7 +974,6 @@ dependencies = [
 name = "texcraft"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "clap 3.1.6",
  "colored",
  "performance",
@@ -993,7 +986,6 @@ dependencies = [
 name = "texcraft-playground"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "console_error_panic_hook",
  "texlang-core",
  "texlang-stdlib",
@@ -1012,9 +1004,7 @@ dependencies = [
 name = "texlang-core"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "colored",
- "num-traits",
  "once_cell",
  "texcraft-stdext",
 ]
@@ -1023,7 +1013,6 @@ dependencies = [
 name = "texlang-stdlib"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "chrono",
  "colored",
  "linefeed",

@@ -53,7 +53,7 @@ enum Key {
 impl<S> TryFrom<&BuiltIn<S>> for Key {
     type Error = ();
 
-    fn try_from(value: &BuiltIn<S>) -> Result<Self, Self::Error> {
+    fn try_from(value: &BuiltIn<S>) -> std::result::Result<Self, Self::Error> {
         (&value.cmd).try_into()
     }
 }
@@ -61,7 +61,7 @@ impl<S> TryFrom<&BuiltIn<S>> for Key {
 impl<S> TryFrom<&Command<S>> for Key {
     type Error = ();
 
-    fn try_from(value: &Command<S>) -> Result<Self, Self::Error> {
+    fn try_from(value: &Command<S>) -> std::result::Result<Self, Self::Error> {
         match &value {
             Command::Expansion(f, tag) => Ok(Key::Expansion(*f as usize, *tag)),
             Command::Execution(f, tag) => Ok(Key::Execution(*f as usize, *tag)),
@@ -89,7 +89,7 @@ impl<S> TryFrom<&Command<S>> for Key {
 impl TryFrom<Key> for variable::GetterKey {
     type Error = ();
 
-    fn try_from(value: Key) -> Result<Self, Self::Error> {
+    fn try_from(value: Key) -> std::result::Result<Self, Self::Error> {
         match value {
             Key::Execution(_, _) => Err(()),
             Key::Expansion(_, _) => Err(()),
@@ -200,7 +200,7 @@ impl<S> Map<S> {
         alias: token::CsName,
         control_sequence: token::CsName,
         scope: groupingmap::Scope,
-    ) -> Result<(), InvalidAlias> {
+    ) -> std::result::Result<(), InvalidAlias> {
         let command = match self.get_command(&control_sequence) {
             None => return Err(InvalidAlias {}),
             Some(t) => t,
@@ -243,8 +243,9 @@ impl<S> Map<S> {
         self.commands.begin_group();
     }
 
-    pub(crate) fn end_group(&mut self) -> bool {
-        self.commands.end_group()
+    pub(crate) fn end_group(&mut self) -> std::result::Result<(), groupingmap::EndOfGroupError> {
+        self.commands.end_group()?;
+        Ok(())
     }
 
     pub fn is_empty(&self) -> bool {

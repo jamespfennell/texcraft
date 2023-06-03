@@ -14,32 +14,18 @@
 //! whitespace characters after a control sequence. The correct result is thus the control sequence
 //! followed by the single letter token B.
 
-use crate::error;
 use crate::token;
 use crate::token::catcode::CatCode;
 use crate::token::trace;
 use crate::token::CsNameInterner;
 use crate::token::Token;
-use std::fmt;
 use texcraft_stdext::str::OwningChars;
 
-const MALFORMED_CONTROL_SEQUENCE_ERROR_TITLE: &str = "Unexpected end of file";
-const MALFORMED_CONTROL_SEQUENCE_ERROR_HELP: &str =
-    "expected the escape character to be followed by the name of a control sequence";
-
 #[derive(Debug)]
-pub enum LexerError {
-    MalformedControlSequence(anyhow::Error),
-    InvalidToken,
+pub(crate) enum Error {
+    InvalidCharacter(char, trace::Key),
+    EmptyControlSequence(trace::Key),
 }
-
-impl fmt::Display for LexerError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "LEXER ERROR")
-    }
-}
-
-impl std::error::Error for LexerError {}
 
 pub trait CatCodeFn {
     fn cat_code(&self, c: char) -> CatCode;
@@ -60,7 +46,7 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn new(source_code: String, trace_key_range: trace::KeyRange) -> Lexer {
+    pub fn new(source_code: std::rc::Rc<str>, trace_key_range: trace::KeyRange) -> Lexer {
         Lexer {
             raw_lexer: RawLexer::new(source_code, trace_key_range),
             trim_next_whitespace: false,
@@ -68,11 +54,11 @@ impl Lexer {
         }
     }
 
-    pub fn next<F: CatCodeFn>(
+    pub(crate) fn next<F: CatCodeFn>(
         &mut self,
         cat_code_fn: &F,
         cs_name_interner: &mut CsNameInterner,
-    ) -> Result<Option<token::Token>, LexerError> {
+    ) -> Result<Option<token::Token>, Error> {
         while let Some(raw_token) = self.raw_lexer.next(cat_code_fn) {
             let c = raw_token.char;
             let value = match raw_token.code {
@@ -120,7 +106,7 @@ impl Lexer {
                 CatCode::Ignored => {
                     continue;
                 }
-                CatCode::Invalid => return Err(LexerError::InvalidToken),
+                CatCode::Invalid => return Err(Error::InvalidCharacter(c, raw_token.trace_key)),
             };
             self.trim_next_whitespace = matches!(value.value(), token::Value::ControlSequence(..));
             return Ok(Some(value));
@@ -148,19 +134,11 @@ impl Lexer {
         raw_token: &RawToken,
         cat_code_fn: &F,
         cs_name_interner: &mut CsNameInterner,
-    ) -> Result<token::CsName, LexerError> {
+    ) -> Result<token::CsName, Error> {
         self.buffer.clear();
         match self.raw_lexer.next(cat_code_fn) {
             None => {
-                // TODO: this should be an end of input error
-                return Err(LexerError::MalformedControlSequence(
-                    error::TokenError::new(
-                        token::Token::new_other(raw_token.char, raw_token.trace_key),
-                        MALFORMED_CONTROL_SEQUENCE_ERROR_TITLE,
-                    )
-                    .add_note(MALFORMED_CONTROL_SEQUENCE_ERROR_HELP)
-                    .cast(),
-                ));
+                return Err(Error::EmptyControlSequence(raw_token.trace_key));
             }
             Some(RawToken {
                 char,
@@ -198,7 +176,7 @@ struct RawLexer {
 }
 
 impl RawLexer {
-    pub fn new(source_code: String, trace_key_range: trace::KeyRange) -> RawLexer {
+    pub fn new(source_code: std::rc::Rc<str>, trace_key_range: trace::KeyRange) -> RawLexer {
         RawLexer {
             iter: OwningChars::new(source_code),
             trace_key_range,
@@ -271,7 +249,7 @@ mod tests {
             $(
             #[test]
             fn $name() {
-                let mut lexer = Lexer::new($input.to_string(), trace::KeyRange::for_testing());
+                let mut lexer = Lexer::new($input.into(), trace::KeyRange::for_testing());
                 let mut map: HashMap<char, CatCode> = CatCode::PLAIN_TEX_DEFAULTS.iter().enumerate().map(|(a, b)| {
                     (char::from_u32(a.try_into().unwrap()).unwrap(), *b)
                 }).collect();

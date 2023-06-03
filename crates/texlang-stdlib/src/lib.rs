@@ -7,6 +7,7 @@ extern crate texlang_core;
 
 use std::collections::HashMap;
 
+use texlang_core::command;
 use texlang_core::traits::*;
 use texlang_core::vm;
 use texlang_core::vm::implement_has_component;
@@ -66,7 +67,7 @@ impl TexlangState for StdLibState {
         token: texlang_core::token::Token,
         input: &mut vm::ExpansionInput<Self>,
         tag: Option<texlang_core::command::Tag>,
-    ) -> anyhow::Result<Option<texlang_core::token::Token>> {
+    ) -> command::Result<Option<texlang_core::token::Token>> {
         expansion::noexpand_hook(token, input, tag)
     }
 }
@@ -143,6 +144,85 @@ implement_has_component![
     (tracingmacros::Component, tracing_macros),
 ];
 
+pub struct ErrorCase {
+    pub description: &'static str,
+    pub source_code: &'static str,
+}
+
+impl ErrorCase {
+    /// Returns a vector of TeX snippets that exercise all error paths in Texlang
+    pub fn all_error_cases() -> Vec<ErrorCase> {
+        let mut cases = vec![];
+        for (description, source_code) in vec![
+            ("invalid relation", r"\ifnum 3 z 4"),
+            ("malformed by keyword", r"\advance \year bg"),
+            ("undefined control sequence", r"\cattcode"),
+            ("invalid character", "\u{7F}"),
+            ("empty control sequence", r"\"),
+            ("invalid end of group", r"}"),
+            ("invalid start of number", r"\count X"),
+            ("invalid start of number (eof)", r"\count"),
+            ("invalid start of number (not a variable)", r"\count \def"),
+            (
+                "case negative number to positive (from constant)",
+                r"\count -1",
+            ),
+            (
+                "cast negative number to positive (from variable)",
+                r"\count 0 = 1 \count - \count 0",
+            ),
+            (
+                "read positive number from negative variable value",
+                r"\count 0 = -1 \count \count 0",
+            ),
+            ("invalid character", r"\count `\def"),
+            ("invalid character (eof)", r"\count `"),
+            ("invalid octal digit", r"\count '9"),
+            ("invalid octal digit (eof)", r"\count '"),
+            ("invalid hexadecimal digit", "\\count \"Z"),
+            ("invalid hexadecimal digit (eof)", "\\count \""),
+            (
+                "decimal number too big (radix)",
+                r"\count 1000000000000000000000",
+            ),
+            (
+                "decimal number too big (sum)",
+                r"\count 18446744073709551617",
+            ),
+            ("octal number too big", r"\count '7777777777777777777777"),
+            (
+                "hexadecimal number too big",
+                "\\count \"AAAAAAAAAAAAAAAAAAAAAA",
+            ),
+            ("number with letter catcode", r"\catcode `1 = 11 \count 1"),
+            /*
+            ("", r""),
+            ("", r""),
+            ("", r""),
+            ("", r""),
+            ("", r""),
+            ("", r""),
+            ("", r""),
+            ("", r""),
+            ("", r""),
+            ("", r""),
+            ("", r""),
+            ("", r""),
+            ("", r""),
+            ("", r""), */
+            ("category code out of bounds", r"\catcode 0 = 17"),
+            ("invalid command target", r"\let a = \year"),
+            ("invalid command target (eof)", r"\let"),
+        ] {
+            cases.push(ErrorCase {
+                description,
+                source_code,
+            })
+        }
+        cases
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -159,5 +239,17 @@ mod tests {
         overwrite_else,
         r"\def\else{}\ifodd 2 \else should be skipped \fi",
         r""
-    ),),];
+    ))];
+
+    #[test]
+    fn all_error_cases() {
+        let options = vec![
+            TestOption::InitialCommands(StdLibState::all_initial_built_ins),
+            TestOption::AllowUndefinedCommands(false),
+        ];
+        for case in ErrorCase::all_error_cases() {
+            println!("CASE {}", case.description);
+            run_failure_test::<StdLibState>(case.source_code, &options)
+        }
+    }
 }

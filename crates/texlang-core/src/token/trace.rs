@@ -3,7 +3,7 @@
 //! This module implements a [Tracer] for tokens.
 //! When building helpful error messages we need to know the origin of tokens -
 //!     e.g., the file and line they came from.
-//! The tracing functionality here enables obtaining this information in the form of a [Trace].
+//! The tracing functionality here enables obtaining this information in the form of a [SourceCodeTrace].
 //!
 //! Rather than the custom system here,
 //!     a simpler solution would be to include this information on the token itself.
@@ -34,7 +34,6 @@
 //!     into the source code.
 //! Thus we can uniquely identify the UTF-8 character the token is a associated to.
 use crate::token::{CsNameInterner, Token, Value};
-use colored::*;
 use std::collections::BTreeMap;
 use std::ops::Bound::Included;
 
@@ -97,7 +96,7 @@ impl KeyRange {
 
 /// A token trace
 #[derive(Debug, PartialEq, Eq)]
-pub struct Trace {
+pub struct SourceCodeTrace {
     /// Name of the file this token came from.
     pub file_name: String,
     /// Content of the line this token came from.
@@ -108,6 +107,9 @@ pub struct Trace {
     pub index: usize,
     /// Value of the token.
     pub value: String,
+    /// If this is for a token, the value of the token.
+    /// Otherwise this is an end of input snippet.
+    pub token: Option<Token>,
 }
 
 /// Data structure that records information for token tracing
@@ -143,7 +145,8 @@ impl Tracer {
                     u32::MAX
                 )
             }
-            Ok(0) => return KeyRange::empty(),
+            // For empty files, we still assign one key because this allows us to trace end of input errors.
+            Ok(0) => 1_u32,
             Ok(limit) => limit,
         };
         let range = KeyRange {
@@ -165,7 +168,7 @@ impl Tracer {
     }
 
     /// Return a trace for the provided token.
-    pub fn trace(&self, token: Token, cs_name_interner: &CsNameInterner) -> Trace {
+    pub fn trace(&self, token: Token, cs_name_interner: &CsNameInterner) -> SourceCodeTrace {
         let value = match token.value() {
             Value::ControlSequence(cs_name) => {
                 format!["\\{}", cs_name_interner.resolve(cs_name).unwrap()]
@@ -202,18 +205,19 @@ impl Tracer {
                     None => tail.to_string(),
                     Some((a, _)) => a.to_string(),
                 };
-                Trace {
+                SourceCodeTrace {
                     file_name: file_name.clone(),
                     line_content,
                     line_number,
                     index: position,
                     value,
+                    token: Some(token),
                 }
             }
         }
     }
 
-    pub fn trace_end_of_input(&self) -> Trace {
+    pub fn trace_end_of_input(&self) -> SourceCodeTrace {
         let f = self
             .checkpoints
             .get(&self.last_external_input.unwrap())
@@ -232,49 +236,16 @@ impl Tracer {
                     }
                 }
                 let last_line = content[last_non_empty_line.1..].trim_end();
-                Trace {
+                SourceCodeTrace {
                     file_name: file_name.clone(),
                     line_content: last_line.to_string(),
                     line_number: last_non_empty_line.0 + 1,
                     index: last_line.len(),
                     value: " ".to_string(),
+                    token: None,
                 }
             }
         }
-    }
-}
-
-impl std::fmt::Display for Trace {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let margin_width = self.line_number.to_string().len() + 1;
-        let bar = "|".bright_yellow();
-        writeln!(
-            f,
-            "{}{} {}:{}:{}",
-            " ".repeat(margin_width - 1),
-            ">>>".bright_yellow().bold(),
-            self.file_name,
-            self.line_number,
-            self.index + 1
-        )?;
-        writeln!(f, "{}{} ", " ".repeat(margin_width), bar)?;
-        writeln!(
-            f,
-            "{}{} {} {}",
-            " ".repeat(margin_width - self.line_number.to_string().len() - 1),
-            self.line_number.to_string().bright_yellow(),
-            bar,
-            self.line_content.trim_end()
-        )?;
-        write!(
-            f,
-            "{}{} {}{}",
-            " ".repeat(margin_width),
-            bar,
-            " ".repeat(self.index),
-            "^".repeat(self.value.len()).bright_red().bold(),
-        )?;
-        Ok(())
     }
 }
 
@@ -319,95 +290,107 @@ mod tests {
         ];
         tokens.append(&mut extra_tokens);
 
-        let got_traces: Vec<Trace> = tokens
-            .into_iter()
-            .map(|token| tracer.trace(token, &interner))
+        let got_traces: Vec<SourceCodeTrace> = tokens
+            .iter()
+            .map(|token| tracer.trace(*token, &interner))
             .collect();
 
         let want_traces = vec![
-            Trace {
+            SourceCodeTrace {
                 file_name: file_name.clone(),
                 line_content: line_1.clone(),
                 line_number: 1,
                 index: 0,
                 value: "h".to_string(),
+                token: Some(tokens[0]),
             },
-            Trace {
+            SourceCodeTrace {
                 file_name: file_name.clone(),
                 line_content: line_1.clone(),
                 line_number: 1,
                 index: 1,
                 value: "e".to_string(),
+                token: Some(tokens[1]),
             },
-            Trace {
+            SourceCodeTrace {
                 file_name: file_name.clone(),
                 line_content: line_1.clone(),
                 line_number: 1,
                 index: 2,
                 value: "l".to_string(),
+                token: Some(tokens[2]),
             },
-            Trace {
+            SourceCodeTrace {
                 file_name: file_name.clone(),
                 line_content: line_1.clone(),
                 line_number: 1,
                 index: 3,
                 value: "\n".to_string(),
+                token: Some(tokens[3]),
             },
-            Trace {
+            SourceCodeTrace {
                 file_name: file_name.clone(),
                 line_content: line_2.clone(),
                 line_number: 2,
                 index: 0,
                 value: "w".to_string(),
+                token: Some(tokens[4]),
             },
-            Trace {
+            SourceCodeTrace {
                 file_name: file_name.clone(),
                 line_content: line_2.clone(),
                 line_number: 2,
                 index: 1,
                 value: "o".to_string(),
+                token: Some(tokens[5]),
             },
-            Trace {
+            SourceCodeTrace {
                 file_name: file_name.clone(),
                 line_content: line_2.clone(),
                 line_number: 2,
                 index: 2,
                 value: "r".to_string(),
+                token: Some(tokens[6]),
             },
-            Trace {
+            SourceCodeTrace {
                 file_name: file_name.clone(),
                 line_content: line_2.clone(),
                 line_number: 2,
                 index: 3,
                 value: "\\command".to_string(),
+                token: Some(tokens[7]),
             },
-            Trace {
+            SourceCodeTrace {
                 file_name: file_name.clone(),
                 line_content: line_2.clone(),
                 line_number: 2,
                 index: 11,
                 value: "\n".to_string(),
+                token: Some(tokens[8]),
             },
-            Trace {
+            SourceCodeTrace {
                 file_name: file_name.clone(),
                 line_content: line_3.clone(),
                 line_number: 3,
                 index: 0,
                 value: "h".to_string(),
+                token: Some(tokens[9]),
             },
-            Trace {
+            SourceCodeTrace {
                 file_name: file_name.clone(),
                 line_content: line_3.clone(),
                 line_number: 3,
                 index: 1,
                 value: "e".to_string(),
+                token: Some(tokens[10]),
             },
-            Trace {
+            SourceCodeTrace {
                 file_name: file_name.clone(),
                 line_content: line_3.clone(),
                 line_number: 3,
                 index: 2,
                 value: "l".to_string(),
+                token: Some(tokens[11]),
             },
         ];
         assert_eq!(want_traces, got_traces);
@@ -434,32 +417,35 @@ mod tests {
         let mut range = tracer.register_source_code(None, file_3.clone(), &file_3_content);
         tokens.push(Token::new_letter('c', range.next()));
 
-        let got_traces: Vec<Trace> = tokens
-            .into_iter()
-            .map(|token| tracer.trace(token, &interner))
+        let got_traces: Vec<SourceCodeTrace> = tokens
+            .iter()
+            .map(|token| tracer.trace(*token, &interner))
             .collect();
 
         let want_traces = vec![
-            Trace {
+            SourceCodeTrace {
                 file_name: file_1,
                 line_content: file_1_content,
                 line_number: 1,
                 index: 0,
                 value: "a".to_string(),
+                token: Some(tokens[0]),
             },
-            Trace {
+            SourceCodeTrace {
                 file_name: file_2,
                 line_content: file_2_content,
                 line_number: 1,
                 index: 0,
                 value: "b".to_string(),
+                token: Some(tokens[1]),
             },
-            Trace {
+            SourceCodeTrace {
                 file_name: file_3,
                 line_content: file_3_content,
                 line_number: 1,
                 index: 0,
                 value: "c".to_string(),
+                token: Some(tokens[2]),
             },
         ];
         assert_eq!(want_traces, got_traces);

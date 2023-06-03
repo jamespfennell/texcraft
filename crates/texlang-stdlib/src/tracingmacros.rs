@@ -36,7 +36,8 @@ pub fn hook<S: HasComponent<Component>>(
         "Macro expansion trace of ".bold(),
         trace.value.bold()
     );
-    println!("{trace}");
+    // TODO
+    // println!("{trace}");
     let interner = input.vm().cs_name_interner();
     println!["                        ┌──",];
     print!["              arguments "];

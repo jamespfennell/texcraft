@@ -13,7 +13,7 @@ static NO_EXPAND_TAG: command::StaticTag = command::StaticTag::new();
 fn noexpand_fn<S>(
     _: token::Token,
     _: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<token::Token>> {
+) -> command::Result<Vec<token::Token>> {
     panic!(
         "The \\noexpand expansion function is never invoked directly. \
          Instead, the primitive operates through the \\noexpand hook, \
@@ -27,7 +27,7 @@ pub fn noexpand_hook<S: TexlangState>(
     token: token::Token,
     input: &mut vm::ExpansionInput<S>,
     tag: Option<command::Tag>,
-) -> anyhow::Result<Option<token::Token>> {
+) -> command::Result<Option<token::Token>> {
     // Fast path: this is not the \noexpand command.
     // We want this check to be inlined into the VM functions that perform
     if tag != Some(NO_EXPAND_TAG.get()) {
@@ -41,14 +41,15 @@ pub fn noexpand_hook<S: TexlangState>(
 fn noexpand_hook_finish<S: TexlangState>(
     token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Option<token::Token>> {
+) -> command::Result<Option<token::Token>> {
     match input.unexpanded().next()? {
-        None => Err(error::TokenError::new(
+        None => Err(error::SimpleTokenError::new(
+            input.vm(),
             token,
             "unexpected end of input while expanding a `\\noexpand` command",
         )
-        .add_note("the `\\noexpand` command must be followed by 1 token")
-        .cast()),
+        .into()),
+        // TODO .add_note("the `\\noexpand` command must be followed by 1 token")
         Some(token) => Ok(Some(token)),
     }
 }
@@ -112,15 +113,19 @@ pub fn get_expandafter_optimized<S: TexlangState>() -> command::BuiltIn<S> {
 fn expandafter_simple_fn<S: TexlangState>(
     expandafter_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<token::Token>> {
+) -> command::Result<Vec<token::Token>> {
     let next = match input.unexpanded().next()? {
         None => {
-            return Err(expandafter_missing_first_token_error(expandafter_token));
+            return Err(expandafter_missing_first_token_error(
+                input.vm(),
+                expandafter_token,
+            ));
         }
         Some(next) => next,
     };
     if input.unexpanded().peek()?.is_none() {
         return Err(expandafter_missing_second_token_error(
+            input.vm(),
             expandafter_token,
             next,
         ));
@@ -133,17 +138,23 @@ fn expandafter_simple_fn<S: TexlangState>(
 fn expandafter_optimized_fn<S: TexlangState>(
     expandafter_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<token::Token>> {
+) -> command::Result<Vec<token::Token>> {
     let mut buffer: Vec<token::Token> = input.checkout_token_buffer();
     let unexpanded_input = input.unexpanded();
     loop {
         match unexpanded_input.next()? {
-            None => return Err(expandafter_missing_first_token_error(expandafter_token)),
+            None => {
+                return Err(expandafter_missing_first_token_error(
+                    input.vm(),
+                    expandafter_token,
+                ))
+            }
             Some(next) => buffer.push(next),
         };
         let token = match unexpanded_input.peek()? {
             None => {
                 return Err(expandafter_missing_second_token_error(
+                    input.vm(),
                     expandafter_token,
                     *buffer.last().unwrap(),
                 ))
@@ -180,7 +191,7 @@ fn expandafter_optimized_fn<S: TexlangState>(
             // Under-full
             0 => {
                 let next = match input.unexpanded().next()? {
-                    None => return Err(expandafter_missing_first_token_error(root)),
+                    None => return Err(expandafter_missing_first_token_error(input.vm(), root)),
                     Some(next) => next,
                 };
                 buffer.push(next);
@@ -199,6 +210,7 @@ fn expandafter_optimized_fn<S: TexlangState>(
         // exactly right cases, but it's easier to put it here.
         if input.unexpanded().peek()?.is_none() {
             return Err(expandafter_missing_second_token_error(
+                input.vm(),
                 root,
                 *buffer.last().unwrap(),
             ));
@@ -221,28 +233,35 @@ fn remove_even_indices(v: &mut Vec<token::Token>) {
     v.truncate(dest);
 }
 
-fn expandafter_missing_first_token_error(expandafter_token: token::Token) -> anyhow::Error {
-    error::TokenError::new(
+fn expandafter_missing_first_token_error<S>(
+    vm: &vm::VM<S>,
+    expandafter_token: token::Token,
+) -> Box<error::Error> {
+    error::SimpleTokenError::new(
+        vm,
         expandafter_token,
         "unexpected end of input while expanding an `\\expandafter` command",
     )
-    .add_note("the `\\expandafter` command must be followed by 2 tokens")
-    .add_note("no more tokens were found")
-    .cast()
+    .into()
+    // TODO
+    // .add_note("the `\\expandafter` command must be followed by 2 tokens")
+    // .add_note("no more tokens were found")
 }
 
-fn expandafter_missing_second_token_error(
+fn expandafter_missing_second_token_error<S>(
+    vm: &vm::VM<S>,
     expandafter_token: token::Token,
     first_token: token::Token,
-) -> anyhow::Error {
+) -> Box<error::Error> {
     _ = first_token;
-    error::TokenError::new(
+    error::SimpleTokenError::new(
+        vm,
         expandafter_token,
         "unexpected end of input while expanding an `\\expandafter` command",
     )
-    .add_note("the `\\expandafter` command must be followed by 2 tokens")
-    .add_note("only 1 more tokens was found")
-    .cast()
+    .into()
+    // TODO .add_note("the `\\expandafter` command must be followed by 2 tokens")
+    //.add_note("only 1 more tokens was found")
 }
 
 /// Get the `\relax` command.
@@ -280,7 +299,7 @@ mod test {
             token: token::Token,
             input: &mut vm::ExpansionInput<Self>,
             tag: Option<command::Tag>,
-        ) -> anyhow::Result<Option<token::Token>> {
+        ) -> command::Result<Option<token::Token>> {
             noexpand_hook(token, input, tag)
         }
     }

@@ -194,10 +194,10 @@
 //! In the variables API, we implement this by providing the following type of function:
 //!
 //! ```
-//! use texlang_core::{parse, token, traits::*, variable, vm};
-//! use anyhow;
+//! use texlang_core::*;
+//! use texlang_core::traits::*;
 //!
-//! fn index<S: TexlangState>(token: token::Token, input: &mut vm::ExpandedStream<S>) -> anyhow::Result<variable::Index> {
+//! fn index<S: TexlangState>(token: token::Token, input: &mut vm::ExpandedStream<S>) -> command::Result<variable::Index> {
 //!     let index = usize::parse(input)?;
 //!     if index >= 10 {
 //!         // for simplicity we panic, but in real code we should return an error
@@ -212,15 +212,14 @@
 //! with the `Dynamic` variant:
 //!
 //! ```
-//! # use texlang_core::{command, parse, token, variable, vm};
-//! # use anyhow;
+//! # use texlang_core::*;
 //! # fn getter<S: HasComponent<MyComponent>>(state: &S, index: variable::Index) -> &i32 {
 //! #   panic![""]
 //! # }
 //! # fn mut_getter<S: HasComponent<MyComponent>>(state: &mut S, index: variable::Index) -> &mut i32 {
 //! #   panic![""]
 //! # }
-//! # fn index_resolver<S>(token: token::Token, input: &mut vm::ExpandedStream<S>) -> anyhow::Result<variable::Index> {
+//! # fn index_resolver<S>(token: token::Token, input: &mut vm::ExpandedStream<S>) -> command::Result<variable::Index> {
 //! #   panic![""]
 //! # }
 //! # pub struct MyComponent {
@@ -248,7 +247,7 @@
 //! for the `\myarray` command implemented above.
 //! The implementation is in 3 steps:
 //!
-//! 1. The target (e.g. `\A`) is read using [crate::parse::CommandTarget::parse].
+//! 1. The target (e.g. `\A`) is read using [crate::parse::Command::parse].
 //!
 //! 1. The index (e.g. `1`) is read using [usize::parse], just like in the previous section.
 //!
@@ -275,6 +274,7 @@
 //! | Token list | TBD, but presumably a [Vec] of [Tokens](super::token::Token)    | `\toks`                | Not implemented
 //!
 
+use crate::error;
 use crate::parse::OptionalEquals;
 use crate::traits::*;
 use crate::vm;
@@ -324,7 +324,7 @@ pub enum IndexResolver<S> {
     ///
     /// For example, in `\count 4` the index of `4` is determined by parsing a number
     /// from the input token stream.
-    Dynamic(fn(token::Token, &mut vm::ExpandedStream<S>) -> anyhow::Result<Index>),
+    Dynamic(fn(token::Token, &mut vm::ExpandedStream<S>) -> Result<Index, Box<error::Error>>),
     /// A dynamic index, but determined using virtual method dispatch.
     ///
     /// This method is more flexible than the Dynamic variant, but less performant.
@@ -338,7 +338,7 @@ pub trait DynamicIndexResolver<S> {
         &self,
         token: token::Token,
         input: &mut vm::ExpandedStream<S>,
-    ) -> anyhow::Result<Index>;
+    ) -> Result<Index, Box<error::Error>>;
 }
 
 impl<S> IndexResolver<S> {
@@ -347,7 +347,7 @@ impl<S> IndexResolver<S> {
         &self,
         token: token::Token,
         input: &mut vm::ExpandedStream<S>,
-    ) -> anyhow::Result<Index> {
+    ) -> Result<Index, Box<error::Error>> {
         match self {
             IndexResolver::Static(addr) => Ok(*addr),
             IndexResolver::Dynamic(f) => f(token, input),
@@ -396,23 +396,36 @@ impl<S> Command<S> {
     ) -> Command<S> {
         SupportedType::new_command(ref_fn, ref_mut_fn, Some(index_resolver))
     }
+}
 
+impl<S: TexlangState> Command<S> {
     /// Resolve the command to obtain a [Variable].
     pub fn resolve(
         &self,
         token: token::Token,
         input: &mut vm::ExpandedStream<S>,
-    ) -> anyhow::Result<Variable<S>> {
+    ) -> Result<Variable<S>, Box<error::Error>> {
         let index = match &self.index_resolver {
             None => Index(0),
-            Some(index_resolver) => index_resolver.resolve(token, input)?,
+            Some(index_resolver) => match index_resolver.resolve(token, input) {
+                Ok(index) => index,
+                Err(err) => {
+                    return Err(error::Error::new_propagated(
+                        input.vm(),
+                        error::PropagationContext::VariableRead,
+                        token,
+                        err,
+                    ))
+                }
+            },
         };
         Ok(match self.getters {
             Getters::Int(a, b) => Variable::Int(TypedVariable(a, b, index)),
             Getters::CatCode(a, b) => Variable::CatCode(TypedVariable(a, b, index)),
         })
     }
-
+}
+impl<S> Command<S> {
     pub(crate) fn getter_key(&self) -> GetterKey {
         self.getters.key()
     }
@@ -428,7 +441,7 @@ impl<S: TexlangState> Command<S> {
         &self,
         token: token::Token,
         input: &'a mut vm::ExpandedStream<S>,
-    ) -> anyhow::Result<ValueRef<'a>> {
+    ) -> Result<ValueRef<'a>, Box<error::Error>> {
         Ok(self.resolve(token, input)?.value(input))
     }
 
@@ -442,7 +455,7 @@ impl<S: TexlangState> Command<S> {
         token: token::Token,
         input: &mut vm::ExecutionInput<S>,
         scope: groupingmap::Scope,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), Box<error::Error>> {
         self.resolve(token, input.as_mut())?
             .set_value_using_input(input, scope)
     }
@@ -493,7 +506,7 @@ impl<S: TexlangState> Variable<S> {
         &self,
         input: &mut vm::ExecutionInput<S>,
         scope: groupingmap::Scope,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), Box<error::Error>> {
         OptionalEquals::parse(input)?;
         match self {
             Variable::Int(variable) => {

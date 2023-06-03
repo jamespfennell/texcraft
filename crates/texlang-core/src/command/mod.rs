@@ -41,15 +41,17 @@ use std::sync;
 
 mod map;
 
+pub use crate::error::Error;
 pub use map::Map;
+
+pub type Result<T> = std::result::Result<T, Box<Error>>;
 
 /// The Rust type of expansion primitive functions.
 pub type ExpansionFn<S> =
-    fn(token: token::Token, input: &mut vm::ExpansionInput<S>) -> anyhow::Result<Vec<token::Token>>;
+    fn(token: token::Token, input: &mut vm::ExpansionInput<S>) -> Result<Vec<token::Token>>;
 
 /// The Rust type of execution primitive functions.
-pub type ExecutionFn<S> =
-    fn(token: token::Token, input: &mut vm::ExecutionInput<S>) -> anyhow::Result<()>;
+pub type ExecutionFn<S> = fn(token: token::Token, input: &mut vm::ExecutionInput<S>) -> Result<()>;
 
 /// A TeX command.
 pub enum Command<S> {
@@ -219,11 +221,11 @@ impl<S> From<Command<S>> for BuiltIn<S> {
 /// In general, TeX commands interface with the VM in two ways.
 /// The first most common way is when the main VM loop or expansion loop encounters a command.
 /// The loop invokes the command's associated Rust function.
-/// One can think of the Rust function as providing the behaviour of the command in this context.
+/// One can think of the Rust function as providing the behavior of the command in this context.
 ///
 /// The second way is when a different command, like a conditional command, performs some operation
 ///     that is dependent on the commands it reads out of the input stream.
-/// In this context the commands in the input stream provide behaviour using tags.
+/// In this context the commands in the input stream provide behavior using tags.
 /// The `\else` command having the specific else tag results in the conditional branch processing completing.
 ///
 /// Note that the same tag can be used for multiple commands,

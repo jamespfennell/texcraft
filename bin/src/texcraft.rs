@@ -50,7 +50,14 @@ fn main() {
             repl();
             Ok(())
         }
-        SubCommand::Run(run_args) => run(run_args.file_path),
+        SubCommand::Run(run_args) => {
+            let result = run(run_args.file_path);
+            if let Err(err) = result {
+                println!["{err}"];
+                std::process::exit(1);
+            }
+            Ok(())
+        }
     };
     if let Err(err) = result {
         println!["{err}"];
@@ -58,14 +65,15 @@ fn main() {
     }
 }
 
-fn run(mut path: PathBuf) -> Result<(), anyhow::Error> {
+fn run(mut path: PathBuf) -> Result<(), Box<error::Error>> {
     if path.extension().is_none() {
         path.set_extension("tex");
     }
     let source_code = match fs::read_to_string(&path) {
         Ok(source_code) => source_code,
         Err(err) => {
-            return Err(anyhow::anyhow!["Failed to open file {:?}: {}", &path, err]);
+            println!["Failed to open file {:?}: {err}", &path];
+            std::process::exit(1);
         }
     };
     let mut vm = new_vm();
@@ -118,7 +126,7 @@ Tips
 Website: https://texcraft.dev
 ";
 
-fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
+fn doc(cs_name: Option<String>) -> Result<(), String> {
     let vm = new_vm();
 
     match cs_name {
@@ -151,18 +159,18 @@ fn doc(cs_name: Option<String>) -> Result<(), anyhow::Error> {
             }
             Ok(())
         }
-        Some(cs_name) => {
-            let cs_name_s = match vm.cs_name_interner().get(&cs_name) {
-                None => return Err(anyhow::anyhow!("Unknown command \\{}", cs_name)),
+        Some(name) => {
+            let cs_name = match vm.cs_name_interner().get(&name) {
+                None => return Err(format!("Unknown command \\{name}")),
                 Some(s) => s,
             };
-            let cmd = match vm.commands_map.get_command_slow(&cs_name_s) {
+            let cmd = match vm.commands_map.get_command_slow(&cs_name) {
                 None => {
-                    return Err(anyhow::anyhow!("Unknown command \\{}", cs_name));
+                    return Err(format!("Unknown command \\{name}"));
                 }
                 Some(cmd) => cmd,
             };
-            println!["\\{}  {}", cs_name.bold(), cmd.doc().unwrap_or("")];
+            println!["\\{}  {}", name.bold(), cmd.doc().unwrap_or("")];
             Ok(())
         }
     }

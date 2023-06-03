@@ -37,24 +37,23 @@
 //! cat_colors.begin_group();
 //! cat_colors.insert("paganini", "gray", Scope::Local);
 //! assert_eq!(cat_colors.get(&"paganini"), Some(&"gray"));
-//! assert_eq!(cat_colors.end_group(), true);
+//! assert_eq!(cat_colors.end_group(), Ok(()));
 //! assert_eq!(cat_colors.get(&"paganini"), Some(&"black"));
 //!
 //! // Begin a new group, insert a value, and then end the group to roll back the insert.
 //! cat_colors.begin_group();
 //! cat_colors.insert("mint", "ginger", Scope::Local);
 //! assert_eq!(cat_colors.get(&"mint"), Some(&"ginger"));
-//! assert_eq!(cat_colors.end_group(), true);
+//! assert_eq!(cat_colors.end_group(), Ok(()));
 //! assert_eq!(cat_colors.get(&"mint"), None);
 //! ```
-//! The `end_group` method returns a boolean which is false if there is no group to end, and true
-//! otherwise. It is generally an error to end a group that hasn't been started, so the method is
-//! annoted with `#[must_use]`.
+//! The `end_group` method returns an error if there is no group to end.
 //! ```
 //! # use texcraft_stdext::collections::groupingmap::GroupingHashMap;
 //! # use texcraft_stdext::collections::groupingmap::Scope;
+//! # use texcraft_stdext::collections::groupingmap::EndOfGroupError;
 //! let mut cat_colors = GroupingHashMap::<String, String>::new();
-//! assert_eq!(cat_colors.end_group(), false);
+//! assert_eq!(cat_colors.end_group(), Err(EndOfGroupError{}));
 //! ```
 //! There is also a "global" variant of the `insert` method. It inserts the value at the global
 //! group, and erases all other values.
@@ -65,7 +64,7 @@
 //! cat_colors.insert("paganini", "black", Scope::Local);
 //! cat_colors.begin_group();
 //! cat_colors.insert("paganini", "gray", Scope::Global);
-//! assert_eq!(cat_colors.end_group(), true);
+//! assert_eq!(cat_colors.end_group(), Ok(()));
 //! assert_eq!(cat_colors.get(&"paganini"), Some(&"gray"));
 //! ```
 //!
@@ -220,6 +219,10 @@ enum EndOfGroupAction<V> {
     Delete,
 }
 
+// Error returned if end group is called when there is no group to end.
+#[derive(Debug, PartialEq, Eq)]
+pub struct EndOfGroupError;
+
 impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V, T> {
     /// Inserts the key, value pair in the provided scope.
     pub fn insert(&mut self, key: K, mut val: V, scope: Scope) -> bool {
@@ -274,12 +277,10 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V,
         self.groups.push(HashMap::new());
     }
 
-    #[must_use]
-    /// Attempts to end the current group and returns true if there is a group to end, and false
-    /// otherwise.
-    pub fn end_group(&mut self) -> bool {
+    /// Attempts to end the current group. Returns an error if there is no group to end.
+    pub fn end_group(&mut self) -> Result<(), EndOfGroupError> {
         match self.groups.pop() {
-            None => false,
+            None => Err(EndOfGroupError {}),
             Some(group) => {
                 // Note that for the running time analysis we account each iteration of this loop
                 // to the insert method that put the key in the changed_keys set. Put another way,
@@ -295,7 +296,7 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V,
                         }
                     }
                 }
-                true
+                Ok(())
             }
         }
     }
@@ -394,7 +395,7 @@ mod tests {
         let mut map = GroupingHashMap::new();
         map.begin_group();
         map.insert(3, 5, Scope::Local);
-        assert_eq!(map.end_group(), true);
+        assert_eq!(map.end_group(), Ok(()));
         assert_eq!(map.get(&3), None);
         map.insert(3, 4, Scope::Local);
         assert_eq!(map.get(&3), Some(&4));
@@ -405,7 +406,7 @@ mod tests {
         let mut map = GroupingHashMap::new();
         map.begin_group();
         map.insert(3, 5, Scope::Global);
-        assert_eq!(map.end_group(), true);
+        assert_eq!(map.end_group(), Ok(()));
         assert_eq!(map.get(&3), Some(&5));
     }
 
@@ -420,7 +421,7 @@ mod tests {
         original.begin_group();
         original.insert("key1", 5, Scope::Local);
         original.insert("key3", 6, Scope::Global);
-        assert_eq!(original.end_group(), true);
+        assert_eq!(original.end_group(), Ok(()));
 
         let mut want = GroupingHashMap::new();
         want.insert("key1-new".to_string(), "key1-1".to_string(), Scope::Local);
@@ -431,7 +432,7 @@ mod tests {
         want.begin_group();
         want.insert("key1-new".to_string(), "key1-5".to_string(), Scope::Local);
         want.insert("key3-new".to_string(), "key3-6".to_string(), Scope::Global);
-        assert_eq!(want.end_group(), true);
+        assert_eq!(want.end_group(), Ok(()));
 
         let got: GroupingHashMap<String, String> = original
             .clone_with_conversion(&mut |k| format!["{}-new", k], &mut |k, v| {

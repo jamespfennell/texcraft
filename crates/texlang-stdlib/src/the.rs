@@ -15,12 +15,10 @@ pub fn get_the<S: TexlangState>() -> command::BuiltIn<S> {
 fn the_primitive_fn<S: TexlangState>(
     the_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<token::Token>> {
+) -> command::Result<Vec<token::Token>> {
     // TODO: double check \the expands the input
     let token = match input.next()? {
-        None => {
-            return Err(error::EndOfInputError::new("").cast());
-        }
+        None => return Err(error::SimpleEndOfInputError::new(input.vm(), "TODO").into()),
         Some(token) => token,
     };
     Ok(match &token.value() {

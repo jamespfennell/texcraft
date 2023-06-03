@@ -5,7 +5,7 @@ use texcraft_stdext::algorithms::substringsearch::Matcher;
 use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
 use texcraft_stdext::nevec;
-use texlang_core::parse::CommandTarget;
+use texlang_core::parse::Command;
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -30,14 +30,14 @@ pub fn def_tag() -> command::Tag {
 fn def_primitive_fn<S: HasComponent<prefix::Component>>(
     def_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> anyhow::Result<()> {
+) -> Result<(), Box<error::Error>> {
     parse_and_set_macro(def_token, input, false)
 }
 
 fn gdef_primitive_fn<S: HasComponent<prefix::Component>>(
     def_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> anyhow::Result<()> {
+) -> Result<(), Box<error::Error>> {
     parse_and_set_macro(def_token, input, true)
 }
 
@@ -45,12 +45,12 @@ fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
     set_globally_override: bool,
-) -> anyhow::Result<()> {
+) -> Result<(), Box<error::Error>> {
     let mut scope = input.state_mut().component_mut().read_and_reset_global();
     if set_globally_override {
         scope = groupingmap::Scope::Global;
     }
-    let CommandTarget::ControlSequence(name) = CommandTarget::parse(input)?;
+    let Command::ControlSequence(name) = Command::parse(input)?;
     let (prefix, raw_parameters, replacement_end_token) =
         parse_prefix_and_parameters(input.unexpanded())?;
     let parameters: Vec<texmacro::Parameter> = raw_parameters
@@ -109,7 +109,7 @@ fn char_to_parameter_index(c: char) -> Option<usize> {
 
 fn parse_prefix_and_parameters<S: TexlangState>(
     input: &mut vm::UnexpandedStream<S>,
-) -> anyhow::Result<(Vec<token::Token>, Vec<RawParameter>, Option<token::Token>)> {
+) -> command::Result<(Vec<token::Token>, Vec<RawParameter>, Option<token::Token>)> {
     let mut prefix = Vec::new();
     let mut parameters = Vec::new();
     let mut replacement_end_token = None;
@@ -120,19 +120,19 @@ fn parse_prefix_and_parameters<S: TexlangState>(
                 return Ok((prefix, parameters, replacement_end_token));
             }
             token::Value::EndGroup(_) => {
-                return Err(error::TokenError::new(
+                return Err(error::SimpleTokenError::new(
+                    input.vm(),
                     token,
                     "unexpected end group token while parsing the parameter of a macro definition",
                 )
-                .cast());
+                .into());
             }
             token::Value::Parameter(_) => {
                 let parameter_token = match input.next()? {
                     None => {
-                        return Err(error::EndOfInputError::new(
-                "unexpected end of input while reading the token after a parameter token")
-                .add_note("a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
-                .cast());
+                        return Err(error::SimpleEndOfInputError::new(input.vm(),
+                "unexpected end of input while reading the token after a parameter token").into());
+                        // TODO .add_note("a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
                     }
                     Some(token) => token,
                 };
@@ -151,33 +151,37 @@ fn parse_prefix_and_parameters<S: TexlangState>(
                         return Ok((prefix, parameters, replacement_end_token));
                     }
                     token::Value::ControlSequence(..) => {
-                        return Err(error::TokenError::new(
-                                    parameter_token,
-                                    "unexpected control sequence after a parameter token")
-                                    .add_note(
-                                    "a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
-                                    .cast());
+                        return Err(error::SimpleTokenError::new(
+                            input.vm(),
+                            parameter_token,
+                            "unexpected control sequence after a parameter token",
+                        )
+                        .into());
+                        // TODO "a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
                     }
                     _ => {
                         let c = parameter_token.char().unwrap();
                         let parameter_index = match char_to_parameter_index(c) {
                             None => {
-                                return Err(error::TokenError::new(
-                                            parameter_token,
-                                            "unexpected character after a parameter token")
-                                    .add_note("a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
-                                    .cast());
+                                return Err(error::SimpleTokenError::new(
+                                    input.vm(),
+                                    parameter_token,
+                                    "unexpected character after a parameter token",
+                                )
+                                .into());
+                                // TODO .add_note("a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
                             }
                             Some(n) => n,
                         };
                         if parameter_index != parameters.len() {
-                            return Err(error::TokenError::new(
+                            return Err(error::SimpleTokenError::new(
+                                input.vm(),
                                 parameter_token,
-                                format!["unexpected parameter number {}", parameter_index+1])
-                                .add_note(
-                                    format!["this macro has {} parameter(s) so far, so parameter number #{} was expected.",
-                                    parameters.len(), parameters.len()+1
-                                    ]).cast());
+                                format!["unexpected parameter number {}", parameter_index + 1],
+                            )
+                            .into());
+                            // TODO format!["this macro has {} parameter(s) so far, so parameter number #{} was expected.",
+                            //TODO parameters.len(), parameters.len()+1
                         }
                         parameters.push(RawParameter::Undelimited);
                     }
@@ -193,17 +197,19 @@ fn parse_prefix_and_parameters<S: TexlangState>(
             },
         }
     }
-    Err(error::EndOfInputError::new(
-                "unexpected end of input while reading the parameter text of a macro")
-                .add_note("the parameter text of a macro must end with a closing brace { or another token with catcode 1 (begin group)")
-                .cast())
+    Err(error::SimpleEndOfInputError::new(
+        input.vm(),
+        "unexpected end of input while reading the parameter text of a macro",
+    )
+    .into())
+    // TODO .add_note("the parameter text of a macro must end with a closing brace { or another token with catcode 1 (begin group)")
 }
 
 fn parse_replacement_text<S: TexlangState>(
     input: &mut vm::UnexpandedStream<S>,
     opt_final_token: Option<token::Token>,
     num_parameters: usize,
-) -> anyhow::Result<Vec<texmacro::Replacement>> {
+) -> command::Result<Vec<texmacro::Replacement>> {
     // TODO: could we use a pool of vectors to avoid some of the allocations here?
     let mut result = vec![];
     let mut scope_depth = 0;
@@ -233,21 +239,23 @@ fn parse_replacement_text<S: TexlangState>(
             token::Value::Parameter(_) => {
                 let parameter_token = match input.next()? {
                     None => {
-                        return Err(error::EndOfInputError::new(
+                        return Err(error::SimpleEndOfInputError::new(
+                            input.vm(),
                             "unexpected end of input while reading a parameter number",
                         )
-                        .cast());
+                        .into())
                     }
                     Some(token) => token,
                 };
                 let c = match parameter_token.value() {
                     token::Value::ControlSequence(..) => {
-                        return Err(error::TokenError::new(
+                        return Err(error::SimpleTokenError::new(
+                            input.vm(),
                             parameter_token,
                             "unexpected character while reading a parameter number",
                         )
-                        .add_note("expected a number between 1 and 9 inclusive")
-                        .cast());
+                        .into());
+                        // TODO .add_note("expected a number between 1 and 9 inclusive")
                     }
                     token::Value::Parameter(_) => {
                         push(&mut result, parameter_token);
@@ -258,21 +266,23 @@ fn parse_replacement_text<S: TexlangState>(
 
                 let parameter_index = match char_to_parameter_index(c) {
                     None => {
-                        return Err(error::TokenError::new(
+                        return Err(error::SimpleTokenError::new(
+                            input.vm(),
                             parameter_token,
                             "unexpected character while reading a parameter number",
                         )
-                        .add_note("expected a number between 1 and 9 inclusive")
-                        .cast())
+                        .into());
+                        // TODO .add_note("expected a number between 1 and 9 inclusive")
                     }
                     Some(n) => n,
                 };
                 if parameter_index >= num_parameters {
-                    return Err(error::TokenError::new(
+                    return Err(error::SimpleTokenError::new(
+                        input.vm(),
                         parameter_token,
                         "unexpected character while reading a parameter number",
                     )
-                    .cast());
+                    .into());
 
                     /* TODO
                             var msg string
@@ -298,10 +308,11 @@ fn parse_replacement_text<S: TexlangState>(
         push(&mut result, token);
     }
 
-    Err(
-        error::EndOfInputError::new("unexpected end of input while reading a parameter number")
-            .cast(),
+    Err(error::SimpleEndOfInputError::new(
+        input.vm(),
+        "unexpected end of input while reading a parameter number",
     )
+    .into())
 }
 
 #[cfg(test)]

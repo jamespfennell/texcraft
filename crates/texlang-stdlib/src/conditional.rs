@@ -3,6 +3,7 @@
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
+use texlang_core::token::trace;
 use texlang_core::traits::*;
 use texlang_core::*;
 
@@ -89,7 +90,7 @@ static FI_TAG: command::StaticTag = command::StaticTag::new();
 fn true_case<S: HasComponent<Component>>(
     token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<token::Token>> {
+) -> Result<Vec<token::Token>, Box<error::Error>> {
     push_branch(
         input,
         Branch {
@@ -107,9 +108,8 @@ fn true_case<S: HasComponent<Component>>(
 fn false_case<S: HasComponent<Component>>(
     original_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<token::Token>> {
+) -> Result<Vec<token::Token>, Box<error::Error>> {
     let mut depth = 0;
-    let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
         if let token::Value::ControlSequence(name) = &token.value() {
             // TODO: use switch
@@ -134,22 +134,38 @@ fn false_case<S: HasComponent<Component>>(
                 }
             }
         }
-        last_token = Some(token)
     }
-    let token = match last_token {
-        None => original_token,
-        Some(token) => token,
-    };
     let branch = pop_branch(input);
-    Err(error::TokenError::new(
-        token,
-        "unexpected end of input while expanding an `if` command")
-            .add_note("each `if` command must be terminated by a `fi` command, with an optional `else` in between")
-            .add_note("this `if` command evaluated to false, and the input ended while skipping the true branch")
-            .add_note("this is the `if` command involved in the error:")
-            .add_note(format!["{branch:?}"])
-            .cast()
-    )
+    Err(FalseBranchEndOfInputError {
+        trace: input.vm().trace_end_of_input(),
+        branch,
+    }
+    .into())
+}
+
+#[derive(Debug)]
+struct FalseBranchEndOfInputError {
+    trace: trace::SourceCodeTrace,
+    branch: Option<Branch>,
+}
+
+impl error::TexError for FalseBranchEndOfInputError {
+    fn kind(&self) -> error::Kind {
+        error::Kind::EndOfInput(&self.trace)
+    }
+
+    fn title(&self) -> String {
+        "unexpected end of input while expanding an `if` command".into()
+    }
+
+    fn notes(&self) -> Vec<String> {
+        vec![
+            "each `if` command must be terminated by a `fi` command, with an optional `else` in between".to_string(),
+            "this `if` command evaluated to false, and the input ended while skipping the true branch".to_string(),
+            "this is the `if` command involved in the error:".to_string(),
+            format!["{:?}", self.branch],
+        ]
+    }
 }
 
 macro_rules! create_if_primitive {
@@ -157,7 +173,7 @@ macro_rules! create_if_primitive {
         fn $if_primitive_fn<S: HasComponent<Component>>(
             token: token::Token,
             input: &mut vm::ExpansionInput<S>,
-        ) -> anyhow::Result<Vec<token::Token>> {
+        ) -> Result<Vec<token::Token>, Box<error::Error>> {
             match $if_fn(input)? {
                 true => true_case(token, input),
                 false => false_case(token, input),
@@ -172,20 +188,20 @@ macro_rules! create_if_primitive {
     };
 }
 
-fn if_true<S>(_: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
+fn if_true<S>(_: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
     Ok(true)
 }
 
-fn if_false<S>(_: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
+fn if_false<S>(_: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
     Ok(false)
 }
 
-fn if_num<S: TexlangState>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
+fn if_num<S: TexlangState>(stream: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
     let (a, o, b) = <(i32, Ordering, i32)>::parse(stream)?;
     Ok(a.cmp(&b) == o)
 }
 
-fn if_odd<S: TexlangState>(stream: &mut vm::ExpansionInput<S>) -> anyhow::Result<bool> {
+fn if_odd<S: TexlangState>(stream: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
     let n = i32::parse(stream)?;
     Ok((n % 2) == 1)
 }
@@ -198,7 +214,7 @@ create_if_primitive![if_odd, if_odd_primitive_fn, get_if_odd, IFODD_DOC];
 fn if_case_primitive_fn<S: HasComponent<Component>>(
     ifcase_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<token::Token>> {
+) -> Result<Vec<token::Token>, Box<error::Error>> {
     // TODO: should we reading the number from the unexpanded stream? Probably!
     let mut cases_to_skip = i32::parse(input)?;
     if cases_to_skip == 0 {
@@ -212,7 +228,6 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
         return Ok(Vec::new());
     }
     let mut depth = 0;
-    let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
         if let token::Value::ControlSequence(name) = &token.value() {
             // TODO: switch
@@ -250,20 +265,35 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
                 }
             }
         }
-        last_token = Some(token);
     }
-    let token = match last_token {
-        None => ifcase_token,
-        Some(token) => token,
-    };
-    Err(error::TokenError::new(
-        token,
-        "unexpected end of input while expanding an `ifcase` command",
-    )
-    .add_note("each `ifcase` command must be matched by a `or`, `else` or `fi` command")
-    .add_note("this `ifcase` case evaluated to %d and we skipped %d cases before the input ran out")
-    .add_note("this is the `ifnum` command involved in the error:")
-    .cast())
+    Err(IfCaseEndOfInputError {
+        trace: input.trace_end_of_input(),
+    }
+    .into())
+}
+
+#[derive(Debug)]
+struct IfCaseEndOfInputError {
+    trace: trace::SourceCodeTrace,
+}
+
+impl error::TexError for IfCaseEndOfInputError {
+    fn kind(&self) -> error::Kind {
+        error::Kind::EndOfInput(&self.trace)
+    }
+
+    fn title(&self) -> String {
+        "unexpected end of input while expanding an `ifcase` command".into()
+    }
+
+    fn notes(&self) -> Vec<String> {
+        vec![
+            "each `ifcase` command must be matched by a `or`, `else` or `fi` command".to_string(),
+            "this `ifcase` case evaluated to %d and we skipped %d cases before the input ran out"
+                .to_string(),
+            "this is the `ifnum` command involved in the error:".to_string(),
+        ]
+    }
 }
 
 /// Get the `\ifcase` primitive.
@@ -274,7 +304,7 @@ pub fn get_if_case<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn or_primitive_fn<S: HasComponent<Component>>(
     ifcase_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<token::Token>> {
+) -> Result<Vec<token::Token>, Box<error::Error>> {
     let branch = pop_branch(input);
     // For an or command to be valid, we must be in a switch statement
     let is_valid = match branch {
@@ -282,14 +312,17 @@ fn or_primitive_fn<S: HasComponent<Component>>(
         Some(branch) => matches!(branch.kind, BranchKind::Switch),
     };
     if !is_valid {
-        return Err(error::TokenError::new(ifcase_token, "unexpected `or` command").cast());
+        return Err(error::SimpleTokenError::new(
+            input.vm(),
+            ifcase_token,
+            "unexpected `or` command",
+        )
+        .into());
     }
 
     let mut depth = 0;
-    let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
         if let token::Value::ControlSequence(name) = &token.value() {
-            // TODO: switch
             let tag = input.commands_map().get_tag(name);
             if tag == Some(input.state().component().if_tag) {
                 depth += 1;
@@ -301,25 +334,35 @@ fn or_primitive_fn<S: HasComponent<Component>>(
                 }
             }
         }
-        last_token = Some(token);
     }
-    let token = match last_token {
-        None => ifcase_token,
-        Some(token) => token,
-    };
-    Err(error::TokenError::new(
-        token,
-        "unexpected end of input while expanding an `or` command".to_string()
-    ).add_note(
-            "each `or` command must be terminated by a `fi` command".to_string()
-    ).add_note(
-            "this `or` corresponds to an `ifcase` command that evaluated to %d, and the input ended while skipping the remaining cases".to_string()
-    ).add_note(
-            "this is the `ifcase` command involved in the error:".to_string()
-    ).add_note(
-            "this is the `or` command involved in the error:".to_string()
-    ).cast()
-    )
+    Err(OrEndOfInputError {
+        trace: input.vm().trace_end_of_input(),
+    }
+    .into())
+}
+
+#[derive(Debug)]
+struct OrEndOfInputError {
+    trace: trace::SourceCodeTrace,
+}
+
+impl error::TexError for OrEndOfInputError {
+    fn kind(&self) -> error::Kind {
+        error::Kind::EndOfInput(&self.trace)
+    }
+
+    fn title(&self) -> String {
+        "unexpected end of input while expanding an `or` command".into()
+    }
+
+    fn notes(&self) -> Vec<String> {
+        vec![
+        "each `or` command must be terminated by a `fi` command".to_string(),
+        "this `or` corresponds to an `ifcase` command that evaluated to %d, and the input ended while skipping the remaining cases".to_string(),
+        "this is the `ifcase` command involved in the error:".to_string(),
+        "this is the `or` command involved in the error:".to_string(),
+        ]
+    }
 }
 
 /// Get the `\or` primitive.
@@ -330,7 +373,7 @@ pub fn get_or<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn else_primitive_fn<S: HasComponent<Component>>(
     else_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<token::Token>> {
+) -> Result<Vec<token::Token>, Box<error::Error>> {
     let branch = pop_branch(input);
     // For else token to be valid, we must be in the true branch of a conditional
     let is_valid = match branch {
@@ -338,12 +381,16 @@ fn else_primitive_fn<S: HasComponent<Component>>(
         Some(branch) => matches!(branch.kind, BranchKind::True | BranchKind::Switch),
     };
     if !is_valid {
-        return Err(error::TokenError::new(else_token, "unexpected `else` command").cast());
+        return Err(error::SimpleTokenError::new(
+            input.vm(),
+            else_token,
+            "unexpected `else` command",
+        )
+        .into());
     }
 
     // Now consume all of the tokens until the next \fi
     let mut depth = 0;
-    let mut last_token = None;
     while let Some(token) = input.unexpanded().next()? {
         if let token::Value::ControlSequence(name) = &token.value() {
             // TODO: switch
@@ -358,20 +405,35 @@ fn else_primitive_fn<S: HasComponent<Component>>(
                 }
             }
         }
-        last_token = Some(token);
     }
-    let token = match last_token {
-        None => else_token,
-        Some(token) => token,
-    };
-    Err(error::TokenError::new(
-        token,
-        "unexpected end of input while expanding an `else` command")
-            .add_note("each `else` command must be terminated by a `fi` command")
-            .add_note("this `else` corresponds to an `if` command that evaluated to true, and the input ended while skipping the false branch")
-            .add_note("this is the `if` command involved in the error:")
-            .add_note("this is the `else` command involved in the error:")
-    .cast())
+    Err(ElseEndOfInputError {
+        trace: input.vm().trace_end_of_input(),
+    }
+    .into())
+}
+
+#[derive(Debug)]
+struct ElseEndOfInputError {
+    trace: trace::SourceCodeTrace,
+}
+
+impl error::TexError for ElseEndOfInputError {
+    fn kind(&self) -> error::Kind {
+        error::Kind::EndOfInput(&self.trace)
+    }
+
+    fn title(&self) -> String {
+        "unexpected end of input while expanding an `else` command".into()
+    }
+
+    fn notes(&self) -> Vec<String> {
+        vec![
+            "each `else` command must be terminated by a `fi` command".to_string(),
+            "this `else` corresponds to an `if` command that evaluated to true, and the input ended while skipping the false branch".to_string(),
+            "this is the `if` command involved in the error:".to_string(),
+            "this is the `else` command involved in the error:".to_string(),
+        ]
+    }
 }
 
 /// Get the `\else` primitive.
@@ -383,14 +445,16 @@ pub fn get_else<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn fi_primitive_fn<S: HasComponent<Component>>(
     token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<token::Token>> {
+) -> Result<Vec<token::Token>, Box<error::Error>> {
     let branch = pop_branch(input);
     // For a \fi primitive to be valid, we must be in a conditional.
     // Note that we could be in the false branch: \iftrue\else\fi
     // Or in the true branch: \iftrue\fi
     // Or in a switch statement.
     if branch.is_none() {
-        return Err(error::TokenError::new(token, "unexpected `fi` command").cast());
+        return Err(
+            error::SimpleTokenError::new(input.vm(), token, "unexpected `fi` command").into(),
+        );
     }
     Ok(Vec::new())
 }

@@ -13,7 +13,7 @@ pub fn get_texcraft<S>() -> command::BuiltIn<S> {
 pub fn texcraft_primitive_fn<S>(
     t: token::Token,
     _: &mut vm::ExpansionInput<S>,
-) -> anyhow::Result<Vec<token::Token>> {
+) -> command::Result<Vec<token::Token>> {
     Ok(vec![
         token::Token::new_letter('T', t.trace_key()),
         token::Token::new_letter('e', t.trace_key()),

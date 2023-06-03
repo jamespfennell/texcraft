@@ -12,14 +12,10 @@ use std::collections::HashMap;
 
 use crate::prefix;
 use crate::script;
-use anyhow::Result;
-use texlang_core::command;
-use texlang_core::token;
 use texlang_core::traits::*;
-use texlang_core::variable;
-use texlang_core::vm;
 use texlang_core::vm::implement_has_component;
 use texlang_core::vm::VM;
+use texlang_core::*;
 
 /// Simple state type for use in unit tests.
 ///
@@ -74,6 +70,11 @@ pub enum TestOption<'a, S> {
     /// Overrides previous `CustomVMInitialization` or `CustomVMInitializationDyn` options.
     #[allow(clippy::type_complexity)]
     CustomVMInitializationDyn(Box<dyn Fn(&mut VM<S>) + 'a>),
+
+    /// Whether undefined commands raise an error.
+    ///
+    /// Overrides previous `AllowUndefinedCommands` options.
+    AllowUndefinedCommands(bool),
 }
 
 /// Run an expansion equality test.
@@ -160,19 +161,21 @@ where
 pub fn execute_source_code<S>(
     source: &str,
     options: &[TestOption<S>],
-) -> (Result<Vec<token::Token>>, VM<S>)
+) -> (Result<Vec<token::Token>, Box<error::Error>>, VM<S>)
 where
     S: Default + HasComponent<script::Component>,
 {
     let mut initial_commands: &dyn Fn() -> HashMap<&'static str, command::BuiltIn<S>> =
         &HashMap::new;
     let mut custom_vm_initialization: &dyn Fn(&mut VM<S>) = &|_| {};
+    let mut allow_undefined_commands: bool = true;
     for option in options {
         match option {
             TestOption::InitialCommands(f) => initial_commands = f,
             TestOption::InitialCommandsDyn(f) => initial_commands = f,
             TestOption::CustomVMInitialization(f) => custom_vm_initialization = f,
             TestOption::CustomVMInitializationDyn(f) => custom_vm_initialization = f,
+            TestOption::AllowUndefinedCommands(b) => allow_undefined_commands = *b,
         }
     }
 
@@ -180,7 +183,7 @@ where
     (custom_vm_initialization)(&mut vm);
     vm.push_source("testing.tex".to_string(), source.to_string())
         .unwrap();
-    script::set_allow_undefined_command(&mut vm.custom_state, true);
+    script::set_allow_undefined_command(&mut vm.custom_state, allow_undefined_commands);
     let output = script::run(&mut vm);
     (output, vm)
 }

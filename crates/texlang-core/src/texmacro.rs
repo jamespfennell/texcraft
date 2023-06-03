@@ -1,5 +1,6 @@
 //! Implementation of TeX user defined macros.
 
+use crate::command;
 use crate::error;
 use crate::parse;
 use crate::token;
@@ -55,12 +56,8 @@ impl Macro {
         &self,
         token: Token,
         input: &mut vm::ExpansionInput<S>,
-    ) -> anyhow::Result<()> {
-        remove_tokens_from_stream(
-            &self.prefix,
-            input.unexpanded(),
-            "matching the prefix for a user-defined macro",
-        )?;
+    ) -> Result<(), Box<command::Error>> {
+        remove_tokens_from_stream(&self.prefix, input.unexpanded())?;
         let mut argument_indices: Vec<(usize, usize)> = Default::default();
         let mut argument_tokens = input.checkout_token_buffer();
         let unexpanded_stream = input.unexpanded();
@@ -161,7 +158,7 @@ impl Parameter {
         stream: &mut S,
         index: usize,
         result: &mut Vec<Token>,
-    ) -> anyhow::Result<bool> {
+    ) -> Result<bool, Box<command::Error>> {
         match self {
             Parameter::Undelimited => {
                 Parameter::parse_undelimited_argument(macro_token, stream, index + 1, result)?;
@@ -183,7 +180,7 @@ impl Parameter {
         matcher_factory: &Matcher<Token>,
         param_num: usize,
         result: &mut Vec<Token>,
-    ) -> anyhow::Result<bool> {
+    ) -> Result<bool, Box<command::Error>> {
         let mut matcher = matcher_factory.start();
         let mut scope_depth = 0;
 
@@ -217,9 +214,11 @@ impl Parameter {
                 ));
             }
         }
-        let mut e = error::EndOfInputError::new(format![
+        return Err(error::SimpleEndOfInputError::new(stream.vm(),format![
             "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
-        ])
+        ]).into());
+        /*
+        TODO
         .add_note(format![
             "this argument is delimited and must be suffixed by the tokens `{}`",
             matcher_factory.substring()
@@ -236,6 +235,7 @@ impl Parameter {
         Err(e
             .add_token_context(macro_token, "the macro invocation started here:")
             .cast())
+         */
     }
 
     fn should_trim_outer_braces_if_present(list: &[Token]) -> bool {
@@ -262,14 +262,12 @@ impl Parameter {
         stream: &mut S,
         param_num: usize,
         result: &mut Vec<Token>,
-    ) -> anyhow::Result<()> {
-        let opening_brace = match stream.next()? {
+    ) -> Result<(), Box<command::Error>> {
+        let _opening_brace = match stream.next()? {
             None => {
-                return Err(error::EndOfInputError::new(format![
+                return Err(error::SimpleEndOfInputError::new(stream.vm(), format![
                     "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
-                ])
-                .add_token_context(macro_token, "the macro invocation started here:")
-                .cast());
+                ]).into())
             }
             Some(token) => match token.value() {
                 token::Value::BeginGroup(_) => token,
@@ -281,15 +279,17 @@ impl Parameter {
         };
         match parse::parse_balanced_tokens(stream, result)? {
             true => Ok(()),
-            false => Err(error::EndOfInputError::new(format![
+            false => Err(error::SimpleEndOfInputError::new(stream.vm(), format![
                 "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
-            ])
+            ]).into()),
+            /* TODO
             .add_note(format![
             "this argument started with a `{opening_brace}` and must be finished with a matching closing brace"
         ])
             .add_token_context(&opening_brace, "the argument started here:")
             .add_token_context(macro_token, "the macro invocation started here:")
             .cast()),
+             */
         }
     }
 }
@@ -377,18 +377,18 @@ pub fn pretty_print_replacement_text(replacements: &[Replacement]) -> String {
 pub fn remove_tokens_from_stream<T: vm::TokenStream>(
     tokens: &[Token],
     stream: &mut T,
-    action: &str,
-) -> anyhow::Result<()> {
+) -> Result<(), Box<command::Error>> {
     for prefix_token in tokens.iter() {
-        let stream_token = match stream.next()? {
-            None => {
-                return Err(error::EndOfInputError::new(format![
-                    "unexpected end of input while {action}"
-                ])
-                .cast());
-            }
-            Some(token) => token,
-        };
+        let stream_token =
+            match stream.next()? {
+                None => return Err(error::SimpleEndOfInputError::new(
+                    stream.vm(),
+                    "unexpected end of input while matching the prefix for a user-defined macro",
+                    // TODO: add everything we've matched so far, and what we were expecting
+                )
+                .into()),
+                Some(token) => token,
+            };
         if &stream_token != prefix_token {
             /*
             let note = match &prefix_token.value {
@@ -401,13 +401,12 @@ pub fn remove_tokens_from_stream<T: vm::TokenStream>(
                 ],
             };
              */
-            let note = "todo";
-            return Err(error::TokenError::new(
+            return Err(error::SimpleTokenError::new(
+                stream.vm(),
                 stream_token,
-                format!["unexpected token while {action}"],
+                "unexpected token while matching the prefix for a user-defined macro",
             )
-            .add_note(note)
-            .cast());
+            .into());
         }
     }
     Ok(())

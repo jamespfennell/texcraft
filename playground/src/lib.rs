@@ -42,7 +42,7 @@ pub fn run(
     vm.push_source(file_name, input).unwrap();
     match script::run(&mut vm) {
         Ok(tokens) => token::write_tokens(&tokens, vm.cs_name_interner()),
-        Err(err) => format!["{err}"],
+        Err(err) => format!["{err:?}"],
     }
 }
 
@@ -65,7 +65,7 @@ impl TexlangState for PlaygroundState {
         token: texlang_core::token::Token,
         input: &mut vm::ExpansionInput<Self>,
         tag: Option<texlang_core::command::Tag>,
-    ) -> anyhow::Result<Option<texlang_core::token::Token>> {
+    ) -> command::Result<Option<texlang_core::token::Token>> {
         expansion::noexpand_hook(token, input, tag)
     }
 }

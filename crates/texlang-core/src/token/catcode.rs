@@ -103,7 +103,29 @@ impl TryFrom<u8> for CatCode {
 
 impl std::fmt::Display for CatCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} ({})", self, *self as u8)?;
+        write!(
+            f,
+            "{} ({})",
+            *self as u8,
+            match self {
+                Escape => "escape",
+                BeginGroup => "begin group",
+                EndGroup => "end group",
+                MathShift => "math shift",
+                AlignmentTab => "alignment tab",
+                EndOfLine => "end of line",
+                Parameter => "parameter",
+                Superscript => "superscript",
+                Subscript => "subscript",
+                Ignored => "ignored",
+                Space => "space",
+                Letter => "letter",
+                Other => "other",
+                Active => "active",
+                Comment => "comment",
+                Invalid => "invalid",
+            }
+        )?;
         Ok(())
     }
 }
