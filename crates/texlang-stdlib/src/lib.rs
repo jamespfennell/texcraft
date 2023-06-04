@@ -70,6 +70,13 @@ impl TexlangState for StdLibState {
     ) -> command::Result<Option<texlang_core::token::Token>> {
         expansion::noexpand_hook(token, input, tag)
     }
+
+    #[inline]
+    fn variable_assignment_scope_hook(
+        state: &mut Self,
+    ) -> texcraft_stdext::collections::groupingmap::Scope {
+        prefix::variable_assignment_scope_hook(state)
+    }
 }
 
 impl StdLibState {
@@ -154,6 +161,11 @@ impl ErrorCase {
     pub fn all_error_cases() -> Vec<ErrorCase> {
         let mut cases = vec![];
         for (description, source_code) in vec![
+            ("end of input after \\global", r"\global"),
+            ("can't be prefixed by \\global", r"\global \sleep"),
+            ("can't be prefixed by \\global (character)", r"\global a"),
+            ("can't be prefixed by \\long", r"\long \let \a = \def"),
+            ("can't be prefixed by \\outer", r"\outer \let \a = \def"),
             ("bad rhs in assignment", r"\year = X"),
             ("invalid variable (undefined)", r"\advance \undefined by 4"),
             (

@@ -91,8 +91,8 @@ impl error::TexError for Error {
         format!["expected {}, instead {}", self.expected, got]
     }
 
-    fn notes(&self) -> Vec<String> {
-        vec![self.guidance.clone()]
+    fn notes(&self) -> Vec<error::display::Note> {
+        vec![self.guidance.clone().into()]
     }
 
     fn source_annotation(&self) -> String {

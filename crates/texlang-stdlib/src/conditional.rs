@@ -158,12 +158,12 @@ impl error::TexError for FalseBranchEndOfInputError {
         "unexpected end of input while expanding an `if` command".into()
     }
 
-    fn notes(&self) -> Vec<String> {
+    fn notes(&self) -> Vec<error::display::Note> {
         vec![
-            "each `if` command must be terminated by a `fi` command, with an optional `else` in between".to_string(),
-            "this `if` command evaluated to false, and the input ended while skipping the true branch".to_string(),
-            "this is the `if` command involved in the error:".to_string(),
-            format!["{:?}", self.branch],
+            "each `if` command must be terminated by a `fi` command, with an optional `else` in between".into(),
+            "this `if` command evaluated to false, and the input ended while skipping the true branch".into(),
+            "this is the `if` command involved in the error:".into(),
+            format!["{:?}", self.branch].into(),
         ]
     }
 }
@@ -286,12 +286,12 @@ impl error::TexError for IfCaseEndOfInputError {
         "unexpected end of input while expanding an `ifcase` command".into()
     }
 
-    fn notes(&self) -> Vec<String> {
+    fn notes(&self) -> Vec<error::display::Note> {
         vec![
-            "each `ifcase` command must be matched by a `or`, `else` or `fi` command".to_string(),
+            "each `ifcase` command must be matched by a `or`, `else` or `fi` command".into(),
             "this `ifcase` case evaluated to %d and we skipped %d cases before the input ran out"
-                .to_string(),
-            "this is the `ifnum` command involved in the error:".to_string(),
+                .into(),
+            "this is the `ifnum` command involved in the error:".into(),
         ]
     }
 }
@@ -355,12 +355,12 @@ impl error::TexError for OrEndOfInputError {
         "unexpected end of input while expanding an `or` command".into()
     }
 
-    fn notes(&self) -> Vec<String> {
+    fn notes(&self) -> Vec<error::display::Note> {
         vec![
-        "each `or` command must be terminated by a `fi` command".to_string(),
-        "this `or` corresponds to an `ifcase` command that evaluated to %d, and the input ended while skipping the remaining cases".to_string(),
-        "this is the `ifcase` command involved in the error:".to_string(),
-        "this is the `or` command involved in the error:".to_string(),
+        "each `or` command must be terminated by a `fi` command".into(),
+        "this `or` corresponds to an `ifcase` command that evaluated to %d, and the input ended while skipping the remaining cases".into(),
+        "this is the `ifcase` command involved in the error:".into(),
+        "this is the `or` command involved in the error:".into(),
         ]
     }
 }
@@ -426,12 +426,12 @@ impl error::TexError for ElseEndOfInputError {
         "unexpected end of input while expanding an `else` command".into()
     }
 
-    fn notes(&self) -> Vec<String> {
+    fn notes(&self) -> Vec<error::display::Note> {
         vec![
-            "each `else` command must be terminated by a `fi` command".to_string(),
-            "this `else` corresponds to an `if` command that evaluated to true, and the input ended while skipping the false branch".to_string(),
-            "this is the `if` command involved in the error:".to_string(),
-            "this is the `else` command involved in the error:".to_string(),
+            "each `else` command must be terminated by a `fi` command".into(),
+            "this `else` corresponds to an `if` command that evaluated to true, and the input ended while skipping the false branch".into(),
+            "this is the `if` command involved in the error:".into(),
+            "this is the `else` command involved in the error:".into(),
         ]
     }
 }

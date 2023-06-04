@@ -1,5 +1,5 @@
 use crate::error;
-use crate::token::trace;
+use crate::token::trace::{self, SourceCodeTrace};
 use colored::*;
 
 pub fn format_error(f: &mut std::fmt::Formatter<'_>, err: &error::Error) -> std::fmt::Result {
@@ -15,7 +15,7 @@ pub fn format_error(f: &mut std::fmt::Formatter<'_>, err: &error::Error) -> std:
         source: error_line,
         title: root.title(),
         token_annotation: root.source_annotation(),
-        notes: root.notes(),
+        notes: root.notes().iter().map(|n| format!["{n}"]).collect(),
     };
     write!(f, "{line}")?;
 
@@ -37,16 +37,16 @@ pub fn format_error(f: &mut std::fmt::Formatter<'_>, err: &error::Error) -> std:
 }
 
 #[derive(Debug)]
-pub struct PrimaryLine<'a> {
+struct PrimaryLine<'a> {
     kind: PrimaryLineKind,
     source: &'a trace::SourceCodeTrace,
     title: String,
     token_annotation: String,
-    notes: Vec<String>, // TODO: Notes
+    notes: Vec<String>,
 }
 
 #[derive(Debug)]
-pub enum PrimaryLineKind {
+enum PrimaryLineKind {
     Error,
     Context,
 }
@@ -115,7 +115,7 @@ impl<'a> std::fmt::Display for PrimaryLine<'a> {
     }
 }
 
-pub struct ErrorStack<'a>(Vec<&'a error::PropagatedError>);
+struct ErrorStack<'a>(Vec<&'a error::PropagatedError>);
 
 impl<'a> std::fmt::Display for ErrorStack<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -124,22 +124,7 @@ impl<'a> std::fmt::Display for ErrorStack<'a> {
                 writeln!(f)?;
             }
             let (s, p) = (&propagated.trace, &propagated.context);
-            let prefix = format!("  {}:{}:{}", s.file_name, s.line_number, s.index + 1);
-            writeln!(
-                f,
-                "{}  {}",
-                prefix,
-                highlight_substring(&s.line_content, s.index, s.value.len())
-            )?;
-            writeln!(
-                f,
-                "{}  {} {}",
-                " ".repeat(prefix.len() + s.index),
-                "^".repeat(s.value.len())
-                    .color(PrimaryLineKind::Context.color())
-                    .bold(),
-                p.action()
-            )?;
+            fmt_source_code_trace_light(f, s, 2, PrimaryLineKind::Context.color(), p.action())?;
         }
         Ok(())
     }
@@ -259,4 +244,58 @@ fn highlight_substring(line: &str, start: usize, length: usize) -> String {
         line[start..start + length].bold(),
         line[start + length..].trim_end(),
     ]
+}
+
+fn fmt_source_code_trace_light(
+    f: &mut std::fmt::Formatter<'_>,
+    s: &SourceCodeTrace,
+    indent: usize,
+    underline_color: colored::Color,
+    annotation: &str,
+) -> std::fmt::Result {
+    let prefix = format!(
+        "{}{}:{}:{}",
+        " ".repeat(indent),
+        s.file_name,
+        s.line_number,
+        s.index + 1
+    );
+    writeln!(
+        f,
+        "{}  {}",
+        prefix,
+        highlight_substring(&s.line_content, s.index, s.value.len())
+    )?;
+    writeln!(
+        f,
+        "{}  {} {}",
+        " ".repeat(prefix.len() + s.index),
+        "^".repeat(s.value.len()).color(underline_color).bold(),
+        annotation,
+    )?;
+    Ok(())
+}
+
+#[derive(Debug)]
+pub enum Note<'a> {
+    Text(String),
+    SourceCodeTrace(String, &'a trace::SourceCodeTrace),
+}
+
+impl<'a, T: Into<String>> From<T> for Note<'a> {
+    fn from(value: T) -> Self {
+        Note::Text(value.into())
+    }
+}
+
+impl<'a> std::fmt::Display for Note<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Note::Text(s) => write!(f, "{s}"),
+            Note::SourceCodeTrace(s, trace) => {
+                write!(f, "{s}\n\n")?;
+                fmt_source_code_trace_light(f, trace, 2, PrimaryLineKind::Error.color(), "")
+            }
+        }
+    }
 }

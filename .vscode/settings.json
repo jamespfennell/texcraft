@@ -5,6 +5,7 @@
         "countdef",
         "expandafter",
         "futurelet",
+        "globaldefs",
         "groupingmap",
         "ifcase",
         "iffalse",

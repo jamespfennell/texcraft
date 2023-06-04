@@ -117,11 +117,9 @@ pub fn run<S: TexlangState, H: Handlers<S>>(vm: &mut VM<S>) -> Result<(), Box<er
                         }
                     }
                     Some(Command::Variable(cmd)) => {
-                        cmd.clone().set_value_using_input(
-                            token,
-                            input,
-                            groupingmap::Scope::Local,
-                        )?;
+                        let cmd = cmd.clone();
+                        let scope = S::variable_assignment_scope_hook(input.state_mut());
+                        cmd.set_value_using_input(token, input, scope)?;
                     }
                     Some(Command::Character(token_value)) => {
                         // TODO: the token may be a begin group, end group token, or active character token.
@@ -271,6 +269,14 @@ pub trait TexlangState: Sized {
              */
         }
         Ok(())
+    }
+
+    /// Hook that determines the scope of a variable assignment.
+    ///
+    /// This hook is designed to support the \global and \globaldefs commands.
+    fn variable_assignment_scope_hook(state: &mut Self) -> groupingmap::Scope {
+        _ = state;
+        groupingmap::Scope::Local
     }
 }
 
@@ -628,9 +634,11 @@ macro_rules! implement_has_component {
     ( $type: path, $(($component: path, $field: ident),)+) => {
         $(
             impl ::texlang_core::vm::HasComponent<$component> for $type {
+                #[inline]
                 fn component(&self) -> &$component {
                     &self.$field
                 }
+                #[inline]
                 fn component_mut(&mut self) -> &mut $component {
                     &mut self.$field
                 }

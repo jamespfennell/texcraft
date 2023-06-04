@@ -55,24 +55,31 @@ use crate::def;
 use crate::math;
 use std::collections::HashSet;
 use texcraft_stdext::collections::groupingmap;
+use texlang_core::token::trace;
 use texlang_core::traits::*;
 use texlang_core::*;
 
 /// Component for the prefix commands.
 pub struct Component {
     scope: groupingmap::Scope,
-    prefixable_with_any: HashSet<command::Tag>,
-    prefixable_with_global: HashSet<command::Tag>,
+    can_be_prefixed_with_any: HashSet<command::Tag>,
+    can_be_prefixed_with_global: HashSet<command::Tag>,
+    global_tag: command::Tag,
+    long_tag: command::Tag,
+    outer_tag: command::Tag,
 }
 
 impl Default for Component {
     fn default() -> Self {
         Component {
             scope: groupingmap::Scope::Local,
-            prefixable_with_any: vec![def::def_tag()].into_iter().collect(),
-            prefixable_with_global: vec![math::get_variable_op_tag(), alias::let_tag()]
+            can_be_prefixed_with_any: vec![def::def_tag()].into_iter().collect(),
+            can_be_prefixed_with_global: vec![math::get_variable_op_tag(), alias::let_tag()]
                 .into_iter()
                 .collect(),
+            global_tag: GLOBAL_TAG.get(),
+            long_tag: LONG_TAG.get(),
+            outer_tag: OUTER_TAG.get(),
         }
     }
 }
@@ -81,6 +88,7 @@ impl Component {
     /// Read the value of the global flag and reset the flag to false.
     ///
     /// See the module documentation for correct usage of this method.
+    #[inline]
     pub fn read_and_reset_global(&mut self) -> groupingmap::Scope {
         let scope = self.scope;
         self.scope = groupingmap::Scope::Local;
@@ -111,36 +119,31 @@ impl Prefix {
 
 /// Get the `\global` command.
 pub fn get_global<S: HasComponent<Component>>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_execution(global_primitive_fn).with_tag(global_tag())
+    command::BuiltIn::new_execution(global_primitive_fn).with_tag(GLOBAL_TAG.get())
 }
 
 static GLOBAL_TAG: command::StaticTag = command::StaticTag::new();
 
-fn global_tag() -> command::Tag {
-    GLOBAL_TAG.get()
+#[inline]
+pub fn variable_assignment_scope_hook<S: HasComponent<Component>>(
+    state: &mut S,
+) -> groupingmap::Scope {
+    state.component_mut().read_and_reset_global()
 }
 
-/// Get the `\long` command.
+// Get the `\long` command.
 pub fn get_long<S: HasComponent<Component>>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_execution(long_primitive_fn).with_tag(long_tag())
+    command::BuiltIn::new_execution(long_primitive_fn).with_tag(LONG_TAG.get())
 }
 
 static LONG_TAG: command::StaticTag = command::StaticTag::new();
 
-fn long_tag() -> command::Tag {
-    LONG_TAG.get()
-}
-
 /// Get the `\outer` command.
 pub fn get_outer<S: HasComponent<Component>>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_execution(outer_primitive_fn).with_tag(outer_tag())
+    command::BuiltIn::new_execution(outer_primitive_fn).with_tag(OUTER_TAG.get())
 }
 
 static OUTER_TAG: command::StaticTag = command::StaticTag::new();
-
-fn outer_tag() -> command::Tag {
-    OUTER_TAG.get()
-}
 
 fn global_primitive_fn<S: HasComponent<Component>>(
     global_token: token::Token,
@@ -190,38 +193,32 @@ fn process_prefixes<S: HasComponent<Component>>(
 ) -> command::Result<()> {
     complete_prefix(&mut prefix, input)?;
     match input.peek()? {
-        None => {
-            let (_prefix_token, prefix_kind) = prefix.get_one();
-            Err(error::SimpleEndOfInputError::new(
-                input.vm(),
-                format!["{prefix_kind:?} TODO end of input while looking for command to prefix"],
-            )
-            .into())
-        }
+        None => Err(error::SimpleEndOfInputError::new(
+            input.vm(),
+            "end of input while looking for a command to prefix",
+        )
+        .with_note(
+            r"prefix commands (\global, \long, \outer) must be followed by a command to prefix",
+        )
+        .into()),
         Some(&t) => match t.value() {
             token::Value::ControlSequence(name) => {
-                // First check if it's a variable command. If so, assign to the variable at the local or global scope.
-                if let Some(command::Command::Variable(cmd)) =
+                // First check if it's a variable command.
+                if let Some(command::Command::Variable(_)) =
                     input.commands_map_mut().get_command(&name)
                 {
-                    let cmd = cmd.clone();
                     assert_only_global_prefix(t, prefix, input)?;
-                    input.consume()?;
-                    cmd.set_value_using_input(
-                        t,
-                        input,
-                        match prefix.global {
-                            None => groupingmap::Scope::Local,
-                            Some(_) => groupingmap::Scope::Global,
-                        },
-                    )?;
+                    input.state_mut().component_mut().scope = match prefix.global {
+                        None => groupingmap::Scope::Local,
+                        Some(_) => groupingmap::Scope::Global,
+                    };
                     return Ok(());
                 }
                 // Next check if it's a command that can be prefixed by any of the prefix command.
                 let component = input.state().component();
                 let tag = input.commands_map().get_tag(&name);
                 if let Some(tag) = tag {
-                    if component.prefixable_with_any.contains(&tag) {
+                    if component.can_be_prefixed_with_any.contains(&tag) {
                         input.state_mut().component_mut().scope = match prefix.global {
                             None => groupingmap::Scope::Local,
                             Some(_) => groupingmap::Scope::Global,
@@ -230,7 +227,7 @@ fn process_prefixes<S: HasComponent<Component>>(
                     }
                     // Next check if it's a command that can be prefixed by global only. In this case we check
                     // that no other prefixes are present.
-                    if component.prefixable_with_global.contains(&tag) {
+                    if component.can_be_prefixed_with_global.contains(&tag) {
                         assert_only_global_prefix(t, prefix, input)?;
                         input.state_mut().component_mut().scope = match prefix.global {
                             None => groupingmap::Scope::Local,
@@ -240,49 +237,44 @@ fn process_prefixes<S: HasComponent<Component>>(
                     }
                 }
                 // If we make it to here, this is not a valid target for the prefix command.
-                let (_prefix_token, prefix_kind) = prefix.get_one();
-                Err(error::SimpleTokenError::new(
-                    input.vm(),
-                    t,
-                    format!["{prefix_kind:?} TODO not a valid prefix command"],
-                )
+                let (prefix_token, kind) = prefix.get_one();
+                Err(Error {
+                    kind,
+                    got: input.vm().trace(t),
+                    prefix: input.vm().trace(prefix_token),
+                }
                 .into())
             }
             _ => {
-                let (_prefix_token, prefix_kind) = prefix.get_one();
-                Err(error::SimpleTokenError::new(
-                    input.vm(),
-                    t,
-                    format!["{prefix_kind:?} TODO not a valid prefix target/token"],
-                )
+                let (prefix_token, kind) = prefix.get_one();
+                Err(Error {
+                    kind,
+                    got: input.vm().trace(t),
+                    prefix: input.vm().trace(prefix_token),
+                }
                 .into())
             }
         },
     }
 }
 
-fn complete_prefix<S: TexlangState>(
+fn complete_prefix<S: HasComponent<Component>>(
     prefix: &mut Prefix,
     input: &mut vm::ExecutionInput<S>,
 ) -> command::Result<()> {
-    // TODO: spaces and \relax are allowed after prefixes per TeX source sections 1211 and 404.
+    // BUG: spaces and \relax are allowed after prefixes per TeX source sections 1211 and 404.
     let found_prefix = match input.peek()? {
         None => false,
         Some(&t) => match t.value() {
             token::Value::ControlSequence(name) => {
-                let cmd_id = input.commands_map().get_tag(&name);
-                // TODO: cache these tags in the component
-                let global_id = global_tag();
-                let outer_id = outer_tag();
-                let long_id = long_tag();
-                // TODO: switch
-                if cmd_id == Some(global_id) {
+                let tag = input.commands_map().get_tag(&name);
+                if tag == Some(input.state().component().global_tag) {
                     prefix.global = Some(t);
                     true
-                } else if cmd_id == Some(outer_id) {
+                } else if tag == Some(input.state().component().outer_tag) {
                     prefix.outer = Some(t);
                     true
-                } else if cmd_id == Some(long_id) {
+                } else if tag == Some(input.state().component().long_tag) {
                     prefix.long = Some(t);
                     true
                 } else {
@@ -304,19 +296,19 @@ fn assert_only_global_prefix<S: TexlangState>(
     prefix: Prefix,
     input: &vm::ExecutionInput<S>,
 ) -> command::Result<()> {
-    if let Some(_outer_token) = prefix.outer {
-        Err(error::SimpleTokenError::new(
-            input.vm(),
-            token,
-            "TODO Outer cannot be applied to this command",
-        )
+    if let Some(outer_token) = prefix.outer {
+        Err(Error {
+            kind: Kind::Outer,
+            got: input.vm().trace(token),
+            prefix: input.vm().trace(outer_token),
+        }
         .into())
-    } else if let Some(_long_token) = prefix.long {
-        Err(error::SimpleTokenError::new(
-            input.vm(),
-            token,
-            "TODO long cannot be applied to this command",
-        )
+    } else if let Some(long_token) = prefix.long {
+        Err(Error {
+            kind: Kind::Long,
+            got: input.vm().trace(token),
+            prefix: input.vm().trace(long_token),
+        }
         .into())
     } else {
         Ok(())
@@ -324,60 +316,58 @@ fn assert_only_global_prefix<S: TexlangState>(
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum Kind {
+enum Kind {
     Global,
     Long,
     Outer,
 }
 
-/*
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::CommandCannotBePrefixed {
-                command_token,
-                prefix_token,
-                prefix_kind,
-            } => {
-                error::DisplayBuilder::new(
-                    command_token,
-                    format!("the command {command_token} cannot be prefixed with {prefix_token}"),
-                ).add_note(match prefix_kind {
-                    Kind::Global => {
-                        r"see the documentation for \global for the list of commands this prefix can be used with"
-                    }
-                    Kind::Long => {
-                        r"the \long prefix can only be used with \def, \gdef, \edef and \xdef (or their aliases)"
-                    }
-                    Kind::Outer => {
-                        r"the \outer prefix can only be used with \def, \gdef, \edef and \xdef (or their aliases)"
-                    }
-                }).fmt(f)
+#[derive(Debug)]
+struct Error {
+    kind: Kind,
+    got: trace::SourceCodeTrace,
+    prefix: trace::SourceCodeTrace,
+}
+
+impl error::TexError for Error {
+    fn kind(&self) -> error::Kind {
+        error::Kind::Token(&self.got)
+    }
+
+    fn title(&self) -> String {
+        match self.got.token.unwrap().value() {
+            token::Value::ControlSequence(_) => {
+                format!["this command cannot be prefixed by {}", self.prefix.value]
             }
-            Error::TokenCannotBePrefixed {
-                token,
-                prefix_token,
-                prefix_kind: _,
-            } => {
-                error::DisplayBuilder::new(
-                    token,
-                    format!("character tokens cannot be prefixed with {prefix_token}"),
-                ).fmt(f)
-            }
-            Error::EndOfInputAfterPrefix {
-                end_of_input,
-                prefix_token,
-                prefix_kind: _,
-            } => {
-                error::DisplayBuilder::new(
-                    end_of_input,
-                    format!("end of input after prefix command {prefix_token}"),
-                ).add_note(r"prefix commands must be followed by a valid prefix target like \def").fmt(f)
-            },
+            _ => format![
+                "character tokens cannot be prefixed by {}",
+                self.prefix.value
+            ],
         }
     }
+
+    fn source_annotation(&self) -> String {
+        format!["cannot by prefixed by {}", self.prefix.value]
+    }
+
+    fn notes(&self) -> Vec<error::display::Note> {
+        let guidance = match self.kind {
+            Kind::Global => {
+                r"see the documentation for \global for the list of commands it can be used with"
+            }
+            Kind::Long => {
+                r"the \long prefix can only be used with \def, \gdef, \edef and \xdef (or their aliases)"
+            }
+            Kind::Outer => {
+                r"the \outer prefix can only be used with \def, \gdef, \edef and \xdef (or their aliases)"
+            }
+        };
+        vec![
+            guidance.into(),
+            error::display::Note::SourceCodeTrace("the prefix appeared here:".into(), &self.prefix),
+        ]
+    }
 }
- */
 
 /// Get an execution command that checks that the global flag is off.
 ///
@@ -416,14 +406,18 @@ mod test {
 
     #[derive(Default)]
     struct State {
-        exec: script::Component,
+        script: script::Component,
         prefix: Component,
         integer: i32,
     }
 
-    impl TexlangState for State {}
+    impl TexlangState for State {
+        fn variable_assignment_scope_hook(state: &mut Self) -> groupingmap::Scope {
+            variable_assignment_scope_hook(state)
+        }
+    }
 
-    implement_has_component![State, (script::Component, exec), (Component, prefix),];
+    implement_has_component![State, (script::Component, script), (Component, prefix),];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([

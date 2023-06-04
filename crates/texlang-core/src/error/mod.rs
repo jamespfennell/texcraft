@@ -77,7 +77,7 @@ pub trait TexError: std::fmt::Debug {
 
     fn title(&self) -> String;
 
-    fn notes(&self) -> Vec<String> {
+    fn notes(&self) -> Vec<display::Note> {
         vec![]
     }
 
@@ -161,15 +161,22 @@ impl TexError for SimpleTokenError {
 pub struct SimpleEndOfInputError {
     pub trace: trace::SourceCodeTrace,
     pub title: String,
+    pub text_notes: Vec<String>,
 }
 
 impl SimpleEndOfInputError {
     /// Create a new simple end of input error.
-    pub fn new<S, T: AsRef<str>>(vm: &vm::VM<S>, title: T) -> SimpleEndOfInputError {
-        SimpleEndOfInputError {
+    pub fn new<S, T: AsRef<str>>(vm: &vm::VM<S>, title: T) -> Self {
+        Self {
             trace: vm.trace_end_of_input(),
             title: title.as_ref().into(),
+            text_notes: vec![],
         }
+    }
+
+    pub fn with_note<T: Into<String>>(mut self, note: T) -> Self {
+        self.text_notes.push(note.into());
+        self
     }
 }
 
@@ -180,6 +187,14 @@ impl TexError for SimpleEndOfInputError {
 
     fn title(&self) -> String {
         self.title.clone()
+    }
+
+    fn notes(&self) -> Vec<display::Note> {
+        let mut notes = vec![];
+        for text_note in &self.text_notes {
+            notes.push(text_note.into())
+        }
+        notes
     }
 }
 
@@ -217,11 +232,8 @@ impl TexError for UndefinedCommandError {
         format!["undefined control sequence {}", &self.trace.value]
     }
 
-    fn notes(&self) -> Vec<String> {
+    fn notes(&self) -> Vec<display::Note> {
         use colored::Colorize;
-        vec![format![
-            "did you mean \\{}?\n",
-            self.close_names[0].right().bold(),
-        ]]
+        vec![format!["did you mean \\{}?\n", self.close_names[0].right().bold(),].into()]
     }
 }

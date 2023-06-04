@@ -691,10 +691,10 @@ mod stream {
             .into()
         }
 
-        fn notes(&self) -> Vec<String> {
+        fn notes(&self) -> Vec<error::display::Note> {
             match self {
                 LexerError::InvalidCharacter(_, _) => vec![
-                  format!["characters with category code {} cannot appear in the input", CatCode::Invalid]
+                  format!["characters with category code {} cannot appear in the input", CatCode::Invalid].into()
                 ],
                 LexerError::EmptyControlSequence(_) => vec![
                   "escape tokens start a control sequence and must be followed by at least one character".into(),

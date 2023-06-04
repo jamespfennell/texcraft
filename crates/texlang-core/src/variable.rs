@@ -483,7 +483,7 @@ pub enum ValueRef<'a> {
 /// Operations on this value (like reading or setting the value) can be done in two ways:
 ///
 /// 1. (Easy, less flexible) Use the methods directly on this type like [Variable::value]
-///     or [Variable::set_value_using_input] to read or set the value.
+///     or [Command::set_value_using_input] to read or set the value.
 ///     These methods are really ergonomic.
 ///     The problem with the value method specifically is that the result
 ///     is a reference which keeps the borrow of the state alive.

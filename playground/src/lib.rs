@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
+use texcraft_stdext::collections::groupingmap;
 use texlang_core::traits::*;
 use texlang_core::*;
 use texlang_stdlib::alias;
@@ -67,6 +68,10 @@ impl TexlangState for PlaygroundState {
         tag: Option<texlang_core::command::Tag>,
     ) -> command::Result<Option<texlang_core::token::Token>> {
         expansion::noexpand_hook(token, input, tag)
+    }
+
+    fn variable_assignment_scope_hook(state: &mut Self) -> groupingmap::Scope {
+        prefix::variable_assignment_scope_hook(state)
     }
 }
 
