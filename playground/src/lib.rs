@@ -109,6 +109,7 @@ fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::V
         //
         ("gdef", def::get_gdef()),
         ("global", prefix::get_global()),
+        ("globaldefs", prefix::get_globaldefs()),
         //
         ("ifcase", conditional::get_if_case()),
         ("iffalse", conditional::get_if_false()),

@@ -100,6 +100,7 @@ impl StdLibState {
             //
             ("gdef", def::get_gdef()),
             ("global", prefix::get_global()),
+            ("globaldefs", prefix::get_globaldefs()),
             //
             ("ifcase", conditional::get_if_case()),
             ("iffalse", conditional::get_if_false()),

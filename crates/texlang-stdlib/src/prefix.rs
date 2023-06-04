@@ -62,6 +62,7 @@ use texlang_core::*;
 /// Component for the prefix commands.
 pub struct Component {
     scope: groupingmap::Scope,
+    global_defs_value: i32,
     can_be_prefixed_with_any: HashSet<command::Tag>,
     can_be_prefixed_with_global: HashSet<command::Tag>,
     global_tag: command::Tag,
@@ -73,6 +74,7 @@ impl Default for Component {
     fn default() -> Self {
         Component {
             scope: groupingmap::Scope::Local,
+            global_defs_value: 0,
             can_be_prefixed_with_any: vec![def::def_tag()].into_iter().collect(),
             can_be_prefixed_with_global: vec![math::get_variable_op_tag(), alias::let_tag()]
                 .into_iter()
@@ -90,9 +92,23 @@ impl Component {
     /// See the module documentation for correct usage of this method.
     #[inline]
     pub fn read_and_reset_global(&mut self) -> groupingmap::Scope {
-        let scope = self.scope;
-        self.scope = groupingmap::Scope::Local;
-        scope
+        match self.global_defs_value.cmp(&0) {
+            std::cmp::Ordering::Less => groupingmap::Scope::Local,
+            std::cmp::Ordering::Equal => {
+                std::mem::replace(&mut self.scope, groupingmap::Scope::Local)
+            }
+            std::cmp::Ordering::Greater => groupingmap::Scope::Global,
+        }
+    }
+
+    fn set_scope(&mut self, scope: groupingmap::Scope) {
+        self.scope = if self.global_defs_value == 0 {
+            scope
+        } else {
+            // If either globaldefs override is enabled we skip setting the scope here so that
+            // we can avoid setting it in the (hotter) variable assignment path.
+            groupingmap::Scope::Local
+        }
     }
 }
 
@@ -115,6 +131,14 @@ impl Prefix {
             panic!("")
         }
     }
+}
+
+/// Get the `\globaldefs` command.
+pub fn get_globaldefs<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_variable(variable::Command::new_singleton(
+        |s, _| &s.component().global_defs_value,
+        |s, _| &mut s.component_mut().global_defs_value,
+    ))
 }
 
 /// Get the `\global` command.
@@ -208,10 +232,12 @@ fn process_prefixes<S: HasComponent<Component>>(
                     input.commands_map_mut().get_command(&name)
                 {
                     assert_only_global_prefix(t, prefix, input)?;
-                    input.state_mut().component_mut().scope = match prefix.global {
-                        None => groupingmap::Scope::Local,
-                        Some(_) => groupingmap::Scope::Global,
-                    };
+                    if prefix.global.is_some() {
+                        input
+                            .state_mut()
+                            .component_mut()
+                            .set_scope(groupingmap::Scope::Global);
+                    }
                     return Ok(());
                 }
                 // Next check if it's a command that can be prefixed by any of the prefix command.
@@ -219,20 +245,24 @@ fn process_prefixes<S: HasComponent<Component>>(
                 let tag = input.commands_map().get_tag(&name);
                 if let Some(tag) = tag {
                     if component.can_be_prefixed_with_any.contains(&tag) {
-                        input.state_mut().component_mut().scope = match prefix.global {
-                            None => groupingmap::Scope::Local,
-                            Some(_) => groupingmap::Scope::Global,
-                        };
+                        if prefix.global.is_some() {
+                            input
+                                .state_mut()
+                                .component_mut()
+                                .set_scope(groupingmap::Scope::Global);
+                        }
                         return Ok(());
                     }
                     // Next check if it's a command that can be prefixed by global only. In this case we check
                     // that no other prefixes are present.
                     if component.can_be_prefixed_with_global.contains(&tag) {
                         assert_only_global_prefix(t, prefix, input)?;
-                        input.state_mut().component_mut().scope = match prefix.global {
-                            None => groupingmap::Scope::Local,
-                            Some(_) => groupingmap::Scope::Global,
-                        };
+                        if prefix.global.is_some() {
+                            input
+                                .state_mut()
+                                .component_mut()
+                                .set_scope(groupingmap::Scope::Global);
+                        }
                         return Ok(());
                     }
                 }
@@ -422,6 +452,7 @@ mod test {
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("global", get_global()),
+            ("globaldefs", get_globaldefs()),
             ("long", get_long()),
             ("outer", get_outer()),
             ("i", get_integer()),
@@ -461,6 +492,8 @@ mod test {
                 r"\long\outer\global\long\global\outer\def\A{Hello}\A",
                 "Hello"
             ),
+            (global_defs_1, r"\i=5{\globaldefs=1 \i=8}\the\i", "8"),
+            (global_defs_2, r"\i=5{\globaldefs=-1\global\i=8}\the\i", "5"),
         ),
         failure_tests(
             (global_end_of_input, r"\global"),
