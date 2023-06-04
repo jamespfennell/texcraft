@@ -73,7 +73,7 @@ fn par_primitive_fn<S: HasComponent<Component>>(
 pub fn run<S: HasComponent<Component>>(
     vm: &mut vm::VM<S>,
 ) -> Result<Vec<token::Token>, Box<error::Error>> {
-    vm::run::<S, Handlers>(vm)?;
+    vm.run::<Handlers>()?;
     let mut result = Vec::new();
     std::mem::swap(
         &mut result,

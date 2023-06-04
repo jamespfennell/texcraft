@@ -21,7 +21,7 @@ fn run(case: ErrorCase) -> RunResult {
     let mut vm =
         vm::VM::<StdLibState>::new(StdLibState::all_initial_built_ins(), Default::default());
     vm.push_source("input.tex", case.source_code).unwrap();
-    let err = match vm::run::<StdLibState, vm::DefaultHandlers>(&mut vm) {
+    let err = match vm.run::<vm::DefaultHandlers>() {
         Ok(_) => panic!(
             "successfully ran {} (`{}`) but expected an error",
             case.description, case.source_code

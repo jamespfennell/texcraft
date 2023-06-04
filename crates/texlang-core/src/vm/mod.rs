@@ -91,71 +91,73 @@ pub struct DefaultHandlers;
 
 impl<S: TexlangState> Handlers<S> for DefaultHandlers {}
 
-/// Run the VM.
-///
-/// It is assumed that the VM has been preloaded with TeX source code using the
-/// [VM::push_source] method.
-pub fn run<S: TexlangState, H: Handlers<S>>(vm: &mut VM<S>) -> Result<(), Box<error::Error>> {
-    let input = ExecutionInput::new(vm);
-    loop {
-        let token = match input.next()? {
-            None => break,
-            Some(token) => token,
-        };
-        // TODO: propagate all of these
-        match token.value() {
-            Value::ControlSequence(name) => {
-                match input.commands_map().get_command(&name) {
-                    Some(Command::Execution(cmd, _)) => {
-                        if let Err(err) = cmd(token, input) {
-                            return Err(error::Error::new_propagated(
-                                input.vm(),
-                                error::PropagationContext::Execution,
-                                token,
-                                err,
-                            ));
+impl<S: TexlangState> VM<S> {
+    /// Run the VM.
+    ///
+    /// It is assumed that the VM has been preloaded with TeX source code using the
+    /// [VM::push_source] method.
+    pub fn run<H: Handlers<S>>(&mut self) -> Result<(), Box<error::Error>> {
+        let input = ExecutionInput::new(self);
+        loop {
+            let token = match input.next()? {
+                None => break,
+                Some(token) => token,
+            };
+            // TODO: propagate all of these
+            match token.value() {
+                Value::ControlSequence(name) => {
+                    match input.commands_map().get_command(&name) {
+                        Some(Command::Execution(cmd, _)) => {
+                            if let Err(err) = cmd(token, input) {
+                                return Err(error::Error::new_propagated(
+                                    input.vm(),
+                                    error::PropagationContext::Execution,
+                                    token,
+                                    err,
+                                ));
+                            }
                         }
+                        Some(Command::Variable(cmd)) => {
+                            let cmd = cmd.clone();
+                            let scope = S::variable_assignment_scope_hook(input.state_mut());
+                            cmd.set_value_using_input(token, input, scope)?;
+                        }
+                        Some(Command::Character(token_value)) => {
+                            // TODO: the token may be a begin group, end group token, or active character token.
+                            // What to do in this case? Check pdfTeX.
+                            H::character_handler(
+                                Token::new_from_value(*token_value, token.trace_key()),
+                                input,
+                            )?
+                        }
+                        Some(Command::Expansion(_, _)) | Some(Command::Macro(_)) => {
+                            H::unexpanded_expansion_command(token, input)?
+                        }
+                        None => H::undefined_command_handler(token, input)?,
                     }
-                    Some(Command::Variable(cmd)) => {
-                        let cmd = cmd.clone();
-                        let scope = S::variable_assignment_scope_hook(input.state_mut());
-                        cmd.set_value_using_input(token, input, scope)?;
-                    }
-                    Some(Command::Character(token_value)) => {
-                        // TODO: the token may be a begin group, end group token, or active character token.
-                        // What to do in this case? Check pdfTeX.
-                        H::character_handler(
-                            Token::new_from_value(*token_value, token.trace_key()),
-                            input,
-                        )?
-                    }
-                    Some(Command::Expansion(_, _)) | Some(Command::Macro(_)) => {
-                        H::unexpanded_expansion_command(token, input)?
-                    }
-                    None => H::undefined_command_handler(token, input)?,
                 }
-            }
-            Value::Active(_) => {
-                // TODO: look up the command and dispatch
-                todo!()
-            }
-            Value::BeginGroup(_) => {
-                input.begin_group();
-            }
-            Value::EndGroup(_) => {
-                input.end_group(token)?;
-            }
-            Value::MathShift(_)
-            | Value::AlignmentTab(_)
-            | Value::Parameter(_)
-            | Value::Superscript(_)
-            | Value::Subscript(_)
-            | Value::Space(_)
-            | Value::Letter(_)
-            | Value::Other(_) => H::character_handler(token, input)?,
-        };
+                Value::Active(_) => {
+                    // TODO: look up the command and dispatch
+                    todo!()
+                }
+                Value::BeginGroup(_) => {
+                    input.begin_group();
+                }
+                Value::EndGroup(_) => {
+                    input.end_group(token)?;
+                }
+                Value::MathShift(_)
+                | Value::AlignmentTab(_)
+                | Value::Parameter(_)
+                | Value::Superscript(_)
+                | Value::Subscript(_)
+                | Value::Space(_)
+                | Value::Letter(_)
+                | Value::Other(_) => H::character_handler(token, input)?,
+            };
+        }
+        Ok(())
     }
-    Ok(())
 }
 
 #[derive(Debug)]
