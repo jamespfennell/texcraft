@@ -8,32 +8,26 @@ impl<S: TexlangState> Parsable<S> for variable::Variable<S> {
             Some(token) => match token.value() {
                 token::Value::ControlSequence(name) => {
                     match input.commands_map().get_command(&name) {
-                        None => Err(parse::Error::new(
-                            input.vm(),
-                            "a variable (got undefined cs)",
-                            Some(token),
-                            "",
-                        )
-                        .into()),
+                        None => Err(parse::Error::new(input.vm(), "a variable", Some(token), "")
+                            .with_got_override("got an undefined control sequence")
+                            .with_annotation_override("undefined control sequence")
+                            .into()),
                         Some(command::Command::Variable(cmd)) => {
                             Ok(cmd.clone().resolve(token, input)?)
                         }
-                        Some(_) => Err(parse::Error::new(
-                            input.vm(),
-                            "a variable (got a different kind of command)",
-                            Some(token),
-                            "",
-                        )
-                        .into()),
+                        Some(cmd) => {
+                            Err(parse::Error::new(input.vm(), "a variable", Some(token), "")
+                                .with_got_override("got a non-variable command")
+                                .with_annotation_override(format![
+                                    "control sequence referencing {cmd}"
+                                ])
+                                .into())
+                        }
                     }
                 }
-                _ => Err(parse::Error::new(
-                    input.vm(),
-                    "a variable (got a character token)",
-                    Some(token),
-                    "",
-                )
-                .into()),
+                _ => Err(parse::Error::new(input.vm(), "a variable", Some(token), "")
+                    .with_got_override("got a character token")
+                    .into()),
             },
         }
     }

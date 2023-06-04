@@ -104,11 +104,11 @@ impl error::TexError for Error {
 }
 
 impl Error {
-    pub fn new<S, T: Into<String>>(
+    pub fn new<S, T: Into<String>, R: Into<String>>(
         vm: &vm::VM<S>,
         expected: T,
         got: Option<token::Token>,
-        guidance: &str,
+        guidance: R,
     ) -> Self {
         let got = match got {
             None => vm.trace_end_of_input(),
@@ -125,13 +125,13 @@ impl Error {
     }
 
     pub fn with_got_override<T: Into<String>>(mut self, got_override: T) -> Self {
-      self.got_override = got_override.into();
-      self
+        self.got_override = got_override.into();
+        self
     }
 
     pub fn with_annotation_override<T: Into<String>>(mut self, annotation_override: T) -> Self {
-      self.annotation_override = annotation_override.into();
-      self
+        self.annotation_override = annotation_override.into();
+        self
     }
 }
 

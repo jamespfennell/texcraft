@@ -154,6 +154,14 @@ impl ErrorCase {
     pub fn all_error_cases() -> Vec<ErrorCase> {
         let mut cases = vec![];
         for (description, source_code) in vec![
+            ("bad rhs in assignment", r"\year = X"),
+            ("invalid variable (undefined)", r"\advance \undefined by 4"),
+            (
+                "invalid variable (not a variable command)",
+                r"\advance \def by 4",
+            ),
+            ("invalid variable (character token)", r"\advance a by 4"),
+            ("invalid variable (eof)", r"\advance"),
             ("invalid relation", r"\ifnum 3 z 4"),
             ("malformed by keyword", r"\advance \year bg"),
             ("undefined control sequence", r"\cattcode"),

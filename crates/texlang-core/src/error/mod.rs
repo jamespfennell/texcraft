@@ -105,19 +105,19 @@ pub trait TexError: std::fmt::Debug {
 #[derive(Debug)]
 pub enum PropagationContext {
     Expansion,
-    VariableRead,
-    VariableWrite,
+    Execution,
+    VariableIndex,
+    VariableAssignment,
 }
 
 impl PropagationContext {
     fn action(&self) -> &'static str {
         match self {
             PropagationContext::Expansion => "expanding this command",
-            PropagationContext::VariableRead => {
-                "determining the index of a variable referenced by this command"
-            }
-            PropagationContext::VariableWrite => {
-                "assigning to a variable referenced by this command"
+            PropagationContext::Execution => "executing this command",
+            PropagationContext::VariableIndex => "determining the index of this variable",
+            PropagationContext::VariableAssignment => {
+                "determining the value to assign to this variable"
             }
         }
     }

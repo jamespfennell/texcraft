@@ -16,8 +16,8 @@ impl<S: TexlangState> Parsable<S> for OptionalBy {
         if let Some(()) = next_is_b {
             get_required_element![
                 input,
-                "the letter y or Y",
-                "the `by` keyword consists of two letter tokens, and is case insensitive",
+                "the second of letter of the `by` keyword",
+                "the `by` keyword consists of a b or B letter token, then a y or Y letter token",
                 token::Value::Letter('y') => OptionalBy{},
                 token::Value::Letter('Y') => OptionalBy{},
             ]

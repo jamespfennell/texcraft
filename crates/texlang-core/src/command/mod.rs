@@ -77,6 +77,18 @@ pub enum Command<S> {
     Character(token::Value),
 }
 
+impl<S> std::fmt::Display for Command<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Command::Expansion(_, _) => write![f, "an expansion command"],
+            Command::Macro(_) => write![f, "a user-defined macro"],
+            Command::Execution(_, _) => write![f, "an execution command"],
+            Command::Variable(_) => write![f, "a variable command"],
+            Command::Character(_) => write![f, "a token alias"],
+        }
+    }
+}
+
 impl<S> Command<S> {
     /// Gets the tag associated to this command, or [None] if the command has no tag.
     pub fn tag(&self) -> Option<Tag> {

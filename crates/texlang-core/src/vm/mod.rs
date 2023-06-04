@@ -106,21 +106,22 @@ pub fn run<S: TexlangState, H: Handlers<S>>(vm: &mut VM<S>) -> Result<(), Box<er
         match token.value() {
             Value::ControlSequence(name) => {
                 match input.commands_map().get_command(&name) {
-                    Some(Command::Execution(cmd, _)) => cmd(token, input),
-                    Some(Command::Variable(cmd)) => {
-                        if let Err(err) = cmd.clone().set_value_using_input(
-                            token,
-                            input,
-                            groupingmap::Scope::Local,
-                        ) {
+                    Some(Command::Execution(cmd, _)) => {
+                        if let Err(err) = cmd(token, input) {
                             return Err(error::Error::new_propagated(
                                 input.vm(),
-                                error::PropagationContext::VariableWrite,
+                                error::PropagationContext::Execution,
                                 token,
                                 err,
                             ));
                         }
-                        Ok(())
+                    }
+                    Some(Command::Variable(cmd)) => {
+                        cmd.clone().set_value_using_input(
+                            token,
+                            input,
+                            groupingmap::Scope::Local,
+                        )?;
                     }
                     Some(Command::Character(token_value)) => {
                         // TODO: the token may be a begin group, end group token, or active character token.
@@ -128,12 +129,12 @@ pub fn run<S: TexlangState, H: Handlers<S>>(vm: &mut VM<S>) -> Result<(), Box<er
                         H::character_handler(
                             Token::new_from_value(*token_value, token.trace_key()),
                             input,
-                        )
+                        )?
                     }
                     Some(Command::Expansion(_, _)) | Some(Command::Macro(_)) => {
-                        H::unexpanded_expansion_command(token, input)
+                        H::unexpanded_expansion_command(token, input)?
                     }
-                    None => H::undefined_command_handler(token, input),
+                    None => H::undefined_command_handler(token, input)?,
                 }
             }
             Value::Active(_) => {
@@ -142,11 +143,9 @@ pub fn run<S: TexlangState, H: Handlers<S>>(vm: &mut VM<S>) -> Result<(), Box<er
             }
             Value::BeginGroup(_) => {
                 input.begin_group();
-                Ok(())
             }
             Value::EndGroup(_) => {
                 input.end_group(token)?;
-                Ok(())
             }
             Value::MathShift(_)
             | Value::AlignmentTab(_)
@@ -155,8 +154,8 @@ pub fn run<S: TexlangState, H: Handlers<S>>(vm: &mut VM<S>) -> Result<(), Box<er
             | Value::Subscript(_)
             | Value::Space(_)
             | Value::Letter(_)
-            | Value::Other(_) => H::character_handler(token, input),
-        }?;
+            | Value::Other(_) => H::character_handler(token, input)?,
+        };
     }
     Ok(())
 }

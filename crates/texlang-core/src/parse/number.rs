@@ -37,7 +37,7 @@ impl<S: TexlangState> Parsable<S> for token::CatCode {
         Err(parse::Error {
             expected: "a category code number (an integer in the range [0, 15])".into(),
             got: input.vm().trace(token),
-            got_override: format!["the integer {i}"],
+            got_override: format!["got the integer {i}"],
             annotation_override: "this is where the number started".into(),
             guidance: "".into(),
             additional_notes: vec![],
@@ -143,6 +143,10 @@ fn parse_number_internal<S: TexlangState, T: PrimInt>(
                     Some(first_token),
                     GUIDANCE_BEGINNING,
                 )
+                .with_annotation_override(match cmd {
+                    None => "undefined control sequence".to_string(),
+                    Some(cmd) => format!["control sequence referencing {cmd}"],
+                })
                 .into());
             }
         }
@@ -241,18 +245,17 @@ fn parse_character<S: TexlangState, T: PrimInt>(
             _ => Ok(token.char().unwrap()),
         },
     };
-    let c = match c_or {
-        Ok(c) => c,
-        Err(optional_token) => {
-            return Err(parse::Error::new(
+    let c =
+        match c_or {
+            Ok(c) => c,
+            Err(optional_token) => return Err(parse::Error::new(
                 input.vm(),
-                "a character token or single-character control sequence",
+                "a character",
                 optional_token,
-                "todo",
+                "a character is a character token or single-character control sequence like \\a",
             )
-            .into())
-        }
-    };
+            .into()),
+        };
     // This cast always succeeds at the time of writing.
     // This is because `c as u32` returns c's Unicode code point, which
     // is in the range [0, 2^21] and fits in the two types (i32, usize)

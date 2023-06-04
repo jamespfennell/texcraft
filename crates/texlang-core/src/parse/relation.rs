@@ -11,8 +11,8 @@ impl<S: TexlangState> Parsable<S> for Ordering {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
         get_required_element![
             input,
-            "a relation", 
-            "a relation is a token with character code other and one of the following values: <, =, >",
+            "a relation",
+            format!["a relation is a token with character code {} and one of the following values: <, =, >", token::CatCode::Other],
             token::Value::Other('<') => Ordering::Less,
             token::Value::Other('=') => Ordering::Equal,
             token::Value::Other('>') => Ordering::Greater,

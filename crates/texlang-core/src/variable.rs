@@ -412,7 +412,7 @@ impl<S: TexlangState> Command<S> {
                 Err(err) => {
                     return Err(error::Error::new_propagated(
                         input.vm(),
-                        error::PropagationContext::VariableRead,
+                        error::PropagationContext::VariableIndex,
                         token,
                         err,
                     ))
@@ -456,8 +456,18 @@ impl<S: TexlangState> Command<S> {
         input: &mut vm::ExecutionInput<S>,
         scope: groupingmap::Scope,
     ) -> Result<(), Box<error::Error>> {
-        self.resolve(token, input.as_mut())?
+        match self
+            .resolve(token, input.as_mut())?
             .set_value_using_input(input, scope)
+        {
+            Ok(()) => Ok(()),
+            Err(err) => Err(error::Error::new_propagated(
+                input.vm(),
+                error::PropagationContext::VariableAssignment,
+                token,
+                err,
+            )),
+        }
     }
 }
 
@@ -502,7 +512,7 @@ impl<S: TexlangState> Variable<S> {
     }
 
     /// Set the value of a variable using the following tokens in the input stream.
-    pub fn set_value_using_input(
+    fn set_value_using_input(
         &self,
         input: &mut vm::ExecutionInput<S>,
         scope: groupingmap::Scope,
