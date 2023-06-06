@@ -5,7 +5,7 @@ pub(crate) mod lexer;
 pub mod trace;
 pub use catcode::CatCode;
 
-use std::num;
+use std::{fmt::Display, num};
 use texcraft_stdext::collections::interner;
 
 /// String type used to represent control sequence names in Texlang.
@@ -184,31 +184,20 @@ impl Token {
 }
 
 enum PendingWhitespace {
+    NotStarted,
     None,
     Space,
     Newlines(usize),
 }
 
 impl PendingWhitespace {
-    fn write_out(&mut self, s: &mut String) {
-        if !s.is_empty() {
-            match self {
-                PendingWhitespace::None => {}
-                PendingWhitespace::Space => {
-                    s.push(' ');
-                }
-                PendingWhitespace::Newlines(n) => {
-                    for _ in 0..*n {
-                        s.push('\n');
-                    }
-                }
-            }
-        }
+    fn start(&mut self) {
         *self = PendingWhitespace::None;
     }
 
     fn add_space(&mut self) {
         *self = match self {
+            PendingWhitespace::NotStarted => PendingWhitespace::NotStarted,
             PendingWhitespace::None => PendingWhitespace::Space,
             PendingWhitespace::Space => PendingWhitespace::Space,
             PendingWhitespace::Newlines(n) => PendingWhitespace::Newlines(*n),
@@ -217,10 +206,89 @@ impl PendingWhitespace {
 
     fn add_newline(&mut self) {
         *self = match self {
+            PendingWhitespace::NotStarted => PendingWhitespace::NotStarted,
             PendingWhitespace::None => PendingWhitespace::Newlines(1),
             PendingWhitespace::Space => PendingWhitespace::Newlines(1),
             PendingWhitespace::Newlines(n) => PendingWhitespace::Newlines(*n + 1),
         }
+    }
+}
+
+impl Display for PendingWhitespace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PendingWhitespace::NotStarted | PendingWhitespace::None => Ok(()),
+            PendingWhitespace::Space => {
+                write!(f, " ")
+            }
+            PendingWhitespace::Newlines(n) => {
+                for _ in 0..*n {
+                    writeln!(f)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+/// Data structure for writing tokens
+pub struct Writer<I> {
+    io_writer: I,
+    pending_whitespace: PendingWhitespace,
+}
+
+impl<I: Default> Default for Writer<I> {
+    fn default() -> Self {
+        Self {
+            io_writer: Default::default(),
+            pending_whitespace: PendingWhitespace::NotStarted,
+        }
+    }
+}
+
+impl<I> Writer<I> {
+    /// Create a new writer that writes output to the provided IO writer.
+    pub fn new(io_writer: I) -> Self {
+        Self {
+            io_writer,
+            pending_whitespace: PendingWhitespace::NotStarted,
+        }
+    }
+    pub fn take_io_writer(self) -> I {
+        self.io_writer
+    }
+}
+
+impl<I: std::io::Write> Writer<I> {
+    /// Write a token.
+    pub fn write(
+        &mut self,
+        interner: &CsNameInterner,
+        token: Token,
+    ) -> Result<(), std::io::Error> {
+        match &token.value {
+            Value::ControlSequence(s) => {
+                write!(
+                    self.io_writer,
+                    "{}\\{}",
+                    self.pending_whitespace,
+                    interner.resolve(*s).unwrap()
+                )?;
+                self.pending_whitespace.start();
+            }
+            Value::Space('\n') => self.pending_whitespace.add_newline(),
+            Value::Space(_) => self.pending_whitespace.add_space(),
+            _ => {
+                write!(
+                    self.io_writer,
+                    "{}{}",
+                    self.pending_whitespace,
+                    token.char().unwrap()
+                )?;
+                self.pending_whitespace.start();
+            }
+        }
+        self.io_writer.flush()
     }
 }
 
@@ -229,33 +297,12 @@ pub fn write_tokens<'a, T>(tokens: T, interner: &CsNameInterner) -> String
 where
     T: IntoIterator<Item = &'a Token>,
 {
-    let mut result: String = String::default();
-    let mut pending_whitespace = PendingWhitespace::None;
+    let mut writer: Writer<Vec<u8>> = Default::default();
     for token in tokens.into_iter() {
-        match &token.value {
-            Value::ControlSequence(s) => {
-                pending_whitespace.write_out(&mut result);
-                let name = interner
-                    .resolve(*s)
-                    .unwrap_or("corruptedControlSequenceName");
-                result.push('\\');
-                result.push_str(name);
-                pending_whitespace.add_space();
-            }
-            Value::Space(c) => {
-                if *c == '\n' {
-                    pending_whitespace.add_newline();
-                } else {
-                    pending_whitespace.add_space();
-                }
-            }
-            _ => {
-                pending_whitespace.write_out(&mut result);
-                result.push(token.char().unwrap());
-            }
-        }
+        writer.write( interner, *token).unwrap();
     }
-    result
+    let buffer = writer.take_io_writer();
+    std::str::from_utf8(&buffer).unwrap().into()
 }
 
 #[cfg(test)]

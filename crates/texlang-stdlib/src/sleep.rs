@@ -12,6 +12,11 @@ pub fn get_sleep<S: TexlangState>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
         |_: token::Token, input: &mut vm::ExecutionInput<S>| -> command::Result<()> {
             let milliseconds = usize::parse(input)?;
+            writeln![
+                input.vm().std_err.borrow_mut(),
+                "\\sleep: sleeping for {milliseconds}ms",
+            ]
+            .unwrap();
             thread::sleep(time::Duration::from_millis(milliseconds as u64));
             Ok(())
         },

@@ -10,11 +10,22 @@ use texlang_core::*;
 
 #[derive(Default)]
 pub struct Component {
-    exec_output: Vec<token::Token>,
+    tokens: Vec<token::Token>,
+    writer: Option<token::Writer<Box<dyn std::io::Write>>>,
     num_trailing_newlines: usize,
     allow_undefined_command: bool,
 }
 
+impl Component {
+    fn push_token(&mut self, token: token::Token, interner: &token::CsNameInterner) {
+        self.tokens.push(token);
+        if let Some(writer) = &mut self.writer {
+            writer.write(interner, token).unwrap()
+        }
+    }
+}
+
+// TODO: this should just be an argument to the run function
 pub fn set_allow_undefined_command<S: HasComponent<Component>>(state: &mut S, value: bool) {
     state.component_mut().allow_undefined_command = value;
 }
@@ -30,9 +41,10 @@ fn newline_primitive_fn<S: HasComponent<Component>>(
     t: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> command::Result<()> {
-    let c = input.state_mut().component_mut();
+    let (state, interner) = input.state_mut_and_cs_name_interner();
+    let mut c = state.component_mut();
     let newline_token = token::Token::new_space('\n', t.trace_key());
-    c.exec_output.push(newline_token);
+    c.push_token(newline_token, interner);
     c.num_trailing_newlines += 1;
     Ok(())
 }
@@ -49,19 +61,17 @@ fn par_primitive_fn<S: HasComponent<Component>>(
     t: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> command::Result<()> {
-    let c = input.state_mut().component_mut();
-    if c.exec_output.is_empty() {
-        return Ok(());
-    }
+    let (state, interner) = input.state_mut_and_cs_name_interner();
+    let mut c = state.component_mut();
     let par_token = token::Token::new_space('\n', t.trace_key());
     match c.num_trailing_newlines {
         0 => {
-            c.exec_output.push(par_token);
-            c.exec_output.push(par_token);
+            c.push_token(par_token, interner);
+            c.push_token(par_token, interner);
             c.num_trailing_newlines += 2;
         }
         1 => {
-            c.exec_output.push(par_token);
+            c.push_token(par_token, interner);
             c.num_trailing_newlines += 1;
         }
         _ => {}
@@ -75,11 +85,17 @@ pub fn run<S: HasComponent<Component>>(
 ) -> Result<Vec<token::Token>, Box<error::Error>> {
     vm.run::<Handlers>()?;
     let mut result = Vec::new();
-    std::mem::swap(
-        &mut result,
-        &mut vm.custom_state.component_mut().exec_output,
-    );
+    std::mem::swap(&mut result, &mut vm.state.component_mut().tokens);
     Ok(result)
+}
+
+/// Run the Texlang interpreter for the provided VM and write the tokens as strings to the provided writer.
+pub fn run_and_write<S: HasComponent<Component>>(
+    vm: &mut vm::VM<S>,
+    io_writer: Box<dyn std::io::Write>,
+) -> Result<(), Box<error::Error>> {
+    vm.state.component_mut().writer = Some(token::Writer::new(io_writer));
+    vm.run::<Handlers>()
 }
 
 struct Handlers;
@@ -89,11 +105,12 @@ impl<S: HasComponent<Component>> vm::Handlers<S> for Handlers {
         mut token: token::Token,
         input: &mut vm::ExecutionInput<S>,
     ) -> command::Result<()> {
-        let c = input.state_mut().component_mut();
+    let (state, interner) = input.state_mut_and_cs_name_interner();
+    let mut c = state.component_mut();
         if let Some('\n') = token.char() {
             token = token::Token::new_space(' ', token.trace_key());
         }
-        c.exec_output.push(token);
+        c.push_token(token, interner);
         c.num_trailing_newlines = 0;
         Ok(())
     }

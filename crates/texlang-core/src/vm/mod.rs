@@ -177,7 +177,7 @@ impl error::TexError for EndOfGroupError {
 
 /// The Texlang virtual machine.
 pub struct VM<S> {
-    pub custom_state: S,
+    pub state: S,
     pub commands_map: command::Map<S>,
     pub file_system_ops: Box<dyn FileSystemOps>,
     pub std_err: Rc<RefCell<dyn std::io::Write>>,
@@ -293,7 +293,7 @@ impl<S> VM<S> {
             .map(|(key, value)| (internal.cs_name_interner.get_or_intern(key), value))
             .collect();
         VM {
-            custom_state: state,
+            state,
             commands_map: command::Map::new(initial_built_ins, Default::default()),
             internal,
             file_system_ops: Box::new(RealFileSystemOps {}),
@@ -368,7 +368,7 @@ impl<S> VM<S> {
             }
         }
         let group = self.internal.groups.pop().unwrap();
-        group.restore(&mut self.custom_state);
+        group.restore(&mut self.state);
         Ok(())
     }
 

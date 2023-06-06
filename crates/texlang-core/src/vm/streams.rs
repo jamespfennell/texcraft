@@ -1,10 +1,7 @@
 use super::TexlangState;
-use crate::command;
-use crate::error;
 use crate::token::trace;
 use crate::token::Token;
-use crate::variable;
-use crate::vm;
+use crate::*;
 
 /// A stream of tokens generated on demand.
 ///
@@ -84,7 +81,7 @@ pub trait TokenStream {
     /// Returns a reference to the custom state.
     #[inline]
     fn state(&self) -> &Self::S {
-        &self.vm().custom_state
+        &self.vm().state
     }
 
     fn trace(&self, token: Token) -> trace::SourceCodeTrace {
@@ -376,10 +373,18 @@ impl<S> ExecutionInput<S> {
         &mut self.0 .0 .0.commands_map
     }
 
-    /// Returns a mutable reference to the custom state.
+    /// Returns a mutable reference to the state.
     #[inline]
     pub fn state_mut(&mut self) -> &mut S {
-        &mut self.0 .0 .0.custom_state
+        &mut self.0 .0 .0.state
+    }
+
+    /// Returns a mutable reference to the custom state.
+    pub fn state_mut_and_cs_name_interner(&mut self) -> (&mut S, &token::CsNameInterner) {
+        (
+            &mut self.0 .0 .0.state,
+            &self.0 .0 .0.internal.cs_name_interner,
+        )
     }
 
     // TODO: pass in the token and keep it as a reference
@@ -398,7 +403,7 @@ impl<S> ExecutionInput<S> {
     pub(crate) fn current_group_mut(&mut self) -> Option<(&mut variable::RestoreValues<S>, &S)> {
         match self.0 .0 .0.internal.groups.last_mut() {
             None => None,
-            Some(g) => Some((g, &self.0 .0 .0.custom_state)),
+            Some(g) => Some((g, &self.0 .0 .0.state)),
         }
     }
 }
@@ -440,7 +445,7 @@ mod stream {
             .internal
             .current_source
             .root
-            .next(&vm.custom_state, &mut vm.internal.cs_name_interner)
+            .next(&vm.state, &mut vm.internal.cs_name_interner)
         {
             Ok(None) => {}
             Ok(Some(token)) => {
@@ -472,7 +477,7 @@ mod stream {
             .internal
             .current_source
             .root
-            .next(&vm.custom_state, &mut vm.internal.cs_name_interner)
+            .next(&vm.state, &mut vm.internal.cs_name_interner)
         {
             Ok(None) => {}
             Ok(Some(token)) => {

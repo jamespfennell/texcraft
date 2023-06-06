@@ -26,7 +26,7 @@ pub mod run {
         vm: &mut vm::VM<S>,
         opts: RunOptions,
     ) {
-        let mut c = HasComponent::<Component>::component_mut(&mut vm.custom_state);
+        let mut c = HasComponent::<Component>::component_mut(&mut vm.state);
         c.help = opts.help.into();
         c.quit_requested = false;
         let reader = Interface::new("").unwrap();
@@ -47,7 +47,7 @@ pub mod run {
             let tokens = match script::run(vm) {
                 Ok(s) => s,
                 Err(err) => {
-                    if HasComponent::<Component>::component(&vm.custom_state).quit_requested {
+                    if HasComponent::<Component>::component(&vm.state).quit_requested {
                         return;
                     }
                     println!("{err}");
