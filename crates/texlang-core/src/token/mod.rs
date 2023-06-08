@@ -261,11 +261,7 @@ impl<I> Writer<I> {
 
 impl<I: std::io::Write> Writer<I> {
     /// Write a token.
-    pub fn write(
-        &mut self,
-        interner: &CsNameInterner,
-        token: Token,
-    ) -> Result<(), std::io::Error> {
+    pub fn write(&mut self, interner: &CsNameInterner, token: Token) -> Result<(), std::io::Error> {
         match &token.value {
             Value::ControlSequence(s) => {
                 write!(
@@ -299,7 +295,7 @@ where
 {
     let mut writer: Writer<Vec<u8>> = Default::default();
     for token in tokens.into_iter() {
-        writer.write( interner, *token).unwrap();
+        writer.write(interner, *token).unwrap();
     }
     let buffer = writer.take_io_writer();
     std::str::from_utf8(&buffer).unwrap().into()

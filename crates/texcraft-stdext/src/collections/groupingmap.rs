@@ -51,9 +51,9 @@
 //! ```
 //! # use texcraft_stdext::collections::groupingmap::GroupingHashMap;
 //! # use texcraft_stdext::collections::groupingmap::Scope;
-//! # use texcraft_stdext::collections::groupingmap::EndOfGroupError;
+//! # use texcraft_stdext::collections::groupingmap::NoGroupToEndError;
 //! let mut cat_colors = GroupingHashMap::<String, String>::new();
-//! assert_eq!(cat_colors.end_group(), Err(EndOfGroupError{}));
+//! assert_eq!(cat_colors.end_group(), Err(NoGroupToEndError{}));
 //! ```
 //! There is also a "global" variant of the `insert` method. It inserts the value at the global
 //! group, and erases all other values.
@@ -86,8 +86,14 @@ pub trait BackingContainer<K, V>: Default {
     /// Remove a value with the provided key, if it exists.
     fn remove(&mut self, k: &K);
 
-    /// Invoke the provided function for all (key, value) pairs in the map.
-    fn visit<F: FnMut(&K, &V)>(&self, f: F);
+    /// Type of iterator returned by the [BackingContainer::iter] method.
+    type Iter<'a>: Iterator<Item = (K, &'a V)>
+    where
+        V: 'a,
+        Self: 'a;
+
+    /// Iterate over all (key, value) tuples in the container.
+    fn iter(&self) -> Self::Iter<'_>;
 
     /// Return the number of elements in the container.
     fn len(&self) -> usize;
@@ -115,14 +121,20 @@ impl<K: Eq + Hash + Clone, V> BackingContainer<K, V> for HashMap<K, V> {
     fn remove(&mut self, k: &K) {
         HashMap::remove(self, k);
     }
-    fn visit<F: FnMut(&K, &V)>(&self, mut f: F) {
-        for (k, v) in HashMap::iter(self) {
-            f(k, v);
-        }
+    type Iter<'a> = std::iter::Map<
+        std::collections::hash_map::Iter<'a, K, V>,
+        fn(i: (&'a K, &'a V)) -> (K, &'a V)
+    > where K:'a, V: 'a;
+    fn iter(&self) -> Self::Iter<'_> {
+        HashMap::iter(self).map(map_func)
     }
     fn len(&self) -> usize {
         HashMap::len(self)
     }
+}
+
+fn map_func<'a, K: Clone, V>(i: (&'a K, &'a V)) -> (K, &'a V) {
+    (i.0.clone(), i.1)
 }
 
 impl<V> BackingContainer<usize, V> for Vec<Option<V>> {
@@ -162,12 +174,16 @@ impl<V> BackingContainer<usize, V> for Vec<Option<V>> {
         }
     }
 
-    fn visit<F: FnMut(&usize, &V)>(&self, mut f: F) {
-        for (k, v) in <[Option<V>]>::iter(self).enumerate() {
-            if let Some(v) = v {
-                f(&k, v);
-            }
-        }
+    type Iter<'a>  = std::iter::FilterMap<
+        std::iter::Enumerate<
+            std::slice::Iter<'a, Option<V>>
+        >,
+        fn(i: (usize, &'a Option<V>)) -> Option<(usize, &'a V)>
+    > where V: 'a;
+    fn iter(&self) -> Self::Iter<'_> {
+        <[Option<V>]>::iter(self)
+            .enumerate()
+            .filter_map(|i| i.1.as_ref().map(|v| (i.0, v)))
     }
 
     fn len(&self) -> usize {
@@ -184,8 +200,8 @@ impl<V> BackingContainer<usize, V> for Vec<Option<V>> {
 /// A wrapper around [BackingContainer] types that adds a specific kind of group semantics.
 ///
 /// See the module docs for more information.
-#[derive(Debug, PartialEq)]
-pub struct GroupingContainer<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> {
+#[derive(Debug, PartialEq, Eq)]
+pub struct GroupingContainer<K: Eq + Hash, V, T> {
     backing_container: T,
 
     // The groups stack does not contain the global group as no cleanup there is needed.
@@ -213,15 +229,15 @@ pub enum Scope {
     Global,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 enum EndOfGroupAction<V> {
     Revert(V),
     Delete,
 }
 
-// Error returned if end group is called when there is no group to end.
+/// Error returned if there is no group to end when [GroupingContainer::end_group] is invoked.
 #[derive(Debug, PartialEq, Eq)]
-pub struct EndOfGroupError;
+pub struct NoGroupToEndError;
 
 impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V, T> {
     /// Inserts the key, value pair in the provided scope.
@@ -261,7 +277,7 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V,
 
     /// Retrieves the value at the provided key.
     ///
-    /// This exists for convenience only. It is equivalent to obtaining the
+    /// It is equivalent to obtaining the
     /// backing container using [backing_container](GroupingContainer::backing_container)
     /// and calling the [get](BackingContainer::get) method.
     #[inline]
@@ -278,9 +294,9 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V,
     }
 
     /// Attempts to end the current group. Returns an error if there is no group to end.
-    pub fn end_group(&mut self) -> Result<(), EndOfGroupError> {
+    pub fn end_group(&mut self) -> Result<(), NoGroupToEndError> {
         match self.groups.pop() {
-            None => Err(EndOfGroupError {}),
+            None => Err(NoGroupToEndError {}),
             Some(group) => {
                 // Note that for the running time analysis we account each iteration of this loop
                 // to the insert method that put the key in the changed_keys set. Put another way,
@@ -303,7 +319,7 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V,
 
     /// Extends the `GroupingMap` with (key, value) pairs.
     /// ```
-    /// # use texcraft_stdext::collections::groupingmap::GroupingHashMap;
+    /// # use texcraft_stdext::collections::groupingmap::*;
     /// let mut cat_colors = GroupingHashMap::new();
     /// cat_colors.extend(std::array::IntoIter::new([
     ///    ("paganini", "black"),
@@ -335,38 +351,19 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V,
         }
     }
 
-    /// Builds a new [GroupingContainer] which is clone of this grouping map except
-    /// each value is converted using the provided convert function.
-    pub fn clone_with_conversion<
-        KNew: Eq + Hash + Clone,
-        VNew,
-        TNew: BackingContainer<KNew, VNew>,
-    >(
-        &self,
-        convert_key: &mut dyn FnMut(&K) -> KNew,
-        convert_value: &mut dyn FnMut(&K, &V) -> VNew,
-    ) -> GroupingContainer<KNew, VNew, TNew> {
-        let mut m: GroupingContainer<KNew, VNew, TNew> = Default::default();
-        self.backing_container.visit(|k: &K, v: &V| {
-            m.backing_container
-                .insert(convert_key(k), convert_value(k, v));
-        });
-        for group in &self.groups {
-            let mut new_group: HashMap<KNew, EndOfGroupAction<VNew>> = Default::default();
-            for (k, action) in group {
-                new_group.insert(
-                    convert_key(k),
-                    match action {
-                        EndOfGroupAction::Revert(v) => {
-                            EndOfGroupAction::Revert(convert_value(k, v))
-                        }
-                        EndOfGroupAction::Delete => EndOfGroupAction::Delete,
-                    },
-                );
-            }
-            m.groups.push(new_group);
-        }
-        m
+    /// Iterate over all (key, value) tuples that are currently visible.
+    pub fn iter(&self) -> T::Iter<'_> {
+        self.backing_container.iter()
+    }
+
+    /// Iterate over all (key, value) tuples in the container,
+    ///     including tuples that are not currently visible.
+    ///
+    /// See the documentation on [IterAll] for information on how this iterator works.
+    ///
+    /// To iterate over visible items only, use the [GroupingContainer::iter] method.
+    pub fn iter_all(&self) -> IterAll<'_, K, V, T> {
+        IterAll::new(self)
     }
 
     /// Returns the number of elements in the container.
@@ -383,6 +380,193 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V,
 impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> Default for GroupingContainer<K, V, T> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// The item for the [IterAll] iterator.
+#[derive(PartialEq, Eq, Debug)]
+pub enum Item<T> {
+    /// Begin a new group.
+    BeginGroup,
+    /// Insert the `T=(key, value)` tuple into the container.
+    Value(T),
+}
+
+impl<T> Item<T> {
+    /// Adapt a lambda to use in [Iterator::map] for iterators over this item.
+    /// 
+    /// When iterating over items of this type, one almost always wants to keep
+    ///     [Item::BeginGroup] constant and apply a transformation to the [Item::Value] variant.
+    /// This adaptor function helps with this by converting a lambda that operates on `T`
+    ///     to a lambda that operates on [`Item<T>`].
+    /// 
+    /// ```
+    /// # use texcraft_stdext::collections::groupingmap::*;
+    /// let start: Vec<Item<usize>> = vec![
+    ///     Item::Value(1),
+    ///     Item::BeginGroup,
+    ///     Item::Value(2),
+    /// ];
+    /// let end: Vec<Item<usize>> = start.into_iter().map(Item::adapt_map(|i| { i *100 })).collect();
+    /// assert_eq![end, vec![
+    ///     Item::Value(100),
+    ///     Item::BeginGroup,
+    ///     Item::Value(200),
+    /// ]];
+    /// ```
+    pub fn adapt_map<B, F: FnMut(T) ->B>(
+        mut f: F,
+    ) -> impl FnMut(Item<T>) -> Item<B> {
+        move |item| match item {
+            Item::BeginGroup => Item::BeginGroup,
+            Item::Value(kv) => Item::Value(f(kv)),
+        }
+    }
+}
+
+/// An iterator over all values in a grouping container, including invisible values.
+///
+/// To understand this iterator, it's easiest to look at an example.
+/// Suppose we have the following grouping map:
+/// ```
+/// # use texcraft_stdext::collections::groupingmap::*;
+/// let mut cat_colors = GroupingHashMap::new();
+/// cat_colors.insert("paganini", "black", Scope::Local);
+/// cat_colors.begin_group();
+/// cat_colors.insert("paganini", "gray", Scope::Local);
+/// ```
+/// After these mutations, the grouping map contains two tuples:
+///     the tuple `("paganini", "gray")` that is visible, and
+///     the tuple `("paganini", "black")` that is currently invisible.
+/// The second tuple will become visible again when the group ends.
+///
+/// This iterator enables iterating over all tuples, visible and invisible.
+/// In this example here this is the result:
+/// ```
+/// # use texcraft_stdext::collections::groupingmap::*;
+/// # let mut cat_colors = GroupingHashMap::new();
+/// # cat_colors.insert("paganini", "black", Scope::Local);
+/// # cat_colors.begin_group();
+/// # cat_colors.insert("paganini", "gray", Scope::Local);
+/// let items: Vec<_> = cat_colors.iter_all().collect();
+/// assert_eq![items, vec![
+///     Item::Value(("paganini", &"black")),
+///     Item::BeginGroup,
+///     Item::Value(("paganini", &"gray")),
+/// ]]
+/// ```
+/// A good mental model for this iterator is that it replays all mutations (inserts and begin groups)
+///     that have been applied to the map.
+/// However it doesn't replay the mutations exactly as they happened.
+/// Instead, it returns the minimal number of mutations to recreate the map.
+/// Thus:
+/// ```
+/// # use texcraft_stdext::collections::groupingmap::*;
+/// let mut cat_colors = GroupingHashMap::new();
+/// cat_colors.insert("local", "value_1", Scope::Local);
+/// cat_colors.insert("local", "value_2", Scope::Local);
+/// cat_colors.begin_group();
+/// cat_colors.insert("local", "value_3", Scope::Local);
+/// cat_colors.insert("local", "value_4", Scope::Local);
+/// let items: Vec<_> = cat_colors.iter_all().collect();
+/// assert_eq![items, vec![
+///     Item::Value(("local", &"value_2")),
+///     Item::BeginGroup,
+///     Item::Value(("local", &"value_4")),
+/// ]]
+/// ```
+/// It also converts global assignments within a group to regular assignments in the global scope:
+/// ```
+/// # use texcraft_stdext::collections::groupingmap::*;
+/// let mut cat_colors = GroupingHashMap::new();
+/// cat_colors.insert("global", "value_1", Scope::Local);
+/// cat_colors.begin_group();
+/// cat_colors.insert("global", "value_2", Scope::Global);
+/// let items: Vec<_> = cat_colors.iter_all().collect();
+/// assert_eq![items, vec![
+///     Item::Value(("global", &"value_2")),
+///     Item::BeginGroup,
+/// ]]
+/// ```
+pub struct IterAll<'a, K, V, T: BackingContainer<K, V> + 'a> {
+    visible_items: Option<T::Iter<'a>>,
+    non_global_items: Vec<Item<(K, &'a V)>>,
+    key_to_val: HashMap<K, Option<&'a V>>,
+}
+
+impl<'a, K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> IterAll<'a, K, V, T> {
+    fn new(map: &'a GroupingContainer<K, V, T>) -> Self {
+        let mut key_to_val = HashMap::<K, Option<&'a V>>::with_capacity(map.groups.len());
+        let save_stack_size: usize = map.groups.iter().map(HashMap::len).sum();
+        let mut non_global_items = Vec::<Item<(K, &'a V)>>::with_capacity(save_stack_size);
+        for group in map.groups.iter().rev() {
+            for (k, action) in group {
+                let v = match key_to_val.get(k) {
+                    None => map.backing_container.get(k).unwrap(),
+                    Some(v) => v.unwrap(),
+                };
+                non_global_items.push(Item::Value((k.clone(), v)));
+                key_to_val.insert(
+                    k.clone(),
+                    match action {
+                        EndOfGroupAction::Delete => None,
+                        EndOfGroupAction::Revert(v) => Some(v),
+                    },
+                );
+            }
+            non_global_items.push(Item::BeginGroup);
+        }
+        Self {
+            visible_items: Some(map.backing_container().iter()),
+            non_global_items,
+            key_to_val,
+        }
+    }
+}
+
+impl<'a, K: Eq + Hash + Clone, V, T: BackingContainer<K, V> + 'a> Iterator
+    for IterAll<'a, K, V, T>
+{
+    type Item = Item<(K, &'a V)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(visible_items) = &mut self.visible_items {
+            for visible_item in visible_items {
+                match self.key_to_val.get(&visible_item.0) {
+                    // The item is visible and appears nowhere in the save stack. It must have been defined
+                    // in the global scope, and we thus return it.
+                    None => return Some(Item::Value((visible_item.0, visible_item.1))),
+                    // The item is visible and the last entry in the save stack is a delete instruction.
+                    // This indicates the item was first defined inside a local group and is not defined in
+                    // the global scope. We skip it.
+                    Some(None) => continue,
+                    // The item is visible and the last entry in the save stack is a revert instruction.
+                    // We return the value in the revert instruction, as this is the value in the global scope.
+                    Some(Some(global_value)) => {
+                        return Some(Item::Value((visible_item.0, global_value)))
+                    }
+                }
+            }
+        }
+        self.visible_items = None;
+        self.non_global_items.pop()
+    }
+}
+
+impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> FromIterator<Item<(K, V)>>
+    for GroupingContainer<K, V, T>
+{
+    fn from_iter<I: IntoIterator<Item = Item<(K, V)>>>(iter: I) -> Self {
+        let mut map: Self = Default::default();
+        for item in iter {
+            match item {
+                Item::BeginGroup => map.begin_group(),
+                Item::Value((k, v)) => {
+                    map.insert(k, v, Scope::Local);
+                }
+            }
+        }
+        map
     }
 }
 
@@ -410,35 +594,162 @@ mod tests {
         assert_eq!(map.get(&3), Some(&5));
     }
 
-    #[test]
-    fn clone_with_conversion() {
-        let mut original = GroupingHashMap::new();
-        original.insert("key1", 1, Scope::Local);
-        original.begin_group();
-        original.insert("key1", 2, Scope::Local);
-        original.insert("key2", 3, Scope::Local);
-        original.insert("key3", 4, Scope::Local);
-        original.begin_group();
-        original.insert("key1", 5, Scope::Local);
-        original.insert("key3", 6, Scope::Global);
-        assert_eq!(original.end_group(), Ok(()));
-
-        let mut want = GroupingHashMap::new();
-        want.insert("key1-new".to_string(), "key1-1".to_string(), Scope::Local);
-        want.begin_group();
-        want.insert("key1-new".to_string(), "key1-2".to_string(), Scope::Local);
-        want.insert("key2-new".to_string(), "key2-3".to_string(), Scope::Local);
-        want.insert("key3-new".to_string(), "key3-4".to_string(), Scope::Local);
-        want.begin_group();
-        want.insert("key1-new".to_string(), "key1-5".to_string(), Scope::Local);
-        want.insert("key3-new".to_string(), "key3-6".to_string(), Scope::Global);
-        assert_eq!(want.end_group(), Ok(()));
-
-        let got: GroupingHashMap<String, String> = original
-            .clone_with_conversion(&mut |k| format!["{}-new", k], &mut |k, v| {
-                format!["{}-{}", k, v]
-            });
-
+    fn run_iter_all_test(map: &GroupingHashMap<usize, usize>, want: &[Item<(usize, usize)>]) {
+        let got: Vec<_> = map
+            .iter_all()
+            .map(|item| match item {
+                Item::BeginGroup => Item::BeginGroup,
+                Item::Value((k, v)) => Item::Value((k, *v)),
+            })
+            .collect();
         assert_eq!(got, want);
+    }
+
+    macro_rules! iter_all_tests {
+        ( $( ($name: ident, $map: expr, $want: expr $(,)? ), )+ ) => {
+            $(
+            #[test]
+            fn $name() {
+                let map = $map;
+                let want = $want;
+                run_iter_all_test(&map, &want);
+            }
+            )+
+        };
+    }
+
+    mod iter_all_tests {
+        use super::*;
+        iter_all_tests!(
+            (empty_0, GroupingHashMap::new(), vec![]),
+            (
+                empty_1,
+                {
+                    let mut m = GroupingHashMap::new();
+                    m.begin_group();
+                    m
+                },
+                vec![Item::BeginGroup],
+            ),
+            (
+                empty_2,
+                {
+                    let mut m = GroupingHashMap::new();
+                    m.begin_group();
+                    m.begin_group();
+                    m.begin_group();
+                    m.end_group().unwrap();
+                    m
+                },
+                vec![Item::BeginGroup, Item::BeginGroup],
+            ),
+            (
+                single_root_assignment,
+                {
+                    let mut m = GroupingHashMap::new();
+                    m.insert(1, 1, Scope::Local);
+                    m.begin_group();
+                    m.begin_group();
+                    m
+                },
+                vec![Item::Value((1, 1)), Item::BeginGroup, Item::BeginGroup],
+            ),
+            (
+                single_global_assignment,
+                {
+                    let mut m = GroupingHashMap::new();
+                    m.begin_group();
+                    m.insert(1, 1, Scope::Global);
+                    m.begin_group();
+                    m
+                },
+                vec![Item::Value((1, 1)), Item::BeginGroup, Item::BeginGroup],
+            ),
+            (
+                overwrite_root_assignment_1,
+                {
+                    let mut m = GroupingHashMap::new();
+                    m.insert(1, 1, Scope::Local);
+                    m.begin_group();
+                    m.insert(1, 2, Scope::Local);
+                    m.begin_group();
+                    m
+                },
+                vec![
+                    Item::Value((1, 1)),
+                    Item::BeginGroup,
+                    Item::Value((1, 2)),
+                    Item::BeginGroup
+                ],
+            ),
+            (
+                overwrite_root_assignment_2,
+                {
+                    let mut m = GroupingHashMap::new();
+                    m.insert(1, 1, Scope::Local);
+                    m.begin_group();
+                    m.insert(1, 2, Scope::Local);
+                    m.begin_group();
+                    m.insert(1, 3, Scope::Local);
+                    m
+                },
+                vec![
+                    Item::Value((1, 1)),
+                    Item::BeginGroup,
+                    Item::Value((1, 2)),
+                    Item::BeginGroup,
+                    Item::Value((1, 3)),
+                ],
+            ),
+            (
+                single_local_assignment,
+                {
+                    let mut m = GroupingHashMap::new();
+                    m.begin_group();
+                    m.insert(1, 1, Scope::Local);
+                    m.begin_group();
+                    m
+                },
+                vec![Item::BeginGroup, Item::Value((1, 1)), Item::BeginGroup],
+            ),
+            (
+                overwrite_local_assignment_1,
+                {
+                    let mut m = GroupingHashMap::new();
+                    m.begin_group();
+                    m.insert(1, 1, Scope::Local);
+                    m.begin_group();
+                    m.insert(1, 2, Scope::Local);
+                    m
+                },
+                vec![
+                    Item::BeginGroup,
+                    Item::Value((1, 1)),
+                    Item::BeginGroup,
+                    Item::Value((1, 2))
+                ],
+            ),
+            (
+                overwrite_local_assignment_2,
+                {
+                    let mut m = GroupingHashMap::new();
+                    m.begin_group();
+                    m.insert(1, 1, Scope::Local);
+                    m.begin_group();
+                    m.insert(1, 2, Scope::Local);
+                    m.begin_group();
+                    m.insert(1, 3, Scope::Local);
+                    m
+                },
+                vec![
+                    Item::BeginGroup,
+                    Item::Value((1, 1)),
+                    Item::BeginGroup,
+                    Item::Value((1, 2)),
+                    Item::BeginGroup,
+                    Item::Value((1, 3))
+                ],
+            ),
+        );
     }
 }

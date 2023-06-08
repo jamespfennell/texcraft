@@ -243,7 +243,7 @@ impl<S> Map<S> {
         self.commands.begin_group();
     }
 
-    pub(crate) fn end_group(&mut self) -> std::result::Result<(), groupingmap::EndOfGroupError> {
+    pub(crate) fn end_group(&mut self) -> std::result::Result<(), groupingmap::NoGroupToEndError> {
         self.commands.end_group()?;
         Ok(())
     }

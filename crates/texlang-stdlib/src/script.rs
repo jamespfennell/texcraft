@@ -105,8 +105,8 @@ impl<S: HasComponent<Component>> vm::Handlers<S> for Handlers {
         mut token: token::Token,
         input: &mut vm::ExecutionInput<S>,
     ) -> command::Result<()> {
-    let (state, interner) = input.state_mut_and_cs_name_interner();
-    let mut c = state.component_mut();
+        let (state, interner) = input.state_mut_and_cs_name_interner();
+        let mut c = state.component_mut();
         if let Some('\n') = token.char() {
             token = token::Token::new_space(' ', token.trace_key());
         }
