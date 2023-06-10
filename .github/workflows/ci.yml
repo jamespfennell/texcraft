@@ -27,12 +27,13 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --bins
+          args: --bins --all-features
 
       - name: Run the tests
         uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --all-features
 
   compile-benchmarks:
     runs-on: ubuntu-latest

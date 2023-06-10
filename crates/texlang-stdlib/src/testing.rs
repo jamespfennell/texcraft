@@ -22,7 +22,11 @@ use texlang_core::*;
 /// If the primitives under test don't require custom components or
 /// other pieces in the state, it is easier to use this type rather than defining a custom one.
 #[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct State {
+    // TODO: Consider whether prefix should be here.
+    // Getting and setting global should be available via the VMs scope handler
+    // The other prefixes are \def specific, and the \def tests can be change to handle this.
     prefix: prefix::Component,
     script: script::Component,
     integer: i32,
@@ -84,14 +88,18 @@ pub fn run_expansion_equality_test<S>(lhs: &str, rhs: &str, options: &[TestOptio
 where
     S: Default + HasComponent<script::Component>,
 {
-    use ::texlang_core::token::Value::ControlSequence;
-
     let (output_1, vm_1) = crate::testing::execute_source_code(lhs, options);
     let (output_2, vm_2) = crate::testing::execute_source_code(rhs, options);
+    compare_output(output_1.unwrap(), vm_1, output_2.unwrap(), vm_2)
+}
 
-    let output_1 = output_1.unwrap();
-    let output_2 = output_2.unwrap();
-
+fn compare_output<S>(
+    output_1: Vec<token::Token>,
+    vm_1: vm::VM<S>,
+    output_2: Vec<token::Token>,
+    vm_2: vm::VM<S>,
+) {
+    use ::texlang_core::token::Value::ControlSequence;
     println!("{output_1:?}");
     let equal = match output_1.len() == output_2.len() {
         false => {
@@ -157,33 +165,75 @@ where
     }
 }
 
+/// Skip a serialization/deserialization test if the serde feature is off
+#[cfg(not(feature = "serde"))]
+pub fn run_serde_test<S>(_: &str, _: &str, _: &[TestOption<S>]) {}
+
+/// Run a serialization/deserialization test
+#[cfg(feature = "serde")]
+pub fn run_serde_test<S>(input_1: &str, input_2: &str, options: &[TestOption<S>])
+where
+    S: Default + HasComponent<script::Component> + serde::Serialize + serde::de::DeserializeOwned,
+{
+    let (output_1_1, vm_1) = crate::testing::execute_source_code(input_1, options);
+    let mut output_1_1 = output_1_1.unwrap();
+
+    let resolved = ResolvedOptions::new(options);
+
+    let serialized = serde_json::to_string_pretty(&vm_1).unwrap();
+    println!("Serialized VM: {serialized}");
+    let mut deserializer = serde_json::Deserializer::from_str(&serialized);
+    let mut vm_1 = vm::VM::deserialize(&mut deserializer, (resolved.initial_commands)());
+
+    vm_1.push_source("testing2.tex", input_2).unwrap();
+    let mut output_1_2 = script::run(&mut vm_1).unwrap();
+    output_1_1.append(&mut output_1_2);
+
+    let (output_2, vm_2) =
+        crate::testing::execute_source_code(format!["{input_1}{input_2}"], options);
+
+    compare_output(output_1_1, vm_1, output_2.unwrap(), vm_2)
+}
+
+struct ResolvedOptions<'a, S> {
+    initial_commands: &'a dyn Fn() -> HashMap<&'static str, command::BuiltIn<S>>,
+    custom_vm_initialization: &'a dyn Fn(&mut VM<S>),
+    allow_undefined_commands: bool,
+}
+
+impl<'a, S> ResolvedOptions<'a, S> {
+    fn new(options: &'a [TestOption<S>]) -> Self {
+        let mut resolved = Self {
+            initial_commands: &HashMap::new,
+            custom_vm_initialization: &|_| {},
+            allow_undefined_commands: true,
+        };
+        for option in options {
+            match option {
+                TestOption::InitialCommands(f) => resolved.initial_commands = f,
+                TestOption::InitialCommandsDyn(f) => resolved.initial_commands = f,
+                TestOption::CustomVMInitialization(f) => resolved.custom_vm_initialization = f,
+                TestOption::CustomVMInitializationDyn(f) => resolved.custom_vm_initialization = f,
+                TestOption::AllowUndefinedCommands(b) => resolved.allow_undefined_commands = *b,
+            }
+        }
+        resolved
+    }
+}
+
 /// Execute source code in a VM with the provided options.
-pub fn execute_source_code<S>(
-    source: &str,
+pub fn execute_source_code<S, T: Into<String>>(
+    source: T,
     options: &[TestOption<S>],
 ) -> (Result<Vec<token::Token>, Box<error::Error>>, VM<S>)
 where
     S: Default + HasComponent<script::Component>,
 {
-    let mut initial_commands: &dyn Fn() -> HashMap<&'static str, command::BuiltIn<S>> =
-        &HashMap::new;
-    let mut custom_vm_initialization: &dyn Fn(&mut VM<S>) = &|_| {};
-    let mut allow_undefined_commands: bool = true;
-    for option in options {
-        match option {
-            TestOption::InitialCommands(f) => initial_commands = f,
-            TestOption::InitialCommandsDyn(f) => initial_commands = f,
-            TestOption::CustomVMInitialization(f) => custom_vm_initialization = f,
-            TestOption::CustomVMInitializationDyn(f) => custom_vm_initialization = f,
-            TestOption::AllowUndefinedCommands(b) => allow_undefined_commands = *b,
-        }
-    }
-
-    let mut vm = VM::<S>::new((initial_commands)(), Default::default());
-    (custom_vm_initialization)(&mut vm);
-    vm.push_source("testing.tex".to_string(), source.to_string())
-        .unwrap();
-    script::set_allow_undefined_command(&mut vm.state, allow_undefined_commands);
+    let resolved_options = ResolvedOptions::new(options);
+    let mut vm = VM::<S>::new((resolved_options.initial_commands)(), Default::default());
+    (resolved_options.custom_vm_initialization)(&mut vm);
+    vm.push_source("testing.tex", source).unwrap();
+    script::set_allow_undefined_command(&mut vm.state, resolved_options.allow_undefined_commands);
     let output = script::run(&mut vm);
     (output, vm)
 }
@@ -301,6 +351,18 @@ macro_rules! test_suite {
     ( state($state: ty), options $options: tt, expansion_equality_tests $test_body: tt $(,)? ) => (
         compile_error!("Invalid test cases for expansion_equality_tests: must be a list of tuples (name, lhs, rhs)");
     );
+    ( state($state: ty), options $options: tt, serde_tests ( $( ($name: ident, $lhs: expr, $rhs: expr $(,)? ) ),* $(,)? ) $(,)? ) => (
+        $(
+            #[cfg_attr(not(feature = "serde"), ignore)]
+            #[test]
+            fn $name() {
+                let lhs = $lhs;
+                let rhs = $rhs;
+                let options = vec! $options;
+                $crate::testing::run_serde_test::<$state>(&lhs, &rhs, &options);
+            }
+        )*
+    );
     ( state($state: ty), options $options: tt, failure_tests ( $( ($name: ident, $input: expr $(,)? ) ),* $(,)? ) $(,)? ) => (
         $(
             #[test]
@@ -312,7 +374,7 @@ macro_rules! test_suite {
         )*
     );
     ( state($state: ty), options $options: tt, $test_kind: ident $test_cases: tt $(,)? ) => (
-        compile_error!("Invalid keyword: test_suite! only accepts the following keywords: `state, `options`, `expansion_equality_tests`, `failure_tests`");
+        compile_error!("Invalid keyword: test_suite! only accepts the following keywords: `state, `options`, `expansion_equality_tests`, `failure_tests`, `serde_tests`");
     );
     ( state($state: ty), options $options: tt, $( $test_kind: ident $test_cases: tt ),+ $(,)? ) => (
         $(

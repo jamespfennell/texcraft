@@ -22,7 +22,11 @@ texlang-core = { path = "../texlang-core" }
 # Nice terminal output.
 colored = "2"
 
+serde_json = {version="1.0", optional = true}
+serde = {version="^1.0", optional = true}
+
 [features]
 default = ["time"]
-time = ["chrono"]
-repl = ["linefeed"]
+time = ["dep:chrono"]
+repl = ["dep:linefeed"]
+serde = ["dep:serde", "dep:serde_json", "texcraft-stdext/serde", "texlang-core/serde"]

@@ -41,6 +41,7 @@ use std::ops::Bound::Included;
 ///
 /// This type is 32 bits.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Key(u32);
 
 impl Key {

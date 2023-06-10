@@ -41,7 +41,7 @@
 //! ## The implementation
 //!
 //! The algorithm is based on the [string-interner](https://docs.rs/crate/string-interner/latest) crate.
-//! This algorithm is also seperately discovered and discussed in
+//! This algorithm is also separately discovered and discussed in
 //! [a post by Mat Klad](https://matklad.github.io/2020/03/22/fast-simple-rust-interner.html).
 //!
 //! The interner maintains a [String] buffer, and each time a new string is interned it's appended to the buffer.
@@ -73,28 +73,35 @@
 //! When checking if a string exists, we walk the linked list and check if the resolved string for each key
 //!     matches.
 //! If not, we intern the string and append to the linked list.
-//! In the worst case this can result in O(n) lookups, but in reality hash collisions are exceedingly rare.
+//! In the worst case this can result in O(n) lookups, but in reality hash collisions are rare.
 
 use std::collections::hash_map;
+use std::collections::HashMap;
 use std::hash;
 use std::num;
 
 /// String interner.
 ///
-/// See the module documentatino for information about this data structure.
+/// See the module documentation for information about this data structure.
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Interner<K = num::NonZeroU32, S = hash_map::RandomState> {
-    dedup: hash_map::HashMap<u64, LinkedList<K>, hash::BuildHasherDefault<SingleU64Hasher>>,
     buffer: String,
     ends: Vec<usize>,
+    // When deserializing the interner, we reconstruct the deduplication map. We do this because the hash
+    // builder in the deserialized interner will in general be different and so the keys of the map
+    // will have changed. Additionally this is more efficient.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    dedup: DeDupMap<K>,
+    #[cfg_attr(feature = "serde", serde(skip))]
     hash_builder: S,
 }
 
 impl<K, S: Default> Default for Interner<K, S> {
     fn default() -> Self {
         Self {
-            dedup: Default::default(),
             buffer: Default::default(),
             ends: Default::default(),
+            dedup: Default::default(),
             hash_builder: Default::default(),
         }
     }
@@ -133,7 +140,7 @@ impl<K: Key, S: hash::BuildHasher> Interner<K, S> {
     /// Intern the provided string and return its key.
     pub fn get_or_intern(&mut self, s: &str) -> K {
         // First we check if the string has already been interned.
-        let hash = self.hash(s);
+        let hash = hash(&self.hash_builder, s);
         if let Some(key) = self.get_internal(s, hash) {
             return key;
         }
@@ -143,16 +150,7 @@ impl<K: Key, S: hash::BuildHasher> Interner<K, S> {
         self.buffer.push_str(s);
         let end = self.buffer.len();
         self.ends.push(end);
-        match self.dedup.entry(hash) {
-            hash_map::Entry::Occupied(mut o) => {
-                let first = o.get_mut();
-                let second = std::mem::replace(first, LinkedList { key, next: None });
-                first.next = Some(Box::new(second));
-            }
-            hash_map::Entry::Vacant(v) => {
-                v.insert(LinkedList { key, next: None });
-            }
-        };
+        populate_dedup_map(&mut self.dedup, hash, key);
         key
     }
 
@@ -160,7 +158,7 @@ impl<K: Key, S: hash::BuildHasher> Interner<K, S> {
     ///
     /// This method is useful when the caller only has a shared reference to the interner.
     pub fn get(&self, s: &str) -> Option<K> {
-        self.get_internal(s, self.hash(s))
+        self.get_internal(s, hash(&self.hash_builder, s))
     }
 
     fn get_internal(&self, s: &str, hash: u64) -> Option<K> {
@@ -193,13 +191,28 @@ impl<K: Key, S: hash::BuildHasher> Interner<K, S> {
         };
         Some(&self.buffer[start..end])
     }
+}
 
-    fn hash(&self, s: &str) -> u64 {
-        use std::hash::{Hash, Hasher};
-        let mut hasher = self.hash_builder.build_hasher();
-        s.hash(&mut hasher);
-        hasher.finish()
-    }
+fn hash<S: hash::BuildHasher>(hash_builder: &S, s: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = hash_builder.build_hasher();
+    s.hash(&mut hasher);
+    hasher.finish()
+}
+
+type DeDupMap<K> = HashMap<u64, LinkedList<K>, hash::BuildHasherDefault<SingleU64Hasher>>;
+
+fn populate_dedup_map<K>(map: &mut DeDupMap<K>, hash: u64, key: K) {
+    match map.entry(hash) {
+        hash_map::Entry::Occupied(mut o) => {
+            let first = o.get_mut();
+            let second = std::mem::replace(first, LinkedList { key, next: None });
+            first.next = Some(Box::new(second));
+        }
+        hash_map::Entry::Vacant(v) => {
+            v.insert(LinkedList { key, next: None });
+        }
+    };
 }
 
 struct LinkedList<K> {
@@ -235,9 +248,44 @@ impl hash::Hasher for SingleU64Hasher {
     #[inline]
     fn write_u64(&mut self, i: u64) {
         if self.val.is_some() {
-            panic!("this hasher does not writing multiple u64 values")
+            panic!("this hasher does not support writing multiple u64 values")
         }
         self.val = Some(i)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, K: Key, S: Default + hash::BuildHasher> serde::Deserialize<'de> for Interner<K, S> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        struct DeserializedInterner {
+            buffer: String,
+            ends: Vec<usize>,
+        }
+
+        let DeserializedInterner { buffer, ends } =
+            DeserializedInterner::deserialize(deserializer)?;
+        let hash_builder = S::default();
+        let mut dedup = DeDupMap::<K>::default();
+        dedup.reserve(ends.len());
+
+        let mut start: usize = 0;
+        for (i, end) in ends.iter().enumerate() {
+            let s = &buffer[start..*end];
+            let hash = hash(&hash_builder, s);
+            let key = K::try_from_usize(i).unwrap();
+            populate_dedup_map(&mut dedup, hash, key);
+            start = *end;
+        }
+        Ok(Self {
+            buffer,
+            ends,
+            dedup,
+            hash_builder,
+        })
     }
 }
 
@@ -245,8 +293,8 @@ impl hash::Hasher for SingleU64Hasher {
 mod tests {
     use super::*;
 
-    /// A hasher that always returns the same fixed value. This is use to test
-    /// hash collisions.
+    /// A hasher that always returns the same fixed value.
+    /// This is use to test hash collisions.
     #[derive(Default)]
     struct FixedHasher;
 
@@ -270,5 +318,21 @@ mod tests {
 
         assert_eq!(interner.resolve(hello_1), Some("hello"));
         assert_eq!(interner.resolve(world_1), Some("world"));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde() {
+        let mut interner: Interner = Default::default();
+        let hello_1 = interner.get_or_intern("hello");
+        let world_1 = interner.get_or_intern("world");
+
+        let serialized = serde_json::to_string_pretty(&interner).unwrap();
+        let mut interner_de: Interner = serde_json::from_str(&serialized).unwrap();
+        let hello_2 = interner_de.get_or_intern("hello");
+        let world_2 = interner_de.get_or_intern("world");
+
+        assert_eq!(hello_1, hello_2);
+        assert_eq!(world_1, world_2);
     }
 }

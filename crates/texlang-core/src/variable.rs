@@ -280,6 +280,7 @@ use crate::traits::*;
 use crate::vm;
 use crate::{token, token::CatCode};
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use texcraft_stdext::collections::groupingmap;
 
@@ -298,7 +299,7 @@ pub type RefFn<S, T> = fn(state: &S, index: Index) -> &T;
 pub type MutRefFn<S, T> = fn(state: &mut S, index: Index) -> &mut T;
 
 /// Index of a variable within an array.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
 pub struct Index(pub usize);
 
 impl From<usize> for Index {
@@ -426,8 +427,8 @@ impl<S: TexlangState> Command<S> {
     }
 }
 impl<S> Command<S> {
-    pub(crate) fn getter_key(&self) -> GetterKey {
-        self.getters.key()
+    pub(crate) fn getters(&self) -> &Getters<S> {
+        &self.getters
     }
 
     pub(crate) fn index_resolver(&self) -> &Option<IndexResolver<S>> {
@@ -532,19 +533,19 @@ impl<S: TexlangState> Variable<S> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) struct GetterKey(usize, usize);
-
-enum Getters<S> {
+pub(crate) enum Getters<S> {
     Int(RefFn<S, i32>, MutRefFn<S, i32>),
     CatCode(RefFn<S, CatCode>, MutRefFn<S, CatCode>),
 }
 
-impl<S> Getters<S> {
-    fn key(&self) -> GetterKey {
-        match self {
-            Getters::Int(a, b) => GetterKey(*a as usize, *b as usize),
-            Getters::CatCode(a, b) => GetterKey(*a as usize, *b as usize),
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct Key(usize, usize);
+
+impl Key {
+    pub(crate) fn new<S>(getters: &Getters<S>) -> Key {
+        match getters {
+            Getters::Int(a, b) => Key(*a as usize, *b as usize),
+            Getters::CatCode(a, b) => Key(*a as usize, *b as usize),
         }
     }
 }

@@ -60,14 +60,12 @@ use texlang_core::traits::*;
 use texlang_core::*;
 
 /// Component for the prefix commands.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Component {
     scope: groupingmap::Scope,
     global_defs_value: i32,
-    can_be_prefixed_with_any: HashSet<command::Tag>,
-    can_be_prefixed_with_global: HashSet<command::Tag>,
-    global_tag: command::Tag,
-    long_tag: command::Tag,
-    outer_tag: command::Tag,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    tags: Tags,
 }
 
 impl Default for Component {
@@ -75,6 +73,22 @@ impl Default for Component {
         Component {
             scope: groupingmap::Scope::Local,
             global_defs_value: 0,
+            tags: Default::default(),
+        }
+    }
+}
+
+struct Tags {
+    can_be_prefixed_with_any: HashSet<command::Tag>,
+    can_be_prefixed_with_global: HashSet<command::Tag>,
+    global_tag: command::Tag,
+    long_tag: command::Tag,
+    outer_tag: command::Tag,
+}
+
+impl Default for Tags {
+    fn default() -> Self {
+        Self {
             can_be_prefixed_with_any: vec![def::def_tag()].into_iter().collect(),
             can_be_prefixed_with_global: vec![math::get_variable_op_tag(), alias::let_tag()]
                 .into_iter()
@@ -244,7 +258,7 @@ fn process_prefixes<S: HasComponent<Component>>(
                 let component = input.state().component();
                 let tag = input.commands_map().get_tag(&name);
                 if let Some(tag) = tag {
-                    if component.can_be_prefixed_with_any.contains(&tag) {
+                    if component.tags.can_be_prefixed_with_any.contains(&tag) {
                         if prefix.global.is_some() {
                             input
                                 .state_mut()
@@ -255,7 +269,7 @@ fn process_prefixes<S: HasComponent<Component>>(
                     }
                     // Next check if it's a command that can be prefixed by global only. In this case we check
                     // that no other prefixes are present.
-                    if component.can_be_prefixed_with_global.contains(&tag) {
+                    if component.tags.can_be_prefixed_with_global.contains(&tag) {
                         assert_only_global_prefix(t, prefix, input)?;
                         if prefix.global.is_some() {
                             input
@@ -298,13 +312,13 @@ fn complete_prefix<S: HasComponent<Component>>(
         Some(&t) => match t.value() {
             token::Value::ControlSequence(name) => {
                 let tag = input.commands_map().get_tag(&name);
-                if tag == Some(input.state().component().global_tag) {
+                if tag == Some(input.state().component().tags.global_tag) {
                     prefix.global = Some(t);
                     true
-                } else if tag == Some(input.state().component().outer_tag) {
+                } else if tag == Some(input.state().component().tags.outer_tag) {
                     prefix.outer = Some(t);
                     true
-                } else if tag == Some(input.state().component().long_tag) {
+                } else if tag == Some(input.state().component().tags.long_tag) {
                     prefix.long = Some(t);
                     true
                 } else {

@@ -9,8 +9,10 @@ use texlang_core::traits::*;
 use texlang_core::*;
 
 #[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Component {
     tokens: Vec<token::Token>,
+    #[cfg_attr(feature = "serde", serde(skip))]
     writer: Option<token::Writer<Box<dyn std::io::Write>>>,
     num_trailing_newlines: usize,
     allow_undefined_command: bool,
@@ -158,7 +160,7 @@ mod tests {
             fn $name() {
                 let options = vec![TestOption::InitialCommands(initial_commands)];
                 let input = $input;
-                let (got_tokens, vm) = execute_source_code(&input, &options);
+                let (got_tokens, vm) = execute_source_code(input, &options);
                 let got = token::write_tokens(&got_tokens.unwrap(), vm.cs_name_interner());
                 let want = $want.to_string();
 

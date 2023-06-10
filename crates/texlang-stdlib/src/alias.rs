@@ -59,12 +59,15 @@ mod test {
     use super::*;
     use crate::def;
     use crate::testing::*;
+    use crate::the;
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("def", def::get_def()),
             ("global", prefix::get_global()),
+            ("integer", State::get_integer()),
             ("let", get_let()),
+            ("the", the::get_the()),
         ])
     }
 
@@ -78,6 +81,23 @@ mod test {
                 "bb"
             ),
             (let_for_macro_equals, r"\def\A{abc}\let\B=\A\B", "abc"),
+        ),
+        serde_tests(
+            (
+                alias_execution_primitive,
+                r"\let\defNew=\def",
+                r"\defNew\A{abc}\A"
+            ),
+            (
+                alias_expansion_primitive,
+                r"\let\theNew=\the",
+                r"\integer=3\theNew\integer"
+            ),
+            (
+                alias_variable_singleton,
+                r"\let\integerNew=\integer",
+                r"\integerNew=3\the\integer"
+            ),
         ),
         failure_tests((let_unknown_cs_name, r"\let \B=\A")),
     ];

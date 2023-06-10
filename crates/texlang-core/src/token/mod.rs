@@ -4,7 +4,6 @@ mod catcode;
 pub(crate) mod lexer;
 pub mod trace;
 pub use catcode::CatCode;
-
 use std::{fmt::Display, num};
 use texcraft_stdext::collections::interner;
 
@@ -13,6 +12,7 @@ use texcraft_stdext::collections::interner;
 /// The implementation of this type is opaque so that it can be performance optimized
 /// without worrying about downstream consumers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CsName(num::NonZeroU32);
 
 impl CsName {
@@ -45,6 +45,7 @@ impl interner::Key for CsName {
 
 /// The value of a token.
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Value {
     BeginGroup(char),
     EndGroup(char),
@@ -81,6 +82,7 @@ impl Value {
 
 /// A TeX token.
 #[derive(Debug, Eq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Token {
     value: Value,
     trace_key: trace::Key,

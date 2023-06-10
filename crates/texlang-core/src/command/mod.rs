@@ -39,7 +39,7 @@ use std::num;
 use std::rc;
 use std::sync;
 
-mod map;
+pub(crate) mod map;
 
 pub use crate::error::Error;
 pub use map::Map;
@@ -151,13 +151,6 @@ impl<S> BuiltIn<S> {
 
     pub fn doc(&self) -> Option<&'static str> {
         self.doc
-    }
-}
-
-impl<S> std::fmt::Debug for Command<S> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "todo")?;
-        Ok(())
     }
 }
 
@@ -298,9 +291,58 @@ impl StaticTag {
     /// This is not a trivial getter.
     /// The [Tag] is lazily constructed so even subsequent calls to this getter must do some work to check if the [Tag]
     ///     exists or not.
-    /// For very hot code paths it is advised to cache the return value somewhere, for example in a relevent command's state.
+    /// For very hot code paths it is advised to cache the return value somewhere, for example in a relevant command's state.
     pub fn get(&self) -> Tag {
         *self.0.get_or_init(Tag::new)
+    }
+}
+
+/// A primitive key uniquely identifies a primitive.
+///
+/// If two commands have the same key, they are the same primitive (expansion, execution, or variable primitive)
+/// The function returns [None] if the command is not a primitive (a macro or a token alias).
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum PrimitiveKey {
+    Execution(usize, Option<Tag>),
+    Expansion(usize, Option<Tag>),
+    VariableSingleton(variable::Key),
+    VariableArrayStatic(variable::Key, variable::Index),
+    VariableArrayDynamic(variable::Key, usize),
+}
+
+impl PrimitiveKey {
+    pub(crate) fn new<S>(command: &Command<S>) -> Option<Self> {
+        match command {
+            Command::Expansion(f, tag) => Some(PrimitiveKey::Expansion(*f as usize, *tag)),
+            Command::Execution(f, tag) => Some(PrimitiveKey::Execution(*f as usize, *tag)),
+            Command::Variable(v) => {
+                let variable_key = variable::Key::new(v.getters());
+                match v.index_resolver() {
+                    None => Some(PrimitiveKey::VariableSingleton(variable_key)),
+                    Some(index_resolver) => match index_resolver {
+                        variable::IndexResolver::Static(a) => {
+                            Some(PrimitiveKey::VariableArrayStatic(variable_key, *a))
+                        }
+                        variable::IndexResolver::Dynamic(f) => Some(
+                            PrimitiveKey::VariableArrayDynamic(variable_key, *f as usize),
+                        ),
+                        variable::IndexResolver::DynamicVirtual(_) => None,
+                    },
+                }
+            }
+            Command::Macro(_) => None,
+            Command::Character(_) => None,
+        }
+    }
+
+    pub(crate) fn _variable_key(&self) -> Option<variable::Key> {
+        match self {
+            PrimitiveKey::Execution(_, _) => None,
+            PrimitiveKey::Expansion(_, _) => None,
+            PrimitiveKey::VariableSingleton(key) => Some(*key),
+            PrimitiveKey::VariableArrayStatic(key, _) => Some(*key),
+            PrimitiveKey::VariableArrayDynamic(key, _) => Some(*key),
+        }
     }
 }
 

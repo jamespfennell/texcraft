@@ -1,8 +1,10 @@
 //! Map type
 use super::*;
+use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 use std::fmt;
 use texcraft_stdext::collections::groupingmap;
+use texcraft_stdext::collections::groupingmap::GroupingHashMap;
 use texcraft_stdext::collections::groupingmap::GroupingVec;
 
 /// Map is a map type where the keys are control sequence names and the values are TeX commands.
@@ -21,7 +23,7 @@ use texcraft_stdext::collections::groupingmap::GroupingVec;
 ///     register_built_in(cmd) <- must have a unique ID. Is type ID stable across binary builds? Maybe need to
 ///          use a string ID instead? But then need to feed that the library using this registered
 /// - Should we enforce that the previous two steps can only be done at creation time? Probably
-///   Maybe initialize the map using Map<csname, cmd> and `Vec<cmd>`. Can provide csname<->str wrapper at
+///   Maybe initialize the map using Map<cs_name, cmd> and `Vec<cmd>`. Can provide cs_name<->str wrapper at
 ///   the VM level
 ///
 /// - While running, insert macros
@@ -33,113 +35,35 @@ use texcraft_stdext::collections::groupingmap::GroupingVec;
 pub struct Map<S> {
     commands: GroupingVec<Command<S>>,
 
-    built_ins: HashMap<BuiltInKey, BuiltIn<S>>,
-    key_to_built_in: HashMap<Key, BuiltInKey>,
-    _getter_key_to_built_in: HashMap<variable::GetterKey, BuiltInKey>,
+    initial_built_ins: HashMap<token::CsName, BuiltIn<S>>,
+    primitive_key_to_built_in_lazy: RefCell<Option<HashMap<PrimitiveKey, token::CsName>>>,
+    _variable_key_to_built_in_lazy: RefCell<Option<HashMap<variable::Key, token::CsName>>>,
 }
 
-// TODO: move this into the mod.rs, make it public to the create, document what it's about,
-// and add an actual new function not some indirect try_from thing.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum Key {
-    Execution(usize, Option<Tag>),
-    Expansion(usize, Option<Tag>),
-    // Maybe have a variable:Key
-    VariableNoAddress(variable::GetterKey),
-    VariableStaticAddress(variable::GetterKey, variable::Index),
-    VariableDynamic(variable::GetterKey, usize),
-}
-
-impl<S> TryFrom<&BuiltIn<S>> for Key {
+impl TryFrom<PrimitiveKey> for variable::Key {
     type Error = ();
 
-    fn try_from(value: &BuiltIn<S>) -> std::result::Result<Self, Self::Error> {
-        (&value.cmd).try_into()
-    }
-}
-
-impl<S> TryFrom<&Command<S>> for Key {
-    type Error = ();
-
-    fn try_from(value: &Command<S>) -> std::result::Result<Self, Self::Error> {
-        match &value {
-            Command::Expansion(f, tag) => Ok(Key::Expansion(*f as usize, *tag)),
-            Command::Execution(f, tag) => Ok(Key::Execution(*f as usize, *tag)),
-            Command::Variable(v) => {
-                let v_id = v.getter_key();
-                match v.index_resolver() {
-                    None => Ok(Key::VariableNoAddress(v_id)),
-                    Some(index_resolver) => match index_resolver {
-                        variable::IndexResolver::Static(a) => {
-                            Ok(Key::VariableStaticAddress(v_id, *a))
-                        }
-                        variable::IndexResolver::Dynamic(f) => {
-                            Ok(Key::VariableDynamic(v_id, *f as usize))
-                        }
-                        variable::IndexResolver::DynamicVirtual(_) => todo!(),
-                    },
-                }
-            }
-            Command::Macro(_) => Err(()),
-            Command::Character(_) => Err(()),
-        }
-    }
-}
-
-impl TryFrom<Key> for variable::GetterKey {
-    type Error = ();
-
-    fn try_from(value: Key) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: PrimitiveKey) -> std::result::Result<Self, Self::Error> {
         match value {
-            Key::Execution(_, _) => Err(()),
-            Key::Expansion(_, _) => Err(()),
-            Key::VariableNoAddress(g) => Ok(g),
-            Key::VariableStaticAddress(g, _) => Ok(g),
-            Key::VariableDynamic(g, _) => Ok(g),
+            PrimitiveKey::Execution(_, _) => Err(()),
+            PrimitiveKey::Expansion(_, _) => Err(()),
+            PrimitiveKey::VariableSingleton(g) => Ok(g),
+            PrimitiveKey::VariableArrayStatic(g, _) => Ok(g),
+            PrimitiveKey::VariableArrayDynamic(g, _) => Ok(g),
         }
     }
-}
-
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum BuiltInKey {
-    Initial(token::CsName),
-    Additional(rc::Rc<str>),
 }
 
 impl<S> Map<S> {
-    pub(crate) fn new(
-        initial_built_ins: HashMap<token::CsName, BuiltIn<S>>,
-        additional_built_ins: HashMap<rc::Rc<str>, BuiltIn<S>>,
-    ) -> Map<S> {
-        let mut commands: GroupingVec<Command<S>> = Default::default();
-        let mut built_ins: HashMap<BuiltInKey, BuiltIn<S>> = Default::default();
-        let mut key_to_built_in: HashMap<Key, BuiltInKey> = Default::default();
-        let mut getter_key_to_built_in: HashMap<variable::GetterKey, BuiltInKey> =
-            Default::default();
-
-        let mut insert = |built_in: BuiltInKey, cmd: BuiltIn<S>| {
-            if let Ok(cmd_key) = (&cmd).try_into() {
-                key_to_built_in.insert(cmd_key, built_in.clone());
-                if let Ok(getter_key) = cmd_key.try_into() {
-                    getter_key_to_built_in.insert(getter_key, built_in.clone());
-                }
-            }
-            built_ins.insert(built_in, cmd);
-        };
-
-        for (name, cmd) in initial_built_ins {
-            let key = name.to_usize();
-            commands.insert(key, cmd.cmd.clone(), groupingmap::Scope::Local);
-            insert(BuiltInKey::Initial(name), cmd);
-        }
-        for (name, cmd) in additional_built_ins {
-            insert(BuiltInKey::Additional(name), cmd);
-        }
+    pub(crate) fn new(initial_built_ins: HashMap<token::CsName, BuiltIn<S>>) -> Map<S> {
         Self {
-            commands,
-            built_ins,
-            key_to_built_in,
-            _getter_key_to_built_in: getter_key_to_built_in,
+            commands: initial_built_ins
+                .iter()
+                .map(|(k, v)| (k.to_usize(), v.cmd.clone()))
+                .collect(),
+            initial_built_ins,
+            primitive_key_to_built_in_lazy: Default::default(),
+            _variable_key_to_built_in_lazy: Default::default(),
         }
     }
 
@@ -160,9 +84,9 @@ impl<S> Map<S> {
             None => return None,
             Some(t) => t,
         };
-        if let Ok(ref key) = command.try_into() {
-            if let Some(built_in) = self.key_to_built_in.get(key) {
-                return self.built_ins.get(built_in).cloned();
+        if let Some(ref key) = PrimitiveKey::new(command) {
+            if let Some(built_in) = self.primitive_key_to_built_in().get(key) {
+                return self.initial_built_ins.get(built_in).cloned();
             }
         }
         Some(BuiltIn {
@@ -185,7 +109,7 @@ impl<S> Map<S> {
         );
     }
 
-    // TODO: reconsider this API of 4 setters ... it seems to be unneccessary complexity?
+    // TODO: reconsider this API of 4 setters ... it seems to be unnecessary complexity?
     pub fn insert_macro(
         &mut self,
         name: token::CsName,
@@ -255,6 +179,39 @@ impl<S> Map<S> {
     pub fn len(&self) -> usize {
         self.commands.len()
     }
+
+    fn primitive_key_to_built_in(&self) -> Ref<'_, HashMap<PrimitiveKey, token::CsName>> {
+        if let Ok(r) = Ref::filter_map(self.primitive_key_to_built_in_lazy.borrow(), Option::as_ref)
+        {
+            return r;
+        }
+        *self.primitive_key_to_built_in_lazy.borrow_mut() = Some(
+            self.initial_built_ins
+                .iter()
+                .filter_map(|(cs_name, built_in)| {
+                    PrimitiveKey::new(built_in.cmd()).map(|key| (key, *cs_name))
+                })
+                .collect(),
+        );
+        self.primitive_key_to_built_in()
+    }
+
+    fn _variable_key_to_built_in(&self) -> Ref<'_, HashMap<variable::Key, token::CsName>> {
+        if let Ok(r) = Ref::filter_map(self._variable_key_to_built_in_lazy.borrow(), Option::as_ref)
+        {
+            return r;
+        }
+        *self._variable_key_to_built_in_lazy.borrow_mut() = Some(
+            self.primitive_key_to_built_in()
+                .iter()
+                .filter_map(|(key, cs_name)| {
+                    key._variable_key()
+                        .map(|variable_key| (variable_key, *cs_name))
+                })
+                .collect(),
+        );
+        self._variable_key_to_built_in()
+    }
 }
 
 #[derive(Debug)]
@@ -270,3 +227,59 @@ impl fmt::Display for InvalidAlias {
 }
 
 impl std::error::Error for InvalidAlias {}
+
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+enum SerializableCommand {
+    BuiltIn(token::CsName),
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub(crate) struct SerializableMap {
+    // TODO: instead of serializing the map we could just serialize the iterator.
+    // This would be more efficient on the deserialization path.
+    // TODO: maybe the map should also serde itself using the iterator.
+    commands: GroupingHashMap<token::CsName, SerializableCommand>,
+}
+
+impl SerializableMap {
+    pub(crate) fn new<S>(map: &Map<S>) -> Self {
+        let primitive_key_to_built_in = map.primitive_key_to_built_in();
+        let commands: GroupingHashMap<token::CsName, SerializableCommand> = map
+            .commands
+            .iter_all()
+            .map(groupingmap::Item::adapt_map(|(u, command)| {
+                let cs_name = token::CsName::try_from_usize(u).unwrap();
+                let key = PrimitiveKey::new(command).unwrap();
+                let built_in = primitive_key_to_built_in.get(&key).unwrap();
+                (cs_name, SerializableCommand::BuiltIn(*built_in))
+            }))
+            .collect();
+        Self { commands }
+    }
+
+    pub(crate) fn finish_deserialization<S>(
+        &self,
+        initial_built_ins: HashMap<token::CsName, BuiltIn<S>>,
+    ) -> Map<S> {
+        let commands: GroupingVec<Command<S>> = self
+            .commands
+            .iter_all()
+            .map(groupingmap::Item::adapt_map(
+                |(cs_name, serialized_command): (token::CsName, &SerializableCommand)| {
+                    let command = match serialized_command {
+                        SerializableCommand::BuiltIn(cs_name) => {
+                            initial_built_ins.get(cs_name).unwrap().cmd.clone()
+                        }
+                    };
+                    (cs_name.to_usize(), command)
+                },
+            ))
+            .collect();
+        Map {
+            commands,
+            initial_built_ins,
+            primitive_key_to_built_in_lazy: Default::default(),
+            _variable_key_to_built_in_lazy: Default::default(),
+        }
+    }
+}

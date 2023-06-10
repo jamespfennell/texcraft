@@ -4,9 +4,11 @@
         "catcodecmd",
         "countdef",
         "expandafter",
+        "Freyler",
         "futurelet",
         "globaldefs",
         "groupingmap",
+        "Hasher",
         "ifcase",
         "iffalse",
         "ifnum",
@@ -15,11 +17,13 @@
         "impls",
         "INITEX",
         "Interner",
+        "Klad",
         "lastpenalty",
         "linepenalty",
         "makeatletter",
         "muglue",
         "nevec",
+        "newcommand",
         "noexpand",
         "PDFTEX",
         "randtex",
@@ -32,6 +36,9 @@
         "Texlang",
         "texmacro",
         "tracingmacros",
-        "Undelimited"
-    ]
+        "Undelimited",
+        "unexpandable"
+    ],    
+    "rust-analyzer.cargo.features": "all",
+    "rust-analyzer.check.features": "all"
 }

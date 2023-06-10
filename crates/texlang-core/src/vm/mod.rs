@@ -23,6 +23,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use texcraft_stdext::collections::groupingmap;
 
+#[cfg(feature = "serde")]
+mod serde;
 mod streams;
 pub use streams::*;
 
@@ -287,18 +289,28 @@ impl TexlangState for () {}
 impl<S> VM<S> {
     /// Create a new VM.
     pub fn new(initial_built_ins: HashMap<&str, BuiltIn<S>>, state: S) -> VM<S> {
-        let mut internal = Internal::new();
+        let mut internal = Internal::new(Default::default());
         let initial_built_ins = initial_built_ins
             .into_iter()
             .map(|(key, value)| (internal.cs_name_interner.get_or_intern(key), value))
             .collect();
         VM {
             state,
-            commands_map: command::Map::new(initial_built_ins, Default::default()),
+            commands_map: command::Map::new(initial_built_ins),
             internal,
             file_system_ops: Box::new(RealFileSystemOps {}),
             std_err: Rc::new(RefCell::new(std::io::stderr())),
         }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, S: ::serde::Deserialize<'de>> VM<S> {
+    pub fn deserialize<D: ::serde::Deserializer<'de>>(
+        deserializer: D,
+        initial_built_ins: HashMap<&str, BuiltIn<S>>,
+    ) -> Self {
+        serde::deserialize(deserializer, initial_built_ins)
     }
 }
 
@@ -391,18 +403,18 @@ struct Internal<S> {
     sources: Vec<Source>,
 
     // The working directory is used as the root for relative file paths.
-    working_directory: Option<std::path::PathBuf>,
+    working_directory: Option<std::path::PathBuf>, // Move to VM
     cs_name_interner: CsNameInterner,
 
     tracer: trace::Tracer,
 
-    token_buffers: std::collections::BinaryHeap<TokenBuffer>,
+    token_buffers: std::collections::BinaryHeap<TokenBuffer>, // add a #[skip]
 
     groups: Vec<variable::RestoreValues<S>>,
 }
 
 impl<S> Internal<S> {
-    fn new() -> Self {
+    fn new(cs_name_interner: CsNameInterner) -> Self {
         Internal {
             current_source: Default::default(),
             sources: Default::default(),
@@ -413,7 +425,7 @@ impl<S> Internal<S> {
                     None
                 }
             },
-            cs_name_interner: Default::default(),
+            cs_name_interner,
             tracer: Default::default(),
             token_buffers: Default::default(),
             groups: Default::default(),

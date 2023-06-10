@@ -19,9 +19,9 @@ impl Component {
         let dt: DateTime<Local> = Local::now();
         Component {
             minutes_since_midnight: 60 * (dt.time().hour() as i32) + (dt.time().minute() as i32),
-            day: dt.date().day() as i32,
-            month: dt.date().month() as i32,
-            year: dt.date().year(),
+            day: dt.day() as i32,
+            month: dt.month() as i32,
+            year: dt.year(),
         }
     }
 

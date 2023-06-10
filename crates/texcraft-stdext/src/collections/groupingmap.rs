@@ -21,7 +21,7 @@
 //! ```
 //! # use texcraft_stdext::collections::groupingmap::GroupingHashMap;
 //! # use texcraft_stdext::collections::groupingmap::Scope;
-//! let mut cat_colors = GroupingHashMap::new();
+//! let mut cat_colors = GroupingHashMap::default();
 //! cat_colors.insert("mint", "ginger", Scope::Local);
 //! assert_eq!(cat_colors.get(&"mint"), Some(&"ginger"));
 //! ```
@@ -29,7 +29,7 @@
 //! ```
 //! # use texcraft_stdext::collections::groupingmap::GroupingHashMap;
 //! # use texcraft_stdext::collections::groupingmap::Scope;
-//! let mut cat_colors = GroupingHashMap::new();
+//! let mut cat_colors = GroupingHashMap::default();
 //!
 //! // Insert a new value, update the value in a new group, and then end the group to roll back
 //! // the update.
@@ -52,7 +52,7 @@
 //! # use texcraft_stdext::collections::groupingmap::GroupingHashMap;
 //! # use texcraft_stdext::collections::groupingmap::Scope;
 //! # use texcraft_stdext::collections::groupingmap::NoGroupToEndError;
-//! let mut cat_colors = GroupingHashMap::<String, String>::new();
+//! let mut cat_colors = GroupingHashMap::<String, String>::default();
 //! assert_eq!(cat_colors.end_group(), Err(NoGroupToEndError{}));
 //! ```
 //! There is also a "global" variant of the `insert` method. It inserts the value at the global
@@ -60,7 +60,7 @@
 //! ```
 //! # use texcraft_stdext::collections::groupingmap::GroupingHashMap;
 //! # use texcraft_stdext::collections::groupingmap::Scope;
-//! let mut cat_colors = GroupingHashMap::new();
+//! let mut cat_colors = GroupingHashMap::default();
 //! cat_colors.insert("paganini", "black", Scope::Local);
 //! cat_colors.begin_group();
 //! cat_colors.insert("paganini", "gray", Scope::Global);
@@ -200,11 +200,18 @@ impl<V> BackingContainer<usize, V> for Vec<Option<V>> {
 /// A wrapper around [BackingContainer] types that adds a specific kind of group semantics.
 ///
 /// See the module docs for more information.
-#[derive(Debug, PartialEq, Eq)]
-pub struct GroupingContainer<K: Eq + Hash, V, T> {
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct GroupingContainer<K, V, T> {
     backing_container: T,
 
     // The groups stack does not contain the global group as no cleanup there is needed.
+    #[cfg_attr(
+        feature = "serde",
+        serde(bound(
+            deserialize = "K: Eq + Hash + serde::Deserialize<'de>, V: serde::Deserialize<'de>"
+        ))
+    )]
     groups: Vec<HashMap<K, EndOfGroupAction<V>>>,
 }
 
@@ -221,6 +228,7 @@ pub type GroupingVec<V> = GroupingContainer<usize, V, Vec<Option<V>>>;
 
 /// Scope is used in the insertion method to determine the scope to insert at.
 #[derive(Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Scope {
     /// Insertions in the local scope are rolled back at the end of the current group.
     Local,
@@ -230,6 +238,7 @@ pub enum Scope {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum EndOfGroupAction<V> {
     Revert(V),
     Delete,
@@ -320,7 +329,7 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V,
     /// Extends the `GroupingMap` with (key, value) pairs.
     /// ```
     /// # use texcraft_stdext::collections::groupingmap::*;
-    /// let mut cat_colors = GroupingHashMap::new();
+    /// let mut cat_colors = GroupingHashMap::default();
     /// cat_colors.extend(std::array::IntoIter::new([
     ///    ("paganini", "black"),
     ///    ("mint", "ginger"),
@@ -341,14 +350,6 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V,
     #[inline]
     pub fn backing_container(&self) -> &T {
         &self.backing_container
-    }
-
-    /// Returns a new empty `groupingMap`.
-    pub fn new() -> GroupingContainer<K, V, T> {
-        GroupingContainer {
-            backing_container: Default::default(),
-            groups: Vec::new(),
-        }
     }
 
     /// Iterate over all (key, value) tuples that are currently visible.
@@ -377,11 +378,22 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> GroupingContainer<K, V,
     }
 }
 
-impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> Default for GroupingContainer<K, V, T> {
+impl<K, V, T: Default> Default for GroupingContainer<K, V, T> {
     fn default() -> Self {
-        Self::new()
+        Self {
+            backing_container: Default::default(),
+            groups: Default::default(),
+        }
     }
 }
+
+impl<K: Eq + Hash, V: PartialEq, T: PartialEq> PartialEq for GroupingContainer<K, V, T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.backing_container == other.backing_container && self.groups == other.groups
+    }
+}
+
+impl<K: Eq + Hash, V: Eq, T: Eq> Eq for GroupingContainer<K, V, T> {}
 
 /// The item for the [IterAll] iterator.
 #[derive(PartialEq, Eq, Debug)]
@@ -394,12 +406,12 @@ pub enum Item<T> {
 
 impl<T> Item<T> {
     /// Adapt a lambda to use in [Iterator::map] for iterators over this item.
-    /// 
+    ///
     /// When iterating over items of this type, one almost always wants to keep
     ///     [Item::BeginGroup] constant and apply a transformation to the [Item::Value] variant.
     /// This adaptor function helps with this by converting a lambda that operates on `T`
     ///     to a lambda that operates on [`Item<T>`].
-    /// 
+    ///
     /// ```
     /// # use texcraft_stdext::collections::groupingmap::*;
     /// let start: Vec<Item<usize>> = vec![
@@ -414,9 +426,7 @@ impl<T> Item<T> {
     ///     Item::Value(200),
     /// ]];
     /// ```
-    pub fn adapt_map<B, F: FnMut(T) ->B>(
-        mut f: F,
-    ) -> impl FnMut(Item<T>) -> Item<B> {
+    pub fn adapt_map<B, F: FnMut(T) -> B>(mut f: F) -> impl FnMut(Item<T>) -> Item<B> {
         move |item| match item {
             Item::BeginGroup => Item::BeginGroup,
             Item::Value(kv) => Item::Value(f(kv)),
@@ -430,7 +440,7 @@ impl<T> Item<T> {
 /// Suppose we have the following grouping map:
 /// ```
 /// # use texcraft_stdext::collections::groupingmap::*;
-/// let mut cat_colors = GroupingHashMap::new();
+/// let mut cat_colors = GroupingHashMap::default();
 /// cat_colors.insert("paganini", "black", Scope::Local);
 /// cat_colors.begin_group();
 /// cat_colors.insert("paganini", "gray", Scope::Local);
@@ -444,7 +454,7 @@ impl<T> Item<T> {
 /// In this example here this is the result:
 /// ```
 /// # use texcraft_stdext::collections::groupingmap::*;
-/// # let mut cat_colors = GroupingHashMap::new();
+/// # let mut cat_colors = GroupingHashMap::default();
 /// # cat_colors.insert("paganini", "black", Scope::Local);
 /// # cat_colors.begin_group();
 /// # cat_colors.insert("paganini", "gray", Scope::Local);
@@ -462,7 +472,7 @@ impl<T> Item<T> {
 /// Thus:
 /// ```
 /// # use texcraft_stdext::collections::groupingmap::*;
-/// let mut cat_colors = GroupingHashMap::new();
+/// let mut cat_colors = GroupingHashMap::default();
 /// cat_colors.insert("local", "value_1", Scope::Local);
 /// cat_colors.insert("local", "value_2", Scope::Local);
 /// cat_colors.begin_group();
@@ -478,7 +488,7 @@ impl<T> Item<T> {
 /// It also converts global assignments within a group to regular assignments in the global scope:
 /// ```
 /// # use texcraft_stdext::collections::groupingmap::*;
-/// let mut cat_colors = GroupingHashMap::new();
+/// let mut cat_colors = GroupingHashMap::default();
 /// cat_colors.insert("global", "value_1", Scope::Local);
 /// cat_colors.begin_group();
 /// cat_colors.insert("global", "value_2", Scope::Global);
@@ -524,9 +534,7 @@ impl<'a, K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> IterAll<'a, K, V, T
     }
 }
 
-impl<'a, K: Eq + Hash + Clone, V, T: BackingContainer<K, V> + 'a> Iterator
-    for IterAll<'a, K, V, T>
-{
+impl<'a, K: Eq + Hash, V, T: BackingContainer<K, V> + 'a> Iterator for IterAll<'a, K, V, T> {
     type Item = Item<(K, &'a V)>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -557,7 +565,7 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> FromIterator<Item<(K, V
     for GroupingContainer<K, V, T>
 {
     fn from_iter<I: IntoIterator<Item = Item<(K, V)>>>(iter: I) -> Self {
-        let mut map: Self = Default::default();
+        let mut map: Self = GroupingContainer::default();
         for item in iter {
             match item {
                 Item::BeginGroup => map.begin_group(),
@@ -570,13 +578,25 @@ impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> FromIterator<Item<(K, V
     }
 }
 
+impl<K: Eq + Hash + Clone, V, T: BackingContainer<K, V>> FromIterator<(K, V)>
+    for GroupingContainer<K, V, T>
+{
+    fn from_iter<I: IntoIterator<Item = (K, V)>>(iter: I) -> Self {
+        let mut map: Self = GroupingContainer::default();
+        for (k, v) in iter {
+            map.backing_container.insert(k, v);
+        }
+        map
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::collections::groupingmap::*;
 
     #[test]
     fn insert_after_nested_insert() {
-        let mut map = GroupingHashMap::new();
+        let mut map = GroupingHashMap::default();
         map.begin_group();
         map.insert(3, 5, Scope::Local);
         assert_eq!(map.end_group(), Ok(()));
@@ -587,7 +607,7 @@ mod tests {
 
     #[test]
     fn insert_global_after_no_insert() {
-        let mut map = GroupingHashMap::new();
+        let mut map = GroupingHashMap::default();
         map.begin_group();
         map.insert(3, 5, Scope::Global);
         assert_eq!(map.end_group(), Ok(()));
@@ -621,11 +641,11 @@ mod tests {
     mod iter_all_tests {
         use super::*;
         iter_all_tests!(
-            (empty_0, GroupingHashMap::new(), vec![]),
+            (empty_0, GroupingHashMap::default(), vec![]),
             (
                 empty_1,
                 {
-                    let mut m = GroupingHashMap::new();
+                    let mut m = GroupingHashMap::default();
                     m.begin_group();
                     m
                 },
@@ -634,7 +654,7 @@ mod tests {
             (
                 empty_2,
                 {
-                    let mut m = GroupingHashMap::new();
+                    let mut m = GroupingHashMap::default();
                     m.begin_group();
                     m.begin_group();
                     m.begin_group();
@@ -646,7 +666,7 @@ mod tests {
             (
                 single_root_assignment,
                 {
-                    let mut m = GroupingHashMap::new();
+                    let mut m = GroupingHashMap::default();
                     m.insert(1, 1, Scope::Local);
                     m.begin_group();
                     m.begin_group();
@@ -657,7 +677,7 @@ mod tests {
             (
                 single_global_assignment,
                 {
-                    let mut m = GroupingHashMap::new();
+                    let mut m = GroupingHashMap::default();
                     m.begin_group();
                     m.insert(1, 1, Scope::Global);
                     m.begin_group();
@@ -668,7 +688,7 @@ mod tests {
             (
                 overwrite_root_assignment_1,
                 {
-                    let mut m = GroupingHashMap::new();
+                    let mut m = GroupingHashMap::default();
                     m.insert(1, 1, Scope::Local);
                     m.begin_group();
                     m.insert(1, 2, Scope::Local);
@@ -685,7 +705,7 @@ mod tests {
             (
                 overwrite_root_assignment_2,
                 {
-                    let mut m = GroupingHashMap::new();
+                    let mut m = GroupingHashMap::default();
                     m.insert(1, 1, Scope::Local);
                     m.begin_group();
                     m.insert(1, 2, Scope::Local);
@@ -704,7 +724,7 @@ mod tests {
             (
                 single_local_assignment,
                 {
-                    let mut m = GroupingHashMap::new();
+                    let mut m = GroupingHashMap::default();
                     m.begin_group();
                     m.insert(1, 1, Scope::Local);
                     m.begin_group();
@@ -715,7 +735,7 @@ mod tests {
             (
                 overwrite_local_assignment_1,
                 {
-                    let mut m = GroupingHashMap::new();
+                    let mut m = GroupingHashMap::default();
                     m.begin_group();
                     m.insert(1, 1, Scope::Local);
                     m.begin_group();
@@ -732,7 +752,7 @@ mod tests {
             (
                 overwrite_local_assignment_2,
                 {
-                    let mut m = GroupingHashMap::new();
+                    let mut m = GroupingHashMap::default();
                     m.begin_group();
                     m.insert(1, 1, Scope::Local);
                     m.begin_group();
