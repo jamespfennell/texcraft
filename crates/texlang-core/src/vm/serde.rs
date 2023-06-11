@@ -54,9 +54,17 @@ impl<S> DeserializedVM<S> {
         vm::VM {
             state: self.state,
             commands_map: self.commands_map.finish_deserialization(initial_built_ins),
+            file_system: Box::new(super::RealFileSystem {}),
+            terminal: Rc::new(RefCell::new(std::io::stderr())),
+            log_file: Rc::new(RefCell::new(std::io::sink())),
+            working_directory: match std::env::current_dir() {
+                Ok(path_buf) => Some(path_buf),
+                Err(err) => {
+                    println!("failed to determine the working directory: {err}");
+                    None
+                }
+            },
             internal,
-            file_system_ops: Box::new(vm::RealFileSystemOps {}),
-            std_err: Rc::new(RefCell::new(std::io::stderr())),
         }
     }
 }

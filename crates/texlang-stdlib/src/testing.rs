@@ -253,8 +253,8 @@ where
 ///     Default::default(),  // initial commands
 ///     Default::default(),  // initial state
 /// );
-/// let mock_file_system_ops: InMemoryFileSystem = Default::default();
-/// vm.file_system_ops = Box::new(mock_file_system_ops);
+/// let mock_file_system: InMemoryFileSystem = Default::default();
+/// vm.file_system = Box::new(mock_file_system);
 /// ```
 ///
 /// When using the test runners in this module or the [test_suite] macro,
@@ -265,8 +265,8 @@ where
 /// # use texlang_core::vm;
 /// # use texlang_stdlib::testing::*;
 /// let options = TestOption::CustomVMInitializationDyn(Box::new(|vm: &mut vm::VM<State>|{
-///     let mock_file_system_ops: InMemoryFileSystem = Default::default();
-///     vm.file_system_ops = Box::new(mock_file_system_ops);
+///     let mock_file_system: InMemoryFileSystem = Default::default();
+///     vm.file_system = Box::new(mock_file_system);
 /// }));
 /// ```
 #[derive(Default)]
@@ -274,7 +274,7 @@ pub struct InMemoryFileSystem {
     files: HashMap<std::path::PathBuf, String>,
 }
 
-impl vm::FileSystemOps for InMemoryFileSystem {
+impl vm::FileSystem for InMemoryFileSystem {
     fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String> {
         match self.files.get(path) {
             None => Err(std::io::Error::new(

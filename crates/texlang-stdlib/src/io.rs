@@ -38,7 +38,7 @@ fn read_file<S>(
     let file_path = match path::Path::new(&raw_file_path).is_absolute() {
         true => path::Path::new(&raw_file_path).to_path_buf(),
         false => match file_location.area {
-            None => match vm.working_directory() {
+            None => match &vm.working_directory {
                 None => {
                     panic!("TODO: handle this error");
                 }
@@ -50,7 +50,7 @@ fn read_file<S>(
         },
     };
 
-    match vm.file_system_ops.read_to_string(&file_path) {
+    match vm.file_system.read_to_string(&file_path) {
         Ok(s) => Ok((raw_file_path, s)),
         Err(_err) => Err(error::SimpleTokenError::new(
             vm,
@@ -72,28 +72,28 @@ mod tests {
     }
 
     fn custom_vm_initialization(vm: &mut vm::VM<State>) {
-        let cwd = vm.working_directory().unwrap();
+        let cwd = vm.working_directory.clone().unwrap();
 
-        let mut file_system_ops: InMemoryFileSystem = Default::default();
+        let mut file_system: InMemoryFileSystem = Default::default();
 
         let mut path_1 = cwd.to_path_buf();
         path_1.push("file1.tex");
-        file_system_ops.add_file(path_1, "content1\n");
+        file_system.add_file(path_1, "content1\n");
 
         let mut path_2 = cwd.to_path_buf();
         path_2.push("file2.tex");
-        file_system_ops.add_file(path_2, "content2%\n");
+        file_system.add_file(path_2, "content2%\n");
 
         let mut path_3 = cwd.to_path_buf();
         path_3.push("file3.tex");
-        file_system_ops.add_file(path_3, r"\input nested/file4");
+        file_system.add_file(path_3, r"\input nested/file4");
 
         let mut path_4 = cwd.to_path_buf();
         path_4.push("nested");
         path_4.push("file4.tex");
-        file_system_ops.add_file(path_4, "content4");
+        file_system.add_file(path_4, "content4");
 
-        vm.file_system_ops = Box::new(file_system_ops);
+        vm.file_system = Box::new(file_system);
     }
 
     test_suite!(

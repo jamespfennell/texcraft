@@ -17,6 +17,7 @@
         "impls",
         "INITEX",
         "Interner",
+        "jobname",
         "Klad",
         "lastpenalty",
         "linepenalty",

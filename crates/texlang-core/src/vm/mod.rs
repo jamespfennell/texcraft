@@ -179,26 +179,53 @@ impl error::TexError for EndOfGroupError {
 
 /// The Texlang virtual machine.
 pub struct VM<S> {
+    /// The state
     pub state: S,
+
+    /// The commands map
     pub commands_map: command::Map<S>,
-    pub file_system_ops: Box<dyn FileSystemOps>,
-    pub std_err: Rc<RefCell<dyn std::io::Write>>,
+
+    /// File system operations
+    ///
+    /// By default this is real operations on the file system.
+    /// It is replaceable to support both unit testing, and running Texcraft
+    ///     in environments like WASM in the browser.
+    pub file_system: Box<dyn FileSystem>,
+
+    /// Writer that writes to the terminal
+    ///
+    /// Defaults to standard error.
+    /// In other contexts (for example WASM) this may be changed to e.g. write to a string
+    ///     that can be displayed in the browser.
+    pub terminal: Rc<RefCell<dyn std::io::Write>>,
+
+    /// Writer that writes to the log file
+    ///
+    /// Defaults to a sink writer that writes nothing.
+    pub log_file: Rc<RefCell<dyn std::io::Write>>,
+
+    /// The working directory which is used as the root for relative file paths
+    ///
+    /// This is [None] if the working directory could not be determined.
+    pub working_directory: Option<std::path::PathBuf>,
+
     internal: Internal<S>,
 }
 
 /// File system operations that TeX may need to perform.
 ///
-/// These operations are extracted to a trait so that they be mocked out in unit testing.
-pub trait FileSystemOps {
+/// These operations are extracted to a trait so that they be mocked out in unit testing
+///     and in execution contexts like WASM.
+pub trait FileSystem {
     /// Read the entire contents of a file into a string.
     ///
     /// This is implemented by [std::fs::read_to_string].
     fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String>;
 }
 
-struct RealFileSystemOps;
+struct RealFileSystem;
 
-impl FileSystemOps for RealFileSystemOps {
+impl FileSystem for RealFileSystem {
     fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String> {
         std::fs::read_to_string(path)
     }
@@ -298,8 +325,16 @@ impl<S> VM<S> {
             state,
             commands_map: command::Map::new(initial_built_ins),
             internal,
-            file_system_ops: Box::new(RealFileSystemOps {}),
-            std_err: Rc::new(RefCell::new(std::io::stderr())),
+            file_system: Box::new(RealFileSystem {}),
+            terminal: Rc::new(RefCell::new(std::io::stderr())),
+            log_file: Rc::new(RefCell::new(std::io::sink())),
+            working_directory: match std::env::current_dir() {
+                Ok(path_buf) => Some(path_buf),
+                Err(err) => {
+                    println!("failed to determine the working directory: {err}");
+                    None
+                }
+            },
         }
     }
 }
@@ -333,11 +368,6 @@ impl<S> VM<S> {
     /// Clear all source code from the VM.
     pub fn clear_sources(&mut self) {
         self.internal.clear_sources()
-    }
-
-    /// Return the current working directory, or [None] if it could not be determined.
-    pub fn working_directory(&self) -> Option<&std::path::Path> {
-        self.internal.working_directory.as_deref()
     }
 
     /// Return a regular hash map with all the commands as they are currently defined.
@@ -395,15 +425,13 @@ impl<S> VM<S> {
     }
 }
 
-/// Parts of the VM that cannot be edited by TeX commands at runtime.
+/// Parts of the VM that are private.
 struct Internal<S> {
     // The sources form a stack. We store the top element directly on the VM
     // for performance reasons.
     current_source: Source,
     sources: Vec<Source>,
 
-    // The working directory is used as the root for relative file paths.
-    working_directory: Option<std::path::PathBuf>, // Move to VM
     cs_name_interner: CsNameInterner,
 
     tracer: trace::Tracer,
@@ -418,13 +446,6 @@ impl<S> Internal<S> {
         Internal {
             current_source: Default::default(),
             sources: Default::default(),
-            working_directory: match std::env::current_dir() {
-                Ok(path_buf) => Some(path_buf),
-                Err(err) => {
-                    print!("failed to determine the working directory: {err}");
-                    None
-                }
-            },
             cs_name_interner,
             tracer: Default::default(),
             token_buffers: Default::default(),

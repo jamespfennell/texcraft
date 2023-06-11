@@ -5,24 +5,24 @@
 
 use texlang_core::*;
 
-/// Get the `\texcraft` expansion primtive.
+/// Get the `\texcraft` expansion primitive.
 pub fn get_texcraft<S>() -> command::BuiltIn<S> {
     command::BuiltIn::new_expansion(texcraft_primitive_fn)
 }
 
 pub fn texcraft_primitive_fn<S>(
-    t: token::Token,
+    token: token::Token,
     _: &mut vm::ExpansionInput<S>,
 ) -> command::Result<Vec<token::Token>> {
     Ok(vec![
-        token::Token::new_letter('T', t.trace_key()),
-        token::Token::new_letter('e', t.trace_key()),
-        token::Token::new_letter('x', t.trace_key()),
-        token::Token::new_letter('c', t.trace_key()),
-        token::Token::new_letter('r', t.trace_key()),
-        token::Token::new_letter('a', t.trace_key()),
-        token::Token::new_letter('f', t.trace_key()),
-        token::Token::new_letter('t', t.trace_key()),
+        token::Token::new_letter('T', token.trace_key()),
+        token::Token::new_letter('e', token.trace_key()),
+        token::Token::new_letter('x', token.trace_key()),
+        token::Token::new_letter('c', token.trace_key()),
+        token::Token::new_letter('r', token.trace_key()),
+        token::Token::new_letter('a', token.trace_key()),
+        token::Token::new_letter('f', token.trace_key()),
+        token::Token::new_letter('t', token.trace_key()),
     ])
 }
 
