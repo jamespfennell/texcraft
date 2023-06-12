@@ -25,6 +25,8 @@
         "muglue",
         "nevec",
         "newcommand",
+        "newint",
+        "newintarray",
         "noexpand",
         "PDFTEX",
         "randtex",

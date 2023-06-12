@@ -115,8 +115,8 @@ impl StdLibState {
             ("month", time::get_month()),
             ("multiply", math::get_multiply()),
             //
-            ("newint", alloc::get_newint()),
-            ("newarray", alloc::get_newarray()),
+            ("newInt", alloc::get_newint()),
+            ("newIntArray", alloc::get_newintarray()),
             ("noexpand", expansion::get_noexpand()),
             //
             ("or", conditional::get_or()),

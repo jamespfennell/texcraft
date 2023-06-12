@@ -39,7 +39,7 @@ export const DigitsOfPiDotTex = new TexFile("digits-of-pi.tex", String.raw
 %   result will be incorrect. This n is at least 5000. Its exact value is not
 %   known yet.
 %
-% - This script uses Texcraft's allocation commands (\newint and \newarray) and
+% - This script uses Texcraft's allocation commands (\newInt and \newIntArray) and
 %   thus does not work on existing TeX engines like pdfTeX. There is a version
 %   of this script that uses \count registers instead and that can run on both
 %   pdfTeX and Texcraft [2]. The use of allocation commands allows for arbitrary
@@ -57,7 +57,7 @@ export const DigitsOfPiDotTex = new TexFile("digits-of-pi.tex", String.raw
 }
 
 % Modulus: calculates \`#1 % #2\` and puts the result in #1
-\newint \modulusTemp
+\newInt \modulusTemp
 \def\modulus#1#2{
   \modulusTemp = #1
   \divide \modulusTemp by #2
@@ -77,36 +77,36 @@ export const DigitsOfPiDotTex = new TexFile("digits-of-pi.tex", String.raw
 % The algorithm sometimes produces less than n digits. The tail of the array
 % may contain -1 values indicating those digits were no calculated.
 \def\computeDigitsOfPi#1#2{
-  \newint \n
+  \newInt \n
   \n = #1
   \let \result = #2
-  \newint\resultIndex
+  \newInt\resultIndex
 
   % allocate an array of length (10n)/3
-  \newint \len
+  \newInt \len
   \len = \n
   \multiply \len by 10
   \divide \len by 3
-  \newarray \r \len
+  \newIntArray \r \len
 
   % initialize each element of the array to 2
-  \newint \i
+  \newInt \i
   \i = 0
   \while{\i < \len}{
     \r \i = 2
     \advance \i by 1
   }
 
-  \newint \j
-  \newint \k
-  \newint \carry
-  \newint \preDigit
-  \newint \firstPreDigit
+  \newInt \j
+  \newInt \k
+  \newInt \carry
+  \newInt \preDigit
+  \newInt \firstPreDigit
   \firstPreDigit = -1
-  \newint \numTrailingPreDigits
+  \newInt \numTrailingPreDigits
   \numTrailingPreDigits = 0
 
-  \newint \outerLoopIndex
+  \newInt \outerLoopIndex
   \outerLoopIndex = 0
   \while{\outerLoopIndex < \n}{
     \advance \outerLoopIndex by 1
@@ -172,13 +172,13 @@ export const DigitsOfPiDotTex = new TexFile("digits-of-pi.tex", String.raw
   \while{\resultIndex < \n}{\result\resultIndex-1\advance\resultIndex1}
 }
 
-\newint \m
+\newInt \m
 \m = 50
-\newarray \digits \m
+\newIntArray \digits \m
 \computeDigitsOfPi \m \digits
 
 \i=0
-\newint \temp
+\newInt \temp
 \while{\i<\m}{%
   \ifnum \result\i > -1 \the\digits\i \fi
   \ifnum \i=0.\fi

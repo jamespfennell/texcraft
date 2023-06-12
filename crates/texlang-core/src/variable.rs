@@ -326,20 +326,6 @@ pub enum IndexResolver<S> {
     /// For example, in `\count 4` the index of `4` is determined by parsing a number
     /// from the input token stream.
     Dynamic(fn(token::Token, &mut vm::ExpandedStream<S>) -> Result<Index, Box<error::Error>>),
-    /// A dynamic index, but determined using virtual method dispatch.
-    ///
-    /// This method is more flexible than the Dynamic variant, but less performant.
-    DynamicVirtual(Box<dyn DynamicIndexResolver<S>>),
-}
-
-/// Trait used for dynamically determining an index using virtual method dispatch.
-pub trait DynamicIndexResolver<S> {
-    /// Determine the index of a variable.
-    fn resolve(
-        &self,
-        token: token::Token,
-        input: &mut vm::ExpandedStream<S>,
-    ) -> Result<Index, Box<error::Error>>;
 }
 
 impl<S> IndexResolver<S> {
@@ -352,7 +338,6 @@ impl<S> IndexResolver<S> {
         match self {
             IndexResolver::Static(addr) => Ok(*addr),
             IndexResolver::Dynamic(f) => f(token, input),
-            IndexResolver::DynamicVirtual(v) => v.resolve(token, input),
         }
     }
 }

@@ -122,8 +122,8 @@ fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::V
         ("month", time::get_month()),
         ("multiply", math::get_multiply()),
         //
-        ("newarray", alloc::get_newarray()),
-        ("newint", alloc::get_newint()),
+        ("newInt", alloc::get_newint()),
+        ("newIntArray", alloc::get_newintarray()),
         ("newline", script::get_newline()),
         //
         ("or", conditional::get_or()),

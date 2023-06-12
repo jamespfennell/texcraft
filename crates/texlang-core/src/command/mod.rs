@@ -326,7 +326,6 @@ impl PrimitiveKey {
                         variable::IndexResolver::Dynamic(f) => Some(
                             PrimitiveKey::VariableArrayDynamic(variable_key, *f as usize),
                         ),
-                        variable::IndexResolver::DynamicVirtual(_) => None,
                     },
                 }
             }
