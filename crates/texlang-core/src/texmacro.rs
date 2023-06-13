@@ -11,7 +11,8 @@ use colored::*;
 use texcraft_stdext::algorithms::substringsearch::Matcher;
 
 /// A TeX Macro.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Macro {
     prefix: Vec<Token>,
     parameters: Vec<Parameter>,
@@ -25,7 +26,8 @@ impl Macro {
 }
 
 /// A token list or parameter in a replacement text.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Replacement {
     /// A list of tokens.
     Tokens(Vec<Token>),
@@ -37,7 +39,8 @@ pub enum Replacement {
     Parameter(usize),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Parameter {
     Undelimited,
     Delimited(Matcher<Token>),

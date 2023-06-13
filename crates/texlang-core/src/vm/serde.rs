@@ -7,7 +7,7 @@ use std::rc::Rc;
 #[derive(Serialize)]
 struct SerializableVM<'a, S> {
     state: &'a S,
-    commands_map: command::map::SerializableMap,
+    commands_map: &'a command::Map<S>,
     interner: &'a token::CsNameInterner,
 }
 
@@ -15,7 +15,7 @@ impl<'a, S> SerializableVM<'a, S> {
     fn new(vm: &'a vm::VM<S>) -> Self {
         Self {
             state: &vm.state,
-            commands_map: command::map::SerializableMap::new(&vm.commands_map),
+            commands_map: &vm.commands_map,
             interner: &vm.internal.cs_name_interner,
         }
     }
@@ -32,13 +32,13 @@ impl<State: serde::Serialize> Serialize for vm::VM<State> {
 }
 
 #[derive(Deserialize)]
-struct DeserializedVM<S> {
+struct DeserializedVM<'a, S> {
     state: S,
-    commands_map: command::map::SerializableMap,
+    commands_map: command::map::SerializableMap<'a>,
     interner: token::CsNameInterner,
 }
 
-impl<S> DeserializedVM<S> {
+impl<'a, S> DeserializedVM<'a, S> {
     fn finish_deserialization(
         self,
         initial_built_ins: HashMap<&str, command::BuiltIn<S>>,

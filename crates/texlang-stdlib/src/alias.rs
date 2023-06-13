@@ -81,6 +81,7 @@ mod test {
                 "bb"
             ),
             (let_for_macro_equals, r"\def\A{abc}\let\B=\A\B", "abc"),
+            (let_character, r"\let\A=B\A", "B"),
         ),
         serde_tests(
             (
@@ -98,6 +99,8 @@ mod test {
                 r"\let\integerNew=\integer",
                 r"\integerNew=3\the\integer"
             ),
+            (serde_macro, r"\def\A{Hello World}\let\B=\A ", r"\A \B",),
+            (serde_character, r"\let\A=B ", r"\A",),
         ),
         failure_tests((let_unknown_cs_name, r"\let \B=\A")),
     ];

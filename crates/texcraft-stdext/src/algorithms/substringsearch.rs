@@ -49,7 +49,8 @@
 use crate::collections::nevec::Nevec;
 
 /// Data structure used to match a specific substring in many strings.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Matcher<T: PartialEq> {
     substring: Nevec<T>,
     prefix_fn: Nevec<usize>,

@@ -7,7 +7,8 @@
 use std::ops::Index;
 
 /// Non-empty vector type.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Nevec<T> {
     first: T,
     tail: Vec<T>,

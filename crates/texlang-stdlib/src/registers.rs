@@ -1,6 +1,5 @@
 //! Register variables (`\count`, `\countdef`)
 
-use serde::{Deserialize, Serialize};
 use texcraft_stdext::collections::groupingmap;
 use texlang_core::parse::{Command, OptionalEquals};
 use texlang_core::token::trace;
@@ -13,7 +12,7 @@ pub const COUNTDEF_DOC: &str = "Bind an integer register to a control sequence";
 pub struct Component<T, const N: usize>([T; N]);
 
 #[cfg(feature = "serde")]
-impl<T: Serialize, const N: usize> Serialize for Component<T, N> {
+impl<T: serde::Serialize, const N: usize> serde::Serialize for Component<T, N> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -24,7 +23,7 @@ impl<T: Serialize, const N: usize> Serialize for Component<T, N> {
 }
 
 #[cfg(feature = "serde")]
-impl<'de, T: std::fmt::Debug + Deserialize<'de>, const N: usize> Deserialize<'de>
+impl<'de, T: std::fmt::Debug + serde::Deserialize<'de>, const N: usize> serde::Deserialize<'de>
     for Component<T, N>
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>

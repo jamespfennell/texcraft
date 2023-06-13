@@ -1,8 +1,10 @@
 //! Map type
 use super::*;
+use std::borrow::Cow;
 use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 use std::fmt;
+use std::rc::Rc;
 use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::groupingmap::GroupingHashMap;
 use texcraft_stdext::collections::groupingmap::GroupingVec;
@@ -232,55 +234,97 @@ impl std::error::Error for InvalidAlias {}
 enum SerializableCommand {
     BuiltIn(token::CsName),
     VariableArrayStatic(token::CsName, usize),
+    Macro(usize),
+    Character(token::Value),
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub(crate) struct SerializableMap {
+pub(crate) struct SerializableMap<'a> {
     // TODO: instead of serializing the map we could just serialize the iterator.
     // This would be more efficient on the deserialization path.
     // TODO: maybe the map should also serde itself using the iterator.
     commands: GroupingHashMap<token::CsName, SerializableCommand>,
+    macros: Vec<Cow<'a, texmacro::Macro>>,
 }
 
-impl SerializableMap {
-    pub(crate) fn new<S>(map: &Map<S>) -> Self {
+#[cfg(feature = "serde")]
+impl<State> serde::Serialize for Map<State> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let serializable_map = SerializableMap::new(self);
+        serializable_map.serialize(serializer)
+    }
+}
+
+impl<'a> SerializableMap<'a> {
+    fn new<S>(map: &'a Map<S>) -> Self {
+        let mut macros_de_dup = HashMap::<usize, usize>::new();
+        let mut macros: Vec<Cow<'a, texmacro::Macro>> = Default::default();
         let primitive_key_to_built_in = map.primitive_key_to_built_in();
         let variable_key_to_built_in = map.variable_key_to_built_in();
         let commands: GroupingHashMap<token::CsName, SerializableCommand> = map
             .commands
             .iter_all()
-            .map(groupingmap::Item::adapt_map(|(u, command)| {
-                let cs_name = token::CsName::try_from_usize(u).unwrap();
-                if let Some(key) = PrimitiveKey::new(command) {
-                    if let Some(built_in) = primitive_key_to_built_in.get(&key) {
-                        return (cs_name, SerializableCommand::BuiltIn(*built_in));
-                    }
-                    // As a fallback, we can serialize static references into arrays when
-                    // we've been provided with a reference to the array.
-                    if let Command::Variable(variable_command) = command {
-                        let key = variable::Key::new(variable_command.getters());
-                        let built_in = variable_key_to_built_in.get(&key).unwrap();
-                        if let Some(variable::IndexResolver::Static(index)) =
-                            variable_command.index_resolver()
-                        {
-                            return (
-                                cs_name,
-                                SerializableCommand::VariableArrayStatic(*built_in, index.0),
-                            );
+            .map(groupingmap::Item::adapt_map(
+                |(u, command): (usize, &Command<S>)| {
+                    let command: SerializableCommand = match command {
+                        Command::Expansion(_, _) | Command::Execution(_, _) => {
+                            let key = PrimitiveKey::new(command).unwrap();
+                            match primitive_key_to_built_in.get(&key) {
+                                None => todo!("return an error"),
+                                Some(built_in) => SerializableCommand::BuiltIn(*built_in),
+                            }
                         }
-                    }
-                    // should error here
-                }
-                todo!();
-            }))
+                        Command::Variable(variable_command) => {
+                            let key = PrimitiveKey::new(command).unwrap();
+                            if let Some(built_in) = primitive_key_to_built_in.get(&key) {
+                                SerializableCommand::BuiltIn(*built_in)
+                            } else {
+                                // As a fallback, we can serialize static references into arrays when
+                                // we've been provided with a way to reference the array.
+                                let key = variable::Key::new(variable_command.getters());
+                                let built_in = variable_key_to_built_in.get(&key).unwrap();
+                                if let Some(variable::IndexResolver::Static(index)) =
+                                    variable_command.index_resolver()
+                                {
+                                    SerializableCommand::VariableArrayStatic(*built_in, index.0)
+                                } else {
+                                    todo!();
+                                }
+                            }
+                        }
+                        Command::Macro(tex_macro) => {
+                            let rc_addr = Rc::as_ptr(tex_macro) as usize;
+                            let u = *macros_de_dup.entry(rc_addr).or_insert_with(|| {
+                                let u = macros.len();
+                                macros.push(Cow::Borrowed(&tex_macro));
+                                u
+                            });
+                            SerializableCommand::Macro(u)
+                        }
+                        Command::Character(v) => SerializableCommand::Character(*v),
+                    };
+
+                    let cs_name = token::CsName::try_from_usize(u).unwrap();
+                    (cs_name, command)
+                },
+            ))
             .collect();
-        Self { commands }
+        Self { commands, macros }
     }
 
     pub(crate) fn finish_deserialization<S>(
-        &self,
+        self,
         initial_built_ins: HashMap<token::CsName, BuiltIn<S>>,
     ) -> Map<S> {
+        let macros: Vec<Rc<texmacro::Macro>> = self
+            .macros
+            .into_iter()
+            .map(std::borrow::Cow::into_owned)
+            .map(Rc::new)
+            .collect();
         let commands: GroupingVec<Command<S>> = self
             .commands
             .iter_all()
@@ -303,6 +347,11 @@ impl SerializableMap {
                                 _ => todo!(),
                             }
                         }
+                        SerializableCommand::Macro(u) => {
+                            // TODO: error handling if the macro is missing
+                            Command::Macro(macros.get(*u).unwrap().clone())
+                        }
+                        SerializableCommand::Character(v) => Command::Character(*v),
                     };
                     (cs_name.to_usize(), command)
                 },

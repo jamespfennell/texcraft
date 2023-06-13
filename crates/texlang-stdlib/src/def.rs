@@ -504,6 +504,11 @@ mod test {
                 "And Hello, World!"
             ),
         ),
+        serde_tests((
+            serde_basic,
+            r"\def\helloWorld{Hello World} ",
+            r"\helloWorld"
+        ),),
         failure_tests(
             (end_of_input_scanning_target, "\\def"),
             (end_of_input_scanning_argument_text, "\\def\\A"),
