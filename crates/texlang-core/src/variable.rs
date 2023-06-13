@@ -382,6 +382,14 @@ impl<S> Command<S> {
     ) -> Command<S> {
         SupportedType::new_command(ref_fn, ref_mut_fn, Some(index_resolver))
     }
+
+    /// Create a new variable using getters.
+    pub(crate) fn new(getters: Getters<S>, index_resolver: Option<IndexResolver<S>>) -> Self {
+        Self {
+            getters,
+            index_resolver,
+        }
+    }
 }
 
 impl<S: TexlangState> Command<S> {
@@ -521,6 +529,15 @@ impl<S: TexlangState> Variable<S> {
 pub(crate) enum Getters<S> {
     Int(RefFn<S, i32>, MutRefFn<S, i32>),
     CatCode(RefFn<S, CatCode>, MutRefFn<S, CatCode>),
+}
+
+impl<S> Clone for Getters<S> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Int(a, b) => Self::Int(*a, *b),
+            Self::CatCode(a, b) => Self::CatCode(*a, *b),
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

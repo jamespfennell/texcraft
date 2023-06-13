@@ -37,7 +37,7 @@ pub struct Map<S> {
 
     initial_built_ins: HashMap<token::CsName, BuiltIn<S>>,
     primitive_key_to_built_in_lazy: RefCell<Option<HashMap<PrimitiveKey, token::CsName>>>,
-    _variable_key_to_built_in_lazy: RefCell<Option<HashMap<variable::Key, token::CsName>>>,
+    variable_key_to_built_in_lazy: RefCell<Option<HashMap<variable::Key, token::CsName>>>,
 }
 
 impl TryFrom<PrimitiveKey> for variable::Key {
@@ -63,7 +63,7 @@ impl<S> Map<S> {
                 .collect(),
             initial_built_ins,
             primitive_key_to_built_in_lazy: Default::default(),
-            _variable_key_to_built_in_lazy: Default::default(),
+            variable_key_to_built_in_lazy: Default::default(),
         }
     }
 
@@ -196,12 +196,12 @@ impl<S> Map<S> {
         self.primitive_key_to_built_in()
     }
 
-    fn _variable_key_to_built_in(&self) -> Ref<'_, HashMap<variable::Key, token::CsName>> {
-        if let Ok(r) = Ref::filter_map(self._variable_key_to_built_in_lazy.borrow(), Option::as_ref)
+    fn variable_key_to_built_in(&self) -> Ref<'_, HashMap<variable::Key, token::CsName>> {
+        if let Ok(r) = Ref::filter_map(self.variable_key_to_built_in_lazy.borrow(), Option::as_ref)
         {
             return r;
         }
-        *self._variable_key_to_built_in_lazy.borrow_mut() = Some(
+        *self.variable_key_to_built_in_lazy.borrow_mut() = Some(
             self.primitive_key_to_built_in()
                 .iter()
                 .filter_map(|(key, cs_name)| {
@@ -210,7 +210,7 @@ impl<S> Map<S> {
                 })
                 .collect(),
         );
-        self._variable_key_to_built_in()
+        self.variable_key_to_built_in()
     }
 }
 
@@ -231,6 +231,7 @@ impl std::error::Error for InvalidAlias {}
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum SerializableCommand {
     BuiltIn(token::CsName),
+    VariableArrayStatic(token::CsName, usize),
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -244,14 +245,33 @@ pub(crate) struct SerializableMap {
 impl SerializableMap {
     pub(crate) fn new<S>(map: &Map<S>) -> Self {
         let primitive_key_to_built_in = map.primitive_key_to_built_in();
+        let variable_key_to_built_in = map.variable_key_to_built_in();
         let commands: GroupingHashMap<token::CsName, SerializableCommand> = map
             .commands
             .iter_all()
             .map(groupingmap::Item::adapt_map(|(u, command)| {
                 let cs_name = token::CsName::try_from_usize(u).unwrap();
-                let key = PrimitiveKey::new(command).unwrap();
-                let built_in = primitive_key_to_built_in.get(&key).unwrap();
-                (cs_name, SerializableCommand::BuiltIn(*built_in))
+                if let Some(key) = PrimitiveKey::new(command) {
+                    if let Some(built_in) = primitive_key_to_built_in.get(&key) {
+                        return (cs_name, SerializableCommand::BuiltIn(*built_in));
+                    }
+                    // As a fallback, we can serialize static references into arrays when
+                    // we've been provided with a reference to the array.
+                    if let Command::Variable(variable_command) = command {
+                        let key = variable::Key::new(variable_command.getters());
+                        let built_in = variable_key_to_built_in.get(&key).unwrap();
+                        if let Some(variable::IndexResolver::Static(index)) =
+                            variable_command.index_resolver()
+                        {
+                            return (
+                                cs_name,
+                                SerializableCommand::VariableArrayStatic(*built_in, index.0),
+                            );
+                        }
+                    }
+                    // should error here
+                }
+                todo!();
             }))
             .collect();
         Self { commands }
@@ -270,6 +290,19 @@ impl SerializableMap {
                         SerializableCommand::BuiltIn(cs_name) => {
                             initial_built_ins.get(cs_name).unwrap().cmd.clone()
                         }
+                        SerializableCommand::VariableArrayStatic(cs_name, index) => {
+                            match &initial_built_ins.get(cs_name).unwrap().cmd {
+                                Command::Variable(variable_command) => {
+                                    Command::Variable(std::rc::Rc::new(variable::Command::new(
+                                        variable_command.getters().clone(),
+                                        Some(variable::IndexResolver::Static(variable::Index(
+                                            *index,
+                                        ))),
+                                    )))
+                                }
+                                _ => todo!(),
+                            }
+                        }
                     };
                     (cs_name.to_usize(), command)
                 },
@@ -279,7 +312,7 @@ impl SerializableMap {
             commands,
             initial_built_ins,
             primitive_key_to_built_in_lazy: Default::default(),
-            _variable_key_to_built_in_lazy: Default::default(),
+            variable_key_to_built_in_lazy: Default::default(),
         }
     }
 }

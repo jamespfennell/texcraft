@@ -1,5 +1,6 @@
 //! Register variables (`\count`, `\countdef`)
 
+use serde::{Deserialize, Serialize};
 use texcraft_stdext::collections::groupingmap;
 use texlang_core::parse::{Command, OptionalEquals};
 use texlang_core::token::trace;
@@ -10,6 +11,31 @@ pub const COUNT_DOC: &str = "Get or set an integer register";
 pub const COUNTDEF_DOC: &str = "Bind an integer register to a control sequence";
 
 pub struct Component<T, const N: usize>([T; N]);
+
+#[cfg(feature = "serde")]
+impl<T: Serialize, const N: usize> Serialize for Component<T, N> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let v: Vec<&T> = self.0.iter().collect();
+        v.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, T: std::fmt::Debug + Deserialize<'de>, const N: usize> Deserialize<'de>
+    for Component<T, N>
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let v = Vec::<T>::deserialize(deserializer)?;
+        let a: [T; N] = v.try_into().unwrap();
+        Ok(Component(a))
+    }
+}
 
 impl<T: Default + Copy, const N: usize> Default for Component<T, N> {
     fn default() -> Self {
@@ -115,9 +141,10 @@ mod tests {
     use texlang_core::vm::implement_has_component;
 
     #[derive(Default)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     struct State {
         registers: Component<i32, 256>,
-        exec: script::Component,
+        script: script::Component,
     }
 
     impl TexlangState for State {}
@@ -125,7 +152,7 @@ mod tests {
     implement_has_component![
         State,
         (Component<i32, 256>, registers),
-        (script::Component, exec),
+        (script::Component, script),
     ];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
@@ -156,6 +183,10 @@ mod tests {
                 r"\countdef\A 23\A 4\count 23 5 \the\A",
                 r"5"
             ),
+        ),
+        serde_tests(
+            (serde_basic, r"\count 100 200 ", r"\the \count 100"),
+            (serde_countdef, r"\countdef \A 100 \A = 200 ", r"\the \A"),
         ),
         failure_tests(
             (write_register_index_too_big, r"\count 260 = 4"),
