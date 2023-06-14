@@ -5,6 +5,7 @@ use chrono::prelude::*;
 use texlang_core::{command, variable, vm::HasComponent};
 
 /// Component for storing state related to the time commands.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Component {
     minutes_since_midnight: i32,
     day: i32,

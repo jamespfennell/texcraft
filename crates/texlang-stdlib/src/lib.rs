@@ -33,6 +33,7 @@ pub mod tracingmacros;
 
 /// A state struct that is compatible with every primitive in the Texlang standard library.
 #[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StdLibState {
     alloc: alloc::Component,
     catcode: catcode::Component,

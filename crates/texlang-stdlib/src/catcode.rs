@@ -6,7 +6,15 @@ use texlang_core::token::CatCode;
 use texlang_core::traits::*;
 use texlang_core::*;
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Component {
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            serialize_with = "texcraft_stdext::serde_tools::serialize_array",
+            deserialize_with = "texcraft_stdext::serde_tools::deserialize_array",
+        )
+    )]
     low: [CatCode; 128],
     high: HashMap<usize, CatCode>,
     default: CatCode,
@@ -73,6 +81,7 @@ mod tests {
     use crate::the;
 
     #[derive(Default)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     struct State {
         catcode: Component,
         script: script::Component,
@@ -95,6 +104,10 @@ mod tests {
                 r"1112"
             ),
             (catcode_default, r"\the\catcode 48", r"12"),
+        ),
+        serde_tests(
+            (serde_low, r"\catcode 48 11 ", r"\the\catcode 48"),
+            (serde_high, r"\catcode 480 11 ", r"\the\catcode 480"),
         ),
         failure_tests(
             (catcode_value_too_large, r"\catcode 48 16"),

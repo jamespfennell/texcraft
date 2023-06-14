@@ -299,7 +299,7 @@ impl<'a> SerializableMap<'a> {
                             let rc_addr = Rc::as_ptr(tex_macro) as usize;
                             let u = *macros_de_dup.entry(rc_addr).or_insert_with(|| {
                                 let u = macros.len();
-                                macros.push(Cow::Borrowed(&tex_macro));
+                                macros.push(Cow::Borrowed(tex_macro));
                                 u
                             });
                             SerializableCommand::Macro(u)

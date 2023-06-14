@@ -5,6 +5,7 @@ use texlang_core::{command, texmacro, token::write_tokens, traits::*, variable, 
 
 /// Component for storing state related to macro tracing.
 #[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Component {
     tracing_macros: i32,
 }

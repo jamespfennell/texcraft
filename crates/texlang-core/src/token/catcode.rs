@@ -6,6 +6,7 @@ use CatCode::*;
 ///
 /// Each variant's documentation contains an example character which is mapped to that category code in plainTeX.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum CatCode {
     /// Marks the beginning of a control sequence.
     /// Example: `\`.

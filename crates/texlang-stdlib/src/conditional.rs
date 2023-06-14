@@ -17,6 +17,7 @@ pub const FI_DOC: &str = "End a conditional or switch statement";
 pub const OR_DOC: &str = "Begin the next branch of a switch statement";
 
 /// A component for keeping track of conditional branches as they are expanded.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Component {
     // Branches is a stack where each element corresponds to a conditional that is currently
     // expanding. A nested conditional is further up the stack than the conditional it is
@@ -30,16 +31,60 @@ pub struct Component {
     // Because the conditional commands are expansion commands, they cannot get a mutable reference
     // to the state. We thus wrap the branches in a ref cell to support mutating them through
     // an immutable reference.
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            serialize_with = "serialize_branches",
+            deserialize_with = "deserialize_branches"
+        )
+    )]
     branches: RefCell<Vec<Branch>>,
 
     // We cache the tag values inside the component for performance reasons.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    tags: Tags,
+}
+
+#[cfg(feature = "serde")]
+fn serialize_branches<S>(input: &RefCell<Vec<Branch>>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use serde::Serialize;
+    let slice: &[Branch] = &input.borrow();
+    slice.serialize(serializer)
+}
+
+#[cfg(feature = "serde")]
+fn deserialize_branches<'de, D>(deserializer: D) -> Result<RefCell<Vec<Branch>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let vec = Vec::<Branch>::deserialize(deserializer)?;
+    Ok(RefCell::new(vec))
+}
+
+struct Tags {
     if_tag: command::Tag,
     else_tag: command::Tag,
     or_tag: command::Tag,
     fi_tag: command::Tag,
 }
 
+impl Default for Tags {
+    fn default() -> Self {
+        Self {
+            if_tag: IF_TAG.get(),
+            else_tag: ELSE_TAG.get(),
+            or_tag: OR_TAG.get(),
+            fi_tag: FI_TAG.get(),
+        }
+    }
+}
+
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum BranchKind {
     // The true branch of an if conditional.
     True,
@@ -50,6 +95,7 @@ enum BranchKind {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 struct Branch {
     _token: token::Token,
     kind: BranchKind,
@@ -59,10 +105,7 @@ impl Component {
     pub fn new() -> Component {
         Component {
             branches: RefCell::new(Vec::new()),
-            if_tag: IF_TAG.get(),
-            else_tag: ELSE_TAG.get(),
-            or_tag: OR_TAG.get(),
-            fi_tag: FI_TAG.get(),
+            tags: Default::default(),
         }
     }
 }
@@ -114,7 +157,7 @@ fn false_case<S: HasComponent<Component>>(
         if let token::Value::ControlSequence(name) = &token.value() {
             // TODO: use switch
             let tag = input.commands_map().get_tag(name);
-            if tag == Some(input.state().component().else_tag) && depth == 0 {
+            if tag == Some(input.state().component().tags.else_tag) && depth == 0 {
                 push_branch(
                     input,
                     Branch {
@@ -124,10 +167,10 @@ fn false_case<S: HasComponent<Component>>(
                 );
                 return Ok(Vec::new());
             }
-            if tag == Some(input.state().component().if_tag) {
+            if tag == Some(input.state().component().tags.if_tag) {
                 depth += 1;
             }
-            if tag == Some(input.state().component().fi_tag) {
+            if tag == Some(input.state().component().tags.fi_tag) {
                 depth -= 1;
                 if depth < 0 {
                     return Ok(Vec::new());
@@ -232,7 +275,7 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
         if let token::Value::ControlSequence(name) = &token.value() {
             // TODO: switch
             let tag = input.commands_map().get_tag(name);
-            if tag == Some(input.state().component().or_tag) && depth == 0 {
+            if tag == Some(input.state().component().tags.or_tag) && depth == 0 {
                 cases_to_skip -= 1;
                 if cases_to_skip == 0 {
                     push_branch(
@@ -245,7 +288,7 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
                     return Ok(Vec::new());
                 }
             }
-            if tag == Some(input.state().component().else_tag) && depth == 0 {
+            if tag == Some(input.state().component().tags.else_tag) && depth == 0 {
                 push_branch(
                     input,
                     Branch {
@@ -255,10 +298,10 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
                 );
                 return Ok(Vec::new());
             }
-            if tag == Some(input.state().component().if_tag) {
+            if tag == Some(input.state().component().tags.if_tag) {
                 depth += 1;
             }
-            if tag == Some(input.state().component().fi_tag) {
+            if tag == Some(input.state().component().tags.fi_tag) {
                 depth -= 1;
                 if depth < 0 {
                     return Ok(Vec::new());
@@ -324,10 +367,10 @@ fn or_primitive_fn<S: HasComponent<Component>>(
     while let Some(token) = input.unexpanded().next()? {
         if let token::Value::ControlSequence(name) = &token.value() {
             let tag = input.commands_map().get_tag(name);
-            if tag == Some(input.state().component().if_tag) {
+            if tag == Some(input.state().component().tags.if_tag) {
                 depth += 1;
             }
-            if tag == Some(input.state().component().fi_tag) {
+            if tag == Some(input.state().component().tags.fi_tag) {
                 depth -= 1;
                 if depth < 0 {
                     return Ok(Vec::new());
@@ -395,10 +438,10 @@ fn else_primitive_fn<S: HasComponent<Component>>(
         if let token::Value::ControlSequence(name) = &token.value() {
             // TODO: switch
             let tag = input.commands_map().get_tag(name);
-            if tag == Some(input.state().component().if_tag) {
+            if tag == Some(input.state().component().tags.if_tag) {
                 depth += 1;
             }
-            if tag == Some(input.state().component().fi_tag) {
+            if tag == Some(input.state().component().tags.fi_tag) {
                 depth -= 1;
                 if depth < 0 {
                     return Ok(Vec::new());
@@ -472,6 +515,7 @@ mod tests {
     use texlang_core::vm::implement_has_component;
 
     #[derive(Default)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     struct State {
         conditional: Component,
         exec: script::Component,
@@ -544,6 +588,14 @@ mod tests {
                 r"\ifcase 1 a\or b\ifcase 1 c\or d\or e\else f\fi g\or h\fi i",
                 r"bdgi"
             ),
+        ),
+        serde_tests(
+            (serde_if, r"\iftrue true ", r"branch \else false branch \fi"),
+            (
+                serde_ifcase,
+                r"\ifcase 2 a\or b\or executed ",
+                r"case \or d \fi"
+            )
         ),
         failure_tests(
             (iftrue_end_of_input, r"\iftrue a\else b"),

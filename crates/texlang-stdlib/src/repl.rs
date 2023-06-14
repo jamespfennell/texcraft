@@ -12,6 +12,7 @@ pub struct RunOptions<'a> {
 }
 
 #[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Component {
     help: String,
     quit_requested: bool,

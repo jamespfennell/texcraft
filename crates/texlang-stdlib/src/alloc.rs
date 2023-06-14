@@ -62,6 +62,7 @@ The new control sequence can *not* be aliased using \let.
 
 /// Component required for the alloc commands.
 #[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Component {
     singletons: Vec<i32>,
     arrays: Vec<i32>,
