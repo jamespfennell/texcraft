@@ -8,7 +8,7 @@ pub fn advance_bench(c: &mut Criterion) {
     let mut initial_built_ins = StdLibState::all_initial_built_ins();
     initial_built_ins.insert("par", script::get_par());
     initial_built_ins.insert("end", script::get_newline());
-    let mut vm = vm::VM::<StdLibState>::new(initial_built_ins, Default::default());
+    let mut vm = vm::VM::<StdLibState>::new(initial_built_ins);
     vm.push_source(
         "".to_string(),
         r"\countdef\k 0 \def\a{\advance\k by 1}".to_string(),

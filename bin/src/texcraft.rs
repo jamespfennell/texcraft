@@ -175,18 +175,18 @@ fn doc(cs_name: Option<String>) -> Result<(), String> {
     }
 }
 
-fn new_vm() -> vm::VM<StdLibState> {
-    vm::VM::<StdLibState>::new(initial_built_ins(), Default::default())
+fn new_vm() -> Box<vm::VM<StdLibState>> {
+    vm::VM::<StdLibState>::new(initial_built_ins())
 }
 
-fn new_repl_vm() -> vm::VM<StdLibState> {
+fn new_repl_vm() -> Box<vm::VM<StdLibState>> {
     let mut m = initial_built_ins();
     m.insert("doc", repl::get_doc());
     m.insert("help", repl::get_help());
     m.insert("exit", repl::get_exit());
     m.insert("quit", repl::get_exit());
     m.insert("q", repl::get_exit());
-    vm::VM::<StdLibState>::new(m, Default::default())
+    vm::VM::<StdLibState>::new(m)
 }
 
 fn initial_built_ins() -> HashMap<&'static str, command::BuiltIn<StdLibState>> {

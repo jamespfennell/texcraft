@@ -160,7 +160,9 @@ mod tests {
             fn $name() {
                 let options = vec![TestOption::InitialCommands(initial_commands)];
                 let input = $input;
-                let (got_tokens, vm) = execute_source_code(input, &options);
+                let options = ResolvedOptions::new(&options);
+                let mut vm = initialize_vm(&options);
+                let got_tokens = execute_source_code(&mut vm, input, &options);
                 let got = token::write_tokens(&got_tokens.unwrap(), vm.cs_name_interner());
                 let want = $want.to_string();
 

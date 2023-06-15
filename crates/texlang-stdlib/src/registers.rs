@@ -9,7 +9,12 @@ use texlang_core::*;
 pub const COUNT_DOC: &str = "Get or set an integer register";
 pub const COUNTDEF_DOC: &str = "Bind an integer register to a control sequence";
 
-pub struct Component<T, const N: usize>([T; N]);
+pub struct Component<T, const N: usize>(
+    // We currently box the values because putting them directly on the stack causes the
+    // message pack decoder to stack overflow. It's a pity that we have to pay a runtime
+    // cost due to this, and it would be nice to fix the issue another way.
+    Box<[T; N]>
+);
 
 #[cfg(feature = "serde")]
 impl<T: serde::Serialize, const N: usize> serde::Serialize for Component<T, N> {
@@ -31,14 +36,14 @@ impl<'de, T: std::fmt::Debug + serde::Deserialize<'de>, const N: usize> serde::D
         D: serde::Deserializer<'de>,
     {
         let v = Vec::<T>::deserialize(deserializer)?;
-        let a: [T; N] = v.try_into().unwrap();
+        let a: Box<[T; N]> = v.try_into().unwrap();
         Ok(Component(a))
     }
 }
 
 impl<T: Default + Copy, const N: usize> Default for Component<T, N> {
     fn default() -> Self {
-        Self([Default::default(); N])
+        Self(Box::new([Default::default(); N]))
     }
 }
 

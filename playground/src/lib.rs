@@ -47,6 +47,7 @@ pub fn run(
     }
 }
 
+#[derive(Default)]
 struct PlaygroundState {
     alloc: alloc::Component,
     catcode: catcode::Component,
@@ -86,7 +87,12 @@ implement_has_component![
     (time::Component, time),
 ];
 
-fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::VM<PlaygroundState> {
+fn new_vm(
+    minutes_since_midnight: i32,
+    day: i32,
+    month: i32,
+    year: i32,
+) -> Box<vm::VM<PlaygroundState>> {
     let initial_built_ins = HashMap::from([
         (
             "\\",
@@ -135,16 +141,7 @@ fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::V
         //
         ("year", time::get_year()),
     ]);
-    vm::VM::<PlaygroundState>::new(
-        initial_built_ins,
-        PlaygroundState {
-            alloc: Default::default(),
-            catcode: Default::default(),
-            conditional: Default::default(),
-            prefix: Default::default(),
-            registers: Default::default(),
-            script: Default::default(),
-            time: time::Component::new_with_values(minutes_since_midnight, day, month, year),
-        },
-    )
+    let mut vm = vm::VM::<PlaygroundState>::new(initial_built_ins);
+    vm.state.time = time::Component::new_with_values(minutes_since_midnight, day, month, year);
+    vm
 }

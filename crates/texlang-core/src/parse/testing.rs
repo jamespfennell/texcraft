@@ -7,7 +7,7 @@ pub fn run_parse_success_test<S: TexlangState + Default, T: Parsable<S> + Debug 
     source: &str,
     want: T,
 ) {
-    let mut vm = vm::VM::<S>::new(HashMap::new(), Default::default());
+    let mut vm = vm::VM::<S>::new(HashMap::new());
     vm.push_source("".to_string(), source.to_string()).unwrap();
     let input = vm::ExecutionInput::new(&mut vm);
     let got = T::parse(input).unwrap();
@@ -15,7 +15,7 @@ pub fn run_parse_success_test<S: TexlangState + Default, T: Parsable<S> + Debug 
 }
 
 pub fn run_parse_failure_test<S: TexlangState + Default, T: Parsable<S> + Debug>(source: &str) {
-    let mut vm = vm::VM::<S>::new(HashMap::new(), Default::default());
+    let mut vm = vm::VM::<S>::new(HashMap::new());
     vm.push_source("".to_string(), source.to_string()).unwrap();
     let input = vm::ExecutionInput::new(&mut vm);
     let result = T::parse(input);

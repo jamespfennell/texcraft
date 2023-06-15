@@ -117,7 +117,9 @@ impl StdLibState {
             ("multiply", math::get_multiply()),
             //
             ("newInt", alloc::get_newint()),
+            ("newInt_getter_provider_\u{0}", alloc::get_newint_getter_provider()),
             ("newIntArray", alloc::get_newintarray()),
+            ("newIntArray_getter_provider_\u{0}", alloc::get_newintarray_getter_provider()),
             ("noexpand", expansion::get_noexpand()),
             //
             ("or", conditional::get_or()),
@@ -135,8 +137,8 @@ impl StdLibState {
         ])
     }
 
-    pub fn new() -> vm::VM<StdLibState> {
-        vm::VM::<StdLibState>::new(StdLibState::all_initial_built_ins(), Default::default())
+    pub fn new() -> Box<vm::VM<StdLibState>> {
+        vm::VM::<StdLibState>::new(StdLibState::all_initial_built_ins())
     }
 }
 
@@ -178,7 +180,7 @@ impl ErrorCase {
             ("invalid variable (eof)", r"\advance"),
             ("invalid relation", r"\ifnum 3 z 4"),
             ("malformed by keyword", r"\advance \year bg"),
-            ("undefined control sequence", r"\cattcode"),
+            ("undefined control sequence", r"\elephant"),
             ("invalid character", "\u{7F}"),
             ("empty control sequence", r"\"),
             ("invalid end of group", r"}"),
@@ -257,11 +259,14 @@ mod tests {
         StdLibState::all_initial_built_ins()
     }
 
-    test_suite![expansion_equality_tests((
-        overwrite_else,
-        r"\def\else{}\ifodd 2 \else should be skipped \fi",
-        r""
-    ))];
+    test_suite![
+        expansion_equality_tests((
+            overwrite_else,
+            r"\def\else{}\ifodd 2 \else should be skipped \fi",
+            r""
+        )),
+        serde_tests((serde_sanity_check, r"\def\HW{Hello World} ", r"\HW"),),
+    ];
 
     #[test]
     fn all_error_cases() {

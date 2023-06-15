@@ -88,16 +88,21 @@ pub fn run_expansion_equality_test<S>(lhs: &str, rhs: &str, options: &[TestOptio
 where
     S: Default + HasComponent<script::Component>,
 {
-    let (output_1, vm_1) = crate::testing::execute_source_code(lhs, options);
-    let (output_2, vm_2) = crate::testing::execute_source_code(rhs, options);
-    compare_output(output_1.unwrap(), vm_1, output_2.unwrap(), vm_2)
+    let options = ResolvedOptions::new(options);
+
+    let mut vm_1 = initialize_vm(&options);
+    let output_1 = crate::testing::execute_source_code(&mut vm_1, lhs, &options).unwrap();
+
+    let mut vm_2 = initialize_vm(&options);
+    let output_2 = crate::testing::execute_source_code(&mut vm_2, rhs, &options).unwrap();
+    compare_output(output_1, &vm_1, output_2, &vm_2)
 }
 
 fn compare_output<S>(
     output_1: Vec<token::Token>,
-    vm_1: vm::VM<S>,
+    vm_1: &vm::VM<S>,
     output_2: Vec<token::Token>,
-    vm_2: vm::VM<S>,
+    vm_2: &vm::VM<S>,
 ) {
     use ::texlang_core::token::Value::ControlSequence;
     println!("{output_1:?}");
@@ -154,7 +159,10 @@ pub fn run_failure_test<S>(input: &str, options: &[TestOption<S>])
 where
     S: Default + HasComponent<script::Component>,
 {
-    let (result, vm) = execute_source_code(input, options);
+    let options = ResolvedOptions::new(options);
+
+    let mut vm = initialize_vm(&options);
+    let result = execute_source_code(&mut vm, input, &options);
     if let Ok(output) = result {
         println!("Expansion succeeded:");
         println!(
@@ -165,44 +173,62 @@ where
     }
 }
 
+pub enum SerdeFormat {
+    Json,
+    MessagePack,
+}
+
 /// Skip a serialization/deserialization test if the serde feature is off
 #[cfg(not(feature = "serde"))]
-pub fn run_serde_test<S>(_: &str, _: &str, _: &[TestOption<S>]) {}
+pub fn run_serde_test<S>(_: &str, _: &str, _: &[TestOption<S>], format: SerdeFormat) {}
 
 /// Run a serialization/deserialization test
 #[cfg(feature = "serde")]
-pub fn run_serde_test<S>(input_1: &str, input_2: &str, options: &[TestOption<S>])
-where
+pub fn run_serde_test<S>(
+    input_1: &str,
+    input_2: &str,
+    options: &[TestOption<S>],
+    format: SerdeFormat,
+) where
     S: Default + HasComponent<script::Component> + serde::Serialize + serde::de::DeserializeOwned,
 {
-    let (output_1_1, vm_1) = crate::testing::execute_source_code(input_1, options);
-    let mut output_1_1 = output_1_1.unwrap();
+    let options = ResolvedOptions::new(options);
 
-    let resolved = ResolvedOptions::new(options);
+    let mut vm_1 = initialize_vm(&options);
+    let mut output_1_1 = crate::testing::execute_source_code(&mut vm_1, input_1, &options).unwrap();
 
-    let serialized = serde_json::to_string_pretty(&vm_1).unwrap();
-    println!("Serialized VM: {serialized}");
-    let mut deserializer = serde_json::Deserializer::from_str(&serialized);
-    let mut vm_1 = vm::VM::deserialize(&mut deserializer, (resolved.initial_commands)());
+    let mut vm_1 = match format {
+        SerdeFormat::Json => {
+            let serialized = serde_json::to_string_pretty(&vm_1).unwrap();
+            println!("Serialized VM: {serialized}");
+            let mut deserializer = serde_json::Deserializer::from_str(&serialized);
+            vm::VM::deserialize(&mut deserializer, (options.initial_commands)())
+        }
+        SerdeFormat::MessagePack => {
+            let serialized = rmp_serde::to_vec(&vm_1).unwrap();
+            let mut deserializer = rmp_serde::decode::Deserializer::from_read_ref(&serialized);
+            vm::VM::deserialize(&mut deserializer, (options.initial_commands)())
+        }
+    };
 
     vm_1.push_source("testing2.tex", input_2).unwrap();
     let mut output_1_2 = script::run(&mut vm_1).unwrap();
     output_1_1.append(&mut output_1_2);
 
-    let (output_2, vm_2) =
-        crate::testing::execute_source_code(format!["{input_1}{input_2}"], options);
+    let mut vm_2 = initialize_vm(&options);
+    let output_2 = crate::testing::execute_source_code(&mut vm_2,format!["{input_1}{input_2}"], &options).unwrap();
 
-    compare_output(output_1_1, vm_1, output_2.unwrap(), vm_2)
+    compare_output(output_1_1, &vm_1, output_2, &vm_2)
 }
 
-struct ResolvedOptions<'a, S> {
+pub struct ResolvedOptions<'a, S> {
     initial_commands: &'a dyn Fn() -> HashMap<&'static str, command::BuiltIn<S>>,
     custom_vm_initialization: &'a dyn Fn(&mut VM<S>),
     allow_undefined_commands: bool,
 }
 
 impl<'a, S> ResolvedOptions<'a, S> {
-    fn new(options: &'a [TestOption<S>]) -> Self {
+    pub fn new(options: &'a [TestOption<S>]) -> Self {
         let mut resolved = Self {
             initial_commands: &HashMap::new,
             custom_vm_initialization: &|_| {},
@@ -221,21 +247,24 @@ impl<'a, S> ResolvedOptions<'a, S> {
     }
 }
 
+pub fn initialize_vm<S: Default>(options: &ResolvedOptions<S>) -> Box<vm::VM<S>> {
+    let mut vm = VM::<S>::new((options.initial_commands)());
+    (options.custom_vm_initialization)(&mut vm);
+    vm
+}
+
 /// Execute source code in a VM with the provided options.
 pub fn execute_source_code<S, T: Into<String>>(
+    vm: &mut vm::VM<S>,
     source: T,
-    options: &[TestOption<S>],
-) -> (Result<Vec<token::Token>, Box<error::Error>>, VM<S>)
+    options: &ResolvedOptions<S>,
+) -> Result<Vec<token::Token>, Box<error::Error>>
 where
     S: Default + HasComponent<script::Component>,
 {
-    let resolved_options = ResolvedOptions::new(options);
-    let mut vm = VM::<S>::new((resolved_options.initial_commands)(), Default::default());
-    (resolved_options.custom_vm_initialization)(&mut vm);
     vm.push_source("testing.tex", source).unwrap();
-    script::set_allow_undefined_command(&mut vm.state, resolved_options.allow_undefined_commands);
-    let output = script::run(&mut vm);
-    (output, vm)
+    script::set_allow_undefined_command(&mut vm.state, options.allow_undefined_commands);
+    script::run(vm)
 }
 
 /// In-memory filesystem for use in unit tests.
@@ -251,7 +280,6 @@ where
 /// # use texlang_stdlib::testing::*;
 /// let mut vm = vm::VM::<State>::new(
 ///     Default::default(),  // initial commands
-///     Default::default(),  // initial state
 /// );
 /// let mock_file_system: InMemoryFileSystem = Default::default();
 /// vm.file_system = Box::new(mock_file_system);
@@ -353,13 +381,24 @@ macro_rules! test_suite {
     );
     ( state($state: ty), options $options: tt, serde_tests ( $( ($name: ident, $lhs: expr, $rhs: expr $(,)? ) ),* $(,)? ) $(,)? ) => (
         $(
-            #[cfg_attr(not(feature = "serde"), ignore)]
-            #[test]
-            fn $name() {
-                let lhs = $lhs;
-                let rhs = $rhs;
-                let options = vec! $options;
-                $crate::testing::run_serde_test::<$state>(&lhs, &rhs, &options);
+            mod $name {
+                use super::*;
+                #[cfg_attr(not(feature = "serde"), ignore)]
+                #[test]
+                fn json() {
+                    let lhs = $lhs;
+                    let rhs = $rhs;
+                    let options = vec! $options;
+                    $crate::testing::run_serde_test::<$state>(&lhs, &rhs, &options, $crate::testing::SerdeFormat::Json);
+                }
+                #[cfg_attr(not(feature = "serde"), ignore)]
+                #[test]
+                fn message_pack() {
+                    let lhs = $lhs;
+                    let rhs = $rhs;
+                    let options = vec! $options;
+                    $crate::testing::run_serde_test::<$state>(&lhs, &rhs, &options, $crate::testing::SerdeFormat::MessagePack);
+                }
             }
         )*
     );

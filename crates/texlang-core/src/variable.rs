@@ -383,7 +383,23 @@ impl<S> Command<S> {
         SupportedType::new_command(ref_fn, ref_mut_fn, Some(index_resolver))
     }
 
-    /// Create a new variable using getters.
+    /// Create a new getter provider.
+    /// 
+    /// A getter provider is a variable command that is not intended to be invoked directly
+    /// In fact, the variable command will panic the program if it is invoked.
+    /// Instead the provider is included in a VM's initial commands so that
+    ///     the VM has a reference to the getters inside the command.
+    /// If a variable with the same getters is subsequently inserted into the commands map
+    ///     (for example, by a `\countdef` type command), the VM can still serialize that
+    ///     variable using the getters provided here.
+    pub fn new_getter_provider<T: SupportedType>(
+        ref_fn: RefFn<S, T>,
+        ref_mut_fn: MutRefFn<S, T>,
+    ) -> Command<S> {
+        SupportedType::new_command(ref_fn, ref_mut_fn, Some(IndexResolver::Dynamic(|_, _|{ panic!() })))
+    }
+
+    /// Create a new variable using the provided getters.
     pub(crate) fn new(getters: Getters<S>, index_resolver: Option<IndexResolver<S>>) -> Self {
         Self {
             getters,

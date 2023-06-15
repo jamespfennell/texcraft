@@ -105,6 +105,14 @@ fn singleton_mut_ref_fn<S: HasComponent<Component>>(
     &mut state.component_mut().singletons[index.0]
 }
 
+/// Return a getter provider for the `\newInt` command.
+/// 
+/// The initial commands for a VM must include this command in order for
+///     the allocation component to be serializable.
+pub fn get_newint_getter_provider<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    variable::Command::new_getter_provider(singleton_ref_fn, singleton_mut_ref_fn).into()
+}
+
 /// Get the `\newIntArray` execution command.
 pub fn get_newintarray<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(newintarray_primitive_fn)
@@ -166,6 +174,18 @@ fn array_element_mut_ref_fn<S: HasComponent<Component>>(
     &mut state.component_mut().arrays[index.0]
 }
 
+/// Return a getter provider for the `\newIntArray` command.
+/// 
+/// The initial commands for a VM must include this command in order to support
+///     the allocation component to be serializable.
+pub fn get_newintarray_getter_provider<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    variable::Command::new_array(
+        array_element_ref_fn,
+        array_element_mut_ref_fn,
+        variable::IndexResolver::Dynamic(resolve),
+    ).into()
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -174,19 +194,22 @@ mod test {
     use texlang_core::vm::implement_has_component;
 
     #[derive(Default)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     struct State {
         alloc: Component,
-        exec: script::Component,
+        script: script::Component,
     }
 
     impl TexlangState for State {}
 
-    implement_has_component![State, (Component, alloc), (script::Component, exec),];
+    implement_has_component![State, (Component, alloc), (script::Component, script),];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("newInt", get_newint()),
+            ("newInt_getter_provider_\u{0}", get_newint_getter_provider()),
             ("newIntArray", get_newintarray()),
+            ("newIntArray_getter_provider_\u{0}", get_newintarray_getter_provider()),
             ("the", get_the()),
         ])
     }
@@ -209,6 +232,10 @@ mod test {
                 r"\newIntArray \a 3 \a 2 = 2 \the\a 2",
                 "2"
             ),
+        ),
+        serde_tests(
+            (serde_singleton, r"\newInt\a \a=-1 ", r"\the\a"),
+            (serde_array, r"\newIntArray\a 20 \a 3=-1 ", r"\the\a 3"),
         ),
         failure_tests(
             (newintarray_out_of_bounds, r"\newIntArray \a 3 \a 3 = 2"),

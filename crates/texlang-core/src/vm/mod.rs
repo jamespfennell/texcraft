@@ -313,16 +313,16 @@ pub trait TexlangState: Sized {
 
 impl TexlangState for () {}
 
-impl<S> VM<S> {
+impl<S: Default> VM<S> {
     /// Create a new VM.
-    pub fn new(initial_built_ins: HashMap<&str, BuiltIn<S>>, state: S) -> VM<S> {
+    pub fn new(initial_built_ins: HashMap<&str, BuiltIn<S>>) -> Box<VM<S>> {
         let mut internal = Internal::new(Default::default());
         let initial_built_ins = initial_built_ins
             .into_iter()
             .map(|(key, value)| (internal.cs_name_interner.get_or_intern(key), value))
             .collect();
-        VM {
-            state,
+        Box::new(VM {
+            state: Default::default(),
             commands_map: command::Map::new(initial_built_ins),
             internal,
             file_system: Box::new(RealFileSystem {}),
@@ -335,7 +335,7 @@ impl<S> VM<S> {
                     None
                 }
             },
-        }
+        })
     }
 }
 
@@ -344,7 +344,7 @@ impl<'de, S: ::serde::Deserialize<'de>> VM<S> {
     pub fn deserialize<D: ::serde::Deserializer<'de>>(
         deserializer: D,
         initial_built_ins: HashMap<&str, BuiltIn<S>>,
-    ) -> Self {
+    ) -> Box<Self> {
         serde::deserialize(deserializer, initial_built_ins)
     }
 }

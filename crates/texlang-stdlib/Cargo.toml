@@ -24,9 +24,10 @@ colored = "2"
 
 serde_json = {version="1.0", optional = true}
 serde = {version="^1.0", optional = true}
+rmp-serde = {version="^1.0", optional = true}
 
 [features]
 default = ["time"]
 time = ["dep:chrono"]
 repl = ["dep:linefeed"]
-serde = ["dep:serde", "dep:serde_json", "texcraft-stdext/serde", "texlang-core/serde"]
+serde = ["dep:serde", "dep:serde_json", "dep:rmp-serde", "texcraft-stdext/serde", "texlang-core/serde"]
