@@ -244,7 +244,7 @@
 //! One way of thinking about it is that `\A` aliases `\count 1`.
 //!
 //! Using the Texlang variables API it is possible to implement the analogous command
-//! for the `\myarray` command implemented above.
+//! for the `\myArray` command implemented above.
 //! The implementation is in 3 steps:
 //!
 //! 1. The target (e.g. `\A`) is read using [crate::parse::Command::parse].
@@ -464,7 +464,7 @@ impl<S: TexlangState> Command<S> {
     /// This function is used in TeX code like `\variable = 3`.
     /// In this case `\variable` is a command which resolves to a variable without consuming any more input.
     /// The variable is populated using the input `= 3` that follows.
-    pub fn set_value_using_input(
+    pub(crate) fn set_value_using_input(
         &self,
         token: token::Token,
         input: &mut vm::ExecutionInput<S>,
@@ -497,7 +497,7 @@ pub enum ValueRef<'a> {
 /// Operations on this value (like reading or setting the value) can be done in two ways:
 ///
 /// 1. (Easy, less flexible) Use the methods directly on this type like [Variable::value]
-///     or [Command::set_value_using_input] to read or set the value.
+///     to read the value.
 ///     These methods are really ergonomic.
 ///     The problem with the value method specifically is that the result
 ///     is a reference which keeps the borrow of the state alive.
@@ -520,8 +520,8 @@ impl<S: TexlangState> Variable<S> {
     /// Return a reference to the value of the variable.
     pub fn value<'a>(&self, input: &'a mut vm::ExpandedStream<S>) -> ValueRef<'a> {
         match self {
-            Variable::Int(variable) => ValueRef::Int(variable.value(input.state())),
-            Variable::CatCode(variable) => ValueRef::CatCode(variable.value(input.state())),
+            Variable::Int(variable) => ValueRef::Int(variable.get(input.state())),
+            Variable::CatCode(variable) => ValueRef::CatCode(variable.get(input.state())),
         }
     }
 
@@ -535,11 +535,11 @@ impl<S: TexlangState> Variable<S> {
         match self {
             Variable::Int(variable) => {
                 let value = i32::parse(input)?;
-                *variable.value_mut(input, scope) = value;
+                variable.set(input, scope, value);
             }
             Variable::CatCode(variable) => {
                 let value = CatCode::parse(input)?;
-                *variable.value_mut(input, scope) = value;
+                variable.set(input, scope, value);
             }
         };
         Ok(())
@@ -585,7 +585,7 @@ impl<S, T> Clone for TypedVariable<S, T> {
 
 impl<S, T> TypedVariable<S, T> {
     /// Returns an immutable reference to the variable's value.
-    pub fn value<'a>(&self, state: &'a S) -> &'a T {
+    pub fn get<'a>(&self, state: &'a S) -> &'a T {
         (self.0)(state, self.2)
     }
 
@@ -597,9 +597,9 @@ impl<S, T> TypedVariable<S, T> {
 impl<S, T> TypedVariable<S, T>
 where
     S: TexlangState,
-    T: Copy + SupportedType,
+    T: SupportedType,
 {
-    /// Returns a mutable reference to the variable's value. This method is used for regular non-base variables.
+    /// Sets the value of the variable.
     ///
     /// The input and scope must be passed because of TeX's grouping semantics.
     /// When the current group ends, any variable assignments made in the group
@@ -607,32 +607,14 @@ where
     /// Thus this function generally saves the current value of the variable in the VM so that it
     ///     can be restored later.
     /// This is why the full input must be provided, and not just the state.
-    ///
-    /// **Important note**: this function assumes that the mutable reference is being
-    ///     requested in order to assign to the value.
-    /// If no assignment happens, the variable may be in a weird state afterwards.
-    /// For example, calling the function with the global scope will erase all non-global
-    ///     values for the variable, even if no assignment occurs.
-    /// To just read the variable, use [TypedVariable::value] instead.
-    pub fn value_mut<'a>(
-        &self,
-        input: &'a mut vm::ExecutionInput<S>,
-        scope: groupingmap::Scope,
-    ) -> &'a mut T {
-        let current_value = *(self.0)(input.state(), self.2);
-        match scope {
-            groupingmap::Scope::Global => {
-                for group in input.groups() {
-                    SupportedType::restore_map_mut(group).remove(self)
-                }
-            }
-            groupingmap::Scope::Local => {
-                if let Some((group, _)) = input.current_group_mut() {
-                    SupportedType::restore_map_mut(group).save(*self, current_value);
-                }
-            }
+    pub fn set(&self, input: &mut vm::ExecutionInput<S>, scope: groupingmap::Scope, value: T) {
+        let r: &mut T = (self.1)(input.state_mut(), self.2);
+        let overwritten_value = std::mem::replace(r, value);
+        // We guard the function call behind this conditional to make the current function small
+        // to make it beneficial to inline it.
+        if !input.groups().is_empty() {
+            SupportedType::update_save_stack(input, self, scope, overwritten_value);
         }
-        (self.1)(input.state_mut(), self.2)
     }
 }
 
@@ -655,29 +637,58 @@ impl<S, T> Hash for TypedVariable<S, T> {
 
 /// Trait satisfied by all Rust types that can be used as TeX variables.
 ///
-/// It exists to make the variables API more ergonomic;
-///     for example, it is used to provide a uniform constructor [Command::new_array] for commands.
+/// It exists to make the variables API more ergonomic.
+/// For example, it is used to provide a uniform constructor [Command::new_array] for commands.
+/// The trait cannot be implemented for new types.
 pub trait SupportedType: Sized {
-    /// This method exists so that the trait cannot be be implemented without changing the variable enum.
-    fn new_variable<S>(ref_fn: RefFn<S, Self>, mut_fn: MutRefFn<S, Self>) -> Variable<S>;
-
-    fn restore_map_mut<S>(_: &mut RestoreValues<S>) -> &mut RestoreMap<S, Self>;
-
+    /// Create a new command of this type with the provided reference functions and index resolver.
     fn new_command<S>(
         ref_fn: RefFn<S, Self>,
         ref_mut_fn: MutRefFn<S, Self>,
-        _: Option<IndexResolver<S>>,
+        index_resolver: Option<IndexResolver<S>>,
     ) -> Command<S>;
+
+    /// Update the VM's save stack after a variable assignment.
+    fn update_save_stack<S>(
+        input: &mut vm::ExecutionInput<S>,
+        variable: &TypedVariable<S, Self>,
+        scope: groupingmap::Scope,
+        overwritten_value: Self,
+    );
+}
+
+/// This function is used to implement the [SupportedType::update_save_stack] method.
+///
+/// It's a bit janky to implement the logic as a free function, rather than, say, as
+///     a default trait implementation.
+/// The main problem is that the implementation calls into the save stack, which is an
+///     internal VM data structure.
+/// Any way that does this on the trait directly requires making some of the save stack
+///     type public, because [SupportedType] is public.
+fn update_save_stack<S, T, F>(
+    input: &mut vm::ExecutionInput<S>,
+    variable: &TypedVariable<S, T>,
+    scope: groupingmap::Scope,
+    overwritten_value: T,
+    map_getter: F,
+) where
+    F: Fn(&mut SaveStackElement<S>) -> &mut SaveStackMap<S, T>,
+{
+    match scope {
+        groupingmap::Scope::Global => {
+            for group in input.groups() {
+                map_getter(group).remove(variable)
+            }
+        }
+        groupingmap::Scope::Local => {
+            if let Some((group, _)) = input.current_group_mut() {
+                map_getter(group).save(*variable, overwritten_value);
+            }
+        }
+    }
 }
 
 impl SupportedType for i32 {
-    fn new_variable<S>(ref_fn: RefFn<S, Self>, mut_fn: MutRefFn<S, Self>) -> Variable<S> {
-        Variable::Int(TypedVariable(ref_fn, mut_fn, Index(0)))
-    }
-
-    fn restore_map_mut<S>(m: &mut RestoreValues<S>) -> &mut RestoreMap<S, Self> {
-        &mut m.i32
-    }
     fn new_command<S>(
         ref_fn: RefFn<S, Self>,
         ref_mut_fn: MutRefFn<S, Self>,
@@ -688,17 +699,19 @@ impl SupportedType for i32 {
             index_resolver,
         }
     }
+    fn update_save_stack<S>(
+        input: &mut vm::ExecutionInput<S>,
+        variable: &TypedVariable<S, Self>,
+        scope: groupingmap::Scope,
+        overwritten_value: Self,
+    ) {
+        update_save_stack(input, variable, scope, overwritten_value, |element| {
+            &mut element.i32
+        })
+    }
 }
 
 impl SupportedType for CatCode {
-    fn new_variable<S>(ref_fn: RefFn<S, Self>, mut_fn: MutRefFn<S, Self>) -> Variable<S> {
-        Variable::CatCode(TypedVariable(ref_fn, mut_fn, Index(0)))
-    }
-
-    fn restore_map_mut<S>(m: &mut RestoreValues<S>) -> &mut RestoreMap<S, Self> {
-        &mut m.catcode
-    }
-
     fn new_command<S>(
         ref_fn: RefFn<S, Self>,
         ref_mut_fn: MutRefFn<S, Self>,
@@ -709,18 +722,25 @@ impl SupportedType for CatCode {
             index_resolver,
         }
     }
+    fn update_save_stack<S>(
+        input: &mut vm::ExecutionInput<S>,
+        variable: &TypedVariable<S, Self>,
+        scope: groupingmap::Scope,
+        overwritten_value: Self,
+    ) {
+        update_save_stack(input, variable, scope, overwritten_value, |element| {
+            &mut element.catcode
+        })
+    }
 }
 
 /// Internal VM data structure used to implement TeX's grouping semantics.
-///
-/// This is not intended to be used outside of the VM.
-// TODO: make this private somehow. Maybe the restore values doesn't need to be a part of the SupportedType trait.
-pub struct RestoreValues<S> {
-    i32: RestoreMap<S, i32>,
-    catcode: RestoreMap<S, CatCode>,
+pub(crate) struct SaveStackElement<S> {
+    i32: SaveStackMap<S, i32>,
+    catcode: SaveStackMap<S, CatCode>,
 }
 
-impl<S> Default for RestoreValues<S> {
+impl<S> Default for SaveStackElement<S> {
     fn default() -> Self {
         Self {
             i32: Default::default(),
@@ -729,7 +749,7 @@ impl<S> Default for RestoreValues<S> {
     }
 }
 
-impl<S> RestoreValues<S> {
+impl<S> SaveStackElement<S> {
     pub fn restore(self, state: &mut S) {
         self.i32.restore(state);
         self.catcode.restore(state);
@@ -737,17 +757,15 @@ impl<S> RestoreValues<S> {
 }
 
 /// Internal VM data structure used to implement TeX's grouping semantics.
-///
-/// This is not intended to be used outside of the VM.
-pub struct RestoreMap<S, T>(HashMap<TypedVariable<S, T>, T>);
+pub(crate) struct SaveStackMap<S, T>(HashMap<TypedVariable<S, T>, T>);
 
-impl<S, T> Default for RestoreMap<S, T> {
+impl<S, T> Default for SaveStackMap<S, T> {
     fn default() -> Self {
         Self(HashMap::new())
     }
 }
 
-impl<S, T> RestoreMap<S, T> {
+impl<S, T> SaveStackMap<S, T> {
     pub(super) fn save(&mut self, variable: TypedVariable<S, T>, val: T) {
         self.0.entry(variable).or_insert(val);
     }

@@ -97,9 +97,7 @@ pub trait TexError: std::fmt::Debug {
                 }
             }
             Kind::EndOfInput(_) => "input ended here".into(),
-            Kind::FailedPrecondition => {
-                "failed precondition error while running this command".into()
-            }
+            Kind::FailedPrecondition => self.title(),
         }
     }
 }

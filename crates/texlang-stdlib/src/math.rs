@@ -5,35 +5,35 @@ use texlang_core::parse::OptionalBy;
 use texlang_core::traits::*;
 use texlang_core::*;
 
-pub const ADVANCE_DOC: &str = "Add an integer to a variable";
-pub const ADVANCECHK_DOC: &str = "Add an integer to a variable and error on overflow";
-pub const MULTIPLY_DOC: &str = "Multiply a variable by an integer";
-pub const MULTIPLYCHK_DOC: &str = "Multiply a variable by an integer and error on overflow";
-pub const DIVIDE_DOC: &str = "Divide a variable by an integer";
-
 /// Get the `\advance` command.
 pub fn get_advance<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_execution(advance_fn).with_tag(get_variable_op_tag())
+    get_command::<S, AddOp>()
 }
 
-/// Get the `\advancechk` command.
-pub fn get_advancechk<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_execution(advancechk_fn).with_tag(get_variable_op_tag())
+/// Get the `\advanceChecked` command.
+pub fn get_advance_checked<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+    get_command::<S, AddCheckedOp>()
 }
 
 /// Get the `\multiply` command.
 pub fn get_multiply<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_execution(multiply_fn).with_tag(get_variable_op_tag())
+    get_command::<S, MultiplyOp>()
 }
 
-/// Get the `\multiplychk` command.
-pub fn get_multiplychk<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_execution(multiplychk_fn).with_tag(get_variable_op_tag())
+/// Get the `\multiplyWrapped` command.
+pub fn get_multiply_wrapped<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+    get_command::<S, MultiplyWrappedOp>()
 }
 
 /// Get the `\divide` command.
 pub fn get_divide<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_execution(divide_fn).with_tag(get_variable_op_tag())
+    get_command::<S, DivideOp>()
+}
+
+fn get_command<S: HasComponent<prefix::Component>, O: Op>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(math_primitive_fn::<S, O>)
+        .with_tag(get_variable_op_tag())
+        .with_doc(O::DOC)
 }
 
 static VARIABLE_OP_TAG: command::StaticTag = command::StaticTag::new();
@@ -42,27 +42,140 @@ pub fn get_variable_op_tag() -> command::Tag {
     VARIABLE_OP_TAG.get()
 }
 
-macro_rules! create_arithmetic_primitive {
-    ($prim_fn: ident, $arithmetic_op: ident) => {
-        fn $prim_fn<S: HasComponent<prefix::Component>>(
-            token: token::Token,
-            input: &mut vm::ExecutionInput<S>,
-        ) -> Result<(), Box<error::Error>> {
-            let scope = input.state_mut().component_mut().read_and_reset_global();
-            let variable = variable::Variable::parse(input)?;
-            OptionalBy::parse(input)?;
-            match variable {
-                variable::Variable::Int(variable) => {
-                    let n = i32::parse(input)?;
-                    let lhs = *variable.value(input.state());
-                    let result = $arithmetic_op(input.vm(), token, lhs, n)?;
-                    *variable.value_mut(input, scope) = result;
-                    Ok(())
-                }
-                variable::Variable::CatCode(_) => invalid_variable_error(input.vm(), token),
+trait Op {
+    const DOC: &'static str = "";
+    fn perform(lhs: i32, rhs: i32) -> Result<i32, Box<error::Error>>;
+}
+
+struct AddOp;
+
+impl Op for AddOp {
+    const DOC: &'static str = "Add an integer to a variable";
+    fn perform(lhs: i32, rhs: i32) -> Result<i32, Box<error::Error>> {
+        // Note: TeX explicitly permits overflow in \advance
+        Ok(lhs.wrapping_add(rhs))
+    }
+}
+
+struct AddCheckedOp;
+
+impl Op for AddCheckedOp {
+    const DOC: &'static str = "Add an integer to a variable and error on overflow";
+    fn perform(lhs: i32, rhs: i32) -> Result<i32, Box<error::Error>> {
+        match lhs.checked_add(rhs) {
+            Some(result) => Ok(result),
+            None => Err(OverflowError {
+                op_name: "addition",
+                lhs,
+                rhs,
+                wrapped_result: lhs.wrapping_add(rhs),
             }
+            .into()),
         }
-    };
+    }
+}
+
+struct MultiplyOp;
+
+impl Op for MultiplyOp {
+    const DOC: &'static str = "Multiply a variable by an integer";
+    fn perform(lhs: i32, rhs: i32) -> Result<i32, Box<error::Error>> {
+        match lhs.checked_mul(rhs) {
+            Some(result) => Ok(result),
+            None => Err(OverflowError {
+                op_name: "multiplication",
+                lhs,
+                rhs,
+                wrapped_result: lhs.wrapping_mul(rhs),
+            }
+            .into()),
+        }
+    }
+}
+
+struct MultiplyWrappedOp;
+
+impl Op for MultiplyWrappedOp {
+    const DOC: &'static str = "Multiply a variable by an integer and wrap on overflow";
+    fn perform(lhs: i32, rhs: i32) -> Result<i32, Box<error::Error>> {
+        Ok(lhs.wrapping_mul(rhs))
+    }
+}
+
+struct DivideOp;
+
+impl Op for DivideOp {
+    const DOC: &'static str = "Divide a variable by an integer";
+    fn perform(lhs: i32, rhs: i32) -> Result<i32, Box<error::Error>> {
+        if rhs == 0 {
+            return Err(DivisionByZeroError { numerator: lhs }.into());
+        }
+        Ok(lhs.wrapping_div(rhs))
+    }
+}
+
+#[derive(Debug)]
+struct OverflowError {
+    op_name: &'static str,
+    lhs: i32,
+    rhs: i32,
+    wrapped_result: i32,
+}
+
+impl error::TexError for OverflowError {
+    fn kind(&self) -> error::Kind {
+        error::Kind::FailedPrecondition
+    }
+
+    fn title(&self) -> String {
+        format!["overflow in checked {}", self.op_name]
+    }
+
+    fn notes(&self) -> Vec<error::display::Note> {
+        vec![
+            format!["left hand side evaluated to {}", self.lhs].into(),
+            format!["right hand side evaluated to {}", self.rhs].into(),
+            format!["wrapped result would be {}", self.wrapped_result].into(),
+        ]
+    }
+}
+
+#[derive(Debug)]
+struct DivisionByZeroError {
+    numerator: i32,
+}
+
+impl error::TexError for DivisionByZeroError {
+    fn kind(&self) -> error::Kind {
+        error::Kind::FailedPrecondition
+    }
+
+    fn title(&self) -> String {
+        "division by zero".into()
+    }
+
+    fn notes(&self) -> Vec<error::display::Note> {
+        vec![format!["numerator evaluated to {}", self.numerator].into()]
+    }
+}
+
+fn math_primitive_fn<S: HasComponent<prefix::Component>, O: Op>(
+    token: token::Token,
+    input: &mut vm::ExecutionInput<S>,
+) -> Result<(), Box<error::Error>> {
+    let scope = input.state_mut().component_mut().read_and_reset_global();
+    let variable = variable::Variable::parse(input)?;
+    OptionalBy::parse(input)?;
+    match variable {
+        variable::Variable::Int(variable) => {
+            let lhs = *variable.get(input.state());
+            let rhs = i32::parse(input)?;
+            let result = O::perform(lhs, rhs)?;
+            variable.set(input, scope, result);
+            Ok(())
+        }
+        variable::Variable::CatCode(_) => invalid_variable_error(input.vm(), token),
+    }
 }
 
 fn invalid_variable_error<S>(vm: &vm::VM<S>, token: token::Token) -> Result<(), Box<error::Error>> {
@@ -75,86 +188,6 @@ fn invalid_variable_error<S>(vm: &vm::VM<S>, token: token::Token) -> Result<(), 
     // TODO .add_note(
     //       "arithmetic commands (\\advance, \\multiply, \\divide) can be applied to integer, dimension, glue and muglue variables",
 }
-
-#[inline]
-fn add<S>(_: &vm::VM<S>, _: token::Token, lhs: i32, rhs: i32) -> Result<i32, Box<error::Error>> {
-    // Note: TeX explicitly permits overflow in \advance
-    Ok(lhs.wrapping_add(rhs))
-}
-
-fn checked_add<S>(
-    vm: &vm::VM<S>,
-    token: token::Token,
-    lhs: i32,
-    rhs: i32,
-) -> Result<i32, Box<error::Error>> {
-    match lhs.checked_add(rhs) {
-        Some(result) => Ok(result),
-        None => Err(
-            error::SimpleTokenError::new(vm, token, "overflow in checked addition").into(), /* TODO
-                                                                                            .add_note(format!["left hand side evaluated to {lhs}"])
-                                                                                            .add_note(format!["right hand side evaluated {rhs}"])
-                                                                                            .add_note(format![
-                                                                                                "overflowed result would be {}",
-                                                                                                lhs.wrapping_add(rhs)
-                                                                                            ])
-                                                                                            .add_note("use \\advance instead of \\advancechk to permit overflowing")
-                                                                                            */
-        ),
-    }
-}
-
-#[inline]
-fn multiply<S>(
-    _: &vm::VM<S>,
-    _: token::Token,
-    lhs: i32,
-    rhs: i32,
-) -> Result<i32, Box<error::Error>> {
-    // Note: TeX explicitly permits overflow in \multiply
-    Ok(lhs.wrapping_mul(rhs))
-}
-
-fn checked_multiply<S>(
-    vm: &vm::VM<S>,
-    token: token::Token,
-    lhs: i32,
-    rhs: i32,
-) -> Result<i32, Box<error::Error>> {
-    match lhs.checked_mul(rhs) {
-        Some(result) => Ok(result),
-        None => Err(
-            error::SimpleTokenError::new(vm, token, "overflow in checked multiplication").into(), /* TODO
-                                                                                                     .add_note(format!["left hand side evaluated to {lhs}"])
-                                                                                                     .add_note(format!["right hand side evaluated {rhs}"])
-                                                                                                     .add_note(format![
-                                                                                                         "overflowed result would be {}",
-                                                                                                         lhs.wrapping_mul(rhs)
-                                                                                                     ])
-                                                                                                     .add_note("use \\multiply instead of \\multiplychk to permit overflowing")
-                                                                                                  */
-        ),
-    }
-}
-
-#[inline]
-fn divide<S>(
-    vm: &vm::VM<S>,
-    token: token::Token,
-    lhs: i32,
-    rhs: i32,
-) -> Result<i32, Box<error::Error>> {
-    if rhs == 0 {
-        return Err(error::SimpleTokenError::new(vm, token, "division by zero").into());
-    }
-    Ok(lhs.wrapping_div(rhs))
-}
-
-create_arithmetic_primitive![advance_fn, add];
-create_arithmetic_primitive![advancechk_fn, checked_add];
-create_arithmetic_primitive![multiply_fn, multiply];
-create_arithmetic_primitive![multiplychk_fn, checked_multiply];
-create_arithmetic_primitive![divide_fn, divide];
 
 #[cfg(test)]
 mod tests {
@@ -189,9 +222,9 @@ mod tests {
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("advance", get_advance()),
-            ("advancechk", get_advancechk()),
+            ("advanceChecked", get_advance_checked()),
             ("multiply", get_multiply()),
-            ("multiplychk", get_multiplychk()),
+            ("multiplyWrapped", get_multiply_wrapped()),
             ("divide", get_divide()),
             //
             ("catcode", catcode::get_catcode()),
@@ -234,21 +267,33 @@ mod tests {
         (multiply_neg_pos, r"\multiply", "5", "-4", "-20"),
         (multiply_neg_neg, r"\multiply", "-5", "-4", "20"),
         (
-            multiply_overflow,
-            r"\multiply",
+            multiply_wrapping_overflow,
+            r"\multiplyWrapped",
             "100000",
             "100000",
             "1410065408"
         ),
-        (multiplychk_base_case, r"\multiplychk", "5", "4", "20"),
+        (
+            multiply_wrapping_base_case,
+            r"\multiplyWrapped",
+            "5",
+            "4",
+            "20"
+        ),
         (divide_base_case, r"\divide", "9", "4", "2"),
         (divide_with_by, r"\divide", "9", "by 4", "2"),
         (divide_pos_neg, r"\divide", "-9", "4", "-2"),
         (divide_neg_pos, r"\divide", "9", "-4", "-2"),
         (divide_neg_neg, r"\divide", "-9", "-4", "2"),
         (divide_exact, r"\divide", "100", "10", "10"),
-        (advancechk_base_case, r"\advancechk", "1", "2", "3"),
-        (advancechk_negative_summand, r"\advancechk", "10", "-2", "8")
+        (advance_checked_base_case, r"\advanceChecked", "1", "2", "3"),
+        (
+            advance_checked_negative_summand,
+            r"\advanceChecked",
+            "10",
+            "-2",
+            "8"
+        )
     ];
 
     test_suite![
@@ -280,12 +325,12 @@ mod tests {
             ),
             (advance_catcode_not_supported, r"\advance\catcode 100 by 2"),
             (
-                advancechk_overflow,
-                r"\count 1 2147483647 \advancechk\count 1 by 1"
+                advance_checked_overflow,
+                r"\count 1 2147483647 \advanceChecked\count 1 by 1"
             ),
             (
-                multiplychk_overflow,
-                r"\count 1 100000 \multiplychk\count 1 by 100000"
+                multiply_overflow,
+                r"\count 1 100000 \multiply\count 1 by 100000"
             ),
             (divide_by_zero, r"\divide\count 1 by 0"),
         ),

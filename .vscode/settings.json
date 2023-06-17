@@ -18,6 +18,7 @@
         "impls",
         "INITEX",
         "Interner",
+        "janky",
         "jobname",
         "Klad",
         "lastpenalty",

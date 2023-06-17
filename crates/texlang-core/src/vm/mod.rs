@@ -456,7 +456,7 @@ struct Internal<S> {
 
     // Groups are handled manually in (de)serialization because we need to have special logic that uses the command map
     #[cfg_attr(feature = "serde", serde(skip))]
-    groups: Vec<variable::RestoreValues<S>>,
+    groups: Vec<variable::SaveStackElement<S>>,
 }
 
 impl<S> Internal<S> {
