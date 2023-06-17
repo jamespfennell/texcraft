@@ -2,7 +2,17 @@
 ///
 /// This iterator is an alternative to the standard library's [Chars](std::str::Chars).
 /// This iterator has shared ownership of the string being iterated over and avoids lifetime issues.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OwningChars {
+    // TODO: we don't need to serialize the full string, we just nneed to serialize
+    // everything after pos.
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            serialize_with = "crate::serde_tools::serialize_str",
+            deserialize_with = "crate::serde_tools::deserialize_rc_str"
+        )
+    )]
     s: std::rc::Rc<str>,
     pos: usize,
 }

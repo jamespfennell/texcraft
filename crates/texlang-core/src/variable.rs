@@ -384,7 +384,7 @@ impl<S> Command<S> {
     }
 
     /// Create a new getter provider.
-    /// 
+    ///
     /// A getter provider is a variable command that is not intended to be invoked directly
     /// In fact, the variable command will panic the program if it is invoked.
     /// Instead the provider is included in a VM's initial commands so that
@@ -396,7 +396,11 @@ impl<S> Command<S> {
         ref_fn: RefFn<S, T>,
         ref_mut_fn: MutRefFn<S, T>,
     ) -> Command<S> {
-        SupportedType::new_command(ref_fn, ref_mut_fn, Some(IndexResolver::Dynamic(|_, _|{ panic!() })))
+        SupportedType::new_command(
+            ref_fn,
+            ref_mut_fn,
+            Some(IndexResolver::Dynamic(|_, _| panic!())),
+        )
     }
 
     /// Create a new variable using the provided getters.

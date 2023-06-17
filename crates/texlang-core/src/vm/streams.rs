@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use super::TexlangState;
 use crate::token::trace;
 use crate::token::Token;
@@ -224,13 +226,14 @@ impl<S> ExpansionInput<S> {
         unsafe { &mut *(vm as *mut vm::VM<S> as *mut ExpansionInput<S>) }
     }
 }
+
 impl<S: TexlangState> ExpansionInput<S> {
     /// Push source code to the front of the input stream.
     #[inline]
     pub fn push_source(
         &mut self,
         token: Token,
-        file_name: String,
+        file_name: PathBuf,
         source_code: String,
     ) -> Result<(), Box<error::Error>> {
         self.0
@@ -239,7 +242,19 @@ impl<S: TexlangState> ExpansionInput<S> {
             .internal
             .push_source(Some(token), file_name, source_code)
     }
+
+    pub fn push_string_tokens(&mut self, token: Token, s: &str) {
+        let trace_key = token.trace_key();
+        for c in s.chars().rev() {
+            let token = match c {
+                ' ' => token::Token::new_space(' ', trace_key),
+                _ => token::Token::new_letter(c, trace_key),
+            };
+            self.expansions_mut().push(token);
+        }
+    }
 }
+
 impl<S> ExpansionInput<S> {
     #[inline]
     pub fn unexpanded(&mut self) -> &mut UnexpandedStream<S> {

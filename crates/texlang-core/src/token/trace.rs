@@ -36,6 +36,7 @@
 use crate::token::{CsNameInterner, Token, Value};
 use std::collections::BTreeMap;
 use std::ops::Bound::Included;
+use std::path::PathBuf;
 
 /// Key attached to tokens to enable tracing them.
 ///
@@ -51,6 +52,7 @@ impl Key {
 }
 
 /// Range of free keys that may be assigned to tokens.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KeyRange {
     next: u32,
     limit: u32,
@@ -99,7 +101,7 @@ impl KeyRange {
 #[derive(Debug, PartialEq, Eq)]
 pub struct SourceCodeTrace {
     /// Name of the file this token came from.
-    pub file_name: String,
+    pub file_name: PathBuf,
     /// Content of the line this token came from.
     pub line_content: String,
     /// Number of the line within the file, starting at 1.
@@ -115,6 +117,7 @@ pub struct SourceCodeTrace {
 
 /// Data structure that records information for token tracing
 #[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Tracer {
     checkpoints: BTreeMap<u32, Checkpoint>,
     next_key: u32,
@@ -135,7 +138,7 @@ impl Tracer {
     pub fn register_source_code(
         &mut self,
         token: Option<Token>,
-        file_name: String,
+        file_name: PathBuf,
         source_code: &str,
     ) -> KeyRange {
         let len = match u32::try_from(source_code.len()) {
@@ -250,8 +253,9 @@ impl Tracer {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum Checkpoint {
-    SourceCode { file_name: String, content: String },
+    SourceCode { file_name: PathBuf, content: String },
 }
 
 #[cfg(test)]
@@ -260,7 +264,7 @@ mod tests {
 
     #[test]
     fn one_source_code() {
-        let file_name = "input.tex".to_string();
+        let file_name: PathBuf = "input.tex".into();
         let line_1 = "hël".to_string();
         let line_2 = "wor\\cömmand".to_string();
         let line_3 = "hël".to_string();
@@ -403,17 +407,17 @@ mod tests {
         let mut tracer: Tracer = Default::default();
         let interner: CsNameInterner = Default::default();
 
-        let file_1 = "a.tex".to_string();
+        let file_1: PathBuf = "a.tex".into();
         let file_1_content = "a".to_string();
         let mut range = tracer.register_source_code(None, file_1.clone(), &file_1_content);
         tokens.push(Token::new_letter('a', range.next()));
 
-        let file_2 = "b.tex".to_string();
+        let file_2: PathBuf = "b.tex".into();
         let file_2_content = "b".to_string();
         let mut range = tracer.register_source_code(None, file_2.clone(), &file_2_content);
         tokens.push(Token::new_letter('b', range.next()));
 
-        let file_3 = "c.tex".to_string();
+        let file_3: PathBuf = "c.tex".into();
         let file_3_content = "c".to_string();
         let mut range = tracer.register_source_code(None, file_3.clone(), &file_3_content);
         tokens.push(Token::new_letter('c', range.next()));

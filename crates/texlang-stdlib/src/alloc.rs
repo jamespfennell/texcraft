@@ -106,7 +106,7 @@ fn singleton_mut_ref_fn<S: HasComponent<Component>>(
 }
 
 /// Return a getter provider for the `\newInt` command.
-/// 
+///
 /// The initial commands for a VM must include this command in order for
 ///     the allocation component to be serializable.
 pub fn get_newint_getter_provider<S: HasComponent<Component>>() -> command::BuiltIn<S> {
@@ -175,7 +175,7 @@ fn array_element_mut_ref_fn<S: HasComponent<Component>>(
 }
 
 /// Return a getter provider for the `\newIntArray` command.
-/// 
+///
 /// The initial commands for a VM must include this command in order to support
 ///     the allocation component to be serializable.
 pub fn get_newintarray_getter_provider<S: HasComponent<Component>>() -> command::BuiltIn<S> {
@@ -183,7 +183,8 @@ pub fn get_newintarray_getter_provider<S: HasComponent<Component>>() -> command:
         array_element_ref_fn,
         array_element_mut_ref_fn,
         variable::IndexResolver::Dynamic(resolve),
-    ).into()
+    )
+    .into()
 }
 
 #[cfg(test)]
@@ -209,7 +210,10 @@ mod test {
             ("newInt", get_newint()),
             ("newInt_getter_provider_\u{0}", get_newint_getter_provider()),
             ("newIntArray", get_newintarray()),
-            ("newIntArray_getter_provider_\u{0}", get_newintarray_getter_provider()),
+            (
+                "newIntArray_getter_provider_\u{0}",
+                get_newintarray_getter_provider(),
+            ),
             ("the", get_the()),
         ])
     }

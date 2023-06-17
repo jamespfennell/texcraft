@@ -20,6 +20,7 @@ use crate::token::Value;
 use crate::variable;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::rc::Rc;
 use texcraft_stdext::collections::groupingmap;
 
@@ -221,6 +222,11 @@ pub trait FileSystem {
     ///
     /// This is implemented by [std::fs::read_to_string].
     fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String>;
+
+    /// Write a slice of bytes to a file.
+    ///
+    /// This is implemented by [std::fs::write].
+    fn write_bytes(&self, path: &std::path::Path, contents: &[u8]) -> std::io::Result<()>;
 }
 
 struct RealFileSystem;
@@ -228,6 +234,9 @@ struct RealFileSystem;
 impl FileSystem for RealFileSystem {
     fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String> {
         std::fs::read_to_string(path)
+    }
+    fn write_bytes(&self, path: &std::path::Path, contents: &[u8]) -> std::io::Result<()> {
+        std::fs::write(path, contents)
     }
 }
 
@@ -354,7 +363,7 @@ impl<S: TexlangState> VM<S> {
     ///
     /// TeX input source code is organized as a stack.
     /// Pushing source code onto the stack will mean it is executed first.
-    pub fn push_source<T1: Into<String>, T2: Into<String>>(
+    pub fn push_source<T1: Into<PathBuf>, T2: Into<String>>(
         &mut self,
         file_name: T1,
         source_code: T2,
@@ -426,6 +435,12 @@ impl<S> VM<S> {
 }
 
 /// Parts of the VM that are private.
+// We have serde(bound="") because otherwise serde tries to put a `Default` bound on S.
+#[cfg_attr(
+    feature = "serde",
+    derive(::serde::Serialize, ::serde::Deserialize),
+    serde(bound = "")
+)]
 struct Internal<S> {
     // The sources form a stack. We store the top element directly on the VM
     // for performance reasons.
@@ -436,8 +451,11 @@ struct Internal<S> {
 
     tracer: trace::Tracer,
 
-    token_buffers: std::collections::BinaryHeap<TokenBuffer>, // add a #[skip]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    token_buffers: std::collections::BinaryHeap<TokenBuffer>,
 
+    // Groups are handled manually in (de)serialization because we need to have special logic that uses the command map
+    #[cfg_attr(feature = "serde", serde(skip))]
     groups: Vec<variable::RestoreValues<S>>,
 }
 
@@ -457,7 +475,7 @@ impl<S: TexlangState> Internal<S> {
     fn push_source(
         &mut self,
         token: Option<Token>,
-        file_name: String,
+        file_name: PathBuf,
         source_code: String,
     ) -> Result<(), Box<error::Error>> {
         let source_code: std::rc::Rc<str> = source_code.into();
@@ -505,6 +523,7 @@ impl<S> Internal<S> {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
 struct Source {
     expansions: Vec<Token>,
     root: lexer::Lexer,

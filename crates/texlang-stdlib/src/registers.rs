@@ -13,7 +13,7 @@ pub struct Component<T, const N: usize>(
     // We currently box the values because putting them directly on the stack causes the
     // message pack decoder to stack overflow. It's a pity that we have to pay a runtime
     // cost due to this, and it would be nice to fix the issue another way.
-    Box<[T; N]>
+    Box<[T; N]>,
 );
 
 #[cfg(feature = "serde")]

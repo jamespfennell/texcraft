@@ -69,7 +69,7 @@ pub struct PropagatedError {
 pub enum Kind<'a> {
     Token(&'a trace::SourceCodeTrace),
     EndOfInput(&'a trace::SourceCodeTrace),
-    InvalidCodePath,
+    FailedPrecondition,
 }
 
 pub trait TexError: std::fmt::Debug {
@@ -97,7 +97,9 @@ pub trait TexError: std::fmt::Debug {
                 }
             }
             Kind::EndOfInput(_) => "input ended here".into(),
-            Kind::InvalidCodePath => todo!(),
+            Kind::FailedPrecondition => {
+                "failed precondition error while running this command".into()
+            }
         }
     }
 }
@@ -183,6 +185,45 @@ impl SimpleEndOfInputError {
 impl TexError for SimpleEndOfInputError {
     fn kind(&self) -> Kind {
         Kind::EndOfInput(&self.trace)
+    }
+
+    fn title(&self) -> String {
+        self.title.clone()
+    }
+
+    fn notes(&self) -> Vec<display::Note> {
+        let mut notes = vec![];
+        for text_note in &self.text_notes {
+            notes.push(text_note.into())
+        }
+        notes
+    }
+}
+
+#[derive(Debug)]
+pub struct SimpleFailedPreconditionError {
+    pub title: String,
+    pub text_notes: Vec<String>,
+}
+
+impl SimpleFailedPreconditionError {
+    /// Create a new simple failed precondition error.
+    pub fn new<T: AsRef<str>>(title: T) -> Self {
+        Self {
+            title: title.as_ref().into(),
+            text_notes: vec![],
+        }
+    }
+
+    pub fn with_note<T: Into<String>>(mut self, note: T) -> Self {
+        self.text_notes.push(note.into());
+        self
+    }
+}
+
+impl TexError for SimpleFailedPreconditionError {
+    fn kind(&self) -> Kind {
+        Kind::FailedPrecondition
     }
 
     fn title(&self) -> String {

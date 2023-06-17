@@ -17,7 +17,7 @@ fn input_fn<S: TexlangState>(
 ) -> Result<Vec<token::Token>, Box<command::Error>> {
     let file_location = FileLocation::parse(input)?;
     let (file_path, source_code) = read_file(input_token, input.vm(), file_location, ".tex")?;
-    input.push_source(input_token, file_path, source_code)?;
+    input.push_source(input_token, file_path.into(), source_code)?;
     Ok(Vec::new())
 }
 

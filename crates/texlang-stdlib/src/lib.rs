@@ -19,6 +19,7 @@ pub mod conditional;
 pub mod def;
 pub mod expansion;
 pub mod io;
+pub mod job;
 pub mod math;
 pub mod prefix;
 pub mod registers;
@@ -38,6 +39,7 @@ pub struct StdLibState {
     alloc: alloc::Component,
     catcode: catcode::Component,
     conditional: conditional::Component,
+    pub job: job::Component,
     prefix: prefix::Component,
     registers: registers::Component<i32, 32768>,
     repl: repl::Component,
@@ -93,6 +95,8 @@ impl StdLibState {
             ("day", time::get_day()),
             ("def", def::get_def()),
             ("divide", math::get_divide()),
+            ("dumpFormat", job::get_dumpformat()),
+            ("dumpValidate", job::get_dumpvalidate()),
             //
             ("else", conditional::get_else()),
             ("expandafter", expansion::get_expandafter_optimized()),
@@ -110,6 +114,8 @@ impl StdLibState {
             ("iftrue", conditional::get_if_true()),
             ("input", io::get_input()),
             //
+            ("jobname", job::get_jobname()),
+            //
             ("let", alias::get_let()),
             ("long", prefix::get_long()),
             //
@@ -117,9 +123,15 @@ impl StdLibState {
             ("multiply", math::get_multiply()),
             //
             ("newInt", alloc::get_newint()),
-            ("newInt_getter_provider_\u{0}", alloc::get_newint_getter_provider()),
+            (
+                "newInt_getter_provider_\u{0}",
+                alloc::get_newint_getter_provider(),
+            ),
             ("newIntArray", alloc::get_newintarray()),
-            ("newIntArray_getter_provider_\u{0}", alloc::get_newintarray_getter_provider()),
+            (
+                "newIntArray_getter_provider_\u{0}",
+                alloc::get_newintarray_getter_provider(),
+            ),
             ("noexpand", expansion::get_noexpand()),
             //
             ("or", conditional::get_or()),
@@ -147,6 +159,7 @@ implement_has_component![
     (alloc::Component, alloc),
     (catcode::Component, catcode),
     (conditional::Component, conditional),
+    (job::Component, job),
     (prefix::Component, prefix),
     (registers::Component<i32, 32768>, registers),
     (repl::Component, repl),
@@ -265,7 +278,7 @@ mod tests {
             r"\def\else{}\ifodd 2 \else should be skipped \fi",
             r""
         )),
-        serde_tests((serde_sanity_check, r"\def\HW{Hello World} ", r"\HW"),),
+        serde_tests((serde_sanity, r"\def\HW{Hello World} ", r"\HW"),),
     ];
 
     #[test]

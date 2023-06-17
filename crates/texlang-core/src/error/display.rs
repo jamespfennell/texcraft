@@ -7,7 +7,7 @@ pub fn format_error(f: &mut std::fmt::Formatter<'_>, err: &error::Error) -> std:
     let (error_line, immediate_command) = match root.kind() {
         error::Kind::Token(s) => (s, stack.last()),
         error::Kind::EndOfInput(s) => (s, stack.last()),
-        error::Kind::InvalidCodePath => (&stack.last().unwrap().trace, None),
+        error::Kind::FailedPrecondition => (&stack.last().unwrap().trace, None),
     };
 
     let line = PrimaryLine {
@@ -211,7 +211,7 @@ fn fmt_source_code_trace(
         .with_content(format!(
             "{} {}:{}:{}",
             ">>>".bright_cyan().bold(),
-            s.file_name,
+            s.file_name.display(),
             s.line_number,
             s.index + 1
         ))
@@ -256,7 +256,7 @@ fn fmt_source_code_trace_light(
     let prefix = format!(
         "{}{}:{}:{}",
         " ".repeat(indent),
-        s.file_name,
+        s.file_name.display(),
         s.line_number,
         s.index + 1
     );

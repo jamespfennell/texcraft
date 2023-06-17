@@ -81,6 +81,10 @@ impl<S> Map<S> {
         }
     }
 
+    pub fn initial_built_ins(&self) -> &HashMap<token::CsName, BuiltIn<S>> {
+        &self.initial_built_ins
+    }
+
     pub fn get_command_slow(&self, name: &token::CsName) -> Option<BuiltIn<S>> {
         let command = match self.get_command(name) {
             None => return None,
@@ -318,6 +322,7 @@ impl<'a> SerializableMap<'a> {
     pub(crate) fn finish_deserialization<S>(
         self,
         initial_built_ins: HashMap<token::CsName, BuiltIn<S>>,
+        interner: &token::CsNameInterner,
     ) -> Map<S> {
         let macros: Vec<Rc<texmacro::Macro>> = self
             .macros
@@ -332,7 +337,15 @@ impl<'a> SerializableMap<'a> {
                 |(cs_name, serialized_command): (token::CsName, &SerializableCommand)| {
                     let command = match serialized_command {
                         SerializableCommand::BuiltIn(cs_name) => {
-                            initial_built_ins.get(cs_name).unwrap().cmd.clone()
+                            match initial_built_ins.get(cs_name) {
+                                None => {
+                                    panic!(
+                                        "unknown control sequence {:?}",
+                                        interner.resolve(*cs_name)
+                                    )
+                                }
+                                Some(cmd) => cmd.cmd.clone(),
+                            }
                         }
                         SerializableCommand::VariableArrayStatic(cs_name, index) => {
                             match &initial_built_ins.get(cs_name).unwrap().cmd {

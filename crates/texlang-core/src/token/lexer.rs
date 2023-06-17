@@ -38,10 +38,12 @@ impl CatCodeFn for std::collections::HashMap<char, CatCode> {
 }
 
 /// The Texlang lexer
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Lexer {
     raw_lexer: RawLexer,
     trim_next_whitespace: bool,
     // We read control sequence names into a shared buffer to avoid allocating for each one.
+    #[cfg_attr(feature = "serde", serde(skip))]
     buffer: String,
 }
 
@@ -170,6 +172,7 @@ struct RawToken {
     trace_key: trace::Key,
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 struct RawLexer {
     iter: OwningChars,
     trace_key_range: trace::KeyRange,

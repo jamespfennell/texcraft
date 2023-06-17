@@ -3,6 +3,8 @@
 *.log
 *.pdf
 *.dvi
+*.json
+*.fmt
 flamegraph.svg
 perf.data*
 callgrind*

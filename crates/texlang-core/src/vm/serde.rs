@@ -8,7 +8,7 @@ use std::rc::Rc;
 struct SerializableVM<'a, S> {
     state: &'a S,
     commands_map: &'a command::Map<S>,
-    interner: &'a token::CsNameInterner,
+    internal: &'a vm::Internal<S>,
 }
 
 impl<'a, S> SerializableVM<'a, S> {
@@ -16,7 +16,7 @@ impl<'a, S> SerializableVM<'a, S> {
         Self {
             state: &vm.state,
             commands_map: &vm.commands_map,
-            interner: &vm.internal.cs_name_interner,
+            internal: &vm.internal,
         }
     }
 }
@@ -35,26 +35,26 @@ impl<State: serde::Serialize> Serialize for vm::VM<State> {
 struct DeserializedVM<'a, S> {
     state: S,
     commands_map: command::map::SerializableMap<'a>,
-    interner: token::CsNameInterner,
+    internal: vm::Internal<S>,
 }
 
 fn finish_deserialization<S>(
-    #[allow(clippy::boxed_local)] deserialized: Box<DeserializedVM<'_, S>>,
+    #[allow(clippy::boxed_local)] mut deserialized: Box<DeserializedVM<'_, S>>,
     initial_built_ins: HashMap<&str, command::BuiltIn<S>>,
 ) -> Box<vm::VM<S>> {
-    let mut internal = vm::Internal::new(deserialized.interner);
     let initial_built_ins = initial_built_ins
         .into_iter()
         .map(|(key, value)| {
-            let cs_name = internal.cs_name_interner.get_or_intern(key);
+            let cs_name = deserialized.internal.cs_name_interner.get_or_intern(key);
             (cs_name, value)
         })
         .collect();
+    let commands_map = deserialized
+        .commands_map
+        .finish_deserialization(initial_built_ins, &deserialized.internal.cs_name_interner);
     Box::new(vm::VM {
         state: deserialized.state,
-        commands_map: deserialized
-            .commands_map
-            .finish_deserialization(initial_built_ins),
+        commands_map,
         file_system: Box::new(super::RealFileSystem {}),
         terminal: Rc::new(RefCell::new(std::io::stderr())),
         log_file: Rc::new(RefCell::new(std::io::sink())),
@@ -65,7 +65,7 @@ fn finish_deserialization<S>(
                 None
             }
         },
-        internal,
+        internal: deserialized.internal,
     })
 }
 

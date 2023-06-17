@@ -1,9 +1,10 @@
 use clap::Parser;
 use colored::Colorize;
-use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::fs;
 use std::path::PathBuf;
 use texlang_core::*;
+use texlang_stdlib::job;
 use texlang_stdlib::repl;
 use texlang_stdlib::script;
 use texlang_stdlib::StdLibState;
@@ -16,6 +17,10 @@ use texlang_stdlib::StdLibState;
 #[derive(Parser)]
 #[clap(version)]
 struct Cli {
+    /// Path to a format file
+    #[arg(long)]
+    format_file: Option<PathBuf>,
+
     #[clap(subcommand)]
     sub_command: SubCommand,
 }
@@ -44,14 +49,16 @@ struct Run {
 
 fn main() {
     let args: Cli = Cli::parse();
+    let is_repl = matches!(args.sub_command, SubCommand::Repl);
+    let mut vm = new_vm(args.format_file, is_repl);
     let result = match args.sub_command {
-        SubCommand::Doc(d) => doc(d.name),
+        SubCommand::Doc(d) => doc(&vm, d.name),
         SubCommand::Repl => {
-            repl();
+            repl(&mut vm);
             Ok(())
         }
         SubCommand::Run(run_args) => {
-            let result = run(run_args.file_path);
+            let result = run(&mut vm, run_args.file_path);
             if let Err(err) = result {
                 println!["{err}"];
                 std::process::exit(1);
@@ -65,10 +72,11 @@ fn main() {
     }
 }
 
-fn run(mut path: PathBuf) -> Result<(), Box<error::Error>> {
+fn run(vm: &mut vm::VM<StdLibState>, mut path: PathBuf) -> Result<(), Box<error::Error>> {
     if path.extension().is_none() {
         path.set_extension("tex");
     }
+    vm.state.job.set_job_name(&path);
     let source_code = match fs::read_to_string(&path) {
         Ok(source_code) => source_code,
         Err(err) => {
@@ -76,19 +84,17 @@ fn run(mut path: PathBuf) -> Result<(), Box<error::Error>> {
             std::process::exit(1);
         }
     };
-    let mut vm = new_vm();
     // The only error possible is input stack size exceeded, which can't be hit.
     // TODO: the external VM method shouldn't error
     let _ = vm.push_source(path.to_string_lossy().to_string(), source_code);
-    script::run_and_write(&mut vm, Box::new(std::io::stdout()))?;
+    script::run_and_write(vm, Box::new(std::io::stdout()))?;
     Ok(())
 }
 
-fn repl() {
+fn repl(vm: &mut vm::VM<StdLibState>) {
     println!("{}\n", REPL_START.trim());
-    let mut vm = new_repl_vm();
     repl::run::run(
-        &mut vm,
+        vm,
         repl::RunOptions {
             prompt: "tex> ",
             help: REPL_HELP,
@@ -125,9 +131,7 @@ Tips
 Website: https://texcraft.dev
 ";
 
-fn doc(cs_name: Option<String>) -> Result<(), String> {
-    let vm = new_vm();
-
+fn doc(vm: &vm::VM<StdLibState>, cs_name: Option<String>) -> Result<(), String> {
     match cs_name {
         None => {
             let mut cs_names = Vec::new();
@@ -175,21 +179,7 @@ fn doc(cs_name: Option<String>) -> Result<(), String> {
     }
 }
 
-fn new_vm() -> Box<vm::VM<StdLibState>> {
-    vm::VM::<StdLibState>::new(initial_built_ins())
-}
-
-fn new_repl_vm() -> Box<vm::VM<StdLibState>> {
-    let mut m = initial_built_ins();
-    m.insert("doc", repl::get_doc());
-    m.insert("help", repl::get_help());
-    m.insert("exit", repl::get_exit());
-    m.insert("quit", repl::get_exit());
-    m.insert("q", repl::get_exit());
-    vm::VM::<StdLibState>::new(m)
-}
-
-fn initial_built_ins() -> HashMap<&'static str, command::BuiltIn<StdLibState>> {
+fn new_vm(format_file_path: Option<PathBuf>, repl: bool) -> Box<vm::VM<StdLibState>> {
     let mut m = StdLibState::all_initial_built_ins();
     m.insert("par", script::get_par());
     m.insert("newline", script::get_newline());
@@ -197,5 +187,27 @@ fn initial_built_ins() -> HashMap<&'static str, command::BuiltIn<StdLibState>> {
         "\\",
         command::Command::Character(token::Value::Other('\\')).into(),
     );
-    m
+    if repl {
+        m.insert("doc", repl::get_doc());
+        m.insert("help", repl::get_help());
+        m.insert("exit", repl::get_exit());
+        m.insert("quit", repl::get_exit());
+        m.insert("q", repl::get_exit());
+    } else {
+        m.insert("dump", job::get_dump());
+    }
+
+    match format_file_path {
+        None => vm::VM::<StdLibState>::new(m),
+        Some(path) => {
+            let format_file = std::fs::read(&path).unwrap();
+            if path.extension().map(OsStr::to_str) == Some(Some("json")) {
+                let mut deserializer = serde_json::Deserializer::from_slice(&format_file);
+                vm::VM::deserialize(&mut deserializer, m)
+            } else {
+                let mut deserializer = rmp_serde::decode::Deserializer::from_read_ref(&format_file);
+                vm::VM::deserialize(&mut deserializer, m)
+            }
+        }
+    }
 }

@@ -216,7 +216,9 @@ pub fn run_serde_test<S>(
     output_1_1.append(&mut output_1_2);
 
     let mut vm_2 = initialize_vm(&options);
-    let output_2 = crate::testing::execute_source_code(&mut vm_2,format!["{input_1}{input_2}"], &options).unwrap();
+    let output_2 =
+        crate::testing::execute_source_code(&mut vm_2, format!["{input_1}{input_2}"], &options)
+            .unwrap();
 
     compare_output(output_1_1, &vm_1, output_2, &vm_2)
 }
@@ -311,6 +313,9 @@ impl vm::FileSystem for InMemoryFileSystem {
             )),
             Some(content) => Ok(content.clone()),
         }
+    }
+    fn write_bytes(&self, _: &std::path::Path, _: &[u8]) -> std::io::Result<()> {
+        unimplemented!()
     }
 }
 

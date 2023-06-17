@@ -146,6 +146,7 @@ impl Token {
         self.value
     }
 
+    #[inline]
     pub fn trace_key(&self) -> trace::Key {
         self.trace_key
     }
