@@ -929,6 +929,15 @@ dependencies = [
 name = "texcraft"
 version = "0.1.0"
 dependencies = [
+ "texcraft-stdext",
+ "texlang",
+ "texlang-stdlib",
+]
+
+[[package]]
+name = "texcraft-bin"
+version = "0.1.0"
+dependencies = [
  "clap 4.3.4",
  "colored",
  "performance",

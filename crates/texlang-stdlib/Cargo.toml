@@ -19,8 +19,8 @@ chrono = {version="0.4.19", default-features = false, features = ["clock"], opti
 
 linefeed = {version = "0.6", optional = true}
 
-texcraft-stdext = { path = "../texcraft-stdext" }
-texlang = { path = "../texlang" }
+texcraft-stdext = { path = "../texcraft-stdext", version = "0.1.0" }
+texlang = { path = "../texlang", version="0.1.0" }
 
 # Nice terminal output.
 colored = "2"
