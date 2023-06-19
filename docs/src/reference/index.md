@@ -6,5 +6,5 @@ The texcraft.dev version is from the most recent deployment of the website.
 | Name              | Rust documentation 
 | ----------------- | ------------------
 | `texlang`         | [docs.rs](https://docs.rs/texlang) / [texcraft.dev](/reference/texlang/)
-| `texlang-stdlib`  | [docs.rs](https://docs.rs/texlang-stdlib) / [texcraft.dev](/reference/texlang-stdlib)
-| `texcraft-stdext` | [docs.rs](https://docs.rs/texcraft-stdext) / [texcraft.dev](/references/texcraft-stdext)
+| `texlang-stdlib`  | [docs.rs](https://docs.rs/texlang-stdlib) / [texcraft.dev](/reference/texlang_stdlib)
+| `texcraft-stdext` | [docs.rs](https://docs.rs/texcraft-stdext) / [texcraft.dev](/reference/texcraft_stdext)
