@@ -1,19 +1,7 @@
-FROM golang:1.16 AS hugo-builder
+FROM rust:1.67 AS builder
 
-# Install Hugo
-WORKDIR /usr/bin
-RUN curl -L -o hugo.tar.gz https://github.com/gohugoio/hugo/releases/download/v0.87.0/hugo_extended_0.87.0_Linux-64bit.tar.gz
-RUN tar -zxvf hugo.tar.gz
-
-# Build the Hugo HTML files
-WORKDIR /website
-COPY . .
-RUN cd docs && hugo
-
-FROM rust:1.67 AS rust-builder
-
-# Build the Rustdoc HTML files
-WORKDIR /rustdoc
+# Add the files into the container
+WORKDIR /texcraft
 COPY Cargo.lock .
 COPY Cargo.toml .
 COPY bin bin
@@ -21,11 +9,24 @@ COPY performance performance
 COPY playground playground
 COPY crates crates
 RUN cargo fetch
-RUN RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --lib
+# In order to run the MD book tests we need one and only one build of the Texlang code
+# in the target/debug/deps. So we clean the workspace before building the lib just to be sure.
+RUN cargo clean
+RUN cargo build --lib
 
-FROM nginx
+# Build the MD book
+RUN curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.30/mdbook-v0.4.30-x86_64-unknown-linux-gnu.tar.gz | tar -xz --directory=/usr/bin
+COPY docs .
+RUN ls -lah
+RUN mdbook build
+RUN mdbook test -L target/debug/deps
 
-# Put it all together
-RUN rm -rf /usr/share/nginx/html
-COPY --from=hugo-builder /website/docs/public /usr/share/nginx/html
-COPY --from=rust-builder /rustdoc/target/doc /usr/share/nginx/html/rustdoc
+# Built the Rust reference
+RUN RUSTDOCFLAGS="-D warnings" cargo doc --all-features --lib --no-deps -p texlang -p texlang-stdlib -p texcraft-stdext
+
+# Serve the static files using Caddy
+FROM caddy
+WORKDIR /texcraft
+COPY --from=builder /texcraft/book /texcraft
+COPY --from=builder /texcraft/target/doc /texcraft/reference
+ENTRYPOINT caddy file-server --listen :8080 --root /texcraft

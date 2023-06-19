@@ -1,6 +1,6 @@
-//! Texlang standard library of primitives.
+//! # The Texlang standard library
 //!
-//! This module contains implementations of TeX primitives for Texcraft.
+//! This module contains implementations of TeX primitives for Texlang.
 
 extern crate texcraft_stdext;
 extern crate texlang;

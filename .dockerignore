@@ -26,7 +26,5 @@
 !playground/go.sum
 !playground/*.go
 
-!docs/config.toml
-!docs/content/*
-!docs/layouts/*
-!docs/themes/*
+!docs/book.toml
+!docs/src/*

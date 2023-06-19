@@ -35,6 +35,7 @@
         "repr",
         "Seedable",
         "stdext",
+        "stdlib",
         "substringsearch",
         "texbook",
         "Texcraft",
