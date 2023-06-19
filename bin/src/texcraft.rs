@@ -3,7 +3,7 @@ use colored::Colorize;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::PathBuf;
-use texlang_core::*;
+use texlang::*;
 use texlang_stdlib::job;
 use texlang_stdlib::repl;
 use texlang_stdlib::script;

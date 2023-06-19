@@ -20,7 +20,7 @@ pub mod vm;
 ///
 /// This is useful for getting all of the traits in scope in a Rust module:
 /// ```
-/// use texlang_core::traits::*;
+/// use texlang::traits::*;
 /// ```
 pub mod traits {
     pub use super::parse::Parsable;

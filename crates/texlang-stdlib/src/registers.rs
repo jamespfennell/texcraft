@@ -1,10 +1,10 @@
 //! Register variables (`\count`, `\countdef`)
 
 use texcraft_stdext::collections::groupingmap;
-use texlang_core::parse::{Command, OptionalEquals};
-use texlang_core::token::trace;
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::parse::{Command, OptionalEquals};
+use texlang::token::trace;
+use texlang::traits::*;
+use texlang::*;
 
 pub const COUNT_DOC: &str = "Get or set an integer register";
 pub const COUNTDEF_DOC: &str = "Bind an integer register to a control sequence";
@@ -142,7 +142,7 @@ mod tests {
     use crate::script;
     use crate::testing::*;
     use crate::the;
-    use texlang_core::vm::implement_has_component;
+    use texlang::vm::implement_has_component;
 
     #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

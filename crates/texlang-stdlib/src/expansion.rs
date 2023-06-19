@@ -1,7 +1,7 @@
 //! Commands that alter the expansion process
 
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::traits::*;
+use texlang::*;
 
 /// Get the `\noexpand` command.
 pub fn get_noexpand<S>() -> command::BuiltIn<S> {

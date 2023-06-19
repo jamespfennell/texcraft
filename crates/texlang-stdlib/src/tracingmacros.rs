@@ -1,7 +1,7 @@
 //! TeX macro debugging
 
 use colored::*;
-use texlang_core::{command, texmacro, token::write_tokens, traits::*, variable, vm};
+use texlang::{command, texmacro, token::write_tokens, traits::*, variable, vm};
 
 /// Component for storing state related to macro tracing.
 #[derive(Default)]
@@ -22,11 +22,11 @@ pub fn get_tracingmacros<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 }
 
 pub fn hook<S: HasComponent<Component>>(
-    token: texlang_core::token::Token,
+    token: texlang::token::Token,
     input: &vm::ExpansionInput<S>,
-    tex_macro: &texlang_core::texmacro::Macro,
-    arguments: &[&[texlang_core::token::Token]],
-    reversed_expansion: &[texlang_core::token::Token],
+    tex_macro: &texlang::texmacro::Macro,
+    arguments: &[&[texlang::token::Token]],
+    reversed_expansion: &[texlang::token::Token],
 ) {
     if input.state().component().tracing_macros <= 0 {
         return;

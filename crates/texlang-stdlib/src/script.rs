@@ -3,10 +3,10 @@
 //! This module enables using TeX as a scripting language.
 //! TeX files are processed using the usual TeX semantics, but instead
 //! of typesetting the result and outputting it to PDF (say), the output is returned as a list of tokens.
-//! These can be easily converted to a string using [texlang_core::token::write_tokens].
+//! These can be easily converted to a string using [texlang::token::write_tokens].
 
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::traits::*;
+use texlang::*;
 
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -143,7 +143,7 @@ mod tests {
     use super::*;
     use crate::def;
     use crate::testing::*;
-    use texlang_core::token;
+    use texlang::token;
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([

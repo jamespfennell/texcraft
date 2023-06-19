@@ -12,10 +12,10 @@ use std::collections::HashMap;
 
 use crate::prefix;
 use crate::script;
-use texlang_core::traits::*;
-use texlang_core::vm::implement_has_component;
-use texlang_core::vm::VM;
-use texlang_core::*;
+use texlang::traits::*;
+use texlang::vm::implement_has_component;
+use texlang::vm::VM;
+use texlang::*;
 
 /// Simple state type for use in unit tests.
 ///
@@ -104,7 +104,7 @@ fn compare_output<S>(
     output_2: Vec<token::Token>,
     vm_2: &vm::VM<S>,
 ) {
-    use ::texlang_core::token::Value::ControlSequence;
+    use ::texlang::token::Value::ControlSequence;
     println!("{output_1:?}");
     let equal = match output_1.len() == output_2.len() {
         false => {
@@ -140,12 +140,12 @@ fn compare_output<S>(
         println!("------[lhs]------");
         println!(
             "'{}'",
-            ::texlang_core::token::write_tokens(&output_1, vm_1.cs_name_interner())
+            ::texlang::token::write_tokens(&output_1, vm_1.cs_name_interner())
         );
         println!("------[rhs]------");
         println!(
             "'{}'",
-            ::texlang_core::token::write_tokens(&output_2, vm_2.cs_name_interner())
+            ::texlang::token::write_tokens(&output_2, vm_2.cs_name_interner())
         );
         println!("-----------------");
         panic!("Expansion test failed");
@@ -167,7 +167,7 @@ where
         println!("Expansion succeeded:");
         println!(
             "{}",
-            ::texlang_core::token::write_tokens(&output, vm.cs_name_interner())
+            ::texlang::token::write_tokens(&output, vm.cs_name_interner())
         );
         panic!("Expansion failure test did not pass: expansion successful");
     }
@@ -278,7 +278,7 @@ where
 /// Given a VM, the file system can be set as follows:
 /// ```
 /// # type State = ();
-/// # use texlang_core::vm;
+/// # use texlang::vm;
 /// # use texlang_stdlib::testing::*;
 /// let mut vm = vm::VM::<State>::new(
 ///     Default::default(),  // initial commands
@@ -292,7 +292,7 @@ where
 ///     [TestOption::CustomVMInitializationDyn] option:
 /// ```
 /// # type State = ();
-/// # use texlang_core::vm;
+/// # use texlang::vm;
 /// # use texlang_stdlib::testing::*;
 /// let options = TestOption::CustomVMInitializationDyn(Box::new(|vm: &mut vm::VM<State>|{
 ///     let mock_file_system: InMemoryFileSystem = Default::default();

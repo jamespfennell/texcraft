@@ -3,14 +3,14 @@
 //! This module contains implementations of TeX primitives for Texcraft.
 
 extern crate texcraft_stdext;
-extern crate texlang_core;
+extern crate texlang;
 
 use std::collections::HashMap;
 
-use texlang_core::command;
-use texlang_core::traits::*;
-use texlang_core::vm;
-use texlang_core::vm::implement_has_component;
+use texlang::command;
+use texlang::traits::*;
+use texlang::vm;
+use texlang::vm::implement_has_component;
 
 pub mod alias;
 pub mod alloc;
@@ -50,27 +50,27 @@ pub struct StdLibState {
 
 impl TexlangState for StdLibState {
     #[inline]
-    fn cat_code(&self, c: char) -> texlang_core::token::CatCode {
+    fn cat_code(&self, c: char) -> texlang::token::CatCode {
         catcode::cat_code(self, c)
     }
 
     #[inline]
     fn post_macro_expansion_hook(
-        token: texlang_core::token::Token,
+        token: texlang::token::Token,
         input: &vm::ExpansionInput<Self>,
-        tex_macro: &texlang_core::texmacro::Macro,
-        arguments: &[&[texlang_core::token::Token]],
-        reversed_expansion: &[texlang_core::token::Token],
+        tex_macro: &texlang::texmacro::Macro,
+        arguments: &[&[texlang::token::Token]],
+        reversed_expansion: &[texlang::token::Token],
     ) {
         tracingmacros::hook(token, input, tex_macro, arguments, reversed_expansion)
     }
 
     #[inline]
     fn expansion_override_hook(
-        token: texlang_core::token::Token,
+        token: texlang::token::Token,
         input: &mut vm::ExpansionInput<Self>,
-        tag: Option<texlang_core::command::Tag>,
-    ) -> command::Result<Option<texlang_core::token::Token>> {
+        tag: Option<texlang::command::Tag>,
+    ) -> command::Result<Option<texlang::token::Token>> {
         expansion::noexpand_hook(token, input, tag)
     }
 
@@ -84,7 +84,7 @@ impl TexlangState for StdLibState {
 
 impl StdLibState {
     pub fn all_initial_built_ins(
-    ) -> HashMap<&'static str, texlang_core::command::BuiltIn<StdLibState>> {
+    ) -> HashMap<&'static str, texlang::command::BuiltIn<StdLibState>> {
         HashMap::from([
             ("advance", math::get_advance()),
             //
@@ -264,7 +264,7 @@ impl ErrorCase {
 mod tests {
     use super::*;
     use testing::*;
-    use texlang_core::command;
+    use texlang::command;
 
     type State = StdLibState;
 

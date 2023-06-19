@@ -245,7 +245,7 @@ impl FileSystem for RealFileSystem {
 /// The most important thing to know about this trait is that it has no required methods.
 /// For any type it can be implemented trivially:
 /// ```
-/// # use texlang_core::traits::TexlangState;
+/// # use texlang::traits::TexlangState;
 /// struct SomeNewType;
 ///
 /// impl TexlangState for SomeNewType {}
@@ -643,8 +643,8 @@ pub trait HasComponent<C>: TexlangState {
 /// # mod mylibrary{
 /// #   pub struct Component;
 /// # }
-/// # use texlang_core::vm::implement_has_component;
-/// # use texlang_core::traits::*;
+/// # use texlang::vm::implement_has_component;
+/// # use texlang::traits::*;
 /// #
 /// struct MyState {
 ///     component: mylibrary::Component,
@@ -664,8 +664,8 @@ pub trait HasComponent<C>: TexlangState {
 /// # mod mylibrary2{
 /// #   pub struct Component;
 /// # }
-/// # use texlang_core::vm::implement_has_component;
-/// # use texlang_core::traits::*;
+/// # use texlang::vm::implement_has_component;
+/// # use texlang::traits::*;
 /// #
 /// struct MyState {
 ///     component_1: mylibrary1::Component,
@@ -687,7 +687,7 @@ macro_rules! implement_has_component {
     };
     ( $type: path, $(($component: path, $field: ident),)+) => {
         $(
-            impl ::texlang_core::vm::HasComponent<$component> for $type {
+            impl ::texlang::vm::HasComponent<$component> for $type {
                 #[inline]
                 fn component(&self) -> &$component {
                     &self.$field

@@ -8,7 +8,7 @@ edition = "2021"
 criterion = "0.3"
 
 [dependencies]
-texlang-core = { path = "../crates/texlang-core", default-features = false }
+texlang = { path = "../crates/texlang", default-features = false }
 texlang-stdlib = { path = "../crates/texlang-stdlib", default-features = false }
 rand = "0.8.4"
 

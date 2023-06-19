@@ -3,8 +3,8 @@ use std::{
     ffi::OsString,
     path::{Path, PathBuf},
 };
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::traits::*;
+use texlang::*;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Component {

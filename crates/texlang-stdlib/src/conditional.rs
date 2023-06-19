@@ -3,9 +3,9 @@
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
-use texlang_core::token::trace;
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::token::trace;
+use texlang::traits::*;
+use texlang::*;
 
 pub const ELSE_DOC: &str = "Start the else branch of a conditional or switch statement";
 pub const IFCASE_DOC: &str = "Begin a switch statement";
@@ -512,7 +512,7 @@ mod tests {
 
     use super::*;
     use crate::{script, testing::*};
-    use texlang_core::vm::implement_has_component;
+    use texlang::vm::implement_has_component;
 
     #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

@@ -2,9 +2,9 @@
 
 use super::script;
 use std::sync::Arc;
-use texlang_core::parse::Command;
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::parse::Command;
+use texlang::traits::*;
+use texlang::*;
 
 pub struct RunOptions<'a> {
     pub prompt: &'a str,

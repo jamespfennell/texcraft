@@ -1,9 +1,9 @@
 //! `\let` aliasing command
 
 use crate::prefix;
-use texlang_core::parse::{Command, OptionalEqualsUnexpanded};
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::parse::{Command, OptionalEqualsUnexpanded};
+use texlang::traits::*;
+use texlang::*;
 
 pub const LET_DOC: &str = "Assign a command or character to a control sequence";
 

@@ -1,9 +1,9 @@
 //! Operations on variables (add, multiply, divide)
 
 use crate::prefix;
-use texlang_core::parse::OptionalBy;
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::parse::OptionalBy;
+use texlang::traits::*;
+use texlang::*;
 
 /// Get the `\advance` command.
 pub fn get_advance<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
@@ -199,7 +199,7 @@ mod tests {
     use crate::script;
     use crate::testing::*;
     use crate::the;
-    use texlang_core::vm::implement_has_component;
+    use texlang::vm::implement_has_component;
 
     #[derive(Default)]
     struct State {

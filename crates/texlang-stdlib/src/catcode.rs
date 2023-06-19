@@ -1,10 +1,10 @@
 //! The `\catcode` primitive
 
 use std::collections::HashMap;
-use texlang_core::token;
-use texlang_core::token::CatCode;
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::token;
+use texlang::token::CatCode;
+use texlang::traits::*;
+use texlang::*;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Component {

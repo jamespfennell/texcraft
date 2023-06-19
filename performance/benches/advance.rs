@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use texlang_core::token::trace;
-use texlang_core::*;
+use texlang::token::trace;
+use texlang::*;
 use texlang_stdlib::script;
 use texlang_stdlib::StdLibState;
 

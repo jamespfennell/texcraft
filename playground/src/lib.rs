@@ -6,8 +6,8 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use texcraft_stdext::collections::groupingmap;
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::traits::*;
+use texlang::*;
 use texlang_stdlib::alias;
 use texlang_stdlib::alloc;
 use texlang_stdlib::catcode;
@@ -59,15 +59,15 @@ struct PlaygroundState {
 }
 
 impl TexlangState for PlaygroundState {
-    fn cat_code(&self, c: char) -> texlang_core::token::CatCode {
+    fn cat_code(&self, c: char) -> texlang::token::CatCode {
         catcode::cat_code(self, c)
     }
 
     fn expansion_override_hook(
-        token: texlang_core::token::Token,
+        token: texlang::token::Token,
         input: &mut vm::ExpansionInput<Self>,
-        tag: Option<texlang_core::command::Tag>,
-    ) -> command::Result<Option<texlang_core::token::Token>> {
+        tag: Option<texlang::command::Tag>,
+    ) -> command::Result<Option<texlang::token::Token>> {
         expansion::noexpand_hook(token, input, tag)
     }
 

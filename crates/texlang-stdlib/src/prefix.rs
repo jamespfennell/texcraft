@@ -55,9 +55,9 @@ use crate::def;
 use crate::math;
 use std::collections::HashSet;
 use texcraft_stdext::collections::groupingmap;
-use texlang_core::token::trace;
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::token::trace;
+use texlang::traits::*;
+use texlang::*;
 
 /// Component for the prefix commands.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -445,8 +445,8 @@ mod test {
     use super::*;
     use crate::{script, testing::*, the};
     use std::collections::HashMap;
-    use texlang_core::variable;
-    use texlang_core::vm::implement_has_component;
+    use texlang::variable;
+    use texlang::vm::implement_has_component;
 
     #[derive(Default)]
     struct State {

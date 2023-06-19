@@ -2,9 +2,9 @@
 //!
 
 use std::path;
-use texlang_core::parse::FileLocation;
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::parse::FileLocation;
+use texlang::traits::*;
+use texlang::*;
 
 /// Get the `\input` expansion primitive.
 pub fn get_input<S: TexlangState>() -> command::BuiltIn<S> {

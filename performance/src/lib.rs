@@ -1,7 +1,7 @@
 use rand::Rng;
 use std::process::Command;
 use std::process::Stdio;
-use texlang_core::vm::VM;
+use texlang::vm::VM;
 use texlang_stdlib::script;
 use texlang_stdlib::StdLibState;
 

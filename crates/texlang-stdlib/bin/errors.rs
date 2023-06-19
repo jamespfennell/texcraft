@@ -1,4 +1,4 @@
-use texlang_core::*;
+use texlang::*;
 use texlang_stdlib::*;
 
 fn main() {

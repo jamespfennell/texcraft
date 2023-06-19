@@ -2,8 +2,8 @@
 
 use core::time;
 use std::thread;
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::traits::*;
+use texlang::*;
 
 pub const SLEEP_DOC: &str = "Sleep for a number of milliseconds";
 

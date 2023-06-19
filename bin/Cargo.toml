@@ -18,6 +18,6 @@ rand = "0.8.4"
 rmp-serde = {version="^1.0"}
 serde_json = {version="1.0"} 
 
-texlang-core = { path = "../crates/texlang-core" }
+texlang = { path = "../crates/texlang" }
 texlang-stdlib = { path = "../crates/texlang-stdlib", features = ["repl", "serde"]}
 performance = {path = "../performance"}

@@ -251,7 +251,7 @@ impl Tag {
     /// Creates a new unique tag.
     ///
     /// ```
-    /// # use texlang_core::command::Tag;
+    /// # use texlang::command::Tag;
     /// let tag_1 = Tag::new();
     /// let tag_2 = Tag::new();
     /// assert_ne!(tag_1, tag_2);
@@ -270,7 +270,7 @@ impl Tag {
 /// A static tag enables creating a tag in a static variable.
 ///
 /// ```
-/// # use texlang_core::command::StaticTag;
+/// # use texlang::command::StaticTag;
 /// static TAG: StaticTag = StaticTag::new();
 ///
 /// let first_get = TAG.get();

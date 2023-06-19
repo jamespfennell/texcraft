@@ -5,9 +5,9 @@
 
 use std::collections::HashMap;
 use texcraft_stdext::collections::groupingmap;
-use texlang_core::parse::Command;
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::parse::Command;
+use texlang::traits::*;
+use texlang::*;
 
 pub const NEWINT_DOC: &str = r"Allocate a new integer
 
@@ -192,7 +192,7 @@ mod test {
     use super::*;
     use crate::the::get_the;
     use crate::{script, testing::*};
-    use texlang_core::vm::implement_has_component;
+    use texlang::vm::implement_has_component;
 
     #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

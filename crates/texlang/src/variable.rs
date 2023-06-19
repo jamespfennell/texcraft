@@ -90,8 +90,8 @@
 //! # pub struct MyComponent {
 //! #     my_variable_value: i32
 //! # }
-//! use texlang_core::vm::HasComponent;
-//! use texlang_core::variable;
+//! use texlang::vm::HasComponent;
+//! use texlang::variable;
 //!
 //! fn getter<S: HasComponent<MyComponent>>(state: &S, index: variable::Index) -> &i32 {
 //!     &state.component().my_variable_value
@@ -106,15 +106,15 @@
 //! # pub struct MyComponent {
 //! #     my_variable_value: i32
 //! # }
-//! # use texlang_core::vm::HasComponent;
+//! # use texlang::vm::HasComponent;
 //! # fn getter<S: HasComponent<MyComponent>>(state: &S, index: variable::Index) -> &i32 {
 //! #    &state.component().my_variable_value
 //! # }
 //! # fn mut_getter<S: HasComponent<MyComponent>>(state: &mut S, index: variable::Index) -> &mut i32 {
 //! #    &mut state.component_mut().my_variable_value
 //! # }
-//! use texlang_core::variable;
-//! use texlang_core::command;
+//! use texlang::variable;
+//! use texlang::command;
 //!
 //! pub fn my_variable<S: HasComponent<MyComponent>>() -> command::BuiltIn<S> {
 //!     return variable::Command::new_singleton(
@@ -136,9 +136,9 @@
 //! With this style, the full code listing is as follows:
 //!
 //! ```
-//! use texlang_core::vm::HasComponent;
-//! use texlang_core::variable;
-//! use texlang_core::command;
+//! use texlang::vm::HasComponent;
+//! use texlang::variable;
+//! use texlang::command;
 //!
 //! pub struct MyComponent {
 //!     my_variable_value: i32
@@ -175,8 +175,8 @@
 //! # pub struct MyComponent {
 //! #     my_array_values: [i32; 10]
 //! # }
-//! # use texlang_core::vm::HasComponent;
-//! # use texlang_core::variable;
+//! # use texlang::vm::HasComponent;
+//! # use texlang::variable;
 //! fn getter<S: HasComponent<MyComponent>>(state: &S, index: variable::Index) -> &i32 {
 //!     &state.component().my_array_values[index.0 as usize]
 //! }
@@ -194,8 +194,8 @@
 //! In the variables API, we implement this by providing the following type of function:
 //!
 //! ```
-//! use texlang_core::*;
-//! use texlang_core::traits::*;
+//! use texlang::*;
+//! use texlang::traits::*;
 //!
 //! fn index<S: TexlangState>(token: token::Token, input: &mut vm::ExpandedStream<S>) -> command::Result<variable::Index> {
 //!     let index = usize::parse(input)?;
@@ -212,7 +212,7 @@
 //! with the `Dynamic` variant:
 //!
 //! ```
-//! # use texlang_core::*;
+//! # use texlang::*;
 //! # fn getter<S: HasComponent<MyComponent>>(state: &S, index: variable::Index) -> &i32 {
 //! #   panic![""]
 //! # }
@@ -225,7 +225,7 @@
 //! # pub struct MyComponent {
 //! #     my_array_values: [i32; 10]
 //! # }
-//! # use texlang_core::vm::HasComponent;
+//! # use texlang::vm::HasComponent;
 //! pub fn my_array<S: HasComponent<MyComponent>>() -> command::BuiltIn<S> {
 //!     return variable::Command::new_array(
 //!         getter,

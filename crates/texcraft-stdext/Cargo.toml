@@ -2,8 +2,12 @@
 name = "texcraft-stdext"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT"
+description = "Rust data structures and algorithms used in the Texcraft project"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["texcraft"]
+categories = ["algorithms", "data-structures"]
 
 [dependencies]
 # Used for diffing strings in the spell check module.

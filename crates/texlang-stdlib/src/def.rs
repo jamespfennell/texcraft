@@ -5,9 +5,9 @@ use texcraft_stdext::algorithms::substringsearch::Matcher;
 use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
 use texcraft_stdext::nevec;
-use texlang_core::parse::Command;
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::parse::Command;
+use texlang::traits::*;
+use texlang::*;
 
 pub const DEF_DOC: &str = "Define a custom macro";
 

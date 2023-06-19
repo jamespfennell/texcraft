@@ -1,9 +1,13 @@
 [package]
-name = "texlang-core"
+name = "texlang"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT"
+description = "Texlang: A TeX language interpreter"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+categories = ["compilers"]
 
 [dependencies]
 # Nice terminal output.

@@ -2,8 +2,8 @@
 
 use std::char;
 use std::convert::TryInto;
-use texlang_core::traits::*;
-use texlang_core::*;
+use texlang::traits::*;
+use texlang::*;
 
 pub const THE_DOC: &str = "Output text describing some inputted tokens";
 
