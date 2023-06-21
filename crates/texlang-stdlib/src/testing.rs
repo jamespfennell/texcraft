@@ -176,6 +176,7 @@ where
 pub enum SerdeFormat {
     Json,
     MessagePack,
+    BinCode,
 }
 
 /// Skip a serialization/deserialization test if the serde feature is off
@@ -208,6 +209,15 @@ pub fn run_serde_test<S>(
             let serialized = rmp_serde::to_vec(&vm_1).unwrap();
             let mut deserializer = rmp_serde::decode::Deserializer::from_read_ref(&serialized);
             vm::VM::deserialize(&mut deserializer, (options.initial_commands)())
+        }
+        SerdeFormat::BinCode => {
+            let serialized =
+                bincode::serde::encode_to_vec(&vm_1, bincode::config::standard()).unwrap();
+            let deserialized: Box<vm::serde::DeserializedVM<S>> =
+                bincode::serde::decode_from_slice(&serialized, bincode::config::standard())
+                    .unwrap()
+                    .0;
+            vm::serde::finish_deserialization(deserialized, (options.initial_commands)())
         }
     };
 
@@ -403,6 +413,14 @@ macro_rules! test_suite {
                     let rhs = $rhs;
                     let options = vec! $options;
                     $crate::testing::run_serde_test::<$state>(&lhs, &rhs, &options, $crate::testing::SerdeFormat::MessagePack);
+                }
+                #[cfg_attr(not(feature = "serde"), ignore)]
+                #[test]
+                fn bincode() {
+                    let lhs = $lhs;
+                    let rhs = $rhs;
+                    let options = vec! $options;
+                    $crate::testing::run_serde_test::<$state>(&lhs, &rhs, &options, $crate::testing::SerdeFormat::BinCode);
                 }
             }
         )*

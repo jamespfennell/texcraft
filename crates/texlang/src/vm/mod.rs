@@ -25,7 +25,7 @@ use std::rc::Rc;
 use texcraft_stdext::collections::groupingmap;
 
 #[cfg(feature = "serde")]
-mod serde;
+pub mod serde;
 mod streams;
 pub use streams::*;
 
@@ -348,6 +348,10 @@ impl<S: Default> VM<S> {
     }
 }
 
+/// Deserialize a Texlang VM.
+///
+/// See the [`serde` submodule](serde) for more information on deserialization,
+///     and for functions that don't require a deserializer.
 #[cfg(feature = "serde")]
 impl<'de, S: ::serde::Deserialize<'de>> VM<S> {
     pub fn deserialize<D: ::serde::Deserializer<'de>>(

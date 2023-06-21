@@ -83,21 +83,22 @@ fn dump_primitive_fn<
         job_name.push(format!["-{}", num_dumps + 1]);
     }
     let mut output_file: PathBuf = job_name.into();
-    output_file.set_extension(if component.dump_format == 0 {
-        "fmt"
-    } else {
-        "fmt.json"
+    output_file.set_extension(match component.dump_format {
+        1 => "fmt.json",
+        2 => "fmt.bincode",
+        _ => "fmt",
     });
 
     // TODO: error handle all these serialization errors.
     let serialized = match component.dump_format {
         0 => rmp_serde::encode::to_vec(input.vm()).unwrap(),
         1 => serde_json::to_vec_pretty(input.vm()).unwrap(),
+        2 => bincode::serde::encode_to_vec(input.vm(), bincode::config::standard()).unwrap(),
         i => {
             return Err(error::SimpleFailedPreconditionError::new(format![
                 r"\dumpFormat has invalid value {i}",
             ])
-            .with_note(r"\dumpFormat must be either 0 (serialize with message pack) or 1 (serialize with json)")
+            .with_note(r"\dumpFormat must be either 0 (message pack), 1 (json) or 2 (bincode)")
             .into())
         }
     };
@@ -123,6 +124,13 @@ fn dump_primitive_fn<
             1 => {
                 let mut deserializer = serde_json::Deserializer::from_slice(&serialized);
                 vm::VM::<S>::deserialize(&mut deserializer, initial_built_ins);
+            }
+            2 => {
+                let deserialized: Box<vm::serde::DeserializedVM<S>> =
+                    bincode::serde::decode_from_slice(&serialized, bincode::config::standard())
+                        .unwrap()
+                        .0;
+                vm::serde::finish_deserialization(deserialized, initial_built_ins);
             }
             _ => unreachable!(),
         };

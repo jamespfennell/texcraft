@@ -1,10 +1,9 @@
 //! Texlang variables API
-//! 
+//!
 //! The documentation website contains
 //!   [a tutorial specifically about Texlang's variables API](https://texcraft.dev/texlang/07-variables.html).
 //! See that documentation for an overview of the API.
 //! As usual, the documentation here is meant as reference.
-
 
 use crate::error;
 use crate::parse::OptionalEquals;

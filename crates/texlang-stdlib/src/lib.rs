@@ -83,8 +83,8 @@ impl TexlangState for StdLibState {
 }
 
 impl StdLibState {
-    pub fn all_initial_built_ins(
-    ) -> HashMap<&'static str, texlang::command::BuiltIn<StdLibState>> {
+    pub fn all_initial_built_ins() -> HashMap<&'static str, texlang::command::BuiltIn<StdLibState>>
+    {
         HashMap::from([
             ("advance", math::get_advance()),
             //

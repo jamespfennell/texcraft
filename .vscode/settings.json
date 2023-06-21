@@ -1,5 +1,6 @@
 {
     "cSpell.words": [
+        "bincode",
         "catcode",
         "catcodecmd",
         "countdef",
@@ -34,6 +35,7 @@
         "randtex",
         "repr",
         "Seedable",
+        "serde",
         "stdext",
         "stdlib",
         "substringsearch",

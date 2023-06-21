@@ -5,6 +5,7 @@
 *.dvi
 *.json
 *.fmt
+*.bincode
 flamegraph.svg
 perf.data*
 callgrind*
