@@ -39,21 +39,7 @@ pub struct Map<S> {
 
     initial_built_ins: HashMap<token::CsName, BuiltIn<S>>,
     primitive_key_to_built_in_lazy: RefCell<Option<HashMap<PrimitiveKey, token::CsName>>>,
-    variable_key_to_built_in_lazy: RefCell<Option<HashMap<variable::Key, token::CsName>>>,
-}
-
-impl TryFrom<PrimitiveKey> for variable::Key {
-    type Error = ();
-
-    fn try_from(value: PrimitiveKey) -> std::result::Result<Self, Self::Error> {
-        match value {
-            PrimitiveKey::Execution(_, _) => Err(()),
-            PrimitiveKey::Expansion(_, _) => Err(()),
-            PrimitiveKey::VariableSingleton(g) => Ok(g),
-            PrimitiveKey::VariableArrayStatic(g, _) => Ok(g),
-            PrimitiveKey::VariableArrayDynamic(g, _) => Ok(g),
-        }
-    }
+    getters_key_to_built_in_lazy: RefCell<Option<HashMap<variable::GettersKey, token::CsName>>>,
 }
 
 impl<S> Map<S> {
@@ -65,7 +51,7 @@ impl<S> Map<S> {
                 .collect(),
             initial_built_ins,
             primitive_key_to_built_in_lazy: Default::default(),
-            variable_key_to_built_in_lazy: Default::default(),
+            getters_key_to_built_in_lazy: Default::default(),
         }
     }
 
@@ -202,21 +188,25 @@ impl<S> Map<S> {
         self.primitive_key_to_built_in()
     }
 
-    fn variable_key_to_built_in(&self) -> Ref<'_, HashMap<variable::Key, token::CsName>> {
-        if let Ok(r) = Ref::filter_map(self.variable_key_to_built_in_lazy.borrow(), Option::as_ref)
+    pub(crate) fn getters_key_to_built_in(
+        &self,
+    ) -> Ref<'_, HashMap<variable::GettersKey, token::CsName>> {
+        if let Ok(r) = Ref::filter_map(self.getters_key_to_built_in_lazy.borrow(), Option::as_ref)
         {
             return r;
         }
-        *self.variable_key_to_built_in_lazy.borrow_mut() = Some(
+        *self.getters_key_to_built_in_lazy.borrow_mut() = Some(
             self.primitive_key_to_built_in()
                 .iter()
-                .filter_map(|(key, cs_name)| {
-                    key._variable_key()
-                        .map(|variable_key| (variable_key, *cs_name))
+                .filter_map(|(key, cs_name)| match key {
+                    PrimitiveKey::Variable(variable_command_key) => {
+                        Some((variable_command_key.getter_key(), *cs_name))
+                    }
+                    _ => None,
                 })
                 .collect(),
         );
-        self.variable_key_to_built_in()
+        self.getters_key_to_built_in()
     }
 }
 
@@ -267,7 +257,7 @@ impl<'a> SerializableMap<'a> {
         let mut macros_de_dup = HashMap::<usize, usize>::new();
         let mut macros: Vec<Cow<'a, texmacro::Macro>> = Default::default();
         let primitive_key_to_built_in = map.primitive_key_to_built_in();
-        let variable_key_to_built_in = map.variable_key_to_built_in();
+        let getters_key_to_built_in = map.getters_key_to_built_in();
         let commands: GroupingHashMap<token::CsName, SerializableCommand> = map
             .commands
             .iter_all()
@@ -288,14 +278,12 @@ impl<'a> SerializableMap<'a> {
                             } else {
                                 // As a fallback, we can serialize static references into arrays when
                                 // we've been provided with a way to reference the array.
-                                let key = variable::Key::new(variable_command.getters());
-                                let built_in = variable_key_to_built_in.get(&key).unwrap();
-                                if let Some(variable::IndexResolver::Static(index)) =
-                                    variable_command.index_resolver()
-                                {
-                                    SerializableCommand::VariableArrayStatic(*built_in, index.0)
-                                } else {
-                                    todo!();
+                                match variable_command.key() {
+                                    variable::CommandKey::ArrayStatic(getters_key, index) => {
+                                        let built_in = getters_key_to_built_in.get(&getters_key).unwrap();
+                                        SerializableCommand::VariableArrayStatic(*built_in, index.0)
+                                    }
+                                    _ => todo!(),
                                 }
                             }
                         }
@@ -350,12 +338,9 @@ impl<'a> SerializableMap<'a> {
                         SerializableCommand::VariableArrayStatic(cs_name, index) => {
                             match &initial_built_ins.get(cs_name).unwrap().cmd {
                                 Command::Variable(variable_command) => {
-                                    Command::Variable(std::rc::Rc::new(variable::Command::new(
-                                        variable_command.getters().clone(),
-                                        Some(variable::IndexResolver::Static(variable::Index(
-                                            *index,
-                                        ))),
-                                    )))
+                                    Command::Variable(std::rc::Rc::new(
+                                        variable_command.new_array_element(variable::Index(*index)),
+                                    ))
                                 }
                                 _ => todo!(),
                             }
@@ -374,7 +359,7 @@ impl<'a> SerializableMap<'a> {
             commands,
             initial_built_ins,
             primitive_key_to_built_in_lazy: Default::default(),
-            variable_key_to_built_in_lazy: Default::default(),
+            getters_key_to_built_in_lazy: Default::default(),
         }
     }
 }

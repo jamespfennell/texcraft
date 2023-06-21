@@ -305,9 +305,7 @@ impl StaticTag {
 pub(crate) enum PrimitiveKey {
     Execution(usize, Option<Tag>),
     Expansion(usize, Option<Tag>),
-    VariableSingleton(variable::Key),
-    VariableArrayStatic(variable::Key, variable::Index),
-    VariableArrayDynamic(variable::Key, usize),
+    Variable(variable::CommandKey),
 }
 
 impl PrimitiveKey {
@@ -315,32 +313,9 @@ impl PrimitiveKey {
         match command {
             Command::Expansion(f, tag) => Some(PrimitiveKey::Expansion(*f as usize, *tag)),
             Command::Execution(f, tag) => Some(PrimitiveKey::Execution(*f as usize, *tag)),
-            Command::Variable(v) => {
-                let variable_key = variable::Key::new(v.getters());
-                match v.index_resolver() {
-                    None => Some(PrimitiveKey::VariableSingleton(variable_key)),
-                    Some(index_resolver) => match index_resolver {
-                        variable::IndexResolver::Static(a) => {
-                            Some(PrimitiveKey::VariableArrayStatic(variable_key, *a))
-                        }
-                        variable::IndexResolver::Dynamic(f) => Some(
-                            PrimitiveKey::VariableArrayDynamic(variable_key, *f as usize),
-                        ),
-                    },
-                }
-            }
+            Command::Variable(v) => Some(PrimitiveKey::Variable(v.key())),
             Command::Macro(_) => None,
             Command::Character(_) => None,
-        }
-    }
-
-    pub(crate) fn _variable_key(&self) -> Option<variable::Key> {
-        match self {
-            PrimitiveKey::Execution(_, _) => None,
-            PrimitiveKey::Expansion(_, _) => None,
-            PrimitiveKey::VariableSingleton(key) => Some(*key),
-            PrimitiveKey::VariableArrayStatic(key, _) => Some(*key),
-            PrimitiveKey::VariableArrayDynamic(key, _) => Some(*key),
         }
     }
 }

@@ -45,7 +45,8 @@
         "texmacro",
         "tracingmacros",
         "Undelimited",
-        "unexpandable"
+        "unexpandable",
+        "VM's"
     ],    
     "rust-analyzer.cargo.features": "all",
     "rust-analyzer.check.features": "all"

@@ -28,14 +28,22 @@ struct SerializableVM<'a, S> {
     state: &'a S,
     commands_map: &'a command::Map<S>,
     internal: &'a vm::Internal<S>,
+    save_stack: Vec<variable::SerializableSaveStackElement<'a>>,
 }
 
 impl<'a, S> SerializableVM<'a, S> {
     fn new(vm: &'a vm::VM<S>) -> Self {
+        let variable_key_to_built_in = vm.commands_map.getters_key_to_built_in();
         Self {
             state: &vm.state,
             commands_map: &vm.commands_map,
             internal: &vm.internal,
+            save_stack: vm
+                .internal
+                .save_stack
+                .iter()
+                .map(|element| element.serializable(&variable_key_to_built_in))
+                .collect(),
         }
     }
 }
@@ -59,6 +67,7 @@ pub struct DeserializedVM<'a, S> {
     state: S,
     commands_map: command::map::SerializableMap<'a>,
     internal: vm::Internal<S>,
+    save_stack: Vec<variable::SerializableSaveStackElement<'a>>,
 }
 
 /// Finish the deserialization of a VM.
@@ -75,6 +84,11 @@ pub fn finish_deserialization<S>(
             let cs_name = deserialized.internal.cs_name_interner.get_or_intern(key);
             (cs_name, value)
         })
+        .collect();
+    deserialized.internal.save_stack = deserialized
+        .save_stack
+        .into_iter()
+        .map(|element| element.finish_deserialization(&initial_built_ins))
         .collect();
     let commands_map = deserialized
         .commands_map

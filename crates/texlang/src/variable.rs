@@ -5,11 +5,13 @@
 //! See that documentation for an overview of the API.
 //! As usual, the documentation here is meant as reference.
 
+use crate::command;
 use crate::error;
 use crate::parse::OptionalEquals;
 use crate::traits::*;
 use crate::vm;
 use crate::{token, token::CatCode};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
@@ -116,8 +118,8 @@ impl<S> Command<S> {
 
     /// Create a new getter provider.
     ///
-    /// A getter provider is a variable command that is not intended to be invoked directly
-    /// In fact, the variable command will panic the program if it is invoked.
+    /// A getter provider is a variable command that is not intended to be invoked directly -
+    ///     in fact, the variable command will panic the program if it is invoked.
     /// Instead the provider is included in a VM's initial commands so that
     ///     the VM has a reference to the getters inside the command.
     /// If a variable with the same getters is subsequently inserted into the commands map
@@ -134,11 +136,11 @@ impl<S> Command<S> {
         )
     }
 
-    /// Create a new variable using the provided getters.
-    pub(crate) fn new(getters: Getters<S>, index_resolver: Option<IndexResolver<S>>) -> Self {
+    /// Create a command that points to a specific element in the array referenced by this command.
+    pub(crate) fn new_array_element(&self, index: Index) -> Self {
         Self {
-            getters,
-            index_resolver,
+            getters: self.getters.clone(),
+            index_resolver: Some(IndexResolver::Static(index)),
         }
     }
 }
@@ -170,13 +172,17 @@ impl<S: TexlangState> Command<S> {
         })
     }
 }
-impl<S> Command<S> {
-    pub(crate) fn getters(&self) -> &Getters<S> {
-        &self.getters
-    }
 
-    pub(crate) fn index_resolver(&self) -> &Option<IndexResolver<S>> {
-        &self.index_resolver
+impl<S> Command<S> {
+    pub(crate) fn key(&self) -> CommandKey {
+        let getters_key = self.getters.key();
+        match &self.index_resolver {
+            None => CommandKey::Singleton(getters_key),
+            Some(index_resolver) => match index_resolver {
+                IndexResolver::Static(a) => CommandKey::ArrayStatic(getters_key, *a),
+                IndexResolver::Dynamic(f) => CommandKey::ArrayDynamic(getters_key, *f as usize),
+            },
+        }
     }
 }
 
@@ -212,6 +218,24 @@ impl<S: TexlangState> Command<S> {
                 token,
                 err,
             )),
+        }
+    }
+}
+
+/// A key that uniquely identifies commands. If two commands have the same command key, they are the same command.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum CommandKey {
+    Singleton(GettersKey),
+    ArrayStatic(GettersKey, Index),
+    ArrayDynamic(GettersKey, usize),
+}
+
+impl CommandKey {
+    pub(crate) fn getter_key(&self) -> GettersKey {
+        match self {
+            CommandKey::Singleton(k) => *k,
+            CommandKey::ArrayStatic(k, _) => *k,
+            CommandKey::ArrayDynamic(k, _) => *k,
         }
     }
 }
@@ -277,7 +301,7 @@ impl<S: TexlangState> Variable<S> {
     }
 }
 
-pub(crate) enum Getters<S> {
+enum Getters<S> {
     Int(RefFn<S, i32>, MutRefFn<S, i32>),
     CatCode(RefFn<S, CatCode>, MutRefFn<S, CatCode>),
 }
@@ -291,17 +315,18 @@ impl<S> Clone for Getters<S> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) struct Key(usize, usize);
-
-impl Key {
-    pub(crate) fn new<S>(getters: &Getters<S>) -> Key {
-        match getters {
-            Getters::Int(a, b) => Key(*a as usize, *b as usize),
-            Getters::CatCode(a, b) => Key(*a as usize, *b as usize),
+impl<S> Getters<S> {
+    fn key(&self) -> GettersKey {
+        match self  {
+            Getters::Int(a, b) => GettersKey(*a as usize, *b as usize),
+            Getters::CatCode(a, b) => GettersKey(*a as usize, *b as usize),
         }
     }
 }
+
+/// A key that uniquely identifies the getters ([RefFn] and [MutRefFn]) in a command or variable.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct GettersKey(usize, usize);
 
 /// A TeX variable of a specific Rust type `T`.
 pub struct TypedVariable<S, T>(RefFn<S, T>, MutRefFn<S, T>, Index);
@@ -386,6 +411,11 @@ pub trait SupportedType: Sized {
         scope: groupingmap::Scope,
         overwritten_value: Self,
     );
+
+    /// Create a new typed variable of this type from the getters in the command and the provided index.
+    ///
+    /// Return `None` if the command has a different type to `Self`.
+    fn new_typed_variable<S>(command: &Command<S>, index: Index) -> Option<TypedVariable<S, Self>>;
 }
 
 /// This function is used to implement the [SupportedType::update_save_stack] method.
@@ -396,7 +426,7 @@ pub trait SupportedType: Sized {
 ///     internal VM data structure.
 /// Any way that does this on the trait directly requires making some of the save stack
 ///     type public, because [SupportedType] is public.
-fn update_save_stack<S, T, F>(
+fn update_save_stack<S, T: Clone, F>(
     input: &mut vm::ExecutionInput<S>,
     variable: &TypedVariable<S, T>,
     scope: groupingmap::Scope,
@@ -440,6 +470,12 @@ impl SupportedType for i32 {
             &mut element.i32
         })
     }
+    fn new_typed_variable<S>(command: &Command<S>, index: Index) -> Option<TypedVariable<S, Self>> {
+        match command.getters {
+            Getters::Int(a, b) => Some(TypedVariable(a, b, index)),
+            _ => None,
+        }
+    }
 }
 
 impl SupportedType for CatCode {
@@ -463,6 +499,12 @@ impl SupportedType for CatCode {
             &mut element.catcode
         })
     }
+    fn new_typed_variable<S>(command: &Command<S>, index: Index) -> Option<TypedVariable<S, Self>> {
+        match command.getters {
+            Getters::CatCode(a, b) => Some(TypedVariable(a, b, index)),
+            _ => None,
+        }
+    }
 }
 
 /// Internal VM data structure used to implement TeX's grouping semantics.
@@ -481,14 +523,24 @@ impl<S> Default for SaveStackElement<S> {
 }
 
 impl<S> SaveStackElement<S> {
-    pub fn restore(self, state: &mut S) {
+    pub(crate) fn restore(self, state: &mut S) {
         self.i32.restore(state);
         self.catcode.restore(state);
+    }
+
+    pub(crate) fn serializable<'a>(
+        &'a self,
+        built_ins: &HashMap<GettersKey, token::CsName>,
+    ) -> SerializableSaveStackElement<'a> {
+        SerializableSaveStackElement {
+            i32: self.i32.serializable(built_ins),
+            catcode: self.catcode.serializable(built_ins),
+        }
     }
 }
 
 /// Internal VM data structure used to implement TeX's grouping semantics.
-pub(crate) struct SaveStackMap<S, T>(HashMap<TypedVariable<S, T>, T>);
+struct SaveStackMap<S, T>(HashMap<TypedVariable<S, T>, T>);
 
 impl<S, T> Default for SaveStackMap<S, T> {
     fn default() -> Self {
@@ -496,18 +548,77 @@ impl<S, T> Default for SaveStackMap<S, T> {
     }
 }
 
-impl<S, T> SaveStackMap<S, T> {
-    pub(super) fn save(&mut self, variable: TypedVariable<S, T>, val: T) {
+impl<S, T: Clone> SaveStackMap<S, T> {
+    fn save(&mut self, variable: TypedVariable<S, T>, val: T) {
         self.0.entry(variable).or_insert(val);
     }
 
-    pub(super) fn remove(&mut self, variable: &TypedVariable<S, T>) {
+    fn remove(&mut self, variable: &TypedVariable<S, T>) {
         self.0.remove(variable);
     }
 
     fn restore(self, state: &mut S) {
         for (v, restored_value) in self.0 {
             *(v.1)(state, v.2) = restored_value;
+        }
+    }
+
+    fn serializable<'a>(
+        &'a self,
+        built_ins: &HashMap<GettersKey, token::CsName>,
+    ) -> Vec<(token::CsName, usize, Cow<'a, T>)> {
+        self.0
+            .iter()
+            .map(|(typed_variable, value): (&TypedVariable<S, T>, &T)| {
+                let key = GettersKey(typed_variable.0 as usize, typed_variable.1 as usize);
+                let cs_name = built_ins.get(&key).unwrap();
+                (*cs_name, typed_variable.2 .0, Cow::Borrowed(value))
+            })
+            .collect()
+    }
+}
+
+impl<S, T: SupportedType + Clone> SaveStackMap<S, T> {
+    fn from_deserialized<'a>(
+        deserialized: Vec<(token::CsName, usize, Cow<'a, T>)>,
+        built_ins: &HashMap<token::CsName, command::BuiltIn<S>>,
+    ) -> Self {
+        let m = deserialized
+            .into_iter()
+            .map(
+                |(cs_name, index, value): (token::CsName, usize, Cow<'a, T>)| {
+                    // TODO: surface error here
+                    let built_in = built_ins.get(&cs_name).unwrap();
+                    let typed_variable = match built_in.cmd() {
+                        command::Command::Variable(variable_command) => {
+                            // TODO: error instead of unwrap
+                            SupportedType::new_typed_variable(variable_command, Index(index))
+                                .unwrap()
+                        }
+                        _ => panic!("wrong type of built in TODO return an error here"),
+                    };
+                    (typed_variable, value.into_owned())
+                },
+            )
+            .collect();
+        Self(m)
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
+pub(crate) struct SerializableSaveStackElement<'a> {
+    i32: Vec<(token::CsName, usize, Cow<'a, i32>)>,
+    catcode: Vec<(token::CsName, usize, Cow<'a, CatCode>)>,
+}
+
+impl<'a> SerializableSaveStackElement<'a> {
+    pub(crate) fn finish_deserialization<S>(
+        self,
+        built_ins: &HashMap<token::CsName, command::BuiltIn<S>>,
+    ) -> SaveStackElement<S> {
+        SaveStackElement {
+            i32: SaveStackMap::from_deserialized(self.i32, built_ins),
+            catcode: SaveStackMap::from_deserialized(self.catcode, built_ins),
         }
     }
 }

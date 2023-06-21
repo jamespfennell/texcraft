@@ -409,7 +409,7 @@ impl<S> VM<S> {
 
     fn begin_group(&mut self) {
         self.commands_map.begin_group();
-        self.internal.groups.push(Default::default());
+        self.internal.save_stack.push(Default::default());
     }
 
     fn end_group(&mut self, token: token::Token) -> Result<(), Box<error::Error>> {
@@ -422,7 +422,7 @@ impl<S> VM<S> {
                 .into())
             }
         }
-        let group = self.internal.groups.pop().unwrap();
+        let group = self.internal.save_stack.pop().unwrap();
         group.restore(&mut self.state);
         Ok(())
     }
@@ -458,9 +458,11 @@ struct Internal<S> {
     #[cfg_attr(feature = "serde", serde(skip))]
     token_buffers: std::collections::BinaryHeap<TokenBuffer>,
 
-    // Groups are handled manually in (de)serialization because we need to have special logic that uses the command map
+    // The save stack is handled manually in (de)serialization.
+    // We need to use special logic in combination with the command map in order to serialize the
+    // variable pointers that are in the stack.
     #[cfg_attr(feature = "serde", serde(skip))]
-    groups: Vec<variable::SaveStackElement<S>>,
+    save_stack: Vec<variable::SaveStackElement<S>>,
 }
 
 impl<S> Internal<S> {
@@ -471,7 +473,7 @@ impl<S> Internal<S> {
             cs_name_interner,
             tracer: Default::default(),
             token_buffers: Default::default(),
-            groups: Default::default(),
+            save_stack: Default::default(),
         }
     }
 }

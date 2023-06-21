@@ -412,11 +412,11 @@ impl<S> ExecutionInput<S> {
     }
 
     pub(crate) fn groups(&mut self) -> &mut [variable::SaveStackElement<S>] {
-        &mut self.0 .0 .0.internal.groups
+        &mut self.0 .0 .0.internal.save_stack
     }
 
     pub(crate) fn current_group_mut(&mut self) -> Option<(&mut variable::SaveStackElement<S>, &S)> {
-        match self.0 .0 .0.internal.groups.last_mut() {
+        match self.0 .0 .0.internal.save_stack.last_mut() {
             None => None,
             Some(g) => Some((g, &self.0 .0 .0.state)),
         }

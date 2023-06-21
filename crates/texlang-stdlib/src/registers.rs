@@ -191,6 +191,11 @@ mod tests {
         serde_tests(
             (serde_basic, r"\count 100 200 ", r"\the \count 100"),
             (serde_countdef, r"\countdef \A 100 \A = 200 ", r"\the \A"),
+            (
+                serde_group,
+                r"\count 1 2 {\count 1 3 ",
+                r"\the \count 1 } \the count 1"
+            ),
         ),
         failure_tests(
             (write_register_index_too_big, r"\count 260 = 4"),

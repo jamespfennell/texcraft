@@ -108,6 +108,11 @@ mod tests {
         serde_tests(
             (serde_low, r"\catcode 48 11 ", r"\the\catcode 48"),
             (serde_high, r"\catcode 480 11 ", r"\the\catcode 480"),
+            (
+                serde_group,
+                r"\catcode 65 7 {r\catcode 65 8 ",
+                r"\the\catcode 65 } \the\catcode 65"
+            ),
         ),
         failure_tests(
             (catcode_value_too_large, r"\catcode 48 16"),
