@@ -19,7 +19,6 @@ use crate::token::catcode::CatCode;
 use crate::token::trace;
 use crate::token::CsNameInterner;
 use crate::token::Token;
-use texcraft_stdext::str::OwningChars;
 
 #[derive(Debug)]
 pub(crate) enum Error {
@@ -48,7 +47,7 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn new(source_code: std::rc::Rc<str>, trace_key_range: trace::KeyRange) -> Lexer {
+    pub fn new(source_code: String, trace_key_range: trace::KeyRange) -> Lexer {
         Lexer {
             raw_lexer: RawLexer::new(source_code, trace_key_range),
             trim_next_whitespace: false,
@@ -90,7 +89,15 @@ impl Lexer {
                 CatCode::MathShift => Token::new_math_shift(c, raw_token.trace_key),
                 CatCode::AlignmentTab => Token::new_alignment_tab(c, raw_token.trace_key),
                 CatCode::Parameter => Token::new_parameter(c, raw_token.trace_key),
-                CatCode::Superscript => Token::new_superscript(c, raw_token.trace_key),
+                CatCode::Superscript => {
+                    if self
+                        .raw_lexer
+                        .maybe_apply_caret_notation(raw_token.char, true)
+                    {
+                        continue;
+                    }
+                    Token::new_superscript(c, raw_token.trace_key)
+                }
                 CatCode::Subscript => Token::new_subscript(c, raw_token.trace_key),
                 CatCode::Letter => Token::new_letter(c, raw_token.trace_key),
                 CatCode::Other => Token::new_other(c, raw_token.trace_key),
@@ -138,27 +145,42 @@ impl Lexer {
         cs_name_interner: &mut CsNameInterner,
     ) -> Result<token::CsName, Error> {
         self.buffer.clear();
-        match self.raw_lexer.next(cat_code_fn) {
-            None => {
-                return Err(Error::EmptyControlSequence(raw_token.trace_key));
-            }
-            Some(RawToken {
-                char,
-                code: CatCode::Letter,
-                ..
-            }) => {
-                self.buffer.push(char);
-                while let Some(RawToken {
-                    char: subsequent_char,
-                    code: CatCode::Letter,
-                    ..
-                }) = self.raw_lexer.peek(cat_code_fn)
-                {
-                    self.raw_lexer.advance();
-                    self.buffer.push(subsequent_char);
+        let first_raw_token = match self.raw_lexer.next(cat_code_fn) {
+            None => return Err(Error::EmptyControlSequence(raw_token.trace_key)),
+            Some(first_raw_token) => first_raw_token,
+        };
+        match first_raw_token.code {
+            CatCode::Letter => {
+                self.buffer.push(first_raw_token.char);
+                while let Some(raw_token) = self.raw_lexer.peek(cat_code_fn) {
+                    match raw_token.code {
+                        CatCode::Letter => {
+                            self.raw_lexer.advance();
+                            self.buffer.push(raw_token.char);
+                        }
+                        CatCode::Superscript => {
+                            if self
+                                .raw_lexer
+                                .maybe_apply_caret_notation(raw_token.char, false)
+                            {
+                                continue;
+                            }
+                            break;
+                        }
+                        _ => break,
+                    }
                 }
             }
-            Some(first_raw_token) => {
+            CatCode::Superscript => {
+                if self
+                    .raw_lexer
+                    .maybe_apply_caret_notation(first_raw_token.char, true)
+                {
+                    return self.read_control_sequence(raw_token, cat_code_fn, cs_name_interner);
+                }
+                self.buffer.push(first_raw_token.char);
+            }
+            _ => {
                 self.buffer.push(first_raw_token.char);
             }
         };
@@ -174,21 +196,25 @@ struct RawToken {
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 struct RawLexer {
-    iter: OwningChars,
+    // TODO: when serializing we only need to serialize self.source_code[self.pos..]
+    source_code: String,
+    pos: usize,
     trace_key_range: trace::KeyRange,
 }
 
 impl RawLexer {
-    pub fn new(source_code: std::rc::Rc<str>, trace_key_range: trace::KeyRange) -> RawLexer {
+    pub fn new(source_code: String, trace_key_range: trace::KeyRange) -> RawLexer {
         RawLexer {
-            iter: OwningChars::new(source_code),
+            source_code,
+            pos: 0,
             trace_key_range,
         }
     }
 
     fn next<F: CatCodeFn>(&mut self, cat_code_fn: &F) -> Option<RawToken> {
-        match self.iter.next() {
+        match self.source_code[self.pos..].chars().next() {
             Some(c) => {
+                self.pos += c.len_utf8();
                 let code = cat_code_fn.cat_code(c);
                 Some(RawToken {
                     char: c,
@@ -201,7 +227,7 @@ impl RawLexer {
     }
 
     fn peek<F: CatCodeFn>(&mut self, cat_code_fn: &F) -> Option<RawToken> {
-        match self.iter.peek() {
+        match self.source_code[self.pos..].chars().next() {
             Some(c) => {
                 let code = cat_code_fn.cat_code(c);
                 Some(RawToken {
@@ -214,14 +240,69 @@ impl RawLexer {
         }
     }
 
+    fn maybe_apply_caret_notation(
+        &mut self,
+        char_1: char,
+        char_1_consumed: bool,
+    ) -> bool {
+        let char_2_start = if char_1_consumed {
+            self.pos
+        } else {
+            self.pos + char_1.len_utf8()
+        };
+        let char_2 = match self.source_code[char_2_start..].chars().next() {
+            None => return false,
+            Some(next_char) => next_char,
+        };
+        if char_2 != char_1 {
+            return false;
+        }
+        let char_3_start = char_2_start+char_2.len_utf8();
+        let char_3 = match self.source_code[char_3_start..].chars().next() {
+            // If the input is over, don't transform. This is what TeX does; see
+            // the TeXBook section 355 and related sections.
+            None => return false,
+            Some(c) => c,
+        };
+        if !char_1_consumed {
+            self.advance();
+        }
+        self.advance();
+        if !char_3.is_ascii() {
+            return true;
+        }
+        let u: u8 = match (char_3 as u32).try_into() {
+            Ok(u) => u,
+            Err(_) => return true, // unreachable because char_3 is ASCII
+        };
+        let m = match u {
+            0x00..=0x3F => u + 0x40,
+            0x40..=0x7F => u - 0x40,
+            _ => return true, // unreachable because char_3 is ASCII
+        };
+        // Given the way `m` is calculated, we're guaranteed that it is ASCII. However,
+        // this assert is to have defense-in-depth in anticipation of the unsafe block next.
+        assert!(char::from_u32(m as u32).unwrap().is_ascii());
+        // SAFETY: the original character `char_3` is single-byte/ASCII and
+        // the replacement character `m` is single-byte/ASCII so the replacement
+        // preserves the UTF-8 structure of the string.
+        unsafe {
+            self.source_code.as_bytes_mut()[self.pos] = m;
+        }
+        true
+    }
+
     fn advance(&mut self) {
-        self.iter.next();
+        if let Some(c) = self.source_code[self.pos..].chars().next() {
+            self.pos += c.len_utf8();
+        }
         self.trace_key_range.next();
     }
 }
 
-// what about the TeX edge case \input{file}b where file ends in \a. Do as \ab control sequence
-// get created? If so, can't isolate inputs behind an expansion runner
+// TODO: in TeX each line in a file is read in separately, spaces at the end are trimmed,
+// and the character in \endlinechar is appended. See section 362 of the TeXBook and also
+// the implementation of `input_ln` in the TeXBook. We should be doing that, too.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -247,25 +328,36 @@ mod tests {
         }
     }
 
+    fn lexer_test(input: &str, expected_tokens: Vec<TokenValue>) {
+        let mut lexer = Lexer::new(input.into(), trace::KeyRange::for_testing());
+        let mut map: HashMap<char, CatCode> = CatCode::PLAIN_TEX_DEFAULTS
+            .iter()
+            .enumerate()
+            .map(|(a, b)| (char::from_u32(a.try_into().unwrap()).unwrap(), *b))
+            .collect();
+        map.insert('X', EndOfLine);
+        map.insert('Y', Space);
+        map.insert('Z', Ignored);
+        let mut cs_name_interner: CsNameInterner = Default::default();
+        let mut actual = Vec::new();
+        while let Some(t) = lexer.next(&map, &mut cs_name_interner).unwrap() {
+            actual.push(t.value);
+        }
+        let expected: Vec<Value> = expected_tokens
+            .into_iter()
+            .map(|t| t.convert(&mut cs_name_interner))
+            .collect();
+        assert_eq!(expected, actual);
+    }
+
     macro_rules! lexer_tests {
         ($( ( $name: ident, $input: expr, $ ( $expected_token : expr, ) * ), )+) => {
             $(
             #[test]
             fn $name() {
-                let mut lexer = Lexer::new($input.into(), trace::KeyRange::for_testing());
-                let mut map: HashMap<char, CatCode> = CatCode::PLAIN_TEX_DEFAULTS.iter().enumerate().map(|(a, b)| {
-                    (char::from_u32(a.try_into().unwrap()).unwrap(), *b)
-                }).collect();
-                map.insert('X', EndOfLine);
-                map.insert('Y', Space);
-                map.insert('Z', Ignored);
-                let mut cs_name_interner: CsNameInterner = Default::default();
-                let mut actual = Vec::new();
-                while let Some(t) = lexer.next(&map, &mut cs_name_interner).unwrap() {
-                    actual.push(t.value);
-                }
-                let expected: Vec<Value> = vec![$ ( $expected_token.convert(&mut cs_name_interner) ) , * ];
-                assert_eq!(expected, actual);
+                let input = $input;
+                let expected_tokens = vec!( $( $expected_token ),* );
+                lexer_test(&input, expected_tokens);
             }
             )+
         };
@@ -355,6 +447,7 @@ mod tests {
             ControlSequence("A"),
             Character('B', Letter),
         ),
+        (case_14, "\\A1", ControlSequence("A"), Character('1', Other),),
         (
             double_space_creates_one_space,
             "A  B",
@@ -405,5 +498,66 @@ mod tests {
             Character('B', Letter),
         ),
         (single_ignored_character, "Z",),
+        (double_superscript_1, "^^k", Character('+', Other),),
+        (double_superscript_2, "^^+", Character('k', Letter),),
+        (double_superscript_3, "^^\n", Character('J', Letter),),
+        (
+            double_superscript_end_of_input_1,
+            "^^",
+            Character('^', Superscript),
+            Character('^', Superscript),
+        ),
+        (
+            double_superscript_end_of_input_2,
+            "\\^^",
+            ControlSequence("^"),
+            Character('^', Superscript),
+        ),
+        (
+            double_superscript_end_of_input_3,
+            "\\a^^",
+            ControlSequence("a"),
+            Character('^', Superscript),
+            Character('^', Superscript),
+        ),
+        (
+            double_superscript_boundary_1,
+            "^^\u{00}",
+            Character(char::from_u32(0x40).unwrap(), Other),
+        ),
+        (
+            double_superscript_boundary_3,
+            "^^\u{40}",
+            // skipped character
+        ),
+        (
+            double_superscript_boundary_4,
+            "^^\u{7F}",
+            Character(char::from_u32(0x3F).unwrap(), Other),
+        ),
+        (double_superscript_cs_1, "\\^^m", ControlSequence("-"),),
+        (
+            double_superscript_cs_2,
+            "\\^^ma",
+            ControlSequence("-"),
+            Character('a', Letter),
+        ),
+        (double_superscript_cs_3, "\\^^-", ControlSequence("m"),),
+        (double_superscript_cs_4, "\\^^-a", ControlSequence("ma"),),
+        (double_superscript_cs_5, "\\^^-^^-", ControlSequence("mm"),),
+        (double_superscript_cs_6, "\\a^^-", ControlSequence("am"),),
+        (
+            double_superscript_cs_7,
+            "\\^a",
+            ControlSequence("^"),
+            Character('a', Letter),
+        ),
+        (
+            double_superscript_cs_8,
+            "\\a^a",
+            ControlSequence("a"),
+            Character('^', Superscript),
+            Character('a', Letter),
+        ),
     ];
 }

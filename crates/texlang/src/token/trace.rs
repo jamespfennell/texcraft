@@ -255,7 +255,10 @@ impl Tracer {
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum Checkpoint {
-    SourceCode { file_name: PathBuf, content: String },
+    SourceCode {
+        file_name: PathBuf,
+        content: String, // TODO: should be rc::Rc<str>?
+    },
 }
 
 #[cfg(test)]

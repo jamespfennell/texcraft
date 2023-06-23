@@ -191,8 +191,7 @@ impl<S> Map<S> {
     pub(crate) fn getters_key_to_built_in(
         &self,
     ) -> Ref<'_, HashMap<variable::GettersKey, token::CsName>> {
-        if let Ok(r) = Ref::filter_map(self.getters_key_to_built_in_lazy.borrow(), Option::as_ref)
-        {
+        if let Ok(r) = Ref::filter_map(self.getters_key_to_built_in_lazy.borrow(), Option::as_ref) {
             return r;
         }
         *self.getters_key_to_built_in_lazy.borrow_mut() = Some(
@@ -280,7 +279,8 @@ impl<'a> SerializableMap<'a> {
                                 // we've been provided with a way to reference the array.
                                 match variable_command.key() {
                                     variable::CommandKey::ArrayStatic(getters_key, index) => {
-                                        let built_in = getters_key_to_built_in.get(&getters_key).unwrap();
+                                        let built_in =
+                                            getters_key_to_built_in.get(&getters_key).unwrap();
                                         SerializableCommand::VariableArrayStatic(*built_in, index.0)
                                     }
                                     _ => todo!(),

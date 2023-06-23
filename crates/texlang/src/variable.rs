@@ -317,7 +317,7 @@ impl<S> Clone for Getters<S> {
 
 impl<S> Getters<S> {
     fn key(&self) -> GettersKey {
-        match self  {
+        match self {
             Getters::Int(a, b) => GettersKey(*a as usize, *b as usize),
             Getters::CatCode(a, b) => GettersKey(*a as usize, *b as usize),
         }

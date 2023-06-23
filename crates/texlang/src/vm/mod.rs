@@ -484,7 +484,6 @@ impl<S: TexlangState> Internal<S> {
         file_name: PathBuf,
         source_code: String,
     ) -> Result<(), Box<error::Error>> {
-        let source_code: std::rc::Rc<str> = source_code.into();
         S::pre_source_code_addition_hook(token, self.sources.len())?;
         let trace_key_range = self
             .tracer
@@ -536,7 +535,7 @@ struct Source {
 }
 
 impl Source {
-    pub fn new(source_code: std::rc::Rc<str>, trace_key_range: trace::KeyRange) -> Source {
+    pub fn new(source_code: String, trace_key_range: trace::KeyRange) -> Source {
         Source {
             expansions: Vec::with_capacity(32),
             root: lexer::Lexer::new(source_code, trace_key_range),
