@@ -449,7 +449,7 @@ mod stream {
         // TODO: implement \endlinechar
         #[inline]
         fn end_line_char(&self) -> Option<char> {
-            Some('\r')
+            self.end_line_char()
         }
     }
 

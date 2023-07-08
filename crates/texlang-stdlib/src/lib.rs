@@ -17,6 +17,7 @@ pub mod alloc;
 pub mod catcode;
 pub mod conditional;
 pub mod def;
+pub mod endlinechar;
 pub mod expansion;
 pub mod io;
 pub mod job;
@@ -39,6 +40,7 @@ pub struct StdLibState {
     alloc: alloc::Component,
     catcode: catcode::Component,
     conditional: conditional::Component,
+    end_line_char: endlinechar::Component,
     pub job: job::Component,
     prefix: prefix::Component,
     registers: registers::Component<i32, 32768>,
@@ -52,6 +54,11 @@ impl TexlangState for StdLibState {
     #[inline]
     fn cat_code(&self, c: char) -> texlang::token::CatCode {
         catcode::cat_code(self, c)
+    }
+
+    #[inline]
+    fn end_line_char(&self) -> Option<char> {
+        endlinechar::end_line_char(self)
     }
 
     #[inline]
@@ -99,6 +106,7 @@ impl StdLibState {
             ("dumpValidate", job::get_dumpvalidate()),
             //
             ("else", conditional::get_else()),
+            ("endlinechar", endlinechar::get_endlinechar()),
             ("expandafter", expansion::get_expandafter_optimized()),
             //
             ("fi", conditional::get_fi()),
@@ -159,6 +167,7 @@ implement_has_component![
     (alloc::Component, alloc),
     (catcode::Component, catcode),
     (conditional::Component, conditional),
+    (endlinechar::Component, end_line_char),
     (job::Component, job),
     (prefix::Component, prefix),
     (registers::Component<i32, 32768>, registers),

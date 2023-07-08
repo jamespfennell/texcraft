@@ -518,12 +518,12 @@ mod tests {
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     struct State {
         conditional: Component,
-        exec: script::Component,
+        script: script::Component,
     }
 
     impl TexlangState for State {}
 
-    implement_has_component![State, (Component, conditional), (script::Component, exec),];
+    implement_has_component![State, (Component, conditional), (script::Component, script),];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([

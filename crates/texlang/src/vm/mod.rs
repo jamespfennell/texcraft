@@ -265,6 +265,13 @@ pub trait TexlangState: Sized {
             .unwrap_or_default()
     }
 
+    /// Get current end line char, or [None] if it's undefined.
+    ///
+    /// The default implementation returns `\r`.
+    fn end_line_char(&self) -> Option<char> {
+        Some('\r')
+    }
+
     /// Hook that is invoked after a TeX macro is expanded.
     ///
     /// This hook is designed to support the `\tracingmacros` primitive.
