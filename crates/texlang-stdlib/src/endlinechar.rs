@@ -1,5 +1,6 @@
+//! The `\endlinechar` primitive
+
 use texlang::traits::*;
-/// The `\endlinechar` primitive
 use texlang::*;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
