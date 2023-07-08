@@ -4,6 +4,7 @@
         "catcode",
         "catcodecmd",
         "countdef",
+        "endlinechar",
         "expandafter",
         "Freyler",
         "futurelet",

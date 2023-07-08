@@ -1,7 +1,7 @@
 //! TeX tokens and category codes.
 
 mod catcode;
-pub(crate) mod lexer;
+pub mod lexer;
 pub mod trace;
 pub use catcode::CatCode;
 use std::{fmt::Display, num};
@@ -180,7 +180,7 @@ impl Token {
             Value::Space(_) => Some(CatCode::Space),
             Value::Letter(_) => Some(CatCode::Letter),
             Value::Other(_) => Some(CatCode::Other),
-            Value::Active(_) => Some(CatCode::Other),
+            Value::Active(_) => Some(CatCode::Active),
             Value::ControlSequence(..) => None,
         }
     }

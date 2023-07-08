@@ -99,13 +99,26 @@ where
 }
 
 fn compare_output<S>(
-    output_1: Vec<token::Token>,
+    mut output_1: Vec<token::Token>,
     vm_1: &vm::VM<S>,
-    output_2: Vec<token::Token>,
+    mut output_2: Vec<token::Token>,
     vm_2: &vm::VM<S>,
 ) {
-    use ::texlang::token::Value::ControlSequence;
+    let trim_space = |v: &mut Vec<token::Token>| {
+        let last = match v.last() {
+            None => return,
+            Some(last) => last,
+        };
+        if last.cat_code() == Some(token::CatCode::Space) {
+            v.pop();
+        }
+    };
+    trim_space(&mut output_1);
+    trim_space(&mut output_2);
+
     println!("{output_1:?}");
+    println!("{output_2:?}");
+    use ::texlang::token::Value::ControlSequence;
     let equal = match output_1.len() == output_2.len() {
         false => {
             println!(

@@ -333,23 +333,23 @@ mod test {
             (simple_case, r"\def\a{Hello}\noexpand\a", r"\a"),
             (
                 expandafter_and_noexpand_1,
-                r"\def\a#1\b{Hello '#1'}\def\b{World} \a\b",
-                " Hello ''"
+                r"\def\a#1\b{Hello '#1'}\def\b{World}\a\b",
+                "Hello ''"
             ),
             (
                 expandafter_and_noexpand_2,
-                r"\def\a#1\b{Hello '#1'}\def\b{World} \a\b\b",
-                " Hello ''World"
+                r"\def\a#1\b{Hello '#1'}\def\b{World}\a\b\b",
+                "Hello ''World"
             ),
             (
                 expandafter_and_noexpand_3,
-                r"\def\a#1\b{Hello '#1'}\def\b{World} \xa\a\b\b",
-                " Hello 'World'"
+                r"\def\a#1\b{Hello '#1'}\def\b{World}\xa\a\b\b",
+                "Hello 'World'"
             ),
             (
                 expandafter_and_noexpand_4,
-                r"\def\a#1\b{Hello '#1'}\def\b{World} \xa\a\noexpand\b\b",
-                " Hello ''World"
+                r"\def\a#1\b{Hello '#1'}\def\b{World}\xa\a\noexpand\b\b",
+                "Hello ''World"
             ),
             (
                 only_expands_once,

@@ -223,11 +223,11 @@ impl CatCode {
         Other,
         Other,
         Other,
-        Space,     // horizontal tab
-        EndOfLine, // carriage return
+        Space,     // horizontal tab (\t)
+        EndOfLine, // line feed (\n)
         Other,
-        Active, // ASCII form-feed
-        Other,
+        Active,    // ASCII form-feed
+        EndOfLine, // carriage return (\r)
         Other,
         Other,
         Other,

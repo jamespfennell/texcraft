@@ -49,6 +49,11 @@ impl Key {
     pub fn dummy() -> Key {
         Key(u32::MAX)
     }
+
+    #[cfg(test)]
+    pub fn as_u32(&self) -> u32 {
+        self.0
+    }
 }
 
 /// Range of free keys that may be assigned to tokens.
@@ -80,6 +85,13 @@ impl KeyRange {
             panic!["requested more trace keys than are in the range"]
         }
         Key(self.next)
+    }
+
+    /// Advances the range forward by the provided offset.
+    ///
+    /// Panics if the provided offset cannot be cast to u32.
+    pub fn advance_by(&mut self, u: usize) {
+        self.next = self.next.checked_add(u.try_into().unwrap()).unwrap();
     }
 }
 
@@ -151,7 +163,9 @@ impl Tracer {
             }
             // For empty files, we still assign one key because this allows us to trace end of input errors.
             Ok(0) => 1_u32,
-            Ok(limit) => limit,
+            // We add 1 to handle the case when the file does not end in a newline character. In this case
+            // the extra key will be used to refer to a character added using the \endlinechar mechanism.
+            Ok(limit) => limit + 1,
         };
         let range = KeyRange {
             next: self.next_key,

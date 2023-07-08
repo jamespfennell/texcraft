@@ -439,13 +439,17 @@ unsafe fn launder<'a>(token: &Token) -> &'a Token {
 mod stream {
     use super::*;
     use crate::token::lexer;
-    use crate::token::CatCode;
-    use crate::token::{lexer::CatCodeFn, Value::ControlSequence};
+    use crate::token::{lexer::Config, Value::ControlSequence};
 
-    impl<T: TexlangState> CatCodeFn for T {
+    impl<T: TexlangState> Config for T {
         #[inline]
         fn cat_code(&self, c: char) -> crate::token::CatCode {
             self.cat_code(c)
+        }
+        // TODO: implement \endlinechar
+        #[inline]
+        fn end_line_char(&self) -> Option<char> {
+            Some('\r')
         }
     }
 
@@ -462,11 +466,13 @@ mod stream {
             .root
             .next(&vm.state, &mut vm.internal.cs_name_interner)
         {
-            Ok(None) => {}
-            Ok(Some(token)) => {
+            lexer::Result::Token(token) => {
                 return Ok(Some(token));
             }
-            Err(err) => return Err(LexerError::new(vm, err).into()),
+            lexer::Result::InvalidCharacter(c, trace_key) => {
+                return Err(build_invalid_character_error(vm, c, trace_key));
+            }
+            lexer::Result::EndOfInput => {}
         }
         next_unexpanded_recurse(vm)
     }
@@ -494,12 +500,14 @@ mod stream {
             .root
             .next(&vm.state, &mut vm.internal.cs_name_interner)
         {
-            Ok(None) => {}
-            Ok(Some(token)) => {
+            lexer::Result::Token(token) => {
                 vm.internal.current_source.expansions.push(token);
                 return Ok(vm.internal.current_source.expansions.last());
             }
-            Err(err) => return Err(LexerError::new(vm, err).into()),
+            lexer::Result::InvalidCharacter(c, trace_key) => {
+                return Err(build_invalid_character_error(vm, c, trace_key));
+            }
+            lexer::Result::EndOfInput => {}
         }
         peek_unexpanded_recurse(vm)
     }
@@ -512,6 +520,14 @@ mod stream {
         } else {
             Ok(None)
         }
+    }
+
+    fn build_invalid_character_error<S: TexlangState>(
+        vm: &mut vm::VM<S>,
+        c: char,
+        trace_key: trace::Key,
+    ) -> Box<error::Error> {
+        lexer::InvalidCharacterError::new(vm, c, trace_key).into()
     }
 
     pub fn next_expanded<S: TexlangState>(
@@ -660,66 +676,5 @@ mod stream {
         err: Box<error::Error>,
     ) -> Box<Error> {
         Error::new_propagated(vm, error::PropagationContext::Expansion, token, err)
-    }
-
-    #[derive(Debug)]
-    enum LexerError {
-        InvalidCharacter(char, trace::SourceCodeTrace),
-        EmptyControlSequence(trace::SourceCodeTrace),
-    }
-
-    impl LexerError {
-        fn new<S>(vm: &vm::VM<S>, err: lexer::Error) -> LexerError {
-            match err {
-                lexer::Error::InvalidCharacter(c, key) => {
-                    LexerError::InvalidCharacter(c, vm.trace(Token::new_other(c, key)))
-                }
-                lexer::Error::EmptyControlSequence(key) => {
-                    LexerError::EmptyControlSequence(vm.trace(Token::new_other(' ', key)))
-                }
-            }
-        }
-    }
-
-    impl error::TexError for LexerError {
-        fn kind(&self) -> error::Kind {
-            match self {
-                LexerError::InvalidCharacter(_, key) => error::Kind::Token(key),
-                LexerError::EmptyControlSequence(key) => error::Kind::EndOfInput(key),
-            }
-        }
-
-        fn title(&self) -> String {
-            match self {
-                LexerError::InvalidCharacter(c, _) => {
-                    format!["input contains a character {} (Unicode code point {}) with category code {}", *c, *c as u32, CatCode::Invalid]
-                }
-                LexerError::EmptyControlSequence(_) => {
-                    format![
-                        "unexpected end of file after a token with category code {}",
-                        CatCode::Escape
-                    ]
-                }
-            }
-        }
-
-        fn source_annotation(&self) -> String {
-            match self {
-                LexerError::InvalidCharacter(_, _) => "invalid character",
-                LexerError::EmptyControlSequence(_) => "file ended after this token",
-            }
-            .into()
-        }
-
-        fn notes(&self) -> Vec<error::display::Note> {
-            match self {
-                LexerError::InvalidCharacter(_, _) => vec![
-                  format!["characters with category code {} cannot appear in the input", CatCode::Invalid].into()
-                ],
-                LexerError::EmptyControlSequence(_) => vec![
-                  "escape tokens start a control sequence and must be followed by at least one character".into(),
-                ],
-            }
-        }
     }
 }
