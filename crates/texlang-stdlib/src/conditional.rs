@@ -1,5 +1,9 @@
 //! Control flow primitives (if, else, switch)
 //!
+//! This module contains implementations of generic conditional commands,
+//!   as well as a mechanism for adding new conditional commands outside
+//!   of this module.
+//! See the [Condition] trait for information on adding new commands.
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
@@ -7,14 +11,14 @@ use texlang::token::trace;
 use texlang::traits::*;
 use texlang::*;
 
-pub const ELSE_DOC: &str = "Start the else branch of a conditional or switch statement";
-pub const IFCASE_DOC: &str = "Begin a switch statement";
-pub const IFNUM_DOC: &str = "Compare two variables";
-pub const IFODD_DOC: &str = "Check if a variable is odd";
-pub const IFTRUE_DOC: &str = "Evaluate the true branch";
-pub const IFFALSE_DOC: &str = "Evaluate the false branch";
-pub const FI_DOC: &str = "End a conditional or switch statement";
-pub const OR_DOC: &str = "Begin the next branch of a switch statement";
+const ELSE_DOC: &str = "Start the else branch of a conditional or switch statement";
+const IFCASE_DOC: &str = "Begin a switch statement";
+const IFNUM_DOC: &str = "Compare two variables";
+const IFODD_DOC: &str = "Check if a variable is odd";
+const IFTRUE_DOC: &str = "Evaluate the true branch";
+const IFFALSE_DOC: &str = "Evaluate the false branch";
+const FI_DOC: &str = "End a conditional or switch statement";
+const OR_DOC: &str = "Begin the next branch of a switch statement";
 
 /// A component for keeping track of conditional branches as they are expanded.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -211,48 +215,102 @@ impl error::TexError for FalseBranchEndOfInputError {
     }
 }
 
-macro_rules! create_if_primitive {
-    ($if_fn: ident, $if_primitive_fn: ident, $get_if: ident, $docs: expr) => {
-        fn $if_primitive_fn<S: HasComponent<Component>>(
-            token: token::Token,
-            input: &mut vm::ExpansionInput<S>,
-        ) -> Result<Vec<token::Token>, Box<error::Error>> {
-            match $if_fn(input)? {
+/// Logical condition used to build `if` conditional commands.
+///
+/// This trait can be used to build new conditional commands outside of this module.
+/// To do this, just create a new type (generally a ZST)
+///   and implement the [`evaluate`](Condition::evaluate) method of the trait for the type.
+/// A conditional command that uses the condition can then be obtained
+///   using the [`build_if_command`](Condition::build_if_command) method.
+pub trait Condition<S: HasComponent<Component>> {
+    /// Optional documentation for the command built using this condition.
+    const DOC: Option<&'static str> = None;
+
+    /// Evaluate the condition.
+    ///
+    /// Returns `true` if the condition is true, `false` if it is false,
+    ///   and an error otherwise.
+    fn evaluate(input: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>>;
+
+    /// Build an `if` conditional command that uses this condition.
+    fn build_if_command() -> command::BuiltIn<S> {
+        let primitive_fn = |token: token::Token,
+                            input: &mut vm::ExpansionInput<S>|
+         -> Result<Vec<token::Token>, Box<error::Error>> {
+            match Self::evaluate(input)? {
                 true => true_case(token, input),
                 false => false_case(token, input),
             }
-        }
-
-        pub fn $get_if<S: HasComponent<Component>>() -> command::BuiltIn<S> {
-            command::BuiltIn::new_expansion($if_primitive_fn)
-                .with_tag(IF_TAG.get())
-                .with_doc($docs)
-        }
-    };
+        };
+        let mut cmd = command::BuiltIn::new_expansion(primitive_fn).with_tag(IF_TAG.get());
+        if let Some(doc) = Self::DOC {
+            cmd = cmd.with_doc(doc)
+        };
+        cmd
+    }
 }
 
-fn if_true<S>(_: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
-    Ok(true)
+struct IfTrue;
+
+impl<S: HasComponent<Component>> Condition<S> for IfTrue {
+    const DOC: Option<&'static str> = Some(IFTRUE_DOC);
+
+    fn evaluate(_: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
+        Ok(true)
+    }
 }
 
-fn if_false<S>(_: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
-    Ok(false)
+/// Get the `\iftrue` primitive.
+pub fn get_iftrue<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    IfTrue::build_if_command()
 }
 
-fn if_num<S: TexlangState>(stream: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
-    let (a, o, b) = <(i32, Ordering, i32)>::parse(stream)?;
-    Ok(a.cmp(&b) == o)
+struct IfFalse;
+
+impl<S: HasComponent<Component>> Condition<S> for IfFalse {
+    const DOC: Option<&'static str> = Some(IFFALSE_DOC);
+
+    fn evaluate(_: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
+        Ok(false)
+    }
 }
 
-fn if_odd<S: TexlangState>(stream: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
-    let n = i32::parse(stream)?;
-    Ok((n % 2) == 1)
+/// Get the `\iffalse` primitive.
+pub fn get_iffalse<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    IfFalse::build_if_command()
 }
 
-create_if_primitive![if_true, if_true_primitive_fn, get_if_true, IFTRUE_DOC];
-create_if_primitive![if_false, if_false_primitive_fn, get_if_false, IFFALSE_DOC];
-create_if_primitive![if_num, if_num_primitive_fn, get_if_num, IFNUM_DOC];
-create_if_primitive![if_odd, if_odd_primitive_fn, get_if_odd, IFODD_DOC];
+struct IfNum;
+
+impl<S: HasComponent<Component>> Condition<S> for IfNum {
+    const DOC: Option<&'static str> = Some(IFNUM_DOC);
+
+    fn evaluate(input: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
+        let (a, o, b) = <(i32, Ordering, i32)>::parse(input)?;
+        Ok(a.cmp(&b) == o)
+    }
+}
+
+/// Get the `\ifnum` primitive.
+pub fn get_ifnum<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    IfNum::build_if_command()
+}
+
+struct IfOdd;
+
+impl<S: HasComponent<Component>> Condition<S> for IfOdd {
+    const DOC: Option<&'static str> = Some(IFODD_DOC);
+
+    fn evaluate(input: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
+        let n = i32::parse(input)?;
+        Ok((n % 2) == 1)
+    }
+}
+
+/// Get the `\ifodd` primitive.
+pub fn get_ifodd<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    IfOdd::build_if_command()
+}
 
 fn if_case_primitive_fn<S: HasComponent<Component>>(
     ifcase_token: token::Token,
@@ -340,8 +398,10 @@ impl error::TexError for IfCaseEndOfInputError {
 }
 
 /// Get the `\ifcase` primitive.
-pub fn get_if_case<S: HasComponent<Component>>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_expansion(if_case_primitive_fn).with_tag(IF_TAG.get())
+pub fn get_ifcase<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_expansion(if_case_primitive_fn)
+        .with_tag(IF_TAG.get())
+        .with_doc(IFCASE_DOC)
 }
 
 fn or_primitive_fn<S: HasComponent<Component>>(
@@ -410,7 +470,9 @@ impl error::TexError for OrEndOfInputError {
 
 /// Get the `\or` primitive.
 pub fn get_or<S: HasComponent<Component>>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_expansion(or_primitive_fn).with_tag(OR_TAG.get())
+    command::BuiltIn::new_expansion(or_primitive_fn)
+        .with_tag(OR_TAG.get())
+        .with_doc(OR_DOC)
 }
 
 fn else_primitive_fn<S: HasComponent<Component>>(
@@ -481,7 +543,9 @@ impl error::TexError for ElseEndOfInputError {
 
 /// Get the `\else` primitive.
 pub fn get_else<S: HasComponent<Component>>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_expansion(else_primitive_fn).with_tag(ELSE_TAG.get())
+    command::BuiltIn::new_expansion(else_primitive_fn)
+        .with_tag(ELSE_TAG.get())
+        .with_doc(ELSE_DOC)
 }
 
 /// Get the `\fi` primitive.
@@ -502,8 +566,11 @@ fn fi_primitive_fn<S: HasComponent<Component>>(
     Ok(Vec::new())
 }
 
+/// Get the `\fi` primitive.
 pub fn get_fi<S: HasComponent<Component>>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_expansion(fi_primitive_fn).with_tag(FI_TAG.get())
+    command::BuiltIn::new_expansion(fi_primitive_fn)
+        .with_tag(FI_TAG.get())
+        .with_doc(FI_DOC)
 }
 
 #[cfg(test)]
@@ -529,11 +596,11 @@ mod tests {
         HashMap::from([
             ("else", get_else()),
             ("fi", get_fi()),
-            ("ifcase", get_if_case()),
-            ("iffalse", get_if_false()),
-            ("ifnum", get_if_num()),
-            ("ifodd", get_if_odd()),
-            ("iftrue", get_if_true()),
+            ("ifcase", get_ifcase()),
+            ("iffalse", get_iffalse()),
+            ("ifnum", get_ifnum()),
+            ("ifodd", get_ifodd()),
+            ("iftrue", get_iftrue()),
             ("or", get_or()),
         ])
     }

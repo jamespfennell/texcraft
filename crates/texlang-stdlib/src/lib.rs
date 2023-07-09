@@ -116,11 +116,11 @@ impl StdLibState {
             ("global", prefix::get_global()),
             ("globaldefs", prefix::get_globaldefs()),
             //
-            ("ifcase", conditional::get_if_case()),
-            ("iffalse", conditional::get_if_false()),
-            ("ifnum", conditional::get_if_num()),
-            ("ifodd", conditional::get_if_odd()),
-            ("iftrue", conditional::get_if_true()),
+            ("ifcase", conditional::get_ifcase()),
+            ("iffalse", conditional::get_iffalse()),
+            ("ifnum", conditional::get_ifnum()),
+            ("ifodd", conditional::get_ifodd()),
+            ("iftrue", conditional::get_iftrue()),
             ("input", input::get_input()),
             //
             ("jobname", job::get_jobname()),
