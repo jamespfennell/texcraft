@@ -243,6 +243,13 @@ impl<S: TexlangState> ExpansionInput<S> {
             .push_source(Some(token), file_name, source_code)
     }
 
+    /// End the current file.
+    ///
+    /// This method is used by `\endinput` primitive.
+    pub fn end_current_file(&mut self) {
+        self.0 .0 .0.internal.end_current_file()
+    }
+
     pub fn push_string_tokens(&mut self, token: Token, s: &str) {
         let trace_key = token.trace_key();
         for c in s.chars().rev() {

@@ -497,8 +497,14 @@ impl<S: TexlangState> Internal<S> {
             .register_source_code(token, file_name, &source_code);
         let mut new_source = Source::new(source_code, trace_key_range);
         std::mem::swap(&mut new_source, &mut self.current_source);
+        // TODO: if the current top source is empty, we should skip this.
+        // Check this is working by looking at the JSON serialization.
         self.sources.push(new_source);
         Ok(())
+    }
+
+    fn end_current_file(&mut self) {
+        self.current_source.root.end()
     }
 }
 impl<S> Internal<S> {
@@ -525,6 +531,8 @@ impl<S> Internal<S> {
     }
 
     fn pop_source(&mut self) -> bool {
+        // We should set the current_source to be Default::default() if there is no additional source.
+        // Check this is working by looking at the JSON serialization.
         match self.sources.pop() {
             None => false,
             Some(source) => {

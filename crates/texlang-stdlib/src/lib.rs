@@ -19,7 +19,7 @@ pub mod conditional;
 pub mod def;
 pub mod endlinechar;
 pub mod expansion;
-pub mod io;
+pub mod input;
 pub mod job;
 pub mod math;
 pub mod prefix;
@@ -106,6 +106,7 @@ impl StdLibState {
             ("dumpValidate", job::get_dumpvalidate()),
             //
             ("else", conditional::get_else()),
+            ("endinput", input::get_endinput()),
             ("endlinechar", endlinechar::get_endlinechar()),
             ("expandafter", expansion::get_expandafter_optimized()),
             //
@@ -120,7 +121,7 @@ impl StdLibState {
             ("ifnum", conditional::get_if_num()),
             ("ifodd", conditional::get_if_odd()),
             ("iftrue", conditional::get_if_true()),
-            ("input", io::get_input()),
+            ("input", input::get_input()),
             //
             ("jobname", job::get_jobname()),
             //

@@ -96,6 +96,7 @@ fn initial_primitives() -> HashMap<&'static str, command::BuiltIn<PlaygroundStat
         ("divide", math::get_divide()),
         //
         ("else", conditional::get_else()),
+        ("endinput", input::get_endinput()),
         ("endlinechar", endlinechar::get_endlinechar()),
         ("expandafter", expansion::get_expandafter_optimized()),
         //

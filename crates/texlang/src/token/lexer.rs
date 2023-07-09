@@ -289,6 +289,13 @@ impl Lexer {
         Result::EndOfInput
     }
 
+    /// Marks the input as ended.
+    ///
+    /// Subsequent invocations of [`Lexer::next`] will return [`Result::EndOfInput`].
+    pub fn end(&mut self) {
+        self.raw_lexer.end()
+    }
+
     fn read_control_sequence<F: Config>(
         &mut self,
         config: &F,
@@ -516,6 +523,14 @@ impl RawLexer {
             .unwrap()
             .len_utf8();
         self.trace_key_range.next();
+    }
+
+    fn end(&mut self) {
+        // This ends the current line, so on the next token request a new line will be created.
+        self.pos = self.current_line.len();
+        // This marks the input as having no additional lines, so the new line request will return
+        // and end of input marker.
+        self.next_line = self.source_code.len();
     }
 }
 

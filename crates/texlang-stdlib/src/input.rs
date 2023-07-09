@@ -21,6 +21,19 @@ fn input_fn<S: TexlangState>(
     Ok(Vec::new())
 }
 
+/// Get the `\endinput` expansion primitive.
+pub fn get_endinput<S: TexlangState>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_expansion(endinput_fn)
+}
+
+fn endinput_fn<S: TexlangState>(
+    _: token::Token,
+    input: &mut vm::ExpansionInput<S>,
+) -> Result<Vec<token::Token>, Box<command::Error>> {
+    input.end_current_file();
+    Ok(Vec::new())
+}
+
 fn read_file<S>(
     t: token::Token,
     vm: &vm::VM<S>,
@@ -57,18 +70,22 @@ fn read_file<S>(
             t,
             format!("could not read from {:?}", &file_path),
         )
-        .into()), // .add_note(format!("underlying filesystem error: {err}"))
+        .into()), // .add_note(format!("underlying filesystem error: {err}")) TODO
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::*;
+    use crate::{def, testing::*};
     use std::collections::HashMap;
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
-        HashMap::from([("input", get_input())])
+        HashMap::from([
+            ("def", def::get_def()),
+            ("endinput", get_endinput()),
+            ("input", get_input()),
+        ])
     }
 
     fn custom_vm_initialization(vm: &mut vm::VM<State>) {
@@ -106,6 +123,36 @@ mod tests {
             (input_together, r"\input file2 hello", r"content2hello"),
             (basic_case_with_ext, r"\input file1.tex", r"content1 "),
             (nested, r"\input file3", r"content4"),
+        ),
+    );
+
+    fn end_input_vm_initialization(vm: &mut vm::VM<State>) {
+        let cwd = vm.working_directory.clone().unwrap();
+
+        let mut file_system: InMemoryFileSystem = Default::default();
+
+        let mut path_1 = cwd.to_path_buf();
+        path_1.push("file1.tex");
+        file_system.add_file(
+            path_1,
+            "Hello\\def\\Macro{Hola\\endinput Mundo}\\Macro World\n",
+        );
+
+        vm.file_system = Box::new(file_system);
+    }
+
+    test_suite!(
+        options(
+            TestOption::InitialCommands(initial_commands),
+            TestOption::CustomVMInitialization(end_input_vm_initialization),
+        ),
+        expansion_equality_tests(
+            (end_input_simple, r"Hello\endinput World", "Hello",),
+            (
+                end_input_in_second_file,
+                r"Before\input file1 After",
+                "BeforeHelloHolaMundoAfter"
+            ),
         ),
     );
 }
