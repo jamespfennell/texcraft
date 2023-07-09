@@ -400,7 +400,10 @@ impl<S> ExecutionInput<S> {
     pub fn state_mut(&mut self) -> &mut S {
         &mut self.0 .0 .0.state
     }
-
+    /// Returns a mutable reference to the tracer.
+    pub fn tracer_mut(&mut self) -> &mut trace::Tracer {
+        &mut self.0 .0 .0.internal.tracer
+    }
     /// Returns a mutable reference to the custom state.
     pub fn state_mut_and_cs_name_interner(&mut self) -> (&mut S, &token::CsNameInterner) {
         (

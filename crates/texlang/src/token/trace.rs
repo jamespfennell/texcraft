@@ -57,6 +57,7 @@ impl Key {
 }
 
 /// Range of free keys that may be assigned to tokens.
+#[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct KeyRange {
     next: u32,

@@ -177,6 +177,7 @@ enum State {
 }
 
 /// The Texlang lexer
+#[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Lexer {
     raw_lexer: RawLexer,
@@ -358,6 +359,7 @@ struct RawToken {
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug)]
 struct RawLexer {
     // TODO: when serializing we only need to serialize self.source_code[self.pos..]
     source_code: String,
