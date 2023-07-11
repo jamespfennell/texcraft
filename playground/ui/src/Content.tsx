@@ -28,15 +28,23 @@ export const PrimesDotTex = new TexFile("primes.tex", "TODO", "calculate the fir
 export const DigitsOfPiDotTex = new TexFile("digits-of-pi.tex", String.raw
 `% Digits of pi using the Rabinowitz and Wagon spigot algorithm [1]
 %
-% The number of digits to produce is configured at the end of the script.
+% The maximum number of digits to produce after the decimal point is
+% configured here:
+%
+\newInt \N
+\N = 50
 %
 % Notes:
 %
-% - The algorithm is O(n^2) and currently quite slow in Texcraft! Calculating
-%   5000 digits can take up to an hour depending on the hardware.
+% - Sometimes the algorithm produces fewer digits than \N; for example, if
+%   \N=4 it only produces 3 digits. This is known property of the spigot
+%   algorithm
 %
-% - TeX uses 32 bit integers and for large enough n overflow will occur and the
-%   result will be incorrect. This n is at least 5000. Its exact value is not
+% - The algorithm is O(n^2) and thus becomes quite slow quite fast for
+%   larger numbers of digits.
+%
+% - TeX uses 32 bit integers and if \N is large enough overflow will occur and the
+%   result will be incorrect. This \N is at least 5000. Its exact value is not
 %   known yet.
 %
 % - This script uses Texcraft's allocation commands (\newInt and \newIntArray) and
@@ -79,7 +87,6 @@ export const DigitsOfPiDotTex = new TexFile("digits-of-pi.tex", String.raw
 \def\computeDigitsOfPi#1#2{
   \newInt \n
   \n = #1
-  \let \result = #2
   \newInt\resultIndex
 
   % allocate an array of length (10n)/3
@@ -138,11 +145,11 @@ export const DigitsOfPiDotTex = new TexFile("digits-of-pi.tex", String.raw
     %
     \ifnum \preDigit < 9
       \ifnum \firstPreDigit > -1
-        \result\resultIndex = \firstPreDigit
+        #2\resultIndex = \firstPreDigit
         \advance\resultIndex by 1
       \fi
       \while{\numTrailingPreDigits > 0}{
-        \result\resultIndex = 9
+        #2\resultIndex = 9
         \advance\resultIndex by 1
         \advance\numTrailingPreDigits by -1
       }
@@ -157,10 +164,10 @@ export const DigitsOfPiDotTex = new TexFile("digits-of-pi.tex", String.raw
       \else 
         \firstPreDigit = 0
       \fi
-      \result\resultIndex = \firstPreDigit
+      #2\resultIndex = \firstPreDigit
       \advance\resultIndex by 1
       \while{\numTrailingPreDigits > 0}{
-        \result\resultIndex = 0
+        #2\resultIndex = 0
         \advance\resultIndex by 1
         \advance\numTrailingPreDigits by -1
       }
@@ -169,18 +176,18 @@ export const DigitsOfPiDotTex = new TexFile("digits-of-pi.tex", String.raw
     \modulus{\r 0}{10}
   }
 
-  \while{\resultIndex < \n}{\result\resultIndex-1\advance\resultIndex1}
+  \while{\resultIndex < \n}{#2\resultIndex-1\advance\resultIndex1}
 }
 
-\newInt \m
-\m = 50
-\newIntArray \digits \m
-\computeDigitsOfPi \m \digits
+\advance\N by 2
+\newIntArray \digits \N
+\computeDigitsOfPi \N \digits
 
+π ≅
 \i=0
 \newInt \temp
-\while{\i<\m}{%
-  \ifnum \result\i > -1 \the\digits\i \fi
+\while{\i<\N}{%
+  \ifnum \digits\i > -1 \the\digits\i \fi
   \ifnum \i=0.\fi
   \advance\i by 1%
 }

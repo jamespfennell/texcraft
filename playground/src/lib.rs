@@ -32,7 +32,7 @@ pub fn run(
     vm.push_source(file_name, input).unwrap();
     match script::run(&mut vm) {
         Ok(tokens) => token::write_tokens(&tokens, vm.cs_name_interner()),
-        Err(err) => format!["{err:?}"],
+        Err(err) => format!["{err}"],
     }
 }
 

@@ -5,9 +5,9 @@
   "scripts": {
     "build": "webpack --mode=production",
     "check": "tsc",
-    "builddev": "wasm-pack build ../wasm && webpack",
-    "clean": "rimraf dist ../wasm/pkg",
-    "start": "wasm-pack build ../wasm && webpack-dev-server --open --host 0.0.0.0"
+    "builddev": "wasm-pack build ../ && webpack",
+    "clean": "rimraf dist ..//pkg",
+    "start": "wasm-pack build ../ && webpack-dev-server --open --host 0.0.0.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.14.8",

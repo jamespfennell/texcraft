@@ -37,7 +37,8 @@ module.exports = {
     static: dist,
   },
   experiments: {
-    asyncWebAssembly: true
+    asyncWebAssembly: true,
+    topLevelAwait: true
   },
   plugins: [
     new CopyPlugin([

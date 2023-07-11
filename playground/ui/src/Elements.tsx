@@ -1,6 +1,7 @@
 import React, { ReactNode } from "react";
 import * as Texcraft from "../../pkg/texcraft_playground";
 import * as Content from "./Content";
+await Texcraft;
 
 type ElementProps = {
   header: string;
@@ -77,7 +78,7 @@ function TexcraftExecRaw(props: TexcraftExecProps) {
     console.log("Running Texcraft");
     var output = Texcraft.run(props.inputFile.filename, props.inputFile.content, minutes_since_midnight, day, month, year);
     return (
-      <Element header={"$ texcraft exec " + props.inputFile.filename}>
+      <Element header={"$ texcraft run " + props.inputFile.filename}>
         <div id="output" className="monospace">{output}</div>
       </Element>
     );
