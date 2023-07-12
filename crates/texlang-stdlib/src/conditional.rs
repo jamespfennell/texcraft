@@ -22,6 +22,7 @@ const OR_DOC: &str = "Begin the next branch of a switch statement";
 
 /// A component for keeping track of conditional branches as they are expanded.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Default)]
 pub struct Component {
     // Branches is a stack where each element corresponds to a conditional that is currently
     // expanding. A nested conditional is further up the stack than the conditional it is
@@ -103,21 +104,6 @@ enum BranchKind {
 struct Branch {
     _token: token::Token,
     kind: BranchKind,
-}
-
-impl Component {
-    pub fn new() -> Component {
-        Component {
-            branches: RefCell::new(Vec::new()),
-            tags: Default::default(),
-        }
-    }
-}
-
-impl Default for Component {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 fn push_branch<S: HasComponent<Component>>(input: &mut vm::ExpansionInput<S>, branch: Branch) {

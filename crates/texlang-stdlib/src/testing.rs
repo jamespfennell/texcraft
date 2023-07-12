@@ -24,15 +24,18 @@ use texlang::*;
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct State {
-    // TODO: Consider whether prefix should be here.
-    // Getting and setting global should be available via the VMs scope handler
-    // The other prefixes are \def specific, and the \def tests can be change to handle this.
     prefix: prefix::Component,
     script: script::Component,
     integer: i32,
 }
 
-impl TexlangState for State {}
+impl TexlangState for State {
+    fn variable_assignment_scope_hook(
+        state: &mut Self,
+    ) -> texcraft_stdext::collections::groupingmap::Scope {
+        prefix::variable_assignment_scope_hook(state)
+    }
+}
 
 implement_has_component![
     State,

@@ -37,18 +37,18 @@ pub mod tracingmacros;
 #[derive(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StdLibState {
-    alloc: alloc::Component,
-    catcode: catcode::Component,
-    conditional: conditional::Component,
-    end_line_char: endlinechar::Component,
-    input: input::Component<16>,
+    pub alloc: alloc::Component,
+    pub catcode: catcode::Component,
+    pub conditional: conditional::Component,
+    pub end_line_char: endlinechar::Component,
+    pub input: input::Component<16>,
     pub job: job::Component,
-    prefix: prefix::Component,
-    registers: registers::Component<i32, 32768>,
-    repl: repl::Component,
-    script: script::Component,
-    time: time::Component,
-    tracing_macros: tracingmacros::Component,
+    pub prefix: prefix::Component,
+    pub registers: registers::Component<i32, 32768>,
+    pub repl: repl::Component,
+    pub script: script::Component,
+    pub time: time::Component,
+    pub tracing_macros: tracingmacros::Component,
 }
 
 impl TexlangState for StdLibState {
@@ -159,7 +159,8 @@ impl StdLibState {
         ])
     }
 
-    pub fn new() -> Box<vm::VM<StdLibState>> {
+    /// Create a new VM that uses the standard library's state and all of its commands.
+    pub fn new_vm() -> Box<vm::VM<StdLibState>> {
         vm::VM::<StdLibState>::new(StdLibState::all_initial_built_ins())
     }
 }
@@ -180,13 +181,14 @@ implement_has_component![
     (tracingmacros::Component, tracing_macros),
 ];
 
+/// A TeX snippet exercises some error case in the standard library.
 pub struct ErrorCase {
     pub description: &'static str,
     pub source_code: &'static str,
 }
 
 impl ErrorCase {
-    /// Returns a vector of TeX snippets that exercise all error paths in Texlang
+    /// Returns a vector of TeX snippets that exercise all error paths in Texlang.
     pub fn all_error_cases() -> Vec<ErrorCase> {
         let mut cases = vec![];
         for (description, source_code) in vec![

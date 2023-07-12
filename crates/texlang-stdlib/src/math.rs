@@ -1,36 +1,35 @@
 //! Operations on variables (add, multiply, divide)
 
-use crate::prefix;
 use texlang::parse::OptionalBy;
 use texlang::traits::*;
 use texlang::*;
 
 /// Get the `\advance` command.
-pub fn get_advance<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+pub fn get_advance<S: TexlangState>() -> command::BuiltIn<S> {
     get_command::<S, AddOp>()
 }
 
 /// Get the `\advanceChecked` command.
-pub fn get_advance_checked<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+pub fn get_advance_checked<S: TexlangState>() -> command::BuiltIn<S> {
     get_command::<S, AddCheckedOp>()
 }
 
 /// Get the `\multiply` command.
-pub fn get_multiply<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+pub fn get_multiply<S: TexlangState>() -> command::BuiltIn<S> {
     get_command::<S, MultiplyOp>()
 }
 
 /// Get the `\multiplyWrapped` command.
-pub fn get_multiply_wrapped<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+pub fn get_multiply_wrapped<S: TexlangState>() -> command::BuiltIn<S> {
     get_command::<S, MultiplyWrappedOp>()
 }
 
 /// Get the `\divide` command.
-pub fn get_divide<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+pub fn get_divide<S: TexlangState>() -> command::BuiltIn<S> {
     get_command::<S, DivideOp>()
 }
 
-fn get_command<S: HasComponent<prefix::Component>, O: Op>() -> command::BuiltIn<S> {
+fn get_command<S: TexlangState, O: Op>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(math_primitive_fn::<S, O>)
         .with_tag(get_variable_op_tag())
         .with_doc(O::DOC)
@@ -159,11 +158,11 @@ impl error::TexError for DivisionByZeroError {
     }
 }
 
-fn math_primitive_fn<S: HasComponent<prefix::Component>, O: Op>(
+fn math_primitive_fn<S: TexlangState, O: Op>(
     token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<error::Error>> {
-    let scope = input.state_mut().component_mut().read_and_reset_global();
+    let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
     let variable = variable::Variable::parse(input)?;
     OptionalBy::parse(input)?;
     match variable {
@@ -195,6 +194,7 @@ mod tests {
 
     use super::*;
     use crate::catcode;
+    use crate::prefix;
     use crate::registers;
     use crate::script;
     use crate::testing::*;
@@ -209,7 +209,13 @@ mod tests {
         script: script::Component,
     }
 
-    impl TexlangState for State {}
+    impl TexlangState for State {
+        fn variable_assignment_scope_hook(
+            state: &mut Self,
+        ) -> texcraft_stdext::collections::groupingmap::Scope {
+            prefix::variable_assignment_scope_hook(state)
+        }
+    }
 
     implement_has_component![
         State,

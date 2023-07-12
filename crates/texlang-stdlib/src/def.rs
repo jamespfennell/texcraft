@@ -1,6 +1,5 @@
 //! User-defined macros (`\def` and friends)
 
-use crate::prefix;
 use texcraft_stdext::algorithms::substringsearch::Matcher;
 use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
@@ -12,12 +11,12 @@ use texlang::*;
 pub const DEF_DOC: &str = "Define a custom macro";
 
 /// Get the `\def` command.
-pub fn get_def<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+pub fn get_def<S: TexlangState>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(def_primitive_fn).with_tag(def_tag())
 }
 
 /// Get the `\gdef` command.
-pub fn get_gdef<S: HasComponent<prefix::Component>>() -> command::BuiltIn<S> {
+pub fn get_gdef<S: TexlangState>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(gdef_primitive_fn).with_tag(def_tag())
 }
 
@@ -27,26 +26,26 @@ pub fn def_tag() -> command::Tag {
     DEF_TAG.get()
 }
 
-fn def_primitive_fn<S: HasComponent<prefix::Component>>(
+fn def_primitive_fn<S: TexlangState>(
     def_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<error::Error>> {
     parse_and_set_macro(def_token, input, false)
 }
 
-fn gdef_primitive_fn<S: HasComponent<prefix::Component>>(
+fn gdef_primitive_fn<S: TexlangState>(
     def_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<error::Error>> {
     parse_and_set_macro(def_token, input, true)
 }
 
-fn parse_and_set_macro<S: HasComponent<prefix::Component>>(
+fn parse_and_set_macro<S: TexlangState>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
     set_globally_override: bool,
 ) -> Result<(), Box<error::Error>> {
-    let mut scope = input.state_mut().component_mut().read_and_reset_global();
+    let mut scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
     if set_globally_override {
         scope = groupingmap::Scope::Global;
     }
@@ -320,6 +319,7 @@ mod test {
     use std::collections::HashMap;
 
     use super::*;
+    use crate::prefix;
     use crate::testing::*;
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {

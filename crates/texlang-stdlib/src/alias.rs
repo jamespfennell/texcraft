@@ -24,7 +24,7 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<error::Error>> {
-    let scope = input.state_mut().component_mut().read_and_reset_global();
+    let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
     let Command::ControlSequence(alias) = Command::parse(input)?;
     OptionalEqualsUnexpanded::parse(input)?;
     match input.unexpanded().next()? {

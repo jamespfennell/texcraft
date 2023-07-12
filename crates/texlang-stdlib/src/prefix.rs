@@ -1,54 +1,36 @@
 //! The `\global`, `\long` and `\outer` prefix commands
 //!
+//! ## Global
+//! 
+//! The `\global` command makes the subsequent assignment global;
+//!     i.e., not scoped to the current group.
+//! This command checks that the subsequent command is allowed to be prefixed
+//!     by global and then sets a `\global` bit.
+//! All commands that can be prefixed then consume this bit by calling
+//!     the hook [`TexlangState::variable_assignment_scope_hook`].
+//! 
+//! In order for this to work correctly it is essential that *all* code
+//!   paths within the command call the hook -
+//!   even if the result is not used!
+//! For example `\gdef` always creates a macro in the global scope, but it still needs to
+//!   call the hook.
+//! Otherwise the global bit will still be set, and the next assignment may be
+//!     incorrectly performed in the global scope.
+//! 
+//! This behavior should be verified with unit tests.
+//! This module provides
+//!   an [`assert_global_is_false`](get_assert_global_is_false) execution command
+//!   to make this easy - the command just raises an error if the global bit is still true.
+//! 
+//! ## Outer and long
+//! 
 //! The `\long` and `\outer` commands are designed to place restrictions on macros
 //!    to avoid performance problems.
 //! These restrictions are described in the TeXBook.
-//! Texlang does not currently impose these restrictions because hardware is much better than in the 70s,
-//!   and minimizing the complexity of Texlang's code is more important than stopping TeX users
-//!   from writing slow TeX code.
+//! Texlang does not currently impose these restrictions.
 //! However, Texlang does enforce the rule that these prefix commands can only come before
 //!  `\def`, `\gdef`, `\edef` and `\xdef`.
 //!
-//! # Developer notes on `\global`
-//!
-//! The `\global` command here is pretty much a nightmare to implement.
-//! One of the core principles of the Texlang implementation is to remove global state,
-//!   but `\global` makes this really hard.
-//! The reason is that it changes the behavior, at run time, of a bunch of
-//!   other commands like `\def` and `\advance`, and it also changes the semantics
-//!   of variable assignment.
-//! It is impossible to scope `\global` tightly because of its wide effects.
-//!
-//! The approach here has two parts.
-//!
-//! First, for variable assignment, we just reimplement what happens in the VM
-//! except we pass a flag that makes the assignment global. This is not too bad
-//! as it's only a few lines of code.
-//!
-//! For commands, it's a little messier.
-//! We maintain a component which has a flag `global` that is set to true by
-//!   the `\global` command.
-//! Commands that can be prefixed with `\global` read the flag and act accordingly.
-//! The problem is that we need the global flag to be reset to false
-//!   at some point; otherwise, `\global` would make *all* subsequent assignments global.
-//! To do this we introduce a convention: any command which can be prefixed
-//!   by `\global` reads the flag a single time using the [Component::read_and_reset_global]
-//!   method.
-//! This method returns the flag value and resets the flag to false.
-//!
-//! In order for the convention to work correctly it is essential that *all* code
-//!   paths within the command call [read_and_reset_global](Component::read_and_reset_global) -
-//!   even if they don't use the result!
-//! For example `\gdef` always creates a macro in the global scope, but it still needs to
-//!   call [read_and_reset_global](Component::read_and_reset_global).
-//! This behavior should be verified with unit tests, and this module provides
-//!   an [assert_global_is_false](get_assert_global_is_false) execution command
-//!   to make this easy.
-//!
-//! Finally, commands which can be prefixed with `\global` are manually added
-//!   to the hash set inside the [Component].
-//! This set is used to validate that the command that follows `\global` is
-//!   allowed to be prefixed by it.
 
 use crate::alias;
 use crate::def;
@@ -102,10 +84,8 @@ impl Default for Tags {
 
 impl Component {
     /// Read the value of the global flag and reset the flag to false.
-    ///
-    /// See the module documentation for correct usage of this method.
     #[inline]
-    pub fn read_and_reset_global(&mut self) -> groupingmap::Scope {
+    fn read_and_reset_global(&mut self) -> groupingmap::Scope {
         match self.global_defs_value.cmp(&0) {
             std::cmp::Ordering::Less => groupingmap::Scope::Local,
             std::cmp::Ordering::Equal => {
@@ -162,6 +142,7 @@ pub fn get_global<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 
 static GLOBAL_TAG: command::StaticTag = command::StaticTag::new();
 
+/// Implementation of the variable assignment scope hook.
 #[inline]
 pub fn variable_assignment_scope_hook<S: HasComponent<Component>>(
     state: &mut S,
@@ -169,7 +150,7 @@ pub fn variable_assignment_scope_hook<S: HasComponent<Component>>(
     state.component_mut().read_and_reset_global()
 }
 
-// Get the `\long` command.
+/// Get the `\long` command.
 pub fn get_long<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(long_primitive_fn).with_tag(LONG_TAG.get())
 }

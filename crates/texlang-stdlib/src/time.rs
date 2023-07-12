@@ -13,29 +13,32 @@ pub struct Component {
     year: i32,
 }
 
-impl Component {
-    /// Create a new component with the variables initialized to the current time.
-    #[cfg(feature = "time")]
-    pub fn new() -> Component {
+#[cfg(feature = "time")]
+impl Default for Component {
+    fn default() -> Self {
         let dt: DateTime<Local> = Local::now();
-        Component {
+        Self {
             minutes_since_midnight: 60 * (dt.time().hour() as i32) + (dt.time().minute() as i32),
             day: dt.day() as i32,
             month: dt.month() as i32,
             year: dt.year(),
         }
     }
+}
 
-    #[cfg(not(feature = "time"))]
-    pub fn new() -> Component {
-        Component {
+#[cfg(not(feature = "time"))]
+impl Default for Component {
+    fn default() -> Self {
+        Self {
             minutes_since_midnight: 0,
             day: 0,
             month: 0,
             year: 0,
         }
     }
+}
 
+impl Component {
     /// Create a new component with the variable initialized with the provided values.
     ///
     /// This is useful in situations where the DateTime library can't be used; e.g., when
@@ -52,12 +55,6 @@ impl Component {
             month,
             year,
         }
-    }
-}
-
-impl Default for Component {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
