@@ -1,14 +1,14 @@
 //! The `\global`, `\long` and `\outer` prefix commands
 //!
 //! ## Global
-//! 
+//!
 //! The `\global` command makes the subsequent assignment global;
 //!     i.e., not scoped to the current group.
 //! This command checks that the subsequent command is allowed to be prefixed
 //!     by global and then sets a `\global` bit.
 //! All commands that can be prefixed then consume this bit by calling
 //!     the hook [`TexlangState::variable_assignment_scope_hook`].
-//! 
+//!
 //! In order for this to work correctly it is essential that *all* code
 //!   paths within the command call the hook -
 //!   even if the result is not used!
@@ -16,14 +16,14 @@
 //!   call the hook.
 //! Otherwise the global bit will still be set, and the next assignment may be
 //!     incorrectly performed in the global scope.
-//! 
+//!
 //! This behavior should be verified with unit tests.
 //! This module provides
 //!   an [`assert_global_is_false`](get_assert_global_is_false) execution command
 //!   to make this easy - the command just raises an error if the global bit is still true.
-//! 
+//!
 //! ## Outer and long
-//! 
+//!
 //! The `\long` and `\outer` commands are designed to place restrictions on macros
 //!    to avoid performance problems.
 //! These restrictions are described in the TeXBook.

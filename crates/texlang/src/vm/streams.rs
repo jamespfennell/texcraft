@@ -404,12 +404,15 @@ impl<S> ExecutionInput<S> {
     pub fn tracer_mut(&mut self) -> &mut trace::Tracer {
         &mut self.0 .0 .0.internal.tracer
     }
-    /// Returns a mutable reference to the custom state.
-    pub fn state_mut_and_cs_name_interner(&mut self) -> (&mut S, &token::CsNameInterner) {
-        (
-            &mut self.0 .0 .0.state,
-            &self.0 .0 .0.internal.cs_name_interner,
-        )
+    /// Returns a [vm::Parts] struct contains mutable references to different parts of the VM.
+    #[inline]
+    pub fn vm_parts(&mut self) -> vm::Parts<'_, S> {
+        let vm = &mut self.0 .0 .0;
+        vm::Parts {
+            state: &mut vm.state,
+            cs_name_interner: &mut vm.internal.cs_name_interner,
+            tracer: &mut vm.internal.tracer,
+        }
     }
 
     // TODO: pass in the token and keep it as a reference
@@ -470,19 +473,19 @@ mod stream {
         if let Some(token) = vm.internal.current_source.expansions.pop() {
             return Ok(Some(token));
         }
-        match vm
-            .internal
-            .current_source
-            .root
-            .next(&vm.state, &mut vm.internal.cs_name_interner)
-        {
+        match vm.internal.current_source.root.next(
+            &vm.state,
+            &mut vm.internal.cs_name_interner,
+            false,
+        ) {
             lexer::Result::Token(token) => {
                 return Ok(Some(token));
             }
             lexer::Result::InvalidCharacter(c, trace_key) => {
                 return Err(build_invalid_character_error(vm, c, trace_key));
             }
-            lexer::Result::EndOfInput => {}
+            // The EndOfLine case is never returned from the lexer but we silently handle it.
+            lexer::Result::EndOfLine | lexer::Result::EndOfInput => {}
         }
         next_unexpanded_recurse(vm)
     }
@@ -504,12 +507,11 @@ mod stream {
         if let Some(token) = vm.internal.current_source.expansions.last() {
             return Ok(Some(unsafe { launder(token) }));
         }
-        match vm
-            .internal
-            .current_source
-            .root
-            .next(&vm.state, &mut vm.internal.cs_name_interner)
-        {
+        match vm.internal.current_source.root.next(
+            &vm.state,
+            &mut vm.internal.cs_name_interner,
+            false,
+        ) {
             lexer::Result::Token(token) => {
                 vm.internal.current_source.expansions.push(token);
                 return Ok(vm.internal.current_source.expansions.last());
@@ -517,7 +519,8 @@ mod stream {
             lexer::Result::InvalidCharacter(c, trace_key) => {
                 return Err(build_invalid_character_error(vm, c, trace_key));
             }
-            lexer::Result::EndOfInput => {}
+            // The EndOfLine case is never returned from the lexer but we silently handle it.
+            lexer::Result::EndOfLine | lexer::Result::EndOfInput => {}
         }
         peek_unexpanded_recurse(vm)
     }

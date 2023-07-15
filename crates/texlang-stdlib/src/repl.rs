@@ -125,7 +125,7 @@ pub fn get_help<S: HasComponent<Component>>() -> command::BuiltIn<S> {
             let help = HasComponent::<Component>::component(input.state())
                 .help
                 .clone();
-            match writeln![input.vm().terminal.borrow_mut(), "{help}"] {
+            match writeln![input.vm().terminal_out.borrow_mut(), "{help}"] {
                 Ok(_) => Ok(()),
                 Err(err) => Err(error::SimpleTokenError::new(
                     input.vm(),
@@ -153,7 +153,7 @@ pub fn get_doc<S: TexlangState>() -> command::BuiltIn<S> {
                     Some(doc) => format!["\\{cs_name_s}  {doc}"],
                 },
             };
-            match writeln![input.vm().terminal.borrow_mut(), "{doc}"] {
+            match writeln![input.vm().terminal_out.borrow_mut(), "{doc}"] {
                 Ok(_) => Ok(()),
                 Err(err) => Err(error::SimpleTokenError::new(
                     input.vm(),

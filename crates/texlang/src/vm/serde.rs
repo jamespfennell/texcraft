@@ -97,7 +97,8 @@ pub fn finish_deserialization<S>(
         state: deserialized.state,
         commands_map,
         file_system: Box::new(super::RealFileSystem {}),
-        terminal: Rc::new(RefCell::new(std::io::stderr())),
+        terminal_in: Rc::new(RefCell::new(super::RealTerminalIn {})),
+        terminal_out: Rc::new(RefCell::new(std::io::stderr())),
         log_file: Rc::new(RefCell::new(std::io::sink())),
         working_directory: match std::env::current_dir() {
             Ok(path_buf) => Some(path_buf),

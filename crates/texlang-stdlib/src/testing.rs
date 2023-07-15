@@ -9,6 +9,7 @@
 //!     which generates a suite of unit tests for a set of primitives.
 
 use std::collections::HashMap;
+use std::path;
 
 use crate::prefix;
 use crate::script;
@@ -94,10 +95,20 @@ where
     let options = ResolvedOptions::new(options);
 
     let mut vm_1 = initialize_vm(&options);
-    let output_1 = crate::testing::execute_source_code(&mut vm_1, lhs, &options).unwrap();
+    let output_1 = crate::testing::execute_source_code(&mut vm_1, lhs, &options)
+        .map_err(|err| {
+            println!("{err}");
+            err
+        })
+        .unwrap();
 
     let mut vm_2 = initialize_vm(&options);
-    let output_2 = crate::testing::execute_source_code(&mut vm_2, rhs, &options).unwrap();
+    let output_2 = crate::testing::execute_source_code(&mut vm_2, rhs, &options)
+        .map_err(|err| {
+            println!("{err}");
+            err
+        })
+        .unwrap();
     compare_output(output_1, &vm_1, output_2, &vm_2)
 }
 
@@ -309,7 +320,8 @@ where
 /// let mut vm = vm::VM::<State>::new(
 ///     Default::default(),  // initial commands
 /// );
-/// let mock_file_system: InMemoryFileSystem = Default::default();
+/// let mut mock_file_system = InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
+/// mock_file_system.add("file/path.tex", "file content");
 /// vm.file_system = Box::new(mock_file_system);
 /// ```
 ///
@@ -321,12 +333,12 @@ where
 /// # use texlang::vm;
 /// # use texlang_stdlib::testing::*;
 /// let options = TestOption::CustomVMInitializationDyn(Box::new(|vm: &mut vm::VM<State>|{
-///     let mock_file_system: InMemoryFileSystem = Default::default();
+///     let mock_file_system = InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
 ///     vm.file_system = Box::new(mock_file_system);
 /// }));
 /// ```
-#[derive(Default)]
 pub struct InMemoryFileSystem {
+    working_directory: path::PathBuf,
     files: HashMap<std::path::PathBuf, String>,
 }
 
@@ -346,9 +358,56 @@ impl vm::FileSystem for InMemoryFileSystem {
 }
 
 impl InMemoryFileSystem {
+    /// Create a new in-memory file system.
+    ///
+    /// Typically the working directory is taken from the VM.
+    pub fn new(working_directory: &path::Path) -> Self {
+        Self {
+            working_directory: working_directory.into(),
+            files: Default::default(),
+        }
+    }
     /// Add a file to the in-memory file system.
-    pub fn add_file(&mut self, path: std::path::PathBuf, content: &str) {
+    ///
+    /// The provided path is relative to the working directory
+    pub fn add(&mut self, relative_path: &str, content: &str) {
+        let mut path = self.working_directory.clone();
+        path.push(relative_path);
         self.files.insert(path, content.to_string());
+    }
+}
+
+/// A mock version of [vm::TerminalIn].
+///
+/// This type wraps a vector of strings.
+/// The first call to [`vm::TerminalIn::read_line`] returns the first string;
+///   the second call returns the second string;
+///   and so on.
+/// When the vector is exausted, `read_line` returns an IO error of
+///   kind [std::io::ErrorKind::UnexpectedEof].
+#[derive(Default)]
+pub struct MockTerminalIn(usize, Vec<String>);
+
+impl MockTerminalIn {
+    /// Add a new line to be returned from the mock terminal.
+    pub fn add_line<S: Into<String>>(&mut self, line: S) {
+        self.1.push(line.into());
+    }
+}
+
+impl vm::TerminalIn for MockTerminalIn {
+    fn read_line(&mut self, _: Option<&str>, buffer: &mut String) -> std::io::Result<()> {
+        match self.1.get(self.0) {
+            None => Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "mock terminal input exausted",
+            )),
+            Some(line) => {
+                buffer.push_str(line);
+                self.0 += 1;
+                Ok(())
+            }
+        }
     }
 }
 

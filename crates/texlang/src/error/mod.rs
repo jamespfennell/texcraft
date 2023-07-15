@@ -97,9 +97,12 @@ pub trait TexError: std::fmt::Debug {
                 }
             }
             Kind::EndOfInput(_) => "input ended here".into(),
-            Kind::FailedPrecondition => self.title(),
+            Kind::FailedPrecondition => "error occurred while running this command".into(),
         }
     }
+
+    // TODO: have a method that returns the exact error messages as Knuth's TeX
+    // The method will return a vector of static strings
 }
 
 #[derive(Debug)]

@@ -1,9 +1,11 @@
-//! Primitives for input and output of files
-//!
+//! Primitives for inputting source code from files and the terminal
 
+use std::cell::RefCell;
 use std::path;
+use std::rc::Rc;
 use texlang::parse::{FileLocation, OptionalEquals};
 use texlang::token::lexer;
+use texlang::token::trace;
 use texlang::traits::*;
 use texlang::*;
 
@@ -19,8 +21,8 @@ fn input_fn<S: TexlangState>(
     input: &mut vm::ExpansionInput<S>,
 ) -> Result<Vec<token::Token>, Box<command::Error>> {
     let file_location = FileLocation::parse(input)?;
-    let (file_path, source_code) = read_file(input_token, input.vm(), file_location, ".tex")?;
-    input.push_source(input_token, file_path.into(), source_code)?;
+    let (file_path, source_code) = read_file(input.vm(), file_location, "tex")?;
+    input.push_source(input_token, file_path, source_code)?;
     Ok(Vec::new())
 }
 
@@ -39,20 +41,32 @@ fn endinput_fn<S: TexlangState>(
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Component<const N: usize> {
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            serialize_with = "serialize_files",
-            deserialize_with = "deserialize_files"
-        )
-    )]
+    #[cfg_attr(feature = "serde", serde(with = "texcraft_stdext::serde_tools::array"))]
     files: [Option<Box<lexer::Lexer>>; N],
+}
+
+impl<const N: usize> Component<N> {
+    fn take_file(&mut self, index: i32) -> Option<Box<lexer::Lexer>> {
+        let u: usize = match index.try_into() {
+            Ok(u) => u,
+            Err(_) => return None,
+        };
+        match self.files.get_mut(u) {
+            None => None,
+            Some(file_or) => file_or.take(),
+        }
+    }
+
+    fn return_file(&mut self, index: i32, file: Box<lexer::Lexer>) {
+        let u: usize = index.try_into().unwrap();
+        *self.files.get_mut(u).unwrap() = Some(file);
+    }
 }
 
 impl<const N: usize> Default for Component<N> {
     fn default() -> Self {
         // We construct the array as a vector first because the element type
-        // is not clonable and so we can't use the standard array constructor.
+        // cannot be cloned and so we can't use the standard array constructor.
         // But note that this isn't inefficient, because the array will
         // simply use the vector's buffer.
         let v: Vec<Option<Box<lexer::Lexer>>> = (0..N).into_iter().map(|_| None).collect();
@@ -60,29 +74,6 @@ impl<const N: usize> Default for Component<N> {
             files: v.try_into().unwrap(),
         }
     }
-}
-
-#[cfg(feature = "serde")]
-fn serialize_files<S>(input: &[Option<Box<lexer::Lexer>>], serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    use serde::Serialize;
-    input.serialize(serializer)
-}
-
-#[cfg(feature = "serde")]
-fn deserialize_files<'de, const N: usize, D>(
-    deserializer: D,
-) -> Result<[Option<Box<lexer::Lexer>>; N], D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::Deserialize;
-    let vec = Vec::<Option<Box<lexer::Lexer>>>::deserialize(deserializer)?;
-    // TODO: return an error instead of panicing
-    // TODO: can we write a generic helper for serding arrays?
-    Ok(vec.try_into().unwrap())
 }
 
 /// Get the `\openin` execution primitive.
@@ -94,15 +85,17 @@ fn openin_fn<const N: usize, S: HasComponent<Component<N>>>(
     openin_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<command::Error>> {
+    // TODO parse Uint<N>
     let (u, _, file_location) = <(usize, OptionalEquals, FileLocation)>::parse(input)?;
-    let lexer_or = match read_file(openin_token, input.vm(), file_location, ".tex") {
+    let lexer_or = match read_file(input.vm(), file_location, "tex") {
         // If the file fails to open TeX does not error out.
         // Instead, TeX users are expected to test the result with \ifeof.
         Err(_) => None,
         Ok((file_path, source_code)) => {
+            let source_code = ensure_ends_in_newline(source_code);
             let trace_key_range = input.tracer_mut().register_source_code(
                 Some(openin_token),
-                file_path.into(),
+                trace::Origin::File(file_path),
                 &source_code,
             );
             Some(Box::new(lexer::Lexer::new(source_code, trace_key_range)))
@@ -117,6 +110,13 @@ fn openin_fn<const N: usize, S: HasComponent<Component<N>>>(
     Ok(())
 }
 
+fn ensure_ends_in_newline(mut s: String) -> String {
+    if !s.ends_with('\n') {
+        s.push('\n')
+    }
+    s
+}
+
 /// Get the `\closein` execution primitive.
 pub fn get_closein<const N: usize, S: HasComponent<Component<N>>>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(closein_fn)
@@ -126,6 +126,7 @@ fn closein_fn<const N: usize, S: HasComponent<Component<N>>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<command::Error>> {
+    // TODO parse Uint<N>
     let u = usize::parse(input)?;
     match input.state_mut().component_mut().files.get_mut(u) {
         None => todo!(),
@@ -134,6 +135,142 @@ fn closein_fn<const N: usize, S: HasComponent<Component<N>>>(
         }
     };
     Ok(())
+}
+
+/// Get the `\read` execution primitive.
+pub fn get_read<const N: usize, S: HasComponent<Component<N>>>() -> command::BuiltIn<S> {
+    command::BuiltIn::new_execution(read_fn)
+}
+
+fn read_fn<const N: usize, S: HasComponent<Component<N>>>(
+    _: token::Token,
+    input: &mut vm::ExecutionInput<S>,
+) -> Result<(), Box<command::Error>> {
+    let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
+    let (index, _, target) = <(i32, parse::To, parse::Command)>::parse(input)?;
+    let parse::Command::ControlSequence(target) = target;
+    let terminal_in = input.vm().terminal_in.clone();
+    let vm::Parts {
+        state,
+        cs_name_interner,
+        tracer,
+    } = input.vm_parts();
+    #[derive(Copy, Clone, PartialEq, Eq)]
+    enum Mode {
+        File,
+        Terminal,
+    }
+
+    let (mut lexer, mode, prompt) = match state.component_mut().take_file(index) {
+        Some(file) => (file, Mode::File, None),
+        None => {
+            let prompt = if index < 0 {
+                None
+            } else {
+                Some(format!(r"\{}=", cs_name_interner.resolve(target).unwrap()))
+            };
+            (
+                read_from_terminal(&terminal_in, tracer, &prompt)?,
+                Mode::Terminal,
+                prompt,
+            )
+        }
+    };
+    let mut tokens = vec![];
+    let mut more_lines_exist = true;
+    let mut braces: Vec<token::Token> = vec![];
+    loop {
+        match (lexer.next(state, cs_name_interner, true), mode) {
+            (lexer::Result::Token(token), _) => {
+                match token.cat_code() {
+                    Some(token::CatCode::BeginGroup) => {
+                        braces.push(token);
+                    }
+                    Some(token::CatCode::EndGroup) => {
+                        if braces.pop().is_none() {
+                            more_lines_exist = drain_line(&mut lexer, state, cs_name_interner);
+                            break;
+                        }
+                    }
+                    _ => (),
+                };
+                tokens.push(token);
+            }
+            (lexer::Result::InvalidCharacter(c, trace_key), _) => {
+                return Err(lexer::InvalidCharacterError::new(input.vm(), c, trace_key).into())
+            }
+            (lexer::Result::EndOfLine, Mode::File) => {
+                if braces.is_empty() {
+                    break;
+                }
+            }
+            (lexer::Result::EndOfInput, Mode::File) => {
+                if let Some(unmatched_brace) = braces.pop() {
+                    return Err(UnmatchedBracesError {
+                        unmatched_brace: input.trace(unmatched_brace),
+                    }
+                    .into());
+                }
+                more_lines_exist = false;
+                break;
+            }
+            (lexer::Result::EndOfLine | lexer::Result::EndOfInput, Mode::Terminal) => {
+                if !braces.is_empty() {
+                    lexer = read_from_terminal(&terminal_in, tracer, &prompt)?;
+                    continue;
+                }
+                break;
+            }
+        }
+    }
+    if mode == Mode::File && more_lines_exist {
+        state.component_mut().return_file(index, lexer);
+    }
+    tokens.reverse();
+    let user_defined_macro =
+        texmacro::Macro::new(vec![], vec![], vec![texmacro::Replacement::Tokens(tokens)]);
+    input
+        .commands_map_mut()
+        .insert_macro(target, user_defined_macro, scope);
+    Ok(())
+}
+
+fn drain_line<S: TexlangState>(
+    file: &mut lexer::Lexer,
+    state: &S,
+    cs_name_interner: &mut token::CsNameInterner,
+) -> bool {
+    loop {
+        match file.next(state, cs_name_interner, true) {
+            lexer::Result::Token(_) | lexer::Result::InvalidCharacter(_, _) => {}
+            lexer::Result::EndOfLine => {
+                return true;
+            }
+            lexer::Result::EndOfInput => {
+                return false;
+            }
+        }
+    }
+}
+
+fn read_from_terminal(
+    terminal_in: &Rc<RefCell<dyn vm::TerminalIn>>,
+    tracer: &mut trace::Tracer,
+    prompt: &Option<String>,
+) -> command::Result<Box<lexer::Lexer>> {
+    let mut buffer = String::new();
+    if let Err(err) = terminal_in
+        .borrow_mut()
+        .read_line(prompt.as_deref(), &mut buffer)
+    {
+        return Err(IoError {
+            title: "failed to read from the terminal".into(),
+            underlying_error: err,
+        }
+        .into());
+    }
+    let trace_key_range = tracer.register_source_code(None, trace::Origin::Terminal, &buffer);
+    Ok(Box::new(lexer::Lexer::new(buffer, trace_key_range)))
 }
 
 /// Get the `\ifeof` conditional expansion primitive.
@@ -156,57 +293,74 @@ where
             .files
             .get(u)
         {
-            None => todo!(),
+            None => todo!(), // TODO: this returns an error in Knuth TeX,
             Some(file_or) => Ok(file_or.is_none()),
         }
     }
 }
 
 fn read_file<S>(
-    t: token::Token,
     vm: &vm::VM<S>,
     file_location: parse::FileLocation,
     default_extension: &str,
-) -> command::Result<(String, String)> {
-    // TODO: return a Path instead of String
-    let raw_file_path = format![
-        "{}{}",
-        &file_location.path,
-        match &file_location.extension {
-            None => default_extension,
-            Some(ext) => ext,
-        }
-    ];
-    let file_path = match path::Path::new(&raw_file_path).is_absolute() {
-        true => path::Path::new(&raw_file_path).to_path_buf(),
-        false => match file_location.area {
-            None => match &vm.working_directory {
-                None => {
-                    panic!("TODO: handle this error");
-                }
-                Some(working_directory) => working_directory.join(&raw_file_path),
-            },
-            Some(_area) => {
-                panic!("TODO: handle this error");
-            }
-        },
-    };
-
+) -> command::Result<(path::PathBuf, String)> {
+    let file_path = file_location.determine_full_path(
+        vm.working_directory.as_ref().map(path::PathBuf::as_ref),
+        default_extension,
+    );
     match vm.file_system.read_to_string(&file_path) {
-        Ok(s) => Ok((raw_file_path, s)),
-        Err(_err) => Err(error::SimpleTokenError::new(
-            vm,
-            t,
-            format!("could not read from {:?}", &file_path),
-        )
-        .into()), // .add_note(format!("underlying filesystem error: {err}")) TODO
+        Ok(source_code) => Ok((file_path, source_code)),
+        Err(err) => Err(IoError {
+            title: format!("could not read from `{}`", file_path.display()),
+            underlying_error: err,
+        }
+        .into()),
+    }
+}
+
+#[derive(Debug)]
+struct IoError {
+    title: String,
+    underlying_error: std::io::Error,
+}
+
+impl error::TexError for IoError {
+    fn kind(&self) -> error::Kind {
+        error::Kind::FailedPrecondition
+    }
+
+    fn title(&self) -> String {
+        self.title.clone()
+    }
+
+    fn notes(&self) -> Vec<error::display::Note> {
+        vec![format!("underlying filesystem error: {}", self.underlying_error).into()]
+    }
+}
+
+#[derive(Debug)]
+struct UnmatchedBracesError {
+    unmatched_brace: trace::SourceCodeTrace,
+}
+
+impl error::TexError for UnmatchedBracesError {
+    fn kind(&self) -> error::Kind {
+        error::Kind::Token(&self.unmatched_brace)
+    }
+
+    fn title(&self) -> String {
+        "file has an unmatched opening brace".into()
+    }
+
+    fn notes(&self) -> Vec<error::display::Note> {
+        vec![r"files being read with the \read primitive must match all opening braces with closing braces".into()]
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{def, prefix, script, testing::*};
+    use crate::{def, expansion, prefix, script, testing::*};
     use std::collections::HashMap;
 
     #[derive(Default)]
@@ -230,40 +384,27 @@ mod tests {
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
+            ("closein", get_closein()),
             ("def", def::get_def()),
             ("else", conditional::get_else()),
             ("endinput", get_endinput()),
             ("fi", conditional::get_fi()),
             ("ifeof", get_ifeof()),
-            ("openin", get_openin()),
-            ("closein", get_closein()),
             ("input", get_input()),
+            ("openin", get_openin()),
+            ("read", get_read()),
+            ("relax", expansion::get_relax()),
         ])
     }
 
     fn custom_vm_initialization(vm: &mut vm::VM<State>) {
-        let cwd = vm.working_directory.clone().unwrap();
-
-        let mut file_system: InMemoryFileSystem = Default::default();
-
-        let mut path_1 = cwd.to_path_buf();
-        path_1.push("file1.tex");
-        file_system.add_file(path_1, "content1\n");
-
-        let mut path_2 = cwd.to_path_buf();
-        path_2.push("file2.tex");
-        file_system.add_file(path_2, "content2%\n");
-
-        let mut path_3 = cwd.to_path_buf();
-        path_3.push("file3.tex");
-        file_system.add_file(path_3, r"\input nested/file4");
-
-        let mut path_4 = cwd.to_path_buf();
-        path_4.push("nested");
-        path_4.push("file4.tex");
-        file_system.add_file(path_4, "content4");
-
-        vm.file_system = Box::new(file_system);
+        let mut fs = InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
+        fs.add("file1.tex", "content1\n");
+        fs.add("file2.tex", "content2%\n");
+        fs.add("file3.tex", r"\input nested/file4");
+        fs.add("nested/file4.tex", "content4");
+        fs.add("file5.tex", "file1.tex");
+        vm.file_system = Box::new(fs);
     }
 
     test_suite!(
@@ -276,22 +417,18 @@ mod tests {
             (input_together, r"\input file2 hello", r"content2hello"),
             (basic_case_with_ext, r"\input file1.tex", r"content1 "),
             (nested, r"\input file3", r"content4"),
+            (nested_2, r"\input \input file5", r"content1 "),
         ),
+        failure_tests((file_does_not_exist, r"\input doesNotExist",),),
     );
 
     fn end_input_vm_initialization(vm: &mut vm::VM<State>) {
-        let cwd = vm.working_directory.clone().unwrap();
-
-        let mut file_system: InMemoryFileSystem = Default::default();
-
-        let mut path_1 = cwd.to_path_buf();
-        path_1.push("file1.tex");
-        file_system.add_file(
-            path_1,
+        let mut fs = InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
+        fs.add(
+            "file1.tex",
             "Hello\\def\\Macro{Hola\\endinput Mundo}\\Macro World\n",
         );
-
-        vm.file_system = Box::new(file_system);
+        vm.file_system = Box::new(fs);
     }
 
     test_suite!(
@@ -310,15 +447,20 @@ mod tests {
     );
 
     fn read_vm_initialization(vm: &mut vm::VM<State>) {
-        let cwd = vm.working_directory.clone().unwrap();
+        let mut fs = InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
+        fs.add("file1.tex", "1\n2%\n3");
+        fs.add("file2.tex", "1{\n2\n3}");
+        fs.add("file3.tex", "1}1\n2");
+        fs.add("file4.tex", "");
+        fs.add("file5.tex", "hello { world");
+        vm.file_system = Box::new(fs);
 
-        let mut file_system: InMemoryFileSystem = Default::default();
-
-        let mut path_1 = cwd.to_path_buf();
-        path_1.push("file1.tex");
-        file_system.add_file(path_1, "Hello World");
-
-        vm.file_system = Box::new(file_system);
+        let mut terminal_in: MockTerminalIn = Default::default();
+        terminal_in.add_line("first-line");
+        terminal_in.add_line("second-line {");
+        terminal_in.add_line("third-line }");
+        terminal_in.add_line("fourth}line");
+        vm.terminal_in = Rc::new(RefCell::new(terminal_in));
     }
 
     test_suite!(
@@ -333,8 +475,8 @@ mod tests {
                 "Closed",
             ),
             (
-                ifeof_non_existant_file,
-                r"\openin 0 doesnotexist \ifeof 0 Closed\else Open\fi",
+                ifeof_non_existent_file,
+                r"\openin 0 doesNotExist \ifeof 0 Closed\else Open\fi",
                 "Closed",
             ),
             (
@@ -343,8 +485,8 @@ mod tests {
                 "Open",
             ),
             (
-                ifeof_non_existant_file_2,
-                r"\openin 0 file1 \openin 0 doesnotexist \ifeof 0 Closed\else Open\fi",
+                ifeof_non_existent_file_2,
+                r"\openin 0 file1 \openin 0 doesNotExist \ifeof 0 Closed\else Open\fi",
                 "Closed",
             ),
             (
@@ -352,11 +494,46 @@ mod tests {
                 r"\openin 0 file1 \closein 0 \ifeof 0 Closed\else Open\fi",
                 "Closed",
             ),
+            (
+                read_1,
+                r"\openin 0 file1\read 0 to \line line1='\line'\read 0 to \line line2='\line'\read 0 to \line line3='\line'\ifeof 0 Closed\else Open\fi",
+                "line1='1 'line2='2'line3='3 'Closed",
+            ),
+            (
+                read_2,
+                r"\openin 0 file2\read 0 to \line line1='\line'\ifeof 0 Closed\else Open\fi",
+                "line1='1{ 2 3} 'Closed",
+            ),
+            (
+                read_3,
+                r"\openin 0 file3\read 0 to \line line1='\line'\read 0 to \line line2='\line'",
+                "line1='1'line2='2 '",
+            ),
+            (
+                read_4,
+                r"\def\par{par}\openin 0 file4\read 0 to \line line1='\line'\ifeof 0 Closed\else Open\fi",
+                "line1='par'Closed",
+            ),
+            (
+                read_from_terminal,
+                r"\read 0 to \line line1='\line'\read 0 to \line line2='\line'\read 0 to \line line3='\line'",
+                "line1='first-line 'line2='second-line { third-line } 'line3='fourth'",
+            )
         ),
         serde_tests((
-            iseof_file_exists_serde,
+            ifeof_file_exists_serde,
             r"\openin 0 file1 ",
             r"\ifeof 0 Closed\else Open\fi"
         ),),
+        failure_tests(
+            (
+                file_has_unmatched_braces,
+                r"\openin 0 file5 \read 0 to \X (\X)",
+            ),
+            (
+                failed_to_read_from_terminal,
+                r"\read 0 to \X \read 0 to \X \read 0 to \X \read 0 to \X",
+            ),
+        )
     );
 }

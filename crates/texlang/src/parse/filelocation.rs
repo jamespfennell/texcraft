@@ -2,6 +2,8 @@
 //!
 //! See section 511 of the TeXBook.
 
+use std::path;
+
 use crate::traits::*;
 use crate::*;
 
@@ -49,9 +51,39 @@ impl<S: TexlangState> Parsable<S> for FileLocation {
             path: raw_string
                 [area_delimiter.unwrap_or(0)..ext_delimiter.unwrap_or(raw_string.len())]
                 .into(),
-            extension: ext_delimiter.map(|j| raw_string[j..].into()),
+            extension: ext_delimiter.map(|j| raw_string[j + 1..].into()),
             area: area_delimiter.map(|i| raw_string[..i].into()),
         })
+    }
+}
+
+impl FileLocation {
+    pub fn determine_full_path(
+        &self,
+        working_directory: Option<&path::Path>,
+        default_extension: &str,
+    ) -> path::PathBuf {
+        let mut path: path::PathBuf = match self.area {
+            None => match working_directory {
+                None => Default::default(),
+                Some(working_directory) => working_directory.into(),
+            },
+            Some(_) => {
+                // TODO: support file areas.
+                // Probably we just need to extend the vm::FileSystem trait to accept areas.
+                // Then in production TeX engines, we provide a map of areas to base path for
+                // that area. There is still an error case when an undefined area is referenced.
+                panic!("Texlang does not have support for file areas yet");
+            }
+        };
+        path.push(std::ffi::OsString::from(&self.path));
+        path.set_extension(std::ffi::OsString::from(
+            self.extension.as_deref().unwrap_or(default_extension),
+        ));
+        if !path.is_absolute() {
+            panic!("TODO: handle this error (path is relative and no working directory set)");
+        }
+        path
     }
 }
 
@@ -102,7 +134,7 @@ mod tests {
             ".tex",
             FileLocation {
                 path: "".to_string(),
-                extension: Some(".tex".to_string()),
+                extension: Some("tex".to_string()),
                 area: None,
             },
         ),
@@ -111,7 +143,7 @@ mod tests {
             "path/to/file.tex",
             FileLocation {
                 path: "path/to/file".to_string(),
-                extension: Some(".tex".to_string()),
+                extension: Some("tex".to_string()),
                 area: None,
             },
         ),
@@ -147,7 +179,7 @@ mod tests {
             "area:path/to/file.tex",
             FileLocation {
                 path: "path/to/file".to_string(),
-                extension: Some(".tex".to_string()),
+                extension: Some("tex".to_string()),
                 area: Some("area:".to_string()),
             },
         ),

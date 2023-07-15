@@ -113,8 +113,8 @@ impl KeyRange {
 /// A token trace
 #[derive(Debug, PartialEq, Eq)]
 pub struct SourceCodeTrace {
-    /// Name of the file this token came from.
-    pub file_name: PathBuf,
+    /// Origin of the source code this token came from.
+    pub origin: Origin,
     /// Content of the line this token came from.
     pub line_content: String,
     /// Number of the line within the file, starting at 1.
@@ -140,6 +140,14 @@ pub struct Tracer {
     last_external_input: Option<u32>,
 }
 
+/// Enum describing the possible origins of source code
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Origin {
+    File(PathBuf),
+    Terminal,
+}
+
 impl Tracer {
     /// Registers source code with the tracer.
     ///
@@ -151,7 +159,7 @@ impl Tracer {
     pub fn register_source_code(
         &mut self,
         token: Option<Token>,
-        file_name: PathBuf,
+        origin: Origin,
         source_code: &str,
     ) -> KeyRange {
         let len = match u32::try_from(source_code.len()) {
@@ -175,7 +183,7 @@ impl Tracer {
         self.checkpoints.insert(
             range.next,
             Checkpoint::SourceCode {
-                file_name,
+                origin,
                 content: source_code.to_string(),
             },
         );
@@ -203,7 +211,7 @@ impl Tracer {
             .unwrap();
 
         match checkpoint {
-            Checkpoint::SourceCode { file_name, content } => {
+            Checkpoint::SourceCode { origin, content } => {
                 let char_offset = (token.trace_key().0 - first_key) as usize;
                 let mut line_number = 1;
                 let mut byte_line_start = 0;
@@ -225,7 +233,7 @@ impl Tracer {
                     Some((a, _)) => a.to_string(),
                 };
                 SourceCodeTrace {
-                    file_name: file_name.clone(),
+                    origin: origin.clone(),
                     line_content,
                     line_number,
                     index: position,
@@ -242,7 +250,7 @@ impl Tracer {
             .get(&self.last_external_input.unwrap())
             .unwrap();
         match f {
-            Checkpoint::SourceCode { file_name, content } => {
+            Checkpoint::SourceCode { origin, content } => {
                 // (line index, byte index of first character)
                 let mut last_line: (usize, usize) = (0, 0);
                 let mut last_non_empty_line: (usize, usize) = (0, 0);
@@ -256,7 +264,7 @@ impl Tracer {
                 }
                 let last_line = content[last_non_empty_line.1..].trim_end();
                 SourceCodeTrace {
-                    file_name: file_name.clone(),
+                    origin: origin.clone(),
                     line_content: last_line.to_string(),
                     line_number: last_non_empty_line.0 + 1,
                     index: last_line.len(),
@@ -271,7 +279,7 @@ impl Tracer {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum Checkpoint {
     SourceCode {
-        file_name: PathBuf,
+        origin: Origin,
         content: String, // TODO: should be rc::Rc<str>?
     },
 }
@@ -283,6 +291,7 @@ mod tests {
     #[test]
     fn one_source_code() {
         let file_name: PathBuf = "input.tex".into();
+        let origin = Origin::File(file_name);
         let line_1 = "hël".to_string();
         let line_2 = "wor\\cömmand".to_string();
         let line_3 = "hël".to_string();
@@ -291,7 +300,7 @@ mod tests {
         let mut tracer: Tracer = Default::default();
         let mut interner: CsNameInterner = Default::default();
         let command = interner.get_or_intern("command");
-        let mut range = tracer.register_source_code(None, file_name.clone(), &source_code);
+        let mut range = tracer.register_source_code(None, origin.clone(), &source_code);
         let mut tokens = vec![
             Token::new_letter('h', range.next()),
             Token::new_letter('e', range.next()),
@@ -320,7 +329,7 @@ mod tests {
 
         let want_traces = vec![
             SourceCodeTrace {
-                file_name: file_name.clone(),
+                origin: origin.clone(),
                 line_content: line_1.clone(),
                 line_number: 1,
                 index: 0,
@@ -328,7 +337,7 @@ mod tests {
                 token: Some(tokens[0]),
             },
             SourceCodeTrace {
-                file_name: file_name.clone(),
+                origin: origin.clone(),
                 line_content: line_1.clone(),
                 line_number: 1,
                 index: 1,
@@ -336,7 +345,7 @@ mod tests {
                 token: Some(tokens[1]),
             },
             SourceCodeTrace {
-                file_name: file_name.clone(),
+                origin: origin.clone(),
                 line_content: line_1.clone(),
                 line_number: 1,
                 index: 2,
@@ -344,7 +353,7 @@ mod tests {
                 token: Some(tokens[2]),
             },
             SourceCodeTrace {
-                file_name: file_name.clone(),
+                origin: origin.clone(),
                 line_content: line_1.clone(),
                 line_number: 1,
                 index: 3,
@@ -352,7 +361,7 @@ mod tests {
                 token: Some(tokens[3]),
             },
             SourceCodeTrace {
-                file_name: file_name.clone(),
+                origin: origin.clone(),
                 line_content: line_2.clone(),
                 line_number: 2,
                 index: 0,
@@ -360,7 +369,7 @@ mod tests {
                 token: Some(tokens[4]),
             },
             SourceCodeTrace {
-                file_name: file_name.clone(),
+                origin: origin.clone(),
                 line_content: line_2.clone(),
                 line_number: 2,
                 index: 1,
@@ -368,7 +377,7 @@ mod tests {
                 token: Some(tokens[5]),
             },
             SourceCodeTrace {
-                file_name: file_name.clone(),
+                origin: origin.clone(),
                 line_content: line_2.clone(),
                 line_number: 2,
                 index: 2,
@@ -376,7 +385,7 @@ mod tests {
                 token: Some(tokens[6]),
             },
             SourceCodeTrace {
-                file_name: file_name.clone(),
+                origin: origin.clone(),
                 line_content: line_2.clone(),
                 line_number: 2,
                 index: 3,
@@ -384,7 +393,7 @@ mod tests {
                 token: Some(tokens[7]),
             },
             SourceCodeTrace {
-                file_name: file_name.clone(),
+                origin: origin.clone(),
                 line_content: line_2.clone(),
                 line_number: 2,
                 index: 11,
@@ -392,7 +401,7 @@ mod tests {
                 token: Some(tokens[8]),
             },
             SourceCodeTrace {
-                file_name: file_name.clone(),
+                origin: origin.clone(),
                 line_content: line_3.clone(),
                 line_number: 3,
                 index: 0,
@@ -400,7 +409,7 @@ mod tests {
                 token: Some(tokens[9]),
             },
             SourceCodeTrace {
-                file_name: file_name.clone(),
+                origin: origin.clone(),
                 line_content: line_3.clone(),
                 line_number: 3,
                 index: 1,
@@ -408,7 +417,7 @@ mod tests {
                 token: Some(tokens[10]),
             },
             SourceCodeTrace {
-                file_name: file_name.clone(),
+                origin: origin.clone(),
                 line_content: line_3.clone(),
                 line_number: 3,
                 index: 2,
@@ -425,17 +434,17 @@ mod tests {
         let mut tracer: Tracer = Default::default();
         let interner: CsNameInterner = Default::default();
 
-        let file_1: PathBuf = "a.tex".into();
+        let file_1 = Origin::File("a.tex".into());
         let file_1_content = "a".to_string();
         let mut range = tracer.register_source_code(None, file_1.clone(), &file_1_content);
         tokens.push(Token::new_letter('a', range.next()));
 
-        let file_2: PathBuf = "b.tex".into();
+        let file_2 = Origin::File("b.tex".into());
         let file_2_content = "b".to_string();
         let mut range = tracer.register_source_code(None, file_2.clone(), &file_2_content);
         tokens.push(Token::new_letter('b', range.next()));
 
-        let file_3: PathBuf = "c.tex".into();
+        let file_3 = Origin::Terminal;
         let file_3_content = "c".to_string();
         let mut range = tracer.register_source_code(None, file_3.clone(), &file_3_content);
         tokens.push(Token::new_letter('c', range.next()));
@@ -447,7 +456,7 @@ mod tests {
 
         let want_traces = vec![
             SourceCodeTrace {
-                file_name: file_1,
+                origin: file_1,
                 line_content: file_1_content,
                 line_number: 1,
                 index: 0,
@@ -455,7 +464,7 @@ mod tests {
                 token: Some(tokens[0]),
             },
             SourceCodeTrace {
-                file_name: file_2,
+                origin: file_2,
                 line_content: file_2_content,
                 line_number: 1,
                 index: 0,
@@ -463,7 +472,7 @@ mod tests {
                 token: Some(tokens[1]),
             },
             SourceCodeTrace {
-                file_name: file_3,
+                origin: file_3,
                 line_content: file_3_content,
                 line_number: 1,
                 index: 0,

@@ -26,3 +26,26 @@ impl<S: TexlangState> Parsable<S> for OptionalBy {
         }
     }
 }
+
+/// When parsed, this type consumes a required `to` keyword from the input stream.
+pub struct To;
+
+impl<S: TexlangState> Parsable<S> for To {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+        get_required_element![
+            input,
+                "the first of letter of the `to` keyword",
+                "the `to` keyword consists of a t or T letter token, then a o or O letter token",
+            token::Value::Letter('t') => (),
+            token::Value::Letter('T') => (),
+        ]?;
+        get_required_element![
+            input,
+            "the second of letter of the `to` keyword",
+            "the `to` keyword consists of a t or T letter token, then a o or O letter token",
+            token::Value::Letter('o') => OptionalBy{},
+            token::Value::Letter('O') => OptionalBy{},
+        ]?;
+        Ok(To {})
+    }
+}

@@ -97,6 +97,7 @@ impl StdLibState {
             ("advance", math::get_advance()),
             //
             ("catcode", catcode::get_catcode()),
+            ("closein", input::get_closein()),
             ("count", registers::get_count()),
             ("countdef", registers::get_countdef()),
             //
@@ -118,6 +119,7 @@ impl StdLibState {
             ("globaldefs", prefix::get_globaldefs()),
             //
             ("ifcase", conditional::get_ifcase()),
+            ("ifeof", input::get_ifeof()),
             ("iffalse", conditional::get_iffalse()),
             ("ifnum", conditional::get_ifnum()),
             ("ifodd", conditional::get_ifodd()),
@@ -145,8 +147,10 @@ impl StdLibState {
             ("noexpand", expansion::get_noexpand()),
             //
             ("or", conditional::get_or()),
+            ("openin", input::get_openin()),
             ("outer", prefix::get_outer()),
             //
+            ("read", input::get_read()),
             ("relax", expansion::get_relax()),
             //
             ("sleep", sleep::get_sleep()),
@@ -192,6 +196,7 @@ impl ErrorCase {
     pub fn all_error_cases() -> Vec<ErrorCase> {
         let mut cases = vec![];
         for (description, source_code) in vec![
+            ("file does not exist", r"\input doesNotExist"),
             ("end of input after \\global", r"\global"),
             ("can't be prefixed by \\global", r"\global \sleep"),
             ("can't be prefixed by \\global (character)", r"\global a"),

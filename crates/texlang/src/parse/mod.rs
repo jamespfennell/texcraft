@@ -26,6 +26,7 @@ mod variable;
 
 pub use filelocation::FileLocation;
 pub use keyword::OptionalBy;
+pub use keyword::To;
 pub use variable::OptionalEquals;
 pub use variable::OptionalEqualsUnexpanded;
 
@@ -157,6 +158,14 @@ pub enum Command {
 
 impl<S: TexlangState> Parsable<S> for Command {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+        while let Some(found_equals) = get_optional_element![
+            input.unexpanded(),
+            token::Value::Space(_) => true,
+        ] {
+            if found_equals {
+                break;
+            }
+        }
         get_required_element![
             input.unexpanded(),
             "a control sequence or active character",

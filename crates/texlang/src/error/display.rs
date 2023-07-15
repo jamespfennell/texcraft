@@ -211,7 +211,10 @@ fn fmt_source_code_trace(
         .with_content(format!(
             "{} {}:{}:{}",
             ">>>".bright_cyan().bold(),
-            s.file_name.display(),
+            match &s.origin {
+                trace::Origin::File(file_name) => format!["{}", file_name.display()],
+                trace::Origin::Terminal => "<input from terminal>".to_string(),
+            },
             s.line_number,
             s.index + 1
         ))
@@ -256,7 +259,10 @@ fn fmt_source_code_trace_light(
     let prefix = format!(
         "{}{}:{}:{}",
         " ".repeat(indent),
-        s.file_name.display(),
+        match &s.origin {
+            trace::Origin::File(file_name) => format!["{}", file_name.display()],
+            trace::Origin::Terminal => "<input from terminal>".to_string(),
+        },
         s.line_number,
         s.index + 1
     );

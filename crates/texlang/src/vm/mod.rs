@@ -193,12 +193,17 @@ pub struct VM<S> {
     ///     in environments like WASM in the browser.
     pub file_system: Box<dyn FileSystem>,
 
+    /// Input operations from the terminal.
+    ///
+    /// By default this reads from standard in.
+    pub terminal_in: Rc<RefCell<dyn TerminalIn>>,
+
     /// Writer that writes to the terminal
     ///
     /// Defaults to standard error.
     /// In other contexts (for example WASM) this may be changed to e.g. write to a string
     ///     that can be displayed in the browser.
-    pub terminal: Rc<RefCell<dyn std::io::Write>>,
+    pub terminal_out: Rc<RefCell<dyn std::io::Write>>,
 
     /// Writer that writes to the log file
     ///
@@ -211,6 +216,13 @@ pub struct VM<S> {
     pub working_directory: Option<std::path::PathBuf>,
 
     internal: Internal<S>,
+}
+
+/// Mutable references to different parts of the VM.
+pub struct Parts<'a, S> {
+    pub state: &'a mut S,
+    pub cs_name_interner: &'a mut token::CsNameInterner,
+    pub tracer: &'a mut trace::Tracer,
 }
 
 /// File system operations that TeX may need to perform.
@@ -237,6 +249,28 @@ impl FileSystem for RealFileSystem {
     }
     fn write_bytes(&self, path: &std::path::Path, contents: &[u8]) -> std::io::Result<()> {
         std::fs::write(path, contents)
+    }
+}
+
+/// Input operations from the terminal.
+///
+/// These operations are extracted to a trait so that they be mocked out in unit testing
+///     and in execution contexts like WASM.
+pub trait TerminalIn {
+    /// Read a line from the terminal and append it to the provided buffer.
+    fn read_line(&mut self, prompt: Option<&str>, buffer: &mut String) -> std::io::Result<()>;
+}
+
+struct RealTerminalIn;
+
+impl TerminalIn for RealTerminalIn {
+    fn read_line(&mut self, prompt: Option<&str>, buffer: &mut String) -> std::io::Result<()> {
+        if let Some(prompt) = prompt {
+            eprint!("\n{prompt}")
+        }
+        let stdin = std::io::stdin();
+        stdin.read_line(buffer)?;
+        Ok(())
     }
 }
 
@@ -342,7 +376,8 @@ impl<S: Default> VM<S> {
             commands_map: command::Map::new(initial_built_ins),
             internal,
             file_system: Box::new(RealFileSystem {}),
-            terminal: Rc::new(RefCell::new(std::io::stderr())),
+            terminal_in: Rc::new(RefCell::new(RealTerminalIn {})),
+            terminal_out: Rc::new(RefCell::new(std::io::stderr())),
             log_file: Rc::new(RefCell::new(std::io::sink())),
             working_directory: match std::env::current_dir() {
                 Ok(path_buf) => Some(path_buf),
@@ -492,9 +527,9 @@ impl<S: TexlangState> Internal<S> {
         source_code: String,
     ) -> Result<(), Box<error::Error>> {
         S::pre_source_code_addition_hook(token, self.sources.len())?;
-        let trace_key_range = self
-            .tracer
-            .register_source_code(token, file_name, &source_code);
+        let trace_key_range =
+            self.tracer
+                .register_source_code(token, trace::Origin::File(file_name), &source_code);
         let mut new_source = Source::new(source_code, trace_key_range);
         std::mem::swap(&mut new_source, &mut self.current_source);
         // TODO: if the current top source is empty, we should skip this.

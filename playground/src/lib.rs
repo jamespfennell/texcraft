@@ -164,16 +164,20 @@ mod tests {
                 .into_keys()
                 .collect();
         let intentionally_missing: HashSet<&'static str> = vec![
-            "dump",         // Playground doesn't support serding
-            "dumpFormat",   // Playground doesn't support serding
-            "dumpValidate", // Playground doesn't support serding
-            //
-            "input", // Playground doesn't have access to a filesystem (yet?)
+            // Playground doesn't have access to a filesystem (yet?)
+            "closein",
+            "openin",
+            "ifeof",
+            "input",
+            "read",
+            // Playground doesn't support (de)serialization
+            "dump",
+            "dumpFormat",
+            "dumpValidate",
+            "newInt_getter_provider_\u{0}",
+            "newIntArray_getter_provider_\u{0}",
             //
             "jobname", // TODO: requires some setup
-            //
-            "newInt_getter_provider_\u{0}", // Playground doesn't support serding
-            "newIntArray_getter_provider_\u{0}", // Playground doesn't support serding
             //
             "sleep", // Using time functions in WASM is tedious, and \sleep isn't worth the hassle
             //

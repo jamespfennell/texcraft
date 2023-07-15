@@ -43,10 +43,14 @@ fn newline_primitive_fn<S: HasComponent<Component>>(
     t: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> command::Result<()> {
-    let (state, interner) = input.state_mut_and_cs_name_interner();
+    let vm::Parts {
+        state,
+        cs_name_interner,
+        ..
+    } = input.vm_parts();
     let mut c = state.component_mut();
     let newline_token = token::Token::new_space('\n', t.trace_key());
-    c.push_token(newline_token, interner);
+    c.push_token(newline_token, cs_name_interner);
     c.num_trailing_newlines += 1;
     Ok(())
 }
@@ -63,17 +67,21 @@ fn par_primitive_fn<S: HasComponent<Component>>(
     t: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> command::Result<()> {
-    let (state, interner) = input.state_mut_and_cs_name_interner();
+    let vm::Parts {
+        state,
+        cs_name_interner,
+        ..
+    } = input.vm_parts();
     let mut c = state.component_mut();
     let par_token = token::Token::new_space('\n', t.trace_key());
     match c.num_trailing_newlines {
         0 => {
-            c.push_token(par_token, interner);
-            c.push_token(par_token, interner);
+            c.push_token(par_token, cs_name_interner);
+            c.push_token(par_token, cs_name_interner);
             c.num_trailing_newlines += 2;
         }
         1 => {
-            c.push_token(par_token, interner);
+            c.push_token(par_token, cs_name_interner);
             c.num_trailing_newlines += 1;
         }
         _ => {}
@@ -107,12 +115,16 @@ impl<S: HasComponent<Component>> vm::Handlers<S> for Handlers {
         mut token: token::Token,
         input: &mut vm::ExecutionInput<S>,
     ) -> command::Result<()> {
-        let (state, interner) = input.state_mut_and_cs_name_interner();
+        let vm::Parts {
+            state,
+            cs_name_interner,
+            ..
+        } = input.vm_parts();
         let mut c = state.component_mut();
         if let Some('\n') = token.char() {
             token = token::Token::new_space(' ', token.trace_key());
         }
-        c.push_token(token, interner);
+        c.push_token(token, cs_name_interner);
         c.num_trailing_newlines = 0;
         Ok(())
     }

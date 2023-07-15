@@ -8,13 +8,7 @@ use texlang::*;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Component {
-    #[cfg_attr(
-        feature = "serde",
-        serde(
-            serialize_with = "texcraft_stdext::serde_tools::serialize_array",
-            deserialize_with = "texcraft_stdext::serde_tools::deserialize_array",
-        )
-    )]
+    #[cfg_attr(feature = "serde", serde(with = "texcraft_stdext::serde_tools::array"))]
     low: [CatCode; 128],
     high: HashMap<usize, CatCode>,
     default: CatCode,

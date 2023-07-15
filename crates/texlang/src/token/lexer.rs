@@ -153,9 +153,6 @@ pub trait Config {
 
     /// Return the current end of line character.
     fn end_line_char(&self) -> Option<char>;
-
-    // TODO
-    // should_report_end_of_line(&self) -> bool;
 }
 
 /// Result of calling [Lexer::next].
@@ -164,6 +161,10 @@ pub enum Result {
     Token(token::Token),
     /// An invalid character appeared in the input.
     InvalidCharacter(char, trace::Key),
+    /// The end of a line was reached.
+    ///
+    /// This is only reported from [Lexer::next] if its `report_end_of_line` argument is true.
+    EndOfLine,
     /// The end of input was reached.
     EndOfInput,
 }
@@ -182,6 +183,7 @@ enum State {
 pub struct Lexer {
     raw_lexer: RawLexer,
     state: State,
+    first_line_started: bool,
     // We read control sequence names into a shared buffer to avoid allocating for each one.
     #[cfg_attr(feature = "serde", serde(skip))]
     buffer: String,
@@ -193,13 +195,35 @@ impl Lexer {
         Lexer {
             raw_lexer: RawLexer::new(source_code, trace_key_range),
             state: State::NewLine,
+            first_line_started: false,
             buffer: Default::default(),
         }
     }
 
     /// Get the next token.
-    pub fn next<C: Config>(&mut self, config: &C, cs_name_interner: &mut CsNameInterner) -> Result {
-        while let Some(raw_token) = self.raw_lexer.next(config) {
+    pub fn next<C: Config>(
+        &mut self,
+        config: &C,
+        cs_name_interner: &mut CsNameInterner,
+        report_end_of_line: bool,
+    ) -> Result {
+        loop {
+            let raw_token = match self.raw_lexer.next(config) {
+                None => {
+                    self.state = State::NewLine;
+                    if !self.raw_lexer.start_new_line(config) {
+                        return Result::EndOfInput;
+                    }
+                    if report_end_of_line {
+                        if self.first_line_started {
+                            return Result::EndOfLine;
+                        }
+                        self.first_line_started = true;
+                    }
+                    continue;
+                }
+                Some(raw_token) => raw_token,
+            };
             let c = raw_token.char;
             let (value, next_state) = match raw_token.code {
                 CatCode::Escape => {
@@ -210,7 +234,7 @@ impl Lexer {
                     )
                 }
                 CatCode::EndOfLine => {
-                    self.raw_lexer.start_new_line(config);
+                    self.raw_lexer.end_line();
                     match self.state {
                         State::NewLine => (
                             Token::new_control_sequence(
@@ -223,7 +247,6 @@ impl Lexer {
                             (Token::new_space(' ', raw_token.trace_key), State::NewLine)
                         }
                         State::SkipBlanks => {
-                            self.state = State::NewLine;
                             continue;
                         }
                     }
@@ -273,8 +296,7 @@ impl Lexer {
                     State::MidLine,
                 ),
                 CatCode::Comment => {
-                    self.raw_lexer.start_new_line(config);
-                    self.state = State::NewLine;
+                    self.raw_lexer.end_line();
                     continue;
                 }
                 CatCode::Ignored => {
@@ -287,7 +309,6 @@ impl Lexer {
             self.state = next_state;
             return Result::Token(value);
         }
-        Result::EndOfInput
     }
 
     /// Marks the input as ended.
@@ -303,11 +324,10 @@ impl Lexer {
         cs_name_interner: &mut CsNameInterner,
     ) -> (token::CsName, State) {
         self.buffer.clear();
-        let first_raw_token = match self.raw_lexer.peek(config) {
+        let first_raw_token = match self.raw_lexer.next(config) {
             None => return (cs_name_interner.get_or_intern(""), State::NewLine),
             Some(first_raw_token) => first_raw_token,
         };
-        self.raw_lexer.advance();
         match first_raw_token.code {
             CatCode::Letter => {
                 self.buffer.push(first_raw_token.char);
@@ -386,6 +406,13 @@ impl RawLexer {
         }
     }
 
+    fn end_line(&mut self) {
+        let num_skipped_chars: usize = self.current_line[self.pos..].chars().count();
+        self.trace_key_range.advance_by(num_skipped_chars);
+        self.pos = self.current_line.len();
+    }
+
+    /// Start a new line in the input. Returns true if and only if there is another line to read.
     fn start_new_line<C: Config>(&mut self, config: &C) -> bool {
         let num_skipped_chars: usize = self.current_line[self.pos..].chars().count();
         self.trace_key_range.advance_by(num_skipped_chars);
@@ -429,24 +456,18 @@ impl RawLexer {
         true
     }
 
+    #[inline]
     fn next<C: Config>(&mut self, config: &C) -> Option<RawToken> {
         match self.next_char() {
             Some(c) => {
-                let trace_key = self.trace_key_range.peek();
-                self.advance();
-                let code = config.cat_code(c);
+                self.pos += c.len_utf8();
                 Some(RawToken {
                     char: c,
-                    code,
-                    trace_key,
+                    code: config.cat_code(c),
+                    trace_key: self.trace_key_range.next(),
                 })
             }
-            None => {
-                if !self.start_new_line(config) {
-                    return None;
-                }
-                self.next(config)
-            }
+            None => None,
         }
     }
 
@@ -549,9 +570,9 @@ mod tests {
     enum TokenValue<'a> {
         Character(char, catcode::CatCode, u32),
         ControlSequence(&'a str, u32),
+        NewLine,
     }
-    use TokenValue::Character;
-    use TokenValue::ControlSequence;
+    use TokenValue::*;
 
     impl<'a> TokenValue<'a> {
         fn new(token: Token, interner: &'a CsNameInterner) -> TokenValue<'a> {
@@ -599,12 +620,21 @@ mod tests {
         let mut cs_name_interner: CsNameInterner = Default::default();
         let mut actual = Vec::new();
         let mut lexer = Lexer::new(input.into(), trace::KeyRange::for_testing());
-        while let Result::Token(t) = lexer.next(&config, &mut cs_name_interner) {
-            actual.push(t);
+        loop {
+            let next = lexer.next(&config, &mut cs_name_interner, true);
+            if let Result::EndOfInput = next {
+                break;
+            }
+            actual.push(next);
         }
         let actual: Vec<TokenValue<'_>> = actual
             .into_iter()
-            .map(|t| TokenValue::new(t, &cs_name_interner))
+            .map(|t| match t {
+                Result::Token(t) => TokenValue::new(t, &cs_name_interner),
+                Result::InvalidCharacter(_, _) => panic!("invalid character"),
+                Result::EndOfLine => TokenValue::NewLine,
+                Result::EndOfInput => unreachable!(),
+            })
             .collect();
         assert_eq!(expected_tokens, actual);
     }
@@ -631,6 +661,8 @@ mod tests {
     lexer_tests![
         end_line_char(Some('\r')),
         cat_code_overrides(),
+        (empty_1, r"",),
+        (empty_2, "\n", ControlSequence("par", 0),),
         (
             control_sequence_basic_1,
             r"\a{b}",
@@ -665,6 +697,7 @@ mod tests {
             control_sequence_single_letter_trailing_newline_1,
             "\\a\n b",
             ControlSequence("a", 0),
+            NewLine,
             Character('b', Letter, 4),
             Character(' ', Space, 5),
         ),
@@ -672,7 +705,9 @@ mod tests {
             control_sequence_single_letter_trailing_newline_2,
             "\\a\n\nb",
             ControlSequence("a", 0),
+            NewLine,
             ControlSequence("par", 3),
+            NewLine,
             Character('b', Letter, 4),
             Character(' ', Space, 5),
         ),
@@ -723,6 +758,7 @@ mod tests {
             comment_1,
             "A%B\nC",
             Character('A', Letter, 0),
+            NewLine,
             Character('C', Letter, 4),
             Character(' ', Space, 5),
         ),
@@ -730,6 +766,7 @@ mod tests {
             comment_1_with_space,
             "A%B \nC",
             Character('A', Letter, 0),
+            NewLine,
             Character('C', Letter, 5),
             Character(' ', Space, 6),
         ),
@@ -737,6 +774,8 @@ mod tests {
             comment_2,
             "A%B\n%C\nD",
             Character('A', Letter, 0),
+            NewLine,
+            NewLine,
             Character('D', Letter, 7),
             Character(' ', Space, 8),
         ),
@@ -745,6 +784,7 @@ mod tests {
             comment_4,
             "A%\n B",
             Character('A', Letter, 0),
+            NewLine,
             Character('B', Letter, 4),
             Character(' ', Space, 5),
         ),
@@ -752,7 +792,9 @@ mod tests {
             comment_5,
             "A%\n\n B",
             Character('A', Letter, 0),
+            NewLine,
             ControlSequence("par", 3),
+            NewLine,
             Character('B', Letter, 5),
             Character(' ', Space, 6),
         ),
@@ -760,6 +802,7 @@ mod tests {
             comment_6,
             "\\A %\nB",
             ControlSequence("A", 0),
+            NewLine,
             Character('B', Letter, 5),
             Character(' ', Space, 6),
         ),
@@ -767,6 +810,7 @@ mod tests {
             texbook_exercise_8_2_e,
             "A%\n B%",
             Character('A', Letter, 0),
+            NewLine,
             Character('B', Letter, 4),
         ),
         (
@@ -790,7 +834,9 @@ mod tests {
             Character('i', Letter, 1),
             Character('!', Other, 2),
             Character(' ', Space, 3),
+            NewLine,
             ControlSequence("par", 4),
+            NewLine,
             ControlSequence("par", 5),
         ),
         (
@@ -806,6 +852,7 @@ mod tests {
             "A\nB",
             Character('A', Letter, 0),
             Character(' ', Space, 1),
+            NewLine,
             Character('B', Letter, 2),
             Character(' ', Space, 3),
         ),
@@ -814,6 +861,7 @@ mod tests {
             "A \nB",
             Character('A', Letter, 0),
             Character(' ', Space, 1),
+            NewLine,
             Character('B', Letter, 3),
             Character(' ', Space, 4),
         ),
@@ -822,7 +870,9 @@ mod tests {
             "A\n\nB",
             Character('A', Letter, 0),
             Character(' ', Space, 1),
+            NewLine,
             ControlSequence("par", 2),
+            NewLine,
             Character('B', Letter, 3),
             Character(' ', Space, 4),
         ),
@@ -831,7 +881,9 @@ mod tests {
             "A\n \nB",
             Character('A', Letter, 0),
             Character(' ', Space, 1),
+            NewLine,
             ControlSequence("par", 2),
+            NewLine,
             Character('B', Letter, 4),
             Character(' ', Space, 5),
         ),
@@ -840,8 +892,11 @@ mod tests {
             "A\n\n\nB",
             Character('A', Letter, 0),
             Character(' ', Space, 1),
+            NewLine,
             ControlSequence("par", 2),
+            NewLine,
             ControlSequence("par", 3),
+            NewLine,
             Character('B', Letter, 4),
             Character(' ', Space, 5),
         ),
@@ -870,6 +925,7 @@ mod tests {
             caret_notation_6,
             "^^\nA",
             Character('M', Letter, 2),
+            NewLine,
             Character('A', Letter, 3),
             Character(' ', Space, 4),
         ),
@@ -1020,6 +1076,11 @@ mod tests {
             Character('A', Letter, 0),
             Character(' ', Space, 1),
         ),
+        (
+            non_standard_newline_character_after_cs,
+            r"\A XB",
+            ControlSequence("A", 0),
+        ),
         (single_non_standard_newline, "X", ControlSequence("par", 0),),
     ];
 
@@ -1084,6 +1145,7 @@ mod tests {
             control_sequence_does_not_span_lines,
             "\\A\nC",
             ControlSequence("AB", 0),
+            NewLine,
             Character('C', Letter, 3),
             Character('B', Letter, 4),
         ),
@@ -1091,7 +1153,9 @@ mod tests {
             repeated_end_line_char_1,
             "\n\n\n",
             Character('B', Letter, 0),
+            NewLine,
             Character('B', Letter, 1),
+            NewLine,
             Character('B', Letter, 2),
         ),
         (
@@ -1099,18 +1163,30 @@ mod tests {
             "A\nA\nA\n",
             Character('A', Letter, 0),
             Character('B', Letter, 1),
+            NewLine,
             Character('A', Letter, 2),
             Character('B', Letter, 3),
+            NewLine,
             Character('A', Letter, 4),
             Character('B', Letter, 5),
         ),
         (
-            right_size_trimming,
+            right_side_trimming,
             "A  \nA  \n",
             Character('A', Letter, 0),
             Character('B', Letter, 1),
+            NewLine,
             Character('A', Letter, 4),
             Character('B', Letter, 5),
+        ),
+        (
+            left_side_trimming,
+            "A\n A\n",
+            Character('A', Letter, 0),
+            Character('B', Letter, 1),
+            NewLine,
+            Character('A', Letter, 3),
+            Character('B', Letter, 4),
         ),
     ];
 
@@ -1121,12 +1197,16 @@ mod tests {
             multiple_skipped_lines,
             "A\n\n\nB",
             Character('A', Letter, 0),
+            NewLine,
+            NewLine,
+            NewLine,
             Character('B', Letter, 4),
         ),
         (
             empty_cs_name,
             "\\\nB",
             ControlSequence("", 0),
+            NewLine,
             Character('B', Letter, 2),
         ),
     ];
