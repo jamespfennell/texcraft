@@ -196,6 +196,8 @@ impl ErrorCase {
     pub fn all_error_cases() -> Vec<ErrorCase> {
         let mut cases = vec![];
         for (description, source_code) in vec![
+            (r"\count is out of bounds", r"\count -200"),
+            (r"\count is out of bounds", r"\count 2000000"),
             ("file does not exist", r"\input doesNotExist"),
             ("end of input after \\global", r"\global"),
             ("can't be prefixed by \\global", r"\global \sleep"),

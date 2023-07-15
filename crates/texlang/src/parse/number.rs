@@ -7,6 +7,7 @@
 use std::fmt::Display;
 use std::rc;
 
+use crate::token::trace;
 use crate::token::Value;
 use crate::traits::*;
 use crate::variable;
@@ -19,6 +20,46 @@ impl<S: TexlangState> Parsable<S> for i32 {
     }
 }
 
+pub struct Uint<const N: usize>(pub usize);
+
+impl<S: TexlangState, const N: usize> Parsable<S> for Uint<N> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+        let (first_token, i): (token::Token, i32) = parse_number_internal(input)?;
+        if i < 0 || i as usize >= N {
+            Err(OutOfBoundsError::<N> {
+                first_token: input.trace(first_token),
+                got: i,
+            }
+            .into())
+        } else {
+            Ok(Uint(i as usize))
+        }
+    }
+}
+
+#[derive(Debug)]
+struct OutOfBoundsError<const N: usize> {
+    first_token: trace::SourceCodeTrace,
+    got: i32,
+}
+
+impl<const N: usize> error::TexError for OutOfBoundsError<N> {
+    fn kind(&self) -> error::Kind {
+        error::Kind::Token(&self.first_token)
+    }
+
+    fn title(&self) -> String {
+        format!(
+            "expected an integer in the range [0, {}), got {}",
+            N, self.got
+        )
+    }
+}
+
+// TODO: I think we'll likely need to get rid of this implementation.
+// In Knuth's TeX the integer scanning routine is only for i32 integers,
+// and all other integers (like 4-bit integers for \openin) are determined
+// by first getting an i32 and then casting if possible.
 impl<S: TexlangState> Parsable<S> for usize {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
         let (_, i): (token::Token, usize) = parse_number_internal(input)?;

@@ -85,8 +85,7 @@ fn openin_fn<const N: usize, S: HasComponent<Component<N>>>(
     openin_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<command::Error>> {
-    // TODO parse Uint<N>
-    let (u, _, file_location) = <(usize, OptionalEquals, FileLocation)>::parse(input)?;
+    let (u, _, file_location) = <(parse::Uint<N>, OptionalEquals, FileLocation)>::parse(input)?;
     let lexer_or = match read_file(input.vm(), file_location, "tex") {
         // If the file fails to open TeX does not error out.
         // Instead, TeX users are expected to test the result with \ifeof.
@@ -101,12 +100,12 @@ fn openin_fn<const N: usize, S: HasComponent<Component<N>>>(
             Some(Box::new(lexer::Lexer::new(source_code, trace_key_range)))
         }
     };
-    match input.state_mut().component_mut().files.get_mut(u) {
-        None => todo!(), // TODO: we should just have an Uint<N> parsable type
-        Some(file) => {
-            *file = lexer_or;
-        }
-    };
+    *input
+        .state_mut()
+        .component_mut()
+        .files
+        .get_mut(u.0)
+        .unwrap() = lexer_or;
     Ok(())
 }
 
@@ -126,14 +125,13 @@ fn closein_fn<const N: usize, S: HasComponent<Component<N>>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<command::Error>> {
-    // TODO parse Uint<N>
-    let u = usize::parse(input)?;
-    match input.state_mut().component_mut().files.get_mut(u) {
-        None => todo!(),
-        Some(file) => {
-            *file = None;
-        }
-    };
+    let u = parse::Uint::<N>::parse(input)?;
+    *input
+        .state_mut()
+        .component_mut()
+        .files
+        .get_mut(u.0)
+        .unwrap() = None;
     Ok(())
 }
 
@@ -288,14 +286,12 @@ where
     S: HasComponent<Component<N>> + HasComponent<conditional::Component>,
 {
     fn evaluate(input: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
-        let u = usize::parse(input)?;
-        match HasComponent::<Component<N>>::component(input.state())
+        let u = parse::Uint::<N>::parse(input)?;
+        Ok(HasComponent::<Component<N>>::component(input.state())
             .files
-            .get(u)
-        {
-            None => todo!(), // TODO: this returns an error in Knuth TeX,
-            Some(file_or) => Ok(file_or.is_none()),
-        }
+            .get(u.0)
+            .unwrap()
+            .is_none())
     }
 }
 

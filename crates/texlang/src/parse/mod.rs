@@ -27,6 +27,7 @@ mod variable;
 pub use filelocation::FileLocation;
 pub use keyword::OptionalBy;
 pub use keyword::To;
+pub use number::Uint;
 pub use variable::OptionalEquals;
 pub use variable::OptionalEqualsUnexpanded;
 
