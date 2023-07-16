@@ -4,11 +4,9 @@
 //! from an internal registers. The full definition of a number in the TeX grammar
 //! is given on page X of the TeXBook.
 
-use std::fmt::Display;
 use std::rc;
 
 use crate::token::trace;
-use crate::token::CommandRef;
 use crate::token::Value;
 use crate::traits::*;
 use crate::variable;
@@ -22,6 +20,10 @@ impl<S: TexlangState> Parsable<S> for i32 {
 }
 
 pub struct Uint<const N: usize>(pub usize);
+
+impl Uint<0> {
+    pub const MAX: usize = i32::MAX as usize;
+}
 
 impl<S: TexlangState, const N: usize> Parsable<S> for Uint<N> {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
@@ -57,20 +59,17 @@ impl<const N: usize> error::TexError for OutOfBoundsError<N> {
     }
 }
 
-// TODO: I think we'll likely need to get rid of this implementation.
-// In Knuth's TeX the integer scanning routine is only for i32 integers,
-// and all other integers (like 4-bit integers for \openin) are determined
-// by first getting an i32 and then casting if possible.
-impl<S: TexlangState> Parsable<S> for usize {
+impl<S: TexlangState> Parsable<S> for char {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
-        let (_, i): (token::Token, usize) = parse_number_internal(input)?;
-        Ok(i)
+        let u1 = Uint::<{char::MAX as usize}>::parse(input)?;
+        let u2: u32 = u1.0.try_into().unwrap();
+        Ok(char::from_u32(u2).unwrap())
     }
 }
 
 impl<S: TexlangState> Parsable<S> for token::CatCode {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
-        let (token, i): (token::Token, usize) = parse_number_internal(input)?;
+        let (token, i): (token::Token, i32) = parse_number_internal(input)?;
         if let Ok(val_u8) = u8::try_from(i) {
             if let Ok(cat_code) = token::CatCode::try_from(val_u8) {
                 return Ok(cat_code);
@@ -88,53 +87,6 @@ impl<S: TexlangState> Parsable<S> for token::CatCode {
     }
 }
 
-trait PrimInt: Copy + Display + From<u8> + TryFrom<i32> + std::fmt::Octal + std::fmt::UpperHex {
-    const MIN: Self;
-    const MAX: Self;
-
-    fn flip_sign(self) -> Option<Self>;
-
-    fn checked_mul(self, rhs: u8) -> Option<Self>;
-    fn checked_add(self, rhs: u8) -> Option<Self>;
-}
-
-impl PrimInt for usize {
-    const MIN: Self = usize::MIN;
-    const MAX: Self = usize::MAX;
-
-    fn flip_sign(self) -> Option<Self> {
-        match self {
-            0 => Some(0),
-            _ => None,
-        }
-    }
-
-    fn checked_mul(self, rhs: u8) -> Option<Self> {
-        self.checked_mul(rhs as usize)
-    }
-
-    fn checked_add(self, rhs: u8) -> Option<Self> {
-        self.checked_add(rhs as usize)
-    }
-}
-
-impl PrimInt for i32 {
-    const MIN: Self = i32::MIN;
-    const MAX: Self = i32::MAX;
-
-    fn flip_sign(self) -> Option<Self> {
-        self.checked_mul(-1)
-    }
-
-    fn checked_mul(self, rhs: u8) -> Option<Self> {
-        self.checked_mul(rhs as i32)
-    }
-
-    fn checked_add(self, rhs: u8) -> Option<Self> {
-        self.checked_add(rhs as i32)
-    }
-}
-
 const GUIDANCE_BEGINNING: &str =
     "a number begins with zero or more minus signs followed by one of the following:
 - A decimal digit (0-9), which begins a decimal number.
@@ -144,9 +96,9 @@ const GUIDANCE_BEGINNING: &str =
 - A command that references a variable, like \\year.
 ";
 
-fn parse_number_internal<S: TexlangState, T: PrimInt>(
+fn parse_number_internal<S: TexlangState>(
     stream: &mut vm::ExpandedStream<S>,
-) -> Result<(token::Token, T), Box<error::Error>> {
+) -> Result<(token::Token, i32), Box<error::Error>> {
     let sign = parse_optional_signs(stream)?;
     let first_token = match stream.next()? {
         None => {
@@ -160,19 +112,19 @@ fn parse_number_internal<S: TexlangState, T: PrimInt>(
         }
         Some(token) => token,
     };
-    let modulus: T = match first_token.value() {
-        Value::Other('0') => parse_decimal(stream, 0)?,
-        Value::Other('1') => parse_decimal(stream, 1)?,
-        Value::Other('2') => parse_decimal(stream, 2)?,
-        Value::Other('3') => parse_decimal(stream, 3)?,
-        Value::Other('4') => parse_decimal(stream, 4)?,
-        Value::Other('5') => parse_decimal(stream, 5)?,
-        Value::Other('6') => parse_decimal(stream, 6)?,
-        Value::Other('7') => parse_decimal(stream, 7)?,
-        Value::Other('8') => parse_decimal(stream, 8)?,
-        Value::Other('9') => parse_decimal(stream, 9)?,
-        Value::Other('\'') => parse_octal(stream)?,
-        Value::Other('"') => parse_hexadecimal(stream)?,
+    let result: i32 = match first_token.value() {
+        Value::Other('0') => parse_constant::<S, 10>(stream, 0)?,
+        Value::Other('1') => parse_constant::<S, 10>(stream, 1)?,
+        Value::Other('2') => parse_constant::<S, 10>(stream, 2)?,
+        Value::Other('3') => parse_constant::<S, 10>(stream, 3)?,
+        Value::Other('4') => parse_constant::<S, 10>(stream, 4)?,
+        Value::Other('5') => parse_constant::<S, 10>(stream, 5)?,
+        Value::Other('6') => parse_constant::<S, 10>(stream, 6)?,
+        Value::Other('7') => parse_constant::<S, 10>(stream, 7)?,
+        Value::Other('8') => parse_constant::<S, 10>(stream, 8)?,
+        Value::Other('9') => parse_constant::<S, 10>(stream, 9)?,
+        Value::Other('\'') => parse_constant::<S, 8>(stream, 0)?,
+        Value::Other('"') => parse_constant::<S, 16>(stream, 0)?,
         Value::Other('`') => parse_character(stream)?,
         Value::CommandRef(command_ref) => {
             let cmd = stream.commands_map().get_command(&command_ref);
@@ -203,24 +155,14 @@ fn parse_number_internal<S: TexlangState, T: PrimInt>(
         }
     };
     get_optional_element![stream, Value::Space(_) => (),];
-    let signed_value = match sign {
-        None => modulus,
-        Some(minus_token) => match modulus.flip_sign() {
-            None => {
-                return Err(parse::Error::new(
-                    stream.vm(),
-                    "a positive number",
-                    Some(minus_token),
-                    "",
-                )
-                .with_got_override("got a negative number")
-                .with_annotation_override("this minus sign makes the number negative")
-                .into());
-            }
-            Some(signed_value) => signed_value,
-        },
+    let result = match sign {
+        None => result,
+        // The only i32 that is not safe to multiply by -1 is i32::MIN.
+        // Experimentally we observe in this case that TeX wraps and the result
+        // is i32::MIN again.
+        Some(_) => result.wrapping_mul(-1),
     };
-    Ok((first_token, signed_value))
+    Ok((first_token, result))
 }
 
 /// Parses optional signs and spaces.
@@ -237,46 +179,33 @@ fn parse_optional_signs<S: TexlangState>(
         Value::Other('-') => false,
         Value::Space(_) => true,
     ] {
-        result = match (result.is_none(), sign) {
-            (true, true) => None,
-            (true, false) => Some(token),
-            (false, true) => result,
-            (false, false) => None,
+        result = match (result, sign) {
+            (None, false) => Some(token),
+            (Some(_), false) => None,
+            (result, true) => result,
         };
     }
     Ok(result)
 }
 
-fn read_number_from_variable<S: TexlangState, T: PrimInt>(
+fn read_number_from_variable<S: TexlangState>(
     token: token::Token,
     cmd: rc::Rc<variable::Command<S>>,
     input: &mut vm::ExpandedStream<S>,
-) -> Result<T, Box<error::Error>> {
-    let i = match cmd.resolve(token, input)?.value(input) {
+) -> Result<i32, Box<error::Error>> {
+    Ok(match cmd.resolve(token, input)?.value(input) {
         variable::ValueRef::Int(i) => *i,
         variable::ValueRef::CatCode(c) => *c as i32,
-    };
-    match TryInto::<T>::try_into(i) {
-        Ok(n) => Ok(n),
-        Err(_) => Err(parse::Error::new(
-            input.vm(),
-            format!["a number in the range [{}, {}]", T::MIN, T::MAX],
-            Some(token),
-            "",
-        )
-        .with_got_override(format!["got the number {i}"])
-        .with_annotation_override("the number was read from this variable")
-        .into()),
-    }
+    })
 }
 
-fn parse_character<S: TexlangState, T: PrimInt>(
+fn parse_character<S: TexlangState>(
     input: &mut vm::ExpandedStream<S>,
-) -> Result<T, Box<error::Error>> {
+) -> Result<i32, Box<error::Error>> {
     let c_or: Result<char, Option<token::Token>> = match input.next()? {
         None => Err(None),
         Some(token) => match token.value() {
-            Value::CommandRef(CommandRef::ControlSequence(cs_name)) => {
+            Value::CommandRef(token::CommandRef::ControlSequence(cs_name)) => {
                 let name = input.vm().cs_name_interner().resolve(cs_name).unwrap();
                 let mut iter = name.chars();
                 match (iter.next(), iter.count()) {
@@ -300,168 +229,106 @@ fn parse_character<S: TexlangState, T: PrimInt>(
         };
     // This cast always succeeds at the time of writing.
     // This is because `c as u32` returns c's Unicode code point, which
-    // is in the range [0, 2^21] and fits in the two types (i32, usize)
-    // that the parsing code currently supports.
-    match TryInto::<T>::try_into(c as i32) {
+    // is in the range [0, 2^21] and fits in an i32.
+    match TryInto::<i32>::try_into(c as i32) {
         Ok(t) => Ok(t),
         Err(_) => panic!(
-            "can't cast unicode character {} ({}) to integer",
+            "can't cast unicode character {} ({}) to 32-bit signed integer",
             c, c as u32
         ),
     }
 }
 
-fn parse_octal<S: TexlangState, T: PrimInt>(
+fn parse_constant<S: TexlangState, const RADIX: i32>(
     stream: &mut vm::ExpandedStream<S>,
-) -> Result<T, Box<error::Error>> {
-    let mut n = get_required_element![
-        stream,
-        "an octal digit",
-        "an octal digit is a token with value 0-7 and category other",
-        Value::Other('0') => 0,
-        Value::Other('1') => 1,
-        Value::Other('2') => 2,
-        Value::Other('3') => 3,
-        Value::Other('4') => 4,
-        Value::Other('5') => 5,
-        Value::Other('6') => 6,
-        Value::Other('7') => 7,
-    ]?
-    .into();
-    while let Some((lsd, token)) = get_optional_element_with_token![
-        stream,
-        Value::Other('0') => 0,
-        Value::Other('1') => 1,
-        Value::Other('2') => 2,
-        Value::Other('3') => 3,
-        Value::Other('4') => 4,
-        Value::Other('5') => 5,
-        Value::Other('6') => 6,
-        Value::Other('7') => 7,
-    ] {
-        n = match add_lsd::<T, 8>(n, lsd) {
+    mut result: i32,
+) -> Result<i32, Box<error::Error>> {
+    let mut started = RADIX == 10;
+    loop {
+        let next = match stream.peek()? {
+            None => break,
+            Some(next) => *next,
+        };
+        let lsd_or = match next.value() {
+            token::Value::Other(c) => {
+                let d = (c as u32).wrapping_sub('0' as u32);
+                if d < 10 && d < (RADIX as u32) {
+                    Some(d as i32)
+                } else if RADIX == 16 {
+                    let d = (c as u32).wrapping_sub('A' as u32);
+                    if d < 6 {
+                        Some(d as i32 + 10)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            token::Value::Letter(c) => {
+                let d = (c as u32).wrapping_sub('A' as u32);
+                if RADIX == 16 && d < 6 {
+                    Some(d as i32 + 10)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+        let lsd = match lsd_or {
+            None => break,
+            Some(lsd) => lsd,
+        };
+        started = true;
+        stream.consume()?;
+        result = match add_lsd::<RADIX>(result, lsd) {
             Some(n) => n,
-            None => return Err(add_lsd_error::<S, T, 8>(token, stream, n, lsd)),
+            None => return Err(add_lsd_error::<S, RADIX>(next, stream, result, lsd)),
         }
     }
-    Ok(n)
-}
-
-fn parse_decimal<S: TexlangState, T: PrimInt>(
-    stream: &mut vm::ExpandedStream<S>,
-    n_start: u8,
-) -> Result<T, Box<error::Error>> {
-    let mut n: T = n_start.into();
-    while let Some((lsd, token)) = get_optional_element_with_token![
-        stream,
-        Value::Other('0') => 0,
-        Value::Other('1') => 1,
-        Value::Other('2') => 2,
-        Value::Other('3') => 3,
-        Value::Other('4') => 4,
-        Value::Other('5') => 5,
-        Value::Other('6') => 6,
-        Value::Other('7') => 7,
-        Value::Other('8') => 8,
-        Value::Other('9') => 9,
-    ] {
-        n = match add_lsd::<T, 10>(n, lsd) {
-            Some(n) => n,
-            None => return Err(add_lsd_error::<S, T, 10>(token, stream, n, lsd)),
-        }
+    if !started {
+        let (expected, guidance) = match RADIX {
+            8 => {
+                ("an octal digit",
+                "an octal digit is a token with value 0-7 and category other")
+            },
+            16 => {
+                ("a hexadecimal digit",
+                "a hexadecimal digit is either:\n- A character token with value 0-9 and category other, or\n- A character token with value A-F and category letter or other")
+            }
+            _ => unreachable!(),
+        };
+        let got = stream.peek()?.copied();
+        return Err(parse::Error::new(stream.vm(), expected, got, guidance).into());
     }
-    Ok(n)
+    Ok(result)
 }
 
-fn parse_hexadecimal<S: TexlangState, T: PrimInt>(
-    stream: &mut vm::ExpandedStream<S>,
-) -> Result<T, Box<error::Error>> {
-    let mut n: T = get_required_element![
-        stream,
-        "a hexadecimal digit",
-        "a hexadecimal digit is either:\n- A character token with value 0-9 and category other, or\n- A character token with value A-F and category letter or other",
-        Value::Other('0') => 0,
-        Value::Other('1') => 1,
-        Value::Other('2') => 2,
-        Value::Other('3') => 3,
-        Value::Other('4') => 4,
-        Value::Other('5') => 5,
-        Value::Other('6') => 6,
-        Value::Other('7') => 7,
-        Value::Other('8') => 8,
-        Value::Other('9') => 9,
-
-        Value::Other('A') => 10,
-        Value::Other('B') => 11,
-        Value::Other('C') => 12,
-        Value::Other('D') => 13,
-        Value::Other('E') => 14,
-        Value::Other('F') => 15,
-
-        Value::Letter('A') => 10,
-        Value::Letter('B') => 11,
-        Value::Letter('C') => 12,
-        Value::Letter('D') => 13,
-        Value::Letter('E') => 14,
-        Value::Letter('F') => 15,
-    ]?.into();
-    while let Some((lsd, token)) = get_optional_element_with_token![
-        stream,
-        Value::Other('0') => 0,
-        Value::Other('1') => 1,
-        Value::Other('2') => 2,
-        Value::Other('3') => 3,
-        Value::Other('4') => 4,
-        Value::Other('5') => 5,
-        Value::Other('6') => 6,
-        Value::Other('7') => 7,
-        Value::Other('8') => 8,
-        Value::Other('9') => 9,
-
-        Value::Other('A') => 10,
-        Value::Other('B') => 11,
-        Value::Other('C') => 12,
-        Value::Other('D') => 13,
-        Value::Other('E') => 14,
-        Value::Other('F') => 15,
-
-        Value::Letter('A') => 10,
-        Value::Letter('B') => 11,
-        Value::Letter('C') => 12,
-        Value::Letter('D') => 13,
-        Value::Letter('E') => 14,
-        Value::Letter('F') => 15,
-    ] {
-        n = match add_lsd::<T, 16>(n, lsd) {
-            Some(n) => n,
-            None => return Err(add_lsd_error::<S, T, 16>(token, stream, n, lsd)),
-        }
-    }
-    Ok(n)
-}
-
-fn add_lsd<T: PrimInt, const RADIX: u8>(n: T, lsd: u8) -> Option<T> {
+fn add_lsd<const RADIX: i32>(n: i32, lsd: i32) -> Option<i32> {
     match n.checked_mul(RADIX) {
         None => None,
         Some(n) => n.checked_add(lsd),
     }
 }
 
-fn add_lsd_error<S: TexlangState, T: PrimInt, const RADIX: u8>(
+fn add_lsd_error<S: TexlangState, const RADIX: i32>(
     token: token::Token,
     input: &mut vm::ExpandedStream<S>,
-    n: T,
-    lsd: u8,
+    n: i32,
+    lsd: i32,
 ) -> Box<error::Error> {
     let (got, range) = match RADIX {
         8 => (
             format!["got '{n:o}{lsd:o}"],
-            format!["'{:o}, '{:o}", T::MIN, T::MAX],
+            format!["'{:o}, '{:o}", i32::MIN, i32::MAX],
         ),
-        10 => (format!["got {n}{lsd}"], format!["{}, {}", T::MIN, T::MAX]),
+        10 => (
+            format!["got {n}{lsd}"],
+            format!["{}, {}", i32::MIN, i32::MAX],
+        ),
         16 => (
             format!["got 0x{n:X}{lsd:X}"],
-            format!["0x{:X}, 0x{:X}", T::MIN, T::MAX],
+            format!["0x{:X}, 0x{:X}", i32::MIN, i32::MAX],
         ),
         _ => panic!("radix must be 8, 10 or 16"),
     };
@@ -499,6 +366,7 @@ mod tests {
         (octal_14, "'16", 14),
         (octal_15, "'17", 15),
         (octal_129, "'201", 129),
+        (octal_max, "'17777777777", 2147483647),
         (decimal_0, "0", 0),
         (decimal_1, "1", 1),
         (decimal_2, "2", 2),
@@ -521,6 +389,7 @@ mod tests {
         (decimal_19, "19", 19),
         (decimal_1_with_0_padding, "00019", 19),
         (decimal_201, "201", 201),
+        (decimal_max, "2147483647", 2147483647),
         (hexadecimal_0, "\"0", 0),
         (hexadecimal_1, "\"1", 1),
         (hexadecimal_2, "\"2", 2),
@@ -554,6 +423,7 @@ mod tests {
         (hexadecimal_30, "\"1E", 30),
         (hexadecimal_31, "\"1F", 31),
         (hexadecimal_513, "\"201", 513),
+        (hexadecimal_max, "\"7FFFFFFF", 2147483647),
         (number_from_character, "`A", 65),
         (number_from_length_1_control_sequence, r"`\A", 65),
         (number_from_character_non_ascii, "`ö", 0x00F6),
@@ -576,7 +446,7 @@ mod tests {
 
     impl TexlangState for State {
         fn cat_code(&self, c: char) -> token::CatCode {
-            if c == '1' {
+            if c == '9' {
                 return token::CatCode::Letter;
             }
             token::CatCode::PLAIN_TEX_DEFAULTS
@@ -586,5 +456,14 @@ mod tests {
         }
     }
 
-    parse_failure_tests![i32, State, (number_with_letter_catcode, "1"),];
+    parse_failure_tests![
+        i32,
+        State,
+        (number_with_letter_catcode, "9"),
+        (octal_too_big, "'177777777770"),
+        (octal_empty, "'"),
+        (decimal_too_big, "2147483648"),
+        (hexadecimal_too_big, "\"7FFFFFFF0"),
+        (hexadecimal_empty, "\""),
+    ];
 }

@@ -204,12 +204,8 @@ use texlang::*;
 use texlang::traits::*;
 
 fn index<S: TexlangState>(token: token::Token, input: &mut vm::ExpandedStream<S>) -> command::Result<variable::Index> {
-    let index = usize::parse(input)?;
-    if index >= 10 {
-        // for simplicity we panic, but in real code we should return an error
-        panic!["out of bounds"]
-    }
-    return Ok(index.into())
+    let index = parse::Uint::<10>::parse(input)?;
+    return Ok(index.0.into())
 }
 ```
 

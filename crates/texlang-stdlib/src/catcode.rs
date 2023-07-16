@@ -59,7 +59,11 @@ pub fn get_catcode<S: HasComponent<Component>>() -> command::BuiltIn<S> {
         variable::IndexResolver::Dynamic(
             |_: token::Token,
              input: &mut vm::ExpandedStream<S>|
-             -> command::Result<variable::Index> { Ok(usize::parse(input)?.into()) },
+             -> command::Result<variable::Index> { 
+                let c = char::parse(input)?;
+                let u = c as usize;
+                Ok(u.into())
+             },
         ),
     )
     .into()

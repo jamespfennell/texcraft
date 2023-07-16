@@ -123,7 +123,7 @@ fn newintarray_primitive_fn<S: HasComponent<Component>>(
     input: &mut vm::ExecutionInput<S>,
 ) -> command::Result<()> {
     let command_ref = token::CommandRef::parse(input)?;
-    let len = usize::parse(input)?;
+    let len = parse::Uint::<{ parse::Uint::MAX }>::parse(input)?.0;
     let component = input.state_mut().component_mut();
     let start = component.arrays.len();
     component.arrays.resize(start + len, Default::default());
@@ -155,7 +155,7 @@ fn resolve<S: HasComponent<Component>>(
         .array_refs
         .get(&command_ref)
         .unwrap();
-    let inner_index = usize::parse(input)?;
+    let inner_index = parse::Uint::<{ parse::Uint::MAX }>::parse(input)?.0;
     if inner_index >= array_len {
         return Err(error::SimpleTokenError::new(input.vm(),
             token,
