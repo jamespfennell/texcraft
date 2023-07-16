@@ -5,7 +5,6 @@
 
 use std::collections::HashMap;
 use texcraft_stdext::collections::groupingmap;
-use texlang::parse::Command;
 use texlang::traits::*;
 use texlang::*;
 
@@ -66,7 +65,8 @@ The new control sequence can *not* be aliased using \let.
 pub struct Component {
     singletons: Vec<i32>,
     arrays: Vec<i32>,
-    array_refs: HashMap<token::CsName, (usize, usize)>,
+    #[cfg_attr(feature = "serde", serde(with = "texcraft_stdext::serde_tools::iter"))]
+    array_refs: HashMap<token::CommandRef, (usize, usize)>,
 }
 
 /// Get the `\newInt` execution command.
@@ -78,12 +78,12 @@ fn newint_primitive_fn<S: HasComponent<Component>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> command::Result<()> {
-    let Command::ControlSequence(name) = Command::parse(input)?;
+    let command_ref = token::CommandRef::parse(input)?;
     let component = input.state_mut().component_mut();
     let index = component.singletons.len();
     component.singletons.push(Default::default());
     input.commands_map_mut().insert_variable_command(
-        name,
+        command_ref,
         variable::Command::new_array(
             singleton_ref_fn,
             singleton_mut_ref_fn,
@@ -122,14 +122,14 @@ fn newintarray_primitive_fn<S: HasComponent<Component>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> command::Result<()> {
-    let Command::ControlSequence(name) = Command::parse(input)?;
+    let command_ref = token::CommandRef::parse(input)?;
     let len = usize::parse(input)?;
     let component = input.state_mut().component_mut();
     let start = component.arrays.len();
     component.arrays.resize(start + len, Default::default());
-    component.array_refs.insert(name, (start, len));
+    component.array_refs.insert(command_ref, (start, len));
     input.commands_map_mut().insert_variable_command(
-        name,
+        command_ref,
         variable::Command::new_array(
             array_element_ref_fn,
             array_element_mut_ref_fn,
@@ -145,11 +145,16 @@ fn resolve<S: HasComponent<Component>>(
     token: token::Token,
     input: &mut vm::ExpandedStream<S>,
 ) -> command::Result<variable::Index> {
-    let name = match token.value() {
-        token::Value::ControlSequence(name) => name,
-        _ => todo!(),
+    let command_ref = match token.value() {
+        token::Value::CommandRef(command_ref) => command_ref,
+        _ => unreachable!(),
     };
-    let (array_index, array_len) = *input.state().component().array_refs.get(&name).unwrap();
+    let (array_index, array_len) = *input
+        .state()
+        .component()
+        .array_refs
+        .get(&command_ref)
+        .unwrap();
     let inner_index = usize::parse(input)?;
     if inner_index >= array_len {
         return Err(error::SimpleTokenError::new(input.vm(),
@@ -226,6 +231,7 @@ mod test {
                 r"\newIntArray \a 3 \a 0 = 2 \the\a 0",
                 "2"
             ),
+            (newint_active_char, r"\newInt~~=3 \the~", "3"),
             (
                 newintarray_base_case_1,
                 r"\newIntArray \a 3 \a 1 = 2 \the\a 1",
@@ -233,9 +239,10 @@ mod test {
             ),
             (
                 newintarray_base_case_2,
-                r"\newIntArray \a 3 \a 2 = 2 \the\a 2",
-                "2"
+                r"\newIntArray \a 3 \a 2 = 5 \the\a 2",
+                "5"
             ),
+            (newintarray_active_char, r"\newIntArray~3~2=5 \the~2", "5"),
         ),
         serde_tests(
             (serde_singleton, r"\newInt\a \a=-1 ", r"\the\a"),

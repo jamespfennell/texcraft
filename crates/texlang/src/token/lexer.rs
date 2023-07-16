@@ -562,6 +562,7 @@ mod tests {
     use super::*;
     use crate::token::catcode;
     use crate::token::catcode::CatCode::*;
+    use crate::token::CommandRef;
     use crate::token::CsNameInterner;
     use crate::token::Value;
     use std::collections::HashMap;
@@ -577,7 +578,7 @@ mod tests {
     impl<'a> TokenValue<'a> {
         fn new(token: Token, interner: &'a CsNameInterner) -> TokenValue<'a> {
             let trace_key = token.trace_key().as_u32();
-            if let Value::ControlSequence(cs_name) = token.value() {
+            if let Value::CommandRef(CommandRef::ControlSequence(cs_name)) = token.value() {
                 TokenValue::ControlSequence(interner.resolve(cs_name).unwrap(), trace_key)
             } else {
                 TokenValue::Character(token.char().unwrap(), token.cat_code().unwrap(), trace_key)

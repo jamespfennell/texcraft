@@ -221,10 +221,10 @@ fn process_prefixes<S: HasComponent<Component>>(
         )
         .into()),
         Some(&t) => match t.value() {
-            token::Value::ControlSequence(name) => {
+            token::Value::CommandRef(command_ref) => {
                 // First check if it's a variable command.
                 if let Some(command::Command::Variable(_)) =
-                    input.commands_map_mut().get_command(&name)
+                    input.commands_map_mut().get_command(&command_ref)
                 {
                     assert_only_global_prefix(t, prefix, input)?;
                     if prefix.global.is_some() {
@@ -237,7 +237,7 @@ fn process_prefixes<S: HasComponent<Component>>(
                 }
                 // Next check if it's a command that can be prefixed by any of the prefix command.
                 let component = input.state().component();
-                let tag = input.commands_map().get_tag(&name);
+                let tag = input.commands_map().get_tag(&command_ref);
                 if let Some(tag) = tag {
                     if component.tags.can_be_prefixed_with_any.contains(&tag) {
                         if prefix.global.is_some() {
@@ -291,8 +291,8 @@ fn complete_prefix<S: HasComponent<Component>>(
     let found_prefix = match input.peek()? {
         None => false,
         Some(&t) => match t.value() {
-            token::Value::ControlSequence(name) => {
-                let tag = input.commands_map().get_tag(&name);
+            token::Value::CommandRef(command_ref) => {
+                let tag = input.commands_map().get_tag(&command_ref);
                 if tag == Some(input.state().component().tags.global_tag) {
                     prefix.global = Some(t);
                     true
@@ -361,7 +361,7 @@ impl error::TexError for Error {
 
     fn title(&self) -> String {
         match self.got.token.unwrap().value() {
-            token::Value::ControlSequence(_) => {
+            token::Value::CommandRef(_) => {
                 format!["this command cannot be prefixed by {}", self.prefix.value]
             }
             _ => format![

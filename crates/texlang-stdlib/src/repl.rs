@@ -2,7 +2,6 @@
 
 use super::script;
 use std::sync::Arc;
-use texlang::parse::Command;
 use texlang::traits::*;
 use texlang::*;
 
@@ -144,13 +143,13 @@ pub fn get_help<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 pub fn get_doc<S: TexlangState>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
         |token: token::Token, input: &mut vm::ExecutionInput<S>| -> command::Result<()> {
-            let Command::ControlSequence(cs_name) = Command::parse(input)?;
-            let cs_name_s = input.vm().cs_name_interner().resolve(cs_name).unwrap();
-            let doc = match input.commands_map().get_command_slow(&cs_name) {
-                None => format!["Unknown command \\{cs_name_s}"],
+            let target = token::CommandRef::parse(input)?;
+            let name = target.to_string(input.vm().cs_name_interner());
+            let doc = match input.commands_map().get_command_slow(&target) {
+                None => format!["Unknown command {name}"],
                 Some(cmd) => match cmd.doc() {
-                    None => format!["No documentation available for the \\{cs_name_s} command"],
-                    Some(doc) => format!["\\{cs_name_s}  {doc}"],
+                    None => format!["No documentation available for the {name} command"],
+                    Some(doc) => format!["{name}  {doc}"],
                 },
             };
             match writeln![input.vm().terminal_out.borrow_mut(), "{doc}"] {

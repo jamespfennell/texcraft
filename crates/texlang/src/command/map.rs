@@ -36,6 +36,7 @@ use texcraft_stdext::collections::groupingmap::GroupingVec;
 ///     alias_character(cs_name, token::Token)
 pub struct Map<S> {
     commands: GroupingVec<Command<S>>,
+    active_char: GroupingHashMap<char, Command<S>>,
 
     initial_built_ins: HashMap<token::CsName, BuiltIn<S>>,
     primitive_key_to_built_in_lazy: RefCell<Option<HashMap<PrimitiveKey, token::CsName>>>,
@@ -49,6 +50,7 @@ impl<S> Map<S> {
                 .iter()
                 .map(|(k, v)| (k.to_usize(), v.cmd.clone()))
                 .collect(),
+            active_char: Default::default(),
             initial_built_ins,
             primitive_key_to_built_in_lazy: Default::default(),
             getters_key_to_built_in_lazy: Default::default(),
@@ -56,23 +58,27 @@ impl<S> Map<S> {
     }
 
     #[inline]
-    pub fn get_command(&self, name: &token::CsName) -> Option<&Command<S>> {
-        self.commands.get(&name.to_usize())
+    pub fn get_command(&self, command_ref: &token::CommandRef) -> Option<&Command<S>> {
+        match command_ref {
+            token::CommandRef::ControlSequence(name) => self.commands.get(&name.to_usize()),
+            token::CommandRef::ActiveCharacter(c) => self.active_char.get(c),
+        }
     }
 
-    pub fn get_tag(&self, name: &token::CsName) -> Option<Tag> {
-        match self.commands.get(&name.to_usize()) {
-            None => None,
-            Some(cmd) => cmd.tag(),
-        }
+    pub fn get_tag(&self, command_ref: &token::CommandRef) -> Option<Tag> {
+        let command = match command_ref {
+            token::CommandRef::ControlSequence(name) => self.commands.get(&name.to_usize()),
+            token::CommandRef::ActiveCharacter(c) => self.active_char.get(c),
+        };
+        command.map(Command::tag).unwrap_or(None)
     }
 
     pub fn initial_built_ins(&self) -> &HashMap<token::CsName, BuiltIn<S>> {
         &self.initial_built_ins
     }
 
-    pub fn get_command_slow(&self, name: &token::CsName) -> Option<BuiltIn<S>> {
-        let command = match self.get_command(name) {
+    pub fn get_command_slow(&self, command_ref: &token::CommandRef) -> Option<BuiltIn<S>> {
+        let command = match self.get_command(command_ref) {
             None => return None,
             Some(t) => t,
         };
@@ -90,12 +96,12 @@ impl<S> Map<S> {
     #[inline]
     pub fn insert_variable_command(
         &mut self,
-        name: token::CsName,
+        command_ref: token::CommandRef,
         variable_command: variable::Command<S>,
         scope: groupingmap::Scope,
     ) {
         self.insert(
-            name,
+            command_ref,
             Command::Variable(rc::Rc::new(variable_command)),
             scope,
         );
@@ -104,7 +110,7 @@ impl<S> Map<S> {
     // TODO: reconsider this API of 4 setters ... it seems to be unnecessary complexity?
     pub fn insert_macro(
         &mut self,
-        name: token::CsName,
+        name: token::CommandRef,
         texmacro: texmacro::Macro,
         scope: groupingmap::Scope,
     ) {
@@ -113,11 +119,11 @@ impl<S> Map<S> {
 
     pub fn alias_control_sequence(
         &mut self,
-        alias: token::CsName,
-        control_sequence: token::CsName,
+        alias: token::CommandRef,
+        command: &token::CommandRef,
         scope: groupingmap::Scope,
     ) -> std::result::Result<(), InvalidAlias> {
-        let command = match self.get_command(&control_sequence) {
+        let command = match self.get_command(command) {
             None => return Err(InvalidAlias {}),
             Some(t) => t,
         };
@@ -127,18 +133,31 @@ impl<S> Map<S> {
 
     pub fn alias_token(
         &mut self,
-        alias: token::CsName,
+        alias: token::CommandRef,
         token: token::Token,
         scope: groupingmap::Scope,
     ) {
         self.insert(alias, Command::Character(token.value()), scope);
     }
 
-    fn insert(&mut self, name: token::CsName, func: Command<S>, scope: groupingmap::Scope) {
-        let key = name.to_usize();
-        self.commands.insert(key, func, scope);
+    fn insert(
+        &mut self,
+        command_ref: token::CommandRef,
+        func: Command<S>,
+        scope: groupingmap::Scope,
+    ) {
+        match command_ref {
+            token::CommandRef::ControlSequence(name) => {
+                let key = name.to_usize();
+                self.commands.insert(key, func, scope);
+            }
+            token::CommandRef::ActiveCharacter(c) => {
+                self.active_char.insert(c, func, scope);
+            }
+        }
     }
 
+    // TODO: support active characters
     pub fn to_hash_map_slow(&self) -> HashMap<token::CsName, BuiltIn<S>> {
         let mut result = HashMap::new();
         for (key, _value) in self.commands.backing_container().iter().enumerate() {
@@ -146,7 +165,8 @@ impl<S> Map<S> {
                 None => continue,
                 Some(cs_name) => cs_name,
             };
-            let cmd = match self.get_command_slow(&cs_name) {
+            let command_ref = token::CommandRef::ControlSequence(cs_name);
+            let cmd = match self.get_command_slow(&command_ref) {
                 None => continue,
                 Some(cmd) => cmd,
             };
@@ -357,6 +377,7 @@ impl<'a> SerializableMap<'a> {
             .collect();
         Map {
             commands,
+            active_char: Default::default(), // TODO
             initial_built_ins,
             primitive_key_to_built_in_lazy: Default::default(),
             getters_key_to_built_in_lazy: Default::default(),

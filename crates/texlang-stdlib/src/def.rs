@@ -4,7 +4,6 @@ use texcraft_stdext::algorithms::substringsearch::Matcher;
 use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
 use texcraft_stdext::nevec;
-use texlang::parse::Command;
 use texlang::traits::*;
 use texlang::*;
 
@@ -49,7 +48,7 @@ fn parse_and_set_macro<S: TexlangState>(
     if set_globally_override {
         scope = groupingmap::Scope::Global;
     }
-    let Command::ControlSequence(name) = Command::parse(input)?;
+    let target = token::CommandRef::parse(input)?;
     let (prefix, raw_parameters, replacement_end_token) =
         parse_prefix_and_parameters(input.unexpanded())?;
     let parameters: Vec<texmacro::Parameter> = raw_parameters
@@ -69,7 +68,7 @@ fn parse_and_set_macro<S: TexlangState>(
     let user_defined_macro = texmacro::Macro::new(prefix, parameters, replacement);
     input
         .commands_map_mut()
-        .insert_macro(name, user_defined_macro, scope);
+        .insert_macro(target, user_defined_macro, scope);
     Ok(())
 }
 
@@ -149,13 +148,14 @@ fn parse_prefix_and_parameters<S: TexlangState>(
                         }
                         return Ok((prefix, parameters, replacement_end_token));
                     }
-                    token::Value::ControlSequence(..) => {
+                    token::Value::CommandRef(..) => {
                         return Err(error::SimpleTokenError::new(
                             input.vm(),
                             parameter_token,
                             "unexpected control sequence after a parameter token",
                         )
                         .into());
+                        // TODO: are we sure we really know what's going on here?
                         // TODO "a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
                     }
                     _ => {
@@ -247,7 +247,7 @@ fn parse_replacement_text<S: TexlangState>(
                     Some(token) => token,
                 };
                 let c = match parameter_token.value() {
-                    token::Value::ControlSequence(..) => {
+                    token::Value::CommandRef(..) => {
                         return Err(error::SimpleTokenError::new(
                             input.vm(),
                             parameter_token,
@@ -333,8 +333,9 @@ mod test {
 
     test_suite![
         expansion_equality_tests(
-            (def_parsed_successfully, "\\def\\A{abc}", ""),
-            (output_is_correct, "\\def\\A{abc}\\A", "abc"),
+            (def_parsed_successfully, r"\def\A{abc}", ""),
+            (output_is_correct, r"\def\A{abc}\A", "abc"),
+            (active_char, r"\def~{abc}~", "abc"),
             (output_twice, "\\def\\A{abc}\\A\\A", "abcabc"),
             (parse_one_parameter, "\\def\\A#1{a-#1-b}", ""),
             (one_undelimited_parameter, "\\def\\A#1{a-#1-b}\\A1", "a-1-b"),

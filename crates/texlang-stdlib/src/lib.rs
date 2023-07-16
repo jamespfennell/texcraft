@@ -185,7 +185,7 @@ implement_has_component![
     (tracingmacros::Component, tracing_macros),
 ];
 
-/// A TeX snippet exercises some error case in the standard library.
+/// A TeX snippet that exercises some error case in the standard library.
 pub struct ErrorCase {
     pub description: &'static str,
     pub source_code: &'static str,
@@ -196,8 +196,8 @@ impl ErrorCase {
     pub fn all_error_cases() -> Vec<ErrorCase> {
         let mut cases = vec![];
         for (description, source_code) in vec![
-            (r"\count is out of bounds", r"\count -200"),
-            (r"\count is out of bounds", r"\count 2000000"),
+            (r"\count is out of bounds (negative)", r"\count -200"),
+            (r"\count is out of bounds (positive)", r"\count 2000000"),
             ("file does not exist", r"\input doesNotExist"),
             ("end of input after \\global", r"\global"),
             ("can't be prefixed by \\global", r"\global \sleep"),
@@ -294,11 +294,18 @@ mod tests {
     }
 
     test_suite![
-        expansion_equality_tests((
-            overwrite_else,
-            r"\def\else{}\ifodd 2 \else should be skipped \fi",
-            r""
-        )),
+        expansion_equality_tests(
+            (
+                overwrite_else,
+                r"\def\else{}\ifodd 2 \else should be skipped \fi",
+                r""
+            ),
+            (
+                math_and_active_char,
+                r"\catcode`\A=13 \countdef A5 \countdef ~6 ~=7 A=8 \advance~byA \the~",
+                r"15",
+            ),
+        ),
         serde_tests((serde_sanity, r"\def\HW{Hello World} ", r"\HW"),),
     ];
 

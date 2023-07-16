@@ -108,8 +108,8 @@ impl<S: TexlangState> VM<S> {
             };
             // TODO: propagate all of these
             match token.value() {
-                Value::ControlSequence(name) => {
-                    match input.commands_map().get_command(&name) {
+                Value::CommandRef(command_ref) => {
+                    match input.commands_map().get_command(&command_ref) {
                         Some(Command::Execution(cmd, _)) => {
                             if let Err(err) = cmd(token, input) {
                                 return Err(error::Error::new_propagated(
@@ -138,10 +138,6 @@ impl<S: TexlangState> VM<S> {
                         }
                         None => H::undefined_command_handler(token, input)?,
                     }
-                }
-                Value::Active(_) => {
-                    // TODO: look up the command and dispatch
-                    todo!()
                 }
                 Value::BeginGroup(_) => {
                     input.begin_group();

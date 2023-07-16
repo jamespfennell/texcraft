@@ -452,7 +452,7 @@ unsafe fn launder<'a>(token: &Token) -> &'a Token {
 mod stream {
     use super::*;
     use crate::token::lexer;
-    use crate::token::{lexer::Config, Value::ControlSequence};
+    use crate::token::lexer::Config;
 
     impl<T: TexlangState> Config for T {
         #[inline]
@@ -549,7 +549,9 @@ mod stream {
         let (token, command) = match next_unexpanded(vm)? {
             None => return Ok(None),
             Some(token) => match token.value() {
-                ControlSequence(name) => (token, vm.commands_map.get_command(&name)),
+                token::Value::CommandRef(command_ref) => {
+                    (token, vm.commands_map.get_command(&command_ref))
+                }
                 _ => return Ok(Some(token)),
             },
         };
@@ -588,9 +590,9 @@ mod stream {
         let (token, command) = match peek_unexpanded(vm)? {
             None => return Ok(None),
             Some(token) => match token.value() {
-                ControlSequence(name) => (
+                token::Value::CommandRef(command_ref) => (
                     unsafe { launder(token) },
-                    vm.commands_map.get_command(&name),
+                    vm.commands_map.get_command(&command_ref),
                 ),
                 _ => return Ok(Some(unsafe { launder(token) })),
             },
@@ -633,9 +635,9 @@ mod stream {
         let (token, command) = match peek_unexpanded(vm)? {
             None => return Ok(false),
             Some(token) => match token.value() {
-                ControlSequence(name) => (
+                token::Value::CommandRef(command_ref) => (
                     unsafe { launder(token) },
-                    vm.commands_map.get_command(&name),
+                    vm.commands_map.get_command(&command_ref),
                 ),
                 _ => return Ok(false),
             },

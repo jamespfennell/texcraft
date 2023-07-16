@@ -6,8 +6,8 @@ impl<S: TexlangState> Parsable<S> for variable::Variable<S> {
         match input.next()? {
             None => Err(parse::Error::new(input.vm(), "a variable", None, "").into()),
             Some(token) => match token.value() {
-                token::Value::ControlSequence(name) => {
-                    match input.commands_map().get_command(&name) {
+                token::Value::CommandRef(command_ref) => {
+                    match input.commands_map().get_command(&command_ref) {
                         None => Err(parse::Error::new(input.vm(), "a variable", Some(token), "")
                             .with_got_override("got an undefined control sequence")
                             .with_annotation_override("undefined control sequence")

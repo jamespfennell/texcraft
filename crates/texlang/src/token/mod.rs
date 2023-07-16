@@ -57,8 +57,26 @@ pub enum Value {
     Space(char),
     Letter(char),
     Other(char),
-    Active(char),
+    CommandRef(CommandRef),
+}
+
+/// The value of a token that references a command
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum CommandRef {
     ControlSequence(CsName),
+    ActiveCharacter(char),
+}
+
+impl CommandRef {
+    pub fn to_string(&self, cs_name_interner: &CsNameInterner) -> String {
+        match self {
+            CommandRef::ControlSequence(cs_name) => {
+                format!("\\{}", cs_name_interner.resolve(*cs_name).unwrap())
+            }
+            CommandRef::ActiveCharacter(c) => format!("{c}"),
+        }
+    }
 }
 
 impl Value {
@@ -74,7 +92,7 @@ impl Value {
             CatCode::Space => Value::Space(c),
             CatCode::Letter => Value::Letter(c),
             CatCode::Other => Value::Other(c),
-            CatCode::Active => Value::Active(c),
+            CatCode::Active => Value::CommandRef(CommandRef::ActiveCharacter(c)),
             _ => panic!("raw cat code not allowed"),
         }
     }
@@ -91,7 +109,7 @@ pub struct Token {
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.value {
-            Value::ControlSequence(_) => {
+            Value::CommandRef(_) => {
                 write![f, "todo"] // TODO
             }
             _ => {
@@ -128,11 +146,17 @@ impl Token {
     token_constructor!(new_space, Value::Space);
     token_constructor!(new_letter, Value::Letter);
     token_constructor!(new_other, Value::Other);
-    token_constructor!(new_active_character, Value::Active);
+
+    pub fn new_active_character(c: char, trace_key: trace::Key) -> Token {
+        Token {
+            value: Value::CommandRef(CommandRef::ActiveCharacter(c)),
+            trace_key,
+        }
+    }
 
     pub fn new_control_sequence(name: CsName, trace_key: trace::Key) -> Token {
         Token {
-            value: Value::ControlSequence(name),
+            value: Value::CommandRef(CommandRef::ControlSequence(name)),
             trace_key,
         }
     }
@@ -151,6 +175,7 @@ impl Token {
         self.trace_key
     }
 
+    /// TODO: should have a char_and_catcode function
     pub fn char(&self) -> Option<char> {
         match self.value {
             Value::BeginGroup(c) => Some(c),
@@ -163,8 +188,10 @@ impl Token {
             Value::Space(c) => Some(c),
             Value::Letter(c) => Some(c),
             Value::Other(c) => Some(c),
-            Value::Active(c) => Some(c),
-            Value::ControlSequence(..) => None,
+            Value::CommandRef(command_ref) => match command_ref {
+                CommandRef::ControlSequence(_) => None,
+                CommandRef::ActiveCharacter(c) => Some(c),
+            },
         }
     }
 
@@ -180,8 +207,10 @@ impl Token {
             Value::Space(_) => Some(CatCode::Space),
             Value::Letter(_) => Some(CatCode::Letter),
             Value::Other(_) => Some(CatCode::Other),
-            Value::Active(_) => Some(CatCode::Active),
-            Value::ControlSequence(..) => None,
+            Value::CommandRef(command_ref) => match command_ref {
+                CommandRef::ControlSequence(_) => None,
+                CommandRef::ActiveCharacter(_) => Some(CatCode::Active),
+            },
         }
     }
 }
@@ -266,7 +295,7 @@ impl<I: std::io::Write> Writer<I> {
     /// Write a token.
     pub fn write(&mut self, interner: &CsNameInterner, token: Token) -> Result<(), std::io::Error> {
         match &token.value {
-            Value::ControlSequence(s) => {
+            Value::CommandRef(CommandRef::ControlSequence(s)) => {
                 write!(
                     self.io_writer,
                     "{}\\{}",

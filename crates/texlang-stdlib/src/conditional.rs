@@ -144,9 +144,8 @@ fn false_case<S: HasComponent<Component>>(
 ) -> Result<Vec<token::Token>, Box<error::Error>> {
     let mut depth = 0;
     while let Some(token) = input.unexpanded().next()? {
-        if let token::Value::ControlSequence(name) = &token.value() {
-            // TODO: use switch
-            let tag = input.commands_map().get_tag(name);
+        if let token::Value::CommandRef(command_ref) = &token.value() {
+            let tag = input.commands_map().get_tag(command_ref);
             if tag == Some(input.state().component().tags.else_tag) && depth == 0 {
                 push_branch(
                     input,
@@ -316,9 +315,8 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
     }
     let mut depth = 0;
     while let Some(token) = input.unexpanded().next()? {
-        if let token::Value::ControlSequence(name) = &token.value() {
-            // TODO: switch
-            let tag = input.commands_map().get_tag(name);
+        if let token::Value::CommandRef(command_ref) = &token.value() {
+            let tag = input.commands_map().get_tag(command_ref);
             if tag == Some(input.state().component().tags.or_tag) && depth == 0 {
                 cases_to_skip -= 1;
                 if cases_to_skip == 0 {
@@ -411,8 +409,8 @@ fn or_primitive_fn<S: HasComponent<Component>>(
 
     let mut depth = 0;
     while let Some(token) = input.unexpanded().next()? {
-        if let token::Value::ControlSequence(name) = &token.value() {
-            let tag = input.commands_map().get_tag(name);
+        if let token::Value::CommandRef(command_ref) = &token.value() {
+            let tag = input.commands_map().get_tag(command_ref);
             if tag == Some(input.state().component().tags.if_tag) {
                 depth += 1;
             }
@@ -483,9 +481,8 @@ fn else_primitive_fn<S: HasComponent<Component>>(
     // Now consume all of the tokens until the next \fi
     let mut depth = 0;
     while let Some(token) = input.unexpanded().next()? {
-        if let token::Value::ControlSequence(name) = &token.value() {
-            // TODO: switch
-            let tag = input.commands_map().get_tag(name);
+        if let token::Value::CommandRef(command_ref) = &token.value() {
+            let tag = input.commands_map().get_tag(command_ref);
             if tag == Some(input.state().component().tags.if_tag) {
                 depth += 1;
             }

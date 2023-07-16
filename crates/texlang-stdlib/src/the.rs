@@ -22,8 +22,10 @@ fn the_primitive_fn<S: TexlangState>(
         Some(token) => token,
     };
     Ok(match &token.value() {
-        token::Value::ControlSequence(name) => {
-            if let Some(command::Command::Variable(cmd)) = input.commands_map().get_command(name) {
+        token::Value::CommandRef(command_ref) => {
+            if let Some(command::Command::Variable(cmd)) =
+                input.commands_map().get_command(command_ref)
+            {
                 match cmd.clone().value(token, input.as_mut())? {
                     variable::ValueRef::Int(i) => int_to_tokens(the_token, *i),
                     variable::ValueRef::CatCode(i) => int_to_tokens(the_token, (*i as u8).into()),

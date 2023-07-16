@@ -8,6 +8,7 @@ use std::fmt::Display;
 use std::rc;
 
 use crate::token::trace;
+use crate::token::CommandRef;
 use crate::token::Value;
 use crate::traits::*;
 use crate::variable;
@@ -173,8 +174,8 @@ fn parse_number_internal<S: TexlangState, T: PrimInt>(
         Value::Other('\'') => parse_octal(stream)?,
         Value::Other('"') => parse_hexadecimal(stream)?,
         Value::Other('`') => parse_character(stream)?,
-        Value::ControlSequence(name) => {
-            let cmd = stream.commands_map().get_command(&name);
+        Value::CommandRef(command_ref) => {
+            let cmd = stream.commands_map().get_command(&command_ref);
             if let Some(command::Command::Variable(cmd)) = cmd {
                 read_number_from_variable(first_token, cmd.clone(), stream)?
             } else {
@@ -275,7 +276,7 @@ fn parse_character<S: TexlangState, T: PrimInt>(
     let c_or: Result<char, Option<token::Token>> = match input.next()? {
         None => Err(None),
         Some(token) => match token.value() {
-            Value::ControlSequence(cs_name) => {
+            Value::CommandRef(CommandRef::ControlSequence(cs_name)) => {
                 let name = input.vm().cs_name_interner().resolve(cs_name).unwrap();
                 let mut iter = name.chars();
                 match (iter.next(), iter.count()) {

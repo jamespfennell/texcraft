@@ -38,6 +38,8 @@ use std::collections::BTreeMap;
 use std::ops::Bound::Included;
 use std::path::PathBuf;
 
+use super::CommandRef;
+
 /// Key attached to tokens to enable tracing them.
 ///
 /// This type is 32 bits.
@@ -197,9 +199,10 @@ impl Tracer {
     /// Return a trace for the provided token.
     pub fn trace(&self, token: Token, cs_name_interner: &CsNameInterner) -> SourceCodeTrace {
         let value = match token.value() {
-            Value::ControlSequence(cs_name) => {
+            Value::CommandRef(CommandRef::ControlSequence(cs_name)) => {
                 format!["\\{}", cs_name_interner.resolve(cs_name).unwrap()]
             }
+            // TODO: maybe have a cs or char method?
             _ => token.char().unwrap().to_string(),
         };
 

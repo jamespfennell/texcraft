@@ -145,8 +145,7 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>>>(
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<command::Error>> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
-    let (index, _, target) = <(i32, parse::To, parse::Command)>::parse(input)?;
-    let parse::Command::ControlSequence(target) = target;
+    let (index, _, target) = <(i32, parse::To, token::CommandRef)>::parse(input)?;
     let terminal_in = input.vm().terminal_in.clone();
     let vm::Parts {
         state,
@@ -165,7 +164,7 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>>>(
             let prompt = if index < 0 {
                 None
             } else {
-                Some(format!(r"\{}=", cs_name_interner.resolve(target).unwrap()))
+                Some(format!(r"{}=", target.to_string(cs_name_interner)))
             };
             (
                 read_from_terminal(&terminal_in, tracer, &prompt)?,
@@ -497,7 +496,7 @@ mod tests {
             ),
             (
                 read_2,
-                r"\openin 0 file2\read 0 to \line line1='\line'\ifeof 0 Closed\else Open\fi",
+                r"\openin 0 file2\read 0 to ~line1='~'\ifeof 0 Closed\else Open\fi",
                 "line1='1{ 2 3} 'Closed",
             ),
             (

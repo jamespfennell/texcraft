@@ -153,7 +153,8 @@ fn doc(vm: &vm::VM<StdLibState>, cs_name: Option<String>) -> Result<(), String> 
                     None => continue,
                     Some(s) => s,
                 };
-                let doc = match vm.commands_map.get_command_slow(&cs_name_s) {
+                let command_ref = token::CommandRef::ControlSequence(cs_name_s);
+                let doc = match vm.commands_map.get_command_slow(&command_ref) {
                     None => "",
                     Some(cmd) => cmd.doc().unwrap_or(""),
                 };
@@ -167,7 +168,8 @@ fn doc(vm: &vm::VM<StdLibState>, cs_name: Option<String>) -> Result<(), String> 
                 None => return Err(format!("Unknown command \\{name}")),
                 Some(s) => s,
             };
-            let cmd = match vm.commands_map.get_command_slow(&cs_name) {
+            let command_ref = token::CommandRef::ControlSequence(cs_name);
+            let cmd = match vm.commands_map.get_command_slow(&command_ref) {
                 None => {
                     return Err(format!("Unknown command \\{name}"));
                 }

@@ -152,12 +152,7 @@ macro_rules! generate_tuple_impls {
 
 generate_tuple_impls![T1, T2, T3, T4, T5];
 
-/// A command like `\let` or `\def`.
-pub enum Command {
-    ControlSequence(token::CsName),
-}
-
-impl<S: TexlangState> Parsable<S> for Command {
+impl<S: TexlangState> Parsable<S> for token::CommandRef {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
         while let Some(found_equals) = get_optional_element![
             input.unexpanded(),
@@ -171,9 +166,7 @@ impl<S: TexlangState> Parsable<S> for Command {
             input.unexpanded(),
             "a control sequence or active character",
             "a command must be a control sequence or an active character",
-            token::Value::ControlSequence(name) => {
-                Command::ControlSequence(name)
-            },
+            token::Value::CommandRef(command_ref) => command_ref,
         ]
     }
 }

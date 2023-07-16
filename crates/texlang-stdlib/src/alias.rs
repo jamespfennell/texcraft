@@ -1,7 +1,7 @@
 //! `\let` aliasing command
 
 use crate::prefix;
-use texlang::parse::{Command, OptionalEqualsUnexpanded};
+use texlang::parse::OptionalEqualsUnexpanded;
 use texlang::traits::*;
 use texlang::*;
 
@@ -25,7 +25,7 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<error::Error>> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
-    let Command::ControlSequence(alias) = Command::parse(input)?;
+    let alias = token::CommandRef::parse(input)?;
     OptionalEqualsUnexpanded::parse(input)?;
     match input.unexpanded().next()? {
         None => Err(error::SimpleEndOfInputError::new(
@@ -34,12 +34,11 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
         )
         .into()),
         Some(token) => match token.value() {
-            token::Value::ControlSequence(control_sequence) => {
-                match input.commands_map_mut().alias_control_sequence(
-                    alias,
-                    control_sequence,
-                    scope,
-                ) {
+            token::Value::CommandRef(command_ref) => {
+                match input
+                    .commands_map_mut()
+                    .alias_control_sequence(alias, &command_ref, scope)
+                {
                     Ok(()) => Ok(()),
                     Err(_) => Err(error::UndefinedCommandError::new(input.vm(), token).into()),
                 }
@@ -74,6 +73,7 @@ mod test {
     test_suite![
         expansion_equality_tests(
             (let_for_macro, r"\def\A{abc}\let\B\A\B", "abc"),
+            (let_for_macro_active_char, r"\def\A{abc}\let~\A~", "abc"),
             (local, r"\def\A{a}\def\B{b}\let\C=\A{\let\C=\B \C}\C", "ba"),
             (
                 global,

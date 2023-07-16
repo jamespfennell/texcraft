@@ -249,14 +249,14 @@ pub struct UndefinedCommandError {
 impl UndefinedCommandError {
     pub fn new<S>(vm: &vm::VM<S>, token: token::Token) -> UndefinedCommandError {
         let name = match &token.value() {
-            token::Value::ControlSequence(name) => vm.cs_name_interner().resolve(*name).expect(""),
-            _ => panic!("undefined command error does not work for non-control sequences tokens"),
+            token::Value::CommandRef(command_ref) => command_ref.to_string(vm.cs_name_interner()),
+            _ => panic!("undefined command error does not work for non-command-ref tokens"),
         };
         let mut all_names = Vec::<String>::new();
         for (cs_name, _) in vm.get_commands_as_map_slow().into_iter() {
             all_names.push(cs_name);
         }
-        let close_names = spellcheck::find_close_words(all_names, name);
+        let close_names = spellcheck::find_close_words(all_names, &name);
 
         UndefinedCommandError {
             trace: vm.trace(token),

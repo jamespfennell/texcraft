@@ -132,7 +132,8 @@ fn compare_output<S>(
 
     println!("{output_1:?}");
     println!("{output_2:?}");
-    use ::texlang::token::Value::ControlSequence;
+    use ::texlang::token::CommandRef::ControlSequence;
+    use ::texlang::token::Value::CommandRef;
     let equal = match output_1.len() == output_2.len() {
         false => {
             println!(
@@ -146,7 +147,10 @@ fn compare_output<S>(
             let mut equal = true;
             for (token_1, token_2) in output_1.iter().zip(output_2.iter()) {
                 let token_equal = match (&token_1.value(), &token_2.value()) {
-                    (ControlSequence(cs_name_1), ControlSequence(cs_name_2)) => {
+                    (
+                        CommandRef(ControlSequence(cs_name_1)),
+                        CommandRef(ControlSequence(cs_name_2)),
+                    ) => {
                         let name_1 = vm_1.cs_name_interner().resolve(*cs_name_1).unwrap();
                         let name_2 = vm_2.cs_name_interner().resolve(*cs_name_2).unwrap();
                         name_1 == name_2

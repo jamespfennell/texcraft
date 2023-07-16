@@ -1,7 +1,7 @@
 //! Register variables (`\count`, `\countdef`)
 
 use texcraft_stdext::collections::groupingmap;
-use texlang::parse::{Command, OptionalEquals};
+use texlang::parse::OptionalEquals;
 use texlang::traits::*;
 use texlang::*;
 
@@ -68,11 +68,10 @@ fn countdef_fn<T: variable::SupportedType, S: HasComponent<Component<T, N>>, con
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> command::Result<()> {
-    let (target, _, index) = <(Command, OptionalEquals, parse::Uint<N>)>::parse(input)?;
-    let Command::ControlSequence(cs_name) = target;
+    let (target, _, index) = <(token::CommandRef, OptionalEquals, parse::Uint<N>)>::parse(input)?;
     // TODO: I suspect \countdef should honor \global, but haven't checked pdfTeX.
     input.commands_map_mut().insert_variable_command(
-        cs_name,
+        target,
         variable::Command::new_array(
             ref_fn,
             mut_fn,
