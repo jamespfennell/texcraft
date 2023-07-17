@@ -3,6 +3,7 @@
         "bincode",
         "catcode",
         "catcodecmd",
+        "chardef",
         "closein",
         "countdef",
         "endinput",

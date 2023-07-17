@@ -61,7 +61,7 @@ impl<const N: usize> error::TexError for OutOfBoundsError<N> {
 
 impl<S: TexlangState> Parsable<S> for char {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
-        let u1 = Uint::<{char::MAX as usize}>::parse(input)?;
+        let u1 = Uint::<{ char::MAX as usize }>::parse(input)?;
         let u2: u32 = u1.0.try_into().unwrap();
         Ok(char::from_u32(u2).unwrap())
     }
@@ -128,20 +128,26 @@ fn parse_number_internal<S: TexlangState>(
         Value::Other('`') => parse_character(stream)?,
         Value::CommandRef(command_ref) => {
             let cmd = stream.commands_map().get_command(&command_ref);
-            if let Some(command::Command::Variable(cmd)) = cmd {
-                read_number_from_variable(first_token, cmd.clone(), stream)?
-            } else {
-                return Err(parse::Error::new(
-                    stream.vm(),
-                    "the beginning of a number",
-                    Some(first_token),
-                    GUIDANCE_BEGINNING,
-                )
-                .with_annotation_override(match cmd {
-                    None => "undefined control sequence".to_string(),
-                    Some(cmd) => format!["control sequence referencing {cmd}"],
-                })
-                .into());
+            match cmd {
+                Some(command::Command::Variable(cmd)) => {
+                    read_number_from_variable(first_token, cmd.clone(), stream)?
+                }
+                Some(command::Command::Character(c)) => {
+                    (*c as u32).try_into().unwrap()
+                }
+                _ => {
+                    return Err(parse::Error::new(
+                        stream.vm(),
+                        "the beginning of a number",
+                        Some(first_token),
+                        GUIDANCE_BEGINNING,
+                    )
+                    .with_annotation_override(match cmd {
+                        None => "undefined control sequence".to_string(),
+                        Some(cmd) => format!["control sequence referencing {cmd}"],
+                    })
+                    .into());
+                }
             }
         }
         _ => {

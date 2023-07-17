@@ -137,10 +137,10 @@ impl<S> Map<S> {
         token: token::Token,
         scope: groupingmap::Scope,
     ) {
-        self.insert(alias, Command::Character(token.value()), scope);
+        self.insert(alias, Command::CharacterTokenAlias(token.value()), scope);
     }
 
-    fn insert(
+    pub fn insert(
         &mut self,
         command_ref: token::CommandRef,
         func: Command<S>,
@@ -248,7 +248,8 @@ enum SerializableCommand {
     BuiltIn(token::CsName),
     VariableArrayStatic(token::CsName, usize),
     Macro(usize),
-    Character(token::Value),
+    CharacterTokenAlias(token::Value),
+    Character(char),
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -316,7 +317,10 @@ impl<'a> SerializableMap<'a> {
                             });
                             SerializableCommand::Macro(u)
                         }
-                        Command::Character(v) => SerializableCommand::Character(*v),
+                        Command::CharacterTokenAlias(v) => {
+                            SerializableCommand::CharacterTokenAlias(*v)
+                        }
+                        Command::Character(c) => SerializableCommand::Character(*c),
                     };
 
                     let cs_name = token::CsName::try_from_usize(u).unwrap();
@@ -369,7 +373,10 @@ impl<'a> SerializableMap<'a> {
                             // TODO: error handling if the macro is missing
                             Command::Macro(macros.get(*u).unwrap().clone())
                         }
-                        SerializableCommand::Character(v) => Command::Character(*v),
+                        SerializableCommand::CharacterTokenAlias(v) => {
+                            Command::CharacterTokenAlias(*v)
+                        }
+                        SerializableCommand::Character(c) => Command::Character(*c),
                     };
                     (cs_name.to_usize(), command)
                 },

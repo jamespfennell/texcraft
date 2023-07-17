@@ -55,26 +55,42 @@ pub type ExecutionFn<S> = fn(token: token::Token, input: &mut vm::ExecutionInput
 
 /// A TeX command.
 pub enum Command<S> {
-    /// An expansion primitive that is implemented in the engine. Examples: `\the`, `\ifnum`.
+    /// An expansion primitive that is implemented in the engine.
+    ///
+    /// Examples: `\the`, `\ifnum`.
     Expansion(ExpansionFn<S>, Option<Tag>),
 
     /// A user defined macro.
+    ///
     /// Examples: `\newcommand` and `\include` in LaTeX.
     Macro(rc::Rc<texmacro::Macro>),
 
-    /// A non-expansion primitive that performs operations on the state. Examples: `\def`, `\par`.
+    /// A non-expansion primitive that performs operations on the state.
+    ///
+    /// Examples: `\def`, `\par`.
     Execution(ExecutionFn<S>, Option<Tag>),
 
     /// A command that is used to reference a variable, like a parameter or a register.
+    ///
     /// Such a command is *resolved* to get the variable using the function pointer it holds.
+    ///
     /// Examples: `\count`, `\year`.
     Variable(rc::Rc<variable::Command<S>>),
 
-    /// A command that aliases a character.
+    /// A command that aliases a character token.
+    ///
     /// Depending on the context in which this command appears it may behave like a
     ///   character (when typesetting) or like an unexpandable command (when parsing integers).
     /// Created using `\let\cmd=<character>`.
-    Character(token::Value),
+    CharacterTokenAlias(token::Value),
+
+    /// A command that references a character.
+    ///
+    /// These commands are generally created using `\countdef`.
+    /// In the main inner loop they result in a character being typeset.
+    /// In other contexts they are interpreted as numbers.
+    /// In Plain TeX, `\countdef 255` is used as a more efficient version of `\def{255 }`.
+    Character(char),
 }
 
 impl<S> std::fmt::Display for Command<S> {
@@ -84,7 +100,8 @@ impl<S> std::fmt::Display for Command<S> {
             Command::Macro(_) => write![f, "a user-defined macro"],
             Command::Execution(_, _) => write![f, "an execution command"],
             Command::Variable(_) => write![f, "a variable command"],
-            Command::Character(_) => write![f, "a token alias"],
+            Command::CharacterTokenAlias(_) => write![f, "a character token alias"],
+            Command::Character(_) => write![f, "a character command"],
         }
     }
 }
@@ -97,6 +114,7 @@ impl<S> Command<S> {
             Command::Macro(_) => None,
             Command::Execution(_, tag) => *tag,
             Command::Variable(_) => None,
+            Command::CharacterTokenAlias(_) => None,
             Command::Character(_) => None,
         }
     }
@@ -132,7 +150,10 @@ impl<S> BuiltIn<S> {
         match &mut self.cmd {
             Command::Expansion(_, t) => *t = Some(tag),
             Command::Execution(_, t) => *t = Some(tag),
-            Command::Macro(_) | Command::Variable(_) | Command::Character(_) => {
+            Command::Macro(_)
+            | Command::Variable(_)
+            | Command::CharacterTokenAlias(_)
+            | Command::Character(_) => {
                 panic!("cannot add a tag to this type of command")
             }
         }
@@ -162,7 +183,8 @@ impl<S> Clone for Command<S> {
             Command::Macro(m) => Command::Macro(m.clone()),
             Command::Execution(e, t) => Command::Execution(*e, *t),
             Command::Variable(v) => Command::Variable(v.clone()),
-            Command::Character(tv) => Command::Character(*tv),
+            Command::CharacterTokenAlias(tv) => Command::CharacterTokenAlias(*tv),
+            Command::Character(c) => Command::Character(*c),
         }
     }
 }
@@ -315,6 +337,7 @@ impl PrimitiveKey {
             Command::Execution(f, tag) => Some(PrimitiveKey::Execution(*f as usize, *tag)),
             Command::Variable(v) => Some(PrimitiveKey::Variable(v.key())),
             Command::Macro(_) => None,
+            Command::CharacterTokenAlias(_) => None,
             Command::Character(_) => None,
         }
     }

@@ -15,6 +15,7 @@ use texlang::vm::implement_has_component;
 pub mod alias;
 pub mod alloc;
 pub mod catcode;
+pub mod chardef;
 pub mod conditional;
 pub mod def;
 pub mod endlinechar;
@@ -98,6 +99,7 @@ impl StdLibState {
             //
             ("catcode", catcode::get_catcode()),
             ("closein", input::get_closein()),
+            ("chardef", chardef::get_chardef()),
             ("count", registers::get_count()),
             ("countdef", registers::get_countdef()),
             //

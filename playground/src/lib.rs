@@ -82,12 +82,13 @@ fn initial_primitives() -> HashMap<&'static str, command::BuiltIn<PlaygroundStat
     HashMap::from([
         (
             "\\",
-            command::Command::Character(token::Value::Other('\\')).into(),
+            command::Command::CharacterTokenAlias(token::Value::Other('\\')).into(),
         ),
         //
         ("advance", math::get_advance()),
         //
         ("catcode", catcode::get_catcode()),
+        ("chardef", chardef::get_chardef()),
         ("count", registers::get_count()),
         ("countdef", registers::get_countdef()),
         //

@@ -187,7 +187,7 @@ fn new_vm(format_file_path: Option<PathBuf>, repl: bool) -> Box<vm::VM<StdLibSta
     m.insert("newline", script::get_newline());
     m.insert(
         "\\",
-        command::Command::Character(token::Value::Other('\\')).into(),
+        command::Command::CharacterTokenAlias(token::Value::Other('\\')).into(),
     );
     if repl {
         m.insert("doc", repl::get_doc());

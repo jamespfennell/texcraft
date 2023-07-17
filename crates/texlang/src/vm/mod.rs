@@ -125,9 +125,11 @@ impl<S: TexlangState> VM<S> {
                             let scope = S::variable_assignment_scope_hook(input.state_mut());
                             cmd.set_value_using_input(token, input, scope)?;
                         }
-                        Some(Command::Character(token_value)) => {
-                            // TODO: the token may be a begin group, end group token, or active character token.
+                        Some(Command::CharacterTokenAlias(token_value)) => {
+                            // TODO: the token may be a begin group, or end group token.
                             // What to do in this case? Check pdfTeX.
+                            // Probably we need to push it to the front of the token stack;
+                            // because it is not a command, the right handler will be called.
                             H::character_handler(
                                 Token::new_from_value(*token_value, token.trace_key()),
                                 input,
@@ -136,6 +138,10 @@ impl<S: TexlangState> VM<S> {
                         Some(Command::Expansion(_, _)) | Some(Command::Macro(_)) => {
                             H::unexpanded_expansion_command(token, input)?
                         }
+                        Some(Command::Character(c)) => H::character_handler(
+                            token::Token::new_other(*c, token.trace_key()),
+                            input,
+                        )?,
                         None => H::undefined_command_handler(token, input)?,
                     }
                 }
