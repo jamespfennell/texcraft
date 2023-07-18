@@ -15,39 +15,56 @@ pub fn get_the<S: TexlangState>() -> command::BuiltIn<S> {
 fn the_primitive_fn<S: TexlangState>(
     the_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> command::Result<Vec<token::Token>> {
-    // TODO: double check \the expands the input
+) -> command::Result<()> {
     let token = match input.next()? {
         None => return Err(error::SimpleEndOfInputError::new(input.vm(), "TODO").into()),
         Some(token) => token,
     };
-    Ok(match &token.value() {
+    match &token.value() {
         token::Value::CommandRef(command_ref) => {
-            if let Some(command::Command::Variable(cmd)) =
-                input.commands_map().get_command(command_ref)
-            {
-                match cmd.clone().value(token, input.as_mut())? {
-                    variable::ValueRef::Int(i) => int_to_tokens(the_token, *i),
-                    variable::ValueRef::CatCode(i) => int_to_tokens(the_token, (*i as u8).into()),
+            match input.commands_map().get_command(command_ref) {
+                Some(command::Command::Variable(cmd)) => {
+                    match cmd.clone().value(token, input.as_mut())? {
+                        variable::ValueRef::Int(i) => {
+                            let i = *i;
+                            int_to_tokens(input.expansions_mut(), the_token, i);
+                        }
+                        variable::ValueRef::CatCode(i) => {
+                            let i = *i;
+                            int_to_tokens(input.expansions_mut(), the_token, (i as u8).into());
+                        }
+                    };
                 }
-            } else {
-                // TODO: push straight onto the expansions stack?
-                vec![token]
+                Some(command::Command::Character(c)) => {
+                    let c = *c;
+                    int_to_tokens(
+                        input.expansions_mut(),
+                        the_token,
+                        (c as u32).try_into().unwrap(),
+                    );
+                }
+                None
+                | Some(
+                    command::Command::Expansion(..)
+                    | command::Command::Macro(..)
+                    | command::Command::Execution(..)
+                    | command::Command::CharacterTokenAlias(..),
+                ) => {
+                    todo!("should return an error")
+                }
             }
         }
-        // TODO: push straight onto the expansions stack?
-        _ => vec![token],
-    })
+        _ => todo!("should return an error"),
+    };
+    Ok(())
 }
 
-fn int_to_tokens(the_token: token::Token, mut i: i32) -> Vec<token::Token> {
+fn int_to_tokens(tokens: &mut Vec<token::Token>, the_token: token::Token, mut i: i32) {
     if i == 0 {
-        return vec![token::Token::new_other('0', the_token.trace_key())];
+        tokens.push(token::Token::new_other('0', the_token.trace_key()));
+        return;
     }
     let negative = i < 0;
-    // TODO: allocate the capacity precisely?
-    // Even better: can push straight onto the expansions stack?
-    let mut tokens = Vec::new();
     while i != 0 {
         let digit = (i % 10).abs();
         tokens.push(token::Token::new_other(
@@ -59,6 +76,4 @@ fn int_to_tokens(the_token: token::Token, mut i: i32) -> Vec<token::Token> {
     if negative {
         tokens.push(token::Token::new_other('-', the_token.trace_key()));
     }
-    tokens.reverse();
-    tokens
 }

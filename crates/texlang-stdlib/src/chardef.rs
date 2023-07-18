@@ -13,15 +13,17 @@ fn chardef_primitive_fn<S: TexlangState>(
 ) -> Result<(), Box<error::Error>> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
     let (target, _, c) = <(token::CommandRef, parse::OptionalEquals, char)>::parse(input)?;
-    input.commands_map_mut().insert(target, command::Command::Character(c), scope);
+    input
+        .commands_map_mut()
+        .insert(target, command::Command::Character(c), scope);
     Ok(())
 }
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
     use super::*;
     use crate::{testing::*, the};
+    use std::collections::HashMap;
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
@@ -34,11 +36,18 @@ mod test {
     test_suite![
         expansion_equality_tests(
             (basic_case, r"\chardef\Hello = `\+ \Hello", "+"),
-            (parsable_as_number, r"\chardef\Hello = 13 \i=\Hello x\the\i", "x13"),
-            (parsable_as_number_negative, r"\chardef\Hello = 13 \i=-\Hello x\the\i", "x-13"),
+            (basic_case_with_the, r"\chardef\Hello = 123 \the\Hello", "123"),
+            (
+                parsable_as_number,
+                r"\chardef\Hello = 13 \i=\Hello x\the\i",
+                "x13"
+            ),
+            (
+                parsable_as_number_negative,
+                r"\chardef\Hello = 13 \i=-\Hello x\the\i",
+                "x-13"
+            ),
         ),
-        serde_tests(
-            (basic_case, r"\chardef\Hello = `\+ ", r"\Hello"),
-        ),
+        serde_tests((basic_case, r"\chardef\Hello = `\+ ", r"\Hello"),),
     ];
 }

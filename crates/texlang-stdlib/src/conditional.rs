@@ -123,7 +123,7 @@ static FI_TAG: command::StaticTag = command::StaticTag::new();
 fn true_case<S: HasComponent<Component>>(
     token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<Vec<token::Token>, Box<error::Error>> {
+) -> Result<(), Box<error::Error>> {
     push_branch(
         input,
         Branch {
@@ -131,7 +131,7 @@ fn true_case<S: HasComponent<Component>>(
             kind: BranchKind::True,
         },
     );
-    Ok(Vec::new())
+    Ok(())
 }
 
 // The `false_case` function is executed whenever a conditional evaluates to false.
@@ -141,7 +141,7 @@ fn true_case<S: HasComponent<Component>>(
 fn false_case<S: HasComponent<Component>>(
     original_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<Vec<token::Token>, Box<error::Error>> {
+) -> Result<(), Box<error::Error>> {
     let mut depth = 0;
     while let Some(token) = input.unexpanded().next()? {
         if let token::Value::CommandRef(command_ref) = &token.value() {
@@ -154,7 +154,7 @@ fn false_case<S: HasComponent<Component>>(
                         kind: BranchKind::Else,
                     },
                 );
-                return Ok(Vec::new());
+                return Ok(());
             }
             if tag == Some(input.state().component().tags.if_tag) {
                 depth += 1;
@@ -162,7 +162,7 @@ fn false_case<S: HasComponent<Component>>(
             if tag == Some(input.state().component().tags.fi_tag) {
                 depth -= 1;
                 if depth < 0 {
-                    return Ok(Vec::new());
+                    return Ok(());
                 }
             }
         }
@@ -221,7 +221,7 @@ pub trait Condition<S: HasComponent<Component>> {
     fn build_if_command() -> command::BuiltIn<S> {
         let primitive_fn = |token: token::Token,
                             input: &mut vm::ExpansionInput<S>|
-         -> Result<Vec<token::Token>, Box<error::Error>> {
+         -> Result<(), Box<error::Error>> {
             match Self::evaluate(input)? {
                 true => true_case(token, input),
                 false => false_case(token, input),
@@ -300,7 +300,7 @@ pub fn get_ifodd<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn if_case_primitive_fn<S: HasComponent<Component>>(
     ifcase_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<Vec<token::Token>, Box<error::Error>> {
+) -> Result<(), Box<error::Error>> {
     // TODO: should we reading the number from the unexpanded stream? Probably!
     let mut cases_to_skip = i32::parse(input)?;
     if cases_to_skip == 0 {
@@ -311,7 +311,7 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
                 kind: BranchKind::Switch,
             },
         );
-        return Ok(Vec::new());
+        return Ok(());
     }
     let mut depth = 0;
     while let Some(token) = input.unexpanded().next()? {
@@ -327,7 +327,7 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
                             kind: BranchKind::Switch,
                         },
                     );
-                    return Ok(Vec::new());
+                    return Ok(());
                 }
             }
             if tag == Some(input.state().component().tags.else_tag) && depth == 0 {
@@ -338,7 +338,7 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
                         kind: BranchKind::Else,
                     },
                 );
-                return Ok(Vec::new());
+                return Ok(());
             }
             if tag == Some(input.state().component().tags.if_tag) {
                 depth += 1;
@@ -346,7 +346,7 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
             if tag == Some(input.state().component().tags.fi_tag) {
                 depth -= 1;
                 if depth < 0 {
-                    return Ok(Vec::new());
+                    return Ok(());
                 }
             }
         }
@@ -391,7 +391,7 @@ pub fn get_ifcase<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn or_primitive_fn<S: HasComponent<Component>>(
     ifcase_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<Vec<token::Token>, Box<error::Error>> {
+) -> Result<(), Box<error::Error>> {
     let branch = pop_branch(input);
     // For an or command to be valid, we must be in a switch statement
     let is_valid = match branch {
@@ -417,7 +417,7 @@ fn or_primitive_fn<S: HasComponent<Component>>(
             if tag == Some(input.state().component().tags.fi_tag) {
                 depth -= 1;
                 if depth < 0 {
-                    return Ok(Vec::new());
+                    return Ok(());
                 }
             }
         }
@@ -462,7 +462,7 @@ pub fn get_or<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn else_primitive_fn<S: HasComponent<Component>>(
     else_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<Vec<token::Token>, Box<error::Error>> {
+) -> Result<(), Box<error::Error>> {
     let branch = pop_branch(input);
     // For else token to be valid, we must be in the true branch of a conditional
     let is_valid = match branch {
@@ -489,7 +489,7 @@ fn else_primitive_fn<S: HasComponent<Component>>(
             if tag == Some(input.state().component().tags.fi_tag) {
                 depth -= 1;
                 if depth < 0 {
-                    return Ok(Vec::new());
+                    return Ok(());
                 }
             }
         }
@@ -535,7 +535,7 @@ pub fn get_else<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn fi_primitive_fn<S: HasComponent<Component>>(
     token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<Vec<token::Token>, Box<error::Error>> {
+) -> Result<(), Box<error::Error>> {
     let branch = pop_branch(input);
     // For a \fi primitive to be valid, we must be in a conditional.
     // Note that we could be in the false branch: \iftrue\else\fi
@@ -546,7 +546,7 @@ fn fi_primitive_fn<S: HasComponent<Component>>(
             error::SimpleTokenError::new(input.vm(), token, "unexpected `fi` command").into(),
         );
     }
-    Ok(Vec::new())
+    Ok(())
 }
 
 /// Get the `\fi` primitive.

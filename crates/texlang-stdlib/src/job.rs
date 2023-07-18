@@ -58,7 +58,7 @@ pub fn get_jobname<S: HasComponent<Component>>() -> command::BuiltIn<S> {
             .to_string_lossy()
             .into();
         input.push_string_tokens(token, &job_name);
-        Ok(vec![])
+        Ok(())
     })
 }
 

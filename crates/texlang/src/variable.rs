@@ -193,7 +193,7 @@ impl<S: TexlangState> Command<S> {
         token: token::Token,
         input: &'a mut vm::ExpandedStream<S>,
     ) -> Result<ValueRef<'a>, Box<error::Error>> {
-        Ok(self.resolve(token, input)?.value(input))
+        Ok(self.resolve(token, input)?.value(input.state()))
     }
 
     /// Resolve the command to a variable and set the value of the variable using the following tokens in the input stream.
@@ -273,10 +273,10 @@ pub enum Variable<S> {
 
 impl<S: TexlangState> Variable<S> {
     /// Return a reference to the value of the variable.
-    pub fn value<'a>(&self, input: &'a mut vm::ExpandedStream<S>) -> ValueRef<'a> {
+    pub fn value<'a>(&self, state: &'a S) -> ValueRef<'a> {
         match self {
-            Variable::Int(variable) => ValueRef::Int(variable.get(input.state())),
-            Variable::CatCode(variable) => ValueRef::CatCode(variable.get(input.state())),
+            Variable::Int(variable) => ValueRef::Int(variable.get(state)),
+            Variable::CatCode(variable) => ValueRef::CatCode(variable.get(state)),
         }
     }
 

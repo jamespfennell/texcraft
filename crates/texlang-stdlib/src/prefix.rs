@@ -456,7 +456,7 @@ mod test {
             ("advance", math::get_advance()),
             (
                 "noOpExpansion",
-                command::BuiltIn::new_expansion(|_, _| Ok(vec![])),
+                command::BuiltIn::new_expansion(|_, _| Ok(())),
             ),
             (
                 "noOpExecution",

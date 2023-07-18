@@ -19,11 +19,11 @@ pub fn get_input<S: TexlangState>() -> command::BuiltIn<S> {
 fn input_fn<S: TexlangState>(
     input_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<Vec<token::Token>, Box<command::Error>> {
+) -> Result<(), Box<command::Error>> {
     let file_location = FileLocation::parse(input)?;
     let (file_path, source_code) = read_file(input.vm(), file_location, "tex")?;
     input.push_source(input_token, file_path, source_code)?;
-    Ok(Vec::new())
+    Ok(())
 }
 
 /// Get the `\endinput` expansion primitive.
@@ -34,9 +34,9 @@ pub fn get_endinput<S: TexlangState>() -> command::BuiltIn<S> {
 fn endinput_fn<S: TexlangState>(
     _: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<Vec<token::Token>, Box<command::Error>> {
+) -> Result<(), Box<command::Error>> {
     input.end_current_file();
-    Ok(Vec::new())
+    Ok(())
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

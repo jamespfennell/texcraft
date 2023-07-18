@@ -47,8 +47,7 @@ pub use map::Map;
 pub type Result<T> = std::result::Result<T, Box<Error>>;
 
 /// The Rust type of expansion primitive functions.
-pub type ExpansionFn<S> =
-    fn(token: token::Token, input: &mut vm::ExpansionInput<S>) -> Result<Vec<token::Token>>;
+pub type ExpansionFn<S> = fn(token: token::Token, input: &mut vm::ExpansionInput<S>) -> Result<()>;
 
 /// The Rust type of execution primitive functions.
 pub type ExecutionFn<S> = fn(token: token::Token, input: &mut vm::ExecutionInput<S>) -> Result<()>;

@@ -12,18 +12,13 @@ pub fn get_texcraft<S>() -> command::BuiltIn<S> {
 
 pub fn texcraft_primitive_fn<S>(
     token: token::Token,
-    _: &mut vm::ExpansionInput<S>,
-) -> command::Result<Vec<token::Token>> {
-    Ok(vec![
-        token::Token::new_letter('T', token.trace_key()),
-        token::Token::new_letter('e', token.trace_key()),
-        token::Token::new_letter('x', token.trace_key()),
-        token::Token::new_letter('c', token.trace_key()),
-        token::Token::new_letter('r', token.trace_key()),
-        token::Token::new_letter('a', token.trace_key()),
-        token::Token::new_letter('f', token.trace_key()),
-        token::Token::new_letter('t', token.trace_key()),
-    ])
+    input: &mut vm::ExpansionInput<S>,
+) -> command::Result<()> {
+    let expansions = input.expansions_mut();
+    for c in "Texcraft".chars().rev() {
+        expansions.push(token::Token::new_letter(c, token.trace_key()))
+    }
+    Ok(())
 }
 
 #[cfg(test)]

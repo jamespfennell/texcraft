@@ -10,10 +10,7 @@ pub fn get_noexpand<S>() -> command::BuiltIn<S> {
 
 static NO_EXPAND_TAG: command::StaticTag = command::StaticTag::new();
 
-fn noexpand_fn<S>(
-    _: token::Token,
-    _: &mut vm::ExpansionInput<S>,
-) -> command::Result<Vec<token::Token>> {
+fn noexpand_fn<S>(_: token::Token, _: &mut vm::ExpansionInput<S>) -> command::Result<()> {
     panic!(
         "The \\noexpand expansion function is never invoked directly. \
          Instead, the primitive operates through the \\noexpand hook, \
@@ -113,7 +110,7 @@ pub fn get_expandafter_optimized<S: TexlangState>() -> command::BuiltIn<S> {
 fn expandafter_simple_fn<S: TexlangState>(
     expandafter_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> command::Result<Vec<token::Token>> {
+) -> command::Result<()> {
     let next = match input.unexpanded().next()? {
         None => {
             return Err(expandafter_missing_first_token_error(
@@ -132,13 +129,13 @@ fn expandafter_simple_fn<S: TexlangState>(
     }
     input.expanded().expand_once()?;
     input.expansions_mut().push(next);
-    Ok(vec![])
+    Ok(())
 }
 
 fn expandafter_optimized_fn<S: TexlangState>(
     expandafter_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> command::Result<Vec<token::Token>> {
+) -> command::Result<()> {
     let mut buffer: Vec<token::Token> = input.checkout_token_buffer();
     let unexpanded_input = input.unexpanded();
     loop {
@@ -219,7 +216,7 @@ fn expandafter_optimized_fn<S: TexlangState>(
         remove_even_indices(&mut buffer);
     }
     input.return_token_buffer(buffer);
-    Ok(vec![])
+    Ok(())
 }
 
 fn remove_even_indices(v: &mut Vec<token::Token>) {

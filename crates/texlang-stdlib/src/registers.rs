@@ -156,7 +156,7 @@ mod tests {
             (
                 serde_group,
                 r"\count 1 2 {\count 1 3 ",
-                r"\the \count 1 } \the count 1"
+                r"\the \count 1 } \the \count 1"
             ),
         ),
         failure_tests(

@@ -132,9 +132,7 @@ fn parse_number_internal<S: TexlangState>(
                 Some(command::Command::Variable(cmd)) => {
                     read_number_from_variable(first_token, cmd.clone(), stream)?
                 }
-                Some(command::Command::Character(c)) => {
-                    (*c as u32).try_into().unwrap()
-                }
+                Some(command::Command::Character(c)) => (*c as u32).try_into().unwrap(),
                 _ => {
                     return Err(parse::Error::new(
                         stream.vm(),
@@ -199,7 +197,7 @@ fn read_number_from_variable<S: TexlangState>(
     cmd: rc::Rc<variable::Command<S>>,
     input: &mut vm::ExpandedStream<S>,
 ) -> Result<i32, Box<error::Error>> {
-    Ok(match cmd.resolve(token, input)?.value(input) {
+    Ok(match cmd.value(token, input)? {
         variable::ValueRef::Int(i) => *i,
         variable::ValueRef::CatCode(c) => *c as i32,
     })

@@ -566,11 +566,9 @@ mod stream {
                     }
                     Err(err) => return Err(convert_command_error(vm, token, err)),
                 };
-                let output = match command(token, ExpansionInput::new(vm)) {
-                    Ok(output) => output,
-                    Err(err) => return Err(convert_command_error(vm, token, err)),
+                if let Err(err) = command(token, ExpansionInput::new(vm)) {
+                    return Err(convert_command_error(vm, token, err));
                 };
-                vm.internal.push_expansion(&output);
                 next_expanded(vm)
             }
             Some(command::Command::Macro(command)) => {
@@ -611,11 +609,9 @@ mod stream {
                     }
                     Err(err) => return Err(convert_command_error(vm, token, err)),
                 };
-                let output = match command(token, ExpansionInput::new(vm)) {
-                    Ok(output) => output,
-                    Err(err) => return Err(convert_command_error(vm, token, err)),
+                if let Err(err) = command(token, ExpansionInput::new(vm)) {
+                    return Err(convert_command_error(vm, token, err));
                 };
-                vm.internal.push_expansion(&output);
                 peek_expanded(vm)
             }
             Some(command::Command::Macro(command)) => {
@@ -656,11 +652,9 @@ mod stream {
                     }
                     Err(err) => return Err(convert_command_error(vm, token, err)),
                 };
-                let output = match command(token, ExpansionInput::new(vm)) {
-                    Ok(output) => output,
-                    Err(err) => return Err(convert_command_error(vm, token, err)),
+                if let Err(err) = command(token, ExpansionInput::new(vm)) {
+                    return Err(convert_command_error(vm, token, err));
                 };
-                vm.internal.push_expansion(&output);
                 Ok(true)
             }
             Some(command::Command::Macro(command)) => {
