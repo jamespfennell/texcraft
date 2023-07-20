@@ -467,7 +467,7 @@ impl<S> VM<S> {
             }
         }
         let group = self.internal.save_stack.pop().unwrap();
-        group.restore(&mut self.state);
+        group.restore(ExecutionInput::new(self));
         Ok(())
     }
 

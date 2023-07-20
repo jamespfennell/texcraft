@@ -31,11 +31,9 @@ pub use number::Uint;
 pub use variable::OptionalEquals;
 pub use variable::OptionalEqualsUnexpanded;
 
-use crate::error;
-use crate::token;
 use crate::token::trace;
 use crate::traits::*;
-use crate::vm;
+use crate::*;
 
 /// Implementations of this trait are elements of the TeX grammar than can be parsed from a stream of tokens.
 pub trait Parsable<S: TexlangState>: Sized {
@@ -171,10 +169,59 @@ impl<S: TexlangState> Parsable<S> for token::CommandRef {
     }
 }
 
+impl<S: TexlangState> Parsable<S> for Vec<token::Token> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+        let mut result = input.checkout_token_buffer();
+        let first_token_or = input.next()?;
+        let got = match first_token_or {
+            None => "the input ended",
+            Some(first_token) => match first_token.value() {
+                token::Value::CommandRef(command_ref) => {
+                    match input.commands_map().get_command(&command_ref) {
+                        Some(command::Command::Variable(cmd)) => {
+                            if let crate::variable::ValueRef::TokenList(token_list) =
+                                cmd.clone().value(first_token, input)?
+                            {
+                                result.extend(token_list.iter());
+                                return Ok(result);
+                            };
+                            "a variable command of the wrong type (wanted a token list)"
+                        }
+                        Some(_) => "a command that is not a variable command",
+                        None => "an undefined command",
+                    }
+                }
+                token::Value::BeginGroup(_) => {
+                    let found_end_group = finish_parsing_balanced_tokens(input, &mut result)?;
+                    if found_end_group {
+                        return Ok(result);
+                    }
+                    input.return_token_buffer(result);
+                    return Err(parse::Error::new(input.vm(), "balanced braces", None, "").into());
+                }
+                _ => "a non-command, non-opening brace token",
+            },
+        };
+        input.return_token_buffer(result);
+        Err(parse::Error::new(
+            input.vm(),
+            "an opening brace or a variable of type token list",
+            first_token_or,
+            "",
+        )
+        .with_got_override(format!("got {got}"))
+        .with_annotation_override(got)
+        .into())
+    }
+}
+
 /// Parses balanced tokens from the stream.
 ///
-/// Returns false if the input ended before balanced tokens completed.
-pub fn parse_balanced_tokens<S: vm::TokenStream>(
+/// This function assumes the the initial opening brace has ready been consumed.
+/// It returns false if the input ends before balanced tokens completed.
+///
+/// This function is analogous to `scan_toks(true, true)` in Knuth's TeX.
+pub fn finish_parsing_balanced_tokens<S: vm::TokenStream>(
     stream: &mut S,
     result: &mut Vec<token::Token>,
 ) -> Result<bool, Box<error::Error>> {

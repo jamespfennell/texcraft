@@ -4,8 +4,6 @@
 //! from an internal registers. The full definition of a number in the TeX grammar
 //! is given on page X of the TeXBook.
 
-use std::rc;
-
 use crate::token::trace;
 use crate::token::Value;
 use crate::traits::*;
@@ -130,10 +128,29 @@ fn parse_number_internal<S: TexlangState>(
             let cmd = stream.commands_map().get_command(&command_ref);
             match cmd {
                 Some(command::Command::Variable(cmd)) => {
-                    read_number_from_variable(first_token, cmd.clone(), stream)?
+                    match cmd.clone().value(first_token, stream)? {
+                        variable::ValueRef::Int(i) => *i,
+                        variable::ValueRef::CatCode(c) => *c as i32,
+                        variable::ValueRef::TokenList(_) => {
+                            return Err(parse::Error::new(
+                                stream.vm(),
+                                "the beginning of a number",
+                                Some(first_token),
+                                GUIDANCE_BEGINNING,
+                            )
+                            .with_annotation_override("token list variable")
+                            .into());
+                        }
+                    }
                 }
                 Some(command::Command::Character(c)) => (*c as u32).try_into().unwrap(),
-                _ => {
+                None
+                | Some(
+                    command::Command::Execution(..)
+                    | command::Command::Expansion(..)
+                    | command::Command::Macro(..)
+                    | command::Command::CharacterTokenAlias(..),
+                ) => {
                     return Err(parse::Error::new(
                         stream.vm(),
                         "the beginning of a number",
@@ -190,17 +207,6 @@ fn parse_optional_signs<S: TexlangState>(
         };
     }
     Ok(result)
-}
-
-fn read_number_from_variable<S: TexlangState>(
-    token: token::Token,
-    cmd: rc::Rc<variable::Command<S>>,
-    input: &mut vm::ExpandedStream<S>,
-) -> Result<i32, Box<error::Error>> {
-    Ok(match cmd.value(token, input)? {
-        variable::ValueRef::Int(i) => *i,
-        variable::ValueRef::CatCode(c) => *c as i32,
-    })
 }
 
 fn parse_character<S: TexlangState>(

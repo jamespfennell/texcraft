@@ -8,6 +8,7 @@ extern crate texlang;
 use std::collections::HashMap;
 
 use texlang::command;
+use texlang::token;
 use texlang::traits::*;
 use texlang::vm;
 use texlang::vm::implement_has_component;
@@ -45,7 +46,8 @@ pub struct StdLibState {
     pub input: input::Component<16>,
     pub job: job::Component,
     pub prefix: prefix::Component,
-    pub registers: registers::Component<i32, 32768>,
+    pub registers_i32: registers::Component<i32, 32768>,
+    pub registers_token_list: registers::Component<Vec<token::Token>, 256>,
     pub repl: repl::Component,
     pub script: script::Component,
     pub time: time::Component,
@@ -159,6 +161,8 @@ impl StdLibState {
             //
             ("the", the::get_the()),
             ("time", time::get_time()),
+            ("toks", registers::get_toks()),
+            ("toksdef", registers::get_toksdef()),
             ("tracingmacros", tracingmacros::get_tracingmacros()),
             //
             ("year", time::get_year()),
@@ -180,7 +184,11 @@ implement_has_component![
     (input::Component<16>, input),
     (job::Component, job),
     (prefix::Component, prefix),
-    (registers::Component<i32, 32768>, registers),
+    (registers::Component<i32, 32768>, registers_i32),
+    (
+        registers::Component<Vec<token::Token>, 256>,
+        registers_token_list
+    ),
     (repl::Component, repl),
     (script::Component, script),
     (time::Component, time),
@@ -198,6 +206,21 @@ impl ErrorCase {
     pub fn all_error_cases() -> Vec<ErrorCase> {
         let mut cases = vec![];
         for (description, source_code) in vec![
+            (r"\toks starts with a letter token", r"\toks 0 = a"),
+            (
+                r"\toks starts with a non-variable command",
+                r"\toks 0 = \def",
+            ),
+            (
+                r"\toks starts is a variable command of the wrong type",
+                r"\toks 0 = \count 0",
+            ),
+            (
+                r"end of input while scanning token list",
+                r"\toks 0 = {  no closing brace",
+            ),
+            (r"assign number from \toks", r"\count 0 = \toks 0"),
+            (r"end of input right after \toks", r"\toks 0"),
             (r"\count is out of bounds (negative)", r"\count -200"),
             (r"\count is out of bounds (positive)", r"\count 2000000"),
             ("file does not exist", r"\input doesNotExist"),
@@ -256,11 +279,6 @@ impl ErrorCase {
             ),
             ("number with letter catcode", r"\catcode `1 = 11 \count 1"),
             /*
-            ("", r""),
-            ("", r""),
-            ("", r""),
-            ("", r""),
-            ("", r""),
             ("", r""),
             ("", r""),
             ("", r""),

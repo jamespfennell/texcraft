@@ -121,6 +121,20 @@ impl<S: TexlangState> ExpandedStream<S> {
     pub fn expand_once(&mut self) -> Result<bool, Box<error::Error>> {
         stream::expand_once(&mut self.unexpanded().0)
     }
+
+    pub fn checkout_token_buffer(&mut self) -> Vec<Token> {
+        self.0 .0.internal.token_buffers.pop().unwrap_or_default().0
+    }
+
+    /// Return a token buffer, allowing it to be reused.
+    pub fn return_token_buffer(&mut self, mut token_buffer: Vec<Token>) {
+        token_buffer.clear();
+        self.0
+             .0
+            .internal
+            .token_buffers
+            .push(super::TokenBuffer(token_buffer))
+    }
 }
 
 impl<S: TexlangState> TokenStream for ExpandedStream<S> {
@@ -276,6 +290,7 @@ impl<S> ExpansionInput<S> {
     /// Push tokens to the front of the input stream.
     ///
     /// The first token in the provided slice will be the next token read.
+    // TODO: destroy
     #[inline]
     pub fn push_expansion(&mut self, expansion: &[Token]) {
         self.0 .0 .0.internal.push_expansion(expansion)
@@ -301,6 +316,11 @@ impl<S> ExpansionInput<S> {
     #[inline]
     pub fn expansions_mut(&mut self) -> &mut Vec<Token> {
         self.0 .0 .0.internal.expansions_mut()
+    }
+
+    #[inline]
+    pub fn state_and_expansions_mut(&mut self) -> (&S, &mut Vec<Token>) {
+        (&self.0 .0 .0.state, self.0 .0 .0.internal.expansions_mut())
     }
 
     /// Returns a vector than can be used as a token buffer, potentially without allocating memory.
@@ -423,7 +443,7 @@ impl<S> ExecutionInput<S> {
     pub fn end_group(&mut self, token: Token) -> Result<(), Box<error::Error>> {
         self.0 .0 .0.end_group(token)
     }
-
+    #[inline]
     pub(crate) fn groups(&mut self) -> &mut [variable::SaveStackElement<S>] {
         &mut self.0 .0 .0.internal.save_stack
     }
@@ -433,6 +453,17 @@ impl<S> ExecutionInput<S> {
             None => None,
             Some(g) => Some((g, &self.0 .0 .0.state)),
         }
+    }
+
+    /// Return a token buffer, allowing it to be reused.
+    pub fn return_token_buffer(&mut self, mut token_buffer: Vec<Token>) {
+        token_buffer.clear();
+        self.0
+             .0
+             .0
+            .internal
+            .token_buffers
+            .push(super::TokenBuffer(token_buffer))
     }
 }
 

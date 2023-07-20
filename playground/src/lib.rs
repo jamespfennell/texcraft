@@ -43,7 +43,8 @@ struct PlaygroundState {
     conditional: conditional::Component,
     end_line_char: endlinechar::Component,
     prefix: prefix::Component,
-    registers: registers::Component<i32, 256>,
+    registers_i32: registers::Component<i32, 256>,
+    registers_token_list: registers::Component<Vec<token::Token>, 256>,
     script: script::Component,
     time: time::Component,
 }
@@ -73,7 +74,11 @@ implement_has_component![
     (conditional::Component, conditional),
     (endlinechar::Component, end_line_char),
     (prefix::Component, prefix),
-    (registers::Component<i32, 256>, registers),
+    (registers::Component<i32, 256>, registers_i32),
+    (
+        registers::Component<Vec<token::Token>, 256>,
+        registers_token_list
+    ),
     (script::Component, script),
     (time::Component, time),
 ];
@@ -133,6 +138,8 @@ fn initial_primitives() -> HashMap<&'static str, command::BuiltIn<PlaygroundStat
         ("relax", expansion::get_relax()),
         //
         ("the", the::get_the()),
+        ("toks", registers::get_toks()),
+        ("toksdef", registers::get_toksdef()),
         ("time", time::get_time()),
         //
         ("year", time::get_year()),

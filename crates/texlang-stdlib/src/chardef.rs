@@ -36,7 +36,11 @@ mod test {
     test_suite![
         expansion_equality_tests(
             (basic_case, r"\chardef\Hello = `\+ \Hello", "+"),
-            (basic_case_with_the, r"\chardef\Hello = 123 \the\Hello", "123"),
+            (
+                basic_case_with_the,
+                r"\chardef\Hello = 123 \the\Hello",
+                "123"
+            ),
             (
                 parsable_as_number,
                 r"\chardef\Hello = 13 \i=\Hello x\the\i",

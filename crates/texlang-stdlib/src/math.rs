@@ -173,7 +173,9 @@ fn math_primitive_fn<S: TexlangState, O: Op>(
             variable.set(input, scope, result);
             Ok(())
         }
-        variable::Variable::CatCode(_) => invalid_variable_error(input.vm(), token),
+        variable::Variable::CatCode(_) | variable::Variable::TokenList(_) => {
+            invalid_variable_error(input.vm(), token)
+        }
     }
 }
 

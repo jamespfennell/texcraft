@@ -169,6 +169,7 @@ impl<S: TexlangState> Command<S> {
         Ok(match self.getters {
             Getters::Int(a, b) => Variable::Int(TypedVariable(a, b, index)),
             Getters::CatCode(a, b) => Variable::CatCode(TypedVariable(a, b, index)),
+            Getters::TokenList(a, b) => Variable::TokenList(TypedVariable(a, b, index)),
         })
     }
 }
@@ -244,6 +245,7 @@ impl CommandKey {
 pub enum ValueRef<'a> {
     Int(&'a i32),
     CatCode(&'a CatCode),
+    TokenList(&'a [token::Token]),
 }
 
 /// TeX variable of any type.
@@ -269,6 +271,7 @@ pub enum ValueRef<'a> {
 pub enum Variable<S> {
     Int(TypedVariable<S, i32>),
     CatCode(TypedVariable<S, CatCode>),
+    TokenList(TypedVariable<S, Vec<token::Token>>),
 }
 
 impl<S: TexlangState> Variable<S> {
@@ -277,6 +280,7 @@ impl<S: TexlangState> Variable<S> {
         match self {
             Variable::Int(variable) => ValueRef::Int(variable.get(state)),
             Variable::CatCode(variable) => ValueRef::CatCode(variable.get(state)),
+            Variable::TokenList(variable) => ValueRef::TokenList(variable.get(state)),
         }
     }
 
@@ -286,24 +290,18 @@ impl<S: TexlangState> Variable<S> {
         input: &mut vm::ExecutionInput<S>,
         scope: groupingmap::Scope,
     ) -> Result<(), Box<error::Error>> {
-        OptionalEquals::parse(input)?;
         match self {
-            Variable::Int(variable) => {
-                let value = i32::parse(input)?;
-                variable.set(input, scope, value);
-            }
-            Variable::CatCode(variable) => {
-                let value = CatCode::parse(input)?;
-                variable.set(input, scope, value);
-            }
-        };
-        Ok(())
+            Variable::Int(variable) => variable.set_using_input(input, scope),
+            Variable::CatCode(variable) => variable.set_using_input(input, scope),
+            Variable::TokenList(variable) => variable.set_using_input(input, scope),
+        }
     }
 }
 
 enum Getters<S> {
     Int(RefFn<S, i32>, MutRefFn<S, i32>),
     CatCode(RefFn<S, CatCode>, MutRefFn<S, CatCode>),
+    TokenList(RefFn<S, Vec<token::Token>>, MutRefFn<S, Vec<token::Token>>),
 }
 
 impl<S> Clone for Getters<S> {
@@ -311,6 +309,7 @@ impl<S> Clone for Getters<S> {
         match self {
             Self::Int(a, b) => Self::Int(*a, *b),
             Self::CatCode(a, b) => Self::CatCode(*a, *b),
+            Self::TokenList(a, b) => Self::TokenList(*a, *b),
         }
     }
 }
@@ -320,6 +319,7 @@ impl<S> Getters<S> {
         match self {
             Getters::Int(a, b) => GettersKey(*a as usize, *b as usize),
             Getters::CatCode(a, b) => GettersKey(*a as usize, *b as usize),
+            Getters::TokenList(a, b) => GettersKey(*a as usize, *b as usize),
         }
     }
 }
@@ -370,7 +370,24 @@ where
         // to make it beneficial to inline it.
         if !input.groups().is_empty() {
             SupportedType::update_save_stack(input, self, scope, overwritten_value);
+        } else {
+            SupportedType::recycle(input, overwritten_value);
         }
+    }
+}
+impl<S, T> TypedVariable<S, T>
+where
+    S: TexlangState,
+    T: SupportedType + crate::parse::Parsable<S>,
+{
+    fn set_using_input(
+        &self,
+        input: &mut vm::ExecutionInput<S>,
+        scope: groupingmap::Scope,
+    ) -> Result<(), Box<error::Error>> {
+        let (_, value) = <(OptionalEquals, T)>::parse(input)?;
+        self.set(input, scope, value);
+        Ok(())
     }
 }
 
@@ -412,6 +429,14 @@ pub trait SupportedType: Sized {
         overwritten_value: Self,
     );
 
+    /// Recycle a value that's about to be dropped.
+    ///
+    /// This method is intended for token lists, in which case the vector is returned
+    /// to the buffers pool.
+    fn recycle<S>(input: &mut vm::ExecutionInput<S>, overwritten_value: Self) {
+        (_, _) = (input, overwritten_value)
+    }
+
     /// Create a new typed variable of this type from the getters in the command and the provided index.
     ///
     /// Return `None` if the command has a different type to `Self`.
@@ -426,7 +451,7 @@ pub trait SupportedType: Sized {
 ///     internal VM data structure.
 /// Any way that does this on the trait directly requires making some of the save stack
 ///     type public, because [SupportedType] is public.
-fn update_save_stack<S, T: Clone, F>(
+fn update_save_stack<S, T: Clone + SupportedType, F>(
     input: &mut vm::ExecutionInput<S>,
     variable: &TypedVariable<S, T>,
     scope: groupingmap::Scope,
@@ -437,13 +462,19 @@ fn update_save_stack<S, T: Clone, F>(
 {
     match scope {
         groupingmap::Scope::Global => {
-            for group in input.groups() {
-                map_getter(group).remove(variable)
+            let n = input.groups().len();
+            for _ in 0..n {
+                let group = &mut input.groups()[0];
+                if let Some(stale_value) = map_getter(group).remove(variable) {
+                    SupportedType::recycle(input, stale_value);
+                }
             }
         }
         groupingmap::Scope::Local => {
             if let Some((group, _)) = input.current_group_mut() {
-                map_getter(group).save(*variable, overwritten_value);
+                if let Some(stale_value) = map_getter(group).save(*variable, overwritten_value) {
+                    SupportedType::recycle(input, stale_value);
+                }
             }
         }
     }
@@ -507,10 +538,43 @@ impl SupportedType for CatCode {
     }
 }
 
+impl SupportedType for Vec<token::Token> {
+    fn new_command<S>(
+        ref_fn: RefFn<S, Self>,
+        ref_mut_fn: MutRefFn<S, Self>,
+        index_resolver: Option<IndexResolver<S>>,
+    ) -> Command<S> {
+        Command {
+            getters: Getters::TokenList(ref_fn, ref_mut_fn),
+            index_resolver,
+        }
+    }
+    fn update_save_stack<S>(
+        input: &mut vm::ExecutionInput<S>,
+        variable: &TypedVariable<S, Self>,
+        scope: groupingmap::Scope,
+        overwritten_value: Self,
+    ) {
+        update_save_stack(input, variable, scope, overwritten_value, |element| {
+            &mut element.token_list
+        })
+    }
+    fn recycle<S>(input: &mut vm::ExecutionInput<S>, overwritten_value: Self) {
+        input.return_token_buffer(overwritten_value);
+    }
+    fn new_typed_variable<S>(command: &Command<S>, index: Index) -> Option<TypedVariable<S, Self>> {
+        match command.getters {
+            Getters::TokenList(a, b) => Some(TypedVariable(a, b, index)),
+            _ => None,
+        }
+    }
+}
+
 /// Internal VM data structure used to implement TeX's grouping semantics.
 pub(crate) struct SaveStackElement<S> {
     i32: SaveStackMap<S, i32>,
     catcode: SaveStackMap<S, CatCode>,
+    token_list: SaveStackMap<S, Vec<token::Token>>,
 }
 
 impl<S> Default for SaveStackElement<S> {
@@ -518,14 +582,16 @@ impl<S> Default for SaveStackElement<S> {
         Self {
             i32: Default::default(),
             catcode: Default::default(),
+            token_list: Default::default(),
         }
     }
 }
 
 impl<S> SaveStackElement<S> {
-    pub(crate) fn restore(self, state: &mut S) {
-        self.i32.restore(state);
-        self.catcode.restore(state);
+    pub(crate) fn restore(self, input: &mut vm::ExecutionInput<S>) {
+        self.i32.restore(input);
+        self.catcode.restore(input);
+        self.token_list.restore(input);
     }
 
     pub(crate) fn serializable<'a>(
@@ -535,6 +601,7 @@ impl<S> SaveStackElement<S> {
         SerializableSaveStackElement {
             i32: self.i32.serializable(built_ins),
             catcode: self.catcode.serializable(built_ins),
+            token_list: self.token_list.serializable(built_ins),
         }
     }
 }
@@ -548,18 +615,26 @@ impl<S, T> Default for SaveStackMap<S, T> {
     }
 }
 
-impl<S, T: Clone> SaveStackMap<S, T> {
-    fn save(&mut self, variable: TypedVariable<S, T>, val: T) {
-        self.0.entry(variable).or_insert(val);
+impl<S, T: Clone + SupportedType> SaveStackMap<S, T> {
+    fn save(&mut self, variable: TypedVariable<S, T>, value: T) -> Option<T> {
+        match self.0.entry(variable) {
+            std::collections::hash_map::Entry::Occupied(_) => Some(value),
+            std::collections::hash_map::Entry::Vacant(v) => {
+                v.insert(value);
+                None
+            }
+        }
     }
 
-    fn remove(&mut self, variable: &TypedVariable<S, T>) {
-        self.0.remove(variable);
+    fn remove(&mut self, variable: &TypedVariable<S, T>) -> Option<T> {
+        self.0.remove(variable)
     }
 
-    fn restore(self, state: &mut S) {
+    fn restore(self, input: &mut vm::ExecutionInput<S>) {
         for (v, restored_value) in self.0 {
-            *(v.1)(state, v.2) = restored_value;
+            let dest = (v.1)(input.state_mut(), v.2);
+            let overwritten_value = std::mem::replace(dest, restored_value);
+            SupportedType::recycle(input, overwritten_value);
         }
     }
 
@@ -609,6 +684,7 @@ impl<S, T: SupportedType + Clone> SaveStackMap<S, T> {
 pub(crate) struct SerializableSaveStackElement<'a> {
     i32: Vec<(token::CsName, usize, Cow<'a, i32>)>,
     catcode: Vec<(token::CsName, usize, Cow<'a, CatCode>)>,
+    token_list: Vec<(token::CsName, usize, Cow<'a, Vec<token::Token>>)>,
 }
 
 impl<'a> SerializableSaveStackElement<'a> {
@@ -619,6 +695,7 @@ impl<'a> SerializableSaveStackElement<'a> {
         SaveStackElement {
             i32: SaveStackMap::from_deserialized(self.i32, built_ins),
             catcode: SaveStackMap::from_deserialized(self.catcode, built_ins),
+            token_list: SaveStackMap::from_deserialized(self.token_list, built_ins),
         }
     }
 }

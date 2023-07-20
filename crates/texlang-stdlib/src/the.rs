@@ -24,14 +24,17 @@ fn the_primitive_fn<S: TexlangState>(
         token::Value::CommandRef(command_ref) => {
             match input.commands_map().get_command(command_ref) {
                 Some(command::Command::Variable(cmd)) => {
-                    match cmd.clone().value(token, input.as_mut())? {
+                    let variable = cmd.clone().resolve(token, input.as_mut())?;
+                    let (state, expansions) = input.state_and_expansions_mut();
+                    match variable.value(state) {
                         variable::ValueRef::Int(i) => {
-                            let i = *i;
-                            int_to_tokens(input.expansions_mut(), the_token, i);
+                            int_to_tokens(expansions, the_token, *i);
                         }
                         variable::ValueRef::CatCode(i) => {
-                            let i = *i;
-                            int_to_tokens(input.expansions_mut(), the_token, (i as u8).into());
+                            int_to_tokens(expansions, the_token, (*i as u8).into());
+                        }
+                        variable::ValueRef::TokenList(t) => {
+                            expansions.extend(t.iter().rev());
                         }
                     };
                 }

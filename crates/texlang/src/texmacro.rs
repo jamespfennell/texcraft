@@ -283,7 +283,7 @@ impl Parameter {
                 }
             },
         };
-        match parse::parse_balanced_tokens(stream, result)? {
+        match parse::finish_parsing_balanced_tokens(stream, result)? {
             true => Ok(()),
             false => Err(error::SimpleEndOfInputError::new(stream.vm(), format![
                 "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
