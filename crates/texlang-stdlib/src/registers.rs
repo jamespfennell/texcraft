@@ -204,6 +204,7 @@ mod tests {
             (write_register_index_too_big, r"\count 260 = 4"),
             (write_register_negative_index, r"\count -1 = 4"),
             (countdef_register_index_too_big, r"\countdef\A 260 \A= 4"),
+            // (recursive, format![r"\the {} 0", r"\count".repeat(1000)]),
         ),
     ];
 }

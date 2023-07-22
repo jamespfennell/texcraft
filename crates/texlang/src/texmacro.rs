@@ -66,11 +66,10 @@ impl Macro {
         remove_tokens_from_stream(&self.prefix, input.unexpanded())?;
         let mut argument_indices: Vec<(usize, usize)> = Default::default();
         let mut argument_tokens = input.checkout_token_buffer();
-        let unexpanded_stream = input.unexpanded();
         for (i, parameter) in self.parameters.iter().enumerate() {
             let start_index = argument_tokens.len();
             let trim_outer_braces =
-                parameter.parse_argument(&token, unexpanded_stream, i, &mut argument_tokens)?;
+                parameter.parse_argument(&token, input, i, &mut argument_tokens)?;
             let element = match trim_outer_braces {
                 true => (start_index + 1, argument_tokens.len() - 1),
                 false => (start_index, argument_tokens.len()),
@@ -158,21 +157,21 @@ impl Macro {
 }
 
 impl Parameter {
-    pub fn parse_argument<S: vm::TokenStream>(
+    pub fn parse_argument<S: TexlangState> (
         &self,
         macro_token: &Token,
-        stream: &mut S,
+        input: &mut vm::ExpansionInput<S>,
         index: usize,
         result: &mut Vec<Token>,
     ) -> Result<bool, Box<command::Error>> {
         match self {
             Parameter::Undelimited => {
-                Parameter::parse_undelimited_argument(macro_token, stream, index + 1, result)?;
+                Parameter::parse_undelimited_argument(macro_token, input, index + 1, result)?;
                 Ok(false)
             }
             Parameter::Delimited(matcher_factory) => Parameter::parse_delimited_argument(
                 macro_token,
-                stream,
+                input.unexpanded(),
                 matcher_factory,
                 index + 1,
                 result,
@@ -263,15 +262,17 @@ impl Parameter {
         true
     }
 
-    fn parse_undelimited_argument<S: vm::TokenStream>(
+    fn parse_undelimited_argument<S: TexlangState>(
         macro_token: &Token,
-        stream: &mut S,
+        input: &mut vm::ExpansionInput<S>,
         param_num: usize,
         result: &mut Vec<Token>,
     ) -> Result<(), Box<command::Error>> {
-        let _opening_brace = match stream.next()? {
+        parse::SpacesUnexpanded::parse(input)?;
+        let input = input.unexpanded();
+        let _opening_brace = match input.next()? {
             None => {
-                return Err(error::SimpleEndOfInputError::new(stream.vm(), format![
+                return Err(error::SimpleEndOfInputError::new(input.vm(), format![
                     "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
                 ]).into())
             }
@@ -283,9 +284,9 @@ impl Parameter {
                 }
             },
         };
-        match parse::finish_parsing_balanced_tokens(stream, result)? {
+        match parse::finish_parsing_balanced_tokens(input, result)? {
             true => Ok(()),
-            false => Err(error::SimpleEndOfInputError::new(stream.vm(), format![
+            false => Err(error::SimpleEndOfInputError::new(input.vm(), format![
                 "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
             ]).into()),
             /* TODO

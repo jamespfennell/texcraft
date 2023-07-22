@@ -325,6 +325,24 @@ mod tests {
                 r"\catcode`\A=13 \countdef A5 \countdef ~6 ~=7 A=8 \advance~byA \the~",
                 r"15",
             ),
+            /*
+                        s.cat_code_map_mut().insert(
+                '[' as u32,
+                catcode::RawCatCode::Regular(catcode::CatCode::BeginGroup),
+            );
+            s.cat_code_map_mut().insert(
+                ']' as u32,
+                catcode::RawCatCode::Regular(catcode::CatCode::EndGroup),
+            );
+            s.cat_code_map_mut().insert(
+                '!' as u32,
+                catcode::RawCatCode::Regular(catcode::CatCode::texmacro::Parameter),
+                 */
+            (
+                texbook_exercise_20_7,
+                r"\catcode`\[=1 \catcode`\]=2 \catcode`\!=6 \def\!!1#2![{!#]#!!2}\! x{[y]][z}",
+                r"\catcode`\[=1 \catcode`\]=2 \catcode`\!=6 {#]![y][z}",
+            )
         ),
         serde_tests((serde_sanity, r"\def\HW{Hello World} ", r"\HW"),),
     ];

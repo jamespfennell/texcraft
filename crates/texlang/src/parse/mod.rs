@@ -243,3 +243,22 @@ pub fn finish_parsing_balanced_tokens<S: vm::TokenStream>(
     }
     Ok(false)
 }
+
+/// When parsed, this type consumes an arbitrary number of spaces from the unexpanded input stream
+pub struct SpacesUnexpanded;
+
+impl<S: TexlangState> Parsable<S> for SpacesUnexpanded {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+        let input = input.unexpanded();
+        while let Some(token) = input.peek()? {
+            match token.value() {
+                token::Value::Space(_) => {
+                    input.consume()?;
+                    continue;
+                }
+                _ => break,
+            }
+        }
+        Ok(SpacesUnexpanded {})
+    }
+}

@@ -4,6 +4,7 @@ use texcraft_stdext::algorithms::substringsearch::Matcher;
 use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
 use texcraft_stdext::nevec;
+use texlang::token::trace;
 use texlang::traits::*;
 use texlang::*;
 
@@ -173,14 +174,12 @@ fn parse_prefix_and_parameters<S: TexlangState>(
                             Some(n) => n,
                         };
                         if parameter_index != parameters.len() {
-                            return Err(error::SimpleTokenError::new(
-                                input.vm(),
-                                parameter_token,
-                                format!["unexpected parameter number {}", parameter_index + 1],
-                            )
+                            return Err(InvalidParameterNumberError {
+                                parameter_number_token: input.trace(parameter_token),
+                                parameter_index,
+                                parameters_so_far: parameters.len(),
+                            }
                             .into());
-                            // TODO format!["this macro has {} parameter(s) so far, so parameter number #{} was expected.",
-                            //TODO parameters.len(), parameters.len()+1
                         }
                         parameters.push(RawParameter::Undelimited);
                     }
@@ -312,6 +311,32 @@ fn parse_replacement_text<S: TexlangState>(
         "unexpected end of input while reading a parameter number",
     )
     .into())
+}
+
+#[derive(Debug)]
+struct InvalidParameterNumberError {
+    parameter_number_token: trace::SourceCodeTrace,
+    parameter_index: usize,
+    parameters_so_far: usize,
+}
+
+impl error::TexError for InvalidParameterNumberError {
+    fn kind(&self) -> error::Kind {
+        error::Kind::Token(&self.parameter_number_token)
+    }
+
+    fn title(&self) -> String {
+        format!["unexpected parameter number {}", self.parameter_index + 1]
+    }
+
+    fn notes(&self) -> Vec<error::display::Note> {
+        vec![format![
+            "this macro has {} parameter(s) so far, so parameter number #{} was expected.",
+            self.parameters_so_far,
+            self.parameters_so_far + 1
+        ]
+        .into()]
+    }
 }
 
 #[cfg(test)]
@@ -504,6 +529,16 @@ mod test {
                 r"\def\b#1{And #1, World!}\def\a#{\b}\a{Hello}",
                 "And Hello, World!"
             ),
+            (
+                space_in_undelimited_param_1,
+                r"\def\Hello#1#2{Hello-#1-#2-World}\Hello A B C",
+                r"Hello-A-B-World C",
+            ),
+            (
+                space_in_undelimited_param_2,
+                r"\def\Space{ }\def\Hello#1#2{Hello-#1-#2-World}\Hello\Space B C",
+                r"Hello- -B-World C",
+            ),
         ),
         serde_tests((
             serde_basic,
@@ -537,31 +572,7 @@ mod test {
                 "\\def\\A #1{#2}"
             ),
             (unexpected_token_in_prefix, "\\def\\A abc{d} \\A abd"),
+            // (recursive, r"\def\recursive{\recursive} \recursive"),
         ),
     ];
-
-    /* TODO: renable using \catcode
-    fn setup_texbook_exercise_20_7<S: TexState<S>>(s: &mut S) {
-        initial_commands(s);
-        s.cat_code_map_mut().insert(
-            '[' as u32,
-            catcode::RawCatCode::Regular(catcode::CatCode::BeginGroup),
-        );
-        s.cat_code_map_mut().insert(
-            ']' as u32,
-            catcode::RawCatCode::Regular(catcode::CatCode::EndGroup),
-        );
-        s.cat_code_map_mut().insert(
-            '!' as u32,
-            catcode::RawCatCode::Regular(catcode::CatCode::texmacro::Parameter),
-        );
-    }
-
-    expansion_test![
-        texbook_exercise_20_7,
-        "\\def\\!!1#2![{!#]#!!2}\\! x{[y]][z}",
-        "{#]![y][z}",
-        setup_texbook_exercise_20_7
-    ];
-    */
 }
