@@ -4,6 +4,7 @@ use super::script;
 use std::sync::Arc;
 use texlang::traits::*;
 use texlang::*;
+use texlang_common as common;
 
 pub struct RunOptions<'a> {
     pub prompt: &'a str,
@@ -118,13 +119,13 @@ pub fn get_exit<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 /// Get the `\help` command.
 ///
 /// This prints help text for the REPL.
-pub fn get_help<S: HasComponent<Component>>() -> command::BuiltIn<S> {
+pub fn get_help<S: HasComponent<Component> + common::HasLogging>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
         |token: token::Token, input: &mut vm::ExecutionInput<S>| -> command::Result<()> {
             let help = HasComponent::<Component>::component(input.state())
                 .help
                 .clone();
-            match writeln![input.vm().terminal_out.borrow_mut(), "{help}"] {
+            match writeln![input.state().terminal_out().borrow_mut(), "{help}"] {
                 Ok(_) => Ok(()),
                 Err(err) => Err(error::SimpleTokenError::new(
                     input.vm(),
@@ -140,7 +141,7 @@ pub fn get_help<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 /// Get the `\doc` command.
 ///
 /// This prints the documentation for a TeX command.
-pub fn get_doc<S: TexlangState>() -> command::BuiltIn<S> {
+pub fn get_doc<S: TexlangState+ common::HasLogging>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
         |token: token::Token, input: &mut vm::ExecutionInput<S>| -> command::Result<()> {
             let target = token::CommandRef::parse(input)?;
@@ -152,7 +153,7 @@ pub fn get_doc<S: TexlangState>() -> command::BuiltIn<S> {
                     Some(doc) => format!["{name}  {doc}"],
                 },
             };
-            match writeln![input.vm().terminal_out.borrow_mut(), "{doc}"] {
+            match writeln![input.state().terminal_out().borrow_mut(), "{doc}"] {
                 Ok(_) => Ok(()),
                 Err(err) => Err(error::SimpleTokenError::new(
                     input.vm(),

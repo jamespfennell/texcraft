@@ -9,7 +9,6 @@
 //!     which generates a suite of unit tests for a set of primitives.
 
 use std::collections::HashMap;
-use std::path;
 
 use crate::prefix;
 use crate::script;
@@ -308,111 +307,6 @@ where
     vm.push_source("testing.tex", source).unwrap();
     script::set_allow_undefined_command(&mut vm.state, options.allow_undefined_commands);
     script::run(vm)
-}
-
-/// In-memory filesystem for use in unit tests.
-///
-/// This type mocks out the file system operations in the VM.
-/// It provides an in-memory system to which "files" can be added before the test runs.
-/// It is designed to help test primitives that interact with the filesystem.
-///
-/// Given a VM, the file system can be set as follows:
-/// ```
-/// # type State = ();
-/// # use texlang::vm;
-/// # use texlang_stdlib::testing::*;
-/// let mut vm = vm::VM::<State>::new(
-///     Default::default(),  // initial commands
-/// );
-/// let mut mock_file_system = InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
-/// mock_file_system.add("file/path.tex", "file content");
-/// vm.file_system = Box::new(mock_file_system);
-/// ```
-///
-/// When using the test runners in this module or the [test_suite] macro,
-///     assign the file system ops using the
-///     [TestOption::CustomVMInitializationDyn] option:
-/// ```
-/// # type State = ();
-/// # use texlang::vm;
-/// # use texlang_stdlib::testing::*;
-/// let options = TestOption::CustomVMInitializationDyn(Box::new(|vm: &mut vm::VM<State>|{
-///     let mock_file_system = InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
-///     vm.file_system = Box::new(mock_file_system);
-/// }));
-/// ```
-pub struct InMemoryFileSystem {
-    working_directory: path::PathBuf,
-    files: HashMap<std::path::PathBuf, String>,
-}
-
-impl vm::FileSystem for InMemoryFileSystem {
-    fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String> {
-        match self.files.get(path) {
-            None => Err(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "not found",
-            )),
-            Some(content) => Ok(content.clone()),
-        }
-    }
-    fn write_bytes(&self, _: &std::path::Path, _: &[u8]) -> std::io::Result<()> {
-        unimplemented!()
-    }
-}
-
-impl InMemoryFileSystem {
-    /// Create a new in-memory file system.
-    ///
-    /// Typically the working directory is taken from the VM.
-    pub fn new(working_directory: &path::Path) -> Self {
-        Self {
-            working_directory: working_directory.into(),
-            files: Default::default(),
-        }
-    }
-    /// Add a file to the in-memory file system.
-    ///
-    /// The provided path is relative to the working directory
-    pub fn add(&mut self, relative_path: &str, content: &str) {
-        let mut path = self.working_directory.clone();
-        path.push(relative_path);
-        self.files.insert(path, content.to_string());
-    }
-}
-
-/// A mock version of [vm::TerminalIn].
-///
-/// This type wraps a vector of strings.
-/// The first call to [`vm::TerminalIn::read_line`] returns the first string;
-///   the second call returns the second string;
-///   and so on.
-/// When the vector is exausted, `read_line` returns an IO error of
-///   kind [std::io::ErrorKind::UnexpectedEof].
-#[derive(Default)]
-pub struct MockTerminalIn(usize, Vec<String>);
-
-impl MockTerminalIn {
-    /// Add a new line to be returned from the mock terminal.
-    pub fn add_line<S: Into<String>>(&mut self, line: S) {
-        self.1.push(line.into());
-    }
-}
-
-impl vm::TerminalIn for MockTerminalIn {
-    fn read_line(&mut self, _: Option<&str>, buffer: &mut String) -> std::io::Result<()> {
-        match self.1.get(self.0) {
-            None => Err(std::io::Error::new(
-                std::io::ErrorKind::UnexpectedEof,
-                "mock terminal input exausted",
-            )),
-            Some(line) => {
-                buffer.push_str(line);
-                self.0 += 1;
-                Ok(())
-            }
-        }
-    }
 }
 
 /// Macro to generate a suite of unit tests

@@ -195,6 +195,10 @@ implement_has_component![
     (tracingmacros::Component, tracing_macros),
 ];
 
+impl texlang_common::HasLogging for StdLibState {}
+impl texlang_common::HasFileSystem for StdLibState {}
+impl texlang_common::HasTerminalIn for StdLibState {}
+
 /// A TeX snippet that exercises some error case in the standard library.
 pub struct ErrorCase {
     pub description: &'static str,

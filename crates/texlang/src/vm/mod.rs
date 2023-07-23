@@ -18,10 +18,8 @@ use crate::token::CsNameInterner;
 use crate::token::Token;
 use crate::token::Value;
 use crate::variable;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::rc::Rc;
 use texcraft_stdext::collections::groupingmap;
 
 #[cfg(feature = "serde")]
@@ -188,30 +186,6 @@ pub struct VM<S> {
     /// The commands map
     pub commands_map: command::Map<S>,
 
-    /// File system operations
-    ///
-    /// By default this is real operations on the file system.
-    /// It is replaceable to support both unit testing, and running Texcraft
-    ///     in environments like WASM in the browser.
-    pub file_system: Box<dyn FileSystem>,
-
-    /// Input operations from the terminal.
-    ///
-    /// By default this reads from standard in.
-    pub terminal_in: Rc<RefCell<dyn TerminalIn>>,
-
-    /// Writer that writes to the terminal
-    ///
-    /// Defaults to standard error.
-    /// In other contexts (for example WASM) this may be changed to e.g. write to a string
-    ///     that can be displayed in the browser.
-    pub terminal_out: Rc<RefCell<dyn std::io::Write>>,
-
-    /// Writer that writes to the log file
-    ///
-    /// Defaults to a sink writer that writes nothing.
-    pub log_file: Rc<RefCell<dyn std::io::Write>>,
-
     /// The working directory which is used as the root for relative file paths
     ///
     /// This is [None] if the working directory could not be determined.
@@ -225,55 +199,6 @@ pub struct Parts<'a, S> {
     pub state: &'a mut S,
     pub cs_name_interner: &'a mut token::CsNameInterner,
     pub tracer: &'a mut trace::Tracer,
-}
-
-/// File system operations that TeX may need to perform.
-///
-/// These operations are extracted to a trait so that they be mocked out in unit testing
-///     and in execution contexts like WASM.
-pub trait FileSystem {
-    /// Read the entire contents of a file into a string.
-    ///
-    /// This is implemented by [std::fs::read_to_string].
-    fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String>;
-
-    /// Write a slice of bytes to a file.
-    ///
-    /// This is implemented by [std::fs::write].
-    fn write_bytes(&self, path: &std::path::Path, contents: &[u8]) -> std::io::Result<()>;
-}
-
-struct RealFileSystem;
-
-impl FileSystem for RealFileSystem {
-    fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String> {
-        std::fs::read_to_string(path)
-    }
-    fn write_bytes(&self, path: &std::path::Path, contents: &[u8]) -> std::io::Result<()> {
-        std::fs::write(path, contents)
-    }
-}
-
-/// Input operations from the terminal.
-///
-/// These operations are extracted to a trait so that they be mocked out in unit testing
-///     and in execution contexts like WASM.
-pub trait TerminalIn {
-    /// Read a line from the terminal and append it to the provided buffer.
-    fn read_line(&mut self, prompt: Option<&str>, buffer: &mut String) -> std::io::Result<()>;
-}
-
-struct RealTerminalIn;
-
-impl TerminalIn for RealTerminalIn {
-    fn read_line(&mut self, prompt: Option<&str>, buffer: &mut String) -> std::io::Result<()> {
-        if let Some(prompt) = prompt {
-            eprint!("\n{prompt}")
-        }
-        let stdin = std::io::stdin();
-        stdin.read_line(buffer)?;
-        Ok(())
-    }
 }
 
 /// Implementations of this trait may be used as the state in a Texlang VM.
@@ -338,22 +263,6 @@ pub trait TexlangState: Sized {
         Ok(None)
     }
 
-    /// Hook that runs before new source code is added.
-    ///
-    /// This hook is designed to support the max input levels constant.
-    fn pre_source_code_addition_hook(
-        token: Option<token::Token>,
-        num_existing_sources: usize,
-    ) -> Result<(), Box<error::Error>> {
-        _ = token;
-        // TODO: make this a token error
-        if num_existing_sources + 1 >= 100 {
-            /* TODO
-             */
-        }
-        Ok(())
-    }
-
     /// Hook that determines the scope of a variable assignment.
     ///
     /// This hook is designed to support the \global and \globaldefs commands.
@@ -377,10 +286,6 @@ impl<S: Default> VM<S> {
             state: Default::default(),
             commands_map: command::Map::new(initial_built_ins),
             internal,
-            file_system: Box::new(RealFileSystem {}),
-            terminal_in: Rc::new(RefCell::new(RealTerminalIn {})),
-            terminal_out: Rc::new(RefCell::new(std::io::stderr())),
-            log_file: Rc::new(RefCell::new(std::io::sink())),
             working_directory: match std::env::current_dir() {
                 Ok(path_buf) => Some(path_buf),
                 Err(err) => {
@@ -480,6 +385,11 @@ impl<S> VM<S> {
     pub fn trace_end_of_input(&self) -> trace::SourceCodeTrace {
         self.internal.tracer.trace_end_of_input()
     }
+
+    /// Returns the number of current sources on the source stack
+    pub fn num_current_sources(&self) -> usize {
+        self.internal.sources.len() + 1
+    }
 }
 
 /// Parts of the VM that are private.
@@ -528,7 +438,6 @@ impl<S: TexlangState> Internal<S> {
         file_name: PathBuf,
         source_code: String,
     ) -> Result<(), Box<error::Error>> {
-        S::pre_source_code_addition_hook(token, self.sources.len())?;
         let trace_key_range =
             self.tracer
                 .register_source_code(token, trace::Origin::File(file_name), &source_code);

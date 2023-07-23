@@ -7,6 +7,7 @@
 !bin
 !performance
 !crates/texlang
+!crates/texlang-common
 !crates/texlang-stdlib
 !crates/texcraft-stdext
 

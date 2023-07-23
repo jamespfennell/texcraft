@@ -157,7 +157,7 @@ impl Macro {
 }
 
 impl Parameter {
-    pub fn parse_argument<S: TexlangState> (
+    pub fn parse_argument<S: TexlangState>(
         &self,
         macro_token: &Token,
         input: &mut vm::ExpansionInput<S>,

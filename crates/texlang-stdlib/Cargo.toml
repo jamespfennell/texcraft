@@ -21,6 +21,7 @@ linefeed = {version = "0.6", optional = true}
 
 texcraft-stdext = { path = "../texcraft-stdext", version = "0.1.0" }
 texlang = { path = "../texlang", version="0.1.0" }
+texlang-common = { path = "../texlang-common", version = "0.1.0" }
 
 # Nice terminal output.
 colored = "2"

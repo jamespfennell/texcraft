@@ -8,22 +8,39 @@ use texlang::token::lexer;
 use texlang::token::trace;
 use texlang::traits::*;
 use texlang::*;
+use texlang_common as common;
 
 use crate::conditional::{self, Condition};
 
 /// Get the `\input` expansion primitive.
-pub fn get_input<S: TexlangState>() -> command::BuiltIn<S> {
+pub fn get_input<S: TexlangState + common::HasFileSystem>() -> command::BuiltIn<S> {
     command::BuiltIn::new_expansion(input_fn)
 }
 
-fn input_fn<S: TexlangState>(
+fn input_fn<S: TexlangState + common::HasFileSystem>(
     input_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
 ) -> Result<(), Box<command::Error>> {
     let file_location = FileLocation::parse(input)?;
     let (file_path, source_code) = read_file(input.vm(), file_location, "tex")?;
+    if input.vm().num_current_sources() > 100 {
+        return Err(TooManyInputs{}.into())
+    }
     input.push_source(input_token, file_path, source_code)?;
     Ok(())
+}
+
+#[derive(Debug)]
+struct TooManyInputs {}
+
+impl error::TexError for TooManyInputs {
+    fn kind(&self) -> error::Kind {
+        error::Kind::FailedPrecondition
+    }
+
+    fn title(&self) -> String {
+            "too many input levels (100)".into()
+    }
 }
 
 /// Get the `\endinput` expansion primitive.
@@ -77,11 +94,12 @@ impl<const N: usize> Default for Component<N> {
 }
 
 /// Get the `\openin` execution primitive.
-pub fn get_openin<const N: usize, S: HasComponent<Component<N>>>() -> command::BuiltIn<S> {
+pub fn get_openin<const N: usize, S: HasComponent<Component<N>> + common::HasFileSystem>(
+) -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(openin_fn)
 }
 
-fn openin_fn<const N: usize, S: HasComponent<Component<N>>>(
+fn openin_fn<const N: usize, S: HasComponent<Component<N>> + common::HasFileSystem>(
     openin_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<command::Error>> {
@@ -136,17 +154,17 @@ fn closein_fn<const N: usize, S: HasComponent<Component<N>>>(
 }
 
 /// Get the `\read` execution primitive.
-pub fn get_read<const N: usize, S: HasComponent<Component<N>>>() -> command::BuiltIn<S> {
+pub fn get_read<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn>(
+) -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(read_fn)
 }
 
-fn read_fn<const N: usize, S: HasComponent<Component<N>>>(
+fn read_fn<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<command::Error>> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
     let (index, _, target) = <(i32, parse::To, token::CommandRef)>::parse(input)?;
-    let terminal_in = input.vm().terminal_in.clone();
     let vm::Parts {
         state,
         cs_name_interner,
@@ -167,7 +185,7 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>>>(
                 Some(format!(r"{}=", target.to_string(cs_name_interner)))
             };
             (
-                read_from_terminal(&terminal_in, tracer, &prompt)?,
+                read_from_terminal(&state.terminal_in(), tracer, &prompt)?,
                 Mode::Terminal,
                 prompt,
             )
@@ -213,7 +231,7 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>>>(
             }
             (lexer::Result::EndOfLine | lexer::Result::EndOfInput, Mode::Terminal) => {
                 if !braces.is_empty() {
-                    lexer = read_from_terminal(&terminal_in, tracer, &prompt)?;
+                    lexer = read_from_terminal(&state.terminal_in(), tracer, &prompt)?;
                     continue;
                 }
                 break;
@@ -251,7 +269,7 @@ fn drain_line<S: TexlangState>(
 }
 
 fn read_from_terminal(
-    terminal_in: &Rc<RefCell<dyn vm::TerminalIn>>,
+    terminal_in: &Rc<RefCell<dyn common::TerminalIn>>,
     tracer: &mut trace::Tracer,
     prompt: &Option<String>,
 ) -> command::Result<Box<lexer::Lexer>> {
@@ -294,7 +312,7 @@ where
     }
 }
 
-fn read_file<S>(
+fn read_file<S: common::HasFileSystem>(
     vm: &vm::VM<S>,
     file_location: parse::FileLocation,
     default_extension: &str,
@@ -303,7 +321,12 @@ fn read_file<S>(
         vm.working_directory.as_ref().map(path::PathBuf::as_ref),
         default_extension,
     );
-    match vm.file_system.read_to_string(&file_path) {
+    match vm
+        .state
+        .file_system()
+        .borrow_mut()
+        .read_to_string(&file_path)
+    {
         Ok(source_code) => Ok((file_path, source_code)),
         Err(err) => Err(IoError {
             title: format!("could not read from `{}`", file_path.display()),
@@ -365,9 +388,25 @@ mod tests {
         input: Component<16>,
         prefix: prefix::Component,
         script: script::Component,
+        #[cfg_attr(feature = "serde", serde(skip))]
+        file_system: Rc<RefCell<common::InMemoryFileSystem>>,
+        #[cfg_attr(feature = "serde", serde(skip))]
+        terminal_in: Rc<RefCell<common::MockTerminalIn>>,
     }
 
     impl TexlangState for State {}
+
+    impl common::HasFileSystem for State {
+        fn file_system(&self) -> Rc<RefCell<dyn common::FileSystem>> {
+            self.file_system.clone()
+        }
+    }
+
+    impl common::HasTerminalIn for State {
+        fn terminal_in(&self) -> Rc<RefCell<dyn common::TerminalIn>> {
+            self.terminal_in.clone()
+        }
+    }
 
     implement_has_component![
         State,
@@ -393,13 +432,14 @@ mod tests {
     }
 
     fn custom_vm_initialization(vm: &mut vm::VM<State>) {
-        let mut fs = InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
+        let mut fs = common::InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
         fs.add("file1.tex", "content1\n");
         fs.add("file2.tex", "content2%\n");
         fs.add("file3.tex", r"\input nested/file4");
         fs.add("nested/file4.tex", "content4");
         fs.add("file5.tex", "file1.tex");
-        vm.file_system = Box::new(fs);
+        fs.add("recursive.tex", r"\input recursive.tex content");
+        vm.state.file_system = Rc::new(RefCell::new(fs));
     }
 
     test_suite!(
@@ -414,16 +454,19 @@ mod tests {
             (nested, r"\input file3", r"content4"),
             (nested_2, r"\input \input file5", r"content1 "),
         ),
-        failure_tests((file_does_not_exist, r"\input doesNotExist",),),
+        failure_tests(
+            (file_does_not_exist, r"\input doesNotExist"),
+            (recursive_input, r"\input recursive s"),
+        ),
     );
 
     fn end_input_vm_initialization(vm: &mut vm::VM<State>) {
-        let mut fs = InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
+        let mut fs = common::InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
         fs.add(
             "file1.tex",
             "Hello\\def\\Macro{Hola\\endinput Mundo}\\Macro World\n",
         );
-        vm.file_system = Box::new(fs);
+        vm.state.file_system = Rc::new(RefCell::new(fs));
     }
 
     test_suite!(
@@ -442,20 +485,20 @@ mod tests {
     );
 
     fn read_vm_initialization(vm: &mut vm::VM<State>) {
-        let mut fs = InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
+        let mut fs = common::InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
         fs.add("file1.tex", "1\n2%\n3");
         fs.add("file2.tex", "1{\n2\n3}");
         fs.add("file3.tex", "1}1\n2");
         fs.add("file4.tex", "");
         fs.add("file5.tex", "hello { world");
-        vm.file_system = Box::new(fs);
+        vm.state.file_system = Rc::new(RefCell::new(fs));
 
-        let mut terminal_in: MockTerminalIn = Default::default();
+        let mut terminal_in: common::MockTerminalIn = Default::default();
         terminal_in.add_line("first-line");
         terminal_in.add_line("second-line {");
         terminal_in.add_line("third-line }");
         terminal_in.add_line("fourth}line");
-        vm.terminal_in = Rc::new(RefCell::new(terminal_in));
+        vm.state.terminal_in = Rc::new(RefCell::new(terminal_in));
     }
 
     test_suite!(

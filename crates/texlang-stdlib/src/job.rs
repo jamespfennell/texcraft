@@ -5,6 +5,7 @@ use std::{
 };
 use texlang::traits::*;
 use texlang::*;
+use texlang_common as common;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Component {
@@ -64,14 +65,21 @@ pub fn get_jobname<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 
 /// Get the `\dump` primitive.
 #[cfg(feature = "serde")]
-pub fn get_dump<S: HasComponent<Component> + serde::Serialize + serde::de::DeserializeOwned>(
-) -> command::BuiltIn<S> {
+pub fn get_dump<
+    S: HasComponent<Component>
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + common::HasFileSystem,
+>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(dump_primitive_fn)
 }
 
 #[cfg(feature = "serde")]
 fn dump_primitive_fn<
-    S: HasComponent<Component> + serde::Serialize + serde::de::DeserializeOwned,
+    S: HasComponent<Component>
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + common::HasFileSystem,
 >(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
@@ -138,8 +146,9 @@ fn dump_primitive_fn<
 
     // TODO: error handle file write
     input
-        .vm()
-        .file_system
+        .state()
+        .file_system()
+        .borrow_mut()
         .write_bytes(&output_file, &serialized)
         .unwrap();
     input.state_mut().component_mut().num_dumps += 1;

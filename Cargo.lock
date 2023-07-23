@@ -989,6 +989,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "texlang-common"
+version = "0.1.0"
+dependencies = [
+ "texlang",
+]
+
+[[package]]
 name = "texlang-stdlib"
 version = "0.1.0"
 dependencies = [
@@ -1001,6 +1008,7 @@ dependencies = [
  "serde_json",
  "texcraft-stdext",
  "texlang",
+ "texlang-common",
 ]
 
 [[package]]

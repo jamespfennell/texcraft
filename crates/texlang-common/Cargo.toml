@@ -1,0 +1,12 @@
+[package]
+name = "texlang-common"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Common abstractions used in Texlang"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+
+[dependencies]
+texlang = { path = "../texlang", version="0.1.0" }
