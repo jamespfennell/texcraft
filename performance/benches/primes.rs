@@ -1,20 +1,20 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
-const DIGITS_OF_PI_TEX: &'static str = include_str!("digits_of_pi.tex");
+const PRIMES_TEX: &'static str = include_str!("primes.tex");
 
 pub fn digits_of_pi_bench(c: &mut Criterion) {
-    let n = match std::env::var("DIGITS_OF_PI_N") {
+    let n = match std::env::var("PRIMES_N") {
         Ok(val) => match val.parse::<usize>() {
             Ok(val) => val,
-            Err(_) => panic!["Failed to parse env var DIGITS_OF_PI_N={} as an integer", val],
+            Err(_) => panic!["Failed to parse env var PRIMES_N={} as an integer", val],
         },
-        Err(_) => 175,
+        Err(_) => 130,
     };
-    let tex_input = str::replace(DIGITS_OF_PI_TEX, r"\n = 100", &format![r"\n = {}", n]);
+    let tex_input = str::replace(PRIMES_TEX, r"\o < 130", &format![r"\o < {}", n]);
 
-    let mut group = c.benchmark_group("digits-of-pi");
+    let mut group = c.benchmark_group("primes");
 
-    group.bench_function("digits_of_pi_texcraft", |b| {
+    group.bench_function("primes_texcraft", |b| {
         b.iter(|| performance::run_in_texcraft(&tex_input))
     });
 

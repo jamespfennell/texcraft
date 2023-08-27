@@ -1,5 +1,6 @@
 {
     "cSpell.words": [
+        "afterassignment",
         "bincode",
         "catcode",
         "catcodecmd",
@@ -40,6 +41,7 @@
         "noexpand",
         "openin",
         "PDFTEX",
+        "primality",
         "randtex",
         "repr",
         "Seedable",

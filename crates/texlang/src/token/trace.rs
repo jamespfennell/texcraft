@@ -48,7 +48,8 @@ use super::CommandRef;
 pub struct Key(u32);
 
 impl Key {
-    pub fn dummy() -> Key {
+    #[cfg(test)]
+    pub (crate) fn dummy() -> Key {
         Key(u32::MAX)
     }
 

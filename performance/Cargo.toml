@@ -17,10 +17,9 @@ name = "digits_of_pi"
 harness = false
 
 [[bench]]
-name = "advance"
-harness = false
-
-[[bench]]
 name = "lexer_throughput"
 harness = false
 
+[[bench]]
+name = "primes"
+harness = false

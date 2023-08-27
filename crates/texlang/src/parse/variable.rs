@@ -53,18 +53,22 @@ impl<S: TexlangState> Parsable<S> for OptionalEqualsUnexpanded {
     }
 }
 
+// Corresponds to the `scan_optional_equals` procedure in Knuth's TeX (405)
 fn parse_optional_equals<S: TexlangState, I: TokenStream<S = S>>(
     input: &mut I,
 ) -> Result<(), Box<error::Error>> {
     while let Some(found_equals) = get_optional_element![
         input,
-        token::Value::Other('=') => false,
-        token::Value::Space(_) => true,
+        token::Value::Other('=') => true,
+        token::Value::Space(_) => false,
     ] {
         if found_equals {
             break;
         }
     }
+    // TODO: this is not correct: this function should not scan spaces after the equals.
+    // A separate routine corresponding to Knuth TeX 404 needs to be added and used instead
+    // at the right call sites.
     while get_optional_element![
         input,
         token::Value::Space(_) => (),

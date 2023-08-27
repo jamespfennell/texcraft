@@ -1,0 +1,157 @@
+% While loop: repeatedly executes #2 while \`\ifnum #1\` is true
+\def\while#1#2{
+  \ifnum #1
+    #2%
+    \while{#1}{#2}\fi
+}
+
+% Set up the sub-array of \count
+\countdef \DStart 1000
+\countdef \DEnd 1001
+\countdef \pos 1002
+\DStart = 2000
+\DEnd = 2000
+\def\getD#1#2{%
+    \pos = #1%
+    \advance \pos by \DStart%
+    #2= \count \pos \relax%
+}
+\def\setD#1#2{%
+    \pos = #1%
+    \advance \pos by \DStart%
+    \global \count \pos = #2\relax%
+}
+
+% Temporary variables
+\countdef \i 1003
+\countdef \j 1004
+\countdef \k 1005
+\countdef \l 1006
+\countdef \m 1007
+\countdef \n 1008
+\countdef \o 1009
+
+% This variable stores the next number to be considered for primality
+\countdef \q 1010
+\q = 2
+
+% Inserts an element with key #1 and value #2 into the multimap
+%
+% Example: \insert{3}{5}
+%
+% Uses temporaries: none
+\def\insert#1#2{
+    {
+        \i = \DStart\relax
+        \while{\i < \DEnd}{
+            % If we found an empty slot, insert the element
+            \getD \i \j
+            \ifnum \j = 0 \relax
+                \setD{\i}{#1}
+                \advance \i by 1
+                \setD{\i}{#2}
+                % Set \i to be 1+\DEnd so that we exit the while loop but don't insert the element at the end
+                \i = \DEnd
+                \advance \i by 1
+            \else
+                \advance \i by 2
+            \fi
+        }
+        % If we didn't find an empty slot, insert the element at the end
+        \ifnum \i = \DEnd \relax
+            \setD{\i}{#1}
+            \advance \i by 1
+            \setD{\i}{#2}
+            \global\advance\DEnd by 2
+        \fi
+    }
+}
+
+% Runs #1{<key>}{<value>} for each key, value pair in the multimap
+%
+% Example: \def\visitor#1#2{Key=\the #1, Value=\the#2.} \foreach\visitor
+%
+% Uses temporaries: \i, \j, \k
+\def\foreach#1{
+    \i = \DStart\relax
+    \while{\i < \DEnd}{
+        \getD \i \j
+        \ifnum \j > 0 \relax
+            \advance \i by 1
+            \getD \i \k
+            #1\j\k
+            \advance \i by 1
+        \else
+            \advance \i by 2
+        \fi
+    }
+}
+
+% Prints the multimap as lines of the form D[<key>] = <value>.
+%
+% Uses \foreach.
+\def\print{
+    \def\printKeyValue##1##2{
+        D[\the ##1] = \the ##2\newline
+    }
+    \foreach{\printKeyValue}
+}
+
+% Deletes all elements from the map whose key is #1.
+%
+% Example: \delete{4}
+%
+% Uses temporaries: none
+\def\delete#1{
+    {
+        \i = \DStart\relax
+        \while{\i < \DEnd}{
+            \getD \i \j
+            \ifnum \j = #1 \relax
+                \setD{\i}{0}
+            \fi
+            \advance \i by 2
+        }
+    }
+}
+
+% TODO: doc \propagateD
+%
+% Uses \foreach and uses temporaries: \m
+\def\propagateD{
+    \m = 0
+    \def\visitor##1##2{
+        \ifnum ##1 = \q \relax
+            \l = \q
+            \advance \l by ##2\relax
+            \insert{\l}{##2}
+            \advance \m by 1
+        \fi
+    }
+    \foreach{\visitor}
+}
+
+\def\nextPrime{
+    \n = -1\relax
+    \while{\n < 0}{
+        \propagateD
+        % if there was no element in the multimap, this is a prime
+        \ifnum \m = 0 \relax
+            \n = \q
+            \multiply \n by \n \relax
+            \insert{\n}{\q}
+            \n = \q
+        \else
+            \delete{\q}
+        \fi
+        \advance \q by 1
+    }
+}
+
+\while{\o < 130}{
+  \nextPrime
+  \advance\o by 1
+}
+\the \n
+
+\end
