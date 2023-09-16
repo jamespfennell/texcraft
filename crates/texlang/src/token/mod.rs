@@ -215,7 +215,9 @@ impl Token {
     }
 }
 
+#[derive(Default)]
 enum PendingWhitespace {
+    #[default]
     NotStarted,
     None,
     Space,
@@ -223,7 +225,7 @@ enum PendingWhitespace {
 }
 
 impl PendingWhitespace {
-    fn start(&mut self) {
+    fn reset(&mut self) {
         *self = PendingWhitespace::None;
     }
 
@@ -242,6 +244,16 @@ impl PendingWhitespace {
             PendingWhitespace::None => PendingWhitespace::Newlines(1),
             PendingWhitespace::Space => PendingWhitespace::Newlines(1),
             PendingWhitespace::Newlines(n) => PendingWhitespace::Newlines(*n + 1),
+        }
+    }
+
+    fn new_paragraph(&mut self) {
+        *self = match self {
+            PendingWhitespace::NotStarted => PendingWhitespace::NotStarted,
+            PendingWhitespace::None | PendingWhitespace::Space | PendingWhitespace::Newlines(1) => {
+                PendingWhitespace::Newlines(2)
+            }
+            PendingWhitespace::Newlines(n) => PendingWhitespace::Newlines(*n),
         }
     }
 }
@@ -264,59 +276,49 @@ impl Display for PendingWhitespace {
 }
 
 /// Data structure for writing tokens
-pub struct Writer<I> {
-    io_writer: I,
+#[derive(Default)]
+pub struct Writer {
     pending_whitespace: PendingWhitespace,
 }
 
-impl<I: Default> Default for Writer<I> {
-    fn default() -> Self {
-        Self {
-            io_writer: Default::default(),
-            pending_whitespace: PendingWhitespace::NotStarted,
-        }
-    }
-}
-
-impl<I> Writer<I> {
-    /// Create a new writer that writes output to the provided IO writer.
-    pub fn new(io_writer: I) -> Self {
-        Self {
-            io_writer,
-            pending_whitespace: PendingWhitespace::NotStarted,
-        }
-    }
-    pub fn take_io_writer(self) -> I {
-        self.io_writer
-    }
-}
-
-impl<I: std::io::Write> Writer<I> {
+impl Writer {
     /// Write a token.
-    pub fn write(&mut self, interner: &CsNameInterner, token: Token) -> Result<(), std::io::Error> {
+    pub fn write(
+        &mut self,
+        io_writer: &mut dyn std::io::Write,
+        interner: &CsNameInterner,
+        token: Token,
+    ) -> Result<(), std::io::Error> {
         match &token.value {
             Value::CommandRef(CommandRef::ControlSequence(s)) => {
                 write!(
-                    self.io_writer,
+                    io_writer,
                     "{}\\{}",
                     self.pending_whitespace,
                     interner.resolve(*s).unwrap()
                 )?;
-                self.pending_whitespace.start();
+                self.pending_whitespace.reset();
             }
-            Value::Space('\n') => self.pending_whitespace.add_newline(),
             Value::Space(_) => self.pending_whitespace.add_space(),
             _ => {
                 write!(
-                    self.io_writer,
+                    io_writer,
                     "{}{}",
                     self.pending_whitespace,
                     token.char().unwrap()
                 )?;
-                self.pending_whitespace.start();
+                self.pending_whitespace.reset();
             }
         }
-        self.io_writer.flush()
+        io_writer.flush()
+    }
+
+    pub fn add_newline(&mut self) {
+        self.pending_whitespace.add_newline();
+    }
+
+    pub fn start_paragraph(&mut self) {
+        self.pending_whitespace.new_paragraph();
     }
 }
 
@@ -325,11 +327,11 @@ pub fn write_tokens<'a, T>(tokens: T, interner: &CsNameInterner) -> String
 where
     T: IntoIterator<Item = &'a Token>,
 {
-    let mut writer: Writer<Vec<u8>> = Default::default();
+    let mut buffer: Vec<u8> = Default::default();
+    let mut writer: Writer = Default::default();
     for token in tokens.into_iter() {
-        writer.write(interner, *token).unwrap();
+        writer.write(&mut buffer, interner, *token).unwrap();
     }
-    let buffer = writer.take_io_writer();
     std::str::from_utf8(&buffer).unwrap().into()
 }
 
@@ -338,103 +340,175 @@ mod tests {
     use super::*;
     use crate::error;
 
-    enum PreInternedToken {
+    enum Instruction {
         ControlSequence(&'static str),
         Character(char, CatCode),
+        Newline,
+        NewParagraph,
     }
 
-    macro_rules! write_tokens_test {
-        ($name: ident, $input: expr, $want: expr) => {
+    fn writer_test(input: Vec<Instruction>, want: &str) {
+        let mut buffer: Vec<u8> = Default::default();
+        let mut writer: Writer = Default::default();
+        let mut interner = CsNameInterner::default();
+        for pre_interned_token in input {
+            match pre_interned_token {
+                Instruction::ControlSequence(name) => {
+                    let cs_name = interner.get_or_intern(name);
+                    let token = Token::new_control_sequence(cs_name, trace::Key::dummy());
+                    writer.write(&mut buffer, &interner, token).unwrap();
+                }
+                Instruction::Character(c, code) => {
+                    let token = Token::new_from_value(Value::new(c, code), trace::Key::dummy());
+                    writer.write(&mut buffer, &interner, token).unwrap();
+                }
+                Instruction::Newline => {
+                    writer.add_newline();
+                }
+                Instruction::NewParagraph => {
+                    writer.start_paragraph();
+                }
+            };
+        }
+        let got: String = std::str::from_utf8(&buffer).unwrap().into();
+        let want = want.to_string();
+
+        if got != want {
+            println!("Output is different:");
+            println!("------[got]-------");
+            println!("{}", got);
+            println!("------[want]------");
+            println!("{}", want);
+            println!("-----------------");
+            panic!("write_tokens test failed");
+        }
+    }
+
+    macro_rules! write_tokens_tests {
+        ($( ($name: ident, $input: expr, $want: expr), )+) => {
+            $(
             #[test]
             fn $name() {
-                let mut tokens: Vec<Token> = vec![];
-                let mut interner = CsNameInterner::default();
-                for pre_interned_token in $input {
-                    let token = match pre_interned_token {
-                        PreInternedToken::ControlSequence(name) => {
-                            let cs_name = interner.get_or_intern(name);
-                            Token::new_control_sequence(cs_name, trace::Key::dummy())
-                        }
-                        PreInternedToken::Character(c, code) => {
-                            Token::new_from_value(Value::new(c, code), trace::Key::dummy())
-                        }
-                    };
-                    tokens.push(token);
-                }
-                let got = write_tokens(&tokens, &interner);
-                let want = $want.to_string();
-
-                if got != want {
-                    println!("Output is different:");
-                    println!("------[got]-------");
-                    println!("{}", got);
-                    println!("------[want]------");
-                    println!("{}", want);
-                    println!("-----------------");
-                    panic!("write_tokens test failed");
-                }
+                writer_test($input, $want);
             }
+            )+
         };
     }
 
-    write_tokens_test!(blank, vec!(), "");
-    write_tokens_test![
-        trim_whitespace_from_start,
-        vec![
-            PreInternedToken::Character('\n', CatCode::Space),
-            PreInternedToken::Character('\n', CatCode::Space),
-            PreInternedToken::Character('\n', CatCode::Space),
-            PreInternedToken::Character('H', CatCode::Letter),
-        ],
-        "H"
-    ];
-    write_tokens_test![
-        trim_whitespace_from_end,
-        vec![
-            PreInternedToken::Character('H', CatCode::Letter),
-            PreInternedToken::Character('\n', CatCode::Space),
-            PreInternedToken::Character('\n', CatCode::Space),
-            PreInternedToken::Character('\n', CatCode::Space),
-        ],
-        "H"
-    ];
-    write_tokens_test![
-        trim_whitespace_from_middle_1,
-        vec![
-            PreInternedToken::Character('H', CatCode::Letter),
-            PreInternedToken::Character(' ', CatCode::Space),
-            PreInternedToken::Character(' ', CatCode::Space),
-            PreInternedToken::Character('W', CatCode::Letter),
-        ],
-        "H W"
-    ];
-    write_tokens_test![
-        trim_whitespace_from_middle_2,
-        vec![
-            PreInternedToken::Character('H', CatCode::Letter),
-            PreInternedToken::Character('\n', CatCode::Space),
-            PreInternedToken::Character(' ', CatCode::Space),
-            PreInternedToken::Character('\n', CatCode::Space),
-            PreInternedToken::Character('W', CatCode::Letter),
-        ],
-        "H\n\nW"
-    ];
-    write_tokens_test![
-        trim_whitespace_from_middle_3,
-        vec![
-            PreInternedToken::Character('H', CatCode::Letter),
-            PreInternedToken::Character('\n', CatCode::Space),
-            PreInternedToken::Character('\n', CatCode::Space),
-            PreInternedToken::Character('\n', CatCode::Space),
-            PreInternedToken::Character('W', CatCode::Letter),
-        ],
-        "H\n\n\nW"
-    ];
-    write_tokens_test![
-        control_sequence,
-        vec![PreInternedToken::ControlSequence("HelloWorld"),],
-        "\\HelloWorld"
-    ];
+    write_tokens_tests!(
+        (blank, vec!(), ""),
+        (
+            trim_whitespace_from_start,
+            vec![
+                Instruction::Character('\n', CatCode::Space),
+                Instruction::Character('\n', CatCode::Space),
+                Instruction::Character('\n', CatCode::Space),
+                Instruction::Character('H', CatCode::Letter),
+            ],
+            "H"
+        ),
+        (
+            trim_whitespace_from_end,
+            vec![
+                Instruction::Character('H', CatCode::Letter),
+                Instruction::Character('\n', CatCode::Space),
+                Instruction::Character('\n', CatCode::Space),
+                Instruction::Character('\n', CatCode::Space),
+            ],
+            "H"
+        ),
+        (
+            trim_whitespace_from_middle_1,
+            vec![
+                Instruction::Character('H', CatCode::Letter),
+                Instruction::Character(' ', CatCode::Space),
+                Instruction::Character(' ', CatCode::Space),
+                Instruction::Character('W', CatCode::Letter),
+            ],
+            "H W"
+        ),
+        (
+            trim_whitespace_from_middle_2,
+            vec![
+                Instruction::Character('H', CatCode::Letter),
+                Instruction::Character('\n', CatCode::Space),
+                Instruction::Character(' ', CatCode::Space),
+                Instruction::Character('\n', CatCode::Space),
+                Instruction::Character('W', CatCode::Letter),
+            ],
+            "H W"
+        ),
+        (
+            trim_whitespace_from_middle_3,
+            vec![
+                Instruction::Character('H', CatCode::Letter),
+                Instruction::Character('\n', CatCode::Space),
+                Instruction::Character('\n', CatCode::Space),
+                Instruction::Character('\n', CatCode::Space),
+                Instruction::Character('W', CatCode::Letter),
+            ],
+            "H W"
+        ),
+        (
+            control_sequence,
+            vec![Instruction::ControlSequence("HelloWorld"),],
+            "\\HelloWorld"
+        ),
+        (
+            newline_1,
+            vec![
+                Instruction::Character('H', CatCode::Letter),
+                Instruction::Newline,
+                Instruction::Character('W', CatCode::Letter),
+            ],
+            "H\nW"
+        ),
+        (
+            newline_2,
+            vec![
+                Instruction::Character('H', CatCode::Letter),
+                Instruction::Newline,
+                Instruction::Character(' ', CatCode::Space),
+                Instruction::Newline,
+                Instruction::Character('W', CatCode::Letter),
+            ],
+            "H\n\nW"
+        ),
+        (
+            newline_3,
+            vec![
+                Instruction::Character('H', CatCode::Letter),
+                Instruction::Newline,
+                Instruction::Character(' ', CatCode::Space),
+                Instruction::Newline,
+                Instruction::Character(' ', CatCode::Space),
+                Instruction::Newline,
+                Instruction::Character('W', CatCode::Letter),
+            ],
+            "H\n\n\nW"
+        ),
+        (
+            par_1,
+            vec![
+                Instruction::Character('H', CatCode::Letter),
+                Instruction::NewParagraph,
+                Instruction::NewParagraph,
+                Instruction::Character('W', CatCode::Letter),
+            ],
+            "H\n\nW"
+        ),
+        (
+            par_2,
+            vec![
+                Instruction::Character('H', CatCode::Letter),
+                Instruction::NewParagraph,
+                Instruction::NewParagraph,
+                Instruction::NewParagraph,
+                Instruction::Character('W', CatCode::Letter),
+            ],
+            "H\n\nW"
+        ),
+    );
 
     #[test]
     fn token_size() {

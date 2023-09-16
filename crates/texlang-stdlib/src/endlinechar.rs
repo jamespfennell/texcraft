@@ -44,14 +44,15 @@ mod test {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::{def, prefix, script, testing::*};
+    use crate::testing::*;
+    use crate::{def, prefix};
     use texlang::vm::implement_has_component;
 
     #[derive(Default)]
     struct State {
         conditional: Component,
         prefix: prefix::Component,
-        script: script::Component,
+        testing: TestingComponent,
     }
 
     impl TexlangState for State {
@@ -64,7 +65,7 @@ mod test {
         State,
         (Component, conditional),
         (prefix::Component, prefix),
-        (script::Component, script),
+        (TestingComponent, testing),
     ];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {

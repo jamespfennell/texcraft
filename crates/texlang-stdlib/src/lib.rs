@@ -50,6 +50,7 @@ pub struct StdLibState {
     pub registers_token_list: registers::Component<Vec<token::Token>, 256>,
     pub repl: repl::Component,
     pub script: script::Component,
+    pub testing: testing::TestingComponent,
     pub time: time::Component,
     pub tracing_macros: tracingmacros::Component,
 }
@@ -191,6 +192,7 @@ implement_has_component![
     ),
     (repl::Component, repl),
     (script::Component, script),
+    (testing::TestingComponent, testing),
     (time::Component, time),
     (tracingmacros::Component, tracing_macros),
 ];
@@ -311,11 +313,11 @@ mod tests {
     use testing::*;
     use texlang::command;
 
-    type State = StdLibState;
-
-    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<StdLibState>> {
         StdLibState::all_initial_built_ins()
     }
+
+    type State = StdLibState;
 
     test_suite![
         expansion_equality_tests(
@@ -359,7 +361,7 @@ mod tests {
         ];
         for case in ErrorCase::all_error_cases() {
             println!("CASE {}", case.description);
-            run_failure_test::<StdLibState>(case.source_code, &options)
+            testing::run_failure_test::<StdLibState>(case.source_code, &options)
         }
     }
 }

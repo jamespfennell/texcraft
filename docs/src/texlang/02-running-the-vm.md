@@ -36,7 +36,7 @@ For example, when a real typesetting VM sees the character `a`,
     it typesets the character `a`.
 Handlers are described in detail in the [VM hooks and handlers section](hooks-and-handlers.md).
 For the moment, we're going to get around the handlers problem entirely
-    by instead running the VM using the [`::texlang_stdlib::script::run_and_write`](https://docs.rs/texlang-stdlib/latest/texlang_stdlib/script/fn.run_and_write.html) function.
+    by instead running the VM using the [`::texlang_stdlib::script::run`](https://docs.rs/texlang-stdlib/latest/texlang_stdlib/script/fn.run.html) function.
 This function automatically provides handlers such that when the VM sees a character,
     it just prints the character to the terminal.
 
@@ -47,7 +47,7 @@ With all of this context,
 # extern crate texlang_stdlib;
 # extern crate texlang;
 use texlang::{vm, command};
-use texlang_stdlib::testing::State;
+use texlang_stdlib::StdLibState;
 use texlang_stdlib::script;
 
 // 1. Create a new map of initial primitives.
@@ -55,13 +55,14 @@ use texlang_stdlib::script;
 let primitives = std::collections::HashMap::new();
 
 // 2. Initialize the VM.
-let mut vm = vm::VM::<State>::new(primitives);
+let mut vm = vm::VM::<StdLibState>::new(primitives);
 
 // 3. Add some TeX source code the VM.
 vm.push_source("input.tex", r"Hello, World.");
 
 // 4. Run the VM and write the results to stdout.
-script::run_and_write(&mut vm, Box::new(std::io::stdout())).unwrap();
+script::set_io_writer(&mut vm, std::io::stdout());
+script::run(&mut vm).unwrap();
 ```
 
 When you run this code, you will simply see:
@@ -101,14 +102,15 @@ Changing the VM setup to the following:
 # extern crate texlang_stdlib;
 # extern crate texlang;
 # use texlang::{vm, command};
-# use texlang_stdlib::testing::State;
+# use texlang_stdlib::StdLibState;
 # use texlang_stdlib::script;
-# let mut vm = vm::VM::<State>::new(Default::default());
+# let mut vm = vm::VM::<StdLibState>::new(Default::default());
 // 3. Add some TeX source code the VM.
 vm.push_source("input.tex", r"\controlSequence");
 
 // 4. Run the VM and write the results to stdout.
-if let Err(err) = script::run_and_write(&mut vm, Box::new(std::io::stdout())){
+script::set_io_writer(&mut vm, std::io::stdout());
+if let Err(err) = script::run(&mut vm){
     println!["{err}"];
 }
 ```

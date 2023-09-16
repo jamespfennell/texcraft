@@ -64,7 +64,7 @@ mod test {
         HashMap::from([
             ("def", def::get_def()),
             ("global", prefix::get_global()),
-            ("integer", State::get_integer()),
+            ("integer", TestingComponent::get_integer()),
             ("let", get_let()),
             ("the", the::get_the()),
         ])

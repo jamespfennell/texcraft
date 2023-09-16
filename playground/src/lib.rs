@@ -30,8 +30,8 @@ pub fn run(
 ) -> String {
     let mut vm = new_vm(minutes_since_midnight, day, month, year);
     vm.push_source(file_name, input).unwrap();
-    match script::run(&mut vm) {
-        Ok(tokens) => token::write_tokens(&tokens, vm.cs_name_interner()),
+    match script::run_to_string(&mut vm) {
+        Ok(s) => s,
         Err(err) => format!["{err}"],
     }
 }

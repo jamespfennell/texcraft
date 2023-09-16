@@ -88,6 +88,7 @@ pub trait Handlers<S: TexlangState> {
     }
 }
 
+#[derive(Default)]
 pub struct DefaultHandlers;
 
 impl<S: TexlangState> Handlers<S> for DefaultHandlers {}

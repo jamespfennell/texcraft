@@ -29,7 +29,7 @@ mod test {
         HashMap::from([
             ("chardef", get_chardef()),
             ("the", the::get_the()),
-            ("i", State::get_integer()),
+            ("i", TestingComponent::get_integer()),
         ])
     }
 

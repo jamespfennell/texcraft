@@ -39,14 +39,14 @@ pub mod run {
         let mut num_names = names.len();
         let a = Arc::new(ControlSequenceCompleter { names });
         reader.set_completer(a);
-
+        script::set_io_writer(vm, std::io::stdout());
         while let ReadResult::Input(input) = reader.read_line().unwrap() {
             reader.add_history(input.clone());
 
             vm.clear_sources();
             vm.push_source("".to_string(), input).unwrap();
-            let tokens = match script::run(vm) {
-                Ok(s) => s,
+            match script::run(vm) {
+                Ok(()) => (),
                 Err(err) => {
                     if HasComponent::<Component>::component(&vm.state).quit_requested {
                         return;
@@ -55,11 +55,8 @@ pub mod run {
                     continue;
                 }
             };
-            let pretty = token::write_tokens(&tokens, vm.cs_name_interner());
-            if !pretty.trim().is_empty() {
-                println!("{pretty}\n");
-            }
-
+            // TODO: better new line handling in the REPL
+            println!();
             if vm.commands_map.len() != num_names {
                 let mut names: Vec<String> = vm.get_commands_as_map_slow().into_keys().collect();
                 names.sort();
@@ -141,7 +138,7 @@ pub fn get_help<S: HasComponent<Component> + common::HasLogging>() -> command::B
 /// Get the `\doc` command.
 ///
 /// This prints the documentation for a TeX command.
-pub fn get_doc<S: TexlangState+ common::HasLogging>() -> command::BuiltIn<S> {
+pub fn get_doc<S: TexlangState + common::HasLogging>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
         |token: token::Token, input: &mut vm::ExecutionInput<S>| -> command::Result<()> {
             let target = token::CommandRef::parse(input)?;

@@ -87,7 +87,8 @@ fn run(vm: &mut vm::VM<StdLibState>, mut path: PathBuf) -> Result<(), Box<error:
     // The only error possible is input stack size exceeded, which can't be hit.
     // TODO: the external VM method shouldn't error
     let _ = vm.push_source(path.to_string_lossy().to_string(), source_code);
-    script::run_and_write(vm, Box::new(std::io::stdout()))?;
+    script::set_io_writer(vm, std::io::stdout());
+    script::run(vm)?;
     Ok(())
 }
 
@@ -96,7 +97,7 @@ fn repl(vm: &mut vm::VM<StdLibState>) {
     repl::run::run(
         vm,
         repl::RunOptions {
-            prompt: "tex> ",
+            prompt: "TeX> ",
             help: REPL_HELP,
         },
     )
@@ -113,11 +114,11 @@ Texcraft interactive TeX terminal
 
 This is a REPL for running TeX. No better way to get started than defining a macro:
 
-tex> \def\hello{Hello, World}
+TeX> \def\hello{Hello, World}
 
 and then running it:
 
-tex> \hello
+TeX> \hello
 Hello, World
 
 TeX supports variables (see the \count and \countdef commands), math (\advance, \multiple, \divide),

@@ -561,19 +561,19 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::{script, testing::*};
+    use crate::testing::*;
     use texlang::vm::implement_has_component;
 
     #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     struct State {
         conditional: Component,
-        script: script::Component,
+        testing: TestingComponent,
     }
 
     impl TexlangState for State {}
 
-    implement_has_component![State, (Component, conditional), (script::Component, script),];
+    implement_has_component![State, (Component, conditional), (TestingComponent, testing),];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([

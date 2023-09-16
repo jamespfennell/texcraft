@@ -270,25 +270,13 @@ pub fn get_relax<S>() -> command::BuiltIn<S> {
 mod test {
     use super::*;
     use crate::prefix;
-    use crate::script;
     use crate::testing::*;
     use std::collections::HashMap;
 
     #[derive(Default)]
     pub struct State {
         prefix: prefix::Component,
-        script: script::Component,
-        integer: i32,
-    }
-
-    impl State {
-        pub fn get_integer() -> command::BuiltIn<State> {
-            variable::Command::new_singleton(
-                |state: &State, _: variable::Index| -> &i32 { &state.integer },
-                |state: &mut State, _: variable::Index| -> &mut i32 { &mut state.integer },
-            )
-            .into()
-        }
+        testing: TestingComponent,
     }
 
     impl TexlangState for State {
@@ -303,15 +291,15 @@ mod test {
 
     implement_has_component![
         State,
-        (script::Component, script),
         (prefix::Component, prefix),
+        (TestingComponent, testing),
     ];
 
     fn initial_commands(optimized: bool) -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("def", crate::def::get_def()),
             ("noexpand", get_noexpand()),
-            ("integer", State::get_integer()),
+            ("integer", TestingComponent::get_integer()),
             (
                 "xa",
                 match optimized {
