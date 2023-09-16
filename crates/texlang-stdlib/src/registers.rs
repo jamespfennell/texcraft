@@ -137,12 +137,11 @@ mod tests {
 
     impl TexlangState for State {}
 
-    implement_has_component![
-        State,
-        (Component<i32, 256>, registers_i32),
-        (Component<Vec<token::Token>, 256>, registers_token_list),
-        (TestingComponent, testing),
-    ];
+    implement_has_component![State{
+        registers_i32: Component<i32, 256>,
+        registers_token_list: Component<Vec<token::Token>, 256>,
+        testing: TestingComponent,
+    }];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([

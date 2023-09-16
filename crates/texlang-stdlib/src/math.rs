@@ -218,13 +218,12 @@ mod tests {
         }
     }
 
-    implement_has_component![
-        State,
-        (catcode::Component, catcode),
-        (prefix::Component, prefix),
-        (registers::Component<i32, 256>, registers),
-        (TestingComponent, testing),
-    ];
+    implement_has_component![State{
+        catcode: catcode::Component,
+        prefix: prefix::Component,
+        registers: registers::Component<i32, 256>,
+        testing: TestingComponent,
+    }];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([

@@ -67,21 +67,17 @@ impl TexlangState for PlaygroundState {
     }
 }
 
-implement_has_component![
-    PlaygroundState,
-    (alloc::Component, alloc),
-    (catcode::Component, catcode),
-    (conditional::Component, conditional),
-    (endlinechar::Component, end_line_char),
-    (prefix::Component, prefix),
-    (registers::Component<i32, 256>, registers_i32),
-    (
-        registers::Component<Vec<token::Token>, 256>,
-        registers_token_list
-    ),
-    (script::Component, script),
-    (time::Component, time),
-];
+implement_has_component![PlaygroundState{
+    alloc: alloc::Component,
+    catcode: catcode::Component,
+    conditional: conditional::Component,
+    end_line_char: endlinechar::Component,
+    prefix: prefix::Component,
+    registers_i32: registers::Component<i32, 256>,
+    registers_token_list: registers::Component<Vec<token::Token>, 256>,
+    script: script::Component,
+    time: time::Component,
+}];
 
 fn initial_primitives() -> HashMap<&'static str, command::BuiltIn<PlaygroundState>> {
     HashMap::from([

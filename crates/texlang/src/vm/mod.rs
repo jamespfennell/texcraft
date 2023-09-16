@@ -536,15 +536,17 @@ impl Ord for TokenBuffer {
 
 /// Helper trait for implementing the component pattern in Texlang.
 ///
-/// The component pattern is a design pattern used when implementing TeX commands that require some state.
+/// The component pattern is a ubiquitous design pattern in Texlang.
+/// It is used when implementing TeX commands that require state.
 /// An example of a stateful TeX command is `\year`, which needs to store the current year somewhere.
+/// 
 /// When the component pattern is used, a stateful TeX command
 ///     can have a single implementation that
 ///     is used by multiple TeX engines built with Texlang.
 /// Additionally, a specific TeX engine can compose many different
 ///     stateful TeX commands together without worrying about conflicts between their state.
 /// The component pattern is Texlang's main solution to the problem of
-///     global mutable state that is pervasive in the original implementations of TeX.
+///     global mutable state that is pervasive in the original implementation of TeX.
 ///
 /// In the component pattern, the state
 ///     needed by a specific command like `\year` is isolated in a _component_, which is a concrete
@@ -607,52 +609,52 @@ pub trait HasComponent<C>: TexlangState {
 /// Implementing a single component:
 ///
 /// ```
-/// # mod mylibrary{
+/// # mod library_1{
 /// #   pub struct Component;
 /// # }
 /// # use texlang::vm::implement_has_component;
 /// # use texlang::traits::*;
 /// #
 /// struct MyState {
-///     component: mylibrary::Component,
+///     component: library_1::Component,
 /// }
 ///
 /// impl TexlangState for MyState {}
 ///
-/// implement_has_component![MyState, mylibrary::Component, component];
+/// implement_has_component![MyState{
+///     component: library_1::Component,
+/// }];
 /// ```
 ///
 /// Implementing multiple components:
 ///
 /// ```
-/// # mod mylibrary1{
+/// # mod library_1{
 /// #   pub struct Component;
 /// # }
-/// # mod mylibrary2{
+/// # mod library_2{
 /// #   pub struct Component;
 /// # }
 /// # use texlang::vm::implement_has_component;
 /// # use texlang::traits::*;
 /// #
 /// struct MyState {
-///     component_1: mylibrary1::Component,
-///     component_2: mylibrary2::Component,
+///     component_1: library_1::Component,
+///     component_2: library_2::Component,
 /// }
 ///
 /// impl TexlangState for MyState {}
 ///
-/// implement_has_component![
-///     MyState,
-///     (mylibrary1::Component, component_1),
-///     (mylibrary2::Component, component_2),
-/// ];
+/// implement_has_component![MyState{
+///     component_1: library_1::Component,
+///     component_2: library_2::Component,
+/// }];
 /// ```
 #[macro_export]
 macro_rules! implement_has_component {
-    ( $type: path, $component: path, $field: ident ) => {
-        implement_has_component![$type, ($component, $field),];
-    };
-    ( $type: path, $(($component: path, $field: ident),)+) => {
+    ($type: path {
+        $( $field: ident: $component: path,)+
+    }) => {
         $(
             impl ::texlang::vm::HasComponent<$component> for $type {
                 #[inline]

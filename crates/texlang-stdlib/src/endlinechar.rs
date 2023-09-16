@@ -61,12 +61,11 @@ mod test {
         }
     }
 
-    implement_has_component![
-        State,
-        (Component, conditional),
-        (prefix::Component, prefix),
-        (TestingComponent, testing),
-    ];
+    implement_has_component![State {
+        conditional: Component,
+        prefix: prefix::Component,
+        testing: TestingComponent,
+    }];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([("def", def::get_def()), ("endlinechar", get_endlinechar())])

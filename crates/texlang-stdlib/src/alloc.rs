@@ -208,7 +208,10 @@ mod test {
 
     impl TexlangState for State {}
 
-    implement_has_component![State, (Component, alloc), (TestingComponent, testing),];
+    implement_has_component![State {
+        alloc: Component,
+        testing: TestingComponent,
+    }];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([

@@ -52,11 +52,10 @@ impl TexlangState for State {
     }
 }
 
-implement_has_component![
-    State,
-    (prefix::Component, prefix),
-    (TestingComponent, testing),
-];
+implement_has_component![State {
+    prefix: prefix::Component,
+    testing: TestingComponent,
+}];
 
 impl TestingComponent {
     pub fn get_integer<S: HasComponent<TestingComponent>>() -> command::BuiltIn<S> {

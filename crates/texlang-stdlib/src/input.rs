@@ -408,13 +408,12 @@ mod tests {
         }
     }
 
-    implement_has_component![
-        State,
-        (conditional::Component, conditional),
-        (Component<16>, input),
-        (prefix::Component, prefix),
-        (TestingComponent, testing),
-    ];
+    implement_has_component![State{
+        conditional: conditional::Component,
+        input: Component<16>,
+        prefix: prefix::Component,
+        testing: TestingComponent,
+    }];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([

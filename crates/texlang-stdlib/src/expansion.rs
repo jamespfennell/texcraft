@@ -289,11 +289,10 @@ mod test {
         }
     }
 
-    implement_has_component![
-        State,
-        (prefix::Component, prefix),
-        (TestingComponent, testing),
-    ];
+    implement_has_component![State {
+        prefix: prefix::Component,
+        testing: TestingComponent,
+    }];
 
     fn initial_commands(optimized: bool) -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([

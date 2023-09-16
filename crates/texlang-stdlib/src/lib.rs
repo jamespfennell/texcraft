@@ -176,26 +176,22 @@ impl StdLibState {
     }
 }
 
-implement_has_component![
-    StdLibState,
-    (alloc::Component, alloc),
-    (catcode::Component, catcode),
-    (conditional::Component, conditional),
-    (endlinechar::Component, end_line_char),
-    (input::Component<16>, input),
-    (job::Component, job),
-    (prefix::Component, prefix),
-    (registers::Component<i32, 32768>, registers_i32),
-    (
-        registers::Component<Vec<token::Token>, 256>,
-        registers_token_list
-    ),
-    (repl::Component, repl),
-    (script::Component, script),
-    (testing::TestingComponent, testing),
-    (time::Component, time),
-    (tracingmacros::Component, tracing_macros),
-];
+implement_has_component![StdLibState{
+    alloc: alloc::Component,
+    catcode: catcode::Component,
+    conditional: conditional::Component,
+    end_line_char: endlinechar::Component,
+    input: input::Component<16>,
+    job: job::Component,
+    prefix: prefix::Component,
+    registers_i32: registers::Component<i32, 32768>,
+    registers_token_list: registers::Component<Vec<token::Token>, 256>,
+    repl: repl::Component,
+    script: script::Component,
+    testing: testing::TestingComponent,
+    time: time::Component,
+    tracing_macros: tracingmacros::Component,
+}];
 
 impl texlang_common::HasLogging for StdLibState {}
 impl texlang_common::HasFileSystem for StdLibState {}

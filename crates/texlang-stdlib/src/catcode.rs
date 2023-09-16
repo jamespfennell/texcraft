@@ -86,7 +86,10 @@ mod tests {
 
     impl TexlangState for State {}
 
-    implement_has_component![State, (Component, catcode), (TestingComponent, testing),];
+    implement_has_component![State {
+        catcode: Component,
+        testing: TestingComponent,
+    }];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([("the", the::get_the()), ("catcode", get_catcode())])
