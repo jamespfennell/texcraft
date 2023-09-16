@@ -2,34 +2,65 @@
 //!
 //! This module enables using TeX as a scripting language.
 //! TeX files are processed using the usual TeX semantics, but instead
-//! of typesetting the result and outputting it to PDF (say), the output is returned as a list of tokens.
-//! These can be easily converted to a string using [texlang::token::write_tokens].
+//! of typesetting the result and outputting it to PDF (say), the output is written to an IO writer.
 
+use std::cell::RefCell;
+use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
 use texlang::traits::*;
 use texlang::*;
 
-#[derive(Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Component {
-    tokens: Vec<token::Token>,
-    #[cfg_attr(feature = "serde", serde(skip))]
-    writer: Option<token::Writer<Box<dyn std::io::Write>>>,
-    num_trailing_newlines: usize,
-    allow_undefined_command: bool,
+    io_writer: Rc<RefCell<dyn std::io::Write>>,
+    writer: token::Writer,
 }
 
-impl Component {
-    fn push_token(&mut self, token: token::Token, interner: &token::CsNameInterner) {
-        self.tokens.push(token);
-        if let Some(writer) = &mut self.writer {
-            writer.write(interner, token).unwrap()
+impl Default for Component {
+    fn default() -> Self {
+        Self {
+            io_writer: Rc::new(RefCell::new(std::io::sink())),
+            writer: Default::default(),
         }
     }
 }
 
-// TODO: this should just be an argument to the run function
-pub fn set_allow_undefined_command<S: HasComponent<Component>>(state: &mut S, value: bool) {
-    state.component_mut().allow_undefined_command = value;
+#[cfg(feature = "serde")]
+impl serde::Serialize for Component {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        ().serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Component {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <()>::deserialize(deserializer)?;
+        Ok(Default::default())
+    }
+}
+
+impl Component {
+    fn write_token<S: HasComponent<Self>>(input: &mut vm::ExecutionInput<S>, token: token::Token) {
+        let vm::Parts {
+            state,
+            cs_name_interner,
+            ..
+        } = input.vm_parts();
+        let c = state.component_mut();
+        c.writer
+            .write(
+                c.io_writer.borrow_mut().deref_mut(),
+                cs_name_interner,
+                token,
+            )
+            .unwrap()
+    }
 }
 
 /// Get the `\newline` command.
@@ -40,18 +71,10 @@ pub fn get_newline<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 }
 
 fn newline_primitive_fn<S: HasComponent<Component>>(
-    t: token::Token,
+    _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> command::Result<()> {
-    let vm::Parts {
-        state,
-        cs_name_interner,
-        ..
-    } = input.vm_parts();
-    let mut c = state.component_mut();
-    let newline_token = token::Token::new_space('\n', t.trace_key());
-    c.push_token(newline_token, cs_name_interner);
-    c.num_trailing_newlines += 1;
+    input.state_mut().component_mut().writer.add_newline();
     Ok(())
 }
 
@@ -64,80 +87,46 @@ pub fn get_par<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 }
 
 fn par_primitive_fn<S: HasComponent<Component>>(
-    t: token::Token,
+    _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> command::Result<()> {
-    let vm::Parts {
-        state,
-        cs_name_interner,
-        ..
-    } = input.vm_parts();
-    let mut c = state.component_mut();
-    let par_token = token::Token::new_space('\n', t.trace_key());
-    match c.num_trailing_newlines {
-        0 => {
-            c.push_token(par_token, cs_name_interner);
-            c.push_token(par_token, cs_name_interner);
-            c.num_trailing_newlines += 2;
-        }
-        1 => {
-            c.push_token(par_token, cs_name_interner);
-            c.num_trailing_newlines += 1;
-        }
-        _ => {}
-    }
+    input.state_mut().component_mut().writer.start_paragraph();
     Ok(())
 }
 
-/// Run the Texlang interpreter for the provided VM and return the result as list of tokens.
-pub fn run<S: HasComponent<Component>>(
+/// Run the Texlang interpreter for the provided VM and return the result as a string.
+pub fn run_to_string<S: HasComponent<Component>>(
     vm: &mut vm::VM<S>,
-) -> Result<Vec<token::Token>, Box<error::Error>> {
-    vm.run::<Handlers>()?;
-    let mut result = Vec::new();
-    std::mem::swap(&mut result, &mut vm.state.component_mut().tokens);
+) -> Result<String, Box<error::Error>> {
+    let buffer = Rc::new(RefCell::new(Vec::<u8>::new()));
+    vm.state.component_mut().io_writer = buffer.clone();
+    run(vm)?;
+    let result: String = std::str::from_utf8(buffer.borrow().deref()).unwrap().into();
     Ok(result)
 }
 
-/// Run the Texlang interpreter for the provided VM and write the tokens as strings to the provided writer.
-pub fn run_and_write<S: HasComponent<Component>>(
-    vm: &mut vm::VM<S>,
-    io_writer: Box<dyn std::io::Write>,
-) -> Result<(), Box<error::Error>> {
-    vm.state.component_mut().writer = Some(token::Writer::new(io_writer));
+/// Run the Texlang interpreter for the provided VM and return the result as list of tokens.
+pub fn run<S: HasComponent<Component>>(vm: &mut vm::VM<S>) -> Result<(), Box<error::Error>> {
     vm.run::<Handlers>()
+}
+
+// Set the IO writer that the script component writes to.
+pub fn set_io_writer<S: HasComponent<Component>, I: std::io::Write + 'static>(
+    vm: &mut vm::VM<S>,
+    writer: I,
+) {
+    vm.state.component_mut().io_writer = Rc::new(RefCell::new(writer))
 }
 
 struct Handlers;
 
 impl<S: HasComponent<Component>> vm::Handlers<S> for Handlers {
     fn character_handler(
-        mut token: token::Token,
-        input: &mut vm::ExecutionInput<S>,
-    ) -> command::Result<()> {
-        let vm::Parts {
-            state,
-            cs_name_interner,
-            ..
-        } = input.vm_parts();
-        let mut c = state.component_mut();
-        if let Some('\n') = token.char() {
-            token = token::Token::new_space(' ', token.trace_key());
-        }
-        c.push_token(token, cs_name_interner);
-        c.num_trailing_newlines = 0;
-        Ok(())
-    }
-
-    fn undefined_command_handler(
         token: token::Token,
         input: &mut vm::ExecutionInput<S>,
     ) -> command::Result<()> {
-        if input.state().component().allow_undefined_command {
-            Handlers::character_handler(token, input)
-        } else {
-            Err(error::UndefinedCommandError::new(input.vm(), token).into())
-        }
+        Component::write_token(input, token);
+        Ok(())
     }
 
     fn unexpanded_expansion_command(
@@ -150,19 +139,34 @@ impl<S: HasComponent<Component>> vm::Handlers<S> for Handlers {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::collections::HashMap;
 
-    use super::*;
-    use crate::def;
-    use crate::testing::*;
-    use texlang::token;
+    #[derive(Default)]
+    struct State {
+        script: Component,
+    }
 
-    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
-        HashMap::from([
-            ("par", get_par()),
-            ("def", def::get_def()),
-            ("newline", get_newline()),
-        ])
+    impl vm::TexlangState for State {}
+
+    implement_has_component![State, (Component, script),];
+
+    fn run_script_test(input: &str, want: &str) {
+        let built_ins = HashMap::from([("par", get_par()), ("newline", get_newline())]);
+        let mut vm = vm::VM::<State>::new(built_ins);
+        vm.push_source("testing.tex", input).unwrap();
+        let got = run_to_string(&mut vm).unwrap();
+        let want = want.to_string();
+
+        if got != want {
+            println!("Output is different:");
+            println!("------[got]-------");
+            println!("{}", got);
+            println!("------[want]------");
+            println!("{}", want);
+            println!("-----------------");
+            panic!("run_script test failed");
+        }
     }
 
     macro_rules! script_tests {
@@ -170,23 +174,7 @@ mod tests {
             $(
             #[test]
             fn $name() {
-                let options = vec![TestOption::InitialCommands(initial_commands)];
-                let input = $input;
-                let options = ResolvedOptions::new(&options);
-                let mut vm = initialize_vm(&options);
-                let got_tokens = execute_source_code(&mut vm, input, &options);
-                let got = token::write_tokens(&got_tokens.unwrap(), vm.cs_name_interner());
-                let want = $want.to_string();
-
-                if got != want {
-                    println!("Output is different:");
-                    println!("------[got]-------");
-                    println!("{}", got);
-                    println!("------[want]------");
-                    println!("{}", want);
-                    println!("-----------------");
-                    panic!("write_tokens test failed");
-                }
+              run_script_test($input, $want);
             }
             )*
         };

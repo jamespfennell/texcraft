@@ -3,7 +3,7 @@
 //! This module contains testable exercises and examples of TeX snippets from the literature (right now the TeXBook).
 //! The documentation for each exercise shows the input and the correct output.
 //!
-//! This collection is intended for testing and for verifing a TeX distribution
+//! This collection is intended for testing and for verifying a TeX distribution
 //! is conformant with the language.
 //! This module's test module runs the exercises as tests for the primitives implemented in the
 //! [Texcraft primitives library](super::library).

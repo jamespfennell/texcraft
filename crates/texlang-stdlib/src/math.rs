@@ -198,7 +198,6 @@ mod tests {
     use crate::catcode;
     use crate::prefix;
     use crate::registers;
-    use crate::script;
     use crate::testing::*;
     use crate::the;
     use texlang::vm::implement_has_component;
@@ -208,7 +207,7 @@ mod tests {
         catcode: catcode::Component,
         prefix: prefix::Component,
         registers: registers::Component<i32, 256>,
-        script: script::Component,
+        testing: TestingComponent,
     }
 
     impl TexlangState for State {
@@ -224,7 +223,7 @@ mod tests {
         (catcode::Component, catcode),
         (prefix::Component, prefix),
         (registers::Component<i32, 256>, registers),
-        (script::Component, script),
+        (TestingComponent, testing),
     ];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {

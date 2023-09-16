@@ -9,7 +9,7 @@ use texlang_common as common;
 pub const SLEEP_DOC: &str = "Sleep for a number of milliseconds";
 
 /// Get the `\sleep` expansion primitive.
-pub fn get_sleep<S: TexlangState+ common::HasLogging>() -> command::BuiltIn<S> {
+pub fn get_sleep<S: TexlangState + common::HasLogging>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
         |_: token::Token, input: &mut vm::ExecutionInput<S>| -> command::Result<()> {
             let milliseconds = parse::Uint::<{ parse::Uint::MAX }>::parse(input)?.0;

@@ -24,7 +24,7 @@ fn input_fn<S: TexlangState + common::HasFileSystem>(
     let file_location = FileLocation::parse(input)?;
     let (file_path, source_code) = read_file(input.vm(), file_location, "tex")?;
     if input.vm().num_current_sources() > 100 {
-        return Err(TooManyInputs{}.into())
+        return Err(TooManyInputs {}.into());
     }
     input.push_source(input_token, file_path, source_code)?;
     Ok(())
@@ -39,7 +39,7 @@ impl error::TexError for TooManyInputs {
     }
 
     fn title(&self) -> String {
-            "too many input levels (100)".into()
+        "too many input levels (100)".into()
     }
 }
 
@@ -378,7 +378,7 @@ impl error::TexError for UnmatchedBracesError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{def, expansion, prefix, script, testing::*};
+    use crate::{def, expansion, prefix, testing::*};
     use std::collections::HashMap;
 
     #[derive(Default)]
@@ -387,7 +387,7 @@ mod tests {
         conditional: conditional::Component,
         input: Component<16>,
         prefix: prefix::Component,
-        script: script::Component,
+        testing: TestingComponent,
         #[cfg_attr(feature = "serde", serde(skip))]
         file_system: Rc<RefCell<common::InMemoryFileSystem>>,
         #[cfg_attr(feature = "serde", serde(skip))]
@@ -413,7 +413,7 @@ mod tests {
         (conditional::Component, conditional),
         (Component<16>, input),
         (prefix::Component, prefix),
-        (script::Component, script),
+        (TestingComponent, testing),
     ];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {

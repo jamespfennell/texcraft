@@ -74,7 +74,6 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::script;
     use crate::testing::*;
     use crate::the;
 
@@ -82,12 +81,12 @@ mod tests {
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     struct State {
         catcode: Component,
-        script: script::Component,
+        testing: TestingComponent,
     }
 
     impl TexlangState for State {}
 
-    implement_has_component![State, (Component, catcode), (script::Component, script),];
+    implement_has_component![State, (Component, catcode), (TestingComponent, testing),];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([("the", the::get_the()), ("catcode", get_catcode())])

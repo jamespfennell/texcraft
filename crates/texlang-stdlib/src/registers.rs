@@ -123,7 +123,6 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::script;
     use crate::testing::*;
     use crate::the;
     use texlang::vm::implement_has_component;
@@ -133,7 +132,7 @@ mod tests {
     struct State {
         registers_i32: Component<i32, 256>,
         registers_token_list: Component<Vec<token::Token>, 256>,
-        script: script::Component,
+        testing: TestingComponent,
     }
 
     impl TexlangState for State {}
@@ -142,7 +141,7 @@ mod tests {
         State,
         (Component<i32, 256>, registers_i32),
         (Component<Vec<token::Token>, 256>, registers_token_list),
-        (script::Component, script),
+        (TestingComponent, testing),
     ];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {

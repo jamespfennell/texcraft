@@ -424,16 +424,15 @@ pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::Buil
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{script, testing::*, the};
+    use crate::testing::*;
+    use crate::the;
     use std::collections::HashMap;
-    use texlang::variable;
     use texlang::vm::implement_has_component;
 
     #[derive(Default)]
     struct State {
-        script: script::Component,
         prefix: Component,
-        integer: i32,
+        testing: TestingComponent,
     }
 
     impl TexlangState for State {
@@ -442,7 +441,7 @@ mod test {
         }
     }
 
-    implement_has_component![State, (script::Component, script), (Component, prefix),];
+    implement_has_component![State, (TestingComponent, testing), (Component, prefix),];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
@@ -450,7 +449,7 @@ mod test {
             ("globaldefs", get_globaldefs()),
             ("long", get_long()),
             ("outer", get_outer()),
-            ("i", get_integer()),
+            ("i", TestingComponent::get_integer()),
             ("the", the::get_the()),
             ("def", def::get_def()),
             ("advance", math::get_advance()),
@@ -463,14 +462,6 @@ mod test {
                 command::BuiltIn::new_execution(|_, _| Ok(())),
             ),
         ])
-    }
-
-    fn get_integer() -> command::BuiltIn<State> {
-        variable::Command::new_singleton(
-            |state: &State, _: variable::Index| -> &i32 { &state.integer },
-            |state: &mut State, _: variable::Index| -> &mut i32 { &mut state.integer },
-        )
-        .into()
     }
 
     test_suite![

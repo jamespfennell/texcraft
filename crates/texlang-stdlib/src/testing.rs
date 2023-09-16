@@ -11,11 +11,27 @@
 use std::collections::HashMap;
 
 use crate::prefix;
-use crate::script;
 use texlang::traits::*;
 use texlang::vm::implement_has_component;
 use texlang::vm::VM;
 use texlang::*;
+
+/// Texlang component that every unit testing state needs to have.
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TestingComponent {
+    allow_undefined_command: bool,
+    tokens: Vec<token::Token>,
+    integer: i32,
+}
+
+impl TestingComponent {
+    fn take_tokens(&mut self) -> Vec<token::Token> {
+        let mut result = Vec::new();
+        std::mem::swap(&mut result, &mut self.tokens);
+        result
+    }
+}
 
 /// Simple state type for use in unit tests.
 ///
@@ -25,8 +41,7 @@ use texlang::*;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct State {
     prefix: prefix::Component,
-    script: script::Component,
-    integer: i32,
+    testing: TestingComponent,
 }
 
 impl TexlangState for State {
@@ -40,14 +55,14 @@ impl TexlangState for State {
 implement_has_component![
     State,
     (prefix::Component, prefix),
-    (script::Component, script),
+    (TestingComponent, testing),
 ];
 
-impl State {
-    pub fn get_integer() -> command::BuiltIn<State> {
+impl TestingComponent {
+    pub fn get_integer<S: HasComponent<TestingComponent>>() -> command::BuiltIn<S> {
         variable::Command::new_singleton(
-            |state: &State, _: variable::Index| -> &i32 { &state.integer },
-            |state: &mut State, _: variable::Index| -> &mut i32 { &mut state.integer },
+            |state: &S, _: variable::Index| -> &i32 { &state.component().integer },
+            |state: &mut S, _: variable::Index| -> &mut i32 { &mut state.component_mut().integer },
         )
         .into()
     }
@@ -89,7 +104,7 @@ pub enum TestOption<'a, S> {
 /// The test passes if the two provided input strings expand to the same tokens.
 pub fn run_expansion_equality_test<S>(lhs: &str, rhs: &str, options: &[TestOption<S>])
 where
-    S: Default + HasComponent<script::Component>,
+    S: Default + HasComponent<TestingComponent>,
 {
     let options = ResolvedOptions::new(options);
 
@@ -187,7 +202,7 @@ fn compare_output<S>(
 /// The test passes if execution of the provided input fails.
 pub fn run_failure_test<S>(input: &str, options: &[TestOption<S>])
 where
-    S: Default + HasComponent<script::Component>,
+    S: Default + HasComponent<TestingComponent>,
 {
     let options = ResolvedOptions::new(options);
 
@@ -221,7 +236,7 @@ pub fn run_serde_test<S>(
     options: &[TestOption<S>],
     format: SerdeFormat,
 ) where
-    S: Default + HasComponent<script::Component> + serde::Serialize + serde::de::DeserializeOwned,
+    S: Default + HasComponent<TestingComponent> + serde::Serialize + serde::de::DeserializeOwned,
 {
     let options = ResolvedOptions::new(options);
 
@@ -251,14 +266,13 @@ pub fn run_serde_test<S>(
         }
     };
 
-    vm_1.push_source("testing2.tex", input_2).unwrap();
-    let mut output_1_2 = script::run(&mut vm_1).unwrap();
+    let mut output_1_2 = crate::testing::execute_source_code(&mut vm_1, input_2, &options).unwrap();
     output_1_1.append(&mut output_1_2);
 
     let mut vm_2 = initialize_vm(&options);
+    let combined_input = format!["{input_1}{input_2}"];
     let output_2 =
-        crate::testing::execute_source_code(&mut vm_2, format!["{input_1}{input_2}"], &options)
-            .unwrap();
+        crate::testing::execute_source_code(&mut vm_2, &combined_input, &options).unwrap();
 
     compare_output(output_1_1, &vm_1, output_2, &vm_2)
 }
@@ -296,17 +310,48 @@ pub fn initialize_vm<S: Default>(options: &ResolvedOptions<S>) -> Box<vm::VM<S>>
 }
 
 /// Execute source code in a VM with the provided options.
-pub fn execute_source_code<S, T: Into<String>>(
+fn execute_source_code<S>(
     vm: &mut vm::VM<S>,
-    source: T,
+    source: &str,
     options: &ResolvedOptions<S>,
 ) -> Result<Vec<token::Token>, Box<error::Error>>
 where
-    S: Default + HasComponent<script::Component>,
+    S: Default + HasComponent<TestingComponent>,
 {
     vm.push_source("testing.tex", source).unwrap();
-    script::set_allow_undefined_command(&mut vm.state, options.allow_undefined_commands);
-    script::run(vm)
+    vm.state.component_mut().allow_undefined_command = options.allow_undefined_commands;
+    vm.run::<Handlers>()?;
+    Ok(vm.state.component_mut().take_tokens())
+}
+
+struct Handlers;
+
+impl<S: HasComponent<TestingComponent>> vm::Handlers<S> for Handlers {
+    fn character_handler(
+        token: token::Token,
+        input: &mut vm::ExecutionInput<S>,
+    ) -> command::Result<()> {
+        input.state_mut().component_mut().tokens.push(token);
+        Ok(())
+    }
+
+    fn undefined_command_handler(
+        token: token::Token,
+        input: &mut vm::ExecutionInput<S>,
+    ) -> command::Result<()> {
+        if input.state().component().allow_undefined_command {
+            Handlers::character_handler(token, input)
+        } else {
+            Err(error::UndefinedCommandError::new(input.vm(), token).into())
+        }
+    }
+
+    fn unexpanded_expansion_command(
+        token: token::Token,
+        input: &mut vm::ExecutionInput<S>,
+    ) -> command::Result<()> {
+        Handlers::character_handler(token, input)
+    }
 }
 
 /// Macro to generate a suite of unit tests

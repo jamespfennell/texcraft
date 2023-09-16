@@ -195,20 +195,20 @@ pub fn get_newintarray_getter_provider<S: HasComponent<Component>>() -> command:
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::testing::*;
     use crate::the::get_the;
-    use crate::{script, testing::*};
     use texlang::vm::implement_has_component;
 
     #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     struct State {
         alloc: Component,
-        script: script::Component,
+        testing: TestingComponent,
     }
 
     impl TexlangState for State {}
 
-    implement_has_component![State, (Component, alloc), (script::Component, script),];
+    implement_has_component![State, (Component, alloc), (TestingComponent, testing),];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
