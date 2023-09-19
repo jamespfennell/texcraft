@@ -1,6 +1,6 @@
 //! Number parsing.
 //!
-//! The number may be octal, decimal_, hexadecimal_, cast from a character token, or read
+//! The number may be octal, decimal, hexadecimal, cast from a character token, or read
 //! from an internal registers. The full definition of a number in the TeX grammar
 //! is given on page X of the TeXBook.
 
@@ -17,6 +17,7 @@ impl<S: TexlangState> Parsable<S> for i32 {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Uint<const N: usize>(pub usize);
 
 impl Uint<0> {
@@ -27,11 +28,15 @@ impl<S: TexlangState, const N: usize> Parsable<S> for Uint<N> {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
         let (first_token, i): (token::Token, i32) = parse_number_internal(input)?;
         if i < 0 || i as usize >= N {
-            Err(OutOfBoundsError::<N> {
-                first_token: input.trace(first_token),
-                got: i,
-            }
-            .into())
+            S::recoverable_error_hook(
+                input.vm(),
+                OutOfBoundsError::<N> {
+                    first_token: input.trace(first_token),
+                    got: i,
+                }
+                .into(),
+            )?;
+            Ok(Uint(0))
         } else {
             Ok(Uint(i as usize))
         }
@@ -377,6 +382,7 @@ mod tests {
         (octal_15, "'17", 15),
         (octal_129, "'201", 129),
         (octal_max, "'17777777777", 2147483647),
+        (octal_min, "-'17777777777", -2147483647),
         (decimal_0, "0", 0),
         (decimal_1, "1", 1),
         (decimal_2, "2", 2),
@@ -400,6 +406,7 @@ mod tests {
         (decimal_1_with_0_padding, "00019", 19),
         (decimal_201, "201", 201),
         (decimal_max, "2147483647", 2147483647),
+        (decimal_min, "-2147483647", -2147483647),
         (hexadecimal_0, "\"0", 0),
         (hexadecimal_1, "\"1", 1),
         (hexadecimal_2, "\"2", 2),
@@ -434,6 +441,7 @@ mod tests {
         (hexadecimal_31, "\"1F", 31),
         (hexadecimal_513, "\"201", 513),
         (hexadecimal_max, "\"7FFFFFFF", 2147483647),
+        (hexadecimal_min, "-\"7FFFFFFF", -2147483647),
         (number_from_character, "`A", 65),
         (number_from_length_1_control_sequence, r"`\A", 65),
         (number_from_character_non_ascii, "`ö", 0x00F6),
@@ -447,8 +455,6 @@ mod tests {
         (signs_plus_minus, r"+-4", -4),
         (signs_minus_minus, r"--4", 4),
         (signs_minus_minus_spaces, r"  -  - 4", 4),
-        // BUG: variable `\count 0 -4 \count -\count 0 3` works in pdftex!
-        // POSSIBLE BUG: how about -(2^31)? Should work?
     ];
 
     #[derive(Default)]
@@ -473,7 +479,13 @@ mod tests {
         (octal_too_big, "'177777777770"),
         (octal_empty, "'"),
         (decimal_too_big, "2147483648"),
+        (decimal_too_negative, "-2147483648"),
         (hexadecimal_too_big, "\"7FFFFFFF0"),
         (hexadecimal_empty, "\""),
+    ];
+
+    parse_failure_recovery_tests![
+        (number_too_big, "16", Uint::<16>(0)),
+        (number_is_negative, "-1", Uint::<16>(0)),
     ];
 }

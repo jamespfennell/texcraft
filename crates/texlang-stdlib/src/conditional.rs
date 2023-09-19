@@ -573,7 +573,10 @@ mod tests {
 
     impl TexlangState for State {}
 
-    implement_has_component![State, (Component, conditional), (TestingComponent, testing),];
+    implement_has_component![State {
+        conditional: Component,
+        testing: TestingComponent,
+    }];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([

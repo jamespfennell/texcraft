@@ -169,6 +169,7 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn
         state,
         cs_name_interner,
         tracer,
+        ..
     } = input.vm_parts();
     #[derive(Copy, Clone, PartialEq, Eq)]
     enum Mode {
@@ -408,13 +409,12 @@ mod tests {
         }
     }
 
-    implement_has_component![
-        State,
-        (conditional::Component, conditional),
-        (Component<16>, input),
-        (prefix::Component, prefix),
-        (TestingComponent, testing),
-    ];
+    implement_has_component![State{
+        conditional: conditional::Component,
+        input: Component<16>,
+        prefix: prefix::Component,
+        testing: TestingComponent,
+    }];
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([

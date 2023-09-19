@@ -6,7 +6,15 @@ use crate::vm;
 use texcraft_stdext::algorithms::spellcheck::{self, WordDiff};
 
 pub mod display;
+#[cfg(feature = "serde")]
+mod serde;
 
+/// Texlang error type
+///
+/// Note that serializing and deserializing this type results in type erasure.
+/// Also the serialization format is private.
+/// This is not by design: the minimal amount of work was done to make the type
+///     serializable, and future work to make this better is welcome!
 #[derive(Debug)]
 pub enum Error {
     Tex(Box<dyn TexError + 'static>),
@@ -16,6 +24,28 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         display::format_error(f, self)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl ::serde::Serialize for Error {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ::serde::Serializer,
+    {
+        let serializable_error: serde::Error = self.into();
+        serializable_error.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> ::serde::Deserialize<'de> for Error {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        let serializable_error = serde::Error::deserialize(deserializer)?;
+        Ok(serializable_error.into())
     }
 }
 
@@ -105,7 +135,8 @@ pub trait TexError: std::fmt::Debug {
     // The method will return a vector of static strings
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
 pub enum PropagationContext {
     Expansion,
     Execution,
