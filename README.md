@@ -1,10 +1,10 @@
 # Texcraft
 
-Texcraft is a project to create a composable, LLVM-style infrastructure for building TeX software.
+Texcraft is an experimental project to create a composable, LLVM-style framework for building TeX software.
 
 Existing TeX engines (Knuth's original TeX '82, pdfTeX, XeTeX, etc.)
     all have monolithic software architectures and do not share code amongst themselves.
-The goal of Texcraft is change this by doing for TeX engines what
+The goal of Texcraft is change this by essentially doing for TeX engines what
     [LLVM](https://en.wikipedia.org/wiki/LLVM) did for compilers.
 In Texcraft, a TeX engine is implemented as a loose collection of libraries that compose together
     using well-defined APIs.

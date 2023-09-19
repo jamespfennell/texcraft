@@ -357,6 +357,11 @@ mod test {
     }
 
     test_suite![
+        state(State),
+        options(
+            TestOption::InitialCommands(initial_commands),
+            TestOption::AllowUndefinedCommands(true),
+        ),
         expansion_equality_tests(
             (def_parsed_successfully, r"\def\A{abc}", ""),
             (output_is_correct, r"\def\A{abc}\A", "abc"),

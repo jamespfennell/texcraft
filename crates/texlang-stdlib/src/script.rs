@@ -149,9 +149,7 @@ mod tests {
 
     impl vm::TexlangState for State {}
 
-    implement_has_component![State{
-        script: Component,
-    }];
+    implement_has_component![State { script: Component }];
 
     fn run_script_test(input: &str, want: &str) {
         let built_ins = HashMap::from([("par", get_par()), ("newline", get_newline())]);

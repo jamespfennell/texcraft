@@ -1,5 +1,6 @@
 {
     "cSpell.words": [
+        "batchmode",
         "bincode",
         "catcode",
         "catcodecmd",
@@ -8,6 +9,8 @@
         "countdef",
         "endinput",
         "endlinechar",
+        "errormode",
+        "errorstopmode",
         "expandafter",
         "Freyler",
         "futurelet",
@@ -38,10 +41,12 @@
         "newint",
         "newintarray",
         "noexpand",
+        "nonstopmode",
         "openin",
         "PDFTEX",
         "randtex",
         "repr",
+        "scrollmode",
         "Seedable",
         "serde",
         "stdext",

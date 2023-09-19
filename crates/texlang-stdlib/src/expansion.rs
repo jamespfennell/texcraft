@@ -310,9 +310,10 @@ mod test {
     }
 
     test_suite![
-        options(TestOption::InitialCommandsDyn(Box::new(|| {
-            initial_commands(true)
-        })),),
+        options(
+            TestOption::InitialCommandsDyn(Box::new(|| { initial_commands(true) })),
+            TestOption::AllowUndefinedCommands(true),
+        ),
         expansion_equality_tests(
             (simple_case, r"\def\a{Hello}\noexpand\a", r"\a"),
             (

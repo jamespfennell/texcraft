@@ -219,7 +219,7 @@ pub struct Parts<'a, S> {
 pub trait TexlangState: Sized {
     /// Get the cat code for the provided character.
     ///
-    /// The default implementation returns the cat code used in plainTeX.
+    /// The default implementation returns the cat code used in plain TeX.
     fn cat_code(&self, c: char) -> token::CatCode {
         token::CatCode::PLAIN_TEX_DEFAULTS
             .get(c as usize)
@@ -229,7 +229,7 @@ pub trait TexlangState: Sized {
 
     /// Get current end line char, or [None] if it's undefined.
     ///
-    /// The default implementation returns `\r`.
+    /// The default implementation returns `Some(\r)`.
     fn end_line_char(&self) -> Option<char> {
         Some('\r')
     }
@@ -270,6 +270,29 @@ pub trait TexlangState: Sized {
     fn variable_assignment_scope_hook(state: &mut Self) -> groupingmap::Scope {
         _ = state;
         groupingmap::Scope::Local
+    }
+
+    /// Hook that determines what to do when a recoverable error occurs.
+    ///
+    /// If the hook returns `Ok(())` then the recovery process should run.
+    /// If the hook returns an error, then that error should be returned from the enclosing
+    ///     function and propagated through the VM.
+    ///
+    /// Note that there is no requirement that an error returned from this hook
+    ///     is the same as the error provided to the hook.
+    /// For example, when Knuth's TeX is running in batch mode errors are generally
+    ///      logged but recovered from.
+    /// However if 100 such errors occur, the interpreter fails.
+    /// To implement this in Texlang, the result of this function would be `Ok(())`
+    ///     for the first 99 errors,
+    ///     but after the 100th error a "too many errors" error would be returned from the hook.
+    /// Note that the returned error in this case is not the 100th error itself.
+    fn recoverable_error_hook(
+        vm: &VM<Self>,
+        recoverable_error: Box<error::Error>,
+    ) -> Result<(), Box<error::Error>> {
+        _ = vm;
+        Err(recoverable_error)
     }
 }
 
@@ -539,7 +562,7 @@ impl Ord for TokenBuffer {
 /// The component pattern is a ubiquitous design pattern in Texlang.
 /// It is used when implementing TeX commands that require state.
 /// An example of a stateful TeX command is `\year`, which needs to store the current year somewhere.
-/// 
+///
 /// When the component pattern is used, a stateful TeX command
 ///     can have a single implementation that
 ///     is used by multiple TeX engines built with Texlang.
@@ -653,7 +676,7 @@ pub trait HasComponent<C>: TexlangState {
 #[macro_export]
 macro_rules! implement_has_component {
     ($type: path {
-        $( $field: ident: $component: path,)+
+        $( $field: ident: $component: path ),+ $(,)?
     }) => {
         $(
             impl ::texlang::vm::HasComponent<$component> for $type {

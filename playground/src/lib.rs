@@ -168,6 +168,11 @@ mod tests {
                 .into_keys()
                 .collect();
         let intentionally_missing: HashSet<&'static str> = vec![
+            // Supporting error modes doesn't seem really useful for the Playground
+            "batchmode",
+            "errorstopmode",
+            "nonstopmode",
+            "scrollmode",
             // Playground doesn't have access to a filesystem (yet?)
             "closein",
             "openin",

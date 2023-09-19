@@ -401,8 +401,8 @@ impl<S: TexlangState> TokenStream for ExecutionInput<S> {
 impl<S> ExecutionInput<S> {
     /// Creates a mutable reference to this type from the [VM](vm::VM) type.
     #[inline]
-    pub fn new(state: &mut vm::VM<S>) -> &mut ExecutionInput<S> {
-        unsafe { &mut *(state as *mut vm::VM<S> as *mut ExecutionInput<S>) }
+    pub fn new(vm: &mut vm::VM<S>) -> &mut ExecutionInput<S> {
+        unsafe { &mut *(vm as *mut vm::VM<S> as *mut ExecutionInput<S>) }
     }
 
     #[inline]

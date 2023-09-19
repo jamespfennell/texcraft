@@ -20,6 +20,7 @@ pub mod chardef;
 pub mod conditional;
 pub mod def;
 pub mod endlinechar;
+pub mod errormode;
 pub mod expansion;
 pub mod input;
 pub mod job;
@@ -43,6 +44,7 @@ pub struct StdLibState {
     pub catcode: catcode::Component,
     pub conditional: conditional::Component,
     pub end_line_char: endlinechar::Component,
+    pub error_mode: errormode::Component,
     pub input: input::Component<16>,
     pub job: job::Component,
     pub prefix: prefix::Component,
@@ -92,6 +94,13 @@ impl TexlangState for StdLibState {
     ) -> texcraft_stdext::collections::groupingmap::Scope {
         prefix::variable_assignment_scope_hook(state)
     }
+
+    fn recoverable_error_hook(
+        vm: &vm::VM<Self>,
+        recoverable_error: Box<texlang::error::Error>,
+    ) -> Result<(), Box<texlang::error::Error>> {
+        errormode::recoverable_error_hook(vm, recoverable_error)
+    }
 }
 
 impl StdLibState {
@@ -99,6 +108,8 @@ impl StdLibState {
     {
         HashMap::from([
             ("advance", math::get_advance()),
+            //
+            ("batchmode", errormode::get_batchmode()),
             //
             ("catcode", catcode::get_catcode()),
             ("closein", input::get_closein()),
@@ -115,6 +126,7 @@ impl StdLibState {
             ("else", conditional::get_else()),
             ("endinput", input::get_endinput()),
             ("endlinechar", endlinechar::get_endlinechar()),
+            ("errorstopmode", errormode::get_errorstopmode()),
             ("expandafter", expansion::get_expandafter_optimized()),
             //
             ("fi", conditional::get_fi()),
@@ -150,6 +162,7 @@ impl StdLibState {
                 alloc::get_newintarray_getter_provider(),
             ),
             ("noexpand", expansion::get_noexpand()),
+            ("nonstopmode", errormode::get_nonstopmode()),
             //
             ("or", conditional::get_or()),
             ("openin", input::get_openin()),
@@ -158,6 +171,7 @@ impl StdLibState {
             ("read", input::get_read()),
             ("relax", expansion::get_relax()),
             //
+            ("scrollmode", errormode::get_scrollmode()),
             ("sleep", sleep::get_sleep()),
             //
             ("the", the::get_the()),
@@ -181,6 +195,7 @@ implement_has_component![StdLibState{
     catcode: catcode::Component,
     conditional: conditional::Component,
     end_line_char: endlinechar::Component,
+    error_mode: errormode::Component,
     input: input::Component<16>,
     job: job::Component,
     prefix: prefix::Component,
@@ -195,7 +210,11 @@ implement_has_component![StdLibState{
 
 impl texlang_common::HasLogging for StdLibState {}
 impl texlang_common::HasFileSystem for StdLibState {}
-impl texlang_common::HasTerminalIn for StdLibState {}
+impl texlang_common::HasTerminalIn for StdLibState {
+    fn terminal_in(&self) -> std::rc::Rc<std::cell::RefCell<dyn texlang_common::TerminalIn>> {
+        self.error_mode.terminal_in()
+    }
+}
 
 /// A TeX snippet that exercises some error case in the standard library.
 pub struct ErrorCase {
@@ -351,10 +370,9 @@ mod tests {
 
     #[test]
     fn all_error_cases() {
-        let options = vec![
-            TestOption::InitialCommands(StdLibState::all_initial_built_ins),
-            TestOption::AllowUndefinedCommands(false),
-        ];
+        let options = vec![TestOption::InitialCommands(
+            StdLibState::all_initial_built_ins,
+        )];
         for case in ErrorCase::all_error_cases() {
             println!("CASE {}", case.description);
             testing::run_failure_test::<StdLibState>(case.source_code, &options)

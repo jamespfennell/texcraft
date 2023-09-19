@@ -169,6 +169,7 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn
         state,
         cs_name_interner,
         tracer,
+        ..
     } = input.vm_parts();
     #[derive(Copy, Clone, PartialEq, Eq)]
     enum Mode {

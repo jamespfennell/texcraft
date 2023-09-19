@@ -135,7 +135,14 @@ mod tests {
         testing: TestingComponent,
     }
 
-    impl TexlangState for State {}
+    impl TexlangState for State {
+        fn recoverable_error_hook(
+            vm: &vm::VM<Self>,
+            recoverable_error: Box<error::Error>,
+        ) -> Result<(), Box<error::Error>> {
+            TestingComponent::recoverable_error_hook(vm, recoverable_error)
+        }
+    }
 
     implement_has_component![State{
         registers_i32: Component<i32, 256>,
@@ -160,6 +167,11 @@ mod tests {
                 write_and_read_register_eq,
                 r"\count 23 = 4 \the\count 23",
                 r"4"
+            ),
+            (
+                negative_negative,
+                r"\count 1=5000 \count 0=-1 \the \count -\count 0",
+                r"5000"
             ),
             (countdef_base_case, r"\countdef\A 23\A 4 \the\A", r"4"),
             (countdef_base_case_eq, r"\countdef\A = 23\A 4 \the\A", r"4"),
@@ -198,11 +210,22 @@ mod tests {
                 r"\the \count 1 } \the \count 1"
             ),
         ),
-        failure_tests(
-            (write_register_index_too_big, r"\count 260 = 4"),
-            (write_register_negative_index, r"\count -1 = 4"),
-            (countdef_register_index_too_big, r"\countdef\A 260 \A= 4"),
-            // (recursive, format![r"\the {} 0", r"\count".repeat(1000)]),
+        recoverable_failure_tests(
+            (
+                write_register_index_too_big,
+                r"\count 260 = 4 \the\count 0",
+                "4"
+            ),
+            (
+                write_register_negative_index,
+                r"\count -1 = 4 \the\count 0",
+                "4"
+            ),
+            (
+                countdef_register_index_too_big,
+                r"\countdef\A 260 \A= 4 \the\count 0",
+                "4"
+            ),
         ),
     ];
 }

@@ -21,6 +21,8 @@ use texlang::*;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TestingComponent {
     allow_undefined_command: bool,
+    recover_from_errors: bool,
+    num_recovered_errors: std::cell::RefCell<usize>,
     tokens: Vec<token::Token>,
     integer: i32,
 }
@@ -30,6 +32,19 @@ impl TestingComponent {
         let mut result = Vec::new();
         std::mem::swap(&mut result, &mut self.tokens);
         result
+    }
+    pub fn recoverable_error_hook<S: HasComponent<Self>>(
+        vm: &VM<S>,
+        recoverable_error: Box<error::Error>,
+    ) -> Result<(), Box<error::Error>> {
+        let component = vm.state.component();
+        if component.recover_from_errors {
+            let mut num_recovered_errors = component.num_recovered_errors.borrow_mut();
+            *num_recovered_errors += 1;
+            Ok(())
+        } else {
+            Err(recoverable_error)
+        }
     }
 }
 
@@ -49,6 +64,12 @@ impl TexlangState for State {
         state: &mut Self,
     ) -> texcraft_stdext::collections::groupingmap::Scope {
         prefix::variable_assignment_scope_hook(state)
+    }
+    fn recoverable_error_hook(
+        vm: &VM<Self>,
+        recoverable_error: Box<error::Error>,
+    ) -> Result<(), Box<error::Error>> {
+        TestingComponent::recoverable_error_hook(vm, recoverable_error)
     }
 }
 
@@ -96,19 +117,28 @@ pub enum TestOption<'a, S> {
     ///
     /// Overrides previous `AllowUndefinedCommands` options.
     AllowUndefinedCommands(bool),
+
+    /// Whether to recover from errors.
+    ///
+    /// Overrides previous `RecoverFromErrors` options.
+    RecoverFromErrors(bool),
 }
 
 /// Run an expansion equality test.
 ///
 /// The test passes if the two provided input strings expand to the same tokens.
-pub fn run_expansion_equality_test<S>(lhs: &str, rhs: &str, options: &[TestOption<S>])
-where
+pub fn run_expansion_equality_test<S>(
+    lhs: &str,
+    rhs: &str,
+    expect_recoverable_errors: bool,
+    options: &[TestOption<S>],
+) where
     S: Default + HasComponent<TestingComponent>,
 {
     let options = ResolvedOptions::new(options);
 
     let mut vm_1 = initialize_vm(&options);
-    let output_1 = crate::testing::execute_source_code(&mut vm_1, lhs, &options)
+    let (output_1, _) = execute_source_code(&mut vm_1, lhs, &options)
         .map_err(|err| {
             println!("{err}");
             err
@@ -116,13 +146,26 @@ where
         .unwrap();
 
     let mut vm_2 = initialize_vm(&options);
-    let output_2 = crate::testing::execute_source_code(&mut vm_2, rhs, &options)
+    let (output_2, _) = execute_source_code(&mut vm_2, rhs, &options)
         .map_err(|err| {
             println!("{err}");
             err
         })
         .unwrap();
-    compare_output(output_1, &vm_1, output_2, &vm_2)
+    compare_output(output_1, &vm_1, output_2, &vm_2);
+
+    let num_recovered_errors = *vm_1.state.component().num_recovered_errors.borrow();
+    match (expect_recoverable_errors, num_recovered_errors) {
+        (true, 0) => {
+            panic!("expected recoverable errors but didn't have any");
+        }
+        (true, _) | (false, 0) => (),
+        (false, i) => {
+            panic!(
+                "did not expect recoverable errors but had {i} recoverable errors",
+            );
+        }
+    }
 }
 
 fn compare_output<S>(
@@ -207,7 +250,7 @@ where
 
     let mut vm = initialize_vm(&options);
     let result = execute_source_code(&mut vm, input, &options);
-    if let Ok(output) = result {
+    if let Ok((output, _)) = result {
         println!("Expansion succeeded:");
         println!(
             "{}",
@@ -240,7 +283,7 @@ pub fn run_serde_test<S>(
     let options = ResolvedOptions::new(options);
 
     let mut vm_1 = initialize_vm(&options);
-    let mut output_1_1 = crate::testing::execute_source_code(&mut vm_1, input_1, &options).unwrap();
+    let (mut output_1_1, _) = execute_source_code(&mut vm_1, input_1, &options).unwrap();
 
     let mut vm_1 = match format {
         SerdeFormat::Json => {
@@ -265,21 +308,21 @@ pub fn run_serde_test<S>(
         }
     };
 
-    let mut output_1_2 = crate::testing::execute_source_code(&mut vm_1, input_2, &options).unwrap();
+    let (mut output_1_2, _) = execute_source_code(&mut vm_1, input_2, &options).unwrap();
     output_1_1.append(&mut output_1_2);
 
     let mut vm_2 = initialize_vm(&options);
     let combined_input = format!["{input_1}{input_2}"];
-    let output_2 =
-        crate::testing::execute_source_code(&mut vm_2, &combined_input, &options).unwrap();
+    let (output_2, _) = execute_source_code(&mut vm_2, &combined_input, &options).unwrap();
 
     compare_output(output_1_1, &vm_1, output_2, &vm_2)
 }
 
-pub struct ResolvedOptions<'a, S> {
+struct ResolvedOptions<'a, S> {
     initial_commands: &'a dyn Fn() -> HashMap<&'static str, command::BuiltIn<S>>,
     custom_vm_initialization: &'a dyn Fn(&mut VM<S>),
     allow_undefined_commands: bool,
+    recover_from_errors: bool,
 }
 
 impl<'a, S> ResolvedOptions<'a, S> {
@@ -287,7 +330,8 @@ impl<'a, S> ResolvedOptions<'a, S> {
         let mut resolved = Self {
             initial_commands: &HashMap::new,
             custom_vm_initialization: &|_| {},
-            allow_undefined_commands: true,
+            allow_undefined_commands: false,
+            recover_from_errors: false,
         };
         for option in options {
             match option {
@@ -296,13 +340,14 @@ impl<'a, S> ResolvedOptions<'a, S> {
                 TestOption::CustomVMInitialization(f) => resolved.custom_vm_initialization = f,
                 TestOption::CustomVMInitializationDyn(f) => resolved.custom_vm_initialization = f,
                 TestOption::AllowUndefinedCommands(b) => resolved.allow_undefined_commands = *b,
+                TestOption::RecoverFromErrors(b) => resolved.recover_from_errors = *b,
             }
         }
         resolved
     }
 }
 
-pub fn initialize_vm<S: Default>(options: &ResolvedOptions<S>) -> Box<vm::VM<S>> {
+fn initialize_vm<S: Default>(options: &ResolvedOptions<S>) -> Box<vm::VM<S>> {
     let mut vm = VM::<S>::new((options.initial_commands)());
     (options.custom_vm_initialization)(&mut vm);
     vm
@@ -313,14 +358,24 @@ fn execute_source_code<S>(
     vm: &mut vm::VM<S>,
     source: &str,
     options: &ResolvedOptions<S>,
-) -> Result<Vec<token::Token>, Box<error::Error>>
+) -> Result<(Vec<token::Token>, usize), Box<error::Error>>
 where
     S: Default + HasComponent<TestingComponent>,
 {
     vm.push_source("testing.tex", source).unwrap();
-    vm.state.component_mut().allow_undefined_command = options.allow_undefined_commands;
+    {
+        let mut component = vm.state.component_mut();
+        component.allow_undefined_command = options.allow_undefined_commands;
+        component.recover_from_errors = options.recover_from_errors;
+        *component.num_recovered_errors.borrow_mut() = 0;
+    }
     vm.run::<Handlers>()?;
-    Ok(vm.state.component_mut().take_tokens())
+    Ok({
+        let component = vm.state.component_mut();
+        let tokens = component.take_tokens();
+        let num_recovered_errors = *component.num_recovered_errors.borrow();
+        (tokens, num_recovered_errors)
+    })
 }
 
 struct Handlers;
@@ -404,7 +459,7 @@ macro_rules! test_suite {
                 let lhs = $lhs;
                 let rhs = $rhs;
                 let options = vec! $options;
-                $crate::testing::run_expansion_equality_test::<$state>(&lhs, &rhs, &options);
+                run_expansion_equality_test::<$state>(&lhs, &rhs, false, &options);
             }
         )*
     );
@@ -421,7 +476,7 @@ macro_rules! test_suite {
                     let lhs = $lhs;
                     let rhs = $rhs;
                     let options = vec! $options;
-                    $crate::testing::run_serde_test::<$state>(&lhs, &rhs, &options, $crate::testing::SerdeFormat::Json);
+                    run_serde_test::<$state>(&lhs, &rhs, &options, SerdeFormat::Json);
                 }
                 #[cfg_attr(not(feature = "serde"), ignore)]
                 #[test]
@@ -429,7 +484,7 @@ macro_rules! test_suite {
                     let lhs = $lhs;
                     let rhs = $rhs;
                     let options = vec! $options;
-                    $crate::testing::run_serde_test::<$state>(&lhs, &rhs, &options, $crate::testing::SerdeFormat::MessagePack);
+                    run_serde_test::<$state>(&lhs, &rhs, &options, SerdeFormat::MessagePack);
                 }
                 #[cfg_attr(not(feature = "serde"), ignore)]
                 #[test]
@@ -437,18 +492,42 @@ macro_rules! test_suite {
                     let lhs = $lhs;
                     let rhs = $rhs;
                     let options = vec! $options;
-                    $crate::testing::run_serde_test::<$state>(&lhs, &rhs, &options, $crate::testing::SerdeFormat::BinCode);
+                    run_serde_test::<$state>(&lhs, &rhs, &options, SerdeFormat::BinCode);
                 }
             }
         )*
     );
+    // TODO: rename unrecoverable_error_test
     ( state($state: ty), options $options: tt, failure_tests ( $( ($name: ident, $input: expr $(,)? ) ),* $(,)? ) $(,)? ) => (
         $(
             #[test]
             fn $name() {
                 let input = $input;
                 let options = vec! $options;
-                $crate::testing::run_failure_test::<$state>(&input, &options);
+                run_failure_test::<$state>(&input, &options);
+            }
+        )*
+    );
+    ( state($state: ty), options $options: tt, recoverable_failure_tests ( $( ($name: ident, $lhs: expr, $rhs: expr $(,)? ) ),* $(,)? ) $(,)? ) => (
+        $(
+            mod $name {
+                use super::*;
+                #[test]
+                fn error_recovery_enabled() {
+                    let lhs = $lhs;
+                    let rhs = $rhs;
+                    let mut options = vec! $options;
+                    options.push(TestOption::RecoverFromErrors(true));
+                    // TODO: verify a recoverable error was thrown?
+                    run_expansion_equality_test::<$state>(&lhs, &rhs, true, &options);
+                }
+                #[test]
+                fn error_recovery_disabled() {
+                    let input = $lhs;
+                    let mut options = vec! $options;
+                    options.push(TestOption::RecoverFromErrors(false));
+                    run_failure_test::<$state>(&input, &options);
+                }
             }
         )*
     );

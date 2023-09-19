@@ -441,7 +441,7 @@ mod test {
         }
     }
 
-    implement_has_component![State{
+    implement_has_component![State {
         prefix: Component,
         testing: TestingComponent,
     }];
