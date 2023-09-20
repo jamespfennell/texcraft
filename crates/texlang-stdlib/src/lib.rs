@@ -363,7 +363,12 @@ mod tests {
                 texbook_exercise_20_7,
                 r"\catcode`\[=1 \catcode`\]=2 \catcode`\!=6 \def\!!1#2![{!#]#!!2}\! x{[y]][z}",
                 r"\catcode`\[=1 \catcode`\]=2 \catcode`\!=6 {#]![y][z}",
-            )
+            ),
+            (
+                variable_assignment_space_before_equal,
+                r"\def\assign#1{#1   =    20\relax}\assign\year\the\year",
+                "20",
+            ),
         ),
         serde_tests((serde_sanity, r"\def\HW{Hello World} ", r"\HW"),),
     ];

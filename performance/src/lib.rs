@@ -83,7 +83,8 @@ impl Default for Weights {
 
 pub fn generate_random_tex_document(
     rng: &mut rand::prelude::StdRng,
-    num_lines: usize,
+    max_bytes: usize,
+    max_lines: usize,
     macro_length_bounds: (usize, usize),
     line_length_bounds: (usize, usize),
     num_cs_names: usize,
@@ -99,18 +100,21 @@ pub fn generate_random_tex_document(
     // 2 lines of comments and the final \end are always included
     let mut num_lines_generated: usize = 3;
     loop {
+        if result.len() >= max_bytes {
+             break;
+        }
         let range = if macro_length_bounds.1 < macro_length_bounds.0 {
             macro_length_bounds.1..macro_length_bounds.1 + 1
         } else {
             macro_length_bounds.0..macro_length_bounds.1 + 1
         };
         // There is a risk that we generate too many lines.
-        let range = if num_lines_generated + macro_length_bounds.1 + 2 > num_lines {
-            if num_lines_generated + macro_length_bounds.0 + 2 >= num_lines {
+        let range = if num_lines_generated + macro_length_bounds.1 + 2 > max_lines {
+            if num_lines_generated + macro_length_bounds.0 + 2 >= max_lines {
                 break;
             }
             // The range is non empty because of the inverse of the previous conditional.
-            macro_length_bounds.0..num_lines - num_lines_generated - 2
+            macro_length_bounds.0..max_lines - num_lines_generated - 2
         } else {
             range
         };

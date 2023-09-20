@@ -58,6 +58,7 @@ fn main() {
         "{}",
         performance::generate_random_tex_document(
             &mut rng,
+            usize::MAX,
             args.num_lines.unwrap_or(20),
             (
                 args.macro_length_min.unwrap_or(10),

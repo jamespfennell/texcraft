@@ -1,5 +1,6 @@
 {
     "cSpell.words": [
+        "afterassignment",
         "batchmode",
         "bincode",
         "catcode",
@@ -44,6 +45,7 @@
         "nonstopmode",
         "openin",
         "PDFTEX",
+        "primality",
         "randtex",
         "repr",
         "scrollmode",
