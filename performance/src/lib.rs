@@ -101,7 +101,7 @@ pub fn generate_random_tex_document(
     let mut num_lines_generated: usize = 3;
     loop {
         if result.len() >= max_bytes {
-             break;
+            break;
         }
         let range = if macro_length_bounds.1 < macro_length_bounds.0 {
             macro_length_bounds.1..macro_length_bounds.1 + 1

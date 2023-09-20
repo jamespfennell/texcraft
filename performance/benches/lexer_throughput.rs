@@ -5,7 +5,10 @@ pub fn lexer_throughput_bench(c: &mut Criterion) {
     let mb = match std::env::var("LEXER_THROUGHPUT_MB") {
         Ok(val) => match val.parse::<usize>() {
             Ok(val) => val,
-            Err(_) => panic!["Failed to parse env var LEXER_THROUGHPUT_MB={} as an integer", val],
+            Err(_) => panic![
+                "Failed to parse env var LEXER_THROUGHPUT_MB={} as an integer",
+                val
+            ],
         },
         Err(_) => 19,
     };

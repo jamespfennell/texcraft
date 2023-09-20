@@ -161,9 +161,7 @@ pub fn run_expansion_equality_test<S>(
         }
         (true, _) | (false, 0) => (),
         (false, i) => {
-            panic!(
-                "did not expect recoverable errors but had {i} recoverable errors",
-            );
+            panic!("did not expect recoverable errors but had {i} recoverable errors",);
         }
     }
 }

@@ -6,7 +6,10 @@ pub fn digits_of_pi_bench(c: &mut Criterion) {
     let n = match std::env::var("DIGITS_OF_PI_N") {
         Ok(val) => match val.parse::<usize>() {
             Ok(val) => val,
-            Err(_) => panic!["Failed to parse env var DIGITS_OF_PI_N={} as an integer", val],
+            Err(_) => panic![
+                "Failed to parse env var DIGITS_OF_PI_N={} as an integer",
+                val
+            ],
         },
         Err(_) => 175,
     };

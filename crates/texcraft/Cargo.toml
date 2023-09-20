@@ -1,14 +1,28 @@
 [package]
 name = "texcraft"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
-description = "A meta crate"
+description = "A crate of binaries from the Texcraft project"
 homepage = "https://texcraft.dev"
 repository = "https://github.com/jamespfennell/texcraft"
 keywords = ["tex", "texcraft"]
 
 [dependencies]
-texcraft-stdext = { path = "../texcraft-stdext", version = "0.1.0" }
-texlang = { path = "../texlang", version = "0.1.0" }
-texlang-stdlib = { path = "../texlang-stdlib", version = "0.1.0" }
+clap = {version="4.3.3", default-features=false, features=["std", "derive"]}
+colored = "2"
+rand = "0.8.4"
+rmp-serde = {version="^1.0"}
+serde_json = {version="1.0"} 
+
+texlang = { path = "../texlang" }
+texlang-stdlib = { path = "../texlang-stdlib", features = ["repl", "serde"]}
+performance = {path = "../../performance"}
+
+[[bin]]
+name = "texcraft"
+path = "src/texcraft.rs"
+
+[[bin]]
+name = "randtex"
+path = "src/randtex.rs"
