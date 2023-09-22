@@ -39,7 +39,8 @@ pub fn run(
 #[derive(Default)]
 struct PlaygroundState {
     alloc: alloc::Component,
-    catcode: catcode::Component,
+    codes_cat_code: codes::Component<token::CatCode>,
+    codes_math_code: codes::Component<types::MathCode>,
     conditional: conditional::Component,
     end_line_char: endlinechar::Component,
     prefix: prefix::Component,
@@ -51,7 +52,7 @@ struct PlaygroundState {
 
 impl TexlangState for PlaygroundState {
     fn cat_code(&self, c: char) -> texlang::token::CatCode {
-        catcode::cat_code(self, c)
+        codes::cat_code(self, c)
     }
 
     fn expansion_override_hook(
@@ -69,7 +70,8 @@ impl TexlangState for PlaygroundState {
 
 implement_has_component![PlaygroundState{
     alloc: alloc::Component,
-    catcode: catcode::Component,
+    codes_cat_code: codes::Component<token::CatCode>,
+    codes_math_code: codes::Component<types::MathCode>,
     conditional: conditional::Component,
     end_line_char: endlinechar::Component,
     prefix: prefix::Component,
@@ -88,7 +90,7 @@ fn initial_primitives() -> HashMap<&'static str, command::BuiltIn<PlaygroundStat
         //
         ("advance", math::get_advance()),
         //
-        ("catcode", catcode::get_catcode()),
+        ("catcode", codes::get_catcode()),
         ("chardef", chardef::get_chardef()),
         ("count", registers::get_count()),
         ("countdef", registers::get_countdef()),
@@ -118,6 +120,8 @@ fn initial_primitives() -> HashMap<&'static str, command::BuiltIn<PlaygroundStat
         ("let", alias::get_let()),
         ("long", prefix::get_long()),
         //
+        ("mathchardef", mathchardef::get_mathchardef()),
+        ("mathcode", codes::get_mathcode()),
         ("month", time::get_month()),
         ("multiply", math::get_multiply()),
         //

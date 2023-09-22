@@ -380,29 +380,49 @@ struct Handlers;
 
 impl<S: HasComponent<TestingComponent>> vm::Handlers<S> for Handlers {
     fn character_handler(
-        token: token::Token,
         input: &mut vm::ExecutionInput<S>,
+        token: token::Token,
+        _: char,
     ) -> command::Result<()> {
         input.state_mut().component_mut().tokens.push(token);
         Ok(())
     }
 
-    fn undefined_command_handler(
-        token: token::Token,
+    fn math_character_handler(
         input: &mut vm::ExecutionInput<S>,
+        token: token::Token,
+        math_character: types::MathCode,
+    ) -> Result<(), Box<error::Error>> {
+        let s = format!("{math_character:?}");
+        for c in s.chars() {
+            let token = if c.is_ascii_alphabetic() {
+                token::Token::new_letter(c, token.trace_key())
+            } else {
+                token::Token::new_other(c, token.trace_key())
+            };
+            input.state_mut().component_mut().tokens.push(token);
+        }
+        Ok(())
+    }
+
+    fn undefined_command_handler(
+        input: &mut vm::ExecutionInput<S>,
+        token: token::Token,
     ) -> command::Result<()> {
         if input.state().component().allow_undefined_command {
-            Handlers::character_handler(token, input)
+            input.state_mut().component_mut().tokens.push(token);
+            Ok(())
         } else {
             Err(error::UndefinedCommandError::new(input.vm(), token).into())
         }
     }
 
     fn unexpanded_expansion_command(
-        token: token::Token,
         input: &mut vm::ExecutionInput<S>,
+        token: token::Token,
     ) -> command::Result<()> {
-        Handlers::character_handler(token, input)
+        input.state_mut().component_mut().tokens.push(token);
+        Ok(())
     }
 }
 

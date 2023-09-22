@@ -70,6 +70,7 @@ impl<S: TexlangState> Parsable<S> for char {
     }
 }
 
+// TODO: move to types/catcode.rs
 impl<S: TexlangState> Parsable<S> for token::CatCode {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
         let (token, i): (token::Token, i32) = parse_number_internal(input)?;
@@ -78,15 +79,19 @@ impl<S: TexlangState> Parsable<S> for token::CatCode {
                 return Ok(cat_code);
             }
         }
-        Err(parse::Error {
-            expected: "a category code number (an integer in the range [0, 15])".into(),
-            got: input.vm().trace(token),
-            got_override: format!["got the integer {i}"],
-            annotation_override: "this is where the number started".into(),
-            guidance: "".into(),
-            additional_notes: vec![],
-        }
-        .into())
+        S::recoverable_error_hook(
+            input.vm(),
+            parse::Error {
+                expected: "a category code number (an integer in the range [0, 15])".into(),
+                got: input.vm().trace(token),
+                got_override: format!["got the integer {i}"],
+                annotation_override: "this is where the number started".into(),
+                guidance: "".into(),
+                additional_notes: vec![],
+            }
+            .into(),
+        )?;
+        Ok(token::CatCode::try_from(0).unwrap())
     }
 }
 
@@ -136,6 +141,7 @@ fn parse_number_internal<S: TexlangState>(
                     match cmd.clone().value(first_token, stream)? {
                         variable::ValueRef::Int(i) => *i,
                         variable::ValueRef::CatCode(c) => *c as i32,
+                        variable::ValueRef::MathCode(c) => c.0 as i32,
                         variable::ValueRef::TokenList(_) => {
                             return Err(parse::Error::new(
                                 stream.vm(),
@@ -149,6 +155,7 @@ fn parse_number_internal<S: TexlangState>(
                     }
                 }
                 Some(command::Command::Character(c)) => (*c as u32).try_into().unwrap(),
+                Some(command::Command::MathCharacter(c)) => c.0 as i32,
                 None
                 | Some(
                     command::Command::Execution(..)

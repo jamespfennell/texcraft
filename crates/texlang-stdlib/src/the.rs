@@ -33,6 +33,9 @@ fn the_primitive_fn<S: TexlangState>(
                         variable::ValueRef::CatCode(i) => {
                             int_to_tokens(expansions, the_token, (*i as u8).into());
                         }
+                        variable::ValueRef::MathCode(i) => {
+                            int_to_tokens(expansions, the_token, i.0 as i32)
+                        }
                         variable::ValueRef::TokenList(t) => {
                             expansions.extend(t.iter().rev());
                         }
@@ -45,6 +48,10 @@ fn the_primitive_fn<S: TexlangState>(
                         the_token,
                         (c as u32).try_into().unwrap(),
                     );
+                }
+                Some(command::Command::MathCharacter(c)) => {
+                    let c = *c;
+                    int_to_tokens(input.expansions_mut(), the_token, c.0 as i32);
                 }
                 None
                 | Some(

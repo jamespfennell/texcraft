@@ -13,6 +13,7 @@ pub mod error;
 pub mod parse;
 pub mod texmacro;
 pub mod token;
+pub mod types;
 pub mod variable;
 pub mod vm;
 

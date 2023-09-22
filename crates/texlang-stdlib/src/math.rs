@@ -173,9 +173,9 @@ fn math_primitive_fn<S: TexlangState, O: Op>(
             variable.set(input, scope, result);
             Ok(())
         }
-        variable::Variable::CatCode(_) | variable::Variable::TokenList(_) => {
-            invalid_variable_error(input.vm(), token)
-        }
+        variable::Variable::CatCode(_)
+        | variable::Variable::TokenList(_)
+        | variable::Variable::MathCode(_) => invalid_variable_error(input.vm(), token),
     }
 }
 
@@ -195,16 +195,17 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::catcode;
+    use crate::codes;
     use crate::prefix;
     use crate::registers;
     use crate::testing::*;
     use crate::the;
+    use texlang::token::CatCode;
     use texlang::vm::implement_has_component;
 
     #[derive(Default)]
     struct State {
-        catcode: catcode::Component,
+        catcode: codes::Component<CatCode>,
         prefix: prefix::Component,
         registers: registers::Component<i32, 256>,
         testing: TestingComponent,
@@ -219,7 +220,7 @@ mod tests {
     }
 
     implement_has_component![State{
-        catcode: catcode::Component,
+        catcode: codes::Component<CatCode>,
         prefix: prefix::Component,
         registers: registers::Component<i32, 256>,
         testing: TestingComponent,
@@ -233,7 +234,7 @@ mod tests {
             ("multiplyWrapped", get_multiply_wrapped()),
             ("divide", get_divide()),
             //
-            ("catcode", catcode::get_catcode()),
+            ("catcode", codes::get_catcode()),
             ("count", registers::get_count()),
             ("global", prefix::get_global()),
             ("the", the::get_the()),

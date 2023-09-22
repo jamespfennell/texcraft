@@ -9,14 +9,16 @@ use std::collections::HashMap;
 
 use texlang::command;
 use texlang::token;
+use texlang::token::CatCode;
 use texlang::traits::*;
+use texlang::types;
 use texlang::vm;
 use texlang::vm::implement_has_component;
 
 pub mod alias;
 pub mod alloc;
-pub mod catcode;
 pub mod chardef;
+pub mod codes;
 pub mod conditional;
 pub mod def;
 pub mod endlinechar;
@@ -25,6 +27,7 @@ pub mod expansion;
 pub mod input;
 pub mod job;
 pub mod math;
+pub mod mathchardef;
 pub mod prefix;
 pub mod registers;
 pub mod repl;
@@ -41,7 +44,8 @@ pub mod tracingmacros;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StdLibState {
     pub alloc: alloc::Component,
-    pub catcode: catcode::Component,
+    pub codes_cat_code: codes::Component<CatCode>,
+    pub codes_math_code: codes::Component<types::MathCode>,
     pub conditional: conditional::Component,
     pub end_line_char: endlinechar::Component,
     pub error_mode: errormode::Component,
@@ -60,7 +64,7 @@ pub struct StdLibState {
 impl TexlangState for StdLibState {
     #[inline]
     fn cat_code(&self, c: char) -> texlang::token::CatCode {
-        catcode::cat_code(self, c)
+        codes::cat_code(self, c)
     }
 
     #[inline]
@@ -111,7 +115,7 @@ impl StdLibState {
             //
             ("batchmode", errormode::get_batchmode()),
             //
-            ("catcode", catcode::get_catcode()),
+            ("catcode", codes::get_catcode()),
             ("closein", input::get_closein()),
             ("chardef", chardef::get_chardef()),
             ("count", registers::get_count()),
@@ -148,6 +152,8 @@ impl StdLibState {
             ("let", alias::get_let()),
             ("long", prefix::get_long()),
             //
+            ("mathchardef", mathchardef::get_mathchardef()),
+            ("mathcode", codes::get_mathcode()),
             ("month", time::get_month()),
             ("multiply", math::get_multiply()),
             //
@@ -192,7 +198,8 @@ impl StdLibState {
 
 implement_has_component![StdLibState{
     alloc: alloc::Component,
-    catcode: catcode::Component,
+    codes_cat_code: codes::Component<CatCode>,
+    codes_math_code: codes::Component<types::MathCode>,
     conditional: conditional::Component,
     end_line_char: endlinechar::Component,
     error_mode: errormode::Component,

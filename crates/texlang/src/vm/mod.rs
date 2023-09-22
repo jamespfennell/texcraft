@@ -17,6 +17,7 @@ use crate::token::trace;
 use crate::token::CsNameInterner;
 use crate::token::Token;
 use crate::token::Value;
+use crate::types;
 use crate::variable;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -60,28 +61,54 @@ pub trait Handlers<S: TexlangState> {
     ///
     /// This token is _not_ invoked for tokens whose category code is begin group (1), end group (2) or active character (13).
     /// These cases are handled automatically by the VM based on the semantics of the TeX language.
+    ///
+    /// The default implementation is a no-op.
     fn character_handler(
-        token: token::Token,
         input: &mut ExecutionInput<S>,
+        token: token::Token,
+        character: char,
     ) -> Result<(), Box<error::Error>> {
-        _ = (token, input);
+        _ = (input, token, character);
         Ok(())
     }
 
-    /// Handler to invoke for a control sequence or active character for which no command is defined.
-    fn undefined_command_handler(
-        token: token::Token,
+    /// Handler to invoke for math character tokens.
+    ///
+    /// The default implementation throws an error because math character tokens are
+    /// only valid in math mode which is implemented outside of the main VM loop.
+    fn math_character_handler(
         input: &mut ExecutionInput<S>,
+        token: token::Token,
+        math_character: types::MathCode,
+    ) -> Result<(), Box<error::Error>> {
+        _ = math_character;
+        Err(error::SimpleTokenError::new(
+            input.vm(),
+            token,
+            "math characters can only appear in math mode",
+        )
+        .into())
+    }
+
+    /// Handler to invoke for a control sequence or active character for which no command is defined.
+    ///
+    /// The default implementation throws an undefined command error.
+    fn undefined_command_handler(
+        input: &mut ExecutionInput<S>,
+        token: token::Token,
     ) -> Result<(), Box<error::Error>> {
         Err(error::UndefinedCommandError::new(input.vm(), token).into())
     }
 
     /// Handler to invoke for expansion commands that were not expanded.
     ///
-    /// This handles the `\the` token in `\noexpand\the`.
+    /// For example, in the TeX snippet `\noexpand\the`, this handler handles
+    /// the unexpanded `\the` token.
+    ///
+    /// The default implementation is a no-op.
     fn unexpanded_expansion_command(
-        token: token::Token,
         input: &mut ExecutionInput<S>,
+        token: token::Token,
     ) -> Result<(), Box<error::Error>> {
         _ = (token, input);
         Ok(())
@@ -105,7 +132,7 @@ impl<S: TexlangState> VM<S> {
                 None => break,
                 Some(token) => token,
             };
-            // TODO: propagate all of these
+            // TODO: propagate the error return value from all of these
             match token.value() {
                 Value::CommandRef(command_ref) => {
                     match input.commands_map().get_command(&command_ref) {
@@ -125,23 +152,21 @@ impl<S: TexlangState> VM<S> {
                             cmd.set_value_using_input(token, input, scope)?;
                         }
                         Some(Command::CharacterTokenAlias(token_value)) => {
-                            // TODO: the token may be a begin group, or end group token.
-                            // What to do in this case? Check pdfTeX.
-                            // Probably we need to push it to the front of the token stack;
-                            // because it is not a command, the right handler will be called.
-                            H::character_handler(
-                                Token::new_from_value(*token_value, token.trace_key()),
-                                input,
-                            )?
+                            // TODO: should add tests for when this is begin group and end group.
+                            input
+                                .push_token(Token::new_from_value(*token_value, token.trace_key()));
                         }
                         Some(Command::Expansion(_, _)) | Some(Command::Macro(_)) => {
-                            H::unexpanded_expansion_command(token, input)?
+                            H::unexpanded_expansion_command(input, token)?
                         }
-                        Some(Command::Character(c)) => H::character_handler(
-                            token::Token::new_other(*c, token.trace_key()),
-                            input,
-                        )?,
-                        None => H::undefined_command_handler(token, input)?,
+                        Some(Command::Character(c)) => {
+                            let token = Token::new_other(*c, token.trace_key()); // Remove
+                            H::character_handler(input, token, *c)?
+                        }
+                        Some(Command::MathCharacter(c)) => {
+                            H::math_character_handler(input, token, *c)?
+                        }
+                        None => H::undefined_command_handler(input, token)?,
                     }
                 }
                 Value::BeginGroup(_) => {
@@ -150,14 +175,14 @@ impl<S: TexlangState> VM<S> {
                 Value::EndGroup(_) => {
                     input.end_group(token)?;
                 }
-                Value::MathShift(_)
-                | Value::AlignmentTab(_)
-                | Value::Parameter(_)
-                | Value::Superscript(_)
-                | Value::Subscript(_)
-                | Value::Space(_)
-                | Value::Letter(_)
-                | Value::Other(_) => H::character_handler(token, input)?,
+                Value::MathShift(c)
+                | Value::AlignmentTab(c)
+                | Value::Parameter(c)
+                | Value::Superscript(c)
+                | Value::Subscript(c)
+                | Value::Space(c)
+                | Value::Letter(c)
+                | Value::Other(c) => H::character_handler(input, token, c)?,
             };
         }
         Ok(())

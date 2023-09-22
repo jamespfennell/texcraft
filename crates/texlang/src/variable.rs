@@ -9,6 +9,7 @@ use crate::command;
 use crate::error;
 use crate::parse::OptionalEquals;
 use crate::traits::*;
+use crate::types;
 use crate::vm;
 use crate::{token, token::CatCode};
 use std::borrow::Cow;
@@ -169,6 +170,7 @@ impl<S: TexlangState> Command<S> {
         Ok(match self.getters {
             Getters::Int(a, b) => Variable::Int(TypedVariable(a, b, index)),
             Getters::CatCode(a, b) => Variable::CatCode(TypedVariable(a, b, index)),
+            Getters::MathCode(a, b) => Variable::MathCode(TypedVariable(a, b, index)),
             Getters::TokenList(a, b) => Variable::TokenList(TypedVariable(a, b, index)),
         })
     }
@@ -245,6 +247,7 @@ impl CommandKey {
 pub enum ValueRef<'a> {
     Int(&'a i32),
     CatCode(&'a CatCode),
+    MathCode(&'a types::MathCode),
     TokenList(&'a [token::Token]),
 }
 
@@ -271,6 +274,7 @@ pub enum ValueRef<'a> {
 pub enum Variable<S> {
     Int(TypedVariable<S, i32>),
     CatCode(TypedVariable<S, CatCode>),
+    MathCode(TypedVariable<S, types::MathCode>),
     TokenList(TypedVariable<S, Vec<token::Token>>),
 }
 
@@ -280,6 +284,7 @@ impl<S: TexlangState> Variable<S> {
         match self {
             Variable::Int(variable) => ValueRef::Int(variable.get(state)),
             Variable::CatCode(variable) => ValueRef::CatCode(variable.get(state)),
+            Variable::MathCode(variable) => ValueRef::MathCode(variable.get(state)),
             Variable::TokenList(variable) => ValueRef::TokenList(variable.get(state)),
         }
     }
@@ -293,6 +298,7 @@ impl<S: TexlangState> Variable<S> {
         match self {
             Variable::Int(variable) => variable.set_using_input(input, scope),
             Variable::CatCode(variable) => variable.set_using_input(input, scope),
+            Variable::MathCode(variable) => variable.set_using_input(input, scope),
             Variable::TokenList(variable) => variable.set_using_input(input, scope),
         }
     }
@@ -301,6 +307,7 @@ impl<S: TexlangState> Variable<S> {
 enum Getters<S> {
     Int(RefFn<S, i32>, MutRefFn<S, i32>),
     CatCode(RefFn<S, CatCode>, MutRefFn<S, CatCode>),
+    MathCode(RefFn<S, types::MathCode>, MutRefFn<S, types::MathCode>),
     TokenList(RefFn<S, Vec<token::Token>>, MutRefFn<S, Vec<token::Token>>),
 }
 
@@ -309,6 +316,7 @@ impl<S> Clone for Getters<S> {
         match self {
             Self::Int(a, b) => Self::Int(*a, *b),
             Self::CatCode(a, b) => Self::CatCode(*a, *b),
+            Self::MathCode(a, b) => Self::MathCode(*a, *b),
             Self::TokenList(a, b) => Self::TokenList(*a, *b),
         }
     }
@@ -319,6 +327,7 @@ impl<S> Getters<S> {
         match self {
             Getters::Int(a, b) => GettersKey(*a as usize, *b as usize),
             Getters::CatCode(a, b) => GettersKey(*a as usize, *b as usize),
+            Getters::MathCode(a, b) => GettersKey(*a as usize, *b as usize),
             Getters::TokenList(a, b) => GettersKey(*a as usize, *b as usize),
         }
     }
@@ -509,34 +518,44 @@ impl SupportedType for i32 {
     }
 }
 
-impl SupportedType for CatCode {
-    fn new_command<S>(
-        ref_fn: RefFn<S, Self>,
-        ref_mut_fn: MutRefFn<S, Self>,
-        index_resolver: Option<IndexResolver<S>>,
-    ) -> Command<S> {
-        Command {
-            getters: Getters::CatCode(ref_fn, ref_mut_fn),
-            index_resolver,
+macro_rules! supported_type_impl {
+    ($type: path, $variable_type: ident, $save_stack_field: ident) => {
+        impl SupportedType for $type {
+            fn new_command<S>(
+                ref_fn: RefFn<S, Self>,
+                ref_mut_fn: MutRefFn<S, Self>,
+                index_resolver: Option<IndexResolver<S>>,
+            ) -> Command<S> {
+                Command {
+                    getters: Getters::$variable_type(ref_fn, ref_mut_fn),
+                    index_resolver,
+                }
+            }
+            fn update_save_stack<S>(
+                input: &mut vm::ExecutionInput<S>,
+                variable: &TypedVariable<S, Self>,
+                scope: groupingmap::Scope,
+                overwritten_value: Self,
+            ) {
+                update_save_stack(input, variable, scope, overwritten_value, |element| {
+                    &mut element.$save_stack_field
+                })
+            }
+            fn new_typed_variable<S>(
+                command: &Command<S>,
+                index: Index,
+            ) -> Option<TypedVariable<S, Self>> {
+                match command.getters {
+                    Getters::$variable_type(a, b) => Some(TypedVariable(a, b, index)),
+                    _ => None,
+                }
+            }
         }
-    }
-    fn update_save_stack<S>(
-        input: &mut vm::ExecutionInput<S>,
-        variable: &TypedVariable<S, Self>,
-        scope: groupingmap::Scope,
-        overwritten_value: Self,
-    ) {
-        update_save_stack(input, variable, scope, overwritten_value, |element| {
-            &mut element.catcode
-        })
-    }
-    fn new_typed_variable<S>(command: &Command<S>, index: Index) -> Option<TypedVariable<S, Self>> {
-        match command.getters {
-            Getters::CatCode(a, b) => Some(TypedVariable(a, b, index)),
-            _ => None,
-        }
-    }
+    };
 }
+
+supported_type_impl!(CatCode, CatCode, catcode);
+supported_type_impl!(types::MathCode, MathCode, math_code);
 
 impl SupportedType for Vec<token::Token> {
     fn new_command<S>(
@@ -574,6 +593,7 @@ impl SupportedType for Vec<token::Token> {
 pub(crate) struct SaveStackElement<S> {
     i32: SaveStackMap<S, i32>,
     catcode: SaveStackMap<S, CatCode>,
+    math_code: SaveStackMap<S, types::MathCode>,
     token_list: SaveStackMap<S, Vec<token::Token>>,
 }
 
@@ -582,6 +602,7 @@ impl<S> Default for SaveStackElement<S> {
         Self {
             i32: Default::default(),
             catcode: Default::default(),
+            math_code: Default::default(),
             token_list: Default::default(),
         }
     }
@@ -591,6 +612,7 @@ impl<S> SaveStackElement<S> {
     pub(crate) fn restore(self, input: &mut vm::ExecutionInput<S>) {
         self.i32.restore(input);
         self.catcode.restore(input);
+        self.math_code.restore(input);
         self.token_list.restore(input);
     }
 
@@ -601,6 +623,7 @@ impl<S> SaveStackElement<S> {
         SerializableSaveStackElement {
             i32: self.i32.serializable(built_ins),
             catcode: self.catcode.serializable(built_ins),
+            math_code: self.math_code.serializable(built_ins),
             token_list: self.token_list.serializable(built_ins),
         }
     }
@@ -684,6 +707,7 @@ impl<S, T: SupportedType + Clone> SaveStackMap<S, T> {
 pub(crate) struct SerializableSaveStackElement<'a> {
     i32: Vec<(token::CsName, usize, Cow<'a, i32>)>,
     catcode: Vec<(token::CsName, usize, Cow<'a, CatCode>)>,
+    math_code: Vec<(token::CsName, usize, Cow<'a, types::MathCode>)>,
     token_list: Vec<(token::CsName, usize, Cow<'a, Vec<token::Token>>)>,
 }
 
@@ -695,6 +719,7 @@ impl<'a> SerializableSaveStackElement<'a> {
         SaveStackElement {
             i32: SaveStackMap::from_deserialized(self.i32, built_ins),
             catcode: SaveStackMap::from_deserialized(self.catcode, built_ins),
+            math_code: SaveStackMap::from_deserialized(self.math_code, built_ins),
             token_list: SaveStackMap::from_deserialized(self.token_list, built_ins),
         }
     }

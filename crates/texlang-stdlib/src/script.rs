@@ -122,18 +122,21 @@ struct Handlers;
 
 impl<S: HasComponent<Component>> vm::Handlers<S> for Handlers {
     fn character_handler(
-        token: token::Token,
         input: &mut vm::ExecutionInput<S>,
+        token: token::Token,
+        _: char,
     ) -> command::Result<()> {
+        // TODO: it's really not great that the character is ignored.
         Component::write_token(input, token);
         Ok(())
     }
 
     fn unexpanded_expansion_command(
-        token: token::Token,
         input: &mut vm::ExecutionInput<S>,
+        token: token::Token,
     ) -> command::Result<()> {
-        Handlers::character_handler(token, input)
+        Component::write_token(input, token);
+        Ok(())
     }
 }
 

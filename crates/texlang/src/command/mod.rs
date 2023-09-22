@@ -32,6 +32,7 @@
 
 use crate::texmacro;
 use crate::token;
+use crate::types;
 use crate::variable;
 use crate::vm;
 use once_cell::sync::OnceCell;
@@ -90,6 +91,11 @@ pub enum Command<S> {
     /// In other contexts they are interpreted as numbers.
     /// In Plain TeX, `\countdef 255` is used as a more efficient version of `\def{255 }`.
     Character(char),
+
+    /// A command that references a math character.
+    ///
+    /// These commands are generally created using `\mathchardef`.
+    MathCharacter(types::MathCode),
 }
 
 impl<S> std::fmt::Display for Command<S> {
@@ -101,6 +107,7 @@ impl<S> std::fmt::Display for Command<S> {
             Command::Variable(_) => write![f, "a variable command"],
             Command::CharacterTokenAlias(_) => write![f, "a character token alias"],
             Command::Character(_) => write![f, "a character command"],
+            Command::MathCharacter(_) => write![f, "a math character command"],
         }
     }
 }
@@ -110,11 +117,12 @@ impl<S> Command<S> {
     pub fn tag(&self) -> Option<Tag> {
         match self {
             Command::Expansion(_, tag) => *tag,
-            Command::Macro(_) => None,
             Command::Execution(_, tag) => *tag,
-            Command::Variable(_) => None,
-            Command::CharacterTokenAlias(_) => None,
-            Command::Character(_) => None,
+            Command::Macro(_)
+            | Command::Variable(_)
+            | Command::CharacterTokenAlias(_)
+            | Command::Character(_)
+            | Command::MathCharacter(_) => None,
         }
     }
 }
@@ -152,7 +160,8 @@ impl<S> BuiltIn<S> {
             Command::Macro(_)
             | Command::Variable(_)
             | Command::CharacterTokenAlias(_)
-            | Command::Character(_) => {
+            | Command::Character(_)
+            | Command::MathCharacter(_) => {
                 panic!("cannot add a tag to this type of command")
             }
         }
@@ -184,6 +193,7 @@ impl<S> Clone for Command<S> {
             Command::Variable(v) => Command::Variable(v.clone()),
             Command::CharacterTokenAlias(tv) => Command::CharacterTokenAlias(*tv),
             Command::Character(c) => Command::Character(*c),
+            Command::MathCharacter(c) => Command::MathCharacter(*c),
         }
     }
 }
@@ -335,9 +345,10 @@ impl PrimitiveKey {
             Command::Expansion(f, tag) => Some(PrimitiveKey::Expansion(*f as usize, *tag)),
             Command::Execution(f, tag) => Some(PrimitiveKey::Execution(*f as usize, *tag)),
             Command::Variable(v) => Some(PrimitiveKey::Variable(v.key())),
-            Command::Macro(_) => None,
-            Command::CharacterTokenAlias(_) => None,
-            Command::Character(_) => None,
+            Command::Macro(_)
+            | Command::CharacterTokenAlias(_)
+            | Command::Character(_)
+            | Command::MathCharacter(_) => None,
         }
     }
 }

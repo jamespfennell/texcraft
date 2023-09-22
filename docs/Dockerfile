@@ -4,7 +4,6 @@ FROM rust:1.67 AS builder
 WORKDIR /texcraft
 COPY Cargo.lock .
 COPY Cargo.toml .
-COPY bin bin
 COPY performance performance
 COPY playground playground
 COPY crates crates
@@ -12,7 +11,7 @@ RUN cargo fetch
 # In order to run the MD book tests we need one and only one build of the Texlang code
 # in the target/debug/deps. So we clean the workspace before building the lib just to be sure.
 RUN cargo clean
-RUN cargo build --lib
+RUN cargo build --lib --all-features
 
 # Build the MD book
 RUN curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.30/mdbook-v0.4.30-x86_64-unknown-linux-gnu.tar.gz | tar -xz --directory=/usr/bin

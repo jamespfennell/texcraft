@@ -207,8 +207,7 @@ impl<S: TexlangState> TokenStream for UnexpandedStream<S> {
 /// [ExpansionInput] or [ExecutionInput] is accepted. We use this type because
 /// it has only read access to the VM, and so casting does not escalate privileges.
 #[repr(transparent)]
-// TODO: shouldn't this be in the command module no vm module?
-// TODO: it should wrap the ExpandedStream
+// TODO: should this be in the command module, not in the vm module?
 pub struct ExpansionInput<S>(ExpandedStream<S>);
 
 impl<S> std::convert::AsMut<ExpandedStream<S>> for ExpansionInput<S> {
@@ -453,6 +452,15 @@ impl<S> ExecutionInput<S> {
             None => None,
             Some(g) => Some((g, &self.0 .0 .0.state)),
         }
+    }
+
+    /// Push tokens to the front of the input stream.
+    ///
+    /// The first token in the provided slice will be the next token read.
+    // TODO: destroy
+    #[inline]
+    pub(crate) fn push_token(&mut self, token: Token) {
+        self.0 .0 .0.internal.expansions_mut().push(token);
     }
 
     /// Return a token buffer, allowing it to be reused.
