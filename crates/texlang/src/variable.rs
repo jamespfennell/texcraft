@@ -167,12 +167,7 @@ impl<S: TexlangState> Command<S> {
                 }
             },
         };
-        Ok(match self.getters {
-            Getters::Int(a, b) => Variable::Int(TypedVariable(a, b, index)),
-            Getters::CatCode(a, b) => Variable::CatCode(TypedVariable(a, b, index)),
-            Getters::MathCode(a, b) => Variable::MathCode(TypedVariable(a, b, index)),
-            Getters::TokenList(a, b) => Variable::TokenList(TypedVariable(a, b, index)),
-        })
+        Ok(new_variable(&self.getters, index))
     }
 }
 
@@ -276,61 +271,6 @@ pub enum Variable<S> {
     CatCode(TypedVariable<S, CatCode>),
     MathCode(TypedVariable<S, types::MathCode>),
     TokenList(TypedVariable<S, Vec<token::Token>>),
-}
-
-impl<S: TexlangState> Variable<S> {
-    /// Return a reference to the value of the variable.
-    pub fn value<'a>(&self, state: &'a S) -> ValueRef<'a> {
-        match self {
-            Variable::Int(variable) => ValueRef::Int(variable.get(state)),
-            Variable::CatCode(variable) => ValueRef::CatCode(variable.get(state)),
-            Variable::MathCode(variable) => ValueRef::MathCode(variable.get(state)),
-            Variable::TokenList(variable) => ValueRef::TokenList(variable.get(state)),
-        }
-    }
-
-    /// Set the value of a variable using the following tokens in the input stream.
-    fn set_value_using_input(
-        &self,
-        input: &mut vm::ExecutionInput<S>,
-        scope: groupingmap::Scope,
-    ) -> Result<(), Box<error::Error>> {
-        match self {
-            Variable::Int(variable) => variable.set_using_input(input, scope),
-            Variable::CatCode(variable) => variable.set_using_input(input, scope),
-            Variable::MathCode(variable) => variable.set_using_input(input, scope),
-            Variable::TokenList(variable) => variable.set_using_input(input, scope),
-        }
-    }
-}
-
-enum Getters<S> {
-    Int(RefFn<S, i32>, MutRefFn<S, i32>),
-    CatCode(RefFn<S, CatCode>, MutRefFn<S, CatCode>),
-    MathCode(RefFn<S, types::MathCode>, MutRefFn<S, types::MathCode>),
-    TokenList(RefFn<S, Vec<token::Token>>, MutRefFn<S, Vec<token::Token>>),
-}
-
-impl<S> Clone for Getters<S> {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Int(a, b) => Self::Int(*a, *b),
-            Self::CatCode(a, b) => Self::CatCode(*a, *b),
-            Self::MathCode(a, b) => Self::MathCode(*a, *b),
-            Self::TokenList(a, b) => Self::TokenList(*a, *b),
-        }
-    }
-}
-
-impl<S> Getters<S> {
-    fn key(&self) -> GettersKey {
-        match self {
-            Getters::Int(a, b) => GettersKey(*a as usize, *b as usize),
-            Getters::CatCode(a, b) => GettersKey(*a as usize, *b as usize),
-            Getters::MathCode(a, b) => GettersKey(*a as usize, *b as usize),
-            Getters::TokenList(a, b) => GettersKey(*a as usize, *b as usize),
-        }
-    }
 }
 
 /// A key that uniquely identifies the getters ([RefFn] and [MutRefFn]) in a command or variable.
@@ -489,37 +429,67 @@ fn update_save_stack<S, T: Clone + SupportedType, F>(
     }
 }
 
-impl SupportedType for i32 {
-    fn new_command<S>(
-        ref_fn: RefFn<S, Self>,
-        ref_mut_fn: MutRefFn<S, Self>,
-        index_resolver: Option<IndexResolver<S>>,
-    ) -> Command<S> {
-        Command {
-            getters: Getters::Int(ref_fn, ref_mut_fn),
-            index_resolver,
-        }
-    }
-    fn update_save_stack<S>(
-        input: &mut vm::ExecutionInput<S>,
-        variable: &TypedVariable<S, Self>,
-        scope: groupingmap::Scope,
-        overwritten_value: Self,
-    ) {
-        update_save_stack(input, variable, scope, overwritten_value, |element| {
-            &mut element.i32
-        })
-    }
-    fn new_typed_variable<S>(command: &Command<S>, index: Index) -> Option<TypedVariable<S, Self>> {
-        match command.getters {
-            Getters::Int(a, b) => Some(TypedVariable(a, b, index)),
-            _ => None,
-        }
-    }
-}
-
 macro_rules! supported_type_impl {
-    ($type: path, $variable_type: ident, $save_stack_field: ident) => {
+    ( $( ($type: path, $enum_variant: ident, $save_stack_field: ident $( , $recycle_fn: ident )? ), )+ ) => {
+        fn new_variable<S>(getters: &Getters<S>, index: Index) -> Variable<S> {
+            match getters {
+                $(
+                    Getters::$enum_variant(a, b) => Variable::$enum_variant(TypedVariable(*a, *b, index)),
+                )+
+            }
+        }
+
+        impl<S: TexlangState> Variable<S> {
+            /// Return a reference to the value of the variable.
+            pub fn value<'a>(&self, state: &'a S) -> ValueRef<'a> {
+                match self {
+                    $(
+                        Variable::$enum_variant(variable) => ValueRef::$enum_variant(variable.get(state)),
+                    )+
+                }
+            }
+
+            /// Set the value of a variable using the following tokens in the input stream.
+            fn set_value_using_input(
+                &self,
+                input: &mut vm::ExecutionInput<S>,
+                scope: groupingmap::Scope,
+            ) -> Result<(), Box<error::Error>> {
+                match self {
+                    $(
+                        Variable::$enum_variant(variable) => variable.set_using_input(input, scope),
+                    )+
+                }
+            }
+        }
+
+        enum Getters<S> {
+            $(
+                $enum_variant(RefFn<S, $type>, MutRefFn<S, $type>),
+            )+
+        }
+
+        impl<S> Clone for Getters<S> {
+            fn clone(&self) -> Self {
+                match self {
+                    $(
+                        Self::$enum_variant(a, b) => Self::$enum_variant(*a, *b),
+                    )+
+                }
+            }
+        }
+
+        impl<S> Getters<S> {
+            fn key(&self) -> GettersKey {
+                match self {
+                    $(
+                        Getters::$enum_variant(a, b) => GettersKey(*a as usize, *b as usize),
+                    )+
+                }
+            }
+        }
+
+        $(
         impl SupportedType for $type {
             fn new_command<S>(
                 ref_fn: RefFn<S, Self>,
@@ -527,7 +497,7 @@ macro_rules! supported_type_impl {
                 index_resolver: Option<IndexResolver<S>>,
             ) -> Command<S> {
                 Command {
-                    getters: Getters::$variable_type(ref_fn, ref_mut_fn),
+                    getters: Getters::$enum_variant(ref_fn, ref_mut_fn),
                     index_resolver,
                 }
             }
@@ -541,92 +511,90 @@ macro_rules! supported_type_impl {
                     &mut element.$save_stack_field
                 })
             }
+            $(
+            fn recycle<S>(input: &mut vm::ExecutionInput<S>, overwritten_value: Self) {
+                $recycle_fn(input, overwritten_value)
+            }
+            )?
             fn new_typed_variable<S>(
                 command: &Command<S>,
                 index: Index,
             ) -> Option<TypedVariable<S, Self>> {
                 match command.getters {
-                    Getters::$variable_type(a, b) => Some(TypedVariable(a, b, index)),
+                    Getters::$enum_variant(a, b) => Some(TypedVariable(a, b, index)),
                     _ => None,
+                }
+            }
+        }
+        )+
+
+        /// Internal VM data structure used to implement TeX's grouping semantics.
+        pub(crate) struct SaveStackElement<S> {
+            $(
+                $save_stack_field: SaveStackMap<S, $type>,
+            )+
+        }
+
+        impl<S> Default for SaveStackElement<S> {
+            fn default() -> Self {
+                Self {
+                    $(
+                        $save_stack_field: Default::default(),
+                    )+
+                }
+            }
+        }
+
+        impl<S> SaveStackElement<S> {
+            pub(crate) fn restore(self, input: &mut vm::ExecutionInput<S>) {
+                $(
+                    self.$save_stack_field.restore(input);
+                )+
+            }
+
+            pub(crate) fn serializable<'a>(
+                &'a self,
+                built_ins: &HashMap<GettersKey, token::CsName>,
+            ) -> SerializableSaveStackElement<'a> {
+                SerializableSaveStackElement {
+                    $(
+                        $save_stack_field: self.$save_stack_field.serializable(built_ins),
+                    )+
+                }
+            }
+        }
+
+        #[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
+        pub(crate) struct SerializableSaveStackElement<'a> {
+            $(
+                $save_stack_field: Vec<(token::CsName, usize, Cow<'a, $type>)>,
+            )+
+        }
+
+        impl<'a> SerializableSaveStackElement<'a> {
+            pub(crate) fn finish_deserialization<S>(
+                self,
+                built_ins: &HashMap<token::CsName, command::BuiltIn<S>>,
+            ) -> SaveStackElement<S> {
+                SaveStackElement {
+                    $(
+                        $save_stack_field: SaveStackMap::from_deserialized(self.$save_stack_field, built_ins),
+                    )+
                 }
             }
         }
     };
 }
 
-supported_type_impl!(CatCode, CatCode, catcode);
-supported_type_impl!(types::MathCode, MathCode, math_code);
+supported_type_impl!(
+    (i32, Int, i32),
+    (CatCode, CatCode, catcode),
+    (types::MathCode, MathCode, math_code),
+    (Vec<token::Token>, TokenList, token_list, recycle_token_list),
+);
 
-impl SupportedType for Vec<token::Token> {
-    fn new_command<S>(
-        ref_fn: RefFn<S, Self>,
-        ref_mut_fn: MutRefFn<S, Self>,
-        index_resolver: Option<IndexResolver<S>>,
-    ) -> Command<S> {
-        Command {
-            getters: Getters::TokenList(ref_fn, ref_mut_fn),
-            index_resolver,
-        }
-    }
-    fn update_save_stack<S>(
-        input: &mut vm::ExecutionInput<S>,
-        variable: &TypedVariable<S, Self>,
-        scope: groupingmap::Scope,
-        overwritten_value: Self,
-    ) {
-        update_save_stack(input, variable, scope, overwritten_value, |element| {
-            &mut element.token_list
-        })
-    }
-    fn recycle<S>(input: &mut vm::ExecutionInput<S>, overwritten_value: Self) {
-        input.return_token_buffer(overwritten_value);
-    }
-    fn new_typed_variable<S>(command: &Command<S>, index: Index) -> Option<TypedVariable<S, Self>> {
-        match command.getters {
-            Getters::TokenList(a, b) => Some(TypedVariable(a, b, index)),
-            _ => None,
-        }
-    }
-}
-
-/// Internal VM data structure used to implement TeX's grouping semantics.
-pub(crate) struct SaveStackElement<S> {
-    i32: SaveStackMap<S, i32>,
-    catcode: SaveStackMap<S, CatCode>,
-    math_code: SaveStackMap<S, types::MathCode>,
-    token_list: SaveStackMap<S, Vec<token::Token>>,
-}
-
-impl<S> Default for SaveStackElement<S> {
-    fn default() -> Self {
-        Self {
-            i32: Default::default(),
-            catcode: Default::default(),
-            math_code: Default::default(),
-            token_list: Default::default(),
-        }
-    }
-}
-
-impl<S> SaveStackElement<S> {
-    pub(crate) fn restore(self, input: &mut vm::ExecutionInput<S>) {
-        self.i32.restore(input);
-        self.catcode.restore(input);
-        self.math_code.restore(input);
-        self.token_list.restore(input);
-    }
-
-    pub(crate) fn serializable<'a>(
-        &'a self,
-        built_ins: &HashMap<GettersKey, token::CsName>,
-    ) -> SerializableSaveStackElement<'a> {
-        SerializableSaveStackElement {
-            i32: self.i32.serializable(built_ins),
-            catcode: self.catcode.serializable(built_ins),
-            math_code: self.math_code.serializable(built_ins),
-            token_list: self.token_list.serializable(built_ins),
-        }
-    }
+fn recycle_token_list<S>(input: &mut vm::ExecutionInput<S>, overwritten_value: Vec<token::Token>) {
+    input.return_token_buffer(overwritten_value);
 }
 
 /// Internal VM data structure used to implement TeX's grouping semantics.
@@ -700,27 +668,5 @@ impl<S, T: SupportedType + Clone> SaveStackMap<S, T> {
             )
             .collect();
         Self(m)
-    }
-}
-
-#[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
-pub(crate) struct SerializableSaveStackElement<'a> {
-    i32: Vec<(token::CsName, usize, Cow<'a, i32>)>,
-    catcode: Vec<(token::CsName, usize, Cow<'a, CatCode>)>,
-    math_code: Vec<(token::CsName, usize, Cow<'a, types::MathCode>)>,
-    token_list: Vec<(token::CsName, usize, Cow<'a, Vec<token::Token>>)>,
-}
-
-impl<'a> SerializableSaveStackElement<'a> {
-    pub(crate) fn finish_deserialization<S>(
-        self,
-        built_ins: &HashMap<token::CsName, command::BuiltIn<S>>,
-    ) -> SaveStackElement<S> {
-        SaveStackElement {
-            i32: SaveStackMap::from_deserialized(self.i32, built_ins),
-            catcode: SaveStackMap::from_deserialized(self.catcode, built_ins),
-            math_code: SaveStackMap::from_deserialized(self.math_code, built_ins),
-            token_list: SaveStackMap::from_deserialized(self.token_list, built_ins),
-        }
     }
 }
