@@ -245,8 +245,8 @@ pub trait TexlangState: Sized {
     /// Get the cat code for the provided character.
     ///
     /// The default implementation returns the cat code used in plain TeX.
-    fn cat_code(&self, c: char) -> token::CatCode {
-        token::CatCode::PLAIN_TEX_DEFAULTS
+    fn cat_code(&self, c: char) -> types::CatCode {
+        types::CatCode::PLAIN_TEX_DEFAULTS
             .get(c as usize)
             .copied()
             .unwrap_or_default()

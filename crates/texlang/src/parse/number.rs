@@ -71,11 +71,11 @@ impl<S: TexlangState> Parsable<S> for char {
 }
 
 // TODO: move to types/catcode.rs
-impl<S: TexlangState> Parsable<S> for token::CatCode {
+impl<S: TexlangState> Parsable<S> for types::CatCode {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
         let (token, i): (token::Token, i32) = parse_number_internal(input)?;
         if let Ok(val_u8) = u8::try_from(i) {
-            if let Ok(cat_code) = token::CatCode::try_from(val_u8) {
+            if let Ok(cat_code) = types::CatCode::try_from(val_u8) {
                 return Ok(cat_code);
             }
         }
@@ -91,7 +91,7 @@ impl<S: TexlangState> Parsable<S> for token::CatCode {
             }
             .into(),
         )?;
-        Ok(token::CatCode::try_from(0).unwrap())
+        Ok(types::CatCode::try_from(0).unwrap())
     }
 }
 
@@ -468,11 +468,11 @@ mod tests {
     struct State;
 
     impl TexlangState for State {
-        fn cat_code(&self, c: char) -> token::CatCode {
+        fn cat_code(&self, c: char) -> types::CatCode {
             if c == '9' {
-                return token::CatCode::Letter;
+                return types::CatCode::Letter;
             }
-            token::CatCode::PLAIN_TEX_DEFAULTS
+            types::CatCode::PLAIN_TEX_DEFAULTS
                 .get(c as usize)
                 .copied()
                 .unwrap_or_default()

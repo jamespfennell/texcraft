@@ -1,5 +1,3 @@
-//! Data structures representing category codes and operations on them.
-
 use CatCode::*;
 
 /// Enum representing all 16 category codes in TeX.
@@ -347,7 +345,7 @@ impl CatCode {
 
 #[cfg(test)]
 mod tests {
-    use crate::token::catcode::CatCode;
+    use super::*;
 
     #[test]
     fn serialize_and_deserialize_cat_code() {

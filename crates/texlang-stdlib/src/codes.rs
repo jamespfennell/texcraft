@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use texlang::token;
-use texlang::token::CatCode;
+use texlang::types::CatCode;
 use texlang::traits::*;
 use texlang::*;
 

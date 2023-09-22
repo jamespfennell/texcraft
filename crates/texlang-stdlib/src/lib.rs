@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use texlang::command;
 use texlang::token;
-use texlang::token::CatCode;
+use texlang::types::CatCode;
 use texlang::traits::*;
 use texlang::types;
 use texlang::vm;
@@ -63,7 +63,7 @@ pub struct StdLibState {
 
 impl TexlangState for StdLibState {
     #[inline]
-    fn cat_code(&self, c: char) -> texlang::token::CatCode {
+    fn cat_code(&self, c: char) -> texlang::types::CatCode {
         codes::cat_code(self, c)
     }
 

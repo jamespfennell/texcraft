@@ -177,7 +177,7 @@ fn compare_output<S>(
             None => return,
             Some(last) => last,
         };
-        if last.cat_code() == Some(token::CatCode::Space) {
+        if last.cat_code() == Some(types::CatCode::Space) {
             v.pop();
         }
     };

@@ -39,7 +39,7 @@ pub fn run(
 #[derive(Default)]
 struct PlaygroundState {
     alloc: alloc::Component,
-    codes_cat_code: codes::Component<token::CatCode>,
+    codes_cat_code: codes::Component<types::CatCode>,
     codes_math_code: codes::Component<types::MathCode>,
     conditional: conditional::Component,
     end_line_char: endlinechar::Component,
@@ -51,7 +51,7 @@ struct PlaygroundState {
 }
 
 impl TexlangState for PlaygroundState {
-    fn cat_code(&self, c: char) -> texlang::token::CatCode {
+    fn cat_code(&self, c: char) -> texlang::types::CatCode {
         codes::cat_code(self, c)
     }
 
@@ -70,7 +70,7 @@ impl TexlangState for PlaygroundState {
 
 implement_has_component![PlaygroundState{
     alloc: alloc::Component,
-    codes_cat_code: codes::Component<token::CatCode>,
+    codes_cat_code: codes::Component<types::CatCode>,
     codes_math_code: codes::Component<types::MathCode>,
     conditional: conditional::Component,
     end_line_char: endlinechar::Component,

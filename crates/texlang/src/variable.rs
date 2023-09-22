@@ -11,7 +11,7 @@ use crate::parse::OptionalEquals;
 use crate::traits::*;
 use crate::types;
 use crate::vm;
-use crate::{token, token::CatCode};
+use crate::token;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -241,7 +241,7 @@ impl CommandKey {
 /// Immutable reference to the value of a variable.
 pub enum ValueRef<'a> {
     Int(&'a i32),
-    CatCode(&'a CatCode),
+    CatCode(&'a types::CatCode),
     MathCode(&'a types::MathCode),
     TokenList(&'a [token::Token]),
 }
@@ -268,7 +268,7 @@ pub enum ValueRef<'a> {
 ///     
 pub enum Variable<S> {
     Int(TypedVariable<S, i32>),
-    CatCode(TypedVariable<S, CatCode>),
+    CatCode(TypedVariable<S, types::CatCode>),
     MathCode(TypedVariable<S, types::MathCode>),
     TokenList(TypedVariable<S, Vec<token::Token>>),
 }
@@ -588,7 +588,7 @@ macro_rules! supported_type_impl {
 
 supported_type_impl!(
     (i32, Int, i32),
-    (CatCode, CatCode, catcode),
+    (types::CatCode, CatCode, catcode),
     (types::MathCode, MathCode, math_code),
     (Vec<token::Token>, TokenList, token_list, recycle_token_list),
 );

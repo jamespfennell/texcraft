@@ -200,7 +200,7 @@ mod tests {
     use crate::registers;
     use crate::testing::*;
     use crate::the;
-    use texlang::token::CatCode;
+    use texlang::types::CatCode;
     use texlang::vm::implement_has_component;
 
     #[derive(Default)]

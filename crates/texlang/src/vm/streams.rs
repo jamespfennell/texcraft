@@ -495,7 +495,7 @@ mod stream {
 
     impl<T: TexlangState> Config for T {
         #[inline]
-        fn cat_code(&self, c: char) -> crate::token::CatCode {
+        fn cat_code(&self, c: char) -> crate::types::CatCode {
             self.cat_code(c)
         }
         // TODO: implement \endlinechar

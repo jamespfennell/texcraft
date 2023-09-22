@@ -91,7 +91,7 @@
 //!
 use crate::error;
 use crate::token;
-use crate::token::catcode::CatCode;
+use crate::types::CatCode;
 use crate::token::trace;
 use crate::token::CsNameInterner;
 use crate::token::Token;
@@ -560,8 +560,7 @@ impl RawLexer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::token::catcode;
-    use crate::token::catcode::CatCode::*;
+    use crate::types::CatCode::*;
     use crate::token::CommandRef;
     use crate::token::CsNameInterner;
     use crate::token::Value;
@@ -569,7 +568,7 @@ mod tests {
 
     #[derive(Debug, PartialEq, Eq)]
     enum TokenValue<'a> {
-        Character(char, catcode::CatCode, u32),
+        Character(char, CatCode, u32),
         ControlSequence(&'a str, u32),
         NewLine,
     }

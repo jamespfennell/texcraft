@@ -1,4 +1,4 @@
-use crate::token;
+use crate::types;
 use crate::traits::*;
 use crate::vm;
 use std::cell::RefCell;
@@ -60,7 +60,7 @@ pub(crate) struct WrappedState<S> {
 }
 
 impl<S: TexlangState> TexlangState for WrappedState<S> {
-    fn cat_code(&self, c: char) -> token::CatCode {
+    fn cat_code(&self, c: char) -> types::CatCode {
         self.inner.cat_code(c)
     }
     fn end_line_char(&self) -> Option<char> {

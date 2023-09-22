@@ -42,7 +42,7 @@ macro_rules! exercises {
                 use crate::driver;
                 use crate::state::Base;
                 use crate::command::library::*;
-                use crate::token::catcode;
+                use crate::types::CatCode;
 
                 struct State;
                 fn new_state() -> State {
