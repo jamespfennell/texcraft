@@ -936,16 +936,7 @@ dependencies = [
 
 [[package]]
 name = "texcraft"
-version = "0.1.0"
-dependencies = [
- "texcraft-stdext",
- "texlang",
- "texlang-stdlib",
-]
-
-[[package]]
-name = "texcraft-bin"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap 4.3.4",
  "colored",
@@ -1019,6 +1010,10 @@ checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
 dependencies = [
  "unicode-width",
 ]
+
+[[package]]
+name = "tfm"
+version = "0.1.0"
 
 [[package]]
 name = "thiserror"

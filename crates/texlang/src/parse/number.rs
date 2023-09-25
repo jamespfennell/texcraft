@@ -70,23 +70,28 @@ impl<S: TexlangState> Parsable<S> for char {
     }
 }
 
-impl<S: TexlangState> Parsable<S> for token::CatCode {
+// TODO: move to types/catcode.rs
+impl<S: TexlangState> Parsable<S> for types::CatCode {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
         let (token, i): (token::Token, i32) = parse_number_internal(input)?;
         if let Ok(val_u8) = u8::try_from(i) {
-            if let Ok(cat_code) = token::CatCode::try_from(val_u8) {
+            if let Ok(cat_code) = types::CatCode::try_from(val_u8) {
                 return Ok(cat_code);
             }
         }
-        Err(parse::Error {
-            expected: "a category code number (an integer in the range [0, 15])".into(),
-            got: input.vm().trace(token),
-            got_override: format!["got the integer {i}"],
-            annotation_override: "this is where the number started".into(),
-            guidance: "".into(),
-            additional_notes: vec![],
-        }
-        .into())
+        S::recoverable_error_hook(
+            input.vm(),
+            parse::Error {
+                expected: "a category code number (an integer in the range [0, 15])".into(),
+                got: input.vm().trace(token),
+                got_override: format!["got the integer {i}"],
+                annotation_override: "this is where the number started".into(),
+                guidance: "".into(),
+                additional_notes: vec![],
+            }
+            .into(),
+        )?;
+        Ok(types::CatCode::try_from(0).unwrap())
     }
 }
 
@@ -136,6 +141,7 @@ fn parse_number_internal<S: TexlangState>(
                     match cmd.clone().value(first_token, stream)? {
                         variable::ValueRef::Int(i) => *i,
                         variable::ValueRef::CatCode(c) => *c as i32,
+                        variable::ValueRef::MathCode(c) => c.0 as i32,
                         variable::ValueRef::TokenList(_) => {
                             return Err(parse::Error::new(
                                 stream.vm(),
@@ -149,6 +155,7 @@ fn parse_number_internal<S: TexlangState>(
                     }
                 }
                 Some(command::Command::Character(c)) => (*c as u32).try_into().unwrap(),
+                Some(command::Command::MathCharacter(c)) => c.0 as i32,
                 None
                 | Some(
                     command::Command::Execution(..)
@@ -461,11 +468,11 @@ mod tests {
     struct State;
 
     impl TexlangState for State {
-        fn cat_code(&self, c: char) -> token::CatCode {
+        fn cat_code(&self, c: char) -> types::CatCode {
             if c == '9' {
-                return token::CatCode::Letter;
+                return types::CatCode::Letter;
             }
-            token::CatCode::PLAIN_TEX_DEFAULTS
+            types::CatCode::PLAIN_TEX_DEFAULTS
                 .get(c as usize)
                 .copied()
                 .unwrap_or_default()

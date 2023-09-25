@@ -1,0 +1,10 @@
+[package]
+name = "tfm"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Parsers for the TeX font metric (.tfm) and property list (.pl) file formats"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+categories = ["parser-implementations"]

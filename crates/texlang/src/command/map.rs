@@ -250,6 +250,7 @@ enum SerializableCommand {
     Macro(usize),
     CharacterTokenAlias(token::Value),
     Character(char),
+    MathCharacter(types::MathCode),
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -321,6 +322,7 @@ impl<'a> SerializableMap<'a> {
                             SerializableCommand::CharacterTokenAlias(*v)
                         }
                         Command::Character(c) => SerializableCommand::Character(*c),
+                        Command::MathCharacter(c) => SerializableCommand::MathCharacter(*c),
                     };
 
                     let cs_name = token::CsName::try_from_usize(u).unwrap();
@@ -377,6 +379,7 @@ impl<'a> SerializableMap<'a> {
                             Command::CharacterTokenAlias(*v)
                         }
                         SerializableCommand::Character(c) => Command::Character(*c),
+                        SerializableCommand::MathCharacter(c) => Command::MathCharacter(*c),
                     };
                     (cs_name.to_usize(), command)
                 },

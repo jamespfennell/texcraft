@@ -199,10 +199,10 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn
         match (lexer.next(state, cs_name_interner, true), mode) {
             (lexer::Result::Token(token), _) => {
                 match token.cat_code() {
-                    Some(token::CatCode::BeginGroup) => {
+                    Some(types::CatCode::BeginGroup) => {
                         braces.push(token);
                     }
-                    Some(token::CatCode::EndGroup) => {
+                    Some(types::CatCode::EndGroup) => {
                         if braces.pop().is_none() {
                             more_lines_exist = drain_line(&mut lexer, state, cs_name_interner);
                             break;

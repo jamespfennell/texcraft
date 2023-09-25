@@ -5,7 +5,6 @@ RUN  curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 WORKDIR /texcraft
 COPY Cargo.toml Cargo.toml
 COPY Cargo.lock Cargo.lock
-COPY bin bin
 COPY performance performance
 COPY playground playground
 COPY crates crates
