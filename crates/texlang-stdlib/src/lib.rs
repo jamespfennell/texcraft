@@ -9,9 +9,9 @@ use std::collections::HashMap;
 
 use texlang::command;
 use texlang::token;
-use texlang::types::CatCode;
 use texlang::traits::*;
 use texlang::types;
+use texlang::types::CatCode;
 use texlang::vm;
 use texlang::vm::implement_has_component;
 

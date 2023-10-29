@@ -464,14 +464,14 @@ impl Deserialize for LigKernCommand {
                 LigKernOp::Ligature {
                     char_to_insert: remainder,
                     post_insert: match (delete_current_char, delete_next_char, skip) {
-                        (false, false, 0) => PostInsert::DeleteNoneMoveNowhere,
-                        (false, false, 1) => PostInsert::DeleteNoneMoveToInserted,
-                        (false, false, 2) => PostInsert::DeleteNoneMoveToNext,
-                        (false, true, 0) => PostInsert::DeleteNextMoveNowhere,
-                        (false, true, 1) => PostInsert::DeleteNextMoveToInserted,
-                        (true, false, 0) => PostInsert::DeleteCurrentMoveToInserted,
-                        (true, false, 1) => PostInsert::DeleteCurrentMoveToNext,
-                        (true, true, 0) => PostInsert::DeleteBothMoveToInserted,
+                        (false, false, 0) => PostInsert::RetainBothMoveNowhere,
+                        (false, false, 1) => PostInsert::RetainBothMoveToInserted,
+                        (false, false, 2) => PostInsert::RetainBothMoveToRight,
+                        (false, true, 0) => PostInsert::RetainLeftMoveNowhere,
+                        (false, true, 1) => PostInsert::RetainLeftMoveToInserted,
+                        (true, false, 0) => PostInsert::RetainRightMoveToInserted,
+                        (true, false, 1) => PostInsert::RetainRightMoveToRight,
+                        (true, true, 0) => PostInsert::RetainNeitherMoveToInserted,
                         _ => unreachable!(),
                     },
                 }
@@ -841,7 +841,7 @@ mod tests {
                             next_char: 6,
                             op: LigKernOp::Ligature {
                                 char_to_insert: 17,
-                                post_insert: PostInsert::DeleteBothMoveToInserted,
+                                post_insert: PostInsert::RetainNeitherMoveToInserted,
                             },
                         },
                         LigKernCommand {
@@ -849,7 +849,7 @@ mod tests {
                             next_char: 7,
                             op: LigKernOp::Ligature {
                                 char_to_insert: 19,
-                                post_insert: PostInsert::DeleteNoneMoveToNext,
+                                post_insert: PostInsert::RetainBothMoveToRight,
                             },
                         },
                         LigKernCommand {
@@ -857,7 +857,7 @@ mod tests {
                             next_char: 8,
                             op: LigKernOp::Ligature {
                                 char_to_insert: 23,
-                                post_insert: PostInsert::DeleteCurrentMoveToNext,
+                                post_insert: PostInsert::RetainRightMoveToRight,
                             },
                         },
                     ],

@@ -1,5 +1,5 @@
-use crate::types;
 use crate::traits::*;
+use crate::types;
 use crate::vm;
 use std::cell::RefCell;
 use std::collections::HashMap;

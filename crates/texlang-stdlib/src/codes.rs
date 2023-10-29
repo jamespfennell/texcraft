@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use texlang::token;
-use texlang::types::CatCode;
 use texlang::traits::*;
+use texlang::types::CatCode;
 use texlang::*;
 
 pub trait Code: Copy + Debug + Default + variable::SupportedType {

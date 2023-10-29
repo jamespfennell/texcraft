@@ -2,11 +2,12 @@
 
 #[cfg(test)]
 mod examples;
+pub mod pl;
 mod tfm;
 
 pub use crate::tfm::{
     deserialize as deserialize_tfm, DeserializeError as DeserializeTfmError,
-    DeserializeWarning as DeserializeTfmWarning, SubFileSizes as SubFileSizes,
+    DeserializeWarning as DeserializeTfmWarning, SubFileSizes,
 };
 
 /// Complete contents of a TeX font metric (.tfm) or property list (.pl) file.
@@ -277,51 +278,51 @@ pub enum LigKernOp {
 // TODO: put all these in a ligkern namespace
 #[derive(Debug, PartialEq, Eq)]
 pub enum PostInsert {
-    DeleteNoneMoveNowhere,
-    DeleteNoneMoveToInserted,
-    DeleteNoneMoveToNext,
-    DeleteCurrentMoveToInserted,
-    DeleteCurrentMoveToNext,
-    DeleteNextMoveNowhere,
-    DeleteNextMoveToInserted,
-    DeleteBothMoveToInserted,
+    RetainBothMoveNowhere,
+    RetainBothMoveToInserted,
+    RetainBothMoveToRight,
+    RetainRightMoveToInserted,
+    RetainRightMoveToRight,
+    RetainLeftMoveNowhere,
+    RetainLeftMoveToInserted,
+    RetainNeitherMoveToInserted,
 }
 
 impl PostInsert {
-    pub fn delete_current(&self) -> bool {
+    pub fn delete_left(&self) -> bool {
         match self {
-            PostInsert::DeleteNoneMoveNowhere
-            | PostInsert::DeleteNoneMoveToInserted
-            | PostInsert::DeleteNoneMoveToNext
-            | PostInsert::DeleteNextMoveNowhere
-            | PostInsert::DeleteNextMoveToInserted => false,
-            PostInsert::DeleteCurrentMoveToInserted
-            | PostInsert::DeleteCurrentMoveToNext
-            | PostInsert::DeleteBothMoveToInserted => true,
+            PostInsert::RetainBothMoveNowhere
+            | PostInsert::RetainBothMoveToInserted
+            | PostInsert::RetainBothMoveToRight
+            | PostInsert::RetainLeftMoveNowhere
+            | PostInsert::RetainLeftMoveToInserted => false,
+            PostInsert::RetainRightMoveToInserted
+            | PostInsert::RetainRightMoveToRight
+            | PostInsert::RetainNeitherMoveToInserted => true,
         }
     }
-    pub fn delete_next(&self) -> bool {
+    pub fn delete_right(&self) -> bool {
         match self {
-            PostInsert::DeleteNoneMoveNowhere
-            | PostInsert::DeleteNoneMoveToInserted
-            | PostInsert::DeleteNoneMoveToNext
-            | PostInsert::DeleteCurrentMoveToInserted
-            | PostInsert::DeleteCurrentMoveToNext => false,
-            PostInsert::DeleteNextMoveNowhere
-            | PostInsert::DeleteNextMoveToInserted
-            | PostInsert::DeleteBothMoveToInserted => true,
+            PostInsert::RetainBothMoveNowhere
+            | PostInsert::RetainBothMoveToInserted
+            | PostInsert::RetainBothMoveToRight
+            | PostInsert::RetainRightMoveToInserted
+            | PostInsert::RetainRightMoveToRight => false,
+            PostInsert::RetainLeftMoveNowhere
+            | PostInsert::RetainLeftMoveToInserted
+            | PostInsert::RetainNeitherMoveToInserted => true,
         }
     }
-    pub fn skip(&self) -> u8 {
+    pub fn num_skips(&self) -> u8 {
         match self {
-            PostInsert::DeleteNoneMoveNowhere
-            | PostInsert::DeleteCurrentMoveToInserted
-            | PostInsert::DeleteNextMoveNowhere => 0,
-            PostInsert::DeleteBothMoveToInserted => 0,
-            PostInsert::DeleteNoneMoveToInserted
-            | PostInsert::DeleteCurrentMoveToNext
-            | PostInsert::DeleteNextMoveToInserted => 1,
-            PostInsert::DeleteNoneMoveToNext => 2,
+            PostInsert::RetainBothMoveNowhere
+            | PostInsert::RetainRightMoveToInserted
+            | PostInsert::RetainLeftMoveNowhere => 0,
+            PostInsert::RetainNeitherMoveToInserted => 0,
+            PostInsert::RetainBothMoveToInserted
+            | PostInsert::RetainRightMoveToRight
+            | PostInsert::RetainLeftMoveToInserted => 1,
+            PostInsert::RetainBothMoveToRight => 2,
         }
     }
 }

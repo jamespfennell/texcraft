@@ -8,10 +8,10 @@
 use crate::command;
 use crate::error;
 use crate::parse::OptionalEquals;
+use crate::token;
 use crate::traits::*;
 use crate::types;
 use crate::vm;
-use crate::token;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::Debug;

@@ -91,10 +91,10 @@
 //!
 use crate::error;
 use crate::token;
-use crate::types::CatCode;
 use crate::token::trace;
 use crate::token::CsNameInterner;
 use crate::token::Token;
+use crate::types::CatCode;
 use crate::vm;
 
 /// Error possibly returned when the input contains an invalid character
@@ -560,10 +560,10 @@ impl RawLexer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::CatCode::*;
     use crate::token::CommandRef;
     use crate::token::CsNameInterner;
     use crate::token::Value;
+    use crate::types::CatCode::*;
     use std::collections::HashMap;
 
     #[derive(Debug, PartialEq, Eq)]
