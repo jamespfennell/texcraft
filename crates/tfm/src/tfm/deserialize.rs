@@ -457,6 +457,7 @@ impl Deserialize for LigKernCommand {
             },
             next_char,
             op: if op_byte < 128 {
+                // TFtoPL.2014.77
                 let delete_next_char = (op_byte % 2) == 0;
                 let op_byte = op_byte / 2;
                 let delete_current_char = (op_byte % 2) == 0;
@@ -472,7 +473,10 @@ impl Deserialize for LigKernCommand {
                         (true, false, 0) => PostInsert::RetainRightMoveToInserted,
                         (true, false, 1) => PostInsert::RetainRightMoveToRight,
                         (true, true, 0) => PostInsert::RetainNeitherMoveToInserted,
-                        _ => unreachable!(),
+                        _ => {
+                            // TODO: issue a warning
+                            PostInsert::RetainNeitherMoveToInserted
+                        }
                     },
                 }
             } else {
@@ -810,14 +814,14 @@ mod tests {
             lig_kern_commands,
             extend(
                 &[
-                    /* lf */ 0, 16, /* lh */ 0, 2, /* bc */ 0, 1, /* ec */ 0,
+                    /* lf */ 0, 17, /* lh */ 0, 2, /* bc */ 0, 1, /* ec */ 0,
                     0, /* nw */ 0, 1, /* nh */ 0, 1, /* nd */ 0, 1, /* ni */ 0,
-                    1, /* nl */ 0, 4, /* nk */ 0, 0, /* ne */ 0, 0, /* np */ 0,
+                    1, /* nl */ 0, 5, /* nk */ 0, 0, /* ne */ 0, 0, /* np */ 0,
                     0, /* header.checksum */ 0, 0, 0, 0, /* header.design_size */ 0, 0,
                     0, 0, /* widths */ 0, 0, 0, 0, /* heights */ 0, 0, 0, 0,
                     /* depths */ 0, 0, 0, 0, /* italic_corrections */ 0, 0, 0, 0,
                     /* lig_kern_commands */
-                    3, 5, 130, 13, 3, 6, 0, 17, 3, 7, 11, 19, 200, 8, 5, 23,
+                    3, 5, 130, 13, 3, 6, 0, 17, 3, 7, 11, 19, 200, 8, 5, 23, 200, 8, 48, 23,
                 ],
                 16 * 4
             ),
@@ -858,6 +862,14 @@ mod tests {
                             op: LigKernOp::Ligature {
                                 char_to_insert: 23,
                                 post_insert: PostInsert::RetainRightMoveToRight,
+                            },
+                        },
+                        LigKernCommand {
+                            next_command: None,
+                            next_char: 8,
+                            op: LigKernOp::Ligature {
+                                char_to_insert: 23,
+                                post_insert: PostInsert::RetainNeitherMoveToInserted,
                             },
                         },
                     ],

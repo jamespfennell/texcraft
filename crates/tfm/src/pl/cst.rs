@@ -2,7 +2,7 @@
 //!
 //! The CST, or parse tree, of a property list file mostly just represents the nesting of parenthesis.
 //! The AST is the most useful representation.
-//! 
+//!
 //! Rough form of the production rules, where `*` means 0 or more, `+` means at least 1, `?` means optional:
 //!
 //! - `<property list> -> <list element>*`
