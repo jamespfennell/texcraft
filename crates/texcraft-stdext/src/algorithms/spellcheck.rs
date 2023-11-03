@@ -103,7 +103,7 @@ fn levenshtein_distance(a: &str, b: &str) -> WordDiff {
     for b_j in &b {
         // Here we are comparing an empty a string (i.e., a[:0]) with b[:j+1].
         // There is only one possible action: append (add b[j]) to the diff for b[:j]
-        let mut cmp = c.clone_to_front(idx_add);
+        let cmp = c.clone_to_front(idx_add);
         cmp.ops.push(DiffOp::Add(*b_j));
         cmp.distance += 1;
     }
@@ -112,7 +112,7 @@ fn levenshtein_distance(a: &str, b: &str) -> WordDiff {
         // Here we are comparing a[:i+1] with an empty b string (i.e., b[:0])
         // There is only one possible action: append (subtract a[i]) to the diff for a[:i]
         //let i_subtract = (idx_to_set + 1) % c.len();
-        let mut cmp = c.clone_to_front(idx_subtract);
+        let cmp = c.clone_to_front(idx_subtract);
         cmp.ops.push(DiffOp::Subtract(*a_i));
         cmp.distance += 1;
 
@@ -133,7 +133,7 @@ fn levenshtein_distance(a: &str, b: &str) -> WordDiff {
                 }
             };
 
-            let mut cmp = c.clone_to_front(idx_to_clone);
+            let cmp = c.clone_to_front(idx_to_clone);
             cmp.ops.push(diff);
             cmp.distance += distance_delta;
         }

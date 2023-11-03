@@ -572,7 +572,7 @@ impl Eq for TokenBuffer {}
 
 impl PartialOrd for TokenBuffer {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.0.capacity().partial_cmp(&other.0.capacity())
+        Some(self.cmp(other))
     }
 }
 

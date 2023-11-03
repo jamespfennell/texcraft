@@ -27,7 +27,7 @@ pub mod run {
         vm: &mut vm::VM<S>,
         opts: RunOptions,
     ) {
-        let mut c = HasComponent::<Component>::component_mut(&mut vm.state);
+        let c = HasComponent::<Component>::component_mut(&mut vm.state);
         c.help = opts.help.into();
         c.quit_requested = false;
         let reader = Interface::new("").unwrap();
@@ -79,7 +79,7 @@ pub mod run {
             start: usize,
             _end: usize,
         ) -> Option<Vec<linefeed::Completion>> {
-            if prompter.buffer()[..start].chars().rev().next() != Some('\\') {
+            if prompter.buffer()[..start].ends_with('\\') {
                 return None;
             }
             let mut completions = Vec::new();

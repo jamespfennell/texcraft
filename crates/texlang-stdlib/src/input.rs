@@ -86,7 +86,7 @@ impl<const N: usize> Default for Component<N> {
         // cannot be cloned and so we can't use the standard array constructor.
         // But note that this isn't inefficient, because the array will
         // simply use the vector's buffer.
-        let v: Vec<Option<Box<lexer::Lexer>>> = (0..N).into_iter().map(|_| None).collect();
+        let v: Vec<Option<Box<lexer::Lexer>>> = (0..N).map(|_| None).collect();
         Self {
             files: v.try_into().unwrap(),
         }
