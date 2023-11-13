@@ -4,7 +4,7 @@
 
 use super::cst;
 use super::error::Error;
-use crate::{Face, FixWord, PostInsert};
+use crate::{ligkern::lang::PostLigOperation, Face, FixWord};
 
 /// Abstract syntax tree for property list files
 ///
@@ -438,20 +438,20 @@ pub enum LigTable {
     ///     and then immediately followed by > characters not exceeding the number of slashes.
     /// Thus there are eight possible forms:
     ///
-    /// | keyword   | retain  | move to  | [`PostInsert`] value |
+    /// | keyword   | retain  | move to  | [`PostLigOperation`] value |
     /// |-----------|---------|----------|--------|
-    /// | `LIG`     | neither | inserted | [`PostInsert::RetainNeitherMoveToInserted`] |
-    /// | `/LIG`    | left    | left     | [`PostInsert::RetainLeftMoveNowhere`]       |
-    /// | `/LIG>`   | left    | inserted | [`PostInsert::RetainLeftMoveToInserted`]    |
-    /// | `LIG/`    | right   | inserted | [`PostInsert::RetainRightMoveToInserted`]   |
-    /// | `LIG/>`   | right   | right    | [`PostInsert::RetainRightMoveToRight`]      |
-    /// | `/LIG/`   | both    | left     | [`PostInsert::RetainBothMoveToInserted`]    |
-    /// | `/LIG/>`  | both    | inserted | [`PostInsert::RetainBothMoveToInserted`]    |
-    /// | `/LIG/>>` | both    | right    | [`PostInsert::RetainBothMoveToRight`]       |
+    /// | `LIG`     | neither | inserted | [`PostLigOperation::RetainNeitherMoveToInserted`] |
+    /// | `/LIG`    | left    | left     | [`PostLigOperation::RetainLeftMoveNowhere`]       |
+    /// | `/LIG>`   | left    | inserted | [`PostLigOperation::RetainLeftMoveToInserted`]    |
+    /// | `LIG/`    | right   | inserted | [`PostLigOperation::RetainRightMoveToInserted`]   |
+    /// | `LIG/>`   | right   | right    | [`PostLigOperation::RetainRightMoveToRight`]      |
+    /// | `/LIG/`   | both    | left     | [`PostLigOperation::RetainBothMoveToInserted`]    |
+    /// | `/LIG/>`  | both    | inserted | [`PostLigOperation::RetainBothMoveToInserted`]    |
+    /// | `/LIG/>>` | both    | right    | [`PostLigOperation::RetainBothMoveToRight`]       |
     ///
     /// The slashes specify retention of the left or right original character; the > signs specify passing over
     /// the result without further ligature processing.
-    Lig(PostInsert, TupleValue<char, char>),
+    Lig(PostLigOperation, TupleValue<char, char>),
 
     /// A kern instruction `(KRN c r)` means,
     ///     "If the next character is c, then insert a blank space of width r between the current character and c;
@@ -497,14 +497,44 @@ impl Data for LigTableLabel {
 node_impl!(
     LigTable,
     (LABEL, "LABEL", Label),
-    (LIG_1, "LIG", Lig, PostInsert::RetainNeitherMoveToInserted),
-    (LIG_2, "/LIG", Lig, PostInsert::RetainLeftMoveNowhere),
-    (LIG_3, "/LIG>", Lig, PostInsert::RetainLeftMoveToInserted),
-    (LIG_4, "LIG/", Lig, PostInsert::RetainRightMoveToInserted),
-    (LIG_5, "LIG/>", Lig, PostInsert::RetainRightMoveToRight),
-    (LIG_6, "/LIG/", Lig, PostInsert::RetainBothMoveNowhere),
-    (LIG_7, "/LIG/>", Lig, PostInsert::RetainBothMoveToInserted),
-    (LIG_8, "/LIG/>>", Lig, PostInsert::RetainBothMoveToRight),
+    (
+        LIG_1,
+        "LIG",
+        Lig,
+        PostLigOperation::RetainNeitherMoveToInserted
+    ),
+    (LIG_2, "/LIG", Lig, PostLigOperation::RetainLeftMoveNowhere),
+    (
+        LIG_3,
+        "/LIG>",
+        Lig,
+        PostLigOperation::RetainLeftMoveToInserted
+    ),
+    (
+        LIG_4,
+        "LIG/",
+        Lig,
+        PostLigOperation::RetainRightMoveToInserted
+    ),
+    (
+        LIG_5,
+        "LIG/>",
+        Lig,
+        PostLigOperation::RetainRightMoveToRight
+    ),
+    (LIG_6, "/LIG/", Lig, PostLigOperation::RetainBothMoveNowhere),
+    (
+        LIG_7,
+        "/LIG/>",
+        Lig,
+        PostLigOperation::RetainBothMoveToInserted
+    ),
+    (
+        LIG_8,
+        "/LIG/>>",
+        Lig,
+        PostLigOperation::RetainBothMoveToRight
+    ),
     (KERN, "KRN", Kern),
     (STOP, "STOP", Stop),
     (SKIP, "SKIP", Skip),
@@ -1192,7 +1222,7 @@ mod tests {
                             data: LigTableLabel::Char('f')
                         }),
                         LigTable::Lig(
-                            PostInsert::RetainNeitherMoveToInserted,
+                            PostLigOperation::RetainNeitherMoveToInserted,
                             TupleValue {
                                 data: ('f', 0o200 as char)
                             }
@@ -1202,7 +1232,7 @@ mod tests {
                             data: LigTableLabel::Char(0o200 as char)
                         }),
                         LigTable::Lig(
-                            PostInsert::RetainNeitherMoveToInserted,
+                            PostLigOperation::RetainNeitherMoveToInserted,
                             TupleValue {
                                 data: ('i', 0o201 as char)
                             }
@@ -1211,7 +1241,7 @@ mod tests {
                             data: (0o51 as char, FixWord(3 * FixWord::UNITY.0 / 2))
                         }),
                         LigTable::Lig(
-                            PostInsert::RetainLeftMoveNowhere,
+                            PostLigOperation::RetainLeftMoveNowhere,
                             TupleValue { data: ('?', 'f') }
                         ),
                         LigTable::Stop(SingleValue { data: () }),

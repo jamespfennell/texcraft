@@ -446,47 +446,50 @@ impl DeserializeFixed for CharInfo {
     const NUM_BYTES: usize = 4;
 }
 
-impl Deserialize for LigKernCommand {
+impl Deserialize for ligkern::lang::Instruction {
     fn deserialize(b: &[u8]) -> Self {
-        let (skip_byte, next_char, op_byte, remainder) = (b[0], b[1], b[2], b[3]);
-        LigKernCommand {
-            next_command: if skip_byte < 128 {
+        let (skip_byte, right_char, op_byte, remainder) = (b[0], b[1], b[2], b[3]);
+        ligkern::lang::Instruction {
+            next_instruction: if skip_byte < 128 {
                 Some(skip_byte)
             } else {
                 None
             },
-            next_char,
-            op: if op_byte < 128 {
+            right_char: right_char.into(),
+            operation: if op_byte < 128 {
                 // TFtoPL.2014.77
                 let delete_next_char = (op_byte % 2) == 0;
                 let op_byte = op_byte / 2;
                 let delete_current_char = (op_byte % 2) == 0;
                 let skip = op_byte / 2;
-                LigKernOp::Ligature {
-                    char_to_insert: remainder,
-                    post_insert: match (delete_current_char, delete_next_char, skip) {
-                        (false, false, 0) => PostInsert::RetainBothMoveNowhere,
-                        (false, false, 1) => PostInsert::RetainBothMoveToInserted,
-                        (false, false, 2) => PostInsert::RetainBothMoveToRight,
-                        (false, true, 0) => PostInsert::RetainLeftMoveNowhere,
-                        (false, true, 1) => PostInsert::RetainLeftMoveToInserted,
-                        (true, false, 0) => PostInsert::RetainRightMoveToInserted,
-                        (true, false, 1) => PostInsert::RetainRightMoveToRight,
-                        (true, true, 0) => PostInsert::RetainNeitherMoveToInserted,
+                use ligkern::lang::PostLigOperation::*;
+                ligkern::lang::Operation::Ligature {
+                    char_to_insert: remainder.into(),
+                    post_lig_operation: match (delete_current_char, delete_next_char, skip) {
+                        (false, false, 0) => RetainBothMoveNowhere,
+                        (false, false, 1) => RetainBothMoveToInserted,
+                        (false, false, 2) => RetainBothMoveToRight,
+                        (false, true, 0) => RetainLeftMoveNowhere,
+                        (false, true, 1) => RetainLeftMoveToInserted,
+                        (true, false, 0) => RetainRightMoveToInserted,
+                        (true, false, 1) => RetainRightMoveToRight,
+                        (true, true, 0) => RetainNeitherMoveToInserted,
                         _ => {
                             // TODO: issue a warning
-                            PostInsert::RetainNeitherMoveToInserted
+                            RetainNeitherMoveToInserted
                         }
                     },
                 }
             } else {
-                LigKernOp::Kern(256 * (op_byte as u16 - 128) + remainder as u16)
+                ligkern::lang::Operation::Kern(FixWord(
+                    256 * (op_byte as i32 - 128) + remainder as i32,
+                ))
             },
         }
     }
 }
 
-impl DeserializeFixed for LigKernCommand {
+impl DeserializeFixed for ligkern::lang::Instruction {
     const NUM_BYTES: usize = 4;
 }
 
@@ -835,41 +838,45 @@ mod tests {
                     depths: vec![FixWord::ZERO],
                     italic_corrections: vec![FixWord::ZERO],
                     lig_kern_commands: vec![
-                        LigKernCommand {
-                            next_command: Some(3),
-                            next_char: 5,
-                            op: LigKernOp::Kern(256 * 2 + 13)
+                        ligkern::lang::Instruction {
+                            next_instruction: Some(3),
+                            right_char: 5.into(),
+                            operation: ligkern::lang::Operation::Kern(FixWord(256 * 2 + 13))
                         },
-                        LigKernCommand {
-                            next_command: Some(3),
-                            next_char: 6,
-                            op: LigKernOp::Ligature {
-                                char_to_insert: 17,
-                                post_insert: PostInsert::RetainNeitherMoveToInserted,
+                        ligkern::lang::Instruction {
+                            next_instruction: Some(3),
+                            right_char: 6.into(),
+                            operation: ligkern::lang::Operation::Ligature {
+                                char_to_insert: 17.into(),
+                                post_lig_operation:
+                                    ligkern::lang::PostLigOperation::RetainNeitherMoveToInserted,
                             },
                         },
-                        LigKernCommand {
-                            next_command: Some(3),
-                            next_char: 7,
-                            op: LigKernOp::Ligature {
-                                char_to_insert: 19,
-                                post_insert: PostInsert::RetainBothMoveToRight,
+                        ligkern::lang::Instruction {
+                            next_instruction: Some(3),
+                            right_char: 7.into(),
+                            operation: ligkern::lang::Operation::Ligature {
+                                char_to_insert: 19.into(),
+                                post_lig_operation:
+                                    ligkern::lang::PostLigOperation::RetainBothMoveToRight,
                             },
                         },
-                        LigKernCommand {
-                            next_command: None,
-                            next_char: 8,
-                            op: LigKernOp::Ligature {
-                                char_to_insert: 23,
-                                post_insert: PostInsert::RetainRightMoveToRight,
+                        ligkern::lang::Instruction {
+                            next_instruction: None,
+                            right_char: 8.into(),
+                            operation: ligkern::lang::Operation::Ligature {
+                                char_to_insert: 23.into(),
+                                post_lig_operation:
+                                    ligkern::lang::PostLigOperation::RetainRightMoveToRight,
                             },
                         },
-                        LigKernCommand {
-                            next_command: None,
-                            next_char: 8,
-                            op: LigKernOp::Ligature {
-                                char_to_insert: 23,
-                                post_insert: PostInsert::RetainNeitherMoveToInserted,
+                        ligkern::lang::Instruction {
+                            next_instruction: None,
+                            right_char: 8.into(),
+                            operation: ligkern::lang::Operation::Ligature {
+                                char_to_insert: 23.into(),
+                                post_lig_operation:
+                                    ligkern::lang::PostLigOperation::RetainNeitherMoveToInserted,
                             },
                         },
                     ],

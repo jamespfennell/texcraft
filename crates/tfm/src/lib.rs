@@ -2,6 +2,7 @@
 
 #[cfg(test)]
 mod examples;
+pub mod ligkern;
 pub mod pl;
 mod tfm;
 
@@ -49,7 +50,7 @@ pub struct Font {
     pub italic_corrections: Vec<FixWord>,
 
     /// Lig kern commands.
-    pub lig_kern_commands: Vec<LigKernCommand>,
+    pub lig_kern_commands: Vec<ligkern::lang::Instruction>,
 
     /// Kerns. These are referenced from inside the lig kern commands.
     pub kern: Vec<FixWord>,
@@ -146,6 +147,14 @@ impl FixWord {
     pub const UNITY: FixWord = FixWord(1 << 20);
 }
 
+impl std::ops::Mul<i32> for FixWord {
+    type Output = FixWord;
+
+    fn mul(self, rhs: i32) -> Self::Output {
+        FixWord(self.0 * rhs)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct CharInfo {
     pub width_index: u8,
@@ -236,93 +245,6 @@ impl From<Face> for u8 {
                 c * 6 + a * 2 + b
             }
             Face::Other(b) => b,
-        }
-    }
-}
-
-/// We start with a current character
-#[derive(Debug, PartialEq, Eq)]
-pub struct LigKernCommand {
-    /// Specifies the next command for the current character.
-    /// Otherwise this is the final command.
-    /// This field essentially makes the lig kern commands for a specific character into a linked list.
-    pub next_command: Option<u8>,
-    /// The operation is performed if `next_char` is the next character.
-    /// Otherwise the next lig kern command for the current character is consulted, using the `next_command` field.
-    ///
-    /// After this operation is performed, no more operations need to be performed.
-    /// This is because for any given pair of characters there is only one lig
-    /// kern command for that pair.
-    pub next_char: u8,
-    /// The operation to perform.
-    pub op: LigKernOp,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum LigKernOp {
-    /// Insert a kern between the current character and the next character.
-    /// The variant payload is the index of the kern in the kerns array.
-    Kern(u16),
-    /// Perform a ligature step.
-    /// This means inserting `char_to_insert` between the current character and the next character,
-    ///     potentially deleting one or both of these characters,
-    ///     and then potentially moving the current character forward.
-    Ligature {
-        /// Character to insert.
-        char_to_insert: u8,
-        /// What to do after inserting the character.
-        post_insert: PostInsert,
-    },
-}
-
-// TODO: put all these in a ligkern namespace
-#[derive(Debug, PartialEq, Eq)]
-pub enum PostInsert {
-    RetainBothMoveNowhere,
-    RetainBothMoveToInserted,
-    RetainBothMoveToRight,
-    RetainRightMoveToInserted,
-    RetainRightMoveToRight,
-    RetainLeftMoveNowhere,
-    RetainLeftMoveToInserted,
-    RetainNeitherMoveToInserted,
-}
-
-impl PostInsert {
-    pub fn delete_left(&self) -> bool {
-        match self {
-            PostInsert::RetainBothMoveNowhere
-            | PostInsert::RetainBothMoveToInserted
-            | PostInsert::RetainBothMoveToRight
-            | PostInsert::RetainLeftMoveNowhere
-            | PostInsert::RetainLeftMoveToInserted => false,
-            PostInsert::RetainRightMoveToInserted
-            | PostInsert::RetainRightMoveToRight
-            | PostInsert::RetainNeitherMoveToInserted => true,
-        }
-    }
-    pub fn delete_right(&self) -> bool {
-        match self {
-            PostInsert::RetainBothMoveNowhere
-            | PostInsert::RetainBothMoveToInserted
-            | PostInsert::RetainBothMoveToRight
-            | PostInsert::RetainRightMoveToInserted
-            | PostInsert::RetainRightMoveToRight => false,
-            PostInsert::RetainLeftMoveNowhere
-            | PostInsert::RetainLeftMoveToInserted
-            | PostInsert::RetainNeitherMoveToInserted => true,
-        }
-    }
-    pub fn num_skips(&self) -> u8 {
-        match self {
-            PostInsert::RetainBothMoveNowhere
-            | PostInsert::RetainRightMoveToInserted
-            | PostInsert::RetainLeftMoveNowhere => 0,
-            PostInsert::RetainNeitherMoveToInserted => 0,
-            PostInsert::RetainBothMoveToInserted
-            | PostInsert::RetainRightMoveToRight
-            | PostInsert::RetainLeftMoveToInserted => 1,
-            PostInsert::RetainBothMoveToRight => 2,
         }
     }
 }
