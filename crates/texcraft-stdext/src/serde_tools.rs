@@ -47,7 +47,7 @@ pub mod iter {
         I: IntoIterator<Item = T>,
         S: serde::Serializer,
     {
-        serializer.collect_seq::<I::IntoIter>(input.into_iter())
+        serializer.collect_seq(input)
     }
 
     /// Function that deserializes types that can be built from iterators
@@ -59,7 +59,7 @@ pub mod iter {
     {
         // TODO: we should not allocate a vector
         let v = Vec::<T>::deserialize(deserializer)?;
-        Ok(C::from_iter(v.into_iter()))
+        Ok(C::from_iter(v))
     }
 }
 

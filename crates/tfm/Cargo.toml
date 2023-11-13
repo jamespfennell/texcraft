@@ -8,3 +8,9 @@ homepage = "https://texcraft.dev"
 repository = "https://github.com/jamespfennell/texcraft"
 keywords = ["tex", "texcraft"]
 categories = ["parser-implementations"]
+
+[dependencies]
+ariadne = {version="0.3.0", default-features = false, optional = true}
+
+[features]
+ariadne = ["dep:ariadne"]

@@ -362,7 +362,7 @@ where
 {
     vm.push_source("testing.tex", source).unwrap();
     {
-        let mut component = vm.state.component_mut();
+        let component = vm.state.component_mut();
         component.allow_undefined_command = options.allow_undefined_commands;
         component.recover_from_errors = options.recover_from_errors;
         *component.num_recovered_errors.borrow_mut() = 0;

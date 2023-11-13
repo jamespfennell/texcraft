@@ -446,43 +446,50 @@ impl DeserializeFixed for CharInfo {
     const NUM_BYTES: usize = 4;
 }
 
-impl Deserialize for LigKernCommand {
+impl Deserialize for ligkern::lang::Instruction {
     fn deserialize(b: &[u8]) -> Self {
-        let (skip_byte, next_char, op_byte, remainder) = (b[0], b[1], b[2], b[3]);
-        LigKernCommand {
-            next_command: if skip_byte < 128 {
+        let (skip_byte, right_char, op_byte, remainder) = (b[0], b[1], b[2], b[3]);
+        ligkern::lang::Instruction {
+            next_instruction: if skip_byte < 128 {
                 Some(skip_byte)
             } else {
                 None
             },
-            next_char,
-            op: if op_byte < 128 {
+            right_char: right_char.into(),
+            operation: if op_byte < 128 {
+                // TFtoPL.2014.77
                 let delete_next_char = (op_byte % 2) == 0;
                 let op_byte = op_byte / 2;
                 let delete_current_char = (op_byte % 2) == 0;
                 let skip = op_byte / 2;
-                LigKernOp::Ligature {
-                    char_to_insert: remainder,
-                    post_insert: match (delete_current_char, delete_next_char, skip) {
-                        (false, false, 0) => PostInsert::DeleteNoneMoveNowhere,
-                        (false, false, 1) => PostInsert::DeleteNoneMoveToInserted,
-                        (false, false, 2) => PostInsert::DeleteNoneMoveToNext,
-                        (false, true, 0) => PostInsert::DeleteNextMoveNowhere,
-                        (false, true, 1) => PostInsert::DeleteNextMoveToInserted,
-                        (true, false, 0) => PostInsert::DeleteCurrentMoveToInserted,
-                        (true, false, 1) => PostInsert::DeleteCurrentMoveToNext,
-                        (true, true, 0) => PostInsert::DeleteBothMoveToInserted,
-                        _ => unreachable!(),
+                use ligkern::lang::PostLigOperation::*;
+                ligkern::lang::Operation::Ligature {
+                    char_to_insert: remainder.into(),
+                    post_lig_operation: match (delete_current_char, delete_next_char, skip) {
+                        (false, false, 0) => RetainBothMoveNowhere,
+                        (false, false, 1) => RetainBothMoveToInserted,
+                        (false, false, 2) => RetainBothMoveToRight,
+                        (false, true, 0) => RetainLeftMoveNowhere,
+                        (false, true, 1) => RetainLeftMoveToInserted,
+                        (true, false, 0) => RetainRightMoveToInserted,
+                        (true, false, 1) => RetainRightMoveToRight,
+                        (true, true, 0) => RetainNeitherMoveToInserted,
+                        _ => {
+                            // TODO: issue a warning
+                            RetainNeitherMoveToInserted
+                        }
                     },
                 }
             } else {
-                LigKernOp::Kern(256 * (op_byte as u16 - 128) + remainder as u16)
+                ligkern::lang::Operation::Kern(FixWord(
+                    256 * (op_byte as i32 - 128) + remainder as i32,
+                ))
             },
         }
     }
 }
 
-impl DeserializeFixed for LigKernCommand {
+impl DeserializeFixed for ligkern::lang::Instruction {
     const NUM_BYTES: usize = 4;
 }
 
@@ -810,14 +817,14 @@ mod tests {
             lig_kern_commands,
             extend(
                 &[
-                    /* lf */ 0, 16, /* lh */ 0, 2, /* bc */ 0, 1, /* ec */ 0,
+                    /* lf */ 0, 17, /* lh */ 0, 2, /* bc */ 0, 1, /* ec */ 0,
                     0, /* nw */ 0, 1, /* nh */ 0, 1, /* nd */ 0, 1, /* ni */ 0,
-                    1, /* nl */ 0, 4, /* nk */ 0, 0, /* ne */ 0, 0, /* np */ 0,
+                    1, /* nl */ 0, 5, /* nk */ 0, 0, /* ne */ 0, 0, /* np */ 0,
                     0, /* header.checksum */ 0, 0, 0, 0, /* header.design_size */ 0, 0,
                     0, 0, /* widths */ 0, 0, 0, 0, /* heights */ 0, 0, 0, 0,
                     /* depths */ 0, 0, 0, 0, /* italic_corrections */ 0, 0, 0, 0,
                     /* lig_kern_commands */
-                    3, 5, 130, 13, 3, 6, 0, 17, 3, 7, 11, 19, 200, 8, 5, 23,
+                    3, 5, 130, 13, 3, 6, 0, 17, 3, 7, 11, 19, 200, 8, 5, 23, 200, 8, 48, 23,
                 ],
                 16 * 4
             ),
@@ -831,33 +838,45 @@ mod tests {
                     depths: vec![FixWord::ZERO],
                     italic_corrections: vec![FixWord::ZERO],
                     lig_kern_commands: vec![
-                        LigKernCommand {
-                            next_command: Some(3),
-                            next_char: 5,
-                            op: LigKernOp::Kern(256 * 2 + 13)
+                        ligkern::lang::Instruction {
+                            next_instruction: Some(3),
+                            right_char: 5.into(),
+                            operation: ligkern::lang::Operation::Kern(FixWord(256 * 2 + 13))
                         },
-                        LigKernCommand {
-                            next_command: Some(3),
-                            next_char: 6,
-                            op: LigKernOp::Ligature {
-                                char_to_insert: 17,
-                                post_insert: PostInsert::DeleteBothMoveToInserted,
+                        ligkern::lang::Instruction {
+                            next_instruction: Some(3),
+                            right_char: 6.into(),
+                            operation: ligkern::lang::Operation::Ligature {
+                                char_to_insert: 17.into(),
+                                post_lig_operation:
+                                    ligkern::lang::PostLigOperation::RetainNeitherMoveToInserted,
                             },
                         },
-                        LigKernCommand {
-                            next_command: Some(3),
-                            next_char: 7,
-                            op: LigKernOp::Ligature {
-                                char_to_insert: 19,
-                                post_insert: PostInsert::DeleteNoneMoveToNext,
+                        ligkern::lang::Instruction {
+                            next_instruction: Some(3),
+                            right_char: 7.into(),
+                            operation: ligkern::lang::Operation::Ligature {
+                                char_to_insert: 19.into(),
+                                post_lig_operation:
+                                    ligkern::lang::PostLigOperation::RetainBothMoveToRight,
                             },
                         },
-                        LigKernCommand {
-                            next_command: None,
-                            next_char: 8,
-                            op: LigKernOp::Ligature {
-                                char_to_insert: 23,
-                                post_insert: PostInsert::DeleteCurrentMoveToNext,
+                        ligkern::lang::Instruction {
+                            next_instruction: None,
+                            right_char: 8.into(),
+                            operation: ligkern::lang::Operation::Ligature {
+                                char_to_insert: 23.into(),
+                                post_lig_operation:
+                                    ligkern::lang::PostLigOperation::RetainRightMoveToRight,
+                            },
+                        },
+                        ligkern::lang::Instruction {
+                            next_instruction: None,
+                            right_char: 8.into(),
+                            operation: ligkern::lang::Operation::Ligature {
+                                char_to_insert: 23.into(),
+                                post_lig_operation:
+                                    ligkern::lang::PostLigOperation::RetainNeitherMoveToInserted,
                             },
                         },
                     ],

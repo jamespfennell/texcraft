@@ -211,8 +211,7 @@ impl Tracer {
         let (&first_key, checkpoint) = self
             .checkpoints
             .range((Included(&0), Included(&token.trace_key.0)))
-            .rev()
-            .next()
+            .next_back()
             .unwrap();
 
         match checkpoint {

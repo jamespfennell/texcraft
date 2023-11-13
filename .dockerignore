@@ -10,6 +10,7 @@
 !crates/texlang-common
 !crates/texlang-stdlib
 !crates/texcraft-stdext
+!crates/tfm
 
 # Playground Rust files
 !playground/Cargo.toml
