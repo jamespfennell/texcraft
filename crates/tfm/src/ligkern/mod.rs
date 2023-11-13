@@ -284,13 +284,13 @@ pub struct CompilationError {
     /// The pair of characters the starts the infinite loop.
     pub starting_pair: (char, char),
     /// A sequence of steps forming the infinite loop.
-    /// 
+    ///
     /// At the end of these steps, the next pair to replace will be the `starting_pair` again.
     pub infinite_loop: Vec<InfiniteLoopStep>,
 }
 
 /// One step in a lig/kern infinite loop.
-/// 
+///
 /// A vector of these steps is returned in a [`CompilationError`].
 #[derive(Debug, PartialEq, Eq)]
 pub struct InfiniteLoopStep {

@@ -131,13 +131,14 @@ impl<const N: usize> From<&str> for StackString<N> {
 ///
 /// This type has 11 bits for the integer part,
 /// 20 bits for the fractional part, and a single signed bit.
+/// The inner value is the number multiplied by 2^20.
 ///
 /// In property list files, this type is represented as a decimal number
 ///   with up to 6 digits after the decimal point.
 /// This is a non-lossy representation
 ///   because 10^(-6) is larger than 2^(-20).
 #[derive(Default, PartialEq, Eq, Debug, Copy, Clone)]
-pub struct FixWord(i32);
+pub struct FixWord(pub i32);
 
 impl FixWord {
     /// Representation of the number 0 as a [FixWord].
@@ -152,6 +153,14 @@ impl std::ops::Mul<i32> for FixWord {
 
     fn mul(self, rhs: i32) -> Self::Output {
         FixWord(self.0 * rhs)
+    }
+}
+
+impl std::ops::Div<i32> for FixWord {
+    type Output = FixWord;
+
+    fn div(self, rhs: i32) -> Self::Output {
+        FixWord(self.0 / rhs)
     }
 }
 

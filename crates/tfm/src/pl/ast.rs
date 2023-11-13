@@ -1093,7 +1093,7 @@ mod tests {
             fix_word_decimal,
             r"(DESIGNSIZE D 11.5)",
             vec![Root::DesignSize(SingleValue {
-                data: FixWord(23 * FixWord::UNITY.0 / 2)
+                data: FixWord::UNITY * 23 / 2,
             })],
             vec![],
         ),
@@ -1101,7 +1101,7 @@ mod tests {
             fix_word_negative,
             r"(DESIGNSIZE D -11.5)",
             vec![Root::DesignSize(SingleValue {
-                data: FixWord(-23 * FixWord::UNITY.0 / 2)
+                data: FixWord::UNITY * -23 / 2,
             })],
             vec![],
         ),
@@ -1179,10 +1179,10 @@ mod tests {
                     data: "ASCII".into()
                 }),
                 Root::DesignSize(SingleValue {
-                    data: FixWord(FixWord::UNITY.0 * 10),
+                    data: FixWord::UNITY * 10,
                 }),
                 Root::DesignUnits(SingleValue {
-                    data: FixWord(FixWord::UNITY.0 * 18),
+                    data: FixWord::UNITY * 18,
                 }),
                 Root::Comment(vec![BalancedElem::String("A COMMENT IS IGNORED".into())]),
                 Root::Comment(vec![BalancedElem::Vec(vec![BalancedElem::String(
@@ -1196,22 +1196,22 @@ mod tests {
                     data: (),
                     children: vec![
                         FontDimension::Slant(SingleValue {
-                            data: FixWord(-1 * FixWord::UNITY.0 / 4)
+                            data: FixWord::UNITY * -1 / 4,
                         }),
                         FontDimension::Space(SingleValue {
-                            data: FixWord(6 * FixWord::UNITY.0)
+                            data: FixWord::UNITY * 6,
                         }),
                         FontDimension::Shrink(SingleValue {
-                            data: FixWord(2 * FixWord::UNITY.0)
+                            data: FixWord::UNITY * 2,
                         }),
                         FontDimension::Stretch(SingleValue {
-                            data: FixWord(3 * FixWord::UNITY.0)
+                            data: FixWord::UNITY * 3,
                         }),
                         FontDimension::XHeight(SingleValue {
                             data: FixWord(1055 * FixWord::UNITY.0 / 100 + 1)
                         }),
                         FontDimension::Quad(SingleValue {
-                            data: FixWord(18 * FixWord::UNITY.0)
+                            data: FixWord::UNITY * 18,
                         }),
                     ]
                 }),
@@ -1238,7 +1238,7 @@ mod tests {
                             }
                         ),
                         LigTable::Kern(TupleValue {
-                            data: (0o51 as char, FixWord(3 * FixWord::UNITY.0 / 2))
+                            data: (0o51 as char, FixWord::UNITY * 3 / 2),
                         }),
                         LigTable::Lig(
                             PostLigOperation::RetainLeftMoveNowhere,
@@ -1251,13 +1251,13 @@ mod tests {
                     data: 'f',
                     children: vec![
                         Character::Width(SingleValue {
-                            data: FixWord(6 * FixWord::UNITY.0)
+                            data: FixWord::UNITY * 6,
                         }),
                         Character::Height(SingleValue {
-                            data: FixWord(27 * FixWord::UNITY.0 / 2)
+                            data: FixWord::UNITY * 27 / 2,
                         }),
                         Character::ItalicCorrection(SingleValue {
-                            data: FixWord(3 * FixWord::UNITY.0 / 2)
+                            data: FixWord::UNITY * 3 / 2,
                         }),
                     ]
                 })
