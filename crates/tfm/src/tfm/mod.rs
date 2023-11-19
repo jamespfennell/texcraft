@@ -1,4 +1,5 @@
 mod deserialize;
+mod serialize;
 
 use super::*;
 

@@ -137,7 +137,7 @@ impl<const N: usize> From<&str> for StackString<N> {
 ///   with up to 6 digits after the decimal point.
 /// This is a non-lossy representation
 ///   because 10^(-6) is larger than 2^(-20).
-#[derive(Default, PartialEq, Eq, Debug, Copy, Clone)]
+#[derive(Default, PartialEq, Eq, Debug, Copy, Clone, PartialOrd, Ord, Hash)]
 pub struct FixWord(pub i32);
 
 impl FixWord {
@@ -146,6 +146,19 @@ impl FixWord {
 
     /// Representation of the number 1 as a [FixWord].
     pub const UNITY: FixWord = FixWord(1 << 20);
+}
+
+impl std::ops::Add<FixWord> for FixWord {
+    type Output = FixWord;
+    fn add(self, rhs: FixWord) -> Self::Output {
+        FixWord(self.0 + rhs.0)
+    }
+}
+impl std::ops::Sub<FixWord> for FixWord {
+    type Output = FixWord;
+    fn sub(self, rhs: FixWord) -> Self::Output {
+        FixWord(self.0 - rhs.0)
+    }
 }
 
 impl std::ops::Mul<i32> for FixWord {
