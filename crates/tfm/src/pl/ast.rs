@@ -73,40 +73,41 @@ pub struct Branch<D, E> {
 /// This makes the `node_impl!` macro simpler to implement because we don't need to provide
 /// the type name to the macro.
 trait FromCstNode: Sized {
-    fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Self;
+    fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self>;
 }
 
-impl<D: Data> FromCstNode for SingleValue<D> {
-    fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Self {
+impl<D: TryParse> FromCstNode for SingleValue<D> {
+    fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self> {
         let (mut input, _) = Input::new(p, errors);
-        Self {
-            data: D::build(&mut input),
-        }
+        D::try_parse(&mut input).map(|data| Self { data })
     }
 }
 
-impl<D: From<u8>, E: Data> FromCstNode for TupleValue<D, E> {
-    fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Self {
+impl<D: TryParse, E: Parse> FromCstNode for TupleValue<D, E> {
+    fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self> {
         let (mut input, _) = Input::new(p, errors);
-        let first = u8::build(&mut input);
-        let second = E::build(&mut input);
-        Self {
-            data: (D::from(first), second),
-        }
+        let first = match D::try_parse(&mut input) {
+            None => return None,
+            Some(first) => first,
+        };
+        let second = E::parse(&mut input);
+        Some(Self {
+            data: (first, second),
+        })
     }
 }
 
-impl<D: Data, E: Node> FromCstNode for Branch<D, E> {
-    fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Self {
+impl<D: Parse, E: Node> FromCstNode for Branch<D, E> {
+    fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self> {
         {
             let (mut input, children) = Input::new(p, errors);
-            Branch::<D, E> {
-                data: D::build(&mut input),
+            Some(Branch::<D, E> {
+                data: D::parse(&mut input),
                 children: children
                     .into_iter()
                     .filter_map(|c| Node::build(c, errors))
                     .collect(),
-            }
+            })
         }
     }
 }
@@ -138,7 +139,12 @@ macro_rules! node_impl {
                 r.key.make_ascii_uppercase();
                 match r.key.as_str() {
                     $(
-                        $type::$key => Some($type::$variant( $( $prefix, )? FromCstNode::from(r, errors))),
+                        $type::$key => {
+                            match FromCstNode::from(r, errors) {
+                                None => None,
+                                Some(v) => Some($type::$variant( $( $prefix, )? v )),
+                            }
+                        },
                     )+
                     _ => {
                         errors.push(Error::InvalidPropertyName {
@@ -482,14 +488,14 @@ pub enum LigTableLabel {
     BoundaryChar,
 }
 
-impl Data for LigTableLabel {
-    fn build(input: &mut Input) -> Self {
+impl Parse for LigTableLabel {
+    fn parse(input: &mut Input) -> Self {
         match input.peek() {
             Some('B' | 'b') => {
                 input.next();
                 LigTableLabel::BoundaryChar
             }
-            _ => LigTableLabel::Char(Data::build(input)),
+            _ => LigTableLabel::Char(Parse::parse(input)),
         }
     }
 }
@@ -540,8 +546,18 @@ node_impl!(
     (SKIP, "SKIP", Skip),
 );
 
-trait Data {
-    fn build(input: &mut Input) -> Self;
+trait Parse: Sized {
+    fn parse(input: &mut Input) -> Self;
+}
+
+trait TryParse: Sized {
+    fn try_parse(input: &mut Input) -> Option<Self>;
+}
+
+impl<T: Parse> TryParse for T {
+    fn try_parse(input: &mut Input) -> Option<Self> {
+        Some(Parse::parse(input))
+    }
 }
 
 struct Input<'a> {
@@ -608,13 +624,13 @@ impl<'a> Iterator for Input<'a> {
     }
 }
 
-impl Data for () {
-    fn build(_: &mut Input) -> Self {}
+impl Parse for () {
+    fn parse(_: &mut Input) -> Self {}
 }
 
-impl Data for u32 {
+impl Parse for u32 {
     // PLtoTF.2014.59-60
-    fn build(input: &mut Input) -> Self {
+    fn parse(input: &mut Input) -> Self {
         let radix = match input.next() {
             Some('O' | 'o') => 8,
             Some('H' | 'h') => 16,
@@ -664,9 +680,9 @@ impl Data for u32 {
     }
 }
 
-impl Data for u8 {
+impl Parse for u8 {
     // PLtoTF.2014.51
-    fn build(input: &mut Input) -> Self {
+    fn parse(input: &mut Input) -> Self {
         let parse_number = |input: &mut Input, radix: u8| {
             input.consume_spaces();
             let start_span = input.raw_data_span.start;
@@ -763,26 +779,26 @@ impl Data for u8 {
     }
 }
 
-impl Data for Char {
-    fn build(input: &mut Input) -> Self {
-        Char(u8::build(input))
+impl Parse for Char {
+    fn parse(input: &mut Input) -> Self {
+        Char(u8::parse(input))
     }
 }
 
-impl Data for String {
-    fn build(input: &mut Input) -> Self {
+impl Parse for String {
+    fn parse(input: &mut Input) -> Self {
         input.take_string()
     }
 }
 
-impl Data for Face {
-    fn build(input: &mut Input) -> Self {
-        u8::build(input).into()
+impl Parse for Face {
+    fn parse(input: &mut Input) -> Self {
+        u8::parse(input).into()
     }
 }
 
-impl Data for bool {
-    fn build(input: &mut Input) -> Self {
+impl TryParse for bool {
+    fn try_parse(input: &mut Input) -> Option<Self> {
         // PLtoTF.2014.90
         let span_start = input.raw_data_span.start;
         let b = match input.next() {
@@ -794,17 +810,17 @@ impl Data for bool {
                 input.skip_error(Error::InvalidBoolean {
                     span: span_start..span_end,
                 });
-                false
+                return None;
             }
         };
         input.skip_to_end();
-        b
+        Some(b)
     }
 }
 
-impl Data for Number {
+impl Parse for Number {
     // PLtoTF.2014.62
-    fn build(input: &mut Input) -> Self {
+    fn parse(input: &mut Input) -> Self {
         match input.next() {
             Some('D' | 'd') | Some('R' | 'r') => (),
             c => {
@@ -954,7 +970,7 @@ mod tests {
         (
             boolean_invalid,
             r"(SEVENBITSAFEFLAG INVALID)",
-            vec![Root::SevenBitSafeFlag(SingleValue { data: false })],
+            vec![],
             vec![Error::InvalidBoolean { span: 18..25 }],
         ),
         (
@@ -1042,8 +1058,8 @@ mod tests {
         ),
         (
             one_byte_four_byte,
-            r"(Header D1HA)",
-            vec![Root::Header(TupleValue { data: (1, 0xA) })],
+            r"(Header D19HA)",
+            vec![Root::Header(TupleValue { data: (19, 0xA) })],
             vec![],
         ),
         (

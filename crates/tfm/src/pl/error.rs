@@ -46,6 +46,9 @@ pub enum Error {
     InvalidBoolean {
         span: std::ops::Range<usize>,
     },
+    InvalidHeaderIndex {
+        span: std::ops::Range<usize>,
+    },
     DecimalTooLarge {
         span: std::ops::Range<usize>,
     },
@@ -96,6 +99,9 @@ impl Error {
                 "invalid prefix for integer constant: need C/O/D/H/F".to_string()
             }
             Error::InvalidBoolean { .. } => "invalid boolean: must be TRUE or FALSE".to_string(),
+            Error::InvalidHeaderIndex { .. } => {
+                "invalid header index: must be 18 or larger".to_string()
+            }
             Error::DecimalTooLarge { .. } => "real constants must be less than 2048".to_string(),
             Error::InvalidPrefixForDecimal { .. } => {
                 "invalid prefix for decimal constant: need R or D".to_string()
@@ -122,6 +128,7 @@ impl Error {
             Error::InvalidCharacterForSmallInteger { .. } => (52, 1),
             Error::InvalidPrefixForSmallInteger { .. } => (51, 1),
             Error::InvalidBoolean { .. } => (90, 1),
+            Error::InvalidHeaderIndex { .. } => (91, 1),
             Error::DecimalTooLarge { .. } => (64, 1),
             Error::InvalidPrefixForDecimal { .. } => (62, 1),
         }
@@ -203,6 +210,7 @@ mod report {
             | Error::InvalidFaceCode { span }
             | Error::InvalidCharacterForSmallInteger { span }
             | Error::InvalidBoolean { span }
+            | Error::InvalidHeaderIndex { span }
             | Error::DecimalTooLarge { span }
             | Error::InvalidPrefixForDecimal { span }
             | Error::InvalidPrefixForSmallInteger { span } => {
