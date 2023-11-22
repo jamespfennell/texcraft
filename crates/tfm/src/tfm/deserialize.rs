@@ -227,14 +227,14 @@ impl DeserializeFixed for u32 {
     const NUM_BYTES: usize = 4;
 }
 
-impl Deserialize for FixWord {
+impl Deserialize for Number {
     #[inline]
     fn deserialize(b: &[u8]) -> Self {
-        FixWord(u32::deserialize(b) as i32)
+        Number(u32::deserialize(b) as i32)
     }
 }
 
-impl DeserializeFixed for FixWord {
+impl DeserializeFixed for Number {
     const NUM_BYTES: usize = 4;
 }
 
@@ -481,7 +481,7 @@ impl Deserialize for ligkern::lang::Instruction {
                     },
                 }
             } else {
-                ligkern::lang::Operation::Kern(FixWord(
+                ligkern::lang::Operation::Kern(Number(
                     256 * (op_byte as i32 - 128) + remainder as i32,
                 ))
             },
@@ -512,14 +512,14 @@ impl Deserialize for Params {
     fn deserialize(b: &[u8]) -> Self {
         let zeros = [0_u8; 4];
         Self {
-            slant: FixWord::deserialize(b.get(0..4).unwrap_or(&zeros)),
-            space: FixWord::deserialize(b.get(4..8).unwrap_or(&zeros)),
-            space_stretch: FixWord::deserialize(b.get(8..12).unwrap_or(&zeros)),
-            space_shrink: FixWord::deserialize(b.get(12..16).unwrap_or(&zeros)),
-            x_height: FixWord::deserialize(b.get(16..20).unwrap_or(&zeros)),
-            quad: FixWord::deserialize(b.get(20..24).unwrap_or(&zeros)),
-            extra_space: FixWord::deserialize(b.get(24..28).unwrap_or(&zeros)),
-            additional_params: Vec::<FixWord>::deserialize(b.get(28..).unwrap_or(&[0; 0])),
+            slant: Number::deserialize(b.get(0..4).unwrap_or(&zeros)),
+            space: Number::deserialize(b.get(4..8).unwrap_or(&zeros)),
+            space_stretch: Number::deserialize(b.get(8..12).unwrap_or(&zeros)),
+            space_shrink: Number::deserialize(b.get(12..16).unwrap_or(&zeros)),
+            x_height: Number::deserialize(b.get(16..20).unwrap_or(&zeros)),
+            quad: Number::deserialize(b.get(20..24).unwrap_or(&zeros)),
+            extra_space: Number::deserialize(b.get(24..28).unwrap_or(&zeros)),
+            additional_params: Vec::<Number>::deserialize(b.get(28..).unwrap_or(&[0; 0])),
         }
     }
 }
@@ -675,7 +675,7 @@ mod tests {
                 Font {
                     header: Header {
                         checksum: 7,
-                        design_size: FixWord(11),
+                        design_size: Number(11),
                         character_coding_scheme: None,
                         font_family: None,
                         seven_bit_safe: None,
@@ -684,10 +684,10 @@ mod tests {
                     },
                     smallest_char_code: 0,
                     char_infos: vec![],
-                    widths: vec![FixWord::ZERO],
-                    heights: vec![FixWord::ZERO],
-                    depths: vec![FixWord::ZERO],
-                    italic_corrections: vec![FixWord::ZERO],
+                    widths: vec![Number::ZERO],
+                    heights: vec![Number::ZERO],
+                    depths: vec![Number::ZERO],
+                    italic_corrections: vec![Number::ZERO],
                     lig_kern_commands: vec![],
                     kern: vec![],
                     extensible_chars: vec![],
@@ -710,7 +710,7 @@ mod tests {
                 Font {
                     header: Header {
                         checksum: 7,
-                        design_size: FixWord(11),
+                        design_size: Number(11),
                         character_coding_scheme: Some("ABC".into()),
                         font_family: Some("DEF".into()),
                         seven_bit_safe: Some(true),
@@ -723,10 +723,10 @@ mod tests {
                     },
                     smallest_char_code: 0,
                     char_infos: vec![],
-                    widths: vec![FixWord::ZERO],
-                    heights: vec![FixWord::ZERO],
-                    depths: vec![FixWord::ZERO],
-                    italic_corrections: vec![FixWord::ZERO],
+                    widths: vec![Number::ZERO],
+                    heights: vec![Number::ZERO],
+                    depths: vec![Number::ZERO],
+                    italic_corrections: vec![Number::ZERO],
                     lig_kern_commands: vec![],
                     kern: vec![],
                     extensible_chars: vec![],
@@ -768,10 +768,10 @@ mod tests {
                             tag: CharTag::Ligature(23),
                         },
                     ],
-                    widths: vec![FixWord::ZERO],
-                    heights: vec![FixWord::ZERO],
-                    depths: vec![FixWord::ZERO],
-                    italic_corrections: vec![FixWord::ZERO],
+                    widths: vec![Number::ZERO],
+                    heights: vec![Number::ZERO],
+                    depths: vec![Number::ZERO],
+                    italic_corrections: vec![Number::ZERO],
                     lig_kern_commands: vec![],
                     kern: vec![],
                     extensible_chars: vec![],
@@ -801,12 +801,12 @@ mod tests {
                     header: Default::default(),
                     smallest_char_code: 0,
                     char_infos: vec![],
-                    widths: vec![FixWord::ZERO, FixWord(23)],
-                    heights: vec![FixWord::ZERO, FixWord(29)],
-                    depths: vec![FixWord::ZERO, FixWord(31)],
-                    italic_corrections: vec![FixWord::ZERO, FixWord(37)],
+                    widths: vec![Number::ZERO, Number(23)],
+                    heights: vec![Number::ZERO, Number(29)],
+                    depths: vec![Number::ZERO, Number(31)],
+                    italic_corrections: vec![Number::ZERO, Number(37)],
                     lig_kern_commands: vec![],
-                    kern: vec![FixWord(37)],
+                    kern: vec![Number(37)],
                     extensible_chars: vec![],
                     params: Default::default(),
                 },
@@ -833,15 +833,15 @@ mod tests {
                     header: Default::default(),
                     smallest_char_code: 0,
                     char_infos: vec![],
-                    widths: vec![FixWord::ZERO],
-                    heights: vec![FixWord::ZERO],
-                    depths: vec![FixWord::ZERO],
-                    italic_corrections: vec![FixWord::ZERO],
+                    widths: vec![Number::ZERO],
+                    heights: vec![Number::ZERO],
+                    depths: vec![Number::ZERO],
+                    italic_corrections: vec![Number::ZERO],
                     lig_kern_commands: vec![
                         ligkern::lang::Instruction {
                             next_instruction: Some(3),
                             right_char: 5.into(),
-                            operation: ligkern::lang::Operation::Kern(FixWord(256 * 2 + 13))
+                            operation: ligkern::lang::Operation::Kern(Number(256 * 2 + 13))
                         },
                         ligkern::lang::Instruction {
                             next_instruction: Some(3),
@@ -907,10 +907,10 @@ mod tests {
                     header: Default::default(),
                     smallest_char_code: 0,
                     char_infos: vec![],
-                    widths: vec![FixWord::ZERO],
-                    heights: vec![FixWord::ZERO],
-                    depths: vec![FixWord::ZERO],
-                    italic_corrections: vec![FixWord::ZERO],
+                    widths: vec![Number::ZERO],
+                    heights: vec![Number::ZERO],
+                    depths: vec![Number::ZERO],
+                    italic_corrections: vec![Number::ZERO],
                     lig_kern_commands: vec![],
                     kern: vec![],
                     extensible_chars: vec![ExtensibleRecipe {
@@ -946,22 +946,22 @@ mod tests {
                     header: Default::default(),
                     smallest_char_code: 0,
                     char_infos: vec![],
-                    widths: vec![FixWord::ZERO],
-                    heights: vec![FixWord::ZERO],
-                    depths: vec![FixWord::ZERO],
-                    italic_corrections: vec![FixWord::ZERO],
+                    widths: vec![Number::ZERO],
+                    heights: vec![Number::ZERO],
+                    depths: vec![Number::ZERO],
+                    italic_corrections: vec![Number::ZERO],
                     lig_kern_commands: vec![],
                     kern: vec![],
                     extensible_chars: vec![],
                     params: Params {
-                        slant: FixWord(11),
-                        space: FixWord(13),
-                        space_stretch: FixWord(17),
-                        space_shrink: FixWord(19),
-                        x_height: FixWord(23),
-                        quad: FixWord(29),
-                        extra_space: FixWord(31),
-                        additional_params: vec![FixWord(37), FixWord(41), FixWord(43),]
+                        slant: Number(11),
+                        space: Number(13),
+                        space_stretch: Number(17),
+                        space_shrink: Number(19),
+                        x_height: Number(23),
+                        quad: Number(29),
+                        extra_space: Number(31),
+                        additional_params: vec![Number(37), Number(41), Number(43),]
                     },
                 },
                 vec![]

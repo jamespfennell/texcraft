@@ -78,7 +78,7 @@
 //!     and so it may be slower if TeX is memory bound.
 
 mod compiler;
-use crate::FixWord;
+use crate::Number;
 use std::collections::HashMap;
 
 /// Types corresponding to the "lig/kern programming language".
@@ -88,7 +88,7 @@ use std::collections::HashMap;
 /// The types here are put in a separate module because users of this crate are generally not expected to use them.
 /// Instead, users will work with compiled lig/kern programs.
 pub mod lang {
-    use crate::FixWord;
+    use crate::Number;
 
     /// A single instruction in a lig/kern program.
     ///
@@ -119,7 +119,7 @@ pub mod lang {
     }
 
     impl Instruction {
-        pub fn new_kern(next_instruction: Option<u8>, right_char: char, kern: FixWord) -> Self {
+        pub fn new_kern(next_instruction: Option<u8>, right_char: char, kern: Number) -> Self {
             Self {
                 next_instruction,
                 right_char,
@@ -149,7 +149,7 @@ pub mod lang {
     pub enum Operation {
         /// Insert a kern between the current character and the next character.
         /// The variant payload is the index of the kern in the kerns array.
-        Kern(FixWord),
+        Kern(Number),
         /// Perform a ligature step.
         /// This inserts `char_to_insert` between the left and right characters,
         ///     and then performs the post-lig operation.
@@ -212,7 +212,7 @@ pub mod lang {
 pub struct CompiledProgram {
     left_to_pairs: HashMap<char, (u16, u16)>,
     pairs: Vec<(char, RawReplacement)>,
-    middle_chars: Vec<(char, FixWord)>,
+    middle_chars: Vec<(char, Number)>,
 }
 
 #[derive(Debug, Clone)]
@@ -315,7 +315,7 @@ pub struct Replacement<'a> {
     /// Operation to perform on the left character.
     pub left_char_operation: LeftCharOperation,
     /// Slice of characters and kerns to insert after the left character.
-    pub middle_chars: &'a [(char, FixWord)],
+    pub middle_chars: &'a [(char, Number)],
     /// Last character to insert.
     pub last_char: char,
 }
@@ -348,7 +348,7 @@ pub enum LeftCharOperation {
     /// Delete the left character.
     Delete,
     /// Retain the left character and append the specified kern.
-    AppendKern(FixWord),
+    AppendKern(Number),
 }
 
 /// Iterator over the replacement of a character pair in a lig/kern program.
@@ -366,12 +366,12 @@ enum IterState {
 }
 
 impl<'a> ReplacementIter<'a> {
-    fn i(&self) -> (IterState, Option<(char, FixWord)>) {
+    fn i(&self) -> (IterState, Option<(char, Number)>) {
         match self.state {
             IterState::LeftChar => (
                 IterState::MiddleChar(0),
                 match self.full_operation.left_char_operation {
-                    LeftCharOperation::Retain => Some((self.left_char, FixWord::ZERO)),
+                    LeftCharOperation::Retain => Some((self.left_char, Number::ZERO)),
                     LeftCharOperation::Delete => None,
                     LeftCharOperation::AppendKern(kern) => Some((self.left_char, kern)),
                 },
@@ -382,7 +382,7 @@ impl<'a> ReplacementIter<'a> {
             },
             IterState::LastChar => (
                 IterState::Exhausted,
-                Some((self.full_operation.last_char, FixWord::ZERO)),
+                Some((self.full_operation.last_char, Number::ZERO)),
             ),
             IterState::Exhausted => (IterState::Exhausted, None),
         }
@@ -390,7 +390,7 @@ impl<'a> ReplacementIter<'a> {
 }
 
 impl<'a> Iterator for ReplacementIter<'a> {
-    type Item = (char, FixWord);
+    type Item = (char, Number);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {

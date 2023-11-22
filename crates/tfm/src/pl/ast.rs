@@ -4,7 +4,7 @@
 
 use super::cst;
 use super::error::Error;
-use crate::{ligkern::lang::PostLigOperation, Face, FixWord};
+use crate::{ligkern::lang::PostLigOperation, Face, Number};
 
 /// Abstract syntax tree for property list files
 ///
@@ -176,7 +176,7 @@ pub enum Root {
     ///     the design size in the TFM file is ignored and effectively replaced by 15 points;
     ///     but if one simply says `\font\A=cmr10` the stated design size is used.
     /// This quantity is always in units of printer's points.
-    DesignSize(SingleValue<FixWord>),
+    DesignSize(SingleValue<Number>),
 
     /// The design units specifies how many units equals the design size
     ///     (or the eventual ‘at’ size, if the font is being scaled).
@@ -184,7 +184,7 @@ pub enum Root {
     /// you have a font that has been digitized with 600 pixels per em,
     ///     and the design size is one em;
     ///     then you could say `(DESIGNUNITS R 600)` if you wanted to give all of your measurements in units of pixels.
-    DesignUnits(SingleValue<FixWord>),
+    DesignUnits(SingleValue<Number>),
 
     /// A string that identifies the correspondence between the numeric codes and font characters.
     /// Its length must be less than 40.
@@ -266,39 +266,39 @@ node_impl!(
 /// The documentation on each variant is based on the documentation in PFtoTF.2014.11.
 #[derive(PartialEq, Eq, Debug)]
 pub enum FontDimension {
-    Slant(SingleValue<FixWord>),
-    Space(SingleValue<FixWord>),
-    Stretch(SingleValue<FixWord>),
-    Shrink(SingleValue<FixWord>),
-    XHeight(SingleValue<FixWord>),
-    Quad(SingleValue<FixWord>),
-    ExtraSpace(SingleValue<FixWord>),
-    Num1(SingleValue<FixWord>),
-    Num2(SingleValue<FixWord>),
-    Num3(SingleValue<FixWord>),
-    Denom1(SingleValue<FixWord>),
-    Denom2(SingleValue<FixWord>),
-    Sup1(SingleValue<FixWord>),
-    Sup2(SingleValue<FixWord>),
-    Sup3(SingleValue<FixWord>),
-    Sub1(SingleValue<FixWord>),
-    Sub2(SingleValue<FixWord>),
-    SupDrop(SingleValue<FixWord>),
-    SubDrop(SingleValue<FixWord>),
-    Delim1(SingleValue<FixWord>),
-    Delim2(SingleValue<FixWord>),
-    AxisHeight(SingleValue<FixWord>),
-    DefaultRuleThickness(SingleValue<FixWord>),
-    BigOpSpacing1(SingleValue<FixWord>),
-    BigOpSpacing2(SingleValue<FixWord>),
-    BigOpSpacing3(SingleValue<FixWord>),
-    BigOpSpacing4(SingleValue<FixWord>),
-    BigOpSpacing5(SingleValue<FixWord>),
+    Slant(SingleValue<Number>),
+    Space(SingleValue<Number>),
+    Stretch(SingleValue<Number>),
+    Shrink(SingleValue<Number>),
+    XHeight(SingleValue<Number>),
+    Quad(SingleValue<Number>),
+    ExtraSpace(SingleValue<Number>),
+    Num1(SingleValue<Number>),
+    Num2(SingleValue<Number>),
+    Num3(SingleValue<Number>),
+    Denom1(SingleValue<Number>),
+    Denom2(SingleValue<Number>),
+    Sup1(SingleValue<Number>),
+    Sup2(SingleValue<Number>),
+    Sup3(SingleValue<Number>),
+    Sub1(SingleValue<Number>),
+    Sub2(SingleValue<Number>),
+    SupDrop(SingleValue<Number>),
+    SubDrop(SingleValue<Number>),
+    Delim1(SingleValue<Number>),
+    Delim2(SingleValue<Number>),
+    AxisHeight(SingleValue<Number>),
+    DefaultRuleThickness(SingleValue<Number>),
+    BigOpSpacing1(SingleValue<Number>),
+    BigOpSpacing2(SingleValue<Number>),
+    BigOpSpacing3(SingleValue<Number>),
+    BigOpSpacing4(SingleValue<Number>),
+    BigOpSpacing5(SingleValue<Number>),
 
     /// The notation `PARAMETER n` provides another way to specify the nth parameter;
     ///     for example, `(PARAMETER D 1 R −.25)` is another way to specify that the `SLANT` is −0.25.
     /// The value of n must be positive and less than max param words.
-    Parameter(TupleValue<u8, FixWord>),
+    Parameter(TupleValue<u8, Number>),
 
     /// A comment that is ignored.
     Comment(Vec<cst::BalancedElem>),
@@ -347,16 +347,16 @@ node_impl!(
 #[derive(PartialEq, Eq, Debug)]
 pub enum Character {
     /// The character's width in design units.
-    Width(SingleValue<FixWord>),
+    Width(SingleValue<Number>),
 
     /// The character's height in design units.
-    Height(SingleValue<FixWord>),
+    Height(SingleValue<Number>),
 
     /// The character's depth in design units.
-    Depth(SingleValue<FixWord>),
+    Depth(SingleValue<Number>),
 
     /// The character's italic correction in design units.
-    ItalicCorrection(SingleValue<FixWord>),
+    ItalicCorrection(SingleValue<Number>),
 
     /// Specifies the character that follows the present one in a "charlist."
     /// The value must be the number of a character in the font,
@@ -458,7 +458,7 @@ pub enum LigTable {
     ///     otherwise go on to the next instruction."
     /// The value of r, which is in design units, is often negative.
     /// Character code c must exist in the font.
-    Kern(TupleValue<char, FixWord>),
+    Kern(TupleValue<char, Number>),
 
     /// A stop instruction ends a ligature/kern program.
     /// It must follow either a `LIG` or `KRN` instruction, not a `LABEL` or `STOP` or `SKIP`.
@@ -803,7 +803,7 @@ impl Data for bool {
     }
 }
 
-impl Data for FixWord {
+impl Data for Number {
     // PLtoTF.2014.62
     fn build(input: &mut Input) -> Self {
         match input.next() {
@@ -812,7 +812,7 @@ impl Data for FixWord {
                 input.skip_error(Error::InvalidPrefixForDecimal {
                     span: input.last_span(c),
                 });
-                return FixWord::ZERO;
+                return Number::ZERO;
             }
         }
         input.consume_spaces();
@@ -873,20 +873,20 @@ impl Data for FixWord {
             acc
         };
 
-        if integer_part >= 2048 || (fractional_part >= FixWord::UNITY.0 && integer_part == 2047) {
+        if integer_part >= 2048 || (fractional_part >= Number::UNITY.0 && integer_part == 2047) {
             let span_end = input.raw_data_span.start;
             input.skip_error(Error::DecimalTooLarge {
                 span: span_start..span_end,
             });
             return if integer_part == 2047 {
-                FixWord::UNITY
+                Number::UNITY
             } else {
-                FixWord::ZERO
+                Number::ZERO
             };
         }
 
         let modulus = integer_part
-            .checked_mul(FixWord::UNITY.0)
+            .checked_mul(Number::UNITY.0)
             .unwrap()
             .checked_add(fractional_part)
             .unwrap();
@@ -895,7 +895,7 @@ impl Data for FixWord {
         } else {
             modulus
         };
-        FixWord(result)
+        Number(result)
     }
 }
 
@@ -1085,7 +1085,7 @@ mod tests {
             fix_word_integer,
             r"(DESIGNSIZE D 1)",
             vec![Root::DesignSize(SingleValue {
-                data: FixWord::UNITY
+                data: Number::UNITY
             })],
             vec![],
         ),
@@ -1093,7 +1093,7 @@ mod tests {
             fix_word_decimal,
             r"(DESIGNSIZE D 11.5)",
             vec![Root::DesignSize(SingleValue {
-                data: FixWord::UNITY * 23 / 2,
+                data: Number::UNITY * 23 / 2,
             })],
             vec![],
         ),
@@ -1101,32 +1101,28 @@ mod tests {
             fix_word_negative,
             r"(DESIGNSIZE D -11.5)",
             vec![Root::DesignSize(SingleValue {
-                data: FixWord::UNITY * -23 / 2,
+                data: Number::UNITY * -23 / 2,
             })],
             vec![],
         ),
         (
             fix_word_too_big_1,
             r"(DESIGNSIZE D 2049.1)",
-            vec![Root::DesignSize(SingleValue {
-                data: FixWord::ZERO,
-            })],
+            vec![Root::DesignSize(SingleValue { data: Number::ZERO })],
             vec![Error::DecimalTooLarge { span: 14..20 }],
         ),
         (
             fix_word_too_big_2,
             r"(DESIGNSIZE D 2047.9999999)",
             vec![Root::DesignSize(SingleValue {
-                data: FixWord::UNITY,
+                data: Number::UNITY,
             })],
             vec![Error::DecimalTooLarge { span: 14..26 }],
         ),
         (
             fix_word_invalid_prefix,
             r"(DESIGNSIZE W 2047.9999999)",
-            vec![Root::DesignSize(SingleValue {
-                data: FixWord::ZERO,
-            })],
+            vec![Root::DesignSize(SingleValue { data: Number::ZERO })],
             vec![Error::InvalidPrefixForDecimal { span: 12..13 }],
         ),
         (
@@ -1179,10 +1175,10 @@ mod tests {
                     data: "ASCII".into()
                 }),
                 Root::DesignSize(SingleValue {
-                    data: FixWord::UNITY * 10,
+                    data: Number::UNITY * 10,
                 }),
                 Root::DesignUnits(SingleValue {
-                    data: FixWord::UNITY * 18,
+                    data: Number::UNITY * 18,
                 }),
                 Root::Comment(vec![BalancedElem::String("A COMMENT IS IGNORED".into())]),
                 Root::Comment(vec![BalancedElem::Vec(vec![BalancedElem::String(
@@ -1196,22 +1192,22 @@ mod tests {
                     data: (),
                     children: vec![
                         FontDimension::Slant(SingleValue {
-                            data: FixWord::UNITY * -1 / 4,
+                            data: Number::UNITY * -1 / 4,
                         }),
                         FontDimension::Space(SingleValue {
-                            data: FixWord::UNITY * 6,
+                            data: Number::UNITY * 6,
                         }),
                         FontDimension::Shrink(SingleValue {
-                            data: FixWord::UNITY * 2,
+                            data: Number::UNITY * 2,
                         }),
                         FontDimension::Stretch(SingleValue {
-                            data: FixWord::UNITY * 3,
+                            data: Number::UNITY * 3,
                         }),
                         FontDimension::XHeight(SingleValue {
-                            data: FixWord(1055 * FixWord::UNITY.0 / 100 + 1)
+                            data: Number(1055 * Number::UNITY.0 / 100 + 1)
                         }),
                         FontDimension::Quad(SingleValue {
-                            data: FixWord::UNITY * 18,
+                            data: Number::UNITY * 18,
                         }),
                     ]
                 }),
@@ -1238,7 +1234,7 @@ mod tests {
                             }
                         ),
                         LigTable::Kern(TupleValue {
-                            data: (0o51 as char, FixWord::UNITY * 3 / 2),
+                            data: (0o51 as char, Number::UNITY * 3 / 2),
                         }),
                         LigTable::Lig(
                             PostLigOperation::RetainLeftMoveNowhere,
@@ -1251,13 +1247,13 @@ mod tests {
                     data: 'f',
                     children: vec![
                         Character::Width(SingleValue {
-                            data: FixWord::UNITY * 6,
+                            data: Number::UNITY * 6,
                         }),
                         Character::Height(SingleValue {
-                            data: FixWord::UNITY * 27 / 2,
+                            data: Number::UNITY * 27 / 2,
                         }),
                         Character::ItalicCorrection(SingleValue {
-                            data: FixWord::UNITY * 3 / 2,
+                            data: Number::UNITY * 3 / 2,
                         }),
                     ]
                 })

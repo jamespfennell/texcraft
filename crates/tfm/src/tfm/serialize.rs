@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use crate::FixWord;
+use crate::Number;
 
 /// The TFM file format can only store up to 15 heights, 15 widths and 63 italic corrections.
 /// If a property list file contains, e.g., more than 15 distinct heights, something has to give.
@@ -55,7 +55,7 @@ use crate::FixWord;
 ///     and if delta is not a valid solution, any smaller delta is also not a valid solution.
 /// The re-implementation using binary search is `O(n log n)`.
 /// Moreover, the constant factors are about the same.
-/// 
+///
 /// * In the worst-case there are O(n^2) distinct deltas because each pair of elements yields a delta.
 /// Let m be the smallest delta and M the largest delta.
 /// In the initial `2^k`-based ranging scheme, the largest `K` satisfies `m 2^{K-1} < M <= m 2^K`,
@@ -64,19 +64,19 @@ use crate::FixWord;
 ///     contains O(n^2) elements.
 /// In the worst-case, the solution is the maximum element of this range.
 fn _compress(
-    values: &[FixWord],
+    values: &[Number],
     max_size: std::num::NonZeroUsize,
-) -> (Vec<FixWord>, HashMap<FixWord, usize>) {
+) -> (Vec<Number>, HashMap<Number, usize>) {
     let dedup_values = {
-        let s: HashSet<FixWord> = values.iter().copied().collect();
-        let mut v: Vec<FixWord> = s.into_iter().collect();
+        let s: HashSet<Number> = values.iter().copied().collect();
+        let mut v: Vec<Number> = s.into_iter().collect();
         v.sort();
         v
     };
     // After deduplication, it is possible we don't need to compress at all so we can exit early.
     // This also handles the case when the values slice is empty.
     if dedup_values.len() <= max_size.get() {
-        let m: HashMap<FixWord, usize> = dedup_values
+        let m: HashMap<Number, usize> = dedup_values
             .iter()
             .enumerate()
             .map(|(i, &w)| (w, i))
@@ -89,7 +89,7 @@ fn _compress(
     //
     // Invariant: delta<lower is never a solution.
     // Because delta must be non-negative, we initialize it to zero.
-    let mut lower = FixWord::ZERO;
+    let mut lower = Number::ZERO;
     // Invariant: delta=upper is always solution.
     // To initialize upper and begin the search we construct a solution that always works: a single
     // interval encompassing the entire slice and the largest delta possible.
@@ -107,7 +107,7 @@ fn _compress(
         let mut interval_start = *dedup_values.first().unwrap();
         // The smallest delta such that the candidate solution will be the same.
         // This is the maximum of all gaps that don't start a new interval.
-        let mut delta_lower = FixWord::ZERO;
+        let mut delta_lower = Number::ZERO;
         // The largest delta such that the candidate solution will be different.
         // This is the minimum of all gaps that start a new interval.
         let mut delta_upper = max_delta;
@@ -145,7 +145,7 @@ fn _compress(
         buffer.clear();
     }
 
-    let mut value_to_index = HashMap::<FixWord, usize>::new();
+    let mut value_to_index = HashMap::<Number, usize>::new();
     let mut result = vec![];
     let mut previous = 0_usize;
     for i in solution {
@@ -165,11 +165,7 @@ fn _compress(
 mod tests {
     use super::*;
 
-    fn run_compress_test(
-        values: Vec<FixWord>,
-        max_size: std::num::NonZeroUsize,
-        want: Vec<FixWord>,
-    ) {
+    fn run_compress_test(values: Vec<Number>, max_size: std::num::NonZeroUsize, want: Vec<Number>) {
         let (got, _) = _compress(&values, max_size);
         assert_eq!(got, want);
     }
@@ -192,56 +188,56 @@ mod tests {
         (no_op_0, vec![], 1, vec![],),
         (
             no_op_2,
-            vec![FixWord::UNITY * 2, FixWord::UNITY],
+            vec![Number::UNITY * 2, Number::UNITY],
             2,
-            vec![FixWord::UNITY, FixWord::UNITY * 2],
+            vec![Number::UNITY, Number::UNITY * 2],
         ),
         (
             just_deduplication,
-            vec![FixWord::UNITY, FixWord::UNITY],
+            vec![Number::UNITY, Number::UNITY],
             1,
-            vec![FixWord::UNITY],
+            vec![Number::UNITY],
         ),
         (
             simple_compression_case,
-            vec![FixWord::UNITY, FixWord::UNITY * 2],
+            vec![Number::UNITY, Number::UNITY * 2],
             1,
-            vec![FixWord::UNITY * 3 / 2],
+            vec![Number::UNITY * 3 / 2],
         ),
         (
             simple_compression_case_2,
             vec![
-                FixWord::UNITY,
-                FixWord::UNITY * 2,
-                FixWord::UNITY * 200,
-                FixWord::UNITY * 201
+                Number::UNITY,
+                Number::UNITY * 2,
+                Number::UNITY * 200,
+                Number::UNITY * 201
             ],
             2,
-            vec![FixWord::UNITY * 3 / 2, FixWord::UNITY * 401 / 2],
+            vec![Number::UNITY * 3 / 2, Number::UNITY * 401 / 2],
         ),
         (
             lower_upper_close_edge_case_1,
-            vec![FixWord(1), FixWord(3)],
+            vec![Number(1), Number(3)],
             1,
-            vec![FixWord(2)],
+            vec![Number(2)],
         ),
         (
             lower_upper_close_edge_case_2,
-            vec![FixWord(0), FixWord(2)],
+            vec![Number(0), Number(2)],
             1,
-            vec![FixWord(1)],
+            vec![Number(1)],
         ),
         (
             lower_upper_close_edge_case_3,
-            vec![FixWord(1), FixWord(4)],
+            vec![Number(1), Number(4)],
             1,
-            vec![FixWord(2)],
+            vec![Number(2)],
         ),
         (
             lower_upper_close_edge_case_4,
-            vec![FixWord(1), FixWord(2)],
+            vec![Number(1), Number(2)],
             1,
-            vec![FixWord(1)],
+            vec![Number(1)],
         ),
     );
 }

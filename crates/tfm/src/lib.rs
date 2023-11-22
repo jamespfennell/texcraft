@@ -16,7 +16,7 @@ pub use crate::tfm::{
 /// The struct contain multiple vectors.
 /// In TeX and TFtoPL there is an optimization in which all of data in the vectors
 /// is stored in one large vector of 32-bit integers.
-/// The conversion from [u32] to the specific types like [FixWord] are then done when the
+/// The conversion from [u32] to the specific types like [Number] are then done when the
 /// data is needed.
 /// This makes the memory footprint of this type much more compact,
 ///     and such a change may be considered in the future.
@@ -38,22 +38,22 @@ pub struct Font {
     pub char_infos: Vec<CharInfo>,
 
     /// Character widths
-    pub widths: Vec<FixWord>,
+    pub widths: Vec<Number>,
 
     /// Character heights
-    pub heights: Vec<FixWord>,
+    pub heights: Vec<Number>,
 
     /// Character depths
-    pub depths: Vec<FixWord>,
+    pub depths: Vec<Number>,
 
     /// Character italic corrections
-    pub italic_corrections: Vec<FixWord>,
+    pub italic_corrections: Vec<Number>,
 
     /// Lig kern commands.
     pub lig_kern_commands: Vec<ligkern::lang::Instruction>,
 
     /// Kerns. These are referenced from inside the lig kern commands.
-    pub kern: Vec<FixWord>,
+    pub kern: Vec<Number>,
 
     /// Extensible characters.
     pub extensible_chars: Vec<ExtensibleRecipe>,
@@ -68,7 +68,7 @@ pub struct Header {
     /// In TeX82, this is stored in the `font_check` array (TeX82.2021.549).
     pub checksum: u32,
     /// In TeX82, this is stored in the `font_dsize` array (TeX82.2021.549).
-    pub design_size: FixWord,
+    pub design_size: Number,
     pub character_coding_scheme: Option<StackString<39>>,
     pub font_family: Option<StackString<19>>,
     pub seven_bit_safe: Option<bool>,
@@ -129,51 +129,52 @@ impl<const N: usize> From<&str> for StackString<N> {
 
 /// Fixed-width numeric type used in TFM files.
 ///
-/// This type has 11 bits for the integer part,
+/// This numeric type has 11 bits for the integer part,
 /// 20 bits for the fractional part, and a single signed bit.
 /// The inner value is the number multiplied by 2^20.
+/// It is called a `fix_word` in TFtoPL.
 ///
 /// In property list files, this type is represented as a decimal number
 ///   with up to 6 digits after the decimal point.
 /// This is a non-lossy representation
 ///   because 10^(-6) is larger than 2^(-20).
 #[derive(Default, PartialEq, Eq, Debug, Copy, Clone, PartialOrd, Ord, Hash)]
-pub struct FixWord(pub i32);
+pub struct Number(pub i32);
 
-impl FixWord {
-    /// Representation of the number 0 as a [FixWord].
-    pub const ZERO: FixWord = FixWord(0);
+impl Number {
+    /// Representation of the number 0 as a [Number].
+    pub const ZERO: Number = Number(0);
 
-    /// Representation of the number 1 as a [FixWord].
-    pub const UNITY: FixWord = FixWord(1 << 20);
+    /// Representation of the number 1 as a [Number].
+    pub const UNITY: Number = Number(1 << 20);
 }
 
-impl std::ops::Add<FixWord> for FixWord {
-    type Output = FixWord;
-    fn add(self, rhs: FixWord) -> Self::Output {
-        FixWord(self.0 + rhs.0)
+impl std::ops::Add<Number> for Number {
+    type Output = Number;
+    fn add(self, rhs: Number) -> Self::Output {
+        Number(self.0 + rhs.0)
     }
 }
-impl std::ops::Sub<FixWord> for FixWord {
-    type Output = FixWord;
-    fn sub(self, rhs: FixWord) -> Self::Output {
-        FixWord(self.0 - rhs.0)
+impl std::ops::Sub<Number> for Number {
+    type Output = Number;
+    fn sub(self, rhs: Number) -> Self::Output {
+        Number(self.0 - rhs.0)
     }
 }
 
-impl std::ops::Mul<i32> for FixWord {
-    type Output = FixWord;
+impl std::ops::Mul<i32> for Number {
+    type Output = Number;
 
     fn mul(self, rhs: i32) -> Self::Output {
-        FixWord(self.0 * rhs)
+        Number(self.0 * rhs)
     }
 }
 
-impl std::ops::Div<i32> for FixWord {
-    type Output = FixWord;
+impl std::ops::Div<i32> for Number {
+    type Output = Number;
 
     fn div(self, rhs: i32) -> Self::Output {
-        FixWord(self.0 / rhs)
+        Number(self.0 / rhs)
     }
 }
 
@@ -281,12 +282,12 @@ pub struct ExtensibleRecipe {
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Params {
-    slant: FixWord,
-    space: FixWord,
-    space_stretch: FixWord,
-    space_shrink: FixWord,
-    x_height: FixWord,
-    quad: FixWord,
-    extra_space: FixWord,
-    additional_params: Vec<FixWord>,
+    slant: Number,
+    space: Number,
+    space_stretch: Number,
+    space_shrink: Number,
+    x_height: Number,
+    quad: Number,
+    extra_space: Number,
+    additional_params: Vec<Number>,
 }

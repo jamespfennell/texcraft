@@ -18,7 +18,7 @@ struct OngoingCalculation {
     // Node this calculation is for.
     node: Node,
     // Part of the ligature result that has been finalized and won't change.
-    finalized: Vec<(char, FixWord)>,
+    finalized: Vec<(char, Number)>,
     // Characters that are still pending replacement. The next step is to apply the ligature
     // rule for (pending[0], pending[1]).
     pending: (char, char, Option<char>),
@@ -68,7 +68,7 @@ fn build_pair_to_instruction_map(
     (result, warnings)
 }
 
-struct Replacement(Vec<(char, FixWord)>, char);
+struct Replacement(Vec<(char, Number)>, char);
 
 fn calculate_replacements(
     instructions: &[lang::Instruction],
@@ -115,7 +115,7 @@ fn calculate_replacements(
             },
         };
         let node = Node(left, right);
-        let pre_cursor = pre_cursor.map(|c| (c, FixWord::ZERO)).collect();
+        let pre_cursor = pre_cursor.map(|c| (c, Number::ZERO)).collect();
         match post_cursor {
             TC::None => {
                 result.insert((node.0, node.1), Replacement(pre_cursor, cursor));
@@ -148,7 +148,7 @@ fn calculate_replacements(
         let last = match result.get(&(child.0, child.1)) {
             // todo node.tuple?
             None => {
-                calc.finalized.push((child.0, FixWord::ZERO));
+                calc.finalized.push((child.0, Number::ZERO));
                 child.1
             }
             Some(Replacement(replacement, last)) => {
@@ -263,7 +263,7 @@ impl Iterator for TC {
 
 fn lower_and_optimize(pair_to_replacement: HashMap<(char, char), Replacement>) -> CompiledProgram {
     let mut intermediate: HashMap<char, Vec<(char, RawReplacement)>> = Default::default();
-    let mut middle_chars: Vec<(char, FixWord)> = Default::default();
+    let mut middle_chars: Vec<(char, Number)> = Default::default();
 
     for (node, Replacement(middle, last)) in pair_to_replacement {
         let (left_char_operation, middle_extension) = match middle.first().copied() {
@@ -271,7 +271,7 @@ fn lower_and_optimize(pair_to_replacement: HashMap<(char, char), Replacement>) -
             Some((first, kern)) => {
                 if first == node.0 {
                     (
-                        if kern == FixWord::ZERO {
+                        if kern == Number::ZERO {
                             LeftCharOperation::Retain
                         } else {
                             LeftCharOperation::AppendKern(kern)
@@ -336,16 +336,16 @@ mod tests {
     fn run_success_test(
         instructions: Vec<lang::Instruction>,
         entry_points: Vec<(char, usize)>,
-        want: Vec<(char, char, Vec<(char, FixWord)>)>,
+        want: Vec<(char, char, Vec<(char, Number)>)>,
     ) {
         let entry_points: HashMap<char, usize> = entry_points.into_iter().collect();
-        let want: HashMap<(char, char), Vec<(char, FixWord)>> =
+        let want: HashMap<(char, char), Vec<(char, Number)>> =
             want.into_iter().map(|t| ((t.0, t.1), t.2)).collect();
         let compiled_program = compile(&instructions, &entry_points).unwrap().0;
 
-        let mut got: HashMap<(char, char), Vec<(char, FixWord)>> = Default::default();
+        let mut got: HashMap<(char, char), Vec<(char, Number)>> = Default::default();
         for pair in compiled_program.all_pairs_having_replacement() {
-            let replacement: Vec<(char, FixWord)> = compiled_program
+            let replacement: Vec<(char, Number)> = compiled_program
                 .get_replacement_iter(pair.0, pair.1)
                 .collect();
             got.insert(pair, replacement);
@@ -372,30 +372,30 @@ mod tests {
         (empty_program, vec![], vec![], vec![],),
         (
             kern,
-            vec![lang::Instruction::new_kern(None, 'V', FixWord::UNITY)],
+            vec![lang::Instruction::new_kern(None, 'V', Number::UNITY)],
             vec![('A', 0)],
-            vec![('A', 'V', vec![('A', FixWord::UNITY), ('V', FixWord::ZERO)]),],
+            vec![('A', 'V', vec![('A', Number::UNITY), ('V', Number::ZERO)]),],
         ),
         (
             same_kern_for_multiple_left_characters,
-            vec![lang::Instruction::new_kern(None, 'V', FixWord::UNITY)],
+            vec![lang::Instruction::new_kern(None, 'V', Number::UNITY)],
             vec![('A', 0), ('B', 0)],
             vec![
-                ('A', 'V', vec![('A', FixWord::UNITY), ('V', FixWord::ZERO)]),
-                ('B', 'V', vec![('B', FixWord::UNITY), ('V', FixWord::ZERO)]),
+                ('A', 'V', vec![('A', Number::UNITY), ('V', Number::ZERO)]),
+                ('B', 'V', vec![('B', Number::UNITY), ('V', Number::ZERO)]),
             ],
         ),
         (
             duplicate_kern,
             vec![
-                lang::Instruction::new_kern(Some(0), 'V', FixWord::UNITY * 2),
-                lang::Instruction::new_kern(None, 'V', FixWord::UNITY * 3),
+                lang::Instruction::new_kern(Some(0), 'V', Number::UNITY * 2),
+                lang::Instruction::new_kern(None, 'V', Number::UNITY * 3),
             ],
             vec![('A', 0)],
             vec![(
                 'A',
                 'V',
-                vec![('A', FixWord::UNITY * 3), ('V', FixWord::ZERO)]
+                vec![('A', Number::UNITY * 3), ('V', Number::ZERO)]
             ),],
         ),
         (
@@ -404,17 +404,17 @@ mod tests {
                 lang::Instruction {
                     next_instruction: Some(0),
                     right_char: 'V',
-                    operation: lang::Operation::Kern(FixWord::UNITY * 2)
+                    operation: lang::Operation::Kern(Number::UNITY * 2)
                 },
                 lang::Instruction {
                     next_instruction: None,
                     right_char: 'W',
-                    operation: lang::Operation::Kern(FixWord::UNITY * 3)
+                    operation: lang::Operation::Kern(Number::UNITY * 3)
                 },
                 lang::Instruction {
                     next_instruction: None,
                     right_char: 'X',
-                    operation: lang::Operation::Kern(FixWord::UNITY * 4)
+                    operation: lang::Operation::Kern(Number::UNITY * 4)
                 },
             ],
             vec![('A', 0), ('B', 1), ('C', 2)],
@@ -422,22 +422,22 @@ mod tests {
                 (
                     'A',
                     'V',
-                    vec![('A', FixWord::UNITY * 2), ('V', FixWord::ZERO)]
+                    vec![('A', Number::UNITY * 2), ('V', Number::ZERO)]
                 ),
                 (
                     'A',
                     'W',
-                    vec![('A', FixWord::UNITY * 3), ('W', FixWord::ZERO)]
+                    vec![('A', Number::UNITY * 3), ('W', Number::ZERO)]
                 ),
                 (
                     'B',
                     'W',
-                    vec![('B', FixWord::UNITY * 3), ('W', FixWord::ZERO)]
+                    vec![('B', Number::UNITY * 3), ('W', Number::ZERO)]
                 ),
                 (
                     'C',
                     'X',
-                    vec![('C', FixWord::UNITY * 4), ('X', FixWord::ZERO)]
+                    vec![('C', Number::UNITY * 4), ('X', Number::ZERO)]
                 ),
             ],
         ),
@@ -450,68 +450,68 @@ mod tests {
                 RetainNeitherMoveToInserted
             )],
             vec![('A', 0)],
-            vec![('A', 'B', vec![('Z', FixWord::ZERO)])],
+            vec![('A', 'B', vec![('Z', Number::ZERO)])],
         ),
         (
             single_lig_2,
             vec![
                 lang::Instruction::new_lig(Some(0), 'B', 'Z', RetainLeftMoveToInserted),
-                lang::Instruction::new_kern(None, 'Z', FixWord::UNITY),
+                lang::Instruction::new_kern(None, 'Z', Number::UNITY),
             ],
             vec![('A', 0)],
             vec![
-                ('A', 'B', vec![('A', FixWord::ZERO), ('Z', FixWord::ZERO)]),
-                ('A', 'Z', vec![('A', FixWord::UNITY), ('Z', FixWord::ZERO)]),
+                ('A', 'B', vec![('A', Number::ZERO), ('Z', Number::ZERO)]),
+                ('A', 'Z', vec![('A', Number::UNITY), ('Z', Number::ZERO)]),
             ],
         ),
         (
             retain_left_move_nowhere_1,
             vec![
                 lang::Instruction::new_lig(Some(0), 'B', 'Z', RetainLeftMoveNowhere),
-                lang::Instruction::new_kern(None, 'Z', FixWord::UNITY),
+                lang::Instruction::new_kern(None, 'Z', Number::UNITY),
             ],
             vec![('A', 0)],
             vec![
-                ('A', 'B', vec![('A', FixWord::UNITY), ('Z', FixWord::ZERO)]),
-                ('A', 'Z', vec![('A', FixWord::UNITY), ('Z', FixWord::ZERO)]),
+                ('A', 'B', vec![('A', Number::UNITY), ('Z', Number::ZERO)]),
+                ('A', 'Z', vec![('A', Number::UNITY), ('Z', Number::ZERO)]),
             ],
         ),
         (
             retain_left_move_nowhere_2,
             vec![new_lig(None, 'B', 'Z', RetainLeftMoveNowhere),],
             vec![('A', 0)],
-            vec![('A', 'B', vec![('A', FixWord::ZERO), ('Z', FixWord::ZERO)]),],
+            vec![('A', 'B', vec![('A', Number::ZERO), ('Z', Number::ZERO)]),],
         ),
         (
             single_lig_4,
             vec![
                 lang::Instruction::new_lig(None, 'B', 'Z', RetainRightMoveToInserted),
-                lang::Instruction::new_kern(None, 'B', FixWord::UNITY),
+                lang::Instruction::new_kern(None, 'B', Number::UNITY),
             ],
             vec![('A', 0), ('Z', 1)],
             vec![
-                ('A', 'B', vec![('Z', FixWord::UNITY), ('B', FixWord::ZERO)]),
-                ('Z', 'B', vec![('Z', FixWord::UNITY), ('B', FixWord::ZERO)]),
+                ('A', 'B', vec![('Z', Number::UNITY), ('B', Number::ZERO)]),
+                ('Z', 'B', vec![('Z', Number::UNITY), ('B', Number::ZERO)]),
             ],
         ),
         (
             single_lig_5,
             vec![
                 lang::Instruction::new_lig(None, 'B', 'Z', RetainRightMoveToRight),
-                lang::Instruction::new_kern(None, 'B', FixWord::UNITY),
+                lang::Instruction::new_kern(None, 'B', Number::UNITY),
             ],
             vec![('A', 0), ('Z', 1)],
             vec![
-                ('A', 'B', vec![('Z', FixWord::ZERO), ('B', FixWord::ZERO)]),
-                ('Z', 'B', vec![('Z', FixWord::UNITY), ('B', FixWord::ZERO)]),
+                ('A', 'B', vec![('Z', Number::ZERO), ('B', Number::ZERO)]),
+                ('Z', 'B', vec![('Z', Number::UNITY), ('B', Number::ZERO)]),
             ],
         ),
         (
             retain_both_move_nowhere_1,
             vec![
                 lang::Instruction::new_lig(Some(0), 'B', 'Z', RetainBothMoveNowhere,),
-                lang::Instruction::new_kern(None, 'Z', FixWord::UNITY * 2),
-                lang::Instruction::new_kern(None, 'B', FixWord::UNITY * 3),
+                lang::Instruction::new_kern(None, 'Z', Number::UNITY * 2),
+                lang::Instruction::new_kern(None, 'B', Number::UNITY * 3),
             ],
             vec![('A', 0), ('Z', 2)],
             vec![
@@ -519,20 +519,20 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::UNITY * 2),
-                        ('Z', FixWord::UNITY * 3),
-                        ('B', FixWord::ZERO)
+                        ('A', Number::UNITY * 2),
+                        ('Z', Number::UNITY * 3),
+                        ('B', Number::ZERO)
                     ]
                 ),
                 (
                     'A',
                     'Z',
-                    vec![('A', FixWord::UNITY * 2), ('Z', FixWord::ZERO)]
+                    vec![('A', Number::UNITY * 2), ('Z', Number::ZERO)]
                 ),
                 (
                     'Z',
                     'B',
-                    vec![('Z', FixWord::UNITY * 3), ('B', FixWord::ZERO)]
+                    vec![('Z', Number::UNITY * 3), ('B', Number::ZERO)]
                 ),
             ],
         ),
@@ -549,9 +549,9 @@ mod tests {
                 'A',
                 'B',
                 vec![
-                    ('A', FixWord::ZERO),
-                    ('Z', FixWord::ZERO),
-                    ('B', FixWord::ZERO)
+                    ('A', Number::ZERO),
+                    ('Z', Number::ZERO),
+                    ('B', Number::ZERO)
                 ]
             ),],
         ),
@@ -567,12 +567,12 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Y', FixWord::ZERO),
-                        ('B', FixWord::ZERO)
+                        ('A', Number::ZERO),
+                        ('Y', Number::ZERO),
+                        ('B', Number::ZERO)
                     ]
                 ),
-                ('Z', 'B', vec![('Y', FixWord::ZERO), ('B', FixWord::ZERO),]),
+                ('Z', 'B', vec![('Y', Number::ZERO), ('B', Number::ZERO),]),
             ],
         ),
         (
@@ -587,19 +587,19 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Y', FixWord::ZERO),
-                        ('Z', FixWord::ZERO),
-                        ('B', FixWord::ZERO)
+                        ('A', Number::ZERO),
+                        ('Y', Number::ZERO),
+                        ('Z', Number::ZERO),
+                        ('B', Number::ZERO)
                     ]
                 ),
                 (
                     'A',
                     'Z',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Y', FixWord::ZERO),
-                        ('Z', FixWord::ZERO)
+                        ('A', Number::ZERO),
+                        ('Y', Number::ZERO),
+                        ('Z', Number::ZERO)
                     ]
                 ),
             ],
@@ -608,8 +608,8 @@ mod tests {
             retain_both_move_to_inserted_1,
             vec![
                 lang::Instruction::new_lig(Some(0), 'B', 'Z', RetainBothMoveToInserted,),
-                lang::Instruction::new_kern(None, 'Z', FixWord::UNITY * 2),
-                lang::Instruction::new_kern(None, 'B', FixWord::UNITY * 3),
+                lang::Instruction::new_kern(None, 'Z', Number::UNITY * 2),
+                lang::Instruction::new_kern(None, 'B', Number::UNITY * 3),
             ],
             vec![('A', 0), ('Z', 2)],
             vec![
@@ -617,20 +617,20 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Z', FixWord::UNITY * 3),
-                        ('B', FixWord::ZERO)
+                        ('A', Number::ZERO),
+                        ('Z', Number::UNITY * 3),
+                        ('B', Number::ZERO)
                     ]
                 ),
                 (
                     'A',
                     'Z',
-                    vec![('A', FixWord::UNITY * 2), ('Z', FixWord::ZERO)]
+                    vec![('A', Number::UNITY * 2), ('Z', Number::ZERO)]
                 ),
                 (
                     'Z',
                     'B',
-                    vec![('Z', FixWord::UNITY * 3), ('B', FixWord::ZERO)]
+                    vec![('Z', Number::UNITY * 3), ('B', Number::ZERO)]
                 ),
             ],
         ),
@@ -646,16 +646,12 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Y', FixWord::ZERO),
-                        ('B', FixWord::ZERO)
+                        ('A', Number::ZERO),
+                        ('Y', Number::ZERO),
+                        ('B', Number::ZERO)
                     ]
                 ),
-                (
-                    'Z',
-                    'B',
-                    vec![('Y', FixWord::ZERO * 3), ('B', FixWord::ZERO)]
-                ),
+                ('Z', 'B', vec![('Y', Number::ZERO * 3), ('B', Number::ZERO)]),
             ],
         ),
         (
@@ -671,9 +667,9 @@ mod tests {
                 'A',
                 'B',
                 vec![
-                    ('A', FixWord::ZERO),
-                    ('Z', FixWord::ZERO),
-                    ('B', FixWord::ZERO)
+                    ('A', Number::ZERO),
+                    ('Z', Number::ZERO),
+                    ('B', Number::ZERO)
                 ]
             ),],
         ),
@@ -689,24 +685,20 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Y', FixWord::ZERO),
-                        ('B', FixWord::ZERO)
+                        ('A', Number::ZERO),
+                        ('Y', Number::ZERO),
+                        ('B', Number::ZERO)
                     ]
                 ),
-                (
-                    'Z',
-                    'B',
-                    vec![('Y', FixWord::ZERO * 3), ('B', FixWord::ZERO)]
-                ),
+                ('Z', 'B', vec![('Y', Number::ZERO * 3), ('B', Number::ZERO)]),
             ],
         ),
         (
             retain_both_move_to_right_1,
             vec![
                 lang::Instruction::new_lig(Some(0), 'B', 'Z', RetainBothMoveToRight,),
-                lang::Instruction::new_kern(None, 'Z', FixWord::UNITY * 2),
-                lang::Instruction::new_kern(None, 'B', FixWord::UNITY * 3),
+                lang::Instruction::new_kern(None, 'Z', Number::UNITY * 2),
+                lang::Instruction::new_kern(None, 'B', Number::UNITY * 3),
             ],
             vec![('A', 0), ('Z', 2)],
             vec![
@@ -714,20 +706,20 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Z', FixWord::ZERO),
-                        ('B', FixWord::ZERO)
+                        ('A', Number::ZERO),
+                        ('Z', Number::ZERO),
+                        ('B', Number::ZERO)
                     ]
                 ),
                 (
                     'A',
                     'Z',
-                    vec![('A', FixWord::UNITY * 2), ('Z', FixWord::ZERO)]
+                    vec![('A', Number::UNITY * 2), ('Z', Number::ZERO)]
                 ),
                 (
                     'Z',
                     'B',
-                    vec![('Z', FixWord::UNITY * 3), ('B', FixWord::ZERO)]
+                    vec![('Z', Number::UNITY * 3), ('B', Number::ZERO)]
                 ),
             ],
         ),
