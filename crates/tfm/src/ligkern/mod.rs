@@ -78,6 +78,7 @@
 //!     and so it may be slower if TeX is memory bound.
 
 mod compiler;
+use crate::Char;
 use crate::Number;
 use std::collections::HashMap;
 
@@ -88,6 +89,7 @@ use std::collections::HashMap;
 /// The types here are put in a separate module because users of this crate are generally not expected to use them.
 /// Instead, users will work with compiled lig/kern programs.
 pub mod lang {
+    use crate::Char;
     use crate::Number;
 
     /// A single instruction in a lig/kern program.
@@ -113,35 +115,9 @@ pub mod lang {
         /// However the result of the operation may result in a new pair being created
         ///     and the lig/kern program will run for that pair.
         /// See the documentation on [`PostLigOperation`] for information on that.
-        pub right_char: char,
+        pub right_char: Char,
         /// The operation to perform for this instruction.
         pub operation: Operation,
-    }
-
-    impl Instruction {
-        pub fn new_kern(next_instruction: Option<u8>, right_char: char, kern: Number) -> Self {
-            Self {
-                next_instruction,
-                right_char,
-                operation: Operation::Kern(kern),
-            }
-        }
-
-        pub fn new_lig(
-            next_instruction: Option<u8>,
-            right_char: char,
-            char_to_insert: char,
-            post_lig_operation: PostLigOperation,
-        ) -> Self {
-            Self {
-                next_instruction,
-                right_char,
-                operation: Operation::Ligature {
-                    char_to_insert,
-                    post_lig_operation,
-                },
-            }
-        }
     }
 
     /// A lig/kern operation to perform.
@@ -155,7 +131,7 @@ pub mod lang {
         ///     and then performs the post-lig operation.
         Ligature {
             /// Character to insert.
-            char_to_insert: char,
+            char_to_insert: Char,
             /// What to do after inserting the character.
             post_lig_operation: PostLigOperation,
         },
@@ -210,35 +186,35 @@ pub mod lang {
 /// A compiled lig/kern program.
 #[derive(Debug)]
 pub struct CompiledProgram {
-    left_to_pairs: HashMap<char, (u16, u16)>,
-    pairs: Vec<(char, RawReplacement)>,
-    middle_chars: Vec<(char, Number)>,
+    left_to_pairs: HashMap<Char, (u16, u16)>,
+    pairs: Vec<(Char, RawReplacement)>,
+    middle_chars: Vec<(Char, Number)>,
 }
 
 #[derive(Debug, Clone)]
 struct RawReplacement {
     left_char_operation: LeftCharOperation,
     middle_char_bounds: std::ops::Range<u16>,
-    last_char: char,
+    last_char: Char,
 }
 
 impl CompiledProgram {
     /// Compile a lig/kern program.
     pub fn compile(
         instructions: &[lang::Instruction],
-        entry_points: HashMap<char, usize>,
+        entry_points: HashMap<Char, usize>,
     ) -> Result<(CompiledProgram, Vec<CompilationWarning>), CompilationError> {
         compiler::compile(instructions, &entry_points)
     }
 
     /// Get an iterator over the full lig/kern replacement for a pair of characters.
-    pub fn get_replacement_iter(&self, left_char: char, right_char: char) -> ReplacementIter {
+    pub fn get_replacement_iter(&self, left_char: Char, right_char: Char) -> ReplacementIter {
         self.get_replacement(left_char, right_char)
             .into_iter(left_char)
     }
 
     /// Get the full lig/kern replacement for a pair of characters.
-    pub fn get_replacement(&self, left_char: char, right_char: char) -> Replacement {
+    pub fn get_replacement(&self, left_char: Char, right_char: Char) -> Replacement {
         if let Some((lower, upper)) = self.left_to_pairs.get(&left_char) {
             for (candidate_right_char, replacement) in
                 &self.pairs[(*lower as usize)..(*upper as usize)]
@@ -268,9 +244,9 @@ impl CompiledProgram {
 
     /// Returns an iterator over all pairs `(char,char)` that have a replacement
     ///     specified in the lig/kern program.
-    pub fn all_pairs_having_replacement(&self) -> impl '_ + Iterator<Item = (char, char)> {
+    pub fn all_pairs_having_replacement(&self) -> impl '_ + Iterator<Item = (Char, Char)> {
         PairsIter {
-            current_left: ' ', // current_left is ignored if right_chars is empty
+            current_left: Char(0),
             left_iter: self.left_to_pairs.iter(),
             right_chars: vec![],
             program: self,
@@ -282,7 +258,7 @@ impl CompiledProgram {
 #[derive(Debug, PartialEq, Eq)]
 pub struct CompilationError {
     /// The pair of characters the starts the infinite loop.
-    pub starting_pair: (char, char),
+    pub starting_pair: (Char, Char),
     /// A sequence of steps forming the infinite loop.
     ///
     /// At the end of these steps, the next pair to replace will be the `starting_pair` again.
@@ -297,7 +273,7 @@ pub struct InfiniteLoopStep {
     /// The index of the instruction to apply in this step.
     pub instruction_index: usize,
     /// The replacement text after applying this step.
-    pub post_replacement: String,
+    pub post_replacement: Vec<Char>,
     /// The position of the cursor after applying this step.
     pub post_cursor_position: usize,
 }
@@ -315,13 +291,13 @@ pub struct Replacement<'a> {
     /// Operation to perform on the left character.
     pub left_char_operation: LeftCharOperation,
     /// Slice of characters and kerns to insert after the left character.
-    pub middle_chars: &'a [(char, Number)],
+    pub middle_chars: &'a [(Char, Number)],
     /// Last character to insert.
-    pub last_char: char,
+    pub last_char: Char,
 }
 
 impl<'a> Replacement<'a> {
-    fn no_op(right_char: char) -> Replacement<'a> {
+    fn no_op(right_char: Char) -> Replacement<'a> {
         Replacement {
             left_char_operation: LeftCharOperation::Retain,
             middle_chars: &[],
@@ -331,7 +307,7 @@ impl<'a> Replacement<'a> {
 }
 
 impl<'a> Replacement<'a> {
-    pub fn into_iter(self, left_char: char) -> ReplacementIter<'a> {
+    pub fn into_iter(self, left_char: Char) -> ReplacementIter<'a> {
         ReplacementIter {
             left_char,
             full_operation: self,
@@ -353,7 +329,7 @@ pub enum LeftCharOperation {
 
 /// Iterator over the replacement of a character pair in a lig/kern program.
 pub struct ReplacementIter<'a> {
-    left_char: char,
+    left_char: Char,
     full_operation: Replacement<'a>,
     state: IterState,
 }
@@ -366,7 +342,7 @@ enum IterState {
 }
 
 impl<'a> ReplacementIter<'a> {
-    fn i(&self) -> (IterState, Option<(char, Number)>) {
+    fn i(&self) -> (IterState, Option<(Char, Number)>) {
         match self.state {
             IterState::LeftChar => (
                 IterState::MiddleChar(0),
@@ -390,7 +366,7 @@ impl<'a> ReplacementIter<'a> {
 }
 
 impl<'a> Iterator for ReplacementIter<'a> {
-    type Item = (char, Number);
+    type Item = (Char, Number);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -407,14 +383,14 @@ impl<'a> Iterator for ReplacementIter<'a> {
 
 /// An iterator over all pairs of characters that have a lig/kern replacement in a program.
 struct PairsIter<'a, L> {
-    current_left: char,
+    current_left: Char,
     left_iter: L,
-    right_chars: Vec<char>,
+    right_chars: Vec<Char>,
     program: &'a CompiledProgram,
 }
 
-impl<'a, L: 'a + Iterator<Item = (&'a char, &'a (u16, u16))>> Iterator for PairsIter<'a, L> {
-    type Item = (char, char);
+impl<'a, L: 'a + Iterator<Item = (&'a Char, &'a (u16, u16))>> Iterator for PairsIter<'a, L> {
+    type Item = (Char, Char);
     fn next(&mut self) -> Option<Self::Item> {
         match self.right_chars.pop() {
             Some(right_char) => Some((self.current_left, right_char)),

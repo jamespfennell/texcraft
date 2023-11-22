@@ -179,9 +179,9 @@ pub fn deserialize(b: &[u8]) -> Result<(Font, Vec<Warning>), Error> {
     let font = Font {
         header: Deserialize::deserialize(raw_header),
         smallest_char_code: if sub_file_sizes.bc <= sub_file_sizes.ec {
-            sub_file_sizes.bc.try_into().unwrap()
+            Char(sub_file_sizes.bc.try_into().unwrap()) // TODO: can't this panic?
         } else {
-            0
+            Char(0)
         },
         char_infos: Deserialize::deserialize(raw_char_infos),
         widths: Deserialize::deserialize(raw_widths),
@@ -455,7 +455,7 @@ impl Deserialize for ligkern::lang::Instruction {
             } else {
                 None
             },
-            right_char: right_char.into(),
+            right_char: Char(right_char),
             operation: if op_byte < 128 {
                 // TFtoPL.2014.77
                 let delete_next_char = (op_byte % 2) == 0;
@@ -464,7 +464,7 @@ impl Deserialize for ligkern::lang::Instruction {
                 let skip = op_byte / 2;
                 use ligkern::lang::PostLigOperation::*;
                 ligkern::lang::Operation::Ligature {
-                    char_to_insert: remainder.into(),
+                    char_to_insert: Char(remainder),
                     post_lig_operation: match (delete_current_char, delete_next_char, skip) {
                         (false, false, 0) => RetainBothMoveNowhere,
                         (false, false, 1) => RetainBothMoveToInserted,
@@ -682,7 +682,7 @@ mod tests {
                         face: None,
                         additional_data: vec![],
                     },
-                    smallest_char_code: 0,
+                    smallest_char_code: Char(0),
                     char_infos: vec![],
                     widths: vec![Number::ZERO],
                     heights: vec![Number::ZERO],
@@ -721,7 +721,7 @@ mod tests {
                         )),
                         additional_data: vec![13],
                     },
-                    smallest_char_code: 0,
+                    smallest_char_code: Char(0),
                     char_infos: vec![],
                     widths: vec![Number::ZERO],
                     heights: vec![Number::ZERO],
@@ -751,7 +751,7 @@ mod tests {
             Ok((
                 Font {
                     header: Default::default(),
-                    smallest_char_code: 70,
+                    smallest_char_code: Char(70),
                     char_infos: vec![
                         CharInfo {
                             width_index: 13,
@@ -799,7 +799,7 @@ mod tests {
             Ok((
                 Font {
                     header: Default::default(),
-                    smallest_char_code: 0,
+                    smallest_char_code: Char(0),
                     char_infos: vec![],
                     widths: vec![Number::ZERO, Number(23)],
                     heights: vec![Number::ZERO, Number(29)],
@@ -831,7 +831,7 @@ mod tests {
             Ok((
                 Font {
                     header: Default::default(),
-                    smallest_char_code: 0,
+                    smallest_char_code: Char(0),
                     char_infos: vec![],
                     widths: vec![Number::ZERO],
                     heights: vec![Number::ZERO],
@@ -840,41 +840,41 @@ mod tests {
                     lig_kern_commands: vec![
                         ligkern::lang::Instruction {
                             next_instruction: Some(3),
-                            right_char: 5.into(),
+                            right_char: Char(5),
                             operation: ligkern::lang::Operation::Kern(Number(256 * 2 + 13))
                         },
                         ligkern::lang::Instruction {
                             next_instruction: Some(3),
-                            right_char: 6.into(),
+                            right_char: Char(6),
                             operation: ligkern::lang::Operation::Ligature {
-                                char_to_insert: 17.into(),
+                                char_to_insert: Char(17),
                                 post_lig_operation:
                                     ligkern::lang::PostLigOperation::RetainNeitherMoveToInserted,
                             },
                         },
                         ligkern::lang::Instruction {
                             next_instruction: Some(3),
-                            right_char: 7.into(),
+                            right_char: Char(7),
                             operation: ligkern::lang::Operation::Ligature {
-                                char_to_insert: 19.into(),
+                                char_to_insert: Char(19),
                                 post_lig_operation:
                                     ligkern::lang::PostLigOperation::RetainBothMoveToRight,
                             },
                         },
                         ligkern::lang::Instruction {
                             next_instruction: None,
-                            right_char: 8.into(),
+                            right_char: Char(8),
                             operation: ligkern::lang::Operation::Ligature {
-                                char_to_insert: 23.into(),
+                                char_to_insert: Char(23),
                                 post_lig_operation:
                                     ligkern::lang::PostLigOperation::RetainRightMoveToRight,
                             },
                         },
                         ligkern::lang::Instruction {
                             next_instruction: None,
-                            right_char: 8.into(),
+                            right_char: Char(8),
                             operation: ligkern::lang::Operation::Ligature {
-                                char_to_insert: 23.into(),
+                                char_to_insert: Char(23),
                                 post_lig_operation:
                                     ligkern::lang::PostLigOperation::RetainNeitherMoveToInserted,
                             },
@@ -905,7 +905,7 @@ mod tests {
             Ok((
                 Font {
                     header: Default::default(),
-                    smallest_char_code: 0,
+                    smallest_char_code: Char(0),
                     char_infos: vec![],
                     widths: vec![Number::ZERO],
                     heights: vec![Number::ZERO],
@@ -944,7 +944,7 @@ mod tests {
             Ok((
                 Font {
                     header: Default::default(),
-                    smallest_char_code: 0,
+                    smallest_char_code: Char(0),
                     char_infos: vec![],
                     widths: vec![Number::ZERO],
                     heights: vec![Number::ZERO],

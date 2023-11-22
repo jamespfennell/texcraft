@@ -1,9 +1,10 @@
 use super::*;
+use crate::Char;
 use std::collections::HashSet;
 
 pub fn compile(
     instructions: &[lang::Instruction],
-    entry_points: &HashMap<char, usize>,
+    entry_points: &HashMap<Char, usize>,
 ) -> Result<(CompiledProgram, Vec<CompilationWarning>), CompilationError> {
     let (pair_to_instruction, warnings) = build_pair_to_instruction_map(instructions, entry_points);
     let pair_to_replacement = calculate_replacements(instructions, pair_to_instruction)?;
@@ -12,16 +13,16 @@ pub fn compile(
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
-struct Node(char, char);
+struct Node(Char, Char);
 
 struct OngoingCalculation {
     // Node this calculation is for.
     node: Node,
     // Part of the ligature result that has been finalized and won't change.
-    finalized: Vec<(char, Number)>,
+    finalized: Vec<(Char, Number)>,
     // Characters that are still pending replacement. The next step is to apply the ligature
     // rule for (pending[0], pending[1]).
-    pending: (char, char, Option<char>),
+    pending: (Char, Char, Option<Char>),
 }
 
 impl OngoingCalculation {
@@ -32,9 +33,9 @@ impl OngoingCalculation {
 
 fn build_pair_to_instruction_map(
     instructions: &[lang::Instruction],
-    entry_points: &HashMap<char, usize>,
-) -> (HashMap<(char, char), usize>, Vec<CompilationWarning>) {
-    let mut result = HashMap::<(char, char), usize>::new();
+    entry_points: &HashMap<Char, usize>,
+) -> (HashMap<(Char, Char), usize>, Vec<CompilationWarning>) {
+    let mut result = HashMap::<(Char, Char), usize>::new();
     let mut reachable_instructions = HashSet::<usize>::with_capacity(instructions.len());
     let mut warnings = vec![];
     for (&left, &entry_point) in entry_points {
@@ -68,17 +69,17 @@ fn build_pair_to_instruction_map(
     (result, warnings)
 }
 
-struct Replacement(Vec<(char, Number)>, char);
+struct Replacement(Vec<(Char, Number)>, Char);
 
 fn calculate_replacements(
     instructions: &[lang::Instruction],
-    pair_to_instruction: HashMap<(char, char), usize>,
-) -> Result<HashMap<(char, char), Replacement>, CompilationError> {
-    let mut result: HashMap<(char, char), Replacement> = Default::default();
+    pair_to_instruction: HashMap<(Char, Char), usize>,
+) -> Result<HashMap<(Char, Char), Replacement>, CompilationError> {
+    let mut result: HashMap<(Char, Char), Replacement> = Default::default();
     let mut actionable: Vec<OngoingCalculation> = vec![];
     let mut node_to_parents: HashMap<Node, Vec<OngoingCalculation>> = Default::default();
     for (&(left, right), &index) in &pair_to_instruction {
-        let (pre_cursor, cursor, post_cursor): (TC, char, TC) = match instructions[index].operation
+        let (pre_cursor, cursor, post_cursor): (TC, Char, TC) = match instructions[index].operation
         {
             lang::Operation::Kern(kern) => {
                 result.insert((left, right), Replacement(vec![(left, kern)], right));
@@ -195,14 +196,15 @@ fn calculate_replacements(
             infinite_loop
         };
         let starting_pair = (infinite_loop[0].0, infinite_loop[0].1);
-        let mut starting_replacement = format!["{}{}", starting_pair.0, starting_pair.1];
+        let mut starting_replacement = vec![starting_pair.0, starting_pair.1];
         let mut cursor_position = 0_usize;
         let mut steps = Vec::<InfiniteLoopStep>::new();
         for node in infinite_loop {
             // TODO: the bug here for /LIG/ nodes is that the loop may caused by the second dep of /LIG/
             // and so we've lost information on how we got from the start to here.
             let calc = &node_to_calc[&node];
-            let mut new_starting_replacement = starting_replacement[0..cursor_position].to_string();
+            let mut new_starting_replacement: Vec<Char> =
+                starting_replacement[0..cursor_position].into();
             for (finalized, _) in &calc.finalized {
                 new_starting_replacement.push(*finalized);
             }
@@ -212,7 +214,7 @@ fn calculate_replacements(
             if let Some(c) = calc.pending.2 {
                 new_starting_replacement.push(c);
             }
-            new_starting_replacement.push_str(&starting_replacement[cursor_position + 2..]);
+            new_starting_replacement.extend(&starting_replacement[cursor_position + 2..]);
 
             starting_replacement = new_starting_replacement;
             cursor_position = new_cursor_position;
@@ -234,12 +236,12 @@ fn calculate_replacements(
 
 enum TC {
     None,
-    One(char),
-    Two(char, char),
+    One(Char),
+    Two(Char, Char),
 }
 
 impl Iterator for TC {
-    type Item = char;
+    type Item = Char;
 
     fn next(&mut self) -> Option<Self::Item> {
         let a = match *self {
@@ -261,9 +263,9 @@ impl Iterator for TC {
     }
 }
 
-fn lower_and_optimize(pair_to_replacement: HashMap<(char, char), Replacement>) -> CompiledProgram {
-    let mut intermediate: HashMap<char, Vec<(char, RawReplacement)>> = Default::default();
-    let mut middle_chars: Vec<(char, Number)> = Default::default();
+fn lower_and_optimize(pair_to_replacement: HashMap<(Char, Char), Replacement>) -> CompiledProgram {
+    let mut intermediate: HashMap<Char, Vec<(Char, RawReplacement)>> = Default::default();
+    let mut middle_chars: Vec<(Char, Number)> = Default::default();
 
     for (node, Replacement(middle, last)) in pair_to_replacement {
         let (left_char_operation, middle_extension) = match middle.first().copied() {
@@ -296,8 +298,8 @@ fn lower_and_optimize(pair_to_replacement: HashMap<(char, char), Replacement>) -
         ));
     }
 
-    let mut left_to_pairs: HashMap<char, (u16, u16)> = Default::default();
-    let mut pairs: Vec<(char, RawReplacement)> = Default::default();
+    let mut left_to_pairs: HashMap<Char, (u16, u16)> = Default::default();
+    let mut pairs: Vec<(Char, RawReplacement)> = Default::default();
 
     for (left, replacements) in intermediate {
         let start: u16 = pairs.len().try_into().unwrap();
@@ -317,6 +319,14 @@ mod tests {
     use super::*;
     use lang::PostLigOperation::*;
 
+    fn new_kern(next_instruction: Option<u8>, right_char: char, kern: Number) -> lang::Instruction {
+        lang::Instruction {
+            next_instruction,
+            right_char: right_char.try_into().unwrap(),
+            operation: lang::Operation::Kern(kern),
+        }
+    }
+
     pub fn new_lig(
         next_instruction: Option<u8>,
         right_char: char,
@@ -325,9 +335,9 @@ mod tests {
     ) -> lang::Instruction {
         lang::Instruction {
             next_instruction,
-            right_char,
+            right_char: right_char.try_into().unwrap(),
             operation: lang::Operation::Ligature {
-                char_to_insert,
+                char_to_insert: char_to_insert.try_into().unwrap(),
                 post_lig_operation,
             },
         }
@@ -338,14 +348,26 @@ mod tests {
         entry_points: Vec<(char, usize)>,
         want: Vec<(char, char, Vec<(char, Number)>)>,
     ) {
-        let entry_points: HashMap<char, usize> = entry_points.into_iter().collect();
-        let want: HashMap<(char, char), Vec<(char, Number)>> =
-            want.into_iter().map(|t| ((t.0, t.1), t.2)).collect();
+        let entry_points: HashMap<Char, usize> = entry_points
+            .into_iter()
+            .map(|(c, u)| (c.try_into().unwrap(), u))
+            .collect();
+        let want: HashMap<(Char, Char), Vec<(Char, Number)>> = want
+            .into_iter()
+            .map(|t| {
+                (
+                    (t.0.try_into().unwrap(), t.1.try_into().unwrap()),
+                    t.2.into_iter()
+                        .map(|(c, n)| (c.try_into().unwrap(), n))
+                        .collect(),
+                )
+            })
+            .collect();
         let compiled_program = compile(&instructions, &entry_points).unwrap().0;
 
-        let mut got: HashMap<(char, char), Vec<(char, Number)>> = Default::default();
+        let mut got: HashMap<(Char, Char), Vec<(Char, Number)>> = Default::default();
         for pair in compiled_program.all_pairs_having_replacement() {
-            let replacement: Vec<(char, Number)> = compiled_program
+            let replacement: Vec<(Char, Number)> = compiled_program
                 .get_replacement_iter(pair.0, pair.1)
                 .collect();
             got.insert(pair, replacement);
@@ -372,13 +394,13 @@ mod tests {
         (empty_program, vec![], vec![], vec![],),
         (
             kern,
-            vec![lang::Instruction::new_kern(None, 'V', Number::UNITY)],
+            vec![new_kern(None, 'V', Number::UNITY)],
             vec![('A', 0)],
             vec![('A', 'V', vec![('A', Number::UNITY), ('V', Number::ZERO)]),],
         ),
         (
             same_kern_for_multiple_left_characters,
-            vec![lang::Instruction::new_kern(None, 'V', Number::UNITY)],
+            vec![new_kern(None, 'V', Number::UNITY)],
             vec![('A', 0), ('B', 0)],
             vec![
                 ('A', 'V', vec![('A', Number::UNITY), ('V', Number::ZERO)]),
@@ -388,8 +410,8 @@ mod tests {
         (
             duplicate_kern,
             vec![
-                lang::Instruction::new_kern(Some(0), 'V', Number::UNITY * 2),
-                lang::Instruction::new_kern(None, 'V', Number::UNITY * 3),
+                new_kern(Some(0), 'V', Number::UNITY * 2),
+                new_kern(None, 'V', Number::UNITY * 3),
             ],
             vec![('A', 0)],
             vec![(
@@ -401,21 +423,9 @@ mod tests {
         (
             kern_instructions_with_relationship,
             vec![
-                lang::Instruction {
-                    next_instruction: Some(0),
-                    right_char: 'V',
-                    operation: lang::Operation::Kern(Number::UNITY * 2)
-                },
-                lang::Instruction {
-                    next_instruction: None,
-                    right_char: 'W',
-                    operation: lang::Operation::Kern(Number::UNITY * 3)
-                },
-                lang::Instruction {
-                    next_instruction: None,
-                    right_char: 'X',
-                    operation: lang::Operation::Kern(Number::UNITY * 4)
-                },
+                new_kern(Some(0), 'V', Number::UNITY * 2),
+                new_kern(None, 'W', Number::UNITY * 3),
+                new_kern(None, 'X', Number::UNITY * 4),
             ],
             vec![('A', 0), ('B', 1), ('C', 2)],
             vec![
@@ -443,20 +453,15 @@ mod tests {
         ),
         (
             single_lig_1,
-            vec![lang::Instruction::new_lig(
-                None,
-                'B',
-                'Z',
-                RetainNeitherMoveToInserted
-            )],
+            vec![new_lig(None, 'B', 'Z', RetainNeitherMoveToInserted)],
             vec![('A', 0)],
             vec![('A', 'B', vec![('Z', Number::ZERO)])],
         ),
         (
             single_lig_2,
             vec![
-                lang::Instruction::new_lig(Some(0), 'B', 'Z', RetainLeftMoveToInserted),
-                lang::Instruction::new_kern(None, 'Z', Number::UNITY),
+                new_lig(Some(0), 'B', 'Z', RetainLeftMoveToInserted),
+                new_kern(None, 'Z', Number::UNITY),
             ],
             vec![('A', 0)],
             vec![
@@ -467,8 +472,8 @@ mod tests {
         (
             retain_left_move_nowhere_1,
             vec![
-                lang::Instruction::new_lig(Some(0), 'B', 'Z', RetainLeftMoveNowhere),
-                lang::Instruction::new_kern(None, 'Z', Number::UNITY),
+                new_lig(Some(0), 'B', 'Z', RetainLeftMoveNowhere),
+                new_kern(None, 'Z', Number::UNITY),
             ],
             vec![('A', 0)],
             vec![
@@ -485,8 +490,8 @@ mod tests {
         (
             single_lig_4,
             vec![
-                lang::Instruction::new_lig(None, 'B', 'Z', RetainRightMoveToInserted),
-                lang::Instruction::new_kern(None, 'B', Number::UNITY),
+                new_lig(None, 'B', 'Z', RetainRightMoveToInserted),
+                new_kern(None, 'B', Number::UNITY),
             ],
             vec![('A', 0), ('Z', 1)],
             vec![
@@ -497,8 +502,8 @@ mod tests {
         (
             single_lig_5,
             vec![
-                lang::Instruction::new_lig(None, 'B', 'Z', RetainRightMoveToRight),
-                lang::Instruction::new_kern(None, 'B', Number::UNITY),
+                new_lig(None, 'B', 'Z', RetainRightMoveToRight),
+                new_kern(None, 'B', Number::UNITY),
             ],
             vec![('A', 0), ('Z', 1)],
             vec![
@@ -509,9 +514,9 @@ mod tests {
         (
             retain_both_move_nowhere_1,
             vec![
-                lang::Instruction::new_lig(Some(0), 'B', 'Z', RetainBothMoveNowhere,),
-                lang::Instruction::new_kern(None, 'Z', Number::UNITY * 2),
-                lang::Instruction::new_kern(None, 'B', Number::UNITY * 3),
+                new_lig(Some(0), 'B', 'Z', RetainBothMoveNowhere,),
+                new_kern(None, 'Z', Number::UNITY * 2),
+                new_kern(None, 'B', Number::UNITY * 3),
             ],
             vec![('A', 0), ('Z', 2)],
             vec![
@@ -538,12 +543,7 @@ mod tests {
         ),
         (
             retain_both_move_nowhere_2,
-            vec![lang::Instruction::new_lig(
-                None,
-                'B',
-                'Z',
-                RetainBothMoveNowhere
-            ),],
+            vec![new_lig(None, 'B', 'Z', RetainBothMoveNowhere),],
             vec![('A', 0)],
             vec![(
                 'A',
@@ -607,9 +607,9 @@ mod tests {
         (
             retain_both_move_to_inserted_1,
             vec![
-                lang::Instruction::new_lig(Some(0), 'B', 'Z', RetainBothMoveToInserted,),
-                lang::Instruction::new_kern(None, 'Z', Number::UNITY * 2),
-                lang::Instruction::new_kern(None, 'B', Number::UNITY * 3),
+                new_lig(Some(0), 'B', 'Z', RetainBothMoveToInserted,),
+                new_kern(None, 'Z', Number::UNITY * 2),
+                new_kern(None, 'B', Number::UNITY * 3),
             ],
             vec![('A', 0), ('Z', 2)],
             vec![
@@ -637,8 +637,8 @@ mod tests {
         (
             retain_both_move_to_inserted_2,
             vec![
-                lang::Instruction::new_lig(None, 'B', 'Z', RetainBothMoveToInserted),
-                lang::Instruction::new_lig(None, 'B', 'Y', RetainRightMoveToInserted),
+                new_lig(None, 'B', 'Z', RetainBothMoveToInserted),
+                new_lig(None, 'B', 'Y', RetainRightMoveToInserted),
             ],
             vec![('A', 0), ('Z', 1)],
             vec![
@@ -656,12 +656,7 @@ mod tests {
         ),
         (
             retain_both_move_to_inserted_3,
-            vec![lang::Instruction::new_lig(
-                None,
-                'B',
-                'Z',
-                RetainBothMoveToInserted
-            ),],
+            vec![new_lig(None, 'B', 'Z', RetainBothMoveToInserted),],
             vec![('A', 0)],
             vec![(
                 'A',
@@ -676,8 +671,8 @@ mod tests {
         (
             retain_both_move_to_inserted_4,
             vec![
-                lang::Instruction::new_lig(None, 'B', 'Z', RetainBothMoveToInserted,),
-                lang::Instruction::new_lig(None, 'B', 'Y', RetainRightMoveToRight),
+                new_lig(None, 'B', 'Z', RetainBothMoveToInserted,),
+                new_lig(None, 'B', 'Y', RetainRightMoveToRight),
             ],
             vec![('A', 0), ('Z', 1)],
             vec![
@@ -696,9 +691,9 @@ mod tests {
         (
             retain_both_move_to_right_1,
             vec![
-                lang::Instruction::new_lig(Some(0), 'B', 'Z', RetainBothMoveToRight,),
-                lang::Instruction::new_kern(None, 'Z', Number::UNITY * 2),
-                lang::Instruction::new_kern(None, 'B', Number::UNITY * 3),
+                new_lig(Some(0), 'B', 'Z', RetainBothMoveToRight,),
+                new_kern(None, 'Z', Number::UNITY * 2),
+                new_kern(None, 'B', Number::UNITY * 3),
             ],
             vec![('A', 0), ('Z', 2)],
             vec![
@@ -730,7 +725,10 @@ mod tests {
         entry_points: Vec<(char, usize)>,
         want_err: CompilationError,
     ) {
-        let entry_points: HashMap<char, usize> = entry_points.into_iter().collect();
+        let entry_points: HashMap<Char, usize> = entry_points
+            .into_iter()
+            .map(|(c, u)| (c.try_into().unwrap(), u))
+            .collect();
         let got_err = compile(&instructions, &entry_points).unwrap_err();
         assert_eq!(got_err, want_err);
     }
@@ -755,10 +753,10 @@ mod tests {
             vec![new_lig(None, 'B', 'A', RetainBothMoveToInserted)],
             vec![('A', 0)],
             CompilationError {
-                starting_pair: ('A', 'B'),
+                starting_pair: starting_pair('A', 'B'),
                 infinite_loop: vec![InfiniteLoopStep {
                     instruction_index: 0,
-                    post_replacement: "AAB".into(),
+                    post_replacement: post_replacement("AAB"),
                     post_cursor_position: 1,
                 }]
             },
@@ -771,16 +769,16 @@ mod tests {
             ],
             vec![('A', 0), ('C', 1)],
             CompilationError {
-                starting_pair: ('A', 'B'),
+                starting_pair: starting_pair('A', 'B'),
                 infinite_loop: vec![
                     InfiniteLoopStep {
                         instruction_index: 0,
-                        post_replacement: "CB".into(),
+                        post_replacement: post_replacement("CB"),
                         post_cursor_position: 0,
                     },
                     InfiniteLoopStep {
                         instruction_index: 1,
-                        post_replacement: "AB".into(),
+                        post_replacement: post_replacement("AB"),
                         post_cursor_position: 0,
                     }
                 ]
@@ -796,21 +794,21 @@ mod tests {
             ],
             vec![('A', 0), ('D', 2)],
             CompilationError {
-                starting_pair: ('A', 'B'),
+                starting_pair: starting_pair('A', 'B'),
                 infinite_loop: vec![
                     InfiniteLoopStep {
                         instruction_index: 0,
-                        post_replacement: "ACB".into(),
+                        post_replacement: post_replacement("ACB"),
                         post_cursor_position: 0,
                     },
                     InfiniteLoopStep {
                         instruction_index: 1,
-                        post_replacement: "DCB".into(),
+                        post_replacement: post_replacement("DCB"),
                         post_cursor_position: 0,
                     },
                     InfiniteLoopStep {
                         instruction_index: 2,
-                        post_replacement: "DAB".into(),
+                        post_replacement: post_replacement("DAB"),
                         post_cursor_position: 1,
                     }
                 ]
@@ -825,16 +823,16 @@ mod tests {
             ],
             vec![('A', 0), ('C', 1)],
             CompilationError {
-                starting_pair: ('A', 'B'),
+                starting_pair: starting_pair('A', 'B'),
                 infinite_loop: vec![
                     InfiniteLoopStep {
                         instruction_index: 0,
-                        post_replacement: "ACB".into(),
+                        post_replacement: post_replacement("ACB"),
                         post_cursor_position: 1,
                     },
                     InfiniteLoopStep {
                         instruction_index: 1,
-                        post_replacement: "ACAB".into(),
+                        post_replacement: post_replacement("ACAB"),
                         post_cursor_position: 2,
                     }
                 ]
@@ -848,13 +846,21 @@ mod tests {
             ],
             vec![('A', 0), ('C', 1)],
             CompilationError {
-                starting_pair: ('C', 'B'),
+                starting_pair: starting_pair('C', 'B'),
                 infinite_loop: vec![InfiniteLoopStep {
                     instruction_index: 1,
-                    post_replacement: "CCB".into(),
+                    post_replacement: post_replacement("CCB"),
                     post_cursor_position: 1,
                 }]
             },
         ),
     );
+
+    fn starting_pair(l: char, r: char) -> (Char, Char) {
+        (l.try_into().unwrap(), r.try_into().unwrap())
+    }
+
+    fn post_replacement(s: &str) -> Vec<Char> {
+        s.chars().map(|c| c.try_into().unwrap()).collect()
+    }
 }

@@ -4,7 +4,7 @@
 
 use super::cst;
 use super::error::Error;
-use crate::{ligkern::lang::PostLigOperation, Face, Number};
+use crate::{ligkern::lang::PostLigOperation, Char, Face, Number};
 
 /// Abstract syntax tree for property list files
 ///
@@ -206,7 +206,7 @@ pub enum Root {
 
     /// If true,
     ///     character codes less than 128 cannot lead to codes of 128 or more via ligatures or
-    ///     charlists or extensible characters.
+    ///     char lists or extensible characters.
     /// (TeX82 ignores this flag, but older versions of TeX would only accept TFM files that were seven-bit safe.)
     /// PLtoTF computes the correct value of this flag and gives an
     ///     error message only if a claimed "true" value is incorrect.
@@ -230,12 +230,12 @@ pub enum Root {
     ///     it matches "end of word" as well as itself.
     /// If no boundary character is given and no `LABEL BOUNDARYCHAR` occurs within a lig table,
     ///     word boundaries will not affect ligatures or kerning.
-    BoundaryChar(SingleValue<char>),
+    BoundaryChar(SingleValue<Char>),
 
     /// Metrics for a character in the font.
     /// The value specifies the character and
     ///     the property list of [`Character`] nodes specifies metrics for the character.
-    Character(Branch<char, Character>),
+    Character(Branch<Char, Character>),
 
     /// A comment that is ignored.
     Comment(Vec<cst::BalancedElem>),
@@ -451,14 +451,14 @@ pub enum LigTable {
     ///
     /// The slashes specify retention of the left or right original character; the > signs specify passing over
     /// the result without further ligature processing.
-    Lig(PostLigOperation, TupleValue<char, char>),
+    Lig(PostLigOperation, TupleValue<Char, Char>),
 
     /// A kern instruction `(KRN c r)` means,
     ///     "If the next character is c, then insert a blank space of width r between the current character and c;
     ///     otherwise go on to the next instruction."
     /// The value of r, which is in design units, is often negative.
     /// Character code c must exist in the font.
-    Kern(TupleValue<char, Number>),
+    Kern(TupleValue<Char, Number>),
 
     /// A stop instruction ends a ligature/kern program.
     /// It must follow either a `LIG` or `KRN` instruction, not a `LABEL` or `STOP` or `SKIP`.
@@ -477,7 +477,7 @@ pub enum LigTable {
 #[derive(PartialEq, Eq, Debug)]
 pub enum LigTableLabel {
     /// A specific character.
-    Char(char),
+    Char(Char),
     /// The boundary character.
     BoundaryChar,
 }
@@ -664,13 +664,6 @@ impl Data for u32 {
     }
 }
 
-impl Data for char {
-    fn build(input: &mut Input) -> Self {
-        let raw = u8::build(input);
-        raw as char
-    }
-}
-
 impl Data for u8 {
     // PLtoTF.2014.51
     fn build(input: &mut Input) -> Self {
@@ -767,6 +760,12 @@ impl Data for u8 {
         };
         input.consume_spaces();
         u
+    }
+}
+
+impl Data for Char {
+    fn build(input: &mut Input) -> Self {
+        Char(u8::build(input))
     }
 }
 
@@ -961,37 +960,39 @@ mod tests {
         (
             one_byte_char_invalid_prefix,
             r"(BOUNDARYCHAR J a)",
-            vec![Root::BoundaryChar(SingleValue { data: 0.into() })],
+            vec![Root::BoundaryChar(SingleValue { data: Char(0) })],
             vec![Error::InvalidPrefixForSmallInteger { span: 14..15 }],
         ),
         (
             one_byte_char_no_prefix,
             r"(BOUNDARYCHAR)",
-            vec![Root::BoundaryChar(SingleValue { data: 0.into() })],
+            vec![Root::BoundaryChar(SingleValue { data: Char(0) })],
             vec![Error::InvalidPrefixForSmallInteger { span: 13..13 }],
         ),
         (
             one_byte_char,
             r"(BOUNDARYCHAR C a)",
-            vec![Root::BoundaryChar(SingleValue { data: 'a' })],
+            vec![Root::BoundaryChar(SingleValue {
+                data: 'a'.try_into().unwrap()
+            })],
             vec![],
         ),
         (
             one_byte_missing,
             r"(BOUNDARYCHAR C)",
-            vec![Root::BoundaryChar(SingleValue { data: 0.into() })],
+            vec![Root::BoundaryChar(SingleValue { data: Char(0) })],
             vec![Error::InvalidCharacterForSmallInteger { span: 15..15 }],
         ),
         (
             one_byte_octal,
             r"(BOUNDARYCHAR O 77)",
-            vec![Root::BoundaryChar(SingleValue { data: 0o77.into() })],
+            vec![Root::BoundaryChar(SingleValue { data: Char(0o77) })],
             vec![],
         ),
         (
             one_byte_octal_too_big,
             r"(BOUNDARYCHAR O 7777)",
-            vec![Root::BoundaryChar(SingleValue { data: 0o0.into() })],
+            vec![Root::BoundaryChar(SingleValue { data: Char(0o0) })],
             vec![Error::SmallIntegerTooBig {
                 span: 16..20,
                 radix: 8
@@ -1000,13 +1001,13 @@ mod tests {
         (
             one_byte_decimal,
             r"(BOUNDARYCHAR D 77)",
-            vec![Root::BoundaryChar(SingleValue { data: 77.into() })],
+            vec![Root::BoundaryChar(SingleValue { data: Char(77) })],
             vec![],
         ),
         (
             one_byte_decimal_too_big,
             r"(BOUNDARYCHAR D 7777)",
-            vec![Root::BoundaryChar(SingleValue { data: 0.into() })],
+            vec![Root::BoundaryChar(SingleValue { data: Char(0) })],
             vec![Error::SmallIntegerTooBig {
                 span: 16..20,
                 radix: 10
@@ -1015,13 +1016,13 @@ mod tests {
         (
             one_byte_hexadecimal,
             r"(BOUNDARYCHAR H 17)",
-            vec![Root::BoundaryChar(SingleValue { data: 0x17.into() })],
+            vec![Root::BoundaryChar(SingleValue { data: Char(0x17) })],
             vec![],
         ),
         (
             one_byte_hexadecimal_too_big,
             r"(BOUNDARYCHAR H 1777)",
-            vec![Root::BoundaryChar(SingleValue { data: 0x0.into() })],
+            vec![Root::BoundaryChar(SingleValue { data: Char(0x0) })],
             vec![Error::SmallIntegerTooBig {
                 span: 16..20,
                 radix: 16
@@ -1030,13 +1031,13 @@ mod tests {
         (
             one_byte_face,
             r"(BOUNDARYCHAR F BIC)",
-            vec![Root::BoundaryChar(SingleValue { data: 9.into() })],
+            vec![Root::BoundaryChar(SingleValue { data: Char(9) })],
             vec![],
         ),
         (
             one_byte_face_invalid,
             r"(BOUNDARYCHAR F ABC)",
-            vec![Root::BoundaryChar(SingleValue { data: 0.into() })],
+            vec![Root::BoundaryChar(SingleValue { data: Char(0) })],
             vec![Error::InvalidFaceCode { span: 16..19 }],
         ),
         (
@@ -1215,36 +1216,38 @@ mod tests {
                     data: (),
                     children: vec![
                         LigTable::Label(SingleValue {
-                            data: LigTableLabel::Char('f')
+                            data: LigTableLabel::Char('f'.try_into().unwrap())
                         }),
                         LigTable::Lig(
                             PostLigOperation::RetainNeitherMoveToInserted,
                             TupleValue {
-                                data: ('f', 0o200 as char)
+                                data: ('f'.try_into().unwrap(), Char(0o200))
                             }
                         ),
                         LigTable::Skip(SingleValue { data: 1 }),
                         LigTable::Label(SingleValue {
-                            data: LigTableLabel::Char(0o200 as char)
+                            data: LigTableLabel::Char(Char(0o200))
                         }),
                         LigTable::Lig(
                             PostLigOperation::RetainNeitherMoveToInserted,
                             TupleValue {
-                                data: ('i', 0o201 as char)
+                                data: ('i'.try_into().unwrap(), Char(0o201))
                             }
                         ),
                         LigTable::Kern(TupleValue {
-                            data: (0o51 as char, Number::UNITY * 3 / 2),
+                            data: (Char(0o51), Number::UNITY * 3 / 2),
                         }),
                         LigTable::Lig(
                             PostLigOperation::RetainLeftMoveNowhere,
-                            TupleValue { data: ('?', 'f') }
+                            TupleValue {
+                                data: ('?'.try_into().unwrap(), 'f'.try_into().unwrap())
+                            }
                         ),
                         LigTable::Stop(SingleValue { data: () }),
                     ]
                 }),
                 Root::Character(Branch {
-                    data: 'f',
+                    data: 'f'.try_into().unwrap(),
                     children: vec![
                         Character::Width(SingleValue {
                             data: Number::UNITY * 6,
@@ -1261,12 +1264,4 @@ mod tests {
             vec![],
         ),
     );
-
-    /*thread 'pl::ast::tests::pl_to_tf_section_7_example' panicked at 'assertion failed: `(left == right)`
-      left: `Ast([Family(LeafValue { data: "NOVA" }), Face(LeafValue { data: Valid(Medium, Italic, Extended) }), CodingScheme(LeafValue { data: "ASCII" }), DesignSize(LeafValue { data: FixWord(10485760) }), DesignUnits(LeafValue { data: FixWord(18874368) }), Comment([String("A COMMENT IS IGNORED")]), Comment([Vec([String("EXCEPT THIS ONE ISN'T")])]), Comment([Vec([String("ACTUALLY IT IS, EVEN THOUGH"), String("IT SAYS IT ISN'T")])]), FontDimension(BranchValue { data: (), children: [Slant(LeafValue { data: FixWord(-262144) }), Space(LeafValue { data: FixWord(6291456) }), Shrink(LeafValue { data: FixWord(2097152) }), Stretch(LeafValue { data: FixWord(3145728) }), XHeight(LeafValue { data: FixWord(11062477) }), Quad(LeafValue { data: FixWord(18874368) })] }), LigTable(BranchValue { data: (), children: [Label(LeafValue { data: Char('f') }), Lig(DeleteBothMoveToInserted, LeafTupleValue { data: ('f', '\u{80}') }), Skip(LeafValue { data: 1 }), Label(LeafValue { data: Char('\u{80}') }), Lig(DeleteBothMoveToInserted, LeafTupleValue { data: ('i', '\u{81}') }), Kern(LeafTupleValue { data: (')', FixWord(1572864)) }), Lig(DeleteNextMoveNowhere, LeafTupleValue { data: ('?', 'f') }), Stop(LeafValue { data: () })] }), Character(BranchValue { data: 'f', children: [Width(LeafValue { data: FixWord(6291456) }), Height(LeafValue { data: FixWord(14155776) }), ItalicCorrection(LeafValue { data: FixWord(1572864) })] })])`,
-     right: `Ast([Family(LeafValue { data: "NOVA" }), Face(LeafValue { data: Valid(Medium, Italic, Extended) }), CodingScheme(LeafValue { data: "ASCII" }), DesignSize(LeafValue { data: FixWord(10485760) }), DesignUnits(LeafValue { data: FixWord(18874368) }), Comment([String("A COMMENT IS IGNORED")]), Comment([Vec([String("EXCEPT THIS ONE ISN'T")])]), Comment([Vec([String("ACTUALLY IT IS, EVEN THOUGH"), String("IT SAYS IT ISN'T")])]), FontDimension(BranchValue { data: (), children: [Slant(LeafValue { data: FixWord(-262144) }), Space(LeafValue { data: FixWord(6291456) }), Shrink(LeafValue { data: FixWord(2097152) }), Stretch(LeafValue { data: FixWord(3145728) }), XHeight(LeafValue { data: FixWord(11062476) }), Quad(LeafValue { data: FixWord(18874368) })] }), LigTable(BranchValue { data: (), children: [Label(LeafValue { data: Char('f') }), Lig(DeleteBothMoveToInserted, LeafTupleValue { data: ('f', '\u{80}') }), Skip(LeafValue { data: 1 }), Label(LeafValue { data: Char('\u{80}') }), Lig(DeleteBothMoveToInserted, LeafTupleValue { data: ('i', '\u{81}') }), Kern(LeafTupleValue { data: (')', FixWord(1572864)) }), Lig(DeleteNextMoveNowhere, LeafTupleValue { data: ('?', 'f') }), Stop(LeafValue { data: () })] }), Character(BranchValue { data: 'f', children: [Width(LeafValue { data: FixWord(6291456) }), Height(LeafValue { data: FixWord(14155776) }), ItalicCorrection(LeafValue { data: FixWord(1572864) })] })])`', crates/tfm/src/pl/ast.rs:704:9
-    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-
-
-             */
 }

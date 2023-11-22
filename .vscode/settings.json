@@ -19,6 +19,7 @@
         "errormode",
         "errorstopmode",
         "expandafter",
+        "FONTDIMEN",
         "Freyler",
         "futurelet",
         "gdef",
@@ -46,6 +47,7 @@
         "mathchar",
         "mathchardef",
         "mathcode",
+        "METAFONT",
         "muglue",
         "Mundo",
         "nevec",
@@ -78,7 +80,8 @@
         "tracingmacros",
         "Undelimited",
         "unexpandable",
-        "VM's"
+        "VM's",
+        "XHEIGHT"
     ],    
     "rust-analyzer.cargo.features": "all",
     "rust-analyzer.check.features": "all"

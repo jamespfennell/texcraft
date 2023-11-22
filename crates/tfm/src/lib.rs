@@ -30,7 +30,7 @@ pub struct Font {
     pub header: Header,
 
     /// The smallest character in the font.
-    pub smallest_char_code: u8,
+    pub smallest_char_code: Char,
 
     /// Character infos.
     ///
@@ -124,6 +124,27 @@ impl<const N: usize> From<&str> for StackString<N> {
             r.len += 1;
         }
         r
+    }
+}
+
+/// A character in a TFM file.
+///
+/// TFM and PL files only support 1-byte characters.
+#[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
+pub struct Char(pub u8);
+
+impl From<u8> for Char {
+    fn from(value: u8) -> Self {
+        Char(value)
+    }
+}
+
+impl TryFrom<char> for Char {
+    type Error = std::char::TryFromCharError;
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        let u: u8 = value.try_into()?;
+        Ok(Char(u))
     }
 }
 
