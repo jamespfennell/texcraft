@@ -5,6 +5,7 @@
 use super::cst;
 use super::error::Error;
 use crate::{ligkern::lang::PostLigOperation, Char, Face, Number};
+use std::ops::Range;
 
 /// Abstract syntax tree for property list files
 ///
@@ -38,8 +39,9 @@ impl Ast {
 pub struct SingleValue<D> {
     /// Data in this leaf node.
     pub data: D,
-    // TODO: open paren spans? key spans? data spans?
-    // TODO pub span: std::ops::Range<usize>,
+    /// Span of the data in the property list source code.
+    pub data_span: Range<usize>,
+    // TODO: open paren spans? key spans?
 }
 
 /// Value of a leaf node in the AST that contains two pieces of data.
@@ -48,9 +50,14 @@ pub struct SingleValue<D> {
 /// and a 32-bit value.
 #[derive(PartialEq, Eq, Debug)]
 pub struct TupleValue<D, E> {
-    /// Data in this leaf node.
-    pub data: (D, E),
-    // TODO pub spans: (std::ops::Range<usize>, std::ops::Range<usize>),
+    /// Left piece of data in the tuple.
+    pub left: D,
+    /// Span of the left data in the property list source code.
+    pub left_span: Range<usize>,
+    /// Right piece of data in the tuple.
+    pub right: E,
+    /// Span of the right data in the property list source code.
+    pub right_span: Range<usize>,
 }
 
 /// Value of a branch node in the AST.
@@ -62,7 +69,9 @@ pub struct TupleValue<D, E> {
 pub struct Branch<D, E> {
     /// Data in this branch node.
     pub data: D,
-    // TODO: open paren spans? key spans? data spans?
+    /// Span of the data in the property list source code.
+    pub data_span: Range<usize>,
+    // TODO: open paren spans? key spans?
     /// Elements of the property list.
     pub children: Vec<E>,
 }
@@ -79,20 +88,26 @@ trait FromCstNode: Sized {
 impl<D: TryParse> FromCstNode for SingleValue<D> {
     fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self> {
         let (mut input, _) = Input::new(p, errors);
-        D::try_parse(&mut input).map(|data| Self { data })
+        D::try_parse(&mut input).map(|data| Self {
+            data: data.0,
+            data_span: data.1,
+        })
     }
 }
 
 impl<D: TryParse, E: Parse> FromCstNode for TupleValue<D, E> {
     fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self> {
         let (mut input, _) = Input::new(p, errors);
-        let first = match D::try_parse(&mut input) {
+        let (left, left_span) = match D::try_parse(&mut input) {
             None => return None,
             Some(first) => first,
         };
-        let second = E::parse(&mut input);
+        let (right, right_span) = E::parse(&mut input);
         Some(Self {
-            data: (first, second),
+            left,
+            left_span,
+            right,
+            right_span,
         })
     }
 }
@@ -101,8 +116,10 @@ impl<D: Parse, E: Node> FromCstNode for Branch<D, E> {
     fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self> {
         {
             let (mut input, children) = Input::new(p, errors);
+            let (data, data_span) = D::parse(&mut input);
             Some(Branch::<D, E> {
-                data: D::parse(&mut input),
+                data,
+                data_span,
                 children: children
                     .into_iter()
                     .filter_map(|c| Node::build(c, errors))
@@ -489,13 +506,17 @@ pub enum LigTableLabel {
 }
 
 impl Parse for LigTableLabel {
-    fn parse(input: &mut Input) -> Self {
+    fn parse(input: &mut Input) -> (Self, Range<usize>) {
         match input.peek() {
             Some('B' | 'b') => {
+                let span_start = input.raw_data_offset;
                 input.next();
-                LigTableLabel::BoundaryChar
+                (LigTableLabel::BoundaryChar, span_start..span_start + 1)
             }
-            _ => LigTableLabel::Char(Parse::parse(input)),
+            _ => {
+                let (c, span) = Parse::parse(input);
+                (LigTableLabel::Char(c), span)
+            }
         }
     }
 }
@@ -547,15 +568,15 @@ node_impl!(
 );
 
 trait Parse: Sized {
-    fn parse(input: &mut Input) -> Self;
+    fn parse(input: &mut Input) -> (Self, Range<usize>);
 }
 
 trait TryParse: Sized {
-    fn try_parse(input: &mut Input) -> Option<Self>;
+    fn try_parse(input: &mut Input) -> Option<(Self, Range<usize>)>;
 }
 
 impl<T: Parse> TryParse for T {
-    fn try_parse(input: &mut Input) -> Option<Self> {
+    fn try_parse(input: &mut Input) -> Option<(Self, Range<usize>)> {
         Some(Parse::parse(input))
     }
 }
@@ -563,7 +584,7 @@ impl<T: Parse> TryParse for T {
 struct Input<'a> {
     raw_data: String,
     raw_data_offset: usize,
-    raw_data_span: std::ops::Range<usize>,
+    raw_data_span: Range<usize>,
     errors: &'a mut Vec<Error>,
 }
 
@@ -596,7 +617,7 @@ impl<'a> Input<'a> {
             self.raw_data_span.start += 1;
         }
     }
-    fn last_span(&self, last: Option<char>) -> std::ops::Range<usize> {
+    fn last_span(&self, last: Option<char>) -> Range<usize> {
         let end_span = self.raw_data_span.start;
         match last {
             None => end_span..end_span,
@@ -625,24 +646,26 @@ impl<'a> Iterator for Input<'a> {
 }
 
 impl Parse for () {
-    fn parse(_: &mut Input) -> Self {}
+    fn parse(input: &mut Input) -> (Self, Range<usize>) {
+        ((), input.raw_data_span.start..input.raw_data_span.start)
+    }
 }
 
 impl Parse for u32 {
     // PLtoTF.2014.59-60
-    fn parse(input: &mut Input) -> Self {
+    fn parse(input: &mut Input) -> (Self, Range<usize>) {
+        let start_span = input.raw_data_span.start;
         let radix = match input.next() {
             Some('O' | 'o') => 8,
             Some('H' | 'h') => 16,
             c => {
-                input.skip_error(Error::InvalidPrefixForInteger {
-                    span: input.last_span(c),
-                });
-                return 0;
+                let span = input.last_span(c);
+                input.skip_error(Error::InvalidPrefixForInteger { span: span.clone() });
+                return (0, span);
             }
         };
         input.consume_spaces();
-        let start_span = input.raw_data_span.start;
+        let number_start_span = input.raw_data_span.start;
         let mut acc: u32 = 0;
         while let Some(c) = input.next() {
             let n: u32 = match c.to_digit(16) {
@@ -669,20 +692,20 @@ impl Parse for u32 {
                     }
                     let end_span = input.raw_data_span.start;
                     input.skip_error(Error::IntegerTooBig {
-                        span: start_span..end_span,
+                        span: number_start_span..end_span,
                     });
                     break;
                 }
                 Some(new_acc) => acc = new_acc,
             }
         }
-        acc
+        (acc, start_span..input.raw_data_span.start)
     }
 }
 
 impl Parse for u8 {
     // PLtoTF.2014.51
-    fn parse(input: &mut Input) -> Self {
+    fn parse(input: &mut Input) -> (Self, Range<usize>) {
         let parse_number = |input: &mut Input, radix: u8| {
             input.consume_spaces();
             let start_span = input.raw_data_span.start;
@@ -717,6 +740,7 @@ impl Parse for u8 {
             }
             acc
         };
+        let span_start = input.raw_data_span.start;
         let u = match input.next() {
             // PLtoTF.2014.52
             Some('C' | 'c') => {
@@ -774,31 +798,37 @@ impl Parse for u8 {
                 0
             }
         };
+        let span_end = input.raw_data_span.start;
         input.consume_spaces();
-        u
+        (u, span_start..span_end)
     }
 }
 
 impl Parse for Char {
-    fn parse(input: &mut Input) -> Self {
-        Char(u8::parse(input))
+    fn parse(input: &mut Input) -> (Self, Range<usize>) {
+        let (u, span) = u8::parse(input);
+        (Char(u), span)
     }
 }
 
 impl Parse for String {
-    fn parse(input: &mut Input) -> Self {
-        input.take_string()
+    fn parse(input: &mut Input) -> (Self, Range<usize>) {
+        let span_start = input.raw_data_span.start;
+        let s = input.take_string();
+        let l = s.len();
+        (s, span_start..span_start + l)
     }
 }
 
 impl Parse for Face {
-    fn parse(input: &mut Input) -> Self {
-        u8::parse(input).into()
+    fn parse(input: &mut Input) -> (Self, Range<usize>) {
+        let (u, span) = u8::parse(input);
+        (u.into(), span)
     }
 }
 
 impl TryParse for bool {
-    fn try_parse(input: &mut Input) -> Option<Self> {
+    fn try_parse(input: &mut Input) -> Option<(Self, Range<usize>)> {
         // PLtoTF.2014.90
         let span_start = input.raw_data_span.start;
         let b = match input.next() {
@@ -813,25 +843,26 @@ impl TryParse for bool {
                 return None;
             }
         };
+        let span_end = input.raw_data_span.start;
         input.skip_to_end();
-        Some(b)
+        Some((b, span_start..span_end))
     }
 }
 
 impl Parse for Number {
     // PLtoTF.2014.62
-    fn parse(input: &mut Input) -> Self {
+    fn parse(input: &mut Input) -> (Self, Range<usize>) {
+        let span_start = input.raw_data_span.start;
         match input.next() {
             Some('D' | 'd') | Some('R' | 'r') => (),
             c => {
-                input.skip_error(Error::InvalidPrefixForDecimal {
-                    span: input.last_span(c),
-                });
-                return Number::ZERO;
+                let span = input.last_span(c);
+                input.skip_error(Error::InvalidPrefixForDecimal { span: span.clone() });
+                return (Number::ZERO, span);
             }
         }
         input.consume_spaces();
-        let span_start = input.raw_data_span.start;
+        let number_span_start = input.raw_data_span.start;
 
         // PLtoTF.2014.63
         let negative = {
@@ -891,12 +922,12 @@ impl Parse for Number {
         if integer_part >= 2048 || (fractional_part >= Number::UNITY.0 && integer_part == 2047) {
             let span_end = input.raw_data_span.start;
             input.skip_error(Error::DecimalTooLarge {
-                span: span_start..span_end,
+                span: number_span_start..span_end,
             });
             return if integer_part == 2047 {
-                Number::UNITY
+                (Number::UNITY, span_start..span_end)
             } else {
-                Number::ZERO
+                (Number::ZERO, span_start..span_end)
             };
         }
 
@@ -910,7 +941,7 @@ impl Parse for Number {
         } else {
             modulus
         };
-        Number(result)
+        (Number(result), span_start..input.raw_data_span.start)
     }
 }
 
@@ -945,26 +976,36 @@ mod tests {
             string,
             r"(CODINGSCHEME MY CODING Scheme)",
             vec![Root::CodingScheme(SingleValue {
-                data: "MY CODING Scheme".into()
+                data: "MY CODING Scheme".into(),
+                data_span: 14..30,
             })],
             vec![],
         ),
         (
             boolean_true,
             r"(SEVENBITSAFEFLAG TRUE)",
-            vec![Root::SevenBitSafeFlag(SingleValue { data: true })],
+            vec![Root::SevenBitSafeFlag(SingleValue {
+                data: true,
+                data_span: 18..19,
+            })],
             vec![],
         ),
         (
             boolean_true_with_junk,
             r"(SEVENBITSAFEFLAG TRIPS)",
-            vec![Root::SevenBitSafeFlag(SingleValue { data: true })],
+            vec![Root::SevenBitSafeFlag(SingleValue {
+                data: true,
+                data_span: 18..19
+            })],
             vec![],
         ),
         (
             boolean_false,
             r"(SEVENBITSAFEFLAG FALSE)",
-            vec![Root::SevenBitSafeFlag(SingleValue { data: false })],
+            vec![Root::SevenBitSafeFlag(SingleValue {
+                data: false,
+                data_span: 18..19
+            })],
             vec![],
         ),
         (
@@ -976,39 +1017,55 @@ mod tests {
         (
             one_byte_char_invalid_prefix,
             r"(BOUNDARYCHAR J a)",
-            vec![Root::BoundaryChar(SingleValue { data: Char(0) })],
+            vec![Root::BoundaryChar(SingleValue {
+                data: Char(0),
+                data_span: 14..17
+            })],
             vec![Error::InvalidPrefixForSmallInteger { span: 14..15 }],
         ),
         (
             one_byte_char_no_prefix,
             r"(BOUNDARYCHAR)",
-            vec![Root::BoundaryChar(SingleValue { data: Char(0) })],
+            vec![Root::BoundaryChar(SingleValue {
+                data: Char(0),
+                data_span: 13..13,
+            })],
             vec![Error::InvalidPrefixForSmallInteger { span: 13..13 }],
         ),
         (
             one_byte_char,
             r"(BOUNDARYCHAR C a)",
             vec![Root::BoundaryChar(SingleValue {
-                data: 'a'.try_into().unwrap()
+                data: 'a'.try_into().unwrap(),
+                data_span: 14..17,
             })],
             vec![],
         ),
         (
             one_byte_missing,
             r"(BOUNDARYCHAR C)",
-            vec![Root::BoundaryChar(SingleValue { data: Char(0) })],
+            vec![Root::BoundaryChar(SingleValue {
+                data: Char(0),
+                data_span: 14..15
+            })],
             vec![Error::InvalidCharacterForSmallInteger { span: 15..15 }],
         ),
         (
             one_byte_octal,
             r"(BOUNDARYCHAR O 77)",
-            vec![Root::BoundaryChar(SingleValue { data: Char(0o77) })],
+            vec![Root::BoundaryChar(SingleValue {
+                data: Char(0o77),
+                data_span: 14..18
+            })],
             vec![],
         ),
         (
             one_byte_octal_too_big,
             r"(BOUNDARYCHAR O 7777)",
-            vec![Root::BoundaryChar(SingleValue { data: Char(0o0) })],
+            vec![Root::BoundaryChar(SingleValue {
+                data: Char(0o0),
+                data_span: 14..20
+            })],
             vec![Error::SmallIntegerTooBig {
                 span: 16..20,
                 radix: 8
@@ -1017,13 +1074,19 @@ mod tests {
         (
             one_byte_decimal,
             r"(BOUNDARYCHAR D 77)",
-            vec![Root::BoundaryChar(SingleValue { data: Char(77) })],
+            vec![Root::BoundaryChar(SingleValue {
+                data: Char(77),
+                data_span: 14..18
+            })],
             vec![],
         ),
         (
             one_byte_decimal_too_big,
             r"(BOUNDARYCHAR D 7777)",
-            vec![Root::BoundaryChar(SingleValue { data: Char(0) })],
+            vec![Root::BoundaryChar(SingleValue {
+                data: Char(0),
+                data_span: 14..20
+            })],
             vec![Error::SmallIntegerTooBig {
                 span: 16..20,
                 radix: 10
@@ -1032,13 +1095,19 @@ mod tests {
         (
             one_byte_hexadecimal,
             r"(BOUNDARYCHAR H 17)",
-            vec![Root::BoundaryChar(SingleValue { data: Char(0x17) })],
+            vec![Root::BoundaryChar(SingleValue {
+                data: Char(0x17),
+                data_span: 14..18
+            })],
             vec![],
         ),
         (
             one_byte_hexadecimal_too_big,
             r"(BOUNDARYCHAR H 1777)",
-            vec![Root::BoundaryChar(SingleValue { data: Char(0x0) })],
+            vec![Root::BoundaryChar(SingleValue {
+                data: Char(0x0),
+                data_span: 14..20
+            })],
             vec![Error::SmallIntegerTooBig {
                 span: 16..20,
                 radix: 16
@@ -1047,62 +1116,92 @@ mod tests {
         (
             one_byte_face,
             r"(BOUNDARYCHAR F BIC)",
-            vec![Root::BoundaryChar(SingleValue { data: Char(9) })],
+            vec![Root::BoundaryChar(SingleValue {
+                data: Char(9),
+                data_span: 14..19
+            })],
             vec![],
         ),
         (
             one_byte_face_invalid,
             r"(BOUNDARYCHAR F ABC)",
-            vec![Root::BoundaryChar(SingleValue { data: Char(0) })],
+            vec![Root::BoundaryChar(SingleValue {
+                data: Char(0),
+                data_span: 14..19
+            })],
             vec![Error::InvalidFaceCode { span: 16..19 }],
         ),
         (
             one_byte_four_byte,
             r"(Header D19HA)",
-            vec![Root::Header(TupleValue { data: (19, 0xA) })],
+            vec![Root::Header(TupleValue {
+                left: 19,
+                left_span: 8..11,
+                right: 0xA,
+                right_span: 11..13,
+            })],
             vec![],
         ),
         (
             four_bytes_octal,
             r"(CHECKSUM O 77)",
-            vec![Root::Checksum(SingleValue { data: 0o77 })],
+            vec![Root::Checksum(SingleValue {
+                data: 0o77,
+                data_span: 10..14
+            })],
             vec![],
         ),
         (
             four_bytes_hexadecimal,
             r"(CHECKSUM H 77)",
-            vec![Root::Checksum(SingleValue { data: 0x77 })],
+            vec![Root::Checksum(SingleValue {
+                data: 0x77,
+                data_span: 10..14
+            })],
             vec![],
         ),
         (
             four_bytes_missing_prefix,
             r"(CHECKSUM)",
-            vec![Root::Checksum(SingleValue { data: 0 })],
+            vec![Root::Checksum(SingleValue {
+                data: 0,
+                data_span: 9..9
+            })],
             vec![Error::InvalidPrefixForInteger { span: 9..9 }],
         ),
         (
             four_bytes_invalid_prefix,
             r"(CHECKSUM W 77)",
-            vec![Root::Checksum(SingleValue { data: 0 })],
+            vec![Root::Checksum(SingleValue {
+                data: 0,
+                data_span: 10..11
+            })],
             vec![Error::InvalidPrefixForInteger { span: 10..11 }],
         ),
         (
             four_bytes_too_big,
             r"(CHECKSUM O 666666666666666666)",
-            vec![Root::Checksum(SingleValue { data: 0o6666666666 })],
+            vec![Root::Checksum(SingleValue {
+                data: 0o6666666666,
+                data_span: 10..30
+            })],
             vec![Error::IntegerTooBig { span: 12..30 }],
         ),
         (
             four_bytes_invalid_octal_digit,
             r"(CHECKSUM O 666686666666666666)",
-            vec![Root::Checksum(SingleValue { data: 0o6666 })],
+            vec![Root::Checksum(SingleValue {
+                data: 0o6666,
+                data_span: 10..30
+            })],
             vec![Error::InvalidOctalDigit { c: '8', span: 16 }],
         ),
         (
             fix_word_integer,
             r"(DESIGNSIZE D 1)",
             vec![Root::DesignSize(SingleValue {
-                data: Number::UNITY
+                data: Number::UNITY,
+                data_span: 12..15,
             })],
             vec![],
         ),
@@ -1111,6 +1210,7 @@ mod tests {
             r"(DESIGNSIZE D 11.5)",
             vec![Root::DesignSize(SingleValue {
                 data: Number::UNITY * 23 / 2,
+                data_span: 12..18,
             })],
             vec![],
         ),
@@ -1119,13 +1219,17 @@ mod tests {
             r"(DESIGNSIZE D -11.5)",
             vec![Root::DesignSize(SingleValue {
                 data: Number::UNITY * -23 / 2,
+                data_span: 12..19,
             })],
             vec![],
         ),
         (
             fix_word_too_big_1,
             r"(DESIGNSIZE D 2049.1)",
-            vec![Root::DesignSize(SingleValue { data: Number::ZERO })],
+            vec![Root::DesignSize(SingleValue {
+                data: Number::ZERO,
+                data_span: 12..20
+            })],
             vec![Error::DecimalTooLarge { span: 14..20 }],
         ),
         (
@@ -1133,13 +1237,17 @@ mod tests {
             r"(DESIGNSIZE D 2047.9999999)",
             vec![Root::DesignSize(SingleValue {
                 data: Number::UNITY,
+                data_span: 12..26,
             })],
             vec![Error::DecimalTooLarge { span: 14..26 }],
         ),
         (
             fix_word_invalid_prefix,
             r"(DESIGNSIZE W 2047.9999999)",
-            vec![Root::DesignSize(SingleValue { data: Number::ZERO })],
+            vec![Root::DesignSize(SingleValue {
+                data: Number::ZERO,
+                data_span: 12..13
+            })],
             vec![Error::InvalidPrefixForDecimal { span: 12..13 }],
         ),
         (
@@ -1179,23 +1287,28 @@ mod tests {
                )",
             vec![
                 Root::Family(SingleValue {
-                    data: "NOVA".into()
+                    data: "NOVA".into(),
+                    data_span: 21..25,
                 }),
                 Root::Face(SingleValue {
                     data: Face::Valid(
                         crate::FaceWeight::Medium,
                         crate::FaceSlope::Italic,
                         crate::FaceExpansion::Extended
-                    )
+                    ),
+                    data_span: 45..50,
                 }),
                 Root::CodingScheme(SingleValue {
-                    data: "ASCII".into()
+                    data: "ASCII".into(),
+                    data_span: 78..83,
                 }),
                 Root::DesignSize(SingleValue {
                     data: Number::UNITY * 10,
+                    data_span: 109..113,
                 }),
                 Root::DesignUnits(SingleValue {
                     data: Number::UNITY * 18,
+                    data_span: 140..144,
                 }),
                 Root::Comment(vec![BalancedElem::String("A COMMENT IS IGNORED".into())]),
                 Root::Comment(vec![BalancedElem::Vec(vec![BalancedElem::String(
@@ -1207,72 +1320,104 @@ mod tests {
                 ])]),
                 Root::FontDimension(Branch {
                     data: (),
+                    data_span: 362..362,
                     children: vec![
                         FontDimension::Slant(SingleValue {
                             data: Number::UNITY * -1 / 4,
+                            data_span: 369..375,
                         }),
                         FontDimension::Space(SingleValue {
                             data: Number::UNITY * 6,
+                            data_span: 399..402,
                         }),
                         FontDimension::Shrink(SingleValue {
                             data: Number::UNITY * 2,
+                            data_span: 427..430,
                         }),
                         FontDimension::Stretch(SingleValue {
                             data: Number::UNITY * 3,
+                            data_span: 456..459,
                         }),
                         FontDimension::XHeight(SingleValue {
-                            data: Number(1055 * Number::UNITY.0 / 100 + 1)
+                            data: Number(1055 * Number::UNITY.0 / 100 + 1),
+                            data_span: 485..492,
                         }),
                         FontDimension::Quad(SingleValue {
                             data: Number::UNITY * 18,
+                            data_span: 515..519,
                         }),
                     ]
                 }),
                 Root::LigTable(Branch {
                     data: (),
+                    data_span: 575..575,
                     children: vec![
                         LigTable::Label(SingleValue {
-                            data: LigTableLabel::Char('f'.try_into().unwrap())
+                            data: LigTableLabel::Char('f'.try_into().unwrap()),
+                            data_span: 582..585,
                         }),
                         LigTable::Lig(
                             PostLigOperation::RetainNeitherMoveToInserted,
                             TupleValue {
-                                data: ('f'.try_into().unwrap(), Char(0o200))
+                                left: 'f'.try_into().unwrap(),
+                                left_span: 607..610,
+                                right: Char(0o200),
+                                right_span: 611..616,
                             }
                         ),
-                        LigTable::Skip(SingleValue { data: 1 }),
+                        LigTable::Skip(SingleValue {
+                            data: 1,
+                            data_span: 639..642
+                        }),
                         LigTable::Label(SingleValue {
-                            data: LigTableLabel::Char(Char(0o200))
+                            data: LigTableLabel::Char(Char(0o200)),
+                            data_span: 666..671,
                         }),
                         LigTable::Lig(
                             PostLigOperation::RetainNeitherMoveToInserted,
                             TupleValue {
-                                data: ('i'.try_into().unwrap(), Char(0o201))
+                                left: 'i'.try_into().unwrap(),
+                                left_span: 693..696,
+                                right: Char(0o201),
+                                right_span: 697..702,
                             }
                         ),
                         LigTable::Kern(TupleValue {
-                            data: (Char(0o51), Number::UNITY * 3 / 2),
+                            left: Char(0o51),
+                            left_span: 724..728,
+                            right: Number::UNITY * 3 / 2,
+                            right_span: 729..734,
                         }),
                         LigTable::Lig(
                             PostLigOperation::RetainLeftMoveNowhere,
                             TupleValue {
-                                data: ('?'.try_into().unwrap(), 'f'.try_into().unwrap())
+                                left: '?'.try_into().unwrap(),
+                                left_span: 757..760,
+                                right: 'f'.try_into().unwrap(),
+                                right_span: 761..764,
                             }
                         ),
-                        LigTable::Stop(SingleValue { data: () }),
+                        LigTable::Stop(SingleValue {
+                            data: (),
+                            data_span: 786..786,
+                        }),
                     ]
                 }),
                 Root::Character(Branch {
                     data: 'f'.try_into().unwrap(),
+                    data_span: 828..831,
                     children: vec![
                         Character::Width(SingleValue {
                             data: Number::UNITY * 6,
+                            data_span: 855..858,
                         }),
                         Character::Height(SingleValue {
                             data: Number::UNITY * 27 / 2,
+                            data_span: 883..889,
                         }),
                         Character::ItalicCorrection(SingleValue {
                             data: Number::UNITY * 3 / 2,
+                            data_span: 914..919,
                         }),
                     ]
                 })
