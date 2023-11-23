@@ -4,7 +4,7 @@
 
 use super::cst;
 use super::error::Error;
-use crate::{ligkern::lang::PostLigOperation, Char, Face, Number};
+use crate::{ligkern::lang::PostLigOperation, Char, Face, NamedParam, Number};
 use std::ops::Range;
 
 /// Abstract syntax tree for property list files
@@ -289,39 +289,13 @@ node_impl!(
 /// The documentation on each variant is based on the documentation in PFtoTF.2014.11.
 #[derive(PartialEq, Eq, Debug)]
 pub enum FontDimension {
-    Slant(SingleValue<Number>),
-    Space(SingleValue<Number>),
-    Stretch(SingleValue<Number>),
-    Shrink(SingleValue<Number>),
-    XHeight(SingleValue<Number>),
-    Quad(SingleValue<Number>),
-    ExtraSpace(SingleValue<Number>),
-    Num1(SingleValue<Number>),
-    Num2(SingleValue<Number>),
-    Num3(SingleValue<Number>),
-    Denom1(SingleValue<Number>),
-    Denom2(SingleValue<Number>),
-    Sup1(SingleValue<Number>),
-    Sup2(SingleValue<Number>),
-    Sup3(SingleValue<Number>),
-    Sub1(SingleValue<Number>),
-    Sub2(SingleValue<Number>),
-    SupDrop(SingleValue<Number>),
-    SubDrop(SingleValue<Number>),
-    Delim1(SingleValue<Number>),
-    Delim2(SingleValue<Number>),
-    AxisHeight(SingleValue<Number>),
-    DefaultRuleThickness(SingleValue<Number>),
-    BigOpSpacing1(SingleValue<Number>),
-    BigOpSpacing2(SingleValue<Number>),
-    BigOpSpacing3(SingleValue<Number>),
-    BigOpSpacing4(SingleValue<Number>),
-    BigOpSpacing5(SingleValue<Number>),
+    /// A named parameters like `(SLANT R -.25)`.
+    NamedParam(NamedParam, SingleValue<Number>),
 
     /// The notation `PARAMETER n` provides another way to specify the nth parameter;
     ///     for example, `(PARAMETER D 1 R −.25)` is another way to specify that the `SLANT` is −0.25.
     /// The value of n must be positive and less than max param words.
-    Parameter(TupleValue<u8, Number>),
+    IndexedParam(TupleValue<u8, Number>),
 
     /// A comment that is ignored.
     Comment(Vec<cst::BalancedElem>),
@@ -329,39 +303,75 @@ pub enum FontDimension {
 
 node_impl!(
     FontDimension,
-    (SLANT, "SLANT", Slant),
-    (SPACE, "SPACE", Space),
-    (STRETCH, "STRETCH", Stretch),
-    (SHRINK, "SHRINK", Shrink),
-    (X_HEIGHT, "XHEIGHT", XHeight),
-    (QUAD, "QUAD", Quad),
-    (EXTRA_SPACE, "EXTRASPACE", ExtraSpace),
-    (NUM_1, "NUM1", Num1),
-    (NUM_2, "NUM2", Num2),
-    (NUM_3, "NUM3", Num3),
-    (DENOM_1, "DENOM1", Denom1),
-    (DENOM_2, "DENOM2", Denom2),
-    (SUP_1, "SUP1", Sup1),
-    (SUP_2, "SUP2", Sup2),
-    (SUP_3, "SUP3", Sup3),
-    (SUB_1, "SUB1", Sub1),
-    (SUB_2, "SUB2", Sub2),
-    (SUP_DROP, "SUPDROP", SupDrop),
-    (SUB_DROP, "SUBDROP", SubDrop),
-    (DELIM_1, "DELIM1", Delim1),
-    (DELIM_2, "DELIM2", Delim2),
-    (AXIS_HEIGHT, "AXISHEIGHT", AxisHeight),
+    (SLANT, "SLANT", NamedParam, NamedParam::Slant),
+    (SPACE, "SPACE", NamedParam, NamedParam::Space),
+    (STRETCH, "STRETCH", NamedParam, NamedParam::Stretch),
+    (SHRINK, "SHRINK", NamedParam, NamedParam::Shrink),
+    (X_HEIGHT, "XHEIGHT", NamedParam, NamedParam::XHeight),
+    (QUAD, "QUAD", NamedParam, NamedParam::Quad),
+    (
+        EXTRA_SPACE,
+        "EXTRASPACE",
+        NamedParam,
+        NamedParam::ExtraSpace
+    ),
+    (NUM_1, "NUM1", NamedParam, NamedParam::Num1),
+    (NUM_2, "NUM2", NamedParam, NamedParam::Num2),
+    (NUM_3, "NUM3", NamedParam, NamedParam::Num3),
+    (DENOM_1, "DENOM1", NamedParam, NamedParam::Denom1),
+    (DENOM_2, "DENOM2", NamedParam, NamedParam::Denom2),
+    (SUP_1, "SUP1", NamedParam, NamedParam::Sup1),
+    (SUP_2, "SUP2", NamedParam, NamedParam::Sup2),
+    (SUP_3, "SUP3", NamedParam, NamedParam::Sup3),
+    (SUB_1, "SUB1", NamedParam, NamedParam::Sub1),
+    (SUB_2, "SUB2", NamedParam, NamedParam::Sub2),
+    (SUP_DROP, "SUPDROP", NamedParam, NamedParam::SupDrop),
+    (SUB_DROP, "SUBDROP", NamedParam, NamedParam::SubDrop),
+    (DELIM_1, "DELIM1", NamedParam, NamedParam::Delim1),
+    (DELIM_2, "DELIM2", NamedParam, NamedParam::Delim2),
+    (
+        AXIS_HEIGHT,
+        "AXISHEIGHT",
+        NamedParam,
+        NamedParam::AxisHeight
+    ),
     (
         DEFAULT_RULE_THICKNESS,
         "DEFAULTRULETHICKNESS",
-        DefaultRuleThickness
+        NamedParam,
+        NamedParam::DefaultRuleThickness
     ),
-    (BIG_OP_SPACING_1, "BIGOPSPACE1", BigOpSpacing1),
-    (BIG_OP_SPACING_2, "BIGOPSPACE2", BigOpSpacing2),
-    (BIG_OP_SPACING_3, "BIGOPSPACE3", BigOpSpacing3),
-    (BIG_OP_SPACING_4, "BIGOPSPACE4", BigOpSpacing4),
-    (BIG_OP_SPACING_5, "BIGOPSPACE5", BigOpSpacing5),
-    (PARAMETER, "PARAMETER", Parameter),
+    (
+        BIG_OP_SPACING_1,
+        "BIGOPSPACE1",
+        NamedParam,
+        NamedParam::BigOpSpacing1
+    ),
+    (
+        BIG_OP_SPACING_2,
+        "BIGOPSPACE2",
+        NamedParam,
+        NamedParam::BigOpSpacing2
+    ),
+    (
+        BIG_OP_SPACING_3,
+        "BIGOPSPACE3",
+        NamedParam,
+        NamedParam::BigOpSpacing3
+    ),
+    (
+        BIG_OP_SPACING_4,
+        "BIGOPSPACE4",
+        NamedParam,
+        NamedParam::BigOpSpacing4
+    ),
+    (
+        BIG_OP_SPACING_5,
+        "BIGOPSPACE5",
+        NamedParam,
+        NamedParam::BigOpSpacing5
+    ),
+    (PARAMETER, "PARAMETER", IndexedParam),
 );
 
 /// An element of a `CHARACTER` property list.
@@ -1322,30 +1332,48 @@ mod tests {
                     data: (),
                     data_span: 362..362,
                     children: vec![
-                        FontDimension::Slant(SingleValue {
-                            data: Number::UNITY * -1 / 4,
-                            data_span: 369..375,
-                        }),
-                        FontDimension::Space(SingleValue {
-                            data: Number::UNITY * 6,
-                            data_span: 399..402,
-                        }),
-                        FontDimension::Shrink(SingleValue {
-                            data: Number::UNITY * 2,
-                            data_span: 427..430,
-                        }),
-                        FontDimension::Stretch(SingleValue {
-                            data: Number::UNITY * 3,
-                            data_span: 456..459,
-                        }),
-                        FontDimension::XHeight(SingleValue {
-                            data: Number(1055 * Number::UNITY.0 / 100 + 1),
-                            data_span: 485..492,
-                        }),
-                        FontDimension::Quad(SingleValue {
-                            data: Number::UNITY * 18,
-                            data_span: 515..519,
-                        }),
+                        FontDimension::NamedParam(
+                            NamedParam::Slant,
+                            SingleValue {
+                                data: Number::UNITY * -1 / 4,
+                                data_span: 369..375,
+                            }
+                        ),
+                        FontDimension::NamedParam(
+                            NamedParam::Space,
+                            SingleValue {
+                                data: Number::UNITY * 6,
+                                data_span: 399..402,
+                            }
+                        ),
+                        FontDimension::NamedParam(
+                            NamedParam::Shrink,
+                            SingleValue {
+                                data: Number::UNITY * 2,
+                                data_span: 427..430,
+                            }
+                        ),
+                        FontDimension::NamedParam(
+                            NamedParam::Stretch,
+                            SingleValue {
+                                data: Number::UNITY * 3,
+                                data_span: 456..459,
+                            }
+                        ),
+                        FontDimension::NamedParam(
+                            NamedParam::XHeight,
+                            SingleValue {
+                                data: Number(1055 * Number::UNITY.0 / 100 + 1),
+                                data_span: 485..492,
+                            }
+                        ),
+                        FontDimension::NamedParam(
+                            NamedParam::Quad,
+                            SingleValue {
+                                data: Number::UNITY * 18,
+                                data_span: 515..519,
+                            }
+                        ),
                     ]
                 }),
                 Root::LigTable(Branch {

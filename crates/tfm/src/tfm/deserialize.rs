@@ -510,17 +510,7 @@ impl DeserializeFixed for ExtensibleRecipe {
 
 impl Deserialize for Params {
     fn deserialize(b: &[u8]) -> Self {
-        let zeros = [0_u8; 4];
-        Self {
-            slant: Number::deserialize(b.get(0..4).unwrap_or(&zeros)),
-            space: Number::deserialize(b.get(4..8).unwrap_or(&zeros)),
-            space_stretch: Number::deserialize(b.get(8..12).unwrap_or(&zeros)),
-            space_shrink: Number::deserialize(b.get(12..16).unwrap_or(&zeros)),
-            x_height: Number::deserialize(b.get(16..20).unwrap_or(&zeros)),
-            quad: Number::deserialize(b.get(20..24).unwrap_or(&zeros)),
-            extra_space: Number::deserialize(b.get(24..28).unwrap_or(&zeros)),
-            additional_params: Vec::<Number>::deserialize(b.get(28..).unwrap_or(&[0; 0])),
-        }
+        Self(Vec::<Number>::deserialize(b))
     }
 }
 
@@ -953,16 +943,18 @@ mod tests {
                     lig_kern_commands: vec![],
                     kern: vec![],
                     extensible_chars: vec![],
-                    params: Params {
-                        slant: Number(11),
-                        space: Number(13),
-                        space_stretch: Number(17),
-                        space_shrink: Number(19),
-                        x_height: Number(23),
-                        quad: Number(29),
-                        extra_space: Number(31),
-                        additional_params: vec![Number(37), Number(41), Number(43),]
-                    },
+                    params: Params(vec![
+                        Number(11),
+                        Number(13),
+                        Number(17),
+                        Number(19),
+                        Number(23),
+                        Number(29),
+                        Number(31),
+                        Number(37),
+                        Number(41),
+                        Number(43),
+                    ]),
                 },
                 vec![]
             ))

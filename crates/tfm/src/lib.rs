@@ -302,13 +302,83 @@ pub struct ExtensibleRecipe {
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
-pub struct Params {
-    slant: Number,
-    space: Number,
-    space_stretch: Number,
-    space_shrink: Number,
-    x_height: Number,
-    quad: Number,
-    extra_space: Number,
-    additional_params: Vec<Number>,
+pub struct Params(pub Vec<Number>);
+
+impl Params {
+    pub fn set(&mut self, index: usize, value: Number) {
+        self.0.resize(index, Default::default());
+        self.0[index] = value;
+    }
+
+    pub fn set_named(&mut self, named_param: NamedParam, value: Number) {
+        self.set(named_param.index() as usize, value)
+    }
+}
+
+/// A named parameter.
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+pub enum NamedParam {
+    Slant,
+    Space,
+    Stretch,
+    Shrink,
+    XHeight,
+    Quad,
+    ExtraSpace,
+    Num1,
+    Num2,
+    Num3,
+    Denom1,
+    Denom2,
+    Sup1,
+    Sup2,
+    Sup3,
+    Sub1,
+    Sub2,
+    SupDrop,
+    SubDrop,
+    Delim1,
+    Delim2,
+    AxisHeight,
+    DefaultRuleThickness,
+    BigOpSpacing1,
+    BigOpSpacing2,
+    BigOpSpacing3,
+    BigOpSpacing4,
+    BigOpSpacing5,
+}
+
+impl NamedParam {
+    pub fn index(&self) -> u8 {
+        match self {
+            NamedParam::Slant => 1,
+            NamedParam::Space => 2,
+            NamedParam::Stretch => 3,
+            NamedParam::Shrink => 4,
+            NamedParam::XHeight => 5,
+            NamedParam::Quad => 6,
+            NamedParam::ExtraSpace => 7,
+            NamedParam::Num1 => 8,
+            NamedParam::Num2 => 9,
+            NamedParam::Num3 => 10,
+            NamedParam::Denom1 => 11,
+            NamedParam::Denom2 => 12,
+            NamedParam::Sup1 => 13,
+            NamedParam::Sup2 => 14,
+            NamedParam::Sup3 => 15,
+            NamedParam::Sub1 => 16,
+            NamedParam::Sub2 => 17,
+            NamedParam::SupDrop => 18,
+            NamedParam::SubDrop => 19,
+            NamedParam::Delim1 => 20,
+            NamedParam::Delim2 => 21,
+            NamedParam::AxisHeight => 22,
+            NamedParam::DefaultRuleThickness => 8,
+            NamedParam::BigOpSpacing1 => 9,
+            NamedParam::BigOpSpacing2 => 10,
+            NamedParam::BigOpSpacing3 => 11,
+            NamedParam::BigOpSpacing4 => 12,
+            NamedParam::BigOpSpacing5 => 13,
+        }
+    }
 }
