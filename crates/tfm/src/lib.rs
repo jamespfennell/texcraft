@@ -11,7 +11,7 @@ pub use crate::tfm::{
     DeserializeWarning as DeserializeTfmWarning, SubFileSizes,
 };
 
-/// Complete contents of a TeX font metric (.tfm) or property list (.pl) file.
+/// Complete contents of a TeX font metric (.tfm) file.
 ///
 /// The struct contain multiple vectors.
 /// In TeX and TFtoPL there is an optimization in which all of data in the vectors
@@ -24,7 +24,7 @@ pub use crate::tfm::{
 /// In fact in TeX the font data for all fonts is stored in one contiguous piece of memory
 ///     (`font_info`, defined in TeX82.2021.549).
 /// This is a little too unsafe to pull off though.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Font {
     /// Header.
     pub header: Header,
@@ -62,52 +62,60 @@ pub struct Font {
     pub params: Params,
 }
 
+impl Default for Font {
+    fn default() -> Self {
+        Self {
+            header: Default::default(),
+            smallest_char_code: Default::default(),
+            char_infos: vec![],
+            widths: vec![Number::ZERO],
+            heights: vec![Number::ZERO],
+            depths: vec![Number::ZERO],
+            italic_corrections: vec![Number::ZERO],
+            lig_kern_commands: vec![],
+            kern: vec![],
+            extensible_chars: vec![],
+            params: Default::default(),
+        }
+    }
+}
+
 /// The TFM header, which contains metadata about the file.
+///
+/// This is defined in TFtoPL.2014.10.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Header {
     /// In TeX82, this is stored in the `font_check` array (TeX82.2021.549).
     pub checksum: u32,
     /// In TeX82, this is stored in the `font_dsize` array (TeX82.2021.549).
     pub design_size: Number,
-    pub character_coding_scheme: Option<StackString<39>>,
-    pub font_family: Option<StackString<19>>,
+    pub character_coding_scheme: String,
+    pub font_family: String,
     pub seven_bit_safe: Option<bool>,
     pub face: Option<Face>,
     /// The TFM format allows the header to contain arbitrary additional data.
     pub additional_data: Vec<u32>,
 }
 
-/// An ASCII string allocated on the stack.
-///
-/// The generic parameter is the maximum size of the string in bytes.
-#[derive(PartialEq, Eq)]
-pub struct StackString<const N: usize> {
-    len: u8,
-    data: [u8; N],
-}
-
-impl<const N: usize> Default for StackString<N> {
-    fn default() -> Self {
-        Self {
-            len: 0,
-            data: [0; N],
+impl Header {
+    /// Returns the default header when parsing property list files.
+    ///
+    /// This is defined in PLtoTF.2014.70.
+    pub fn property_list_default() -> Header {
+        Header {
+            checksum: 0,
+            design_size: Number::UNITY * 10,
+            character_coding_scheme: "UNSPECIFIED".into(),
+            font_family: "UNSPECIFIED".into(),
+            seven_bit_safe: Some(false),
+            face: Some(0.into()),
+            additional_data: vec![],
         }
     }
 }
 
-impl<const N: usize> std::fmt::Debug for StackString<N> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s: &str = self.as_ref();
-        s.fmt(f)
-    }
-}
-
-impl<const N: usize> AsRef<str> for StackString<N> {
-    fn as_ref(&self) -> &str {
-        std::str::from_utf8(&self.data[0..(self.len as usize)]).unwrap()
-    }
-}
-
+/*
+TODO: use this when deserializing strings
 impl<const N: usize> From<&str> for StackString<N> {
     fn from(value: &str) -> Self {
         let mut r: Self = Default::default();
@@ -126,6 +134,7 @@ impl<const N: usize> From<&str> for StackString<N> {
         r
     }
 }
+ */
 
 /// A character in a TFM file.
 ///
@@ -146,6 +155,14 @@ impl TryFrom<char> for Char {
         let u: u8 = value.try_into()?;
         Ok(Char(u))
     }
+}
+
+#[derive(Default, PartialEq, Eq, Debug)]
+pub struct CharData {
+    pub width: Number,
+    pub height: Number,
+    pub depth: Number,
+    pub italic_correction: Number,
 }
 
 /// Fixed-width numeric type used in TFM files.
@@ -305,13 +322,15 @@ pub struct ExtensibleRecipe {
 pub struct Params(pub Vec<Number>);
 
 impl Params {
-    pub fn set(&mut self, index: usize, value: Number) {
-        self.0.resize(index, Default::default());
-        self.0[index] = value;
+    pub fn set(&mut self, number: usize, value: Number) {
+        if self.0.len() <= number {
+            self.0.resize(number, Default::default());
+        }
+        self.0[number - 1] = value;
     }
 
     pub fn set_named(&mut self, named_param: NamedParam, value: Number) {
-        self.set(named_param.index() as usize, value)
+        self.set(named_param.number() as usize, value)
     }
 }
 
@@ -349,7 +368,7 @@ pub enum NamedParam {
 }
 
 impl NamedParam {
-    pub fn index(&self) -> u8 {
+    pub fn number(&self) -> u8 {
         match self {
             NamedParam::Slant => 1,
             NamedParam::Space => 2,

@@ -48,7 +48,7 @@ pub struct SingleValue<D> {
 ///
 /// An example of this node is the `HEADER` entry, which contains a 8-bit header index
 /// and a 32-bit value.
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct TupleValue<D, E> {
     /// Left piece of data in the tuple.
     pub left: D,
@@ -81,6 +81,8 @@ pub struct Branch<D, E> {
 /// I.e., instead of writing `LeafValue::from` we can write `FromCstNode::from`.
 /// This makes the `node_impl!` macro simpler to implement because we don't need to provide
 /// the type name to the macro.
+/// TODO: the conversion may not succeed, e.g. (SEVENBITSAFEFLAG blah).
+/// So the trait should really return Option<Self>
 trait FromCstNode: Sized {
     fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self>;
 }
@@ -241,6 +243,7 @@ pub enum Root {
     ///     for example, to set `header[18]=1`, one may write `(HEADER D 18 O 1)`.
     /// This notation is used for header information that is presently unnamed.
     /// (TeX ignores it.)
+    /// TODO: need to validate that u8 is >= 18! Maybe have a header index
     Header(TupleValue<u8, u32>),
 
     /// Font dimensions property list.

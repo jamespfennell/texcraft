@@ -360,26 +360,32 @@ impl SubFileSizes {
     }
 }
 
-impl<const N: usize> Deserialize for StackString<N> {
+impl Deserialize for String {
     fn deserialize(b: &[u8]) -> Self {
-        let max_len: u8 = N.try_into().unwrap_or(u8::MAX);
-        let len = if b[0] > max_len { max_len } else { b[0] };
-        let mut data = [0_u8; N];
-        for (i, c) in b[1..=(len as usize)].iter().enumerate() {
+        let len = match b.first() {
+            None => return String::new(),
+            Some(&tfm_len) => {
+                let max_len: u8 = (b.len() - 1).try_into().unwrap_or(u8::MAX);
+                if max_len < tfm_len {
+                    max_len
+                } else {
+                    tfm_len
+                }
+            }
+        };
+        let mut s = String::new();
+        for c in b[1..=(len as usize)].iter() {
             // The following transformation implements TFtoPL.2014.52.
-            data[i] = match *c as char {
-                '(' | ')' => '/'.try_into().unwrap(), // TODO: warnings
-                'a'..='z' => c.to_ascii_uppercase(),
-                ' '..='~' => *c,
-                _ => '?'.try_into().unwrap(),
+            let c = match *c as char {
+                '(' | ')' => '/',
+                'a'..='z' => c.to_ascii_uppercase() as char,
+                ' '..='~' => *c as char,
+                _ => '?',
             };
+            s.push(c);
         }
-        Self { len, data }
+        s
     }
-}
-
-impl<const N: usize> DeserializeFixed for StackString<N> {
-    const NUM_BYTES: usize = N + 1;
 }
 
 impl Deserialize for Header {
@@ -482,6 +488,7 @@ impl Deserialize for ligkern::lang::Instruction {
                 }
             } else {
                 ligkern::lang::Operation::Kern(Number(
+                    // TODO: this is wrong!! This is an index into the kerns array.
                     256 * (op_byte as i32 - 128) + remainder as i32,
                 ))
             },
@@ -666,22 +673,37 @@ mod tests {
                     header: Header {
                         checksum: 7,
                         design_size: Number(11),
-                        character_coding_scheme: None,
-                        font_family: None,
+                        character_coding_scheme: "".into(),
+                        font_family: "".into(),
                         seven_bit_safe: None,
                         face: None,
                         additional_data: vec![],
                     },
-                    smallest_char_code: Char(0),
-                    char_infos: vec![],
-                    widths: vec![Number::ZERO],
-                    heights: vec![Number::ZERO],
-                    depths: vec![Number::ZERO],
-                    italic_corrections: vec![Number::ZERO],
-                    lig_kern_commands: vec![],
-                    kern: vec![],
-                    extensible_chars: vec![],
-                    params: Default::default(),
+                    ..Default::default()
+                },
+                vec![]
+            ))
+        ),
+        (
+            corrupt_string_in_header,
+            build_from_header(&[
+                /* checksum */ 0, 0, 0, 7, /* design_size */ 0, 0, 0, 11,
+                /* character_coding_scheme */ 240, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+                65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+                65, 65, 65, 65, 65, 65, 65,
+            ]),
+            Ok((
+                Font {
+                    header: Header {
+                        checksum: 7,
+                        design_size: Number(11),
+                        character_coding_scheme: "A".repeat(39),
+                        font_family: "".into(),
+                        seven_bit_safe: None,
+                        face: None,
+                        additional_data: vec![],
+                    },
+                    ..Default::default()
                 },
                 vec![]
             ))
@@ -701,8 +723,8 @@ mod tests {
                     header: Header {
                         checksum: 7,
                         design_size: Number(11),
-                        character_coding_scheme: Some("ABC".into()),
-                        font_family: Some("DEF".into()),
+                        character_coding_scheme: "ABC".into(),
+                        font_family: "DEF".into(),
                         seven_bit_safe: Some(true),
                         face: Some(Face::Valid(
                             FaceWeight::Bold,
@@ -711,16 +733,7 @@ mod tests {
                         )),
                         additional_data: vec![13],
                     },
-                    smallest_char_code: Char(0),
-                    char_infos: vec![],
-                    widths: vec![Number::ZERO],
-                    heights: vec![Number::ZERO],
-                    depths: vec![Number::ZERO],
-                    italic_corrections: vec![Number::ZERO],
-                    lig_kern_commands: vec![],
-                    kern: vec![],
-                    extensible_chars: vec![],
-                    params: Default::default(),
+                    ..Default::default()
                 },
                 vec![]
             ))
@@ -758,14 +771,7 @@ mod tests {
                             tag: CharTag::Ligature(23),
                         },
                     ],
-                    widths: vec![Number::ZERO],
-                    heights: vec![Number::ZERO],
-                    depths: vec![Number::ZERO],
-                    italic_corrections: vec![Number::ZERO],
-                    lig_kern_commands: vec![],
-                    kern: vec![],
-                    extensible_chars: vec![],
-                    params: Default::default(),
+                    ..Default::default()
                 },
                 vec![]
             ))
@@ -788,17 +794,12 @@ mod tests {
             ),
             Ok((
                 Font {
-                    header: Default::default(),
-                    smallest_char_code: Char(0),
-                    char_infos: vec![],
                     widths: vec![Number::ZERO, Number(23)],
                     heights: vec![Number::ZERO, Number(29)],
                     depths: vec![Number::ZERO, Number(31)],
                     italic_corrections: vec![Number::ZERO, Number(37)],
-                    lig_kern_commands: vec![],
                     kern: vec![Number(37)],
-                    extensible_chars: vec![],
-                    params: Default::default(),
+                    ..Default::default()
                 },
                 vec![]
             ))
@@ -820,13 +821,6 @@ mod tests {
             ),
             Ok((
                 Font {
-                    header: Default::default(),
-                    smallest_char_code: Char(0),
-                    char_infos: vec![],
-                    widths: vec![Number::ZERO],
-                    heights: vec![Number::ZERO],
-                    depths: vec![Number::ZERO],
-                    italic_corrections: vec![Number::ZERO],
                     lig_kern_commands: vec![
                         ligkern::lang::Instruction {
                             next_instruction: Some(3),
@@ -870,9 +864,7 @@ mod tests {
                             },
                         },
                     ],
-                    kern: vec![],
-                    extensible_chars: vec![],
-                    params: Default::default(),
+                    ..Default::default()
                 },
                 vec![]
             ))
@@ -894,22 +886,13 @@ mod tests {
             ),
             Ok((
                 Font {
-                    header: Default::default(),
-                    smallest_char_code: Char(0),
-                    char_infos: vec![],
-                    widths: vec![Number::ZERO],
-                    heights: vec![Number::ZERO],
-                    depths: vec![Number::ZERO],
-                    italic_corrections: vec![Number::ZERO],
-                    lig_kern_commands: vec![],
-                    kern: vec![],
                     extensible_chars: vec![ExtensibleRecipe {
                         top: 17,
                         middle: 19,
                         bottom: 23,
                         rep: 27,
                     }],
-                    params: Default::default(),
+                    ..Default::default()
                 },
                 vec![]
             ))
@@ -933,16 +916,6 @@ mod tests {
             ),
             Ok((
                 Font {
-                    header: Default::default(),
-                    smallest_char_code: Char(0),
-                    char_infos: vec![],
-                    widths: vec![Number::ZERO],
-                    heights: vec![Number::ZERO],
-                    depths: vec![Number::ZERO],
-                    italic_corrections: vec![Number::ZERO],
-                    lig_kern_commands: vec![],
-                    kern: vec![],
-                    extensible_chars: vec![],
                     params: Params(vec![
                         Number(11),
                         Number(13),
@@ -955,6 +928,7 @@ mod tests {
                         Number(41),
                         Number(43),
                     ]),
+                    ..Default::default()
                 },
                 vec![]
             ))
