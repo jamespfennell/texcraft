@@ -4,11 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-clap = {version="4.3.3", default-features=false, features=["std", "derive"]}
+clap = {version="4.4.8", features=["derive"]}
 tfm = { version = "0.1", path = "../", features = ["ariadne"]}
-ariadne = {version="0.3.0", default-features = false}
+ariadne = {version="0.3.0"}
 
 [[bin]]
 name = "tfmtools"
 path = "src/tfmtools.rs"
-

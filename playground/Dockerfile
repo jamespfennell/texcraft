@@ -1,5 +1,5 @@
 # Stage 1: build the Texcraft WebAssembly binary
-FROM rust:1.67 as rust-wasm-builder
+FROM rust:1.74 as rust-wasm-builder
 # This installs the wasm-pack tool
 RUN  curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 WORKDIR /texcraft

@@ -147,10 +147,10 @@ macro_rules! node_impl {
 
         impl $type {
             $(
-                pub const $key: &str = $str;
+                pub const $key: &'static str = $str;
             )+
 
-            pub const ALL_PROPERTY_NAMES: &[&'static str] = &[$( $str, )+];
+            pub const ALL_PROPERTY_NAMES: &'static [&'static str] = &[$( $str, )+];
         }
 
         impl Node for $type {

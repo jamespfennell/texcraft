@@ -1,4 +1,4 @@
-FROM rust:1.67 AS builder
+FROM rust:1.74 AS builder
 
 # Add the files into the container
 WORKDIR /texcraft
