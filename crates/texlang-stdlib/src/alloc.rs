@@ -195,12 +195,11 @@ pub fn get_newintarray_getter_provider<S: HasComponent<Component>>() -> command:
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::testing::*;
     use crate::the::get_the;
     use texlang::vm::implement_has_component;
+    use texlang_testing::*;
 
-    #[derive(Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[derive(Default, serde::Serialize, serde::Deserialize)]
     struct State {
         alloc: Component,
         testing: TestingComponent,

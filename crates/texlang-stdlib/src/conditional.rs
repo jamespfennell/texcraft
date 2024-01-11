@@ -561,11 +561,10 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::testing::*;
     use texlang::vm::implement_has_component;
+    use texlang_testing::*;
 
-    #[derive(Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[derive(Default, serde::Serialize, serde::Deserialize)]
     struct State {
         conditional: Component,
         testing: TestingComponent,

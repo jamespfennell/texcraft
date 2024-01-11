@@ -1064,6 +1064,18 @@ dependencies = [
  "texcraft-stdext",
  "texlang",
  "texlang-common",
+ "texlang-testing",
+]
+
+[[package]]
+name = "texlang-testing"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "rmp-serde",
+ "serde",
+ "serde_json",
+ "texlang",
 ]
 
 [[package]]

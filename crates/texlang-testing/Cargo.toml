@@ -1,0 +1,17 @@
+[package]
+name = "texlang-testing"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Unit testing library for code that uses Texlang"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+
+[dependencies]
+texlang = { path = "../texlang", version="0.1.0" }
+
+serde = {version="^1.0"}
+serde_json = {version="1.0"}
+rmp-serde = {version="^1.0"}
+bincode = {version="2.0.0-rc.3", default-features = false, features = ["alloc", "serde"]}

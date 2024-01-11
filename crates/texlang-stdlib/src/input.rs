@@ -379,11 +379,11 @@ impl error::TexError for UnmatchedBracesError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{def, expansion, prefix, testing::*};
+    use crate::{def, expansion, prefix};
     use std::collections::HashMap;
+    use texlang_testing::*;
 
-    #[derive(Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[derive(Default, serde::Serialize, serde::Deserialize)]
     struct State {
         conditional: conditional::Component,
         input: Component<16>,

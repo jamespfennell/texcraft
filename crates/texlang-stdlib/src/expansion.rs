@@ -270,8 +270,8 @@ pub fn get_relax<S>() -> command::BuiltIn<S> {
 mod test {
     use super::*;
     use crate::prefix;
-    use crate::testing::*;
     use std::collections::HashMap;
+    use texlang_testing::*;
 
     #[derive(Default)]
     pub struct State {
@@ -469,10 +469,10 @@ mod test {
     ];
 
     fn run_expandafter_failure_test(input: &str, optimized: bool) {
-        let options = vec![crate::testing::TestOption::InitialCommandsDyn(Box::new(
-            || initial_commands(optimized),
-        ))];
-        crate::testing::run_failure_test(&input, &options);
+        let options = vec![TestOption::InitialCommandsDyn(Box::new(|| {
+            initial_commands(optimized)
+        }))];
+        run_failure_test(&input, &options);
     }
 
     #[macro_export]

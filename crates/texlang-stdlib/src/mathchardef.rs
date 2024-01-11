@@ -23,8 +23,9 @@ fn mathchardef_primitive_fn<S: TexlangState>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{testing::*, the};
+    use crate::the;
     use std::collections::HashMap;
+    use texlang_testing::*;
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([

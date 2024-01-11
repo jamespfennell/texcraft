@@ -44,9 +44,9 @@ mod test {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::testing::*;
     use crate::{def, prefix};
     use texlang::vm::implement_has_component;
+    use texlang_testing::*;
 
     #[derive(Default)]
     struct State {

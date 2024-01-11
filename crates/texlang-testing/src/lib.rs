@@ -1,24 +1,99 @@
-//! Utilities for writing unit tests
-//!
-//! This module contains utilities (types, helper functions and a Rust macro)
-//!     that make it easier to write unit tests for Texlang primitives.
-//! It's based on the philosophy that high-equality extensive unit tests
-//!     will be written if and only if writing them is easy.
-//!
-//! In general the main tool used in this module is the [test_suite] Rust macro,
-//!     which generates a suite of unit tests for a set of primitives.
+/*!
+Unit testing library for code that uses Texlang
+
+This is a crate that helps with unit testing code that is using Texlang.
+It is used extensively in the Texlang standard library.
+The unit tests there thus serve as examples for what this crate can do.
+
+## Basic setup
+
+As is common in all Texlang code,
+    each unit test built with this library works with a specific user-defined Texlang state type.
+This state type is provided by the unit test writer.
+In addition to implementing the [`TexlangState`](texlang::traits::TexlangState) trait, this state must also:
+
+1. Include the [`TestingComponent`] type as a component.
+    I.e., the state must implement the [`HasComponent<TestingComponent>`](texlang::traits::HasComponent<TestingComponent>) trait.
+
+1. Configure the `recoverable_error_hook` method on the [`TexlangState`](texlang::traits::TexlangState)
+    trait to invoke [`TestingComponent::recoverable_error_hook`].
+
+1. Implement [`Default`].
+
+If the unit test doesn't require anything else from the state,
+    the [`State`] type defined in this library can simply be used.
+This type satisfies all the conditions above.
+
+## Test types
+
+The crate offers a few different types of tests.
+
+### Expansion equality tests
+
+Run using [`run_expansion_equality_test`].
+
+These tests verify that two different TeX snippets expand to the same output.
+For example, an output equality test can verify that
+```tex
+\def\HelloWorld{Hola Mundo}\HelloWorld - \HelloWorld
+```
+and
+```tex
+Hola Mundo - Hola Mundo
+```
+produce the same output.
+
+In this example the second input is just a constant, which is usually how these tests are used.
+We generally use these tests to verify some non-trivial TeX expression
+    (like a `\def` macro definition)
+    evaluates to a specific constant output.
+
+These tests do _not_ verify that the state of the VM is the same in both cases.
+In fact the state is usually different; for example, in the first snippet above the
+    macro `\HelloWorld` will be defined in the state but won't be in the second snippet.
+
+### Failure tests
+
+Run using [`run_failure_test`].
+
+These tests verify that a specific TeX snippet fails to execute.
+
+### Serde tests
+
+Run using [`run_serde_test`].
+
+These tests verify that the Texlang state being used can be
+    successfully serialized and deserialized in the middle of executing a TeX snippet.
+
+A serde test accepts two TeX snippets, `A` and `B`.
+It first runs the VM for the concatenated snippet `AB` and saves the result.
+It then initializes a new VM and performs the following steps:
+
+- Runs the snippet `A`
+- Serializes and deserialized the VM, using a specified format.
+- Runs the snipped `B` in the deserialized VM.
+
+The test verifies that the result from this is the same as the result from the VM for the concatenated snippet `AB`.
+
+## The test suite macro
+
+All of the test types can be run using the run functions described above (e.g., [`run_failure_test`]).
+However the preferred way to write a suite of unit tests is to use the [`test_suite`] macro.
+This macro removes a bunch of boilerplate and makes it easy to add new test cases.
+
+See the macro's documentation for instructions on using it.
+Also the Texlang standard library uses this macro extensively.
+*/
 
 use std::collections::HashMap;
 
-use crate::prefix;
 use texlang::traits::*;
 use texlang::vm::implement_has_component;
 use texlang::vm::VM;
 use texlang::*;
 
 /// Texlang component that every unit testing state needs to have.
-#[derive(Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct TestingComponent {
     allow_undefined_command: bool,
     recover_from_errors: bool,
@@ -33,6 +108,9 @@ impl TestingComponent {
         std::mem::swap(&mut result, &mut self.tokens);
         result
     }
+    /// Recoverable error hook for the testing component.
+    ///
+    /// States used in unit testing must be configured to use this hook.
     pub fn recoverable_error_hook<S: HasComponent<Self>>(
         vm: &VM<S>,
         recoverable_error: Box<error::Error>,
@@ -46,25 +124,29 @@ impl TestingComponent {
             Err(recoverable_error)
         }
     }
+    /// Returns an integer variable command that references an integer stored in the testing component.
+    ///
+    /// If you're writing a unit test that needs an integer variable it's easiest to use this
+    ///     rather than building your own variable.
+    pub fn get_integer<S: HasComponent<TestingComponent>>() -> command::BuiltIn<S> {
+        variable::Command::new_singleton(
+            |state: &S, _: variable::Index| -> &i32 { &state.component().integer },
+            |state: &mut S, _: variable::Index| -> &mut i32 { &mut state.component_mut().integer },
+        )
+        .into()
+    }
 }
 
-/// Simple state type for use in unit tests.
+/// Simple state type for simple unit tests.
 ///
 /// If the primitives under test don't require custom components or
 /// other pieces in the state, it is easier to use this type rather than defining a custom one.
-#[derive(Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct State {
-    prefix: prefix::Component,
     testing: TestingComponent,
 }
 
 impl TexlangState for State {
-    fn variable_assignment_scope_hook(
-        state: &mut Self,
-    ) -> texcraft_stdext::collections::groupingmap::Scope {
-        prefix::variable_assignment_scope_hook(state)
-    }
     fn recoverable_error_hook(
         vm: &VM<Self>,
         recoverable_error: Box<error::Error>,
@@ -74,19 +156,8 @@ impl TexlangState for State {
 }
 
 implement_has_component![State {
-    prefix: prefix::Component,
     testing: TestingComponent,
 }];
-
-impl TestingComponent {
-    pub fn get_integer<S: HasComponent<TestingComponent>>() -> command::BuiltIn<S> {
-        variable::Command::new_singleton(
-            |state: &S, _: variable::Index| -> &i32 { &state.component().integer },
-            |state: &mut S, _: variable::Index| -> &mut i32 { &mut state.component_mut().integer },
-        )
-        .into()
-    }
-}
 
 /// Option passed to a test runner.
 pub enum TestOption<'a, S> {
@@ -258,18 +329,14 @@ where
     }
 }
 
+/// Format to use in a serde test.
 pub enum SerdeFormat {
     Json,
     MessagePack,
     BinCode,
 }
 
-/// Skip a serialization/deserialization test if the serde feature is off
-#[cfg(not(feature = "serde"))]
-pub fn run_serde_test<S>(_: &str, _: &str, _: &[TestOption<S>], format: SerdeFormat) {}
-
 /// Run a serialization/deserialization test
-#[cfg(feature = "serde")]
 pub fn run_serde_test<S>(
     input_1: &str,
     input_2: &str,
@@ -430,7 +497,7 @@ impl<S: HasComponent<TestingComponent>> vm::Handlers<S> for Handlers {
 ///
 /// The general use of this macros looks like this:
 /// ```
-/// # use texlang_stdlib::testing::*;
+/// # use texlang_testing::*;
 /// test_suite![
 ///     state(State),
 ///     options(TestOptions::InitialCommands(initial_commands)),
@@ -477,7 +544,7 @@ macro_rules! test_suite {
                 let lhs = $lhs;
                 let rhs = $rhs;
                 let options = vec! $options;
-                run_expansion_equality_test::<$state>(&lhs, &rhs, false, &options);
+                texlang_testing::run_expansion_equality_test::<$state>(&lhs, &rhs, false, &options);
             }
         )*
     );
@@ -494,7 +561,7 @@ macro_rules! test_suite {
                     let lhs = $lhs;
                     let rhs = $rhs;
                     let options = vec! $options;
-                    run_serde_test::<$state>(&lhs, &rhs, &options, SerdeFormat::Json);
+                    texlang_testing::run_serde_test::<$state>(&lhs, &rhs, &options, texlang_testing::SerdeFormat::Json);
                 }
                 #[cfg_attr(not(feature = "serde"), ignore)]
                 #[test]
@@ -502,7 +569,7 @@ macro_rules! test_suite {
                     let lhs = $lhs;
                     let rhs = $rhs;
                     let options = vec! $options;
-                    run_serde_test::<$state>(&lhs, &rhs, &options, SerdeFormat::MessagePack);
+                    texlang_testing::run_serde_test::<$state>(&lhs, &rhs, &options, texlang_testing::SerdeFormat::MessagePack);
                 }
                 #[cfg_attr(not(feature = "serde"), ignore)]
                 #[test]
@@ -510,7 +577,7 @@ macro_rules! test_suite {
                     let lhs = $lhs;
                     let rhs = $rhs;
                     let options = vec! $options;
-                    run_serde_test::<$state>(&lhs, &rhs, &options, SerdeFormat::BinCode);
+                    texlang_testing::run_serde_test::<$state>(&lhs, &rhs, &options, texlang_testing::SerdeFormat::BinCode);
                 }
             }
         )*
@@ -522,7 +589,7 @@ macro_rules! test_suite {
             fn $name() {
                 let input = $input;
                 let options = vec! $options;
-                run_failure_test::<$state>(&input, &options);
+                texlang_testing::run_failure_test::<$state>(&input, &options);
             }
         )*
     );
@@ -537,14 +604,14 @@ macro_rules! test_suite {
                     let mut options = vec! $options;
                     options.push(TestOption::RecoverFromErrors(true));
                     // TODO: verify a recoverable error was thrown?
-                    run_expansion_equality_test::<$state>(&lhs, &rhs, true, &options);
+                    texlang_testing::run_expansion_equality_test::<$state>(&lhs, &rhs, true, &options);
                 }
                 #[test]
                 fn error_recovery_disabled() {
                     let input = $lhs;
                     let mut options = vec! $options;
                     options.push(TestOption::RecoverFromErrors(false));
-                    run_failure_test::<$state>(&input, &options);
+                    texlang_testing::run_failure_test::<$state>(&input, &options);
                 }
             }
         )*
@@ -554,15 +621,13 @@ macro_rules! test_suite {
     );
     ( state($state: ty), options $options: tt, $( $test_kind: ident $test_cases: tt ),+ $(,)? ) => (
         $(
-            test_suite![state($state), options $options, $test_kind $test_cases,];
+            texlang_testing::test_suite![state($state), options $options, $test_kind $test_cases,];
         )+
     );
     ( options $options: tt, $( $test_kind: ident $test_cases: tt ),+ $(,)? ) => (
-        test_suite![state(State), options $options, $( $test_kind $test_cases, )+ ];
+        texlang_testing::test_suite![state(State), options $options, $( $test_kind $test_cases, )+ ];
     );
     ( $( $test_kind: ident $test_cases: tt ),+ $(,)? ) => (
-        test_suite![options (TestOption::InitialCommands(initial_commands)), $( $test_kind $test_cases, )+ ];
+        texlang_testing::test_suite![options (texlang_testing::TestOption::InitialCommands(initial_commands)), $( $test_kind $test_cases, )+ ];
     );
 }
-
-pub use test_suite;

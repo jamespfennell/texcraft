@@ -57,8 +57,33 @@ mod test {
 
     use super::*;
     use crate::def;
-    use crate::testing::*;
     use crate::the;
+    use texlang_testing::*;
+
+    #[derive(Default, serde::Serialize, serde::Deserialize)]
+    struct State {
+        prefix: prefix::Component,
+        testing: TestingComponent,
+    }
+
+    implement_has_component![State {
+        prefix: prefix::Component,
+        testing: TestingComponent,
+    }];
+
+    impl TexlangState for State {
+        fn variable_assignment_scope_hook(
+            state: &mut Self,
+        ) -> texcraft_stdext::collections::groupingmap::Scope {
+            prefix::variable_assignment_scope_hook(state)
+        }
+        fn recoverable_error_hook(
+            vm: &vm::VM<Self>,
+            recoverable_error: Box<error::Error>,
+        ) -> Result<(), Box<error::Error>> {
+            TestingComponent::recoverable_error_hook(vm, recoverable_error)
+        }
+    }
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([

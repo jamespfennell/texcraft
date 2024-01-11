@@ -424,10 +424,10 @@ pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::Buil
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::testing::*;
     use crate::the;
     use std::collections::HashMap;
     use texlang::vm::implement_has_component;
+    use texlang_testing::*;
 
     #[derive(Default)]
     struct State {

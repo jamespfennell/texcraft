@@ -198,10 +198,10 @@ mod tests {
     use crate::codes;
     use crate::prefix;
     use crate::registers;
-    use crate::testing::*;
     use crate::the;
     use texlang::types::CatCode;
     use texlang::vm::implement_has_component;
+    use texlang_testing::*;
 
     #[derive(Default)]
     struct State {

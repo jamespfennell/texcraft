@@ -33,7 +33,6 @@ pub mod registers;
 pub mod repl;
 pub mod script;
 pub mod sleep;
-pub mod testing;
 pub mod texcraft;
 pub mod the;
 pub mod time;
@@ -56,7 +55,8 @@ pub struct StdLibState {
     pub registers_token_list: registers::Component<Vec<token::Token>, 256>,
     pub repl: repl::Component,
     pub script: script::Component,
-    pub testing: testing::TestingComponent,
+    #[cfg(test)]
+    pub testing: texlang_testing::TestingComponent,
     pub time: time::Component,
     pub tracing_macros: tracingmacros::Component,
 }
@@ -210,7 +210,6 @@ implement_has_component![StdLibState{
     registers_token_list: registers::Component<Vec<token::Token>, 256>,
     repl: repl::Component,
     script: script::Component,
-    testing: testing::TestingComponent,
     time: time::Component,
     tracing_macros: tracingmacros::Component,
 }];
@@ -330,10 +329,21 @@ impl ErrorCase {
 }
 
 #[cfg(test)]
+impl HasComponent<texlang_testing::TestingComponent> for StdLibState {
+    fn component(&self) -> &texlang_testing::TestingComponent {
+        &self.testing
+    }
+
+    fn component_mut(&mut self) -> &mut texlang_testing::TestingComponent {
+        &mut self.testing
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
-    use testing::*;
     use texlang::command;
+    use texlang_testing::*;
 
     fn initial_commands() -> HashMap<&'static str, command::BuiltIn<StdLibState>> {
         StdLibState::all_initial_built_ins()
@@ -387,7 +397,7 @@ mod tests {
         )];
         for case in ErrorCase::all_error_cases() {
             println!("CASE {}", case.description);
-            testing::run_failure_test::<StdLibState>(case.source_code, &options)
+            run_failure_test::<StdLibState>(case.source_code, &options)
         }
     }
 }

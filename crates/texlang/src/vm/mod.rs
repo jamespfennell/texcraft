@@ -305,8 +305,8 @@ pub trait TexlangState: Sized {
     ///
     /// Note that there is no requirement that an error returned from this hook
     ///     is the same as the error provided to the hook.
-    /// For example, when Knuth's TeX is running in batch mode errors are generally
-    ///      logged but recovered from.
+    /// For example, when Knuth's TeX is running in batch mode errors are
+    ///      logged but otherwise ignored.
     /// However if 100 such errors occur, the interpreter fails.
     /// To implement this in Texlang, the result of this function would be `Ok(())`
     ///     for the first 99 errors,
