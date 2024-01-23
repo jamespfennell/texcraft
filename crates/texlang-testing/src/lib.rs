@@ -1,21 +1,23 @@
 /*!
-Unit testing library for code that uses Texlang
+Texlang unit testing library
 
-This is a crate that helps with unit testing code that is using Texlang.
-It is used extensively in the Texlang standard library.
-The unit tests there thus serve as examples for what this crate can do.
+This is a crate for writing unit tests for code that uses Texlang.
+It is used extensively in the Texlang standard library,
+    so the unit tests there are good examples of what this crate can do.
+This crate is designed to be used outside of the Texlang project,
+    and work for any Rust code that uses Texlang.
 
 ## Basic setup
 
 As is common in all Texlang code,
     each unit test built with this library works with a specific user-defined Texlang state type.
 This state type is provided by the unit test writer.
-In addition to implementing the [`TexlangState`](texlang::traits::TexlangState) trait, this state must also:
+In addition to implementing the [`TexlangState`] trait, this state must also:
 
 1. Include the [`TestingComponent`] type as a component.
     I.e., the state must implement the [`HasComponent<TestingComponent>`](texlang::traits::HasComponent<TestingComponent>) trait.
 
-1. Configure the `recoverable_error_hook` method on the [`TexlangState`](texlang::traits::TexlangState)
+1. Configure the `recoverable_error_hook` method on the [`TexlangState`]
     trait to invoke [`TestingComponent::recoverable_error_hook`].
 
 1. Implement [`Default`].

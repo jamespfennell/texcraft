@@ -28,4 +28,4 @@
 
 # Texcraft Rust reference
 
-- [Index of Texcraft Rust crates](reference/index.md)
+- [Index of Texcraft Rust crates](reference.md)
