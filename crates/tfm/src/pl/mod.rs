@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use crate::{ligkern, Char, CharData, Header, Number, Params};
+use crate::{ligkern, Char, CharData, Header, NamedParam, Number, Params};
 use error::Error;
 
 pub mod ast;
@@ -48,7 +48,7 @@ impl File {
         (file, errors)
     }
 
-    /// Build a File from an PST.
+    /// Build a File from an AST.
     pub fn build_from_ast(ast: ast::Ast, errors: &mut Vec<error::Error>) -> File {
         let mut file: File = Default::default();
         let mut lig_kern_precedes = false;
@@ -191,6 +191,175 @@ impl File {
 
         file
     }
+
+    /// Convert a TFM file into a PL file.
+    pub fn from_tfm_file(tfm_file: crate::Font) -> File {
+        let mut char_data = HashMap::<Char, CharData>::new();
+        let mut lig_kern_entrypoints = HashMap::<Char, usize>::new();
+        let mut c = tfm_file.smallest_char_code;
+        for info in tfm_file.char_infos.into_iter() {
+            char_data.insert(
+                c,
+                CharData {
+                    width: tfm_file
+                        .widths
+                        .get(info.width_index as usize)
+                        .copied()
+                        .unwrap_or_default(),
+                    height: tfm_file
+                        .heights
+                        .get(info.height_index as usize)
+                        .copied()
+                        .unwrap_or_default(),
+                    depth: tfm_file
+                        .depths
+                        .get(info.depth_index as usize)
+                        .copied()
+                        .unwrap_or_default(),
+                    italic_correction: tfm_file
+                        .italic_corrections
+                        .get(info.italic_index as usize)
+                        .copied()
+                        .unwrap_or_default(),
+                },
+            );
+            match info.tag {
+                crate::CharTag::None => {}
+                crate::CharTag::Ligature(u) => {
+                    lig_kern_entrypoints.insert(c, u as usize);
+                }
+                crate::CharTag::List(_) => todo!(),
+                crate::CharTag::Extension(_) => todo!(),
+            }
+            c = Char(c.0.checked_add(1).unwrap());
+        }
+        File {
+            header: tfm_file.header,
+            design_units: Number::UNITY,
+            char_data,
+            lig_kern_boundary_char: None,
+            lig_kern_boundary_char_entrypoint: None,
+            lig_kern_entrypoints,
+            lig_kern_instructions: tfm_file.lig_kern_instructions,
+            params: tfm_file.params,
+        }
+    }
+
+    /// Lower a File to an AST.
+    pub fn lower(&self) -> ast::Ast {
+        let mut roots = vec![];
+
+        // First output the header. This is TFtoPL.2014.48-57.
+        if !self.header.font_family.is_empty() {
+            let s = sanitize_string(&self.header.font_family);
+            roots.push(ast::Root::Family(s.into()))
+        }
+        if let Some(face) = self.header.face {
+            roots.push(ast::Root::Face(face.into()))
+        }
+        for (i, &u) in self.header.additional_data.iter().enumerate() {
+            let i: u8 = i.try_into().unwrap();
+            roots.push(ast::Root::Header((i, u).into()))
+        }
+        #[derive(Clone, Copy)]
+        enum FontType {
+            Vanilla,
+            TexMathSy,
+            TexMathEx,
+        }
+        let font_type = match self.header.character_coding_scheme.as_str() {
+            "TEX MATHSY" => FontType::TexMathSy,
+            "TEX MATHEX" => FontType::TexMathEx,
+            _ => FontType::Vanilla,
+        };
+        if !self.header.character_coding_scheme.is_empty() {
+            let s = sanitize_string(&self.header.character_coding_scheme);
+            roots.push(ast::Root::CodingScheme(s.into()))
+        }
+        roots.extend([
+            ast::Root::DesignSize(self.header.design_size.into()),
+            ast::Root::Comment(vec!["DESIGNSIZE IS IN POINTS".into()]),
+            ast::Root::Comment(vec!["OTHER SIZES ARE MULTIPLES OF DESIGNSIZE".into()]),
+            ast::Root::Checksum(self.header.checksum.into()),
+            ast::Root::SevenBitSafeFlag(self.header.seven_bit_safe.unwrap_or(false).into()),
+        ]);
+
+        // Next the parameters. This is TFtoPL.2014.58-61
+        let params: Vec<ast::FontDimension> = self
+            .params
+            .0
+            .iter()
+            .enumerate()
+            .map(|(i, &param)| {
+                let i: u8 = (i + 1).try_into().unwrap();
+                // TODO: check that each parameter except slant is in the range [-16.0, 16.0] per TFtoPL.2014.60
+                let named_param = match (i, font_type) {
+                    (1, _) => NamedParam::Slant,
+                    // TODO: finish this
+                    _ => {
+                        return ast::FontDimension::IndexedParam((i, param).into());
+                    }
+                };
+                ast::FontDimension::NamedParam(named_param, param.into())
+            })
+            .collect();
+        roots.push(ast::Root::FontDimension(((), params).into()));
+
+        ast::Ast(roots)
+    }
+
+    /// Display this file.
+    ///
+    /// This function returns a helper type that implements the [std::fmt::Display]
+    /// trait and can be used in `print!` and similar macros.
+    pub fn display(&self, indent: usize, char_display_format: CharDisplayFormat) -> Display {
+        Display {
+            pl_file: self,
+            indent,
+            char_display_format,
+        }
+    }
+}
+
+fn sanitize_string(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            '(' | ')' => '/', // todo: log a warning
+            ' '..='~' => c.to_ascii_uppercase(),
+            _ => '?', // todo: log a warning
+        })
+        .collect()
+}
+
+/// Helper type for displaying files.
+///
+/// Use the [File::display] method to construct this type.
+pub struct Display<'a> {
+    pl_file: &'a File,
+    indent: usize,
+    char_display_format: CharDisplayFormat,
+}
+
+impl<'a> std::fmt::Display for Display<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let ast = self.pl_file.lower();
+        let cst = ast.lower(self.char_display_format);
+        cst.display(self.indent).fmt(f)
+    }
+}
+
+/// Specification for how to display characters when printing property list data.
+#[derive(Default, Debug, Clone, Copy)]
+pub enum CharDisplayFormat {
+    /// Letters and numbers are output in PL ASCII format (e.g. `C A`), and
+    /// other characters are output in octal (e.g. `O 14`).
+    #[default]
+    Default,
+    /// Visible ASCII characters except ( and ) are output in PL ASCII format (e.g. `C A`), and
+    /// other characters are output in octal (e.g. `O 14`).
+    Ascii,
+    /// All characters are output in octal (e.g. `O 14`)
+    Octal,
 }
 
 #[cfg(test)]

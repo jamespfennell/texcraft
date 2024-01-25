@@ -132,6 +132,7 @@ impl Warning {
 }
 
 /// Deserialize a TeX font metric (.tfm) file.
+/// TODO: this should be a method on Font
 pub fn deserialize(b: &[u8]) -> Result<(Font, Vec<Warning>), Error> {
     let mut warnings: Vec<Warning> = vec![];
     let actual_file_length = b.len();
@@ -188,7 +189,7 @@ pub fn deserialize(b: &[u8]) -> Result<(Font, Vec<Warning>), Error> {
         heights: Deserialize::deserialize(raw_heights),
         depths: Deserialize::deserialize(raw_depths),
         italic_corrections: Deserialize::deserialize(raw_italic_corrections),
-        lig_kern_commands: Deserialize::deserialize(raw_lig_kern),
+        lig_kern_instructions: Deserialize::deserialize(raw_lig_kern),
         kern: Deserialize::deserialize(raw_kerns),
         extensible_chars: Deserialize::deserialize(raw_extensible_chars),
         params: Deserialize::deserialize(raw_params),
@@ -367,24 +368,14 @@ impl Deserialize for String {
             Some(&tfm_len) => {
                 let max_len: u8 = (b.len() - 1).try_into().unwrap_or(u8::MAX);
                 if max_len < tfm_len {
+                    // TODO: need to return the error in TFtoPL.2014.52.1 here.
                     max_len
                 } else {
                     tfm_len
                 }
             }
         };
-        let mut s = String::new();
-        for c in b[1..=(len as usize)].iter() {
-            // The following transformation implements TFtoPL.2014.52.
-            let c = match *c as char {
-                '(' | ')' => '/',
-                'a'..='z' => c.to_ascii_uppercase() as char,
-                ' '..='~' => *c as char,
-                _ => '?',
-            };
-            s.push(c);
-        }
-        s
+        b[1..=(len as usize)].iter().map(|u| *u as char).collect()
     }
 }
 
@@ -821,7 +812,7 @@ mod tests {
             ),
             Ok((
                 Font {
-                    lig_kern_commands: vec![
+                    lig_kern_instructions: vec![
                         ligkern::lang::Instruction {
                             next_instruction: Some(3),
                             right_char: Char(5),

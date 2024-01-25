@@ -49,8 +49,8 @@ pub struct Font {
     /// Character italic corrections
     pub italic_corrections: Vec<Number>,
 
-    /// Lig kern commands.
-    pub lig_kern_commands: Vec<ligkern::lang::Instruction>,
+    /// Lig kern instructions.
+    pub lig_kern_instructions: Vec<ligkern::lang::Instruction>,
 
     /// Kerns. These are referenced from inside the lig kern commands.
     pub kern: Vec<Number>,
@@ -72,7 +72,7 @@ impl Default for Font {
             heights: vec![Number::ZERO],
             depths: vec![Number::ZERO],
             italic_corrections: vec![Number::ZERO],
-            lig_kern_commands: vec![],
+            lig_kern_instructions: vec![],
             kern: vec![],
             extensible_chars: vec![],
             params: Default::default(),
@@ -113,28 +113,6 @@ impl Header {
         }
     }
 }
-
-/*
-TODO: use this when deserializing strings
-impl<const N: usize> From<&str> for StackString<N> {
-    fn from(value: &str) -> Self {
-        let mut r: Self = Default::default();
-        for c in value.chars() {
-            if r.len as usize == N {
-                return r;
-            }
-            r.data[r.len as usize] = match c {
-                ' '..='~' => c,
-                _ => '?',
-            }
-            .try_into()
-            .unwrap();
-            r.len += 1;
-        }
-        r
-    }
-}
- */
 
 /// A character in a TFM file.
 ///
@@ -213,6 +191,29 @@ impl std::ops::Div<i32> for Number {
 
     fn div(self, rhs: i32) -> Self::Output {
         Number(self.0 / rhs)
+    }
+}
+
+impl std::fmt::Display for Number {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TFtoPL.2014.40-43
+        let integer_part = self.0 / Number::UNITY.0;
+        write!(f, "{integer_part}.")?;
+        let mut fp = self.0 % Number::UNITY.0;
+        fp = 10 * fp + 5;
+        let mut delta = 10;
+        loop {
+            if delta > 0o4000000 {
+                fp = fp + 0o2000000 - delta / 2;
+            }
+            write!(f, "{}", fp / 0o4000000)?;
+            fp = 10 * (fp % 0o4000000);
+            delta *= 10;
+            if fp <= delta {
+                break;
+            }
+        }
+        Ok(())
     }
 }
 

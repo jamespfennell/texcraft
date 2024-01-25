@@ -30,6 +30,13 @@ impl Ast {
             .filter_map(|c| Root::build(c, errors))
             .collect()
     }
+    /// Lower an AST to a CST.
+    pub fn lower(self, char_display_format: super::CharDisplayFormat) -> cst::Cst {
+        let opts = LowerOpts {
+            char_display_format,
+        };
+        cst::Cst(self.0.into_iter().map(|c| Root::lower(c, &opts)).collect())
+    }
 }
 
 /// Value of a leaf node in the AST that contains a single piece of data.
@@ -42,6 +49,15 @@ pub struct SingleValue<D> {
     /// Span of the data in the property list source code.
     pub data_span: Range<usize>,
     // TODO: open paren spans? key spans?
+}
+
+impl<D> From<D> for SingleValue<D> {
+    fn from(data: D) -> Self {
+        Self {
+            data,
+            data_span: 0..0,
+        }
+    }
 }
 
 /// Value of a leaf node in the AST that contains two pieces of data.
@@ -60,6 +76,17 @@ pub struct TupleValue<D, E> {
     pub right_span: Range<usize>,
 }
 
+impl<D, E> From<(D, E)> for TupleValue<D, E> {
+    fn from(value: (D, E)) -> Self {
+        Self {
+            left: value.0,
+            left_span: 0..0,
+            right: value.1,
+            right_span: 0..0,
+        }
+    }
+}
+
 /// Value of a branch node in the AST.
 ///
 /// A branch node contains a property list and optionally a piece of data.
@@ -76,18 +103,35 @@ pub struct Branch<D, E> {
     pub children: Vec<E>,
 }
 
-/// The only reason we have this trait is to make it possible to invoke the `from`
+impl<D, E> From<(D, Vec<E>)> for Branch<D, E> {
+    fn from(value: (D, Vec<E>)) -> Self {
+        Self {
+            data: value.0,
+            data_span: 0..0,
+            children: value.1,
+        }
+    }
+}
+
+/// The first reason we have this trait is to make it possible to invoke the `from`
 /// associated function of a type without specifying the type itself.
 /// I.e., instead of writing `LeafValue::from` we can write `FromCstNode::from`.
 /// This makes the `node_impl!` macro simpler to implement because we don't need to provide
 /// the type name to the macro.
-/// TODO: the conversion may not succeed, e.g. (SEVENBITSAFEFLAG blah).
-/// So the trait should really return Option<Self>
-trait FromCstNode: Sized {
+///
+/// Second, the implementations impose trait bounds on `D` and `E` in terms of private traits.
+/// Doing this kinds of bounds on a regular impl block (private trait in public interface (error E0445)).
+/// But with a trait impl we get away with it.
+trait ToFromCstNode: Sized {
     fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self>;
+    fn to(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue;
 }
 
-impl<D: TryParse> FromCstNode for SingleValue<D> {
+struct LowerOpts {
+    char_display_format: super::CharDisplayFormat,
+}
+
+impl<D: TryParse> ToFromCstNode for SingleValue<D> {
     fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self> {
         let (mut input, _) = Input::new(p, errors);
         D::try_parse(&mut input).map(|data| Self {
@@ -95,9 +139,18 @@ impl<D: TryParse> FromCstNode for SingleValue<D> {
             data_span: data.1,
         })
     }
+    fn to(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue {
+        cst::RegularNodeValue {
+            key: key.into(),
+            key_span: 0..0,
+            data: TryParse::to_string(self.data, opts),
+            data_span: self.data_span,
+            children: vec![],
+        }
+    }
 }
 
-impl<D: TryParse, E: Parse> FromCstNode for TupleValue<D, E> {
+impl<D: TryParse, E: Parse> ToFromCstNode for TupleValue<D, E> {
     fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self> {
         let (mut input, _) = Input::new(p, errors);
         let (left, left_span) = match D::try_parse(&mut input) {
@@ -112,9 +165,22 @@ impl<D: TryParse, E: Parse> FromCstNode for TupleValue<D, E> {
             right_span,
         })
     }
+    fn to(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue {
+        cst::RegularNodeValue {
+            key: key.into(),
+            key_span: 0..0,
+            data: format![
+                "{} {}",
+                TryParse::to_string(self.left, opts),
+                Parse::to_string(self.right, opts)
+            ],
+            data_span: self.left_span.start..self.right_span.end,
+            children: vec![],
+        }
+    }
 }
 
-impl<D: Parse, E: Node> FromCstNode for Branch<D, E> {
+impl<D: Parse, E: Node> ToFromCstNode for Branch<D, E> {
     fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self> {
         {
             let (mut input, children) = Input::new(p, errors);
@@ -129,6 +195,19 @@ impl<D: Parse, E: Node> FromCstNode for Branch<D, E> {
             })
         }
     }
+    fn to(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue {
+        cst::RegularNodeValue {
+            key: key.into(),
+            key_span: 0..0,
+            data: TryParse::to_string(self.data, opts),
+            data_span: self.data_span,
+            children: self
+                .children
+                .into_iter()
+                .map(|c| E::lower(c, opts))
+                .collect(),
+        }
+    }
 }
 
 trait Node: Sized {
@@ -140,10 +219,11 @@ trait Node: Sized {
             cst::NodeValue::Regular(r) => Node::build_regular(r, errors),
         }
     }
+    fn lower(self, opts: &LowerOpts) -> cst::Node;
 }
 
 macro_rules! node_impl {
-    ( $type: ident, $( ($key: ident, $str: expr, $variant: ident $(, $prefix: expr )? ), )+ ) => {
+    ( $type: ident, $( ($key: ident, $str: expr, $variant: ident $(, $prefix: path )? ), )+ ) => {
 
         impl $type {
             $(
@@ -159,7 +239,7 @@ macro_rules! node_impl {
                 match r.key.as_str() {
                     $(
                         $type::$key => {
-                            match FromCstNode::from(r, errors) {
+                            match ToFromCstNode::from(r, errors) {
                                 None => None,
                                 Some(v) => Some($type::$variant( $( $prefix, )? v )),
                             }
@@ -177,6 +257,23 @@ macro_rules! node_impl {
             }
             fn build_comment(v: Vec<cst::BalancedElem>) -> Self {
                 $type::Comment(v)
+            }
+            fn lower(self, opts: &LowerOpts) -> cst::Node {
+                let value = match self {
+                    $(
+                        $type::$variant($( $prefix, )? v) => {
+                            cst::NodeValue::Regular(v.to($str, opts))
+                        }
+                    )+
+                    $type::Comment(balanced_elements) => {
+                            cst::NodeValue::Comment(balanced_elements)
+                    }
+                };
+                cst::Node {
+                    opening_parenthesis_span:0,
+                    value,
+                    closing_parenthesis_span: 0,
+                }
             }
         }
     };
@@ -243,7 +340,6 @@ pub enum Root {
     ///     for example, to set `header[18]=1`, one may write `(HEADER D 18 O 1)`.
     /// This notation is used for header information that is presently unnamed.
     /// (TeX ignores it.)
-    /// TODO: need to validate that u8 is >= 18! Maybe have a header index
     Header(TupleValue<u8, u32>),
 
     /// Font dimensions property list.
@@ -532,6 +628,12 @@ impl Parse for LigTableLabel {
             }
         }
     }
+    fn to_string(self, opts: &LowerOpts) -> String {
+        match self {
+            LigTableLabel::Char(c) => Parse::to_string(c, opts),
+            LigTableLabel::BoundaryChar => "BOUNDARYCHAR".into(),
+        }
+    }
 }
 
 node_impl!(
@@ -582,15 +684,20 @@ node_impl!(
 
 trait Parse: Sized {
     fn parse(input: &mut Input) -> (Self, Range<usize>);
+    fn to_string(self, opts: &LowerOpts) -> String;
 }
 
 trait TryParse: Sized {
     fn try_parse(input: &mut Input) -> Option<(Self, Range<usize>)>;
+    fn to_string(self, opts: &LowerOpts) -> String;
 }
 
 impl<T: Parse> TryParse for T {
     fn try_parse(input: &mut Input) -> Option<(Self, Range<usize>)> {
         Some(Parse::parse(input))
+    }
+    fn to_string(self, opts: &LowerOpts) -> String {
+        Parse::to_string(self, opts)
     }
 }
 
@@ -662,6 +769,9 @@ impl Parse for () {
     fn parse(input: &mut Input) -> (Self, Range<usize>) {
         ((), input.raw_data_span.start..input.raw_data_span.start)
     }
+    fn to_string(self, _: &LowerOpts) -> String {
+        "".into()
+    }
 }
 
 impl Parse for u32 {
@@ -713,6 +823,9 @@ impl Parse for u32 {
             }
         }
         (acc, start_span..input.raw_data_span.start)
+    }
+    fn to_string(self, _: &LowerOpts) -> String {
+        format!("O {self:o}")
     }
 }
 
@@ -815,12 +928,30 @@ impl Parse for u8 {
         input.consume_spaces();
         (u, span_start..span_end)
     }
+    fn to_string(self, _: &LowerOpts) -> String {
+        format!["O {self:o}"]
+    }
 }
 
 impl Parse for Char {
     fn parse(input: &mut Input) -> (Self, Range<usize>) {
         let (u, span) = u8::parse(input);
         (Char(u), span)
+    }
+    fn to_string(self, opts: &LowerOpts) -> String {
+        // TFtoPL.2014.38 and my interpretation of `man tftopl`
+        use super::CharDisplayFormat;
+        let output_as_ascii = match (opts.char_display_format, self.0 as char) {
+            (CharDisplayFormat::Default, 'a'..='z' | 'A'..='Z' | '0'..='9') => true,
+            (CharDisplayFormat::Ascii, '(' | ')') => false,
+            (CharDisplayFormat::Ascii, '!'..='~') => true,
+            _ => false,
+        };
+        if output_as_ascii {
+            format!("C {}", self.0 as char)
+        } else {
+            Parse::to_string(self.0, opts)
+        }
     }
 }
 
@@ -831,12 +962,40 @@ impl Parse for String {
         let l = s.len();
         (s, span_start..span_start + l)
     }
+    fn to_string(self, _: &LowerOpts) -> String {
+        self
+    }
 }
 
 impl Parse for Face {
     fn parse(input: &mut Input) -> (Self, Range<usize>) {
         let (u, span) = u8::parse(input);
         (u.into(), span)
+    }
+    fn to_string(self, opts: &LowerOpts) -> String {
+        // TFtoPL.2014.39
+        match self {
+            Face::Valid(w, s, e) => {
+                format!(
+                    "F {}{}{}",
+                    match w {
+                        crate::FaceWeight::Light => 'L',
+                        crate::FaceWeight::Medium => 'M',
+                        crate::FaceWeight::Bold => 'B',
+                    },
+                    match s {
+                        crate::FaceSlope::Roman => 'R',
+                        crate::FaceSlope::Italic => 'I',
+                    },
+                    match e {
+                        crate::FaceExpansion::Regular => 'R',
+                        crate::FaceExpansion::Condensed => 'C',
+                        crate::FaceExpansion::Extended => 'E',
+                    },
+                )
+            }
+            Face::Other(u) => Parse::to_string(u, opts),
+        }
     }
 }
 
@@ -859,6 +1018,9 @@ impl TryParse for bool {
         let span_end = input.raw_data_span.start;
         input.skip_to_end();
         Some((b, span_start..span_end))
+    }
+    fn to_string(self, _: &LowerOpts) -> String {
+        if self { "TRUE" } else { "FALSE" }.into()
     }
 }
 
@@ -955,6 +1117,9 @@ impl Parse for Number {
             modulus
         };
         (Number(result), span_start..input.raw_data_span.start)
+    }
+    fn to_string(self, _: &LowerOpts) -> String {
+        format!["R {self}"]
     }
 }
 

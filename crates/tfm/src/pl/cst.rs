@@ -37,6 +37,26 @@ impl Cst {
         };
         Cst(parse_root_nodes(&mut input))
     }
+
+    /// Display the CST.
+    pub fn display(&self, indent: usize) -> Display {
+        Display { cst: self, indent }
+    }
+}
+
+/// Helper type for displaying CSTs.
+pub struct Display<'a> {
+    cst: &'a Cst,
+    indent: usize,
+}
+
+impl<'a> std::fmt::Display for Display<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for node in &self.cst.0 {
+            node.write(f, self.indent, 0)?;
+        }
+        Ok(())
+    }
 }
 
 /// Node in the CST.
@@ -48,6 +68,33 @@ pub struct Node {
     pub value: NodeValue,
     /// Byte index of the closing parenthesis for this node in the source file
     pub closing_parenthesis_span: usize,
+}
+
+impl Node {
+    pub fn write(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        indent: usize,
+        current_indent: usize,
+    ) -> std::fmt::Result {
+        match &self.value {
+            NodeValue::Comment(e) => write_balanced_elements(e, f)?,
+            NodeValue::Regular(v) => {
+                write!(f, "{}({} {}", " ".repeat(current_indent), &v.key, &v.data)?;
+                if !v.children.is_empty() {
+                    writeln!(f)?;
+                }
+                for child in &v.children {
+                    child.write(f, indent, current_indent + indent)?;
+                }
+                if !v.children.is_empty() {
+                    write!(f, "{}", " ".repeat(current_indent + indent))?;
+                }
+                writeln!(f, ")")?;
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Value of a node in the CST.
@@ -79,6 +126,27 @@ pub struct RegularNodeValue {
 pub enum BalancedElem {
     String(String),
     Vec(Vec<BalancedElem>),
+}
+
+fn write_balanced_elements(
+    elements: &[BalancedElem],
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    for element in elements {
+        write!(f, "(")?;
+        match element {
+            BalancedElem::String(s) => write!(f, "{s}")?,
+            BalancedElem::Vec(v) => write_balanced_elements(v, f)?,
+        }
+        writeln!(f, ")")?;
+    }
+    Ok(())
+}
+
+impl From<&str> for BalancedElem {
+    fn from(value: &str) -> Self {
+        BalancedElem::String(value.into())
+    }
 }
 
 struct Input<'a> {
