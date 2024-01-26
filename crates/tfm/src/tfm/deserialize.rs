@@ -963,11 +963,8 @@ mod tests {
 
         let has_tftopl = Command::new("which")
             .arg("tftopl")
-            .spawn()
-            .expect("`which tftopl` command failed to start")
-            .wait()
-            .expect("failed to run `which tftopl`")
-            .success();
+            .output()
+            .is_ok();
         if !has_tftopl {
             return;
         }
