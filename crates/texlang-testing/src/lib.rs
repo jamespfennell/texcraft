@@ -423,7 +423,9 @@ impl<'a, S> ResolvedOptions<'a, S> {
 }
 
 fn initialize_vm<S: Default>(options: &ResolvedOptions<S>) -> Box<vm::VM<S>> {
-    let mut vm = VM::<S>::new_with_built_in_commands((options.built_in_commands)());
+    let mut vm = Box::new(VM::<S>::new_with_built_in_commands((options
+        .built_in_commands)(
+    )));
     (options.custom_vm_initialization)(&mut vm);
     vm
 }

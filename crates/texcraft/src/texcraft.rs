@@ -202,7 +202,7 @@ fn new_vm(format_file_path: Option<PathBuf>, repl: bool) -> Box<vm::VM<StdLibSta
     }
 
     match format_file_path {
-        None => vm::VM::<StdLibState>::new_with_built_in_commands(m),
+        None => Box::new(vm::VM::<StdLibState>::new_with_built_in_commands(m)),
         Some(path) => {
             let format_file = std::fs::read(&path).unwrap();
             if path.extension().map(OsStr::to_str) == Some(Some("json")) {

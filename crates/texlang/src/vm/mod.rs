@@ -329,13 +329,13 @@ impl<S: Default> VM<S> {
     /// If the state type satisfies the [`HasDefaultBuiltInCommands`] trait,
     ///     and you are using the default built-ins,
     ///     use the [`VM::new`] method instead.
-    pub fn new_with_built_in_commands(built_in_commands: HashMap<&str, BuiltIn<S>>) -> Box<VM<S>> {
+    pub fn new_with_built_in_commands(built_in_commands: HashMap<&str, BuiltIn<S>>) -> VM<S> {
         let mut internal = Internal::new(Default::default());
         let built_in_commands = built_in_commands
             .into_iter()
             .map(|(key, value)| (internal.cs_name_interner.get_or_intern(key), value))
             .collect();
-        Box::new(VM {
+        VM {
             state: Default::default(),
             commands_map: command::Map::new(built_in_commands),
             internal,
@@ -346,14 +346,20 @@ impl<S: Default> VM<S> {
                     None
                 }
             },
-        })
+        }
     }
 }
 
 impl<S: Default + HasDefaultBuiltInCommands> VM<S> {
     /// Create a new VM.
-    pub fn new() -> Box<VM<S>> {
+    pub fn new() -> VM<S> {
         VM::<S>::new_with_built_in_commands(S::default_built_in_commands())
+    }
+}
+
+impl<S: Default + HasDefaultBuiltInCommands> Default for VM<S> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

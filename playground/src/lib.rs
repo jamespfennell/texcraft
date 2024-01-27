@@ -148,12 +148,7 @@ impl HasDefaultBuiltInCommands for PlaygroundState {
     }
 }
 
-fn new_vm(
-    minutes_since_midnight: i32,
-    day: i32,
-    month: i32,
-    year: i32,
-) -> Box<vm::VM<PlaygroundState>> {
+fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::VM<PlaygroundState> {
     let mut vm = vm::VM::<PlaygroundState>::new();
     vm.state.time = time::Component::new_with_values(minutes_since_midnight, day, month, year);
     vm
