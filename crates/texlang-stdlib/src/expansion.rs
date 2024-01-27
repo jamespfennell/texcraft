@@ -294,7 +294,7 @@ mod test {
         testing: TestingComponent,
     }];
 
-    fn initial_commands(optimized: bool) -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn built_in_commands(optimized: bool) -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("def", crate::def::get_def()),
             ("noexpand", get_noexpand()),
@@ -311,7 +311,7 @@ mod test {
 
     test_suite![
         options(
-            TestOption::InitialCommandsDyn(Box::new(|| { initial_commands(true) })),
+            TestOption::BuiltInCommandsDyn(Box::new(|| { built_in_commands(true) })),
             TestOption::AllowUndefinedCommands(true),
         ),
         expansion_equality_tests(
@@ -365,7 +365,7 @@ mod test {
             mod expandafter_simple {
                 use super::*;
                 test_suite![
-                    options(TestOption::InitialCommandsDyn(Box::new(|| { initial_commands(false) }))),
+                    options(TestOption::BuiltInCommandsDyn(Box::new(|| { built_in_commands(false) }))),
                     expansion_equality_tests(
                         $(
                             ( $name, format!("{}{}{}", PREFIX, $lhs, POSTFIX), $rhs ),
@@ -376,7 +376,7 @@ mod test {
             mod expandafter_optimized {
                 use super::*;
                 test_suite![
-                    options(TestOption::InitialCommandsDyn(Box::new(|| { initial_commands(true) }))),
+                    options(TestOption::BuiltInCommandsDyn(Box::new(|| { built_in_commands(true) }))),
                     expansion_equality_tests(
                         $(
                             ( $name, format!("{}{}{}", PREFIX, $lhs, POSTFIX), $rhs ),
@@ -469,8 +469,8 @@ mod test {
     ];
 
     fn run_expandafter_failure_test(input: &str, optimized: bool) {
-        let options = vec![TestOption::InitialCommandsDyn(Box::new(|| {
-            initial_commands(optimized)
+        let options = vec![TestOption::BuiltInCommandsDyn(Box::new(|| {
+            built_in_commands(optimized)
         }))];
         run_failure_test(&input, &options);
     }

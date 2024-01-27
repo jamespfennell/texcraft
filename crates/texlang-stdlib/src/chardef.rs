@@ -26,7 +26,7 @@ mod test {
     use std::collections::HashMap;
     use texlang_testing::*;
 
-    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn built_in_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("chardef", get_chardef()),
             ("the", the::get_the()),

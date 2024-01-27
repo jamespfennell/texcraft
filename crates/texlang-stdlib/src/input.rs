@@ -416,7 +416,7 @@ mod tests {
         testing: TestingComponent,
     }];
 
-    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn built_in_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("closein", get_closein()),
             ("def", def::get_def()),
@@ -444,7 +444,7 @@ mod tests {
 
     test_suite!(
         options(
-            TestOption::InitialCommands(initial_commands),
+            TestOption::BuiltInCommands(built_in_commands),
             TestOption::CustomVMInitialization(custom_vm_initialization),
         ),
         expansion_equality_tests(
@@ -471,7 +471,7 @@ mod tests {
 
     test_suite!(
         options(
-            TestOption::InitialCommands(initial_commands),
+            TestOption::BuiltInCommands(built_in_commands),
             TestOption::CustomVMInitialization(end_input_vm_initialization),
         ),
         expansion_equality_tests(
@@ -503,7 +503,7 @@ mod tests {
 
     test_suite!(
         options(
-            TestOption::InitialCommands(initial_commands),
+            TestOption::BuiltInCommands(built_in_commands),
             TestOption::CustomVMInitialization(read_vm_initialization),
         ),
         expansion_equality_tests(

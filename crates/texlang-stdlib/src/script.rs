@@ -156,7 +156,7 @@ mod tests {
 
     fn run_script_test(input: &str, want: &str) {
         let built_ins = HashMap::from([("par", get_par()), ("newline", get_newline())]);
-        let mut vm = vm::VM::<State>::new(built_ins);
+        let mut vm = vm::VM::<State>::new_with_built_in_commands(built_ins);
         vm.push_source("testing.tex", input).unwrap();
         let got = run_to_string(&mut vm).unwrap();
         let want = want.to_string();

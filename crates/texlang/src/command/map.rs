@@ -38,20 +38,20 @@ pub struct Map<S> {
     commands: GroupingVec<Command<S>>,
     active_char: GroupingHashMap<char, Command<S>>,
 
-    initial_built_ins: HashMap<token::CsName, BuiltIn<S>>,
+    built_in_commands: HashMap<token::CsName, BuiltIn<S>>,
     primitive_key_to_built_in_lazy: RefCell<Option<HashMap<PrimitiveKey, token::CsName>>>,
     getters_key_to_built_in_lazy: RefCell<Option<HashMap<variable::GettersKey, token::CsName>>>,
 }
 
 impl<S> Map<S> {
-    pub(crate) fn new(initial_built_ins: HashMap<token::CsName, BuiltIn<S>>) -> Map<S> {
+    pub(crate) fn new(built_in_commands: HashMap<token::CsName, BuiltIn<S>>) -> Map<S> {
         Self {
-            commands: initial_built_ins
+            commands: built_in_commands
                 .iter()
                 .map(|(k, v)| (k.to_usize(), v.cmd.clone()))
                 .collect(),
             active_char: Default::default(),
-            initial_built_ins,
+            built_in_commands,
             primitive_key_to_built_in_lazy: Default::default(),
             getters_key_to_built_in_lazy: Default::default(),
         }
@@ -73,8 +73,8 @@ impl<S> Map<S> {
         command.map(Command::tag).unwrap_or(None)
     }
 
-    pub fn initial_built_ins(&self) -> &HashMap<token::CsName, BuiltIn<S>> {
-        &self.initial_built_ins
+    pub fn built_in_commands(&self) -> &HashMap<token::CsName, BuiltIn<S>> {
+        &self.built_in_commands
     }
 
     pub fn get_command_slow(&self, command_ref: &token::CommandRef) -> Option<BuiltIn<S>> {
@@ -84,7 +84,7 @@ impl<S> Map<S> {
         };
         if let Some(ref key) = PrimitiveKey::new(command) {
             if let Some(built_in) = self.primitive_key_to_built_in().get(key) {
-                return self.initial_built_ins.get(built_in).cloned();
+                return self.built_in_commands.get(built_in).cloned();
             }
         }
         Some(BuiltIn {
@@ -198,7 +198,7 @@ impl<S> Map<S> {
             return r;
         }
         *self.primitive_key_to_built_in_lazy.borrow_mut() = Some(
-            self.initial_built_ins
+            self.built_in_commands
                 .iter()
                 .filter_map(|(cs_name, built_in)| {
                     PrimitiveKey::new(built_in.cmd()).map(|key| (key, *cs_name))
@@ -335,7 +335,7 @@ impl<'a> SerializableMap<'a> {
 
     pub(crate) fn finish_deserialization<S>(
         self,
-        initial_built_ins: HashMap<token::CsName, BuiltIn<S>>,
+        built_in_commands: HashMap<token::CsName, BuiltIn<S>>,
         interner: &token::CsNameInterner,
     ) -> Map<S> {
         let macros: Vec<Rc<texmacro::Macro>> = self
@@ -351,7 +351,7 @@ impl<'a> SerializableMap<'a> {
                 |(cs_name, serialized_command): (token::CsName, &SerializableCommand)| {
                     let command = match serialized_command {
                         SerializableCommand::BuiltIn(cs_name) => {
-                            match initial_built_ins.get(cs_name) {
+                            match built_in_commands.get(cs_name) {
                                 None => {
                                     panic!(
                                         "unknown control sequence {:?}",
@@ -362,7 +362,7 @@ impl<'a> SerializableMap<'a> {
                             }
                         }
                         SerializableCommand::VariableArrayStatic(cs_name, index) => {
-                            match &initial_built_ins.get(cs_name).unwrap().cmd {
+                            match &built_in_commands.get(cs_name).unwrap().cmd {
                                 Command::Variable(variable_command) => {
                                     Command::Variable(std::rc::Rc::new(
                                         variable_command.new_array_element(variable::Index(*index)),
@@ -388,7 +388,7 @@ impl<'a> SerializableMap<'a> {
         Map {
             commands,
             active_char: Default::default(), // TODO
-            initial_built_ins,
+            built_in_commands,
             primitive_key_to_built_in_lazy: Default::default(),
             getters_key_to_built_in_lazy: Default::default(),
         }

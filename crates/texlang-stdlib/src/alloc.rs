@@ -107,7 +107,7 @@ fn singleton_mut_ref_fn<S: HasComponent<Component>>(
 
 /// Return a getter provider for the `\newInt` command.
 ///
-/// The initial commands for a VM must include this command in order for
+/// The built-in commands for a VM must include this command in order for
 ///     the allocation component to be serializable.
 pub fn get_newint_getter_provider<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     variable::Command::new_getter_provider(singleton_ref_fn, singleton_mut_ref_fn).into()
@@ -181,7 +181,7 @@ fn array_element_mut_ref_fn<S: HasComponent<Component>>(
 
 /// Return a getter provider for the `\newIntArray` command.
 ///
-/// The initial commands for a VM must include this command in order to support
+/// The built-in commands for a VM must include this command in order to support
 ///     the allocation component to be serializable.
 pub fn get_newintarray_getter_provider<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     variable::Command::new_array(
@@ -212,7 +212,7 @@ mod test {
         testing: TestingComponent,
     }];
 
-    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn built_in_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("newInt", get_newint()),
             ("newInt_getter_provider_\u{0}", get_newint_getter_provider()),

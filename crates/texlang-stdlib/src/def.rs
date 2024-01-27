@@ -371,7 +371,7 @@ mod test {
         }
     }
 
-    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn built_in_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("def", get_def()),
             ("gdef", get_gdef()),
@@ -383,7 +383,7 @@ mod test {
     texlang_testing::test_suite![
         state(State),
         options(
-            texlang_testing::TestOption::InitialCommands(initial_commands),
+            texlang_testing::TestOption::BuiltInCommands(built_in_commands),
             texlang_testing::TestOption::AllowUndefinedCommands(true),
         ),
         expansion_equality_tests(

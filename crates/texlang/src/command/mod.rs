@@ -127,10 +127,10 @@ impl<S> Command<S> {
     }
 }
 
-/// A built-in command provided at VM initialization.
+/// A built-in command. This is a command provided at VM initialization.
 ///
 /// This struct is simply a combination of a [Command] and a documentation string for the command.
-/// It is used when providing the initial set of built-in commands for a VM.
+/// It is used when providing the built-in commands for a VM.
 pub struct BuiltIn<S> {
     cmd: Command<S>,
     doc: Option<&'static str>,

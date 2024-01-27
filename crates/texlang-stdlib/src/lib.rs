@@ -14,6 +14,7 @@ use texlang::types;
 use texlang::types::CatCode;
 use texlang::vm;
 use texlang::vm::implement_has_component;
+use texlang::vm::HasDefaultBuiltInCommands;
 
 pub mod alias;
 pub mod alloc;
@@ -107,9 +108,8 @@ impl TexlangState for StdLibState {
     }
 }
 
-impl StdLibState {
-    pub fn all_initial_built_ins() -> HashMap<&'static str, texlang::command::BuiltIn<StdLibState>>
-    {
+impl HasDefaultBuiltInCommands for StdLibState {
+    fn default_built_in_commands() -> HashMap<&'static str, command::BuiltIn<Self>> {
         HashMap::from([
             ("advance", math::get_advance()),
             //
@@ -188,11 +188,6 @@ impl StdLibState {
             //
             ("year", time::get_year()),
         ])
-    }
-
-    /// Create a new VM that uses the standard library's state and all of its commands.
-    pub fn new_vm() -> Box<vm::VM<StdLibState>> {
-        vm::VM::<StdLibState>::new(StdLibState::all_initial_built_ins())
     }
 }
 
@@ -345,8 +340,8 @@ mod tests {
     use texlang::command;
     use texlang_testing::*;
 
-    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<StdLibState>> {
-        StdLibState::all_initial_built_ins()
+    fn built_in_commands() -> HashMap<&'static str, command::BuiltIn<StdLibState>> {
+        StdLibState::default_built_in_commands()
     }
 
     type State = StdLibState;
@@ -392,8 +387,8 @@ mod tests {
 
     #[test]
     fn all_error_cases() {
-        let options = vec![TestOption::InitialCommands(
-            StdLibState::all_initial_built_ins,
+        let options = vec![TestOption::BuiltInCommands(
+            StdLibState::default_built_in_commands,
         )];
         for case in ErrorCase::all_error_cases() {
             println!("CASE {}", case.description);

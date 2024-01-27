@@ -13,7 +13,7 @@ If you just want to see the minimal code to do this, jump down to the first code
 
 Running the VM is generally a four step process:
 
-1. Specify the primitives you want the VM to include.
+1. Specify the built-in commands/primitives you want the VM to include.
 
 1. Initialize the VM using its [`new`](https://docs.rs/texlang/latest/texlang/vm/struct.VM.html#method.new) constructor.
     At this point you will need to decide which concrete state type you're using.
@@ -50,12 +50,12 @@ use texlang::{vm, command};
 use texlang_stdlib::StdLibState;
 use texlang_stdlib::script;
 
-// 1. Create a new map of initial primitives.
-//    In this book's next section we will add some primitives here.
-let primitives = std::collections::HashMap::new();
+// 1. Create a new map of built-in commands.
+//    In this book's next section we will add some commands here.
+let built_in_commands = std::collections::HashMap::new();
 
 // 2. Initialize the VM.
-let mut vm = vm::VM::<StdLibState>::new(primitives);
+let mut vm = vm::VM::<StdLibState>::new_with_built_in_commands(built_in_commands);
 
 // 3. Add some TeX source code the VM.
 vm.push_source("input.tex", r"Hello, World.");
@@ -79,7 +79,7 @@ To see the VM doing a little work at least, change the source code to this:
 # extern crate texlang_stdlib;
 # extern crate texlang;
 # use texlang::{vm, command};
-# let mut vm = vm::VM::<()>::new(Default::default());
+# let mut vm = vm::VM::<()>::new_with_built_in_commands(Default::default());
 // 3. Add some TeX source code the VM.
 vm.push_source("input.tex", r"Hello, {World}.");
 ```
@@ -95,7 +95,7 @@ The braces disappear because they are special characters in the TeX grammar,
 The VM consumes these characters internally when processing the input.
 
 Another thing the VM can do is surface an error if the input contains an undefined control sequence.
-Because we haven't provided any primitives, every control sequence is undefined.
+Because we haven't provided any built-in commands, every control sequence is undefined.
 Changing the VM setup to the following:
 
 ```rust
@@ -104,7 +104,7 @@ Changing the VM setup to the following:
 # use texlang::{vm, command};
 # use texlang_stdlib::StdLibState;
 # use texlang_stdlib::script;
-# let mut vm = vm::VM::<StdLibState>::new(Default::default());
+# let mut vm = vm::VM::<StdLibState>::new_with_built_in_commands(Default::default());
 // 3. Add some TeX source code the VM.
 vm.push_source("input.tex", r"\controlSequence");
 
@@ -125,5 +125,5 @@ Error: undefined control sequence \controlSequence
   | ^^^^^^^^^^^^^^^^ control sequence
 ```
 
-In general, though, the VM can't do much if no primitives are provided.
+In general, though, the VM can't do much if no built-in commands are provided.
 In the next section we will learn how to write some.

@@ -28,7 +28,7 @@ mod tests {
     use super::*;
     use texlang_testing::State;
 
-    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn built_in_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([("texcraft", get_texcraft())])
     }
 

@@ -53,12 +53,13 @@ impl FileSystem for RealFileSystem {
 /// # use std::rc::Rc;
 /// # use std::cell::RefCell;
 /// # use texlang_common::*;
+/// # use std::collections::HashMap;
 /// #[derive(Default)]
 /// struct State {
 ///     file_system: Rc<RefCell<InMemoryFileSystem>>,
 /// }
-/// let mut vm = vm::VM::<State>::new(
-///     Default::default(),  // initial commands
+/// let mut vm = vm::VM::<State>::new_with_built_in_commands(
+///     HashMap::new(),  // empty set of built-in commands
 /// );
 /// let mut mock_file_system = InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
 /// mock_file_system.add("file/path.tex", "file content");

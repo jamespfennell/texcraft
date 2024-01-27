@@ -9,7 +9,7 @@ pub(crate) fn run_parse_success_test<S: TexlangState + Default, T: Parsable<S> +
     source: &str,
     want: T,
 ) {
-    let mut vm = vm::VM::<S>::new(HashMap::new());
+    let mut vm = vm::VM::<S>::new_with_built_in_commands(HashMap::new());
     vm.push_source("".to_string(), source.to_string()).unwrap();
     let input = vm::ExecutionInput::new(&mut vm);
     let got = T::parse(input).unwrap();
@@ -19,7 +19,7 @@ pub(crate) fn run_parse_success_test<S: TexlangState + Default, T: Parsable<S> +
 pub(crate) fn run_parse_failure_test<S: TexlangState + Default, T: Parsable<S> + Debug>(
     source: &str,
 ) {
-    let mut vm = vm::VM::<S>::new(HashMap::new());
+    let mut vm = vm::VM::<S>::new_with_built_in_commands(HashMap::new());
     vm.push_source("".to_string(), source.to_string()).unwrap();
     let input = vm::ExecutionInput::new(&mut vm);
     let result = T::parse(input);
@@ -38,7 +38,7 @@ pub(crate) fn run_parse_failure_recovery_test<
     source: &str,
     want: T,
 ) {
-    let mut vm = vm::VM::<WrappedState<S>>::new(HashMap::new());
+    let mut vm = vm::VM::<WrappedState<S>>::new_with_built_in_commands(HashMap::new());
     vm.state.recover_from_errors = true;
     vm.push_source("".to_string(), source.to_string()).unwrap();
     let input = vm::ExecutionInput::new(&mut vm);

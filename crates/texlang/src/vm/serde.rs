@@ -1,21 +1,26 @@
 //! Serialization and deserialization of VMs
 //!
 //! Texlang VMs can be serialized using the standard serde infrastructure
-//!     because they satisfy the [`::serde::Serialize`] trait.
+//!     because they always satisfy the [`::serde::Serialize`] trait.
 //!
-//! Deserialization is slightly more complicated.
-//! This is because VM contains built-in primitives which are regular Rust functions.
-//! It is not possible to fully serialize and deserialize Rust functions.
+//! In the case when the VM's state type implements [`super::HasDefaultBuiltInCommands`],
+//!     the VM satisfies the [`::serde::Deserialize`] trait too.
+//!
+//! If the state type doesn't implement this trait, deserialization is slightly more complicated
+//!     because the set of built-in commands needs to be provided at deserialization time.
+//! This is because the built-in commands which are regular Rust functions,
+//!     and it is not possible to fully serialize and deserialize Rust functions.
 //! Deserialization of VMs is thus a two-step process:
 //!
 //! 1. Deserialize the bytes to a [`DeserializedVM`] type.
 //!
 //! 2. Invoke [`finish_deserialization`] with the deserialized VM
-//!     and a map of built-in primitives in order to recover the regular Texlang VM.
+//!     and a map of built-in commands in order to recover the regular Texlang VM.
 //!
-//! The Texlang VM has a [`deserialize` convenience method](super::VM::deserialize)
+//! The Texlang VM has a [`deserialize_with_built_in_commands` convenience method](super::VM::deserialize_with_built_in_commands)
 //!     which performs both of these steps at once.
-//!
+//! In the case when VM's state type implements [`super::HasDefaultBuiltInCommands`],
+//!     the VM's implementation of [`::serde::Deserialize`] handles all this automatically.
 
 use crate::*;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -59,7 +64,7 @@ impl<State: serde::Serialize> Serialize for vm::VM<State> {
 /// A VM that has been deserialized.
 ///
 /// In order to recover a regular [Texlang `VM`](super::VM) it is necessary to
-///     call the [`finish_deserialization`] function with the relevant initial built-in primitives.
+///     call the [`finish_deserialization`] function with the relevant built-in commands.
 #[derive(Deserialize)]
 pub struct DeserializedVM<'a, S> {
     state: S,
@@ -70,13 +75,13 @@ pub struct DeserializedVM<'a, S> {
 
 /// Finish the deserialization of a VM.
 ///
-/// This function accepts a [`DeserializedVM`] and a collection of initial built-in primitives
+/// This function accepts a [`DeserializedVM`] and a collection of built-in commands
 ///     and returns a regular [Texlang `VM`](super::VM).
 pub fn finish_deserialization<S>(
     #[allow(clippy::boxed_local)] mut deserialized: Box<DeserializedVM<'_, S>>,
-    initial_built_ins: HashMap<&str, command::BuiltIn<S>>,
-) -> Box<vm::VM<S>> {
-    let initial_built_ins = initial_built_ins
+    built_in_commands: HashMap<&str, command::BuiltIn<S>>,
+) -> vm::VM<S> {
+    let built_in_commands = built_in_commands
         .into_iter()
         .map(|(key, value)| {
             let cs_name = deserialized.internal.cs_name_interner.get_or_intern(key);
@@ -86,12 +91,12 @@ pub fn finish_deserialization<S>(
     deserialized.internal.save_stack = deserialized
         .save_stack
         .into_iter()
-        .map(|element| element.finish_deserialization(&initial_built_ins))
+        .map(|element| element.finish_deserialization(&built_in_commands))
         .collect();
     let commands_map = deserialized
         .commands_map
-        .finish_deserialization(initial_built_ins, &deserialized.internal.cs_name_interner);
-    Box::new(vm::VM {
+        .finish_deserialization(built_in_commands, &deserialized.internal.cs_name_interner);
+    vm::VM {
         state: deserialized.state,
         commands_map,
         working_directory: match std::env::current_dir() {
@@ -102,13 +107,13 @@ pub fn finish_deserialization<S>(
             }
         },
         internal: deserialized.internal,
-    })
+    }
 }
 
 pub(super) fn deserialize<'de, D: Deserializer<'de>, S: serde::Deserialize<'de>>(
     deserializer: D,
-    initial_built_ins: HashMap<&str, command::BuiltIn<S>>,
-) -> Box<vm::VM<S>> {
-    let deserialized_vm: Box<DeserializedVM<S>> = Deserialize::deserialize(deserializer).unwrap();
-    finish_deserialization(deserialized_vm, initial_built_ins)
+    built_in_commands: HashMap<&str, command::BuiltIn<S>>,
+) -> Result<vm::VM<S>, D::Error> {
+    let deserialized_vm: Box<DeserializedVM<S>> = Deserialize::deserialize(deserializer)?;
+    Ok(finish_deserialization(deserialized_vm, built_in_commands))
 }

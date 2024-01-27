@@ -163,15 +163,15 @@ implement_has_component![State {
 
 /// Option passed to a test runner.
 pub enum TestOption<'a, S> {
-    /// The initial commands are the result of invoking the provided static function.
+    /// The built-in commands are the result of invoking the provided static function.
     ///
     /// Overrides previous `InitialCommands` or `InitialCommandsDyn` options.
-    InitialCommands(fn() -> HashMap<&'static str, command::BuiltIn<S>>),
+    BuiltInCommands(fn() -> HashMap<&'static str, command::BuiltIn<S>>),
 
-    /// The initial commands are the result of invoking the provided closure.
+    /// The built-in commands are the result of invoking the provided closure.
     ///
     /// Overrides previous `InitialCommands` or `InitialCommandsDyn` options.
-    InitialCommandsDyn(Box<dyn Fn() -> HashMap<&'static str, command::BuiltIn<S>> + 'a>),
+    BuiltInCommandsDyn(Box<dyn Fn() -> HashMap<&'static str, command::BuiltIn<S>> + 'a>),
 
     /// The provided static function is invoked after the VM is created and before execution starts.
     /// This can be used to provide more custom VM initialization.
@@ -357,12 +357,20 @@ pub fn run_serde_test<S>(
             let serialized = serde_json::to_string_pretty(&vm_1).unwrap();
             println!("Serialized VM: {serialized}");
             let mut deserializer = serde_json::Deserializer::from_str(&serialized);
-            vm::VM::deserialize(&mut deserializer, (options.initial_commands)())
+            vm::VM::deserialize_with_built_in_commands(
+                &mut deserializer,
+                (options.built_in_commands)(),
+            )
+            .unwrap()
         }
         SerdeFormat::MessagePack => {
             let serialized = rmp_serde::to_vec(&vm_1).unwrap();
             let mut deserializer = rmp_serde::decode::Deserializer::from_read_ref(&serialized);
-            vm::VM::deserialize(&mut deserializer, (options.initial_commands)())
+            vm::VM::deserialize_with_built_in_commands(
+                &mut deserializer,
+                (options.built_in_commands)(),
+            )
+            .unwrap()
         }
         SerdeFormat::BinCode => {
             let serialized =
@@ -371,7 +379,7 @@ pub fn run_serde_test<S>(
                 bincode::serde::decode_from_slice(&serialized, bincode::config::standard())
                     .unwrap()
                     .0;
-            vm::serde::finish_deserialization(deserialized, (options.initial_commands)())
+            vm::serde::finish_deserialization(deserialized, (options.built_in_commands)())
         }
     };
 
@@ -386,7 +394,7 @@ pub fn run_serde_test<S>(
 }
 
 struct ResolvedOptions<'a, S> {
-    initial_commands: &'a dyn Fn() -> HashMap<&'static str, command::BuiltIn<S>>,
+    built_in_commands: &'a dyn Fn() -> HashMap<&'static str, command::BuiltIn<S>>,
     custom_vm_initialization: &'a dyn Fn(&mut VM<S>),
     allow_undefined_commands: bool,
     recover_from_errors: bool,
@@ -395,15 +403,15 @@ struct ResolvedOptions<'a, S> {
 impl<'a, S> ResolvedOptions<'a, S> {
     pub fn new(options: &'a [TestOption<S>]) -> Self {
         let mut resolved = Self {
-            initial_commands: &HashMap::new,
+            built_in_commands: &HashMap::new,
             custom_vm_initialization: &|_| {},
             allow_undefined_commands: false,
             recover_from_errors: false,
         };
         for option in options {
             match option {
-                TestOption::InitialCommands(f) => resolved.initial_commands = f,
-                TestOption::InitialCommandsDyn(f) => resolved.initial_commands = f,
+                TestOption::BuiltInCommands(f) => resolved.built_in_commands = f,
+                TestOption::BuiltInCommandsDyn(f) => resolved.built_in_commands = f,
                 TestOption::CustomVMInitialization(f) => resolved.custom_vm_initialization = f,
                 TestOption::CustomVMInitializationDyn(f) => resolved.custom_vm_initialization = f,
                 TestOption::AllowUndefinedCommands(b) => resolved.allow_undefined_commands = *b,
@@ -415,7 +423,7 @@ impl<'a, S> ResolvedOptions<'a, S> {
 }
 
 fn initialize_vm<S: Default>(options: &ResolvedOptions<S>) -> Box<vm::VM<S>> {
-    let mut vm = VM::<S>::new((options.initial_commands)());
+    let mut vm = VM::<S>::new_with_built_in_commands((options.built_in_commands)());
     (options.custom_vm_initialization)(&mut vm);
     vm
 }
@@ -502,7 +510,7 @@ impl<S: HasComponent<TestingComponent>> vm::Handlers<S> for Handlers {
 /// # use texlang_testing::*;
 /// test_suite![
 ///     state(State),
-///     options(TestOptions::InitialCommands(initial_commands)),
+///     options(TestOptions::InitialCommands(built_in_commands)),
 ///     expansion_equality_tests(
 ///         (case_1, "lhs_1", "rhs_1"),
 ///         (case_2, "lhs_2", "rhs_2"),
@@ -521,8 +529,8 @@ impl<S: HasComponent<TestingComponent>> vm::Handlers<S> for Handlers {
 ///
 /// - `options(option_1, option_2, ..., option_n)`: options to pass to the test runner.
 ///     This is a list of values of type [TestOption].
-///     The options can be omitted, in which case they default to `options(TestOptions::InitialCommands(initial_commands))`.
-///     In this case `initial_commands` is a static function that returns a list of built-in primitives
+///     The options can be omitted, in which case they default to `options(TestOptions::InitialCommands(built_in_commands))`.
+///     In this case `built_in_commands` is a static function that returns a list of built-in primitives
 ///     to initialize the VM with.
 ///
 /// - `expansion_equality_tests(cases...)`: a list of expansion equality test cases.
@@ -630,6 +638,6 @@ macro_rules! test_suite {
         texlang_testing::test_suite![state(State), options $options, $( $test_kind $test_cases, )+ ];
     );
     ( $( $test_kind: ident $test_cases: tt ),+ $(,)? ) => (
-        texlang_testing::test_suite![options (texlang_testing::TestOption::InitialCommands(initial_commands)), $( $test_kind $test_cases, )+ ];
+        texlang_testing::test_suite![options (texlang_testing::TestOption::BuiltInCommands(built_in_commands)), $( $test_kind $test_cases, )+ ];
     );
 }

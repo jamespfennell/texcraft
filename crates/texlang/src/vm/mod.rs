@@ -324,16 +324,20 @@ pub trait TexlangState: Sized {
 impl TexlangState for () {}
 
 impl<S: Default> VM<S> {
-    /// Create a new VM.
-    pub fn new(initial_built_ins: HashMap<&str, BuiltIn<S>>) -> Box<VM<S>> {
+    /// Create a new VM with the provided built-in commands.
+    ///
+    /// If the state type satisfies the [`HasDefaultBuiltInCommands`] trait,
+    ///     and you are using the default built-ins,
+    ///     use the [`VM::new`] method instead.
+    pub fn new_with_built_in_commands(built_in_commands: HashMap<&str, BuiltIn<S>>) -> Box<VM<S>> {
         let mut internal = Internal::new(Default::default());
-        let initial_built_ins = initial_built_ins
+        let built_in_commands = built_in_commands
             .into_iter()
             .map(|(key, value)| (internal.cs_name_interner.get_or_intern(key), value))
             .collect();
         Box::new(VM {
             state: Default::default(),
-            commands_map: command::Map::new(initial_built_ins),
+            commands_map: command::Map::new(built_in_commands),
             internal,
             working_directory: match std::env::current_dir() {
                 Ok(path_buf) => Some(path_buf),
@@ -346,17 +350,57 @@ impl<S: Default> VM<S> {
     }
 }
 
-/// Deserialize a Texlang VM.
+impl<S: Default + HasDefaultBuiltInCommands> VM<S> {
+    /// Create a new VM.
+    pub fn new() -> Box<VM<S>> {
+        VM::<S>::new_with_built_in_commands(S::default_built_in_commands())
+    }
+}
+
+/// Deserialize a Texlang VM using the provided built-in commands.
 ///
-/// See the [`serde` submodule](serde) for more information on deserialization,
-///     and for functions that don't require a deserializer.
+/// If the state type satisfies the [`HasDefaultBuiltInCommands`] trait,
+///     and you are deserializing using the default built-ins,
+///     you don't need to use this function.
+/// You can use the serde deserialize trait directly.
+/// See the [`serde` submodule](serde) for more information on deserialization.
 #[cfg(feature = "serde")]
 impl<'de, S: ::serde::Deserialize<'de>> VM<S> {
-    pub fn deserialize<D: ::serde::Deserializer<'de>>(
+    pub fn deserialize_with_built_in_commands<D: ::serde::Deserializer<'de>>(
         deserializer: D,
-        initial_built_ins: HashMap<&str, BuiltIn<S>>,
-    ) -> Box<Self> {
-        serde::deserialize(deserializer, initial_built_ins)
+        built_in_commands: HashMap<&str, BuiltIn<S>>,
+    ) -> Result<Self, D::Error> {
+        serde::deserialize(deserializer, built_in_commands)
+    }
+}
+
+/// States that implement this trait have a default set of built-in commands associated to them.
+///
+/// In general in Texlang, the same state type can be used with different sets of built-in
+///     commands.
+/// However in many situations the state type has a specific set of built-ins
+///     associated to it.
+/// For example, the state type corresponding to pdfTeX is associated with the set of built-ins
+///     provided by pdfTeX.
+///
+/// This trait is used to specify this association.
+/// The benefit is that creating new VMs and deserializing VMs is a bit easier
+///     because the built-in commands don't need to be provided explicitly.
+/// Moreover, if a state implements this trait the associated VM implements serde's deserialize trait.
+pub trait HasDefaultBuiltInCommands: TexlangState {
+    fn default_built_in_commands() -> HashMap<&'static str, BuiltIn<Self>>;
+}
+
+#[cfg(feature = "serde")]
+impl<'de, S: ::serde::Deserialize<'de> + HasDefaultBuiltInCommands> ::serde::Deserialize<'de>
+    for VM<S>
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        let built_ins = S::default_built_in_commands();
+        serde::deserialize(deserializer, built_ins)
     }
 }
 

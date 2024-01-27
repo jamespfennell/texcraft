@@ -67,7 +67,7 @@ mod test {
         testing: TestingComponent,
     }];
 
-    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn built_in_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([("def", def::get_def()), ("endlinechar", get_endlinechar())])
     }
 

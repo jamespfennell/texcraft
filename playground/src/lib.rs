@@ -81,69 +81,71 @@ implement_has_component![PlaygroundState{
     time: time::Component,
 }];
 
-fn initial_primitives() -> HashMap<&'static str, command::BuiltIn<PlaygroundState>> {
-    HashMap::from([
-        (
-            "\\",
-            command::Command::CharacterTokenAlias(token::Value::Other('\\')).into(),
-        ),
-        //
-        ("advance", math::get_advance()),
-        //
-        ("catcode", codes::get_catcode()),
-        ("chardef", chardef::get_chardef()),
-        ("count", registers::get_count()),
-        ("countdef", registers::get_countdef()),
-        //
-        ("day", time::get_day()),
-        ("def", def::get_def()),
-        ("divide", math::get_divide()),
-        //
-        ("else", conditional::get_else()),
-        ("endinput", input::get_endinput()),
-        ("endlinechar", endlinechar::get_endlinechar()),
-        ("expandafter", expansion::get_expandafter_optimized()),
-        //
-        //
-        ("fi", conditional::get_fi()),
-        //
-        ("gdef", def::get_gdef()),
-        ("global", prefix::get_global()),
-        ("globaldefs", prefix::get_globaldefs()),
-        //
-        ("ifcase", conditional::get_ifcase()),
-        ("iffalse", conditional::get_iffalse()),
-        ("ifnum", conditional::get_ifnum()),
-        ("ifodd", conditional::get_ifodd()),
-        ("iftrue", conditional::get_iftrue()),
-        //
-        ("let", alias::get_let()),
-        ("long", prefix::get_long()),
-        //
-        ("mathchardef", mathchardef::get_mathchardef()),
-        ("mathcode", codes::get_mathcode()),
-        ("month", time::get_month()),
-        ("multiply", math::get_multiply()),
-        //
-        ("newInt", alloc::get_newint()),
-        ("newIntArray", alloc::get_newintarray()),
-        ("newline", script::get_newline()),
-        ("noexpand", expansion::get_noexpand()),
-        //
-        ("or", conditional::get_or()),
-        ("outer", prefix::get_outer()),
-        //
-        ("par", script::get_par()),
-        //
-        ("relax", expansion::get_relax()),
-        //
-        ("the", the::get_the()),
-        ("toks", registers::get_toks()),
-        ("toksdef", registers::get_toksdef()),
-        ("time", time::get_time()),
-        //
-        ("year", time::get_year()),
-    ])
+impl HasDefaultBuiltInCommands for PlaygroundState {
+    fn default_built_in_commands() -> HashMap<&'static str, command::BuiltIn<Self>> {
+        HashMap::from([
+            (
+                "\\",
+                command::Command::CharacterTokenAlias(token::Value::Other('\\')).into(),
+            ),
+            //
+            ("advance", math::get_advance()),
+            //
+            ("catcode", codes::get_catcode()),
+            ("chardef", chardef::get_chardef()),
+            ("count", registers::get_count()),
+            ("countdef", registers::get_countdef()),
+            //
+            ("day", time::get_day()),
+            ("def", def::get_def()),
+            ("divide", math::get_divide()),
+            //
+            ("else", conditional::get_else()),
+            ("endinput", input::get_endinput()),
+            ("endlinechar", endlinechar::get_endlinechar()),
+            ("expandafter", expansion::get_expandafter_optimized()),
+            //
+            //
+            ("fi", conditional::get_fi()),
+            //
+            ("gdef", def::get_gdef()),
+            ("global", prefix::get_global()),
+            ("globaldefs", prefix::get_globaldefs()),
+            //
+            ("ifcase", conditional::get_ifcase()),
+            ("iffalse", conditional::get_iffalse()),
+            ("ifnum", conditional::get_ifnum()),
+            ("ifodd", conditional::get_ifodd()),
+            ("iftrue", conditional::get_iftrue()),
+            //
+            ("let", alias::get_let()),
+            ("long", prefix::get_long()),
+            //
+            ("mathchardef", mathchardef::get_mathchardef()),
+            ("mathcode", codes::get_mathcode()),
+            ("month", time::get_month()),
+            ("multiply", math::get_multiply()),
+            //
+            ("newInt", alloc::get_newint()),
+            ("newIntArray", alloc::get_newintarray()),
+            ("newline", script::get_newline()),
+            ("noexpand", expansion::get_noexpand()),
+            //
+            ("or", conditional::get_or()),
+            ("outer", prefix::get_outer()),
+            //
+            ("par", script::get_par()),
+            //
+            ("relax", expansion::get_relax()),
+            //
+            ("the", the::get_the()),
+            ("toks", registers::get_toks()),
+            ("toksdef", registers::get_toksdef()),
+            ("time", time::get_time()),
+            //
+            ("year", time::get_year()),
+        ])
+    }
 }
 
 fn new_vm(
@@ -152,7 +154,7 @@ fn new_vm(
     month: i32,
     year: i32,
 ) -> Box<vm::VM<PlaygroundState>> {
-    let mut vm = vm::VM::<PlaygroundState>::new(initial_primitives());
+    let mut vm = vm::VM::<PlaygroundState>::new();
     vm.state.time = time::Component::new_with_values(minutes_since_midnight, day, month, year);
     vm
 }
@@ -164,11 +166,13 @@ mod tests {
     use texlang_stdlib;
 
     #[test]
-    fn initial_primitives_contain_all_std_lib_primitives() {
+    fn built_in_commands_contain_all_std_lib_commands() {
         let playground_primitives: HashSet<&'static str> =
-            initial_primitives().into_keys().collect();
+            PlaygroundState::default_built_in_commands()
+                .into_keys()
+                .collect();
         let std_lib_primitives: HashSet<&'static str> =
-            texlang_stdlib::StdLibState::all_initial_built_ins()
+            texlang_stdlib::StdLibState::default_built_in_commands()
                 .into_keys()
                 .collect();
         let intentionally_missing: HashSet<&'static str> = vec![

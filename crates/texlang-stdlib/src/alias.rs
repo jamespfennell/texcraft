@@ -85,7 +85,7 @@ mod test {
         }
     }
 
-    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn built_in_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("def", def::get_def()),
             ("global", prefix::get_global()),

@@ -112,10 +112,10 @@ fn dump_primitive_fn<
     };
 
     if component.dump_validate != 0 {
-        let initial_built_ins: HashMap<&str, command::BuiltIn<S>> = input
+        let built_in_commands: HashMap<&str, command::BuiltIn<S>> = input
             .vm()
             .commands_map
-            .initial_built_ins()
+            .built_in_commands()
             .iter()
             .map(|(cs_name, command)| {
                 (
@@ -127,18 +127,27 @@ fn dump_primitive_fn<
         match component.dump_format {
             0 => {
                 let mut deserializer = rmp_serde::decode::Deserializer::from_read_ref(&serialized);
-                vm::VM::<S>::deserialize(&mut deserializer, initial_built_ins);
+                // TODO: this shouldn't panic if the deserialization fails!
+                vm::VM::<S>::deserialize_with_built_in_commands(
+                    &mut deserializer,
+                    built_in_commands,
+                )
+                .unwrap();
             }
             1 => {
                 let mut deserializer = serde_json::Deserializer::from_slice(&serialized);
-                vm::VM::<S>::deserialize(&mut deserializer, initial_built_ins);
+                vm::VM::<S>::deserialize_with_built_in_commands(
+                    &mut deserializer,
+                    built_in_commands,
+                )
+                .unwrap();
             }
             2 => {
                 let deserialized: Box<vm::serde::DeserializedVM<S>> =
                     bincode::serde::decode_from_slice(&serialized, bincode::config::standard())
                         .unwrap()
                         .0;
-                vm::serde::finish_deserialization(deserialized, initial_built_ins);
+                vm::serde::finish_deserialization(deserialized, built_in_commands);
             }
             _ => unreachable!(),
         };

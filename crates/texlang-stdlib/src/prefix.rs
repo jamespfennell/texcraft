@@ -446,7 +446,7 @@ mod test {
         testing: TestingComponent,
     }];
 
-    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn built_in_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("global", get_global()),
             ("globaldefs", get_globaldefs()),

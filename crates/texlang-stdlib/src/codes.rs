@@ -142,7 +142,7 @@ mod tests {
         testing: TestingComponent,
     }];
 
-    fn initial_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
+    fn built_in_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("the", the::get_the()),
             ("catcode", get_catcode()),

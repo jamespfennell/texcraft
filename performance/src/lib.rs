@@ -1,15 +1,16 @@
 use rand::Rng;
 use std::process::Command;
 use std::process::Stdio;
+use texlang::traits::*;
 use texlang::vm::VM;
 use texlang_stdlib::script;
 use texlang_stdlib::StdLibState;
 
 pub fn run_in_texcraft(input: &str) {
-    let mut initial_built_ins = StdLibState::all_initial_built_ins();
-    initial_built_ins.insert("par", script::get_par());
-    initial_built_ins.insert("end", script::get_newline());
-    let mut vm = VM::<StdLibState>::new(initial_built_ins);
+    let mut built_in_commands = StdLibState::default_built_in_commands();
+    built_in_commands.insert("par", script::get_par());
+    built_in_commands.insert("end", script::get_newline());
+    let mut vm = VM::<StdLibState>::new_with_built_in_commands(built_in_commands);
     vm.push_source("".to_string(), input.to_string()).unwrap();
     script::run(&mut vm).unwrap();
 }

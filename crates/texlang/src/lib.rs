@@ -27,6 +27,7 @@ pub mod traits {
     pub use super::parse::Parsable;
     pub use super::vm::ExpandedStream;
     pub use super::vm::HasComponent;
+    pub use super::vm::HasDefaultBuiltInCommands;
     pub use super::vm::TexlangState;
     pub use super::vm::TokenStream;
 }

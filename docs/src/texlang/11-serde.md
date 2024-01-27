@@ -139,33 +139,69 @@ Thus to output an empty VM to JSON:
 # extern crate texlang;
 use texlang::vm;
 
-let initial_primitives = Default::default();
-let vm = vm::VM::<()>::new(initial_primitives);
+let built_in_commands = Default::default();
+let vm = vm::VM::<()>::new_with_built_in_commands(built_in_commands);
 let serialized_vm = serde_json::to_string_pretty(&vm).unwrap();
 println!["{serialized_vm}"];
 ```
 
 Deserialization is a little more tricky because the serialized bytes
-    are insufficient to reconstruct the VM;
-    the initial built-in primitives must also be provided again.
-(Fundamentally, Texlang primitives are Rust functions and these cannot be serialized and deserialized.)
+    are insufficient to reconstruct the VM.
+The VM's built-in commands must be provided again at deserialization time.
+This is because, fundamentally, Texlang primitives are Rust function pointers
+    and these cannot be serialized and deserialized.
 
-Deserialization can be done in one of two ways.
-First way: use the [`VM::deserialize`]() helper function that
-    accepts a Serde deserializer and the initial built-ins:
+The easiest way to support deserialization is to implement [`vm::HasDefaultBuiltInCommands`]
+    for the state type.
+For a given state type, this trait provides the default set of built-in commands for that type.
+If this trait is implemented, the VM automatically satisfies the `serde::Deserialize`
+    trait and the type be used in the idiomatic serde way.
+
+```rust
+# extern crate serde;
+# extern crate serde_json;
+# extern crate texlang;
+# use std::collections::HashMap;
+use texlang::vm;
+use texlang::command;
+
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+struct State;
+impl vm::TexlangState for State {}
+impl vm::HasDefaultBuiltInCommands for State {
+    fn default_built_in_commands() -> HashMap<&'static str, command::BuiltIn<Self>> {
+        // Returning an empty set of built-in commands, but in general this will be non-empty.
+        HashMap::new()
+    }
+}
+
+// When `vm::HasDefaultBuiltInCommands` is implemented for the state,
+// the VM's plain `new` constructor can be used.
+let original_vm = vm::VM::<State>::new();
+let serialized_vm = serde_json::to_string_pretty(&original_vm).unwrap();
+println!["{serialized_vm}"];
+
+let deserialized_vm: vm::VM::<State> = serde_json::from_str(&serialized_vm).unwrap();
+```
+
+If the state doesn't implement [`vm::HasDefaultBuiltInCommands`],
+    or you are using a non-default set of built-in commands,
+    deserialization can be done in one of two ways.
+First way: use the [`VM::deserialize_with_built_in_commands`]() helper function that
+    accepts a Serde deserializer and the built-in commands:
 
 ```rust
 # extern crate serde_json;
 # extern crate texlang;
 # use texlang::vm;
 #
-# let initial_primitives = Default::default();
-# let vm = vm::VM::<()>::new(initial_primitives);
+# let built_in_commands = Default::default();
+# let vm = vm::VM::<()>::new_with_built_in_commands(built_in_commands);
 # let serialized_vm = serde_json::to_string_pretty(&vm).unwrap();
-# let initial_primitives = Default::default();
+# let built_in_commands = Default::default();
 
 let mut deserializer = serde_json::Deserializer::from_str(&serialized_vm);
-let vm = vm::VM::<()>::deserialize(&mut deserializer, initial_primitives);
+let vm = vm::VM::<()>::deserialize_with_built_in_commands(&mut deserializer, built_in_commands);
 ```
 
 Second way: first deserialize the bytes to a [`vm::serde::DeserializedVM`]() type,
@@ -176,13 +212,13 @@ Second way: first deserialize the bytes to a [`vm::serde::DeserializedVM`]() typ
 # extern crate texlang;
 # use texlang::vm;
 #
-# let initial_primitives = Default::default();
-# let vm = vm::VM::<()>::new(initial_primitives);
+# let built_in_commands = Default::default();
+# let vm = vm::VM::<()>::new_with_built_in_commands(built_in_commands);
 # let serialized_vm = serde_json::to_string_pretty(&vm).unwrap();
-# let initial_primitives = Default::default();
+# let built_in_commands = Default::default();
 
 let deserialized_vm: Box<vm::serde::DeserializedVM<()>> = serde_json::from_str(&serialized_vm).unwrap();
-let vm = vm::serde::finish_deserialization(deserialized_vm, initial_primitives);
+let vm = vm::serde::finish_deserialization(deserialized_vm, built_in_commands);
 ```
 
 

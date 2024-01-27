@@ -3,6 +3,7 @@ use colored::Colorize;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::PathBuf;
+use texlang::traits::*;
 use texlang::*;
 use texlang_stdlib::job;
 use texlang_stdlib::repl;
@@ -183,7 +184,7 @@ fn doc(vm: &vm::VM<StdLibState>, cs_name: Option<String>) -> Result<(), String> 
 }
 
 fn new_vm(format_file_path: Option<PathBuf>, repl: bool) -> Box<vm::VM<StdLibState>> {
-    let mut m = StdLibState::all_initial_built_ins();
+    let mut m = StdLibState::default_built_in_commands();
     m.insert("par", script::get_par());
     m.insert("newline", script::get_newline());
     m.insert(
@@ -201,15 +202,16 @@ fn new_vm(format_file_path: Option<PathBuf>, repl: bool) -> Box<vm::VM<StdLibSta
     }
 
     match format_file_path {
-        None => vm::VM::<StdLibState>::new(m),
+        None => vm::VM::<StdLibState>::new_with_built_in_commands(m),
         Some(path) => {
             let format_file = std::fs::read(&path).unwrap();
             if path.extension().map(OsStr::to_str) == Some(Some("json")) {
                 let mut deserializer = serde_json::Deserializer::from_slice(&format_file);
-                vm::VM::deserialize(&mut deserializer, m)
+                // TODO: shouldn't panic if this fails!
+                Box::new(vm::VM::deserialize_with_built_in_commands(&mut deserializer, m).unwrap())
             } else {
                 let mut deserializer = rmp_serde::decode::Deserializer::from_read_ref(&format_file);
-                vm::VM::deserialize(&mut deserializer, m)
+                Box::new(vm::VM::deserialize_with_built_in_commands(&mut deserializer, m).unwrap())
             }
         }
     }
