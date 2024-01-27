@@ -116,7 +116,10 @@ impl Convert {
             TfOrPlPath::Tf(tf_path) => {
                 let (tfm_file, _) = tf_path.read()?;
                 let pl_file = tfm::pl::File::from_tfm_file(tfm_file);
-                let pl_output = format!["{}", pl_file.display(3, tfm::pl::CharDisplayFormat::Default)];
+                let pl_output = format![
+                    "{}",
+                    pl_file.display(3, tfm::pl::CharDisplayFormat::Default)
+                ];
                 match &self.output {
                     None => print!("{pl_output}"),
                     Some(TfOrPlPath::Pl(pl_path)) => {

@@ -964,7 +964,9 @@ mod tests {
         let has_tftopl = Command::new("which")
             .arg("tftopl")
             .output()
-            .is_ok();
+            .unwrap()
+            .status
+            .success();
         if !has_tftopl {
             return;
         }

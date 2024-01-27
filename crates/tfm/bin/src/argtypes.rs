@@ -70,13 +70,7 @@ impl PlPath {
     pub fn write(&self, content: &str) -> Result<(), String> {
         match std::fs::write(&self.0, content) {
             Ok(_) => Ok(()),
-            Err(err) => {
-            Err(format!(
-                "Failed to write `{}`: {}",
-                self.0.display(),
-                err
-            ))
-            }
+            Err(err) => Err(format!("Failed to write `{}`: {}", self.0.display(), err)),
         }
     }
 }
