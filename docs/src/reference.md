@@ -10,3 +10,4 @@ The texcraft.dev version is from the most recent deployment of the website.
 | `texlang-stdlib`  | [docs.rs](https://docs.rs/texlang-stdlib) / [texcraft.dev](/reference/texlang_stdlib)
 | `texlang-testing` | [docs.rs](https://docs.rs/texlang-testing) / [texcraft.dev](/reference/texlang_testing)
 | `texcraft-stdext` | [docs.rs](https://docs.rs/texcraft-stdext) / [texcraft.dev](/reference/texcraft_stdext)
+| `tfm`             | [docs.rs](https://docs.rs/tfm) / [texcraft.dev](/reference/tfm/)

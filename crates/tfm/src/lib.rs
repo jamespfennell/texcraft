@@ -197,17 +197,20 @@ impl std::ops::Div<i32> for Number {
 impl std::fmt::Display for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // TFtoPL.2014.40-43
+        if self.0 < 0 {
+            write!(f, "-")?;
+        }
         let integer_part = self.0 / Number::UNITY.0;
         write!(f, "{integer_part}.")?;
-        let mut fp = self.0 % Number::UNITY.0;
+        let mut fp = (self.0 % Number::UNITY.0).abs();
         fp = 10 * fp + 5;
         let mut delta = 10;
         loop {
-            if delta > 0o4000000 {
-                fp = fp + 0o2000000 - delta / 2;
+            if delta > 0o4_000_000 {
+                fp = fp + 0o2_000_000 - delta / 2;
             }
-            write!(f, "{}", fp / 0o4000000)?;
-            fp = 10 * (fp % 0o4000000);
+            write!(f, "{}", fp / 0o4_000_000)?;
+            fp = 10 * (fp % 0o4_000_000);
             delta *= 10;
             if fp <= delta {
                 break;

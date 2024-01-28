@@ -78,9 +78,16 @@ impl Node {
         current_indent: usize,
     ) -> std::fmt::Result {
         match &self.value {
-            NodeValue::Comment(e) => write_balanced_elements(e, f)?,
+            NodeValue::Comment(e) => {
+                write!(f, "(COMMENT ")?;
+                write_balanced_elements(e, f)?;
+                writeln!(f, ")")?;
+            }
             NodeValue::Regular(v) => {
-                write!(f, "{}({} {}", " ".repeat(current_indent), &v.key, &v.data)?;
+                write!(f, "{}({}", " ".repeat(current_indent), &v.key)?;
+                if !v.data.is_empty() {
+                    write!(f, " {}", &v.data)?;
+                }
                 if !v.children.is_empty() {
                     writeln!(f)?;
                 }
@@ -133,12 +140,14 @@ fn write_balanced_elements(
     f: &mut std::fmt::Formatter<'_>,
 ) -> std::fmt::Result {
     for element in elements {
-        write!(f, "(")?;
         match element {
             BalancedElem::String(s) => write!(f, "{s}")?,
-            BalancedElem::Vec(v) => write_balanced_elements(v, f)?,
+            BalancedElem::Vec(v) => {
+                write!(f, "(")?;
+                write_balanced_elements(v, f)?;
+                writeln!(f, ")")?;
+            }
         }
-        writeln!(f, ")")?;
     }
     Ok(())
 }

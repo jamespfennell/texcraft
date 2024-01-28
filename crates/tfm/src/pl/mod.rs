@@ -20,7 +20,7 @@ pub struct File {
     pub char_data: HashMap<Char, CharData>,
     pub lig_kern_boundary_char: Option<Char>,
     pub lig_kern_boundary_char_entrypoint: Option<usize>,
-    pub lig_kern_entrypoints: HashMap<Char, usize>,
+    pub lig_kern_entrypoints: Vec<(Char, usize)>,
     pub lig_kern_instructions: Vec<ligkern::lang::Instruction>,
     pub params: Params,
 }
@@ -107,7 +107,7 @@ impl File {
                                 let u = file.lig_kern_instructions.len();
                                 match v.data {
                                     ast::LigTableLabel::Char(c) => {
-                                        file.lig_kern_entrypoints.insert(c, u);
+                                        file.lig_kern_entrypoints.push((c, u));
                                     }
                                     ast::LigTableLabel::BoundaryChar => {
                                         file.lig_kern_boundary_char_entrypoint = Some(u);
@@ -195,7 +195,7 @@ impl File {
     /// Convert a TFM file into a PL file.
     pub fn from_tfm_file(tfm_file: crate::Font) -> File {
         let mut char_data = HashMap::<Char, CharData>::new();
-        let mut lig_kern_entrypoints = HashMap::<Char, usize>::new();
+        let mut lig_kern_entrypoints = vec![];
         let mut c = tfm_file.smallest_char_code;
         for info in tfm_file.char_infos.into_iter() {
             char_data.insert(
@@ -226,13 +226,31 @@ impl File {
             match info.tag {
                 crate::CharTag::None => {}
                 crate::CharTag::Ligature(u) => {
-                    lig_kern_entrypoints.insert(c, u as usize);
+                    lig_kern_entrypoints.push((c, u as usize));
                 }
                 crate::CharTag::List(_) => todo!(),
                 crate::CharTag::Extension(_) => todo!(),
             }
             c = Char(c.0.checked_add(1).unwrap());
         }
+        // TODO: consider having this logic when we deserialize TFM files?
+        // Or should the TFM type be a low level representation of the file?
+        let lig_kern_instructions: Vec<ligkern::lang::Instruction> = tfm_file
+            .lig_kern_instructions
+            .into_iter()
+            .map(|mut i| {
+                if let ligkern::lang::Operation::Kern(payload) = &mut i.operation {
+                    // TODO: log a warning if the index is not in the kerns array as
+                    // in TFtoPL.2014.76
+                    *payload = tfm_file
+                        .kern
+                        .get(payload.0 as usize)
+                        .copied()
+                        .unwrap_or_default()
+                }
+                i
+            })
+            .collect();
         File {
             header: tfm_file.header,
             design_units: Number::UNITY,
@@ -240,7 +258,7 @@ impl File {
             lig_kern_boundary_char: None,
             lig_kern_boundary_char_entrypoint: None,
             lig_kern_entrypoints,
-            lig_kern_instructions: tfm_file.lig_kern_instructions,
+            lig_kern_instructions,
             params: tfm_file.params,
         }
     }
@@ -267,10 +285,15 @@ impl File {
             TexMathSy,
             TexMathEx,
         }
-        let font_type = match self.header.character_coding_scheme.as_str() {
-            "TEX MATHSY" => FontType::TexMathSy,
-            "TEX MATHEX" => FontType::TexMathEx,
-            _ => FontType::Vanilla,
+        let font_type = {
+            let scheme = self.header.character_coding_scheme.to_uppercase();
+            if scheme.starts_with("TEX MATH SY") {
+                FontType::TexMathSy
+            } else if scheme.starts_with("TEX MATH EX") {
+                FontType::TexMathEx
+            } else {
+                FontType::Vanilla
+            }
         };
         if !self.header.character_coding_scheme.is_empty() {
             let s = sanitize_string(&self.header.character_coding_scheme);
@@ -292,9 +315,31 @@ impl File {
             .enumerate()
             .map(|(i, &param)| {
                 let i: u8 = (i + 1).try_into().unwrap();
-                // TODO: check that each parameter except slant is in the range [-16.0, 16.0] per TFtoPL.2014.60
+                // TFtoPL.2014.61
+                // TODO: check that each parameter *except* SLANT is in the range [-16.0, 16.0] per TFtoPL.2014.60
                 let named_param = match (i, font_type) {
                     (1, _) => NamedParam::Slant,
+                    (2, _) => NamedParam::Space,
+                    (3, _) => NamedParam::Stretch,
+                    (4, _) => NamedParam::Shrink,
+                    (5, _) => NamedParam::XHeight,
+                    (6, _) => NamedParam::Quad,
+                    (7, _) => NamedParam::ExtraSpace,
+                    (8, FontType::TexMathSy) => NamedParam::Num1,
+                    (9, FontType::TexMathSy) => NamedParam::Num2,
+                    (10, FontType::TexMathSy) => NamedParam::Num3,
+                    (11, FontType::TexMathSy) => NamedParam::Denom1,
+                    (12, FontType::TexMathSy) => NamedParam::Denom2,
+                    (13, FontType::TexMathSy) => NamedParam::Sup1,
+                    (14, FontType::TexMathSy) => NamedParam::Sup2,
+                    (15, FontType::TexMathSy) => NamedParam::Sup3,
+                    (16, FontType::TexMathSy) => NamedParam::Sub1,
+                    (17, FontType::TexMathSy) => NamedParam::Sub2,
+                    (18, FontType::TexMathSy) => NamedParam::SupDrop,
+                    (19, FontType::TexMathSy) => NamedParam::SubDrop,
+                    (20, FontType::TexMathSy) => NamedParam::Delim1,
+                    (21, FontType::TexMathSy) => NamedParam::Delim2,
+                    (22, FontType::TexMathSy) => NamedParam::AxisHeight,
                     // TODO: finish this
                     _ => {
                         return ast::FontDimension::IndexedParam((i, param).into());
@@ -304,6 +349,40 @@ impl File {
             })
             .collect();
         roots.push(ast::Root::FontDimension(((), params).into()));
+
+        // Ligtable
+        let mut l = Vec::<ast::LigTable>::new();
+        let mut index_to_labels = HashMap::<usize, Vec<Char>>::new();
+        for (label, index) in &self.lig_kern_entrypoints {
+            index_to_labels.entry(*index).or_default().push(*label)
+        }
+        for (index, instruction) in self.lig_kern_instructions.iter().enumerate() {
+            for label in index_to_labels.get(&index).unwrap_or(&vec![]) {
+                l.push(ast::LigTable::Label(
+                    ast::LigTableLabel::Char(*label).into(),
+                ));
+            }
+            l.push(match instruction.operation {
+                ligkern::lang::Operation::Kern(kern) => {
+                    ast::LigTable::Kern((instruction.right_char, kern).into())
+                }
+                ligkern::lang::Operation::Ligature {
+                    char_to_insert,
+                    post_lig_operation,
+                } => ast::LigTable::Lig(
+                    post_lig_operation,
+                    (instruction.right_char, char_to_insert).into(),
+                ),
+            });
+            match instruction.next_instruction {
+                None => l.push(ast::LigTable::Stop(().into())),
+                Some(0) => {}
+                Some(i) => l.push(ast::LigTable::Skip(i.into())),
+            }
+        }
+        if !l.is_empty() {
+            roots.push(ast::Root::LigTable(((), l).into()))
+        }
 
         ast::Ast(roots)
     }
@@ -557,10 +636,10 @@ mod tests {
                     right_char: 'r'.try_into().unwrap(),
                     operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
                 },],
-                lig_kern_entrypoints: HashMap::from([
+                lig_kern_entrypoints: vec![
                     ('e'.try_into().unwrap(), 0),
                     ('d'.try_into().unwrap(), 1),
-                ]),
+                ],
                 ..Default::default()
             },
         ),

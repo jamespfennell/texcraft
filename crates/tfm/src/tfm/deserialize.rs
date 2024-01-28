@@ -479,7 +479,7 @@ impl Deserialize for ligkern::lang::Instruction {
                 }
             } else {
                 ligkern::lang::Operation::Kern(Number(
-                    // TODO: this is wrong!! This is an index into the kerns array.
+                    // This is an index into the kerns array, not the value itself.
                     256 * (op_byte as i32 - 128) + remainder as i32,
                 ))
             },
