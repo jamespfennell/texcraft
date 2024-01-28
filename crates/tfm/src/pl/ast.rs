@@ -276,6 +276,12 @@ macro_rules! node_impl {
                 }
             }
         }
+        impl $type {
+            pub fn into_balanced_elements(self, char_display_format: super::CharDisplayFormat) -> Vec<cst::BalancedElem> {
+                let opts =  LowerOpts{char_display_format};
+                self.lower(&opts).into_balanced_elements()
+            }
+        }
     };
 }
 

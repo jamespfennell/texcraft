@@ -42,7 +42,7 @@ fn run(args: Cli) -> Result<(), String> {
     };
     let pl_output = format!["{}", pl_file.display(3, char_display_format)];
     match args.pl_file_path {
-        None => println!("{pl_output}"),
+        None => print!("{pl_output}"),
         Some(pl_file_path) => {
             let pl_file_path = with_default_file_extension(pl_file_path, "pl");
             if let Err(err) = std::fs::write(&pl_file_path, pl_output) {

@@ -71,7 +71,7 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn write(
+    fn write(
         &self,
         f: &mut std::fmt::Formatter<'_>,
         indent: usize,
@@ -79,9 +79,8 @@ impl Node {
     ) -> std::fmt::Result {
         match &self.value {
             NodeValue::Comment(e) => {
-                write!(f, "(COMMENT ")?;
-                write_balanced_elements(e, f)?;
-                writeln!(f, ")")?;
+                write!(f, "{}(COMMENT", " ".repeat(current_indent))?;
+                write_balanced_elements(e, f, current_indent + indent, true)?;
             }
             NodeValue::Regular(v) => {
                 write!(f, "{}({}", " ".repeat(current_indent), &v.key)?;
@@ -101,6 +100,25 @@ impl Node {
             }
         }
         Ok(())
+    }
+
+    /// Convert the node into balanced elements.
+    pub fn into_balanced_elements(&self) -> Vec<BalancedElem> {
+        match &self.value {
+            NodeValue::Comment(v) => v.clone(),
+            NodeValue::Regular(regular_node_value) => {
+                let mut s = regular_node_value.key.clone();
+                if !regular_node_value.data.is_empty() {
+                    s.push(' ');
+                    s.push_str(&regular_node_value.data);
+                }
+                let mut v = vec![BalancedElem::String(s)];
+                for child in &regular_node_value.children {
+                    v.push(BalancedElem::Vec(child.into_balanced_elements()))
+                }
+                v
+            }
+        }
     }
 }
 
@@ -138,17 +156,32 @@ pub enum BalancedElem {
 fn write_balanced_elements(
     elements: &[BalancedElem],
     f: &mut std::fmt::Formatter<'_>,
+    current_indent: usize,
+    mut word_before: bool,
 ) -> std::fmt::Result {
     for element in elements {
         match element {
-            BalancedElem::String(s) => write!(f, "{s}")?,
+            BalancedElem::String(s) => {
+                if word_before {
+                    write!(f, " ")?;
+                }
+                write!(f, "{s}")?;
+                word_before = true;
+            }
             BalancedElem::Vec(v) => {
-                write!(f, "(")?;
-                write_balanced_elements(v, f)?;
-                writeln!(f, ")")?;
+                if word_before {
+                    writeln!(f)?;
+                }
+                write!(f, "{}(", " ".repeat(current_indent))?;
+                write_balanced_elements(v, f, current_indent, false)?;
+                word_before = false;
             }
         }
     }
+    if !word_before {
+        write!(f, "{}", " ".repeat(current_indent))?;
+    }
+    writeln!(f, ")")?;
     Ok(())
 }
 

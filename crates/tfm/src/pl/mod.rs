@@ -20,7 +20,7 @@ pub struct File {
     pub char_data: HashMap<Char, CharData>,
     pub lig_kern_boundary_char: Option<Char>,
     pub lig_kern_boundary_char_entrypoint: Option<usize>,
-    pub lig_kern_entrypoints: Vec<(Char, usize)>,
+    pub lig_kern_entrypoints: HashMap<Char, usize>,
     pub lig_kern_instructions: Vec<ligkern::lang::Instruction>,
     pub params: Params,
 }
@@ -107,7 +107,7 @@ impl File {
                                 let u = file.lig_kern_instructions.len();
                                 match v.data {
                                     ast::LigTableLabel::Char(c) => {
-                                        file.lig_kern_entrypoints.push((c, u));
+                                        file.lig_kern_entrypoints.insert(c, u);
                                     }
                                     ast::LigTableLabel::BoundaryChar => {
                                         file.lig_kern_boundary_char_entrypoint = Some(u);
@@ -195,7 +195,7 @@ impl File {
     /// Convert a TFM file into a PL file.
     pub fn from_tfm_file(tfm_file: crate::Font) -> File {
         let mut char_data = HashMap::<Char, CharData>::new();
-        let mut lig_kern_entrypoints = vec![];
+        let mut lig_kern_entrypoints = HashMap::<Char, usize>::new();
         let mut c = tfm_file.smallest_char_code;
         for info in tfm_file.char_infos.into_iter() {
             char_data.insert(
@@ -226,7 +226,7 @@ impl File {
             match info.tag {
                 crate::CharTag::None => {}
                 crate::CharTag::Ligature(u) => {
-                    lig_kern_entrypoints.push((c, u as usize));
+                    lig_kern_entrypoints.insert(c, u as usize);
                 }
                 crate::CharTag::List(_) => todo!(),
                 crate::CharTag::Extension(_) => todo!(),
@@ -304,9 +304,10 @@ impl File {
             ast::Root::Comment(vec!["DESIGNSIZE IS IN POINTS".into()]),
             ast::Root::Comment(vec!["OTHER SIZES ARE MULTIPLES OF DESIGNSIZE".into()]),
             ast::Root::Checksum(self.header.checksum.into()),
-            ast::Root::SevenBitSafeFlag(self.header.seven_bit_safe.unwrap_or(false).into()),
         ]);
-
+        if self.header.seven_bit_safe == Some(true) {
+            roots.push(ast::Root::SevenBitSafeFlag(true.into()));
+        }
         // Next the parameters. This is TFtoPL.2014.58-61
         let params: Vec<ast::FontDimension> = self
             .params
@@ -350,19 +351,22 @@ impl File {
             .collect();
         roots.push(ast::Root::FontDimension(((), params).into()));
 
+        let ordered_chars = {
+            let mut v: Vec<Char> = self.char_data.keys().copied().collect();
+            v.sort();
+            v
+        };
+
         // Ligtable
         let mut l = Vec::<ast::LigTable>::new();
         let mut index_to_labels = HashMap::<usize, Vec<Char>>::new();
-        for (label, index) in &self.lig_kern_entrypoints {
-            index_to_labels.entry(*index).or_default().push(*label)
-        }
-        for (index, instruction) in self.lig_kern_instructions.iter().enumerate() {
-            for label in index_to_labels.get(&index).unwrap_or(&vec![]) {
-                l.push(ast::LigTable::Label(
-                    ast::LigTableLabel::Char(*label).into(),
-                ));
+        for c in &ordered_chars {
+            if let Some(entrypoint) = self.lig_kern_entrypoints.get(c) {
+                index_to_labels.entry(*entrypoint).or_default().push(*c);
             }
-            l.push(match instruction.operation {
+        }
+        let build_lig_kern_op =
+            |instruction: &ligkern::lang::Instruction| match instruction.operation {
                 ligkern::lang::Operation::Kern(kern) => {
                     ast::LigTable::Kern((instruction.right_char, kern).into())
                 }
@@ -373,15 +377,72 @@ impl File {
                     post_lig_operation,
                     (instruction.right_char, char_to_insert).into(),
                 ),
-            });
+            };
+        for (index, instruction) in self.lig_kern_instructions.iter().enumerate() {
+            for label in index_to_labels.get(&index).unwrap_or(&vec![]) {
+                l.push(ast::LigTable::Label(
+                    ast::LigTableLabel::Char(*label).into(),
+                ));
+            }
+            l.push(build_lig_kern_op(instruction));
             match instruction.next_instruction {
                 None => l.push(ast::LigTable::Stop(().into())),
                 Some(0) => {}
+                // TODO: potentially write a warning if i is too big like in TFtoPL.2014.74.
                 Some(i) => l.push(ast::LigTable::Skip(i.into())),
             }
         }
         if !l.is_empty() {
             roots.push(ast::Root::LigTable(((), l).into()))
+        }
+
+        // Characters
+        for c in &ordered_chars {
+            let data = match self.char_data.get(c) {
+                None => continue,
+                Some(data) => data,
+            };
+            let mut v = vec![];
+            if data.width != Number::ZERO {
+                v.push(ast::Character::Width(data.width.into()));
+            }
+            if data.height != Number::ZERO {
+                v.push(ast::Character::Height(data.height.into()));
+            }
+            if data.depth != Number::ZERO {
+                v.push(ast::Character::Depth(data.depth.into()));
+            }
+            if data.italic_correction != Number::ZERO {
+                v.push(ast::Character::ItalicCorrection(
+                    data.italic_correction.into(),
+                ));
+            }
+
+            if let Some(index) = self.lig_kern_entrypoints.get(c) {
+                let mut l = vec![];
+                let mut index = *index;
+                loop {
+                    let instruction = match self.lig_kern_instructions.get(index) {
+                        // TODO: potentially write a warning if the index is too big like in TFtoPL.2014.74.
+                        None => break,
+                        Some(instruction) => instruction,
+                    };
+                    l.push(build_lig_kern_op(instruction));
+                    index = match instruction.next_instruction {
+                        None => break,
+                        Some(inc) => index + 1 + (inc as usize),
+                    };
+                }
+                v.push(ast::Character::Comment(
+                    l.into_iter()
+                        .map(|n| {
+                            // TODO: need to wire in the char display format
+                            cst::BalancedElem::Vec(n.into_balanced_elements(Default::default()))
+                        })
+                        .collect(),
+                ));
+            }
+            roots.push(ast::Root::Character((*c, v).into()));
         }
 
         ast::Ast(roots)
@@ -636,10 +697,10 @@ mod tests {
                     right_char: 'r'.try_into().unwrap(),
                     operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
                 },],
-                lig_kern_entrypoints: vec![
+                lig_kern_entrypoints: HashMap::from([
                     ('e'.try_into().unwrap(), 0),
                     ('d'.try_into().unwrap(), 1),
-                ],
+                ]),
                 ..Default::default()
             },
         ),

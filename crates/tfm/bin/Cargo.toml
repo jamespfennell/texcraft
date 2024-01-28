@@ -10,7 +10,8 @@ ariadne = {version="0.3.0"}
 
 [dev-dependencies]
 assert_cmd = "2.0.12"
-predicates = "3.0.4"
+predicates = {version="3.0.4"}
+tempfile = "3.9.0"
 
 [[bin]]
 name = "tfmtools"
