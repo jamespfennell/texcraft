@@ -18,7 +18,7 @@ fn run_convert_test(tfm: &[u8], pl: &str, command: &str, args: &dyn Fn(&str) -> 
         stderr
     );
     let got = String::from_utf8(output.stdout).unwrap();
-    similar_asserts::assert_eq!(got, pl);
+    similar_asserts::assert_eq!(got, pl.replace("\r\n", "\n"));
 }
 
 macro_rules! convert_tests {
@@ -29,9 +29,6 @@ macro_rules! convert_tests {
                 const TFM: &'static [u8] = include_bytes!($tfm_path);
                 const PL: &'static str = include_str!($pl_path);
 
-                // TODO: get the test working for windows.
-                // The problem is that the new line chars in the file is different than stdout.
-                #[cfg(not(target_os = "windows"))]
                 #[test]
                 fn tfmtools_convert() {
                     run_convert_test(TFM, PL, "tfmtools", &|tfm_file_path| {
@@ -44,7 +41,6 @@ macro_rules! convert_tests {
                     });
                 }
 
-                #[cfg(not(target_os = "windows"))]
                 #[test]
                 fn tftopl() {
                     run_convert_test(TFM, PL, "tftopl", &|tfm_file_path|{
