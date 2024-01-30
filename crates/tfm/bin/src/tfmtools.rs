@@ -108,6 +108,10 @@ struct Convert {
     /// writes the output to path/to/file.tfm.
     #[arg(short, long)]
     output: Option<TfOrPlPath>,
+
+    /// Specification for how to output characters.
+    #[arg(short, long, default_value = "default")]
+    charcode_format: argtypes::CharcodeFormat,
 }
 
 impl Convert {
@@ -118,7 +122,11 @@ impl Convert {
                 let pl_file = tfm::pl::File::from_tfm_file(tfm_file);
                 let pl_output = format![
                     "{}",
-                    pl_file.display(3, tfm::pl::CharDisplayFormat::Default)
+                    pl_file.display(
+                        3,
+                        self.charcode_format
+                            .to_display_format(&pl_file.header.character_coding_scheme)
+                    )
                 ];
                 match &self.output {
                     None => print!("{pl_output}"),

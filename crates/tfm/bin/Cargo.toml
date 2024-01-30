@@ -12,6 +12,7 @@ ariadne = {version="0.3.0"}
 assert_cmd = "2.0.12"
 predicates = {version="3.0.4"}
 tempfile = "3.9.0"
+similar-asserts = "1.5.0"
 
 [[bin]]
 name = "tfmtools"

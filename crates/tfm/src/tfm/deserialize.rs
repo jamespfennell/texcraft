@@ -432,7 +432,7 @@ impl Deserialize for CharInfo {
             tag: match b[2] % (1 << 2) {
                 0 => CharTag::None,
                 1 => CharTag::Ligature(b[3]),
-                2 => CharTag::List(b[3]),
+                2 => CharTag::List(Char(b[3])),
                 _ => CharTag::Extension(b[3]),
             },
         }
@@ -493,11 +493,18 @@ impl DeserializeFixed for ligkern::lang::Instruction {
 
 impl Deserialize for ExtensibleRecipe {
     fn deserialize(b: &[u8]) -> Self {
+        let char_or = |b: u8| {
+            if b == 0 {
+                None
+            } else {
+                Some(Char(b))
+            }
+        };
         ExtensibleRecipe {
-            top: b[0],
-            middle: b[1],
-            bottom: b[2],
-            rep: b[3],
+            top: char_or(b[0]),
+            middle: char_or(b[1]),
+            bottom: char_or(b[2]),
+            rep: Char(b[3]),
         }
     }
 }
@@ -520,25 +527,13 @@ mod tests {
         ( $( ($name: ident, $input: expr, $want: expr), )+ ) => {
             $(
                 mod $name {
+                    use super::*;
                     #[test]
                     fn unit_test() {
                         let input = $input;
                         let want = $want;
                         let got = deserialize(&input);
                         assert_eq!(got, want);
-                    }
-
-                    use super::*;
-                    #[test]
-                    fn tftopl_error_message_test() {
-                        let input = $input;
-                        let want: Result<(Font, Vec<Warning>), Error> = $want;
-                        let want = match want {
-                            Ok(_) => return,
-                            Err(err) => err,
-                        };
-                        let name = std::module_path!();
-                        tftopl_error_test(&input, want, name);
                     }
                 }
             )+
@@ -878,10 +873,10 @@ mod tests {
             Ok((
                 Font {
                     extensible_chars: vec![ExtensibleRecipe {
-                        top: 17,
-                        middle: 19,
-                        bottom: 23,
-                        rep: 27,
+                        top: Some(Char(17)),
+                        middle: Some(Char(19)),
+                        bottom: Some(Char(23)),
+                        rep: Char(27),
                     }],
                     ..Default::default()
                 },
@@ -947,42 +942,6 @@ mod tests {
         v.extend(header);
         v.extend(&[0_u8; 16]); // the widths etc.
         v
-    }
-
-    fn tftopl_error_test(input: &[u8], want: Error, name: &str) {
-        use std::process::Command;
-
-        let name: String = name
-            .chars()
-            .map(|c| if c.is_alphanumeric() { c } else { '_' })
-            .collect();
-        let mut input_path = std::env::temp_dir();
-        input_path.push(name);
-        input_path.set_extension("tfm");
-        std::fs::write(&input_path, input).expect("Unable to write file");
-
-        let has_tftopl = Command::new("which")
-            .arg("tftopl")
-            .output()
-            .unwrap()
-            .status
-            .success();
-        if !has_tftopl {
-            return;
-        }
-
-        let output = Command::new("tftopl")
-            .arg(&input_path)
-            .output()
-            .expect("tftopl command failed to start");
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let want_message = want.tf_to_pl_message();
-        assert!(
-            stderr.contains(&want_message),
-            "got: {}, want: {}",
-            stderr,
-            want_message
-        );
     }
 
     #[test]

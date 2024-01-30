@@ -135,14 +135,6 @@ impl TryFrom<char> for Char {
     }
 }
 
-#[derive(Default, PartialEq, Eq, Debug)]
-pub struct CharData {
-    pub width: Number,
-    pub height: Number,
-    pub depth: Number,
-    pub italic_correction: Number,
-}
-
 /// Fixed-width numeric type used in TFM files.
 ///
 /// This numeric type has 11 bits for the integer part,
@@ -229,11 +221,12 @@ pub struct CharInfo {
     pub tag: CharTag,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum CharTag {
+    #[default]
     None,
     Ligature(u8),
-    List(u8),
+    List(Char),
     Extension(u8),
 }
 
@@ -314,12 +307,12 @@ impl From<Face> for u8 {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExtensibleRecipe {
-    pub top: u8,
-    pub middle: u8,
-    pub bottom: u8,
-    pub rep: u8,
+    pub top: Option<Char>,
+    pub middle: Option<Char>,
+    pub bottom: Option<Char>,
+    pub rep: Char,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]

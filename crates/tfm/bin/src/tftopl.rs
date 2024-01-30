@@ -34,13 +34,14 @@ fn run(args: Cli) -> Result<(), String> {
         eprintln!("{}", warning.tf_to_pl_message())
     }
     let pl_file = tfm::pl::File::from_tfm_file(tfm_file);
-    let char_display_format = match args.charcode_format {
-        argtypes::CharcodeFormat::Default => tfm::pl::CharDisplayFormat::Default,
-        // TODO: handle the Tex fontex
-        argtypes::CharcodeFormat::Ascii => tfm::pl::CharDisplayFormat::Ascii,
-        argtypes::CharcodeFormat::Octal => tfm::pl::CharDisplayFormat::Octal,
-    };
-    let pl_output = format!["{}", pl_file.display(3, char_display_format)];
+    let pl_output = format![
+        "{}",
+        pl_file.display(
+            3,
+            args.charcode_format
+                .to_display_format(&pl_file.header.character_coding_scheme)
+        )
+    ];
     match args.pl_file_path {
         None => print!("{pl_output}"),
         Some(pl_file_path) => {

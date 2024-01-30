@@ -448,31 +448,31 @@ node_impl!(
     ),
     (
         BIG_OP_SPACING_1,
-        "BIGOPSPACE1",
+        "BIGOPSPACING1",
         NamedParam,
         NamedParam::BigOpSpacing1
     ),
     (
         BIG_OP_SPACING_2,
-        "BIGOPSPACE2",
+        "BIGOPSPACING2",
         NamedParam,
         NamedParam::BigOpSpacing2
     ),
     (
         BIG_OP_SPACING_3,
-        "BIGOPSPACE3",
+        "BIGOPSPACING3",
         NamedParam,
         NamedParam::BigOpSpacing3
     ),
     (
         BIG_OP_SPACING_4,
-        "BIGOPSPACE4",
+        "BIGOPSPACING4",
         NamedParam,
         NamedParam::BigOpSpacing4
     ),
     (
         BIG_OP_SPACING_5,
-        "BIGOPSPACE5",
+        "BIGOPSPACING5",
         NamedParam,
         NamedParam::BigOpSpacing5
     ),
@@ -499,7 +499,7 @@ pub enum Character {
     /// Specifies the character that follows the present one in a "charlist."
     /// The value must be the number of a character in the font,
     ///     and there must be no infinite cycles of supposedly larger and larger characters.
-    NextLarger(SingleValue<u8>),
+    NextLarger(SingleValue<Char>),
 
     /// Specifies an extensible character.
     /// This option and `NEXTLARGER` are mutually exclusive;
@@ -526,16 +526,16 @@ node_impl!(
 #[derive(PartialEq, Eq, Debug)]
 pub enum ExtensibleCharacter {
     /// The top piece of an extensible character, or 0 if the top piece is absent.
-    Top(SingleValue<u8>),
+    Top(SingleValue<Char>),
 
     /// The middle piece of an extensible character, or 0 if the top piece is absent.
-    Middle(SingleValue<u8>),
+    Middle(SingleValue<Char>),
 
     /// The bottom piece of an extensible character, or 0 if the top piece is absent.
-    Bottom(SingleValue<u8>),
+    Bottom(SingleValue<Char>),
 
     /// The replicated piece of an extensible character, or 0 if it is absent.
-    Replicated(SingleValue<u8>),
+    Replicated(SingleValue<Char>),
 
     /// A comment that is ignored.
     Comment(Vec<cst::BalancedElem>),
@@ -946,6 +946,8 @@ impl Parse for Char {
     }
     fn to_string(self, opts: &LowerOpts) -> String {
         // TFtoPL.2014.38 and my interpretation of `man tftopl`
+        // TODO: figure out where the ASCII is coming from! The Knuth source code
+        // doesn't seem to handle it at all.
         use super::CharDisplayFormat;
         let output_as_ascii = match (opts.char_display_format, self.0 as char) {
             (CharDisplayFormat::Default, 'a'..='z' | 'A'..='Z' | '0'..='9') => true,

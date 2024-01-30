@@ -4,13 +4,31 @@
 
 use std::collections::HashMap;
 
-use crate::{ligkern, Char, CharData, Header, NamedParam, Number, Params};
+use crate::{ligkern, Char, ExtensibleRecipe, Header, NamedParam, Number, Params};
 use error::Error;
 
 pub mod ast;
 pub mod cst;
 pub mod error;
 pub mod lexer;
+
+#[derive(Default, PartialEq, Eq, Debug)]
+pub struct CharData {
+    pub width: Number,
+    pub height: Number,
+    pub depth: Number,
+    pub italic_correction: Number,
+    pub tag: CharTag,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub enum CharTag {
+    #[default]
+    None,
+    Ligature(usize),
+    List(Char),
+    Extension(ExtensibleRecipe),
+}
 
 /// Complete contents of a property list (.pl) file.
 #[derive(PartialEq, Eq, Debug)]
@@ -20,7 +38,6 @@ pub struct File {
     pub char_data: HashMap<Char, CharData>,
     pub lig_kern_boundary_char: Option<Char>,
     pub lig_kern_boundary_char_entrypoint: Option<usize>,
-    pub lig_kern_entrypoints: HashMap<Char, usize>,
     pub lig_kern_instructions: Vec<ligkern::lang::Instruction>,
     pub params: Params,
 }
@@ -33,7 +50,6 @@ impl Default for File {
             char_data: Default::default(),
             lig_kern_boundary_char: Default::default(),
             lig_kern_boundary_char_entrypoint: None,
-            lig_kern_entrypoints: Default::default(),
             lig_kern_instructions: Default::default(),
             params: Default::default(),
         }
@@ -107,7 +123,9 @@ impl File {
                                 let u = file.lig_kern_instructions.len();
                                 match v.data {
                                     ast::LigTableLabel::Char(c) => {
-                                        file.lig_kern_entrypoints.insert(c, u);
+                                        let char_data = file.char_data.entry(c).or_default();
+                                        // TODO: error if the tag is already set
+                                        char_data.tag = CharTag::Ligature(u);
                                     }
                                     ast::LigTableLabel::BoundaryChar => {
                                         file.lig_kern_boundary_char_entrypoint = Some(u);
@@ -179,7 +197,10 @@ impl File {
                             ast::Character::ItalicCorrection(v) => {
                                 char_data.italic_correction = v.data;
                             }
-                            ast::Character::NextLarger(_) => todo!(),
+                            ast::Character::NextLarger(c) => {
+                                // TODO: warning if tag != CharTag::None
+                                char_data.tag = CharTag::List(c.data);
+                            }
                             ast::Character::ExtensibleCharacter(_) => todo!(),
                             ast::Character::Comment(_) => {}
                         }
@@ -195,7 +216,6 @@ impl File {
     /// Convert a TFM file into a PL file.
     pub fn from_tfm_file(tfm_file: crate::Font) -> File {
         let mut char_data = HashMap::<Char, CharData>::new();
-        let mut lig_kern_entrypoints = HashMap::<Char, usize>::new();
         let mut c = tfm_file.smallest_char_code;
         for info in tfm_file.char_infos.into_iter() {
             char_data.insert(
@@ -221,16 +241,19 @@ impl File {
                         .get(info.italic_index as usize)
                         .copied()
                         .unwrap_or_default(),
+                    tag: match info.tag {
+                        crate::CharTag::None => CharTag::None,
+                        crate::CharTag::Ligature(u) => CharTag::Ligature(u as usize),
+                        crate::CharTag::List(c) => CharTag::List(c),
+                        crate::CharTag::Extension(i) => {
+                            // TODO: don't panic
+                            CharTag::Extension(
+                                tfm_file.extensible_chars.get(i as usize).cloned().unwrap(),
+                            )
+                        }
+                    },
                 },
             );
-            match info.tag {
-                crate::CharTag::None => {}
-                crate::CharTag::Ligature(u) => {
-                    lig_kern_entrypoints.insert(c, u as usize);
-                }
-                crate::CharTag::List(_) => todo!(),
-                crate::CharTag::Extension(_) => todo!(),
-            }
             c = Char(c.0.checked_add(1).unwrap());
         }
         // TODO: consider having this logic when we deserialize TFM files?
@@ -257,14 +280,13 @@ impl File {
             char_data,
             lig_kern_boundary_char: None,
             lig_kern_boundary_char_entrypoint: None,
-            lig_kern_entrypoints,
             lig_kern_instructions,
             params: tfm_file.params,
         }
     }
 
     /// Lower a File to an AST.
-    pub fn lower(&self) -> ast::Ast {
+    pub fn lower(&self, char_display_format: CharDisplayFormat) -> ast::Ast {
         let mut roots = vec![];
 
         // First output the header. This is TFtoPL.2014.48-57.
@@ -341,7 +363,12 @@ impl File {
                     (20, FontType::TexMathSy) => NamedParam::Delim1,
                     (21, FontType::TexMathSy) => NamedParam::Delim2,
                     (22, FontType::TexMathSy) => NamedParam::AxisHeight,
-                    // TODO: finish this
+                    (8, FontType::TexMathEx) => NamedParam::DefaultRuleThickness,
+                    (9, FontType::TexMathEx) => NamedParam::BigOpSpacing1,
+                    (10, FontType::TexMathEx) => NamedParam::BigOpSpacing2,
+                    (11, FontType::TexMathEx) => NamedParam::BigOpSpacing3,
+                    (12, FontType::TexMathEx) => NamedParam::BigOpSpacing4,
+                    (13, FontType::TexMathEx) => NamedParam::BigOpSpacing5,
                     _ => {
                         return ast::FontDimension::IndexedParam((i, param).into());
                     }
@@ -361,8 +388,10 @@ impl File {
         let mut l = Vec::<ast::LigTable>::new();
         let mut index_to_labels = HashMap::<usize, Vec<Char>>::new();
         for c in &ordered_chars {
-            if let Some(entrypoint) = self.lig_kern_entrypoints.get(c) {
-                index_to_labels.entry(*entrypoint).or_default().push(*c);
+            if let Some(char_data) = self.char_data.get(c) {
+                if let CharTag::Ligature(index) = char_data.tag {
+                    index_to_labels.entry(index).or_default().push(*c);
+                }
             }
         }
         let build_lig_kern_op =
@@ -403,9 +432,7 @@ impl File {
                 Some(data) => data,
             };
             let mut v = vec![];
-            if data.width != Number::ZERO {
-                v.push(ast::Character::Width(data.width.into()));
-            }
+            v.push(ast::Character::Width(data.width.into()));
             if data.height != Number::ZERO {
                 v.push(ast::Character::Height(data.height.into()));
             }
@@ -417,30 +444,54 @@ impl File {
                     data.italic_correction.into(),
                 ));
             }
+            // The corresponding check in TFtoPL.2014.78 is that the tfm file's width index is 0,
+            // not that the width itself is 0. It think there is an edge case where this matters.
+            if v.len() == 1 && data.width == Number::ZERO {
+                continue;
+            }
 
-            if let Some(index) = self.lig_kern_entrypoints.get(c) {
-                let mut l = vec![];
-                let mut index = *index;
-                loop {
-                    let instruction = match self.lig_kern_instructions.get(index) {
-                        // TODO: potentially write a warning if the index is too big like in TFtoPL.2014.74.
-                        None => break,
-                        Some(instruction) => instruction,
-                    };
-                    l.push(build_lig_kern_op(instruction));
-                    index = match instruction.next_instruction {
-                        None => break,
-                        Some(inc) => index + 1 + (inc as usize),
-                    };
+            match &data.tag {
+                CharTag::None => {}
+                CharTag::Ligature(index) => {
+                    let mut l = vec![];
+                    let mut index = *index;
+                    loop {
+                        let instruction = match self.lig_kern_instructions.get(index) {
+                            // TODO: potentially write a warning if the index is too big like in TFtoPL.2014.74.
+                            None => break,
+                            Some(instruction) => instruction,
+                        };
+                        l.push(build_lig_kern_op(instruction));
+                        index = match instruction.next_instruction {
+                            None => break,
+                            Some(inc) => index + 1 + (inc as usize),
+                        };
+                    }
+                    v.push(ast::Character::Comment(
+                        l.into_iter()
+                            .map(|n| {
+                                cst::BalancedElem::Vec(
+                                    n.into_balanced_elements(char_display_format),
+                                )
+                            })
+                            .collect(),
+                    ));
                 }
-                v.push(ast::Character::Comment(
-                    l.into_iter()
-                        .map(|n| {
-                            // TODO: need to wire in the char display format
-                            cst::BalancedElem::Vec(n.into_balanced_elements(Default::default()))
-                        })
-                        .collect(),
-                ));
+                CharTag::List(c) => v.push(ast::Character::NextLarger((*c).into())),
+                CharTag::Extension(recipe) => {
+                    let mut r = vec![];
+                    if let Some(top) = recipe.top {
+                        r.push(ast::ExtensibleCharacter::Top(top.into()));
+                    }
+                    if let Some(middle) = recipe.middle {
+                        r.push(ast::ExtensibleCharacter::Middle(middle.into()));
+                    }
+                    if let Some(bottom) = recipe.bottom {
+                        r.push(ast::ExtensibleCharacter::Bottom(bottom.into()));
+                    }
+                    r.push(ast::ExtensibleCharacter::Replicated(recipe.rep.into()));
+                    v.push(ast::Character::ExtensibleCharacter(((), r).into()))
+                }
             }
             roots.push(ast::Root::Character((*c, v).into()));
         }
@@ -482,7 +533,7 @@ pub struct Display<'a> {
 
 impl<'a> std::fmt::Display for Display<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let ast = self.pl_file.lower();
+        let ast = self.pl_file.lower(self.char_display_format);
         let cst = ast.lower(self.char_display_format);
         cst.display(self.indent).fmt(f)
     }
@@ -493,6 +544,7 @@ impl<'a> std::fmt::Display for Display<'a> {
 pub enum CharDisplayFormat {
     /// Letters and numbers are output in PL ASCII format (e.g. `C A`), and
     /// other characters are output in octal (e.g. `O 14`).
+    /// TODO: rename this variant to AlphanumericAscii or something like that.
     #[default]
     Default,
     /// Visible ASCII characters except ( and ) are output in PL ASCII format (e.g. `C A`), and
@@ -697,9 +749,21 @@ mod tests {
                     right_char: 'r'.try_into().unwrap(),
                     operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
                 },],
-                lig_kern_entrypoints: HashMap::from([
-                    ('e'.try_into().unwrap(), 0),
-                    ('d'.try_into().unwrap(), 1),
+                char_data: HashMap::from([
+                    (
+                        'e'.try_into().unwrap(),
+                        CharData {
+                            tag: CharTag::Ligature(0),
+                            ..Default::default()
+                        }
+                    ),
+                    (
+                        'd'.try_into().unwrap(),
+                        CharData {
+                            tag: CharTag::Ligature(1),
+                            ..Default::default()
+                        }
+                    ),
                 ]),
                 ..Default::default()
             },

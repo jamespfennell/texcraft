@@ -13,6 +13,23 @@ pub enum CharcodeFormat {
     Octal,
 }
 
+impl CharcodeFormat {
+    pub fn to_display_format(&self, character_coding_scheme: &str) -> tfm::pl::CharDisplayFormat {
+        match self {
+            Self::Default => {
+                let scheme = character_coding_scheme.to_uppercase();
+                if scheme.starts_with("TEX MATH SY") || scheme.starts_with("TEX MATH EX") {
+                    tfm::pl::CharDisplayFormat::Octal
+                } else {
+                    tfm::pl::CharDisplayFormat::Default
+                }
+            }
+            Self::Ascii => tfm::pl::CharDisplayFormat::Ascii,
+            Self::Octal => tfm::pl::CharDisplayFormat::Octal,
+        }
+    }
+}
+
 impl TfOrPlPath {
     pub fn parse(input: &str) -> Result<Self, InvalidExtension> {
         let path_buf: std::path::PathBuf = input.into();
