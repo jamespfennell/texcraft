@@ -4,6 +4,7 @@
 //! wget "https://mirrors.ctan.org/fonts/cm/tfm.zip" -O tfm.zip && unzip tfm.zip && rm tfm.zip
 //! ```
 
+// TODO: delete all this
 pub struct TfmFile {
     pub path: &'static str,
     pub data: &'static [u8],

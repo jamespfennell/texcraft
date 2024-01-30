@@ -1,6 +1,6 @@
 //! Lexer for property list files.
 
-use super::error::Error;
+use super::error::ParseError;
 
 /// Type of a token.
 #[derive(PartialEq, Eq, Debug)]
@@ -100,7 +100,7 @@ impl Lexer {
 }
 
 impl Iterator for Lexer {
-    type Item = Result<Token, Error>;
+    type Item = Result<Token, ParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -117,7 +117,7 @@ impl Iterator for Lexer {
                 '\r' => {
                     if !self.source[self.current + 1..].starts_with('\n') {
                         self.current += 1;
-                        return Some(Err(Error::InvalidCharacter('\r', start_of_token)));
+                        return Some(Err(ParseError::InvalidCharacter('\r', start_of_token)));
                     }
                     match self.accumulate_whitespace() {
                         None => continue,
@@ -140,7 +140,7 @@ impl Iterator for Lexer {
                 }
                 c => {
                     self.current += c.len_utf8();
-                    return Some(Err(Error::InvalidCharacter(c, start_of_token)));
+                    return Some(Err(ParseError::InvalidCharacter(c, start_of_token)));
                 }
             };
             return Some(Ok(Token(kind, start_of_token)));
@@ -159,16 +159,16 @@ mod test {
                 #[test]
                 fn $name() {
                     let input = $input;
-                    let want: Vec<Result<Token, Error>> = $want;
+                    let want: Vec<Result<Token, ParseError>> = $want;
                     let lexer = Lexer::new(&input);
-                    let got: Vec<Result<Token, Error>> = lexer.collect();
+                    let got: Vec<Result<Token, ParseError>> = lexer.collect();
                     assert_eq!(got, want);
                 }
             )+
         };
     }
 
-    fn token(kind: TokenKind, span: usize) -> Result<Token, Error> {
+    fn token(kind: TokenKind, span: usize) -> Result<Token, ParseError> {
         Ok(Token(kind, span))
     }
 
@@ -258,7 +258,7 @@ mod test {
             vec![
                 token(OpenParenthesis, 0),
                 token(Word("H".into()), 1),
-                Err(Error::InvalidCharacter('Ë', 2)),
+                Err(ParseError::InvalidCharacter('Ë', 2)),
                 token(Word("LLO".into()), 4),
                 token(ClosedParenthesis, 7),
             ],
@@ -269,7 +269,7 @@ mod test {
             vec![
                 token(OpenParenthesis, 0),
                 token(Word("H".into()), 1),
-                Err(Error::InvalidCharacter('\r', 2)),
+                Err(ParseError::InvalidCharacter('\r', 2)),
                 token(Word("LLO".into()), 3),
                 token(ClosedParenthesis, 6),
             ],
@@ -281,7 +281,7 @@ mod test {
                 token(OpenParenthesis, 0),
                 token(Word("H".into()), 1),
                 token(Whitespace(1, false), 2),
-                Err(Error::InvalidCharacter('\r', 3)),
+                Err(ParseError::InvalidCharacter('\r', 3)),
                 token(Word("LLO".into()), 4),
                 token(ClosedParenthesis, 7),
             ],

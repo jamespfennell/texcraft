@@ -1,7 +1,8 @@
 //! Errors relating to property list file parsing
 
+/// Errors while parsing a property list file
 #[derive(PartialEq, Eq, Debug)]
-pub enum Error {
+pub enum ParseError {
     InvalidCharacter(char, usize),
     InvalidPropertyName {
         name: String,
@@ -57,33 +58,33 @@ pub enum Error {
     },
 }
 
-impl Error {
+impl ParseError {
     pub fn title(&self) -> String {
         match self {
-            Error::InvalidCharacter(c, _) => {
+            ParseError::InvalidCharacter(c, _) => {
                 format!["invalid character {} (U+{:04X})", *c, *c as u32]
             }
-            Error::InvalidPropertyName { name, .. } => {
+            ParseError::InvalidPropertyName { name, .. } => {
                 format!["invalid property name {name}"]
             }
-            Error::UnbalancedOpeningParenthesis { .. } => {
+            ParseError::UnbalancedOpeningParenthesis { .. } => {
                 "file ended before opening parenthesis was closed".to_string()
             }
-            Error::JunkInPropertyList { value, .. } => {
+            ParseError::JunkInPropertyList { value, .. } => {
                 format!["unexpected junk string '{value}' in the middle of a property list",]
             }
-            Error::UnexpectedRightParenthesis { .. } => "unexpected right parenthesis".to_string(),
-            Error::InvalidPrefixForInteger { .. } => {
+            ParseError::UnexpectedRightParenthesis { .. } => "unexpected right parenthesis".to_string(),
+            ParseError::InvalidPrefixForInteger { .. } => {
                 "invalid prefix for integer constant: an octal 'O' or hexadecimal 'H' is required"
                     .to_string()
             }
-            Error::IntegerTooBig { .. } => {
+            ParseError::IntegerTooBig { .. } => {
                 "integer too big: the largest allowed value is O37777777777 or HFFFFFFF".to_string()
             }
-            Error::InvalidOctalDigit { c, .. } => {
+            ParseError::InvalidOctalDigit { c, .. } => {
                 format!["invalid octal digit {c}: only digits 0 through 7 inclusive may appear"]
             }
-            Error::SmallIntegerTooBig { radix, .. } => {
+            ParseError::SmallIntegerTooBig { radix, .. } => {
                 let max = match radix {
                     8 => "0o377",
                     10 => "255",
@@ -91,19 +92,19 @@ impl Error {
                 };
                 format!["integer too big: the largest allowed value is {max}"]
             }
-            Error::InvalidFaceCode { .. } => "invalid face code; using MRR instead".to_string(),
-            Error::InvalidCharacterForSmallInteger { .. } => {
+            ParseError::InvalidFaceCode { .. } => "invalid face code; using MRR instead".to_string(),
+            ParseError::InvalidCharacterForSmallInteger { .. } => {
                 "invalid character; only printable ASCII characters are allowed".to_string()
             }
-            Error::InvalidPrefixForSmallInteger { .. } => {
+            ParseError::InvalidPrefixForSmallInteger { .. } => {
                 "invalid prefix for integer constant: need C/O/D/H/F".to_string()
             }
-            Error::InvalidBoolean { .. } => "invalid boolean: must be TRUE or FALSE".to_string(),
-            Error::InvalidHeaderIndex { .. } => {
+            ParseError::InvalidBoolean { .. } => "invalid boolean: must be TRUE or FALSE".to_string(),
+            ParseError::InvalidHeaderIndex { .. } => {
                 "invalid header index: must be 18 or larger".to_string()
             }
-            Error::DecimalTooLarge { .. } => "real constants must be less than 2048".to_string(),
-            Error::InvalidPrefixForDecimal { .. } => {
+            ParseError::DecimalTooLarge { .. } => "real constants must be less than 2048".to_string(),
+            ParseError::InvalidPrefixForDecimal { .. } => {
                 "invalid prefix for decimal constant: need R or D".to_string()
             }
         }
@@ -111,26 +112,26 @@ impl Error {
 
     pub fn pl_to_tf_section(&self) -> (u8, u8) {
         match self {
-            Error::InvalidCharacter(_, _) => (32, 1),
-            Error::InvalidPropertyName { .. } => (49, 1),
-            Error::UnbalancedOpeningParenthesis { .. } => (33, 1),
-            Error::JunkInPropertyList { .. } => (83, 1),
-            Error::UnexpectedRightParenthesis { .. } => (82, 1),
-            Error::InvalidPrefixForInteger { .. } => (59, 1),
-            Error::IntegerTooBig { .. } => (60, 1),
-            Error::InvalidOctalDigit { .. } => (60, 2),
-            Error::SmallIntegerTooBig { radix, .. } => match radix {
+            ParseError::InvalidCharacter(_, _) => (32, 1),
+            ParseError::InvalidPropertyName { .. } => (49, 1),
+            ParseError::UnbalancedOpeningParenthesis { .. } => (33, 1),
+            ParseError::JunkInPropertyList { .. } => (83, 1),
+            ParseError::UnexpectedRightParenthesis { .. } => (82, 1),
+            ParseError::InvalidPrefixForInteger { .. } => (59, 1),
+            ParseError::IntegerTooBig { .. } => (60, 1),
+            ParseError::InvalidOctalDigit { .. } => (60, 2),
+            ParseError::SmallIntegerTooBig { radix, .. } => match radix {
                 8 => (54, 1),
                 10 => (53, 1),
                 _ => (55, 1),
             },
-            Error::InvalidFaceCode { .. } => (56, 1),
-            Error::InvalidCharacterForSmallInteger { .. } => (52, 1),
-            Error::InvalidPrefixForSmallInteger { .. } => (51, 1),
-            Error::InvalidBoolean { .. } => (90, 1),
-            Error::InvalidHeaderIndex { .. } => (91, 1),
-            Error::DecimalTooLarge { .. } => (64, 1),
-            Error::InvalidPrefixForDecimal { .. } => (62, 1),
+            ParseError::InvalidFaceCode { .. } => (56, 1),
+            ParseError::InvalidCharacterForSmallInteger { .. } => (52, 1),
+            ParseError::InvalidPrefixForSmallInteger { .. } => (51, 1),
+            ParseError::InvalidBoolean { .. } => (90, 1),
+            ParseError::InvalidHeaderIndex { .. } => (91, 1),
+            ParseError::DecimalTooLarge { .. } => (64, 1),
+            ParseError::InvalidPrefixForDecimal { .. } => (62, 1),
         }
     }
 
@@ -145,7 +146,7 @@ mod report {
     use super::*;
     use ariadne::*;
 
-    pub fn build(error: &Error) -> Report {
+    pub fn build(error: &ParseError) -> Report {
         let a = Color::Fixed(81);
 
         let builder = Report::build(ReportKind::Error, (), 3)
@@ -156,13 +157,13 @@ mod report {
             ])
             .with_message(error.title());
         let builder = match error {
-            Error::InvalidCharacter(c, offset) => {
+            ParseError::InvalidCharacter(c, offset) => {
                 let range = *offset..*offset + c.len_utf8();
                 builder
                     .with_label(Label::new(range).with_message(error.title()).with_color(a))
                     .with_note("property list files can only contain printable ASCII characters")
             }
-            Error::InvalidPropertyName {
+            ParseError::InvalidPropertyName {
                 name_span,
                 allowed_property_names,
                 ..
@@ -176,7 +177,7 @@ mod report {
                     "the following property names are allowed: {}",
                     allowed_property_names.join(", ")
                 ]),
-            Error::UnbalancedOpeningParenthesis {
+            ParseError::UnbalancedOpeningParenthesis {
                 opening_parenthesis_span,
                 end_span,
             } => {
@@ -192,28 +193,28 @@ mod report {
                     )
                     .with_note("a additional closing parenthesis was added at the end of the file")
             }
-            Error::JunkInPropertyList { span, .. } => builder
+            ParseError::JunkInPropertyList { span, .. } => builder
                 .with_label(Label::new(span.clone()).with_message("unexpected junk string"))
                 .with_note("the string was ignored"),
-            Error::UnexpectedRightParenthesis { span, .. } => builder
+            ParseError::UnexpectedRightParenthesis { span, .. } => builder
                 .with_label(
                     Label::new(*span..*span + 1).with_message("unexpected right parenthesis"),
                 )
                 .with_help("all right parentheses must be matched by an opening left parenthesis")
                 .with_note("the parenthesis was ignored"),
-            Error::InvalidOctalDigit { c: _, span } => {
+            ParseError::InvalidOctalDigit { c: _, span } => {
                 builder.with_label(Label::new(*span..*span + 1).with_message(error.title()))
             }
-            Error::InvalidPrefixForInteger { span }
-            | Error::IntegerTooBig { span }
-            | Error::SmallIntegerTooBig { span, .. }
-            | Error::InvalidFaceCode { span }
-            | Error::InvalidCharacterForSmallInteger { span }
-            | Error::InvalidBoolean { span }
-            | Error::InvalidHeaderIndex { span }
-            | Error::DecimalTooLarge { span }
-            | Error::InvalidPrefixForDecimal { span }
-            | Error::InvalidPrefixForSmallInteger { span } => {
+            ParseError::InvalidPrefixForInteger { span }
+            | ParseError::IntegerTooBig { span }
+            | ParseError::SmallIntegerTooBig { span, .. }
+            | ParseError::InvalidFaceCode { span }
+            | ParseError::InvalidCharacterForSmallInteger { span }
+            | ParseError::InvalidBoolean { span }
+            | ParseError::InvalidHeaderIndex { span }
+            | ParseError::DecimalTooLarge { span }
+            | ParseError::InvalidPrefixForDecimal { span }
+            | ParseError::InvalidPrefixForSmallInteger { span } => {
                 builder.with_label(Label::new(span.clone()).with_message(error.title()))
             }
         };

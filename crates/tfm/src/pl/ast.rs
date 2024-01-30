@@ -3,7 +3,7 @@
 //! The property list [AST](Ast) is a fully typed representation of a property list file.
 
 use super::cst;
-use super::error::Error;
+use super::error::ParseError;
 use crate::{ligkern::lang::PostLigOperation, Char, Face, NamedParam, Number};
 use std::ops::Range;
 
@@ -15,16 +15,16 @@ pub struct Ast(pub Vec<Root>);
 
 impl Ast {
     /// Build an AST directly from source code.
-    pub fn build(source: &str) -> (Ast, Vec<Error>) {
+    pub fn from_pl_source_code(source: &str) -> (Ast, Vec<ParseError>) {
         let lexer = super::lexer::Lexer::new(source);
         let mut errors = vec![];
-        let cst = cst::Cst::build_from_lexer(lexer, &mut errors);
-        let ast = Ast::build_from_cst(cst, &mut errors);
+        let cst = cst::Cst::from_lexer(lexer, &mut errors);
+        let ast = Ast::from_cst(cst, &mut errors);
         (Ast(ast), errors)
     }
 
     /// Build an AST from a CST.
-    pub fn build_from_cst(cst: cst::Cst, errors: &mut Vec<Error>) -> Vec<Root> {
+    pub fn from_cst(cst: cst::Cst, errors: &mut Vec<ParseError>) -> Vec<Root> {
         cst.0
             .into_iter()
             .filter_map(|c| Root::build(c, errors))
@@ -123,7 +123,7 @@ impl<D, E> From<(D, Vec<E>)> for Branch<D, E> {
 /// Doing this kinds of bounds on a regular impl block (private trait in public interface (error E0445)).
 /// But with a trait impl we get away with it.
 trait ToFromCstNode: Sized {
-    fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self>;
+    fn from(p: cst::RegularNodeValue, errors: &mut Vec<ParseError>) -> Option<Self>;
     fn to(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue;
 }
 
@@ -132,7 +132,7 @@ struct LowerOpts {
 }
 
 impl<D: TryParse> ToFromCstNode for SingleValue<D> {
-    fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self> {
+    fn from(p: cst::RegularNodeValue, errors: &mut Vec<ParseError>) -> Option<Self> {
         let (mut input, _) = Input::new(p, errors);
         D::try_parse(&mut input).map(|data| Self {
             data: data.0,
@@ -151,7 +151,7 @@ impl<D: TryParse> ToFromCstNode for SingleValue<D> {
 }
 
 impl<D: TryParse, E: Parse> ToFromCstNode for TupleValue<D, E> {
-    fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self> {
+    fn from(p: cst::RegularNodeValue, errors: &mut Vec<ParseError>) -> Option<Self> {
         let (mut input, _) = Input::new(p, errors);
         let (left, left_span) = match D::try_parse(&mut input) {
             None => return None,
@@ -181,7 +181,7 @@ impl<D: TryParse, E: Parse> ToFromCstNode for TupleValue<D, E> {
 }
 
 impl<D: Parse, E: Node> ToFromCstNode for Branch<D, E> {
-    fn from(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self> {
+    fn from(p: cst::RegularNodeValue, errors: &mut Vec<ParseError>) -> Option<Self> {
         {
             let (mut input, children) = Input::new(p, errors);
             let (data, data_span) = D::parse(&mut input);
@@ -211,9 +211,9 @@ impl<D: Parse, E: Node> ToFromCstNode for Branch<D, E> {
 }
 
 trait Node: Sized {
-    fn build_regular(p: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self>;
+    fn build_regular(p: cst::RegularNodeValue, errors: &mut Vec<ParseError>) -> Option<Self>;
     fn build_comment(_: Vec<cst::BalancedElem>) -> Self;
-    fn build(n: cst::Node, errors: &mut Vec<Error>) -> Option<Self> {
+    fn build(n: cst::Node, errors: &mut Vec<ParseError>) -> Option<Self> {
         match n.value {
             cst::NodeValue::Comment(c) => Some(Node::build_comment(c)),
             cst::NodeValue::Regular(r) => Node::build_regular(r, errors),
@@ -234,7 +234,7 @@ macro_rules! node_impl {
         }
 
         impl Node for $type {
-            fn build_regular(mut r: cst::RegularNodeValue, errors: &mut Vec<Error>) -> Option<Self> {
+            fn build_regular(mut r: cst::RegularNodeValue, errors: &mut Vec<ParseError>) -> Option<Self> {
                 r.key.make_ascii_uppercase();
                 match r.key.as_str() {
                     $(
@@ -246,7 +246,7 @@ macro_rules! node_impl {
                         },
                     )+
                     _ => {
-                        errors.push(Error::InvalidPropertyName {
+                        errors.push(ParseError::InvalidPropertyName {
                             name: r.key.into(),
                             name_span: r.key_span.clone(),
                             allowed_property_names: $type::ALL_PROPERTY_NAMES,
@@ -711,11 +711,11 @@ struct Input<'a> {
     raw_data: String,
     raw_data_offset: usize,
     raw_data_span: Range<usize>,
-    errors: &'a mut Vec<Error>,
+    errors: &'a mut Vec<ParseError>,
 }
 
 impl<'a> Input<'a> {
-    fn new(p: cst::RegularNodeValue, errors: &'a mut Vec<Error>) -> (Self, Vec<cst::Node>) {
+    fn new(p: cst::RegularNodeValue, errors: &'a mut Vec<ParseError>) -> (Self, Vec<cst::Node>) {
         (
             Input {
                 raw_data: p.data,
@@ -726,7 +726,7 @@ impl<'a> Input<'a> {
             p.children,
         )
     }
-    fn skip_error(&mut self, error: Error) {
+    fn skip_error(&mut self, error: ParseError) {
         self.errors.push(error);
         self.skip_to_end();
     }
@@ -789,7 +789,7 @@ impl Parse for u32 {
             Some('H' | 'h') => 16,
             c => {
                 let span = input.last_span(c);
-                input.skip_error(Error::InvalidPrefixForInteger { span: span.clone() });
+                input.skip_error(ParseError::InvalidPrefixForInteger { span: span.clone() });
                 return (0, span);
             }
         };
@@ -802,7 +802,7 @@ impl Parse for u32 {
                 Some(d) => d,
             };
             if n >= radix {
-                input.skip_error(Error::InvalidOctalDigit {
+                input.skip_error(ParseError::InvalidOctalDigit {
                     c,
                     span: input.raw_data_span.start - 1,
                 });
@@ -820,7 +820,7 @@ impl Parse for u32 {
                         };
                     }
                     let end_span = input.raw_data_span.start;
-                    input.skip_error(Error::IntegerTooBig {
+                    input.skip_error(ParseError::IntegerTooBig {
                         span: number_start_span..end_span,
                     });
                     break;
@@ -860,7 +860,7 @@ impl Parse for u8 {
                             };
                         }
                         let end_span = input.raw_data_span.start;
-                        input.skip_error(Error::SmallIntegerTooBig {
+                        input.skip_error(ParseError::SmallIntegerTooBig {
                             span: start_span..end_span,
                             radix,
                         });
@@ -880,7 +880,7 @@ impl Parse for u8 {
                 match input.next() {
                     Some(c @ ' '..='~') => (c as usize).try_into().unwrap(),
                     c => {
-                        input.skip_error(Error::InvalidCharacterForSmallInteger {
+                        input.skip_error(ParseError::InvalidCharacterForSmallInteger {
                             span: input.last_span(c),
                         });
                         0
@@ -916,7 +916,7 @@ impl Parse for u8 {
                 };
                 if acc >= 18 {
                     let span_end = input.raw_data_span.start;
-                    input.skip_error(Error::InvalidFaceCode {
+                    input.skip_error(ParseError::InvalidFaceCode {
                         span: span_start..span_end,
                     });
                     acc = 0;
@@ -924,7 +924,7 @@ impl Parse for u8 {
                 acc
             }
             c => {
-                input.skip_error(Error::InvalidPrefixForSmallInteger {
+                input.skip_error(ParseError::InvalidPrefixForSmallInteger {
                     span: input.last_span(c),
                 });
                 0
@@ -1017,7 +1017,7 @@ impl TryParse for bool {
             _ => {
                 input.skip_to_end();
                 let span_end = input.raw_data_span.start;
-                input.skip_error(Error::InvalidBoolean {
+                input.skip_error(ParseError::InvalidBoolean {
                     span: span_start..span_end,
                 });
                 return None;
@@ -1040,7 +1040,7 @@ impl Parse for Number {
             Some('D' | 'd') | Some('R' | 'r') => (),
             c => {
                 let span = input.last_span(c);
-                input.skip_error(Error::InvalidPrefixForDecimal { span: span.clone() });
+                input.skip_error(ParseError::InvalidPrefixForDecimal { span: span.clone() });
                 return (Number::ZERO, span);
             }
         }
@@ -1104,7 +1104,7 @@ impl Parse for Number {
 
         if integer_part >= 2048 || (fractional_part >= Number::UNITY.0 && integer_part == 2047) {
             let span_end = input.raw_data_span.start;
-            input.skip_error(Error::DecimalTooLarge {
+            input.skip_error(ParseError::DecimalTooLarge {
                 span: number_span_start..span_end,
             });
             return if integer_part == 2047 {
@@ -1137,8 +1137,8 @@ mod tests {
 
     use super::*;
 
-    fn run(source: &str, want: Vec<Root>, want_errs: Vec<Error>) {
-        let (got, got_errors) = Ast::build(source);
+    fn run(source: &str, want: Vec<Root>, want_errs: Vec<ParseError>) {
+        let (got, got_errors) = Ast::from_pl_source_code(source);
         assert_eq!(got_errors, want_errs);
         assert_eq!(got, Ast(want));
     }
@@ -1198,7 +1198,7 @@ mod tests {
             boolean_invalid,
             r"(SEVENBITSAFEFLAG INVALID)",
             vec![],
-            vec![Error::InvalidBoolean { span: 18..25 }],
+            vec![ParseError::InvalidBoolean { span: 18..25 }],
         ),
         (
             one_byte_char_invalid_prefix,
@@ -1207,7 +1207,7 @@ mod tests {
                 data: Char(0),
                 data_span: 14..17
             })],
-            vec![Error::InvalidPrefixForSmallInteger { span: 14..15 }],
+            vec![ParseError::InvalidPrefixForSmallInteger { span: 14..15 }],
         ),
         (
             one_byte_char_no_prefix,
@@ -1216,7 +1216,7 @@ mod tests {
                 data: Char(0),
                 data_span: 13..13,
             })],
-            vec![Error::InvalidPrefixForSmallInteger { span: 13..13 }],
+            vec![ParseError::InvalidPrefixForSmallInteger { span: 13..13 }],
         ),
         (
             one_byte_char,
@@ -1234,7 +1234,7 @@ mod tests {
                 data: Char(0),
                 data_span: 14..15
             })],
-            vec![Error::InvalidCharacterForSmallInteger { span: 15..15 }],
+            vec![ParseError::InvalidCharacterForSmallInteger { span: 15..15 }],
         ),
         (
             one_byte_octal,
@@ -1252,7 +1252,7 @@ mod tests {
                 data: Char(0o0),
                 data_span: 14..20
             })],
-            vec![Error::SmallIntegerTooBig {
+            vec![ParseError::SmallIntegerTooBig {
                 span: 16..20,
                 radix: 8
             }],
@@ -1273,7 +1273,7 @@ mod tests {
                 data: Char(0),
                 data_span: 14..20
             })],
-            vec![Error::SmallIntegerTooBig {
+            vec![ParseError::SmallIntegerTooBig {
                 span: 16..20,
                 radix: 10
             }],
@@ -1294,7 +1294,7 @@ mod tests {
                 data: Char(0x0),
                 data_span: 14..20
             })],
-            vec![Error::SmallIntegerTooBig {
+            vec![ParseError::SmallIntegerTooBig {
                 span: 16..20,
                 radix: 16
             }],
@@ -1315,7 +1315,7 @@ mod tests {
                 data: Char(0),
                 data_span: 14..19
             })],
-            vec![Error::InvalidFaceCode { span: 16..19 }],
+            vec![ParseError::InvalidFaceCode { span: 16..19 }],
         ),
         (
             one_byte_four_byte,
@@ -1353,7 +1353,7 @@ mod tests {
                 data: 0,
                 data_span: 9..9
             })],
-            vec![Error::InvalidPrefixForInteger { span: 9..9 }],
+            vec![ParseError::InvalidPrefixForInteger { span: 9..9 }],
         ),
         (
             four_bytes_invalid_prefix,
@@ -1362,7 +1362,7 @@ mod tests {
                 data: 0,
                 data_span: 10..11
             })],
-            vec![Error::InvalidPrefixForInteger { span: 10..11 }],
+            vec![ParseError::InvalidPrefixForInteger { span: 10..11 }],
         ),
         (
             four_bytes_too_big,
@@ -1371,7 +1371,7 @@ mod tests {
                 data: 0o6666666666,
                 data_span: 10..30
             })],
-            vec![Error::IntegerTooBig { span: 12..30 }],
+            vec![ParseError::IntegerTooBig { span: 12..30 }],
         ),
         (
             four_bytes_invalid_octal_digit,
@@ -1380,7 +1380,7 @@ mod tests {
                 data: 0o6666,
                 data_span: 10..30
             })],
-            vec![Error::InvalidOctalDigit { c: '8', span: 16 }],
+            vec![ParseError::InvalidOctalDigit { c: '8', span: 16 }],
         ),
         (
             fix_word_integer,
@@ -1416,7 +1416,7 @@ mod tests {
                 data: Number::ZERO,
                 data_span: 12..20
             })],
-            vec![Error::DecimalTooLarge { span: 14..20 }],
+            vec![ParseError::DecimalTooLarge { span: 14..20 }],
         ),
         (
             fix_word_too_big_2,
@@ -1425,7 +1425,7 @@ mod tests {
                 data: Number::UNITY,
                 data_span: 12..26,
             })],
-            vec![Error::DecimalTooLarge { span: 14..26 }],
+            vec![ParseError::DecimalTooLarge { span: 14..26 }],
         ),
         (
             fix_word_invalid_prefix,
@@ -1434,7 +1434,7 @@ mod tests {
                 data: Number::ZERO,
                 data_span: 12..13
             })],
-            vec![Error::InvalidPrefixForDecimal { span: 12..13 }],
+            vec![ParseError::InvalidPrefixForDecimal { span: 12..13 }],
         ),
         (
             pl_to_tf_section_7_example,

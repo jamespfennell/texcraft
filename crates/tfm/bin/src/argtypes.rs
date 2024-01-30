@@ -63,12 +63,14 @@ pub struct TfPath(pub std::path::PathBuf);
 
 impl TfPath {
     #[allow(dead_code)]
-    pub fn read(&self) -> Result<(tfm::Font, Vec<tfm::DeserializeTfmWarning>), String> {
+    pub fn read(
+        &self,
+    ) -> Result<(tfm::format::File, Vec<tfm::format::DeserializeWarning>), String> {
         let data = match std::fs::read(&self.0) {
             Ok(data) => data,
             Err(err) => return Err(format!("Failed to read `{}`: {}", self.0.display(), err)),
         };
-        let (tfm_file, warnings) = match tfm::deserialize_tfm(&data) {
+        let (tfm_file, warnings) = match tfm::format::File::deserialize(&data) {
             Ok(t) => t,
             Err(err) => return Err(err.tf_to_pl_message()),
         };

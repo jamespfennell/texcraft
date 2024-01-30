@@ -11,7 +11,7 @@
 //! - `<whitespace> -> <space><whitespace>? | <newline><whitespace>?`
 //! - `<open parenthesis> -> '('<whitespace>?`
 //! - `<closed parenthesis> -> ')'<whitespace>?`
-use super::error::Error;
+use super::error::ParseError;
 use super::lexer::*;
 
 /// Concrete syntax tree for property list files
@@ -20,15 +20,15 @@ pub struct Cst(pub Vec<Node>);
 
 impl Cst {
     /// Build an CST directly from source code.
-    pub fn build(source: &str) -> (Cst, Vec<Error>) {
+    pub fn from_pl_source_code(source: &str) -> (Cst, Vec<ParseError>) {
         let lexer = Lexer::new(source);
         let mut errors = vec![];
-        let cst = Cst::build_from_lexer(lexer, &mut errors);
+        let cst = Cst::from_lexer(lexer, &mut errors);
         (cst, errors)
     }
 
     /// Build an AST from an instance of the lexer.
-    pub fn build_from_lexer(lexer: Lexer, errors: &mut Vec<Error>) -> Cst {
+    pub fn from_lexer(lexer: Lexer, errors: &mut Vec<ParseError>) -> Cst {
         let mut input = Input {
             lexer,
             next: None,
@@ -196,7 +196,7 @@ struct Input<'a> {
     next: Option<Token>,
     // Used for building error messages when opening spans are not matched.
     opening_parenthesis_spans: Vec<usize>,
-    errors: &'a mut Vec<Error>,
+    errors: &'a mut Vec<ParseError>,
 }
 
 impl<'a> Input<'a> {
@@ -213,7 +213,7 @@ impl<'a> Input<'a> {
     fn next_or_closing(&mut self) -> Token {
         match self.next() {
             None => {
-                self.errors.push(Error::UnbalancedOpeningParenthesis {
+                self.errors.push(ParseError::UnbalancedOpeningParenthesis {
                     // We pop the last opening brace span because it's being matched by the closing brace we return here.
                     opening_parenthesis_span: self.opening_parenthesis_spans.pop().unwrap(),
                     end_span: self.lexer.source_length(),
@@ -341,14 +341,14 @@ fn parse_root_nodes(input: &mut Input) -> Vec<Node> {
                 let span = token.1..token.1 + s.len();
                 input
                     .errors
-                    .push(Error::JunkInPropertyList { value: s, span })
+                    .push(ParseError::JunkInPropertyList { value: s, span })
             }
             TokenKind::OpenParenthesis => {
                 r.push(parse_node(input, token.1));
             }
             TokenKind::ClosedParenthesis => input
                 .errors
-                .push(Error::UnexpectedRightParenthesis { span: token.1 }),
+                .push(ParseError::UnexpectedRightParenthesis { span: token.1 }),
             TokenKind::Whitespace(..) => {}
         }
     }
@@ -364,7 +364,7 @@ fn parse_inner_nodes(input: &mut Input) -> (Vec<Node>, Token) {
                 let span = token.1..token.1 + s.len();
                 input
                     .errors
-                    .push(Error::JunkInPropertyList { value: s, span })
+                    .push(ParseError::JunkInPropertyList { value: s, span })
             }
             TokenKind::OpenParenthesis => {
                 r.push(parse_node(input, token.1));
@@ -398,8 +398,8 @@ fn parse_balanced_elements(input: &mut Input) -> (Vec<BalancedElem>, Token) {
 mod tests {
     use super::*;
 
-    fn run(source: &str, want: Vec<Node>, want_errors: Vec<Error>) {
-        let (got, got_errors) = Cst::build(source);
+    fn run(source: &str, want: Vec<Node>, want_errors: Vec<ParseError>) {
+        let (got, got_errors) = Cst::from_pl_source_code(source);
         assert_eq!(got, Cst(want));
         assert_eq!(got_errors, want_errors);
     }
@@ -483,7 +483,7 @@ mod tests {
                 }),
                 closing_parenthesis_span: 6,
             }],
-            vec![Error::UnbalancedOpeningParenthesis {
+            vec![ParseError::UnbalancedOpeningParenthesis {
                 opening_parenthesis_span: 0,
                 end_span: 6
             }],
@@ -502,7 +502,7 @@ mod tests {
                 }),
                 closing_parenthesis_span: 1,
             }],
-            vec![Error::UnbalancedOpeningParenthesis {
+            vec![ParseError::UnbalancedOpeningParenthesis {
                 opening_parenthesis_span: 0,
                 end_span: 1
             }],
@@ -550,7 +550,7 @@ mod tests {
                     closing_parenthesis_span: 33,
                 },
             ],
-            vec![Error::JunkInPropertyList {
+            vec![ParseError::JunkInPropertyList {
                 value: "Garbage".into(),
                 span: 14..21,
             }],
@@ -582,7 +582,7 @@ mod tests {
                     closing_parenthesis_span: 27,
                 },
             ],
-            vec![Error::UnexpectedRightParenthesis { span: 14 },],
+            vec![ParseError::UnexpectedRightParenthesis { span: 14 },],
         ),
         (
             comment,
@@ -632,11 +632,11 @@ mod tests {
                 closing_parenthesis_span: 16,
             }],
             vec![
-                Error::UnbalancedOpeningParenthesis {
+                ParseError::UnbalancedOpeningParenthesis {
                     opening_parenthesis_span: 15,
                     end_span: 16
                 },
-                Error::UnbalancedOpeningParenthesis {
+                ParseError::UnbalancedOpeningParenthesis {
                     opening_parenthesis_span: 0,
                     end_span: 16
                 },
@@ -656,7 +656,7 @@ mod tests {
                 }),
                 closing_parenthesis_span: 15,
             }],
-            vec![Error::InvalidCharacter('ä', 13)],
+            vec![ParseError::InvalidCharacter('ä', 13)],
         ),
     );
 }

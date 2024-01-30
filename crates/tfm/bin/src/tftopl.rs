@@ -26,7 +26,7 @@ fn run(args: Cli) -> Result<(), String> {
             ))
         }
     };
-    let (tfm_file, warnings) = match tfm::deserialize_tfm(&tfm_data) {
+    let (tfm_file, warnings) = match tfm::format::File::deserialize(&tfm_data) {
         Ok(t) => t,
         Err(err) => return Err(err.tf_to_pl_message()),
     };

@@ -2,83 +2,9 @@
 
 #[cfg(test)]
 mod examples;
+pub mod format;
 pub mod ligkern;
 pub mod pl;
-mod tfm;
-
-pub use crate::tfm::{
-    deserialize as deserialize_tfm, DeserializeError as DeserializeTfmError,
-    DeserializeWarning as DeserializeTfmWarning, SubFileSizes,
-};
-
-/// Complete contents of a TeX font metric (.tfm) file.
-///
-/// The struct contain multiple vectors.
-/// In TeX and TFtoPL there is an optimization in which all of data in the vectors
-/// is stored in one large vector of 32-bit integers.
-/// The conversion from [u32] to the specific types like [Number] are then done when the
-/// data is needed.
-/// This makes the memory footprint of this type much more compact,
-///     and such a change may be considered in the future.
-///
-/// In fact in TeX the font data for all fonts is stored in one contiguous piece of memory
-///     (`font_info`, defined in TeX82.2021.549).
-/// This is a little too unsafe to pull off though.
-#[derive(Debug, PartialEq, Eq)]
-pub struct Font {
-    /// Header.
-    pub header: Header,
-
-    /// The smallest character in the font.
-    pub smallest_char_code: Char,
-
-    /// Character infos.
-    ///
-    /// The char infos mostly contain indices for other vectors in this struct.
-    pub char_infos: Vec<CharInfo>,
-
-    /// Character widths
-    pub widths: Vec<Number>,
-
-    /// Character heights
-    pub heights: Vec<Number>,
-
-    /// Character depths
-    pub depths: Vec<Number>,
-
-    /// Character italic corrections
-    pub italic_corrections: Vec<Number>,
-
-    /// Lig kern instructions.
-    pub lig_kern_instructions: Vec<ligkern::lang::Instruction>,
-
-    /// Kerns. These are referenced from inside the lig kern commands.
-    pub kern: Vec<Number>,
-
-    /// Extensible characters.
-    pub extensible_chars: Vec<ExtensibleRecipe>,
-
-    /// Font parameters.
-    pub params: Params,
-}
-
-impl Default for Font {
-    fn default() -> Self {
-        Self {
-            header: Default::default(),
-            smallest_char_code: Default::default(),
-            char_infos: vec![],
-            widths: vec![Number::ZERO],
-            heights: vec![Number::ZERO],
-            depths: vec![Number::ZERO],
-            italic_corrections: vec![Number::ZERO],
-            lig_kern_instructions: vec![],
-            kern: vec![],
-            extensible_chars: vec![],
-            params: Default::default(),
-        }
-    }
-}
 
 /// The TFM header, which contains metadata about the file.
 ///
@@ -212,24 +138,6 @@ impl std::fmt::Display for Number {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct CharInfo {
-    pub width_index: u8,
-    pub height_index: u8,
-    pub depth_index: u8,
-    pub italic_index: u8,
-    pub tag: CharTag,
-}
-
-#[derive(Debug, Default, PartialEq, Eq)]
-pub enum CharTag {
-    #[default]
-    None,
-    Ligature(u8),
-    List(Char),
-    Extension(u8),
-}
-
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum FaceWeight {
     Light,
@@ -307,14 +215,7 @@ impl From<Face> for u8 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExtensibleRecipe {
-    pub top: Option<Char>,
-    pub middle: Option<Char>,
-    pub bottom: Option<Char>,
-    pub rep: Char,
-}
-
+/// TeX font metric parameters
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Params(pub Vec<Number>);
 
@@ -331,7 +232,7 @@ impl Params {
     }
 }
 
-/// A named parameter.
+/// A named TeX font metric parameter.
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum NamedParam {
     Slant,

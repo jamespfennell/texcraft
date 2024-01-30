@@ -27,7 +27,7 @@ pub enum Error {
     /// The file length specified inside the TFM file is invalid because it is too small.
     ///
     /// TFM files must contain at least 24 bytes of data: the 16-bit file size and the 11
-    /// 16-bit numbers in [SubFileSizes].
+    /// 16-bit numbers in the sub file sizes section.
     ///
     /// Knuth's TFToPL doesn't handle this case explicitly.
     /// When this buggy input is provided, a [Error::SubFileSizeIsNegative] error is thrown.
@@ -132,8 +132,7 @@ impl Warning {
 }
 
 /// Deserialize a TeX font metric (.tfm) file.
-/// TODO: this should be a method on Font
-pub fn deserialize(b: &[u8]) -> Result<(Font, Vec<Warning>), Error> {
+pub(super) fn deserialize(b: &[u8]) -> Result<(File, Vec<Warning>), Error> {
     let mut warnings: Vec<Warning> = vec![];
     let actual_file_length = b.len();
     match actual_file_length {
@@ -177,7 +176,7 @@ pub fn deserialize(b: &[u8]) -> Result<(Font, Vec<Warning>), Error> {
         raw_params,
     ] = sub_file_sizes.partition(&b[24..]);
 
-    let font = Font {
+    let font = File {
         header: Deserialize::deserialize(raw_header),
         smallest_char_code: if sub_file_sizes.bc <= sub_file_sizes.ec {
             Char(sub_file_sizes.bc.try_into().unwrap()) // TODO: can't this panic?
@@ -655,7 +654,7 @@ mod tests {
             minimal_header,
             build_from_header(&[/* checksum */ 0, 0, 0, 7, /* design_size */ 0, 0, 0, 11,]),
             Ok((
-                Font {
+                File {
                     header: Header {
                         checksum: 7,
                         design_size: Number(11),
@@ -679,7 +678,7 @@ mod tests {
                 65, 65, 65, 65, 65, 65, 65,
             ]),
             Ok((
-                Font {
+                File {
                     header: Header {
                         checksum: 7,
                         design_size: Number(11),
@@ -705,7 +704,7 @@ mod tests {
                 /* additional_data */ 0, 0, 0, 13,
             ]),
             Ok((
-                Font {
+                File {
                     header: Header {
                         checksum: 7,
                         design_size: Number(11),
@@ -738,7 +737,7 @@ mod tests {
                 14 * 4
             ),
             Ok((
-                Font {
+                File {
                     header: Default::default(),
                     smallest_char_code: Char(70),
                     char_infos: vec![
@@ -779,7 +778,7 @@ mod tests {
                 17 * 4
             ),
             Ok((
-                Font {
+                File {
                     widths: vec![Number::ZERO, Number(23)],
                     heights: vec![Number::ZERO, Number(29)],
                     depths: vec![Number::ZERO, Number(31)],
@@ -806,7 +805,7 @@ mod tests {
                 16 * 4
             ),
             Ok((
-                Font {
+                File {
                     lig_kern_instructions: vec![
                         ligkern::lang::Instruction {
                             next_instruction: Some(3),
@@ -871,7 +870,7 @@ mod tests {
                 13 * 4
             ),
             Ok((
-                Font {
+                File {
                     extensible_chars: vec![ExtensibleRecipe {
                         top: Some(Char(17)),
                         middle: Some(Char(19)),
@@ -901,7 +900,7 @@ mod tests {
                 22 * 4
             ),
             Ok((
-                Font {
+                File {
                     params: Params(vec![
                         Number(11),
                         Number(13),

@@ -1,17 +1,26 @@
-//! The property list file format
-//!
-//! This module contains a work-in-progress parser for property list files.
+/*!
+The property list (.pl) file format
+
+|                                     | from .pl source code              | to .pl source code    | from lower level         | to lower level
+|-------------------------------------|-----------------------------------|-----------------------|--------------------------|----
+| fully parsed .pl file ([`File`])    | [`File::from_pl_source_code`]     | [`File::display`]     | [`File::from_ast`]       | [`File::lower`]
+| abstract syntax tree ([`ast::Ast`]) | [`ast::Ast::from_pl_source_code`] | `ast::Ast::display` (TODO) | [`ast::Ast::from_cst`]   | [`ast::Ast::lower`]
+| concrete syntax tree ([`cst::Cst`]) | [`cst::Cst::from_pl_source_code`] | [`cst::Cst::display`] | [`cst::Cst::from_lexer`] | N/A
+| tokens (vector of [`lexer::Token`]) | [`lexer::Lexer::new`] and [`lexer::Lexer::next`] | N/A    | N/A                      | N/A
+
+*/
 
 use std::collections::HashMap;
 
-use crate::{ligkern, Char, ExtensibleRecipe, Header, NamedParam, Number, Params};
-use error::Error;
+use crate::{format, ligkern, Char, Header, NamedParam, Number, Params};
 
 pub mod ast;
 pub mod cst;
-pub mod error;
+mod error;
 pub mod lexer;
+pub use error::ParseError;
 
+/// Data about one character in a .pl file.
 #[derive(Default, PartialEq, Eq, Debug)]
 pub struct CharData {
     pub width: Number,
@@ -21,13 +30,14 @@ pub struct CharData {
     pub tag: CharTag,
 }
 
+/// Tag of a character in a .pl file.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub enum CharTag {
     #[default]
     None,
     Ligature(usize),
     List(Char),
-    Extension(ExtensibleRecipe),
+    Extension(format::ExtensibleRecipe),
 }
 
 /// Complete contents of a property list (.pl) file.
@@ -58,14 +68,14 @@ impl Default for File {
 
 impl File {
     /// Build a File from PL source code.
-    pub fn build(source: &str) -> (File, Vec<Error>) {
-        let (ast, mut errors) = ast::Ast::build(source);
-        let file = File::build_from_ast(ast, &mut errors);
+    pub fn from_pl_source_code(source: &str) -> (File, Vec<ParseError>) {
+        let (ast, mut errors) = ast::Ast::from_pl_source_code(source);
+        let file = File::from_ast(ast, &mut errors);
         (file, errors)
     }
 
     /// Build a File from an AST.
-    pub fn build_from_ast(ast: ast::Ast, errors: &mut Vec<error::Error>) -> File {
+    pub fn from_ast(ast: ast::Ast, errors: &mut Vec<error::ParseError>) -> File {
         let mut file: File = Default::default();
         let mut lig_kern_precedes = false;
 
@@ -93,7 +103,7 @@ impl File {
                     file.header.seven_bit_safe = Some(v.data);
                 }
                 ast::Root::Header(v) => match v.left.checked_sub(18) {
-                    None => errors.push(Error::InvalidHeaderIndex { span: v.left_span }),
+                    None => errors.push(ParseError::InvalidHeaderIndex { span: v.left_span }),
                     Some(i) => {
                         let i = i as usize;
                         if file.header.additional_data.len() <= i {
@@ -214,7 +224,7 @@ impl File {
     }
 
     /// Convert a TFM file into a PL file.
-    pub fn from_tfm_file(tfm_file: crate::Font) -> File {
+    pub fn from_tfm_file(tfm_file: crate::format::File) -> File {
         let mut char_data = HashMap::<Char, CharData>::new();
         let mut c = tfm_file.smallest_char_code;
         for info in tfm_file.char_infos.into_iter() {
@@ -242,11 +252,12 @@ impl File {
                         .copied()
                         .unwrap_or_default(),
                     tag: match info.tag {
-                        crate::CharTag::None => CharTag::None,
-                        crate::CharTag::Ligature(u) => CharTag::Ligature(u as usize),
-                        crate::CharTag::List(c) => CharTag::List(c),
-                        crate::CharTag::Extension(i) => {
+                        format::CharTag::None => CharTag::None,
+                        format::CharTag::Ligature(u) => CharTag::Ligature(u as usize),
+                        format::CharTag::List(c) => CharTag::List(c),
+                        format::CharTag::Extension(i) => {
                             // TODO: don't panic
+                            // TODO: audit all unwraps in the crate
                             CharTag::Extension(
                                 tfm_file.extensible_chars.get(i as usize).cloned().unwrap(),
                             )
@@ -561,7 +572,7 @@ mod tests {
     use super::*;
 
     fn run(source: &str, want: File) {
-        let (got, errors) = File::build(source);
+        let (got, errors) = File::from_pl_source_code(source);
         assert_eq!(errors, vec![]);
         assert_eq!(got, want);
     }
