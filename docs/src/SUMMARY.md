@@ -26,6 +26,10 @@
 
 - [Format files (a.k.a. serialization and deserialization)](texlang/11-serde.md)
 
+# Project governance
+
+- [License information](license.md)
+
 # Texcraft Rust reference
 
 - [Index of Texcraft Rust crates](reference.md)

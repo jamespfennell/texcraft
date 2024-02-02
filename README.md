@@ -77,3 +77,9 @@ The TeX language itself is very complex and certain features like
 - [Typst](https://github.com/typst/typst)
 
 - [Sile](https://github.com/sile-typesetter/sile)
+
+## License
+
+Licensed under either of Apache License, Version 2.0 or MIT license at your option.
+
+There is more information about our licensing [on the documentation site](https://texcraft.dev/license.html).
