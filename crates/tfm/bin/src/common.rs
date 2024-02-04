@@ -14,6 +14,7 @@ pub enum CharcodeFormat {
 }
 
 impl CharcodeFormat {
+    #[allow(dead_code)]
     pub fn to_display_format(&self, character_coding_scheme: &str) -> tfm::pl::CharDisplayFormat {
         match self {
             Self::Default => {
@@ -30,6 +31,12 @@ impl CharcodeFormat {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum TfOrPlPath {
+    Tf(TfPath),
+    Pl(PlPath),
+}
+
 impl TfOrPlPath {
     pub fn parse(input: &str) -> Result<Self, InvalidExtension> {
         let path_buf: std::path::PathBuf = input.into();
@@ -42,12 +49,6 @@ impl TfOrPlPath {
             }),
         }
     }
-}
-
-#[derive(Clone, Debug)]
-pub enum TfOrPlPath {
-    Tf(TfPath),
-    Pl(PlPath),
 }
 
 impl clap::builder::ValueParserFactory for TfOrPlPath {
@@ -78,6 +79,24 @@ impl TfPath {
             eprintln!("{}", warning.tf_to_pl_message())
         }
         Ok((tfm_file, warnings))
+    }
+    fn parse(input: &str) -> Result<Self, InvalidExtension> {
+        let path_buf: std::path::PathBuf = input.into();
+        match path_buf.extension().and_then(std::ffi::OsStr::to_str) {
+            Some("tfm") => Ok(TfPath(path_buf)),
+            extension => Err(InvalidExtension {
+                provided: extension.map(str::to_string),
+                allowed: vec!["tfm"],
+            }),
+        }
+    }
+}
+
+impl clap::builder::ValueParserFactory for TfPath {
+    type Parser = clap::builder::ValueParser;
+
+    fn value_parser() -> Self::Parser {
+        clap::builder::ValueParser::new(TfPath::parse)
     }
 }
 
@@ -124,3 +143,18 @@ impl std::fmt::Display for InvalidExtension {
 }
 
 impl std::error::Error for InvalidExtension {}
+
+pub struct AriadneSource {
+    pub path: std::path::PathBuf,
+    pub source: ariadne::Source,
+}
+
+impl ariadne::Cache<()> for &AriadneSource {
+    fn fetch(&mut self, _: &()) -> Result<&ariadne::Source, Box<dyn std::fmt::Debug + '_>> {
+        Ok(&self.source)
+    }
+
+    fn display<'a>(&self, _: &'a ()) -> Option<Box<dyn std::fmt::Display + 'a>> {
+        Some(Box::new(format!["{}", self.path.display()]))
+    }
+}

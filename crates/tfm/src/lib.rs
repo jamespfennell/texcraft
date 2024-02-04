@@ -9,7 +9,7 @@ pub mod pl;
 /// The TFM header, which contains metadata about the file.
 ///
 /// This is defined in TFtoPL.2014.10.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Header {
     /// In TeX82, this is stored in the `font_check` array (TeX82.2021.549).
     pub checksum: u32,

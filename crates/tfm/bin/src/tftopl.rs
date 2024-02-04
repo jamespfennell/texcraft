@@ -1,71 +1,12 @@
 use clap::Parser;
 
-mod argtypes;
+mod common;
 
 fn main() {
-    let args = Cli::parse();
-    if args.verbose {
-        eprintln!("This is the Texcraft implementation of TFtoPL, version 0.1")
-    }
-    if let Err(err) = run(args) {
+    if let Err(err) = Cli::parse().run() {
         eprintln!("{err}");
         std::process::exit(1);
     }
-}
-
-fn run(args: Cli) -> Result<(), String> {
-    let tfm_file_path = with_default_file_extension(args.tfm_file_path, "tfm");
-    // TODO: use argtypes
-    let tfm_data = match std::fs::read(&tfm_file_path) {
-        Ok(tfm_data) => tfm_data,
-        Err(err) => {
-            return Err(format!(
-                "Failed to read `{}`: {}",
-                tfm_file_path.display(),
-                err
-            ))
-        }
-    };
-    let (tfm_file, warnings) = match tfm::format::File::deserialize(&tfm_data) {
-        Ok(t) => t,
-        Err(err) => return Err(err.tf_to_pl_message()),
-    };
-    for warning in warnings {
-        eprintln!("{}", warning.tf_to_pl_message())
-    }
-    let pl_file = tfm::pl::File::from_tfm_file(tfm_file);
-    let pl_output = format![
-        "{}",
-        pl_file.display(
-            3,
-            args.charcode_format
-                .to_display_format(&pl_file.header.character_coding_scheme)
-        )
-    ];
-    match args.pl_file_path {
-        None => print!("{pl_output}"),
-        Some(pl_file_path) => {
-            let pl_file_path = with_default_file_extension(pl_file_path, "pl");
-            if let Err(err) = std::fs::write(&pl_file_path, pl_output) {
-                return Err(format!(
-                    "Failed to write `{}`: {}",
-                    pl_file_path.display(),
-                    err
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn with_default_file_extension(
-    mut path: std::path::PathBuf,
-    extension: &'static str,
-) -> std::path::PathBuf {
-    if path.extension().is_none() {
-        path.set_extension(extension);
-    }
-    path
 }
 
 /// Convert a TeX font metric (.tfm) file to a human-readable property list (.pl) file.
@@ -76,7 +17,7 @@ fn with_default_file_extension(
 ///     consider using the Texcraft tfmtools binary.
 #[derive(Debug, clap::Parser)]
 #[command(
-    name = "tftopl",
+    name = "TFtoPL (Texcraft version)",
     author = "The Texcraft Project",
     version = "0.1",
     about,
@@ -91,9 +32,10 @@ struct Cli {
 
     /// Output path for the property list (.pl) file.
     ///
-    /// If not provided, the property list file is printed to standard out.
-    ///
     /// A file extension is optional, and will be set to .pl if missing.
+    ///
+    /// If the output path is not specified,
+    ///     the property list file is printed to standard out.
     pl_file_path: Option<std::path::PathBuf>,
 
     /// Write some additional information to standard error while converting.
@@ -105,5 +47,70 @@ struct Cli {
 
     /// Specification for how to output characters.
     #[arg(short, long, default_value = "default")]
-    charcode_format: argtypes::CharcodeFormat,
+    charcode_format: common::CharcodeFormat,
+}
+
+impl Cli {
+    fn run(self) -> Result<(), String> {
+        if self.verbose {
+            eprintln!("This is the Texcraft implementation of TFtoPL, version 0.1")
+        }
+
+        // Input
+        let tfm_file_path = with_default_file_extension(self.tfm_file_path, "tfm");
+        let tfm_data = match std::fs::read(&tfm_file_path) {
+            Ok(tfm_data) => tfm_data,
+            Err(err) => {
+                return Err(format!(
+                    "Failed to read `{}`: {}",
+                    tfm_file_path.display(),
+                    err
+                ))
+            }
+        };
+
+        // Conversion
+        let (tfm_file, warnings) = match tfm::format::File::deserialize(&tfm_data) {
+            Ok(t) => t,
+            Err(err) => return Err(err.tf_to_pl_message()),
+        };
+        for warning in warnings {
+            eprintln!("{}", warning.tf_to_pl_message())
+        }
+        let pl_file = tfm::pl::File::from_tfm_file(tfm_file);
+        let pl_output = format![
+            "{}",
+            pl_file.display(
+                3,
+                self.charcode_format
+                    .to_display_format(&pl_file.header.character_coding_scheme)
+            )
+        ];
+
+        // Output
+        match self.pl_file_path {
+            None => print!("{pl_output}"),
+            Some(pl_file_path) => {
+                let pl_file_path = with_default_file_extension(pl_file_path, "pl");
+                if let Err(err) = std::fs::write(&pl_file_path, pl_output) {
+                    return Err(format!(
+                        "Failed to write file `{}`: {}",
+                        pl_file_path.display(),
+                        err
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+fn with_default_file_extension(
+    mut path: std::path::PathBuf,
+    extension: &'static str,
+) -> std::path::PathBuf {
+    if path.extension().is_none() {
+        path.set_extension(extension);
+    }
+    path
 }

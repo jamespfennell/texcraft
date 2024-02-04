@@ -81,6 +81,17 @@ impl File {
     pub fn deserialize(b: &[u8]) -> Result<(File, Vec<DeserializeWarning>), DeserializeError> {
         deserialize::deserialize(b)
     }
+
+    pub fn serialize(&self) -> Vec<u8> {
+        serialize::serialize(self)
+    }
+
+    pub fn from_pl_file(pl_file: &crate::pl::File) -> Self {
+        Self {
+            header: pl_file.header.clone(),
+            ..Default::default()
+        }
+    }
 }
 
 /// Data about one character in a .tfm file.

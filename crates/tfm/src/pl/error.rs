@@ -73,7 +73,9 @@ impl ParseError {
             ParseError::JunkInPropertyList { value, .. } => {
                 format!["unexpected junk string '{value}' in the middle of a property list",]
             }
-            ParseError::UnexpectedRightParenthesis { .. } => "unexpected right parenthesis".to_string(),
+            ParseError::UnexpectedRightParenthesis { .. } => {
+                "unexpected right parenthesis".to_string()
+            }
             ParseError::InvalidPrefixForInteger { .. } => {
                 "invalid prefix for integer constant: an octal 'O' or hexadecimal 'H' is required"
                     .to_string()
@@ -92,18 +94,24 @@ impl ParseError {
                 };
                 format!["integer too big: the largest allowed value is {max}"]
             }
-            ParseError::InvalidFaceCode { .. } => "invalid face code; using MRR instead".to_string(),
+            ParseError::InvalidFaceCode { .. } => {
+                "invalid face code; using MRR instead".to_string()
+            }
             ParseError::InvalidCharacterForSmallInteger { .. } => {
                 "invalid character; only printable ASCII characters are allowed".to_string()
             }
             ParseError::InvalidPrefixForSmallInteger { .. } => {
                 "invalid prefix for integer constant: need C/O/D/H/F".to_string()
             }
-            ParseError::InvalidBoolean { .. } => "invalid boolean: must be TRUE or FALSE".to_string(),
+            ParseError::InvalidBoolean { .. } => {
+                "invalid boolean: must be TRUE or FALSE".to_string()
+            }
             ParseError::InvalidHeaderIndex { .. } => {
                 "invalid header index: must be 18 or larger".to_string()
             }
-            ParseError::DecimalTooLarge { .. } => "real constants must be less than 2048".to_string(),
+            ParseError::DecimalTooLarge { .. } => {
+                "real constants must be less than 2048".to_string()
+            }
             ParseError::InvalidPrefixForDecimal { .. } => {
                 "invalid prefix for decimal constant: need R or D".to_string()
             }

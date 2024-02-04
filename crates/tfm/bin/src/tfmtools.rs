@@ -1,18 +1,10 @@
 use clap::Parser;
 
-mod argtypes;
-use argtypes::*;
+mod common;
+use common::*;
 
 fn main() {
-    let args = Cli::parse();
-    let result = match args.command {
-        Command::Check(check) => check.run(),
-        Command::Convert(convert) => convert.run(),
-        Command::ConvertBatch(convert_batch) => convert_batch.run(),
-        Command::Describe(describe) => describe.run(),
-        Command::Fmt(format) => format.run(),
-    };
-    if let Err(err) = result {
+    if let Err(err) = Cli::parse().run() {
         eprintln!("{err}");
         std::process::exit(1);
     }
@@ -41,6 +33,18 @@ struct Cli {
     pl_charcode_format: CharcodeFormat,
 }
 
+impl Cli {
+    fn run(self) -> Result<(), String> {
+        match self.command {
+            Command::Check(check) => check.run(),
+            Command::Convert(convert) => convert.run(),
+            Command::ConvertBatch(convert_batch) => convert_batch.run(),
+            Command::Debug(debug) => debug.run(),
+            Command::Fmt(format) => format.run(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, clap::Subcommand)]
 enum Command {
     /// Check that a .tfm or .pl file is valid.
@@ -49,8 +53,8 @@ enum Command {
     Convert(Convert),
     /// Convert a batch of .tfm and .pl files.
     ConvertBatch(ConvertBatch),
-    /// Describe a .tfm or .pl file in tabular format.
-    Describe(Describe),
+    /// Print debugging information about a .tfm file.
+    Debug(Debug),
     /// Format a .pl file.
     Fmt(Format),
 }
@@ -87,7 +91,7 @@ impl Check {
 
 #[derive(Clone, Debug, Parser)]
 struct Convert {
-    /// Path to the .tf or .pl file to convert.
+    /// Path to the .tfm or .pl file to convert.
     path: TfOrPlPath,
 
     /// Output path for the converted file.
@@ -111,7 +115,7 @@ struct Convert {
 
     /// Specification for how to output characters.
     #[arg(short, long, default_value = "default")]
-    charcode_format: argtypes::CharcodeFormat,
+    charcode_format: common::CharcodeFormat,
 }
 
 impl Convert {
@@ -190,14 +194,16 @@ impl ConvertBatch {
 }
 
 #[derive(Clone, Debug, Parser)]
-struct Describe {
-    // TODO: we should have a ValidTfFile or ValidPlFile type that reads it in
-    path: TfOrPlPath,
+struct Debug {
+    /// Path to the .tfm to print debugging information for.
+    path: TfPath,
 }
 
-impl Describe {
+impl Debug {
     fn run(&self) -> Result<(), String> {
-        todo!()
+        let (tfm_file, _) = self.path.read()?;
+        println!("{:#?}", tfm_file);
+        Ok(())
     }
 }
 
@@ -219,20 +225,5 @@ struct Format {
 impl Format {
     fn run(&self) -> Result<(), String> {
         todo!()
-    }
-}
-
-struct Source {
-    path: std::path::PathBuf,
-    source: ariadne::Source,
-}
-
-impl ariadne::Cache<()> for Source {
-    fn fetch(&mut self, _: &()) -> Result<&ariadne::Source, Box<dyn std::fmt::Debug + '_>> {
-        Ok(&self.source)
-    }
-
-    fn display<'a>(&self, _: &'a ()) -> Option<Box<dyn std::fmt::Display + 'a>> {
-        Some(Box::new(format!["{}", self.path.display()]))
     }
 }

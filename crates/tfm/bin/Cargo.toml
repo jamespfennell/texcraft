@@ -21,3 +21,7 @@ path = "src/tfmtools.rs"
 [[bin]]
 name = "tftopl"
 path = "src/tftopl.rs"
+
+[[bin]]
+name = "pltotf"
+path = "src/pltotf.rs"
