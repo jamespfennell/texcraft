@@ -98,7 +98,7 @@ pub mod lang {
     ///
     /// In property list files, instructions are specified using a `(LIG _ _)` or `(KERN _ _)` element,
     ///     and optionally a `(STOP)` or `(SKIP _)` element directly after.
-    #[derive(Debug, PartialEq, Eq)]
+    #[derive(Clone, Debug, PartialEq, Eq)]
     pub struct Instruction {
         /// Specifies the next instruction to run if this instruction is not applicable -
         ///     e.g., if the right character of the pair is not `right_char`.

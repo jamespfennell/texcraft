@@ -18,7 +18,7 @@ fn run_convert_test(tfm: &[u8], pl: &str, command: &str, args: &dyn Fn(&str) -> 
         stderr
     );
     let got = String::from_utf8(output.stdout).unwrap();
-    similar_asserts::assert_eq!(got, pl.replace("\r\n", "\n"));
+    similar_asserts::assert_eq!(texcraft: got, knuth: pl.replace("\r\n", "\n"));
 }
 
 macro_rules! convert_tests {
@@ -30,7 +30,7 @@ macro_rules! convert_tests {
                 const PL: &'static str = include_str!($pl_path);
 
                 #[test]
-                fn tfmtools_convert() {
+                fn tfmtools_convert_tfm_to_pl() {
                     run_convert_test(TFM, PL, "tfmtools", &|tfm_file_path| {
                         let mut v: Vec<&str> = vec![];
                         v.extend(["convert", tfm_file_path]);

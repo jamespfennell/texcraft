@@ -1,7 +1,5 @@
 //! Parsers for the TeX font metric (.tfm) and property list (.pl) file formats
 
-#[cfg(test)]
-mod examples;
 pub mod format;
 pub mod ligkern;
 pub mod pl;
@@ -216,7 +214,7 @@ impl From<Face> for u8 {
 }
 
 /// TeX font metric parameters
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Params(pub Vec<Number>);
 
 impl Params {

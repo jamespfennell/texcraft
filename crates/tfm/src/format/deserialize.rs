@@ -193,7 +193,7 @@ pub(super) fn deserialize(b: &[u8]) -> Result<(File, Vec<Warning>), Error> {
         depths: Deserializable::deserialize(raw_depths),
         italic_corrections: Deserializable::deserialize(raw_italic_corrections),
         lig_kern_instructions: Deserializable::deserialize(raw_lig_kern),
-        kern: Deserializable::deserialize(raw_kerns),
+        kerns: Deserializable::deserialize(raw_kerns),
         extensible_chars: Deserializable::deserialize(raw_extensible_chars),
         params: Deserializable::deserialize(raw_params),
     };
@@ -427,24 +427,27 @@ impl<T: DeserializableFixed> Deserializable for Vec<T> {
     }
 }
 
-impl Deserializable for CharInfo {
+impl Deserializable for Option<CharInfo> {
     fn deserialize(b: &[u8]) -> Self {
-        CharInfo {
-            width_index: b[0],
-            height_index: b[1] / (1 << 4),
-            depth_index: b[1] % (1 << 4),
-            italic_index: b[2] / (1 << 2),
-            tag: match b[2] % (1 << 2) {
-                0 => CharTag::None,
-                1 => CharTag::Ligature(b[3]),
-                2 => CharTag::List(Char(b[3])),
-                _ => CharTag::Extension(b[3]),
-            },
+        match b[0].try_into() {
+            Ok(width_index) => Some(CharInfo {
+                width_index,
+                height_index: b[1] / (1 << 4),
+                depth_index: b[1] % (1 << 4),
+                italic_index: b[2] / (1 << 2),
+                tag: match b[2] % (1 << 2) {
+                    0 => CharTag::None,
+                    1 => CharTag::Ligature(b[3]),
+                    2 => CharTag::List(Char(b[3])),
+                    _ => CharTag::Extension(b[3]),
+                },
+            }),
+            Err(_) => None,
         }
     }
 }
 
-impl DeserializableFixed for CharInfo {
+impl DeserializableFixed for Option<CharInfo> {
     const NUM_BYTES: usize = 4;
 }
 
@@ -764,7 +767,7 @@ mod tests {
                     /* ni */ 0, 1, /* nl */ 0, 0, /* nk */ 0, 0, /* ne */ 0, 0,
                     /* np */ 0, 0, /* header.checksum */ 0, 0, 0, 0,
                     /* header.design_size */ 0, 0, 0, 0, /* char_infos */ 13, 35, 16, 0,
-                    0, 0, 1, 23,
+                    1, 0, 1, 23,
                 ],
                 14 * 4
             ),
@@ -772,20 +775,21 @@ mod tests {
                 header: Default::default(),
                 smallest_char_code: Char(70),
                 char_infos: vec![
-                    CharInfo {
-                        width_index: 13,
+                    Some(CharInfo {
+                        width_index: 13.try_into().unwrap(),
                         height_index: 2,
                         depth_index: 3,
                         italic_index: 4,
                         tag: CharTag::None,
-                    },
-                    CharInfo {
-                        width_index: 0,
+                    }),
+                    // None,
+                    Some(CharInfo {
+                        width_index: 1.try_into().unwrap(),
                         height_index: 0,
                         depth_index: 0,
                         italic_index: 0,
                         tag: CharTag::Ligature(23),
-                    },
+                    }),
                 ],
                 ..Default::default()
             },
@@ -807,7 +811,7 @@ mod tests {
                 heights: vec![Number::ZERO, Number(29)],
                 depths: vec![Number::ZERO, Number(31)],
                 italic_corrections: vec![Number::ZERO, Number(37)],
-                kern: vec![Number(37)],
+                kerns: vec![Number(37)],
                 ..Default::default()
             },
         ),
@@ -1051,14 +1055,5 @@ mod tests {
         v.resize(24 + 18 * 4, 0);
         v.extend(&b[boundary..]);
         v
-    }
-
-    #[test]
-    fn examples_can_be_deserialized() {
-        let tfm_files = crate::examples::tfm_files();
-        for file in tfm_files {
-            println!("{}", file.path);
-            deserialize(file.data).unwrap();
-        }
     }
 }

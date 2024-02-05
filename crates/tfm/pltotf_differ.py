@@ -6,13 +6,18 @@ import pathlib
 import os
 import difflib
 
-for pl_path in pathlib.Path("crates/tfm/src").rglob("*.pl"):
+for pl_path in pathlib.Path("crates/tfm").rglob("*.pl"):
     knuth_tfm_path = "/tmp/knuth.tfm"
+    os.popen(f"rm -f {knuth_tfm_path}").read()
     os.popen(f"pltotf {pl_path} {knuth_tfm_path}").read()
     knuth_tfm = open(knuth_tfm_path, "rb").read()
     texcraft_tfm_path = "/tmp/texcraft.tfm"
+    os.popen(f"rm -f {texcraft_tfm_path}").read()
     os.popen(f"cargo run --bin pltotf -- {pl_path} {texcraft_tfm_path}").read()
-    texcraft_tfm = open(texcraft_tfm_path, "rb").read()
+    try:
+        texcraft_tfm = open(texcraft_tfm_path, "rb").read()
+    except FileNotFoundError:
+        texcraft_tfm = []
     if knuth_tfm == texcraft_tfm:
         print(f"{pl_path} OK")
         continue
@@ -24,7 +29,7 @@ for pl_path in pathlib.Path("crates/tfm/src").rglob("*.pl"):
     for line in difflib.unified_diff(knuth_debug.splitlines(), texcraft_debug.splitlines(), fromfile='Knuth', tofile='Texcraft', lineterm=''):
         print(line)
         i += 1
-        if i > 60:
+        if i > 600:
             print("(truncating additional diffs...)")
             break
-    break
+    #    break

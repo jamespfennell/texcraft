@@ -12,7 +12,10 @@ The property list (.pl) file format
 
 use std::collections::HashMap;
 
-use crate::{format, ligkern, Char, Header, NamedParam, Number, Params};
+use crate::{
+    format::{self, ExtensibleRecipe},
+    ligkern, Char, Header, NamedParam, Number, Params,
+};
 
 pub mod ast;
 pub mod cst;
@@ -21,7 +24,7 @@ pub mod lexer;
 pub use error::ParseError;
 
 /// Data about one character in a .pl file.
-#[derive(Default, PartialEq, Eq, Debug)]
+#[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct CharData {
     pub width: Number,
     pub height: Number,
@@ -31,7 +34,7 @@ pub struct CharData {
 }
 
 /// Tag of a character in a .pl file.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum CharTag {
     #[default]
     None,
@@ -211,7 +214,28 @@ impl File {
                                 // TODO: warning if tag != CharTag::None
                                 char_data.tag = CharTag::List(c.data);
                             }
-                            ast::Character::ExtensibleCharacter(_) => todo!(),
+                            ast::Character::ExtensibleCharacter(e) => {
+                                let mut recipe: ExtensibleRecipe = Default::default();
+                                for node in e.children {
+                                    match node {
+                                        ast::ExtensibleCharacter::Top(v) => {
+                                            recipe.top = Some(v.data)
+                                        }
+                                        ast::ExtensibleCharacter::Middle(v) => {
+                                            recipe.middle = Some(v.data)
+                                        }
+                                        ast::ExtensibleCharacter::Bottom(v) => {
+                                            recipe.bottom = Some(v.data)
+                                        }
+                                        ast::ExtensibleCharacter::Replicated(v) => {
+                                            recipe.rep = v.data
+                                        }
+                                        ast::ExtensibleCharacter::Comment(_) => {}
+                                    }
+                                }
+                                // TODO: warning if tag != CharTag::None
+                                char_data.tag = CharTag::Extension(recipe)
+                            }
                             ast::Character::Comment(_) => {}
                         }
                     }
@@ -228,12 +252,18 @@ impl File {
         let mut char_data = HashMap::<Char, CharData>::new();
         let mut c = tfm_file.smallest_char_code;
         for info in tfm_file.char_infos.into_iter() {
+            let this_c = c;
+            c = Char(c.0.checked_add(1).unwrap());
+            let info = match info {
+                None => continue,
+                Some(info) => info,
+            };
             char_data.insert(
-                c,
+                this_c,
                 CharData {
                     width: tfm_file
                         .widths
-                        .get(info.width_index as usize)
+                        .get(info.width_index.get() as usize)
                         .copied()
                         .unwrap_or_default(),
                     height: tfm_file
@@ -265,7 +295,6 @@ impl File {
                     },
                 },
             );
-            c = Char(c.0.checked_add(1).unwrap());
         }
         // TODO: consider having this logic when we deserialize TFM files?
         // Or should the TFM type be a low level representation of the file?
@@ -277,7 +306,7 @@ impl File {
                     // TODO: log a warning if the index is not in the kerns array as
                     // in TFtoPL.2014.76
                     *payload = tfm_file
-                        .kern
+                        .kerns
                         .get(payload.0 as usize)
                         .copied()
                         .unwrap_or_default()
@@ -569,28 +598,30 @@ pub enum CharDisplayFormat {
 mod tests {
     use crate::Face;
 
+    use self::format::ExtensibleRecipe;
+
     use super::*;
 
-    fn run(source: &str, want: File) {
+    fn run_from_pl_source_code_test(source: &str, want: File) {
         let (got, errors) = File::from_pl_source_code(source);
         assert_eq!(errors, vec![]);
         assert_eq!(got, want);
     }
 
-    macro_rules! build_tests {
+    macro_rules! from_pl_source_code_tests {
         ( $( ($name: ident, $source: expr, $want: expr, ), )+ ) => {
             $(
                 #[test]
                 fn $name() {
                     let source = $source;
                     let want = $want;
-                    run(source, want);
+                    run_from_pl_source_code_test(source, want);
                 }
             )+
         };
     }
 
-    build_tests!(
+    from_pl_source_code_tests!(
         (
             checksum,
             "(CHECKSUM H 7)",
@@ -848,5 +879,115 @@ mod tests {
                 ..Default::default()
             },
         ),
+        (
+            char_next_larger,
+            "(CHARACTER C r (NEXTLARGER C A))",
+            File {
+                char_data: HashMap::from([(
+                    'r'.try_into().unwrap(),
+                    CharData {
+                        tag: CharTag::List('A'.try_into().unwrap()),
+                        ..Default::default()
+                    }
+                )]),
+                ..Default::default()
+            },
+        ),
+        (
+            char_extensible_recipe_empty,
+            "(CHARACTER C r (VARCHAR))",
+            File {
+                char_data: HashMap::from([(
+                    'r'.try_into().unwrap(),
+                    CharData {
+                        tag: CharTag::Extension(Default::default()),
+                        ..Default::default()
+                    }
+                )]),
+                ..Default::default()
+            },
+        ),
+        (
+            char_extensible_recipe_data,
+            "(CHARACTER C r (VARCHAR (TOP O 1) (MID O 2) (BOT O 3) (REP O 4)))",
+            File {
+                char_data: HashMap::from([(
+                    'r'.try_into().unwrap(),
+                    CharData {
+                        tag: CharTag::Extension(ExtensibleRecipe {
+                            top: Some(Char(1)),
+                            middle: Some(Char(2)),
+                            bottom: Some(Char(3)),
+                            rep: Char(4),
+                        }),
+                        ..Default::default()
+                    }
+                )]),
+                ..Default::default()
+            },
+        ),
     );
+
+    fn run_from_tfm_file_test(tfm_file: crate::format::File, want: File) {
+        let got = File::from_tfm_file(tfm_file);
+        assert_eq!(got, want);
+    }
+
+    macro_rules! from_tfm_file_tests {
+        ( $( ($name: ident, $tfm_file: expr, $pl_file: expr, ), )+ ) => {
+            $(
+                #[test]
+                fn $name() {
+                    let tfm_file = $tfm_file;
+                    let want = $pl_file;
+                    run_from_tfm_file_test(tfm_file, want);
+                }
+            )+
+        };
+    }
+
+    from_tfm_file_tests!((
+        gap_in_chars,
+        crate::format::File {
+            smallest_char_code: Char('A'.try_into().unwrap()),
+            char_infos: vec![
+                Some(crate::format::CharInfo {
+                    width_index: 1.try_into().unwrap(),
+                    height_index: 0,
+                    depth_index: 0,
+                    italic_index: 0,
+                    tag: crate::format::CharTag::None,
+                }),
+                None,
+                Some(crate::format::CharInfo {
+                    width_index: 2.try_into().unwrap(),
+                    height_index: 0,
+                    depth_index: 0,
+                    italic_index: 0,
+                    tag: crate::format::CharTag::None,
+                }),
+            ],
+            widths: vec![Number::ZERO, Number::UNITY, Number::UNITY * 2],
+            ..Default::default()
+        },
+        File {
+            char_data: HashMap::from([
+                (
+                    'A'.try_into().unwrap(),
+                    CharData {
+                        width: Number::UNITY,
+                        ..Default::default()
+                    }
+                ),
+                (
+                    'C'.try_into().unwrap(),
+                    CharData {
+                        width: Number::UNITY * 2,
+                        ..Default::default()
+                    }
+                ),
+            ]),
+            ..File::from_tfm_file(Default::default())
+        },
+    ),);
 }
