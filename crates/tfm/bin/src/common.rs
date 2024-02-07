@@ -90,6 +90,13 @@ impl TfPath {
             }),
         }
     }
+    #[allow(dead_code)]
+    pub fn write(&self, content: &[u8]) -> Result<(), String> {
+        match std::fs::write(&self.0, content) {
+            Ok(_) => Ok(()),
+            Err(err) => Err(format!("Failed to write `{}`: {}", self.0.display(), err)),
+        }
+    }
 }
 
 impl clap::builder::ValueParserFactory for TfPath {
@@ -104,6 +111,22 @@ impl clap::builder::ValueParserFactory for TfPath {
 pub struct PlPath(pub std::path::PathBuf);
 
 impl PlPath {
+    #[allow(dead_code)]
+    pub fn read(&self) -> Result<tfm::pl::File, String> {
+        let data = match std::fs::read_to_string(&self.0) {
+            Ok(data) => data,
+            Err(err) => return Err(format!("Failed to read `{}`: {}", self.0.display(), err)),
+        };
+        let (pl_file, warnings) = tfm::pl::File::from_pl_source_code(&data);
+        let source = AriadneSource {
+            path: self.0.clone(),
+            source: data.into(),
+        };
+        for warning in &warnings {
+            warning.ariadne_report().eprint(&source).unwrap();
+        }
+        Ok(pl_file)
+    }
     #[allow(dead_code)]
     pub fn write(&self, content: &str) -> Result<(), String> {
         match std::fs::write(&self.0, content) {

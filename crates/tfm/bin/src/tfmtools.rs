@@ -141,7 +141,22 @@ impl Convert {
                 }
                 Ok(())
             }
-            TfOrPlPath::Pl(_pl_path) => todo!(),
+            TfOrPlPath::Pl(pl_path) => {
+                let pl_file = pl_path.read()?;
+                let tfm_file = tfm::format::File::from_pl_file(&pl_file);
+                let tfm_bytes = tfm_file.serialize();
+                let tfm_path: TfPath = match &self.output {
+                    Some(TfOrPlPath::Pl(_pl_path)) => todo!(),
+                    Some(TfOrPlPath::Tf(tfm_path)) => tfm_path.clone(),
+                    None => {
+                        let mut tfm_path: std::path::PathBuf = pl_path.0.clone().into();
+                        tfm_path.set_extension("tfm");
+                        TfPath(tfm_path)
+                    }
+                };
+                tfm_path.write(&tfm_bytes)?;
+                Ok(())
+            }
         }
     }
 }
@@ -155,7 +170,13 @@ struct ConvertBatch {
 
     /// Output directory for the converted files.
     ///
-    /// By default, all of the converted files are written to the specified directory.
+    /// (At least) three ways to do it:
+    /// 
+    /// - Relative to each original file. Defaults to being next to each file but can be customized
+    /// - Relative to the current working directory, with the directory structure preserved
+    /// - Relative to the current working directory, but all flattened (--flatten)
+    /// 
+    /// By default, all of the converted files are written to this directory.
     /// The name of the converted file is the name of the original file with the extension changed accordingly.
     /// Thus
     ///
@@ -165,7 +186,7 @@ struct ConvertBatch {
     ///
     /// Alternatively, the `--preserve-paths` option can be used to preserve directory structure.
     #[arg(short, long)]
-    output: std::path::PathBuf,
+    output_directory: std::path::PathBuf,
 
     /// Preserve the relative paths of input files.
     ///
