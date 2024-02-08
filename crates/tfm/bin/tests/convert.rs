@@ -58,7 +58,7 @@ fn run_pl_to_tfm_test(
     let stdout = String::from_utf8(output.stdout).unwrap();
     similar_asserts::assert_eq!(texcraft: stdout, knuth: "");
     if let Some(want_stderr) = want_stderr {
-        similar_asserts::assert_eq!(texcraft: stderr, knuth: want_stderr);
+        similar_asserts::assert_eq!(texcraft: stderr, knuth: want_stderr.replace("\r\n", "\n"));
     }
 
     let got = std::fs::read(&tfm_file_path).unwrap();

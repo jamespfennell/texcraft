@@ -283,7 +283,7 @@ impl InfiniteLoopError {
 
 /// One step in a lig/kern infinite loop.
 ///
-/// A vector of these steps is returned in a [`CompilationError`].
+/// A vector of these steps is returned in a [`InfiniteLoopError`].
 #[derive(Debug, PartialEq, Eq)]
 pub struct InfiniteLoopStep {
     /// The index of the instruction to apply in this step.
