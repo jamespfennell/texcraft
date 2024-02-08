@@ -28,7 +28,13 @@ fn run_tfm_to_pl_test(tfm: &[u8], pl: &str, command: &str, args_fn: TfmToPlArgsF
 
 type PlToTfmArgsFn = for<'a> fn(pl_file_path: &'a str, tfm_file_path: &'a str) -> Vec<&'a str>;
 
-fn run_pl_to_tfm_test(tfm: &[u8], pl: &str, command: &str, args_fn: PlToTfmArgsFn) {
+fn run_pl_to_tfm_test(
+    tfm: &[u8],
+    pl: &str,
+    command: &str,
+    args_fn: PlToTfmArgsFn,
+    want_stderr: Option<&str>,
+) {
     let dir = tempfile::TempDir::new().unwrap();
     let pl_file_path = dir.path().join("input.pl");
     let mut pl_file = std::fs::File::create(&pl_file_path).unwrap();
@@ -51,7 +57,9 @@ fn run_pl_to_tfm_test(tfm: &[u8], pl: &str, command: &str, args_fn: PlToTfmArgsF
     );
     let stdout = String::from_utf8(output.stdout).unwrap();
     similar_asserts::assert_eq!(texcraft: stdout, knuth: "");
-    similar_asserts::assert_eq!(texcraft: stderr, knuth: "");
+    if let Some(want_stderr) = want_stderr {
+        similar_asserts::assert_eq!(texcraft: stderr, knuth: want_stderr);
+    }
 
     let got = std::fs::read(&tfm_file_path).unwrap();
     if got == tfm {
@@ -61,13 +69,13 @@ fn run_pl_to_tfm_test(tfm: &[u8], pl: &str, command: &str, args_fn: PlToTfmArgsF
     let mut want_tfm_file = std::fs::File::create(&want_tfm_file_path).unwrap();
     want_tfm_file.write_all(tfm).unwrap();
 
-    similar_asserts::assert_eq!(texcraft: debug(&tfm_file_path), knuth: debug(&want_tfm_file_path));
+    similar_asserts::assert_eq!(texcraft: debug_tfm(&tfm_file_path), knuth: debug_tfm(&want_tfm_file_path));
     // It's possible that there is a bug in `tfmtools debug` such that different files have
     // the same debug output. For this case, we assert the bytes are equal too.
     assert_eq!(got, tfm);
 }
 
-fn debug(tfm_file_path: &std::path::PathBuf) -> String {
+fn debug_tfm(tfm_file_path: &std::path::PathBuf) -> String {
     let mut cmd = Command::cargo_bin("tfmtools").unwrap();
     cmd.args(vec!["debug", tfm_file_path.to_str().unwrap()]);
     let output = cmd.output().unwrap();
@@ -111,14 +119,41 @@ macro_rules! convert_tests {
                 fn tfmtools_convert_pl_to_tfm() {
                     run_pl_to_tfm_test(TFM, PL, "tfmtools", |pl_file_path, tfm_file_path| {
                         vec!["convert", "-o", tfm_file_path, pl_file_path]
-                    });
+                    }, Some(""));
                 }
 
                 #[test]
                 fn pltotf() {
                     run_pl_to_tfm_test(TFM, PL, "pltotf", |pl_file_path, tfm_file_path|{
                         vec![pl_file_path, tfm_file_path]
-                    });
+                    }, Some(""));
+                }
+            }
+        )+
+    };
+}
+
+macro_rules! convert_pltotf_tests {
+    ( $( ($name: ident, $tfm_path: expr, $pl_path: expr, $stderr: expr $(,)? ), )+ ) => {
+        $(
+            mod $name {
+                use super::*;
+                const TFM: &'static [u8] = include_bytes!($tfm_path);
+                const PL: &'static str = include_str!($pl_path);
+                const STDERR: &'static str = $stderr;
+
+                #[test]
+                fn tfmtools_convert_pl_to_tfm() {
+                    run_pl_to_tfm_test(TFM, PL, "tfmtools", |pl_file_path, tfm_file_path| {
+                        vec!["convert", "-o", tfm_file_path, pl_file_path]
+                    }, None);
+                }
+
+                #[test]
+                fn pltotf() {
+                    run_pl_to_tfm_test(TFM, PL, "pltotf", |pl_file_path, tfm_file_path|{
+                        vec![pl_file_path, tfm_file_path]
+                    }, Some(STDERR));
                 }
             }
         )+
@@ -143,4 +178,25 @@ convert_tests!(
     (cmex10, "data/cmex10.tfm", "data/cmex10.pl"),
     (cminch, "data/cminch.tfm", "data/cminch.pl"),
     (cmsy7, "data/cmsy7.tfm", "data/cmsy7.pl"),
+);
+
+convert_pltotf_tests!(
+    (
+        empty_varchar,
+        "data/empty-varchar.tfm",
+        "data/empty-varchar.pl",
+        "",
+    ),
+    (
+        zero_width_chars,
+        "data/zero-width-char.tfm",
+        "data/zero-width-char.pl",
+        "",
+    ),
+    (
+        ligature_loop,
+        "data/ligature-loop.tfm",
+        "data/ligature-loop.pl",
+        include_str!["data/ligature-loop.stderr.txt"],
+    ),
 );

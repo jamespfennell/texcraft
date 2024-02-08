@@ -1,0 +1,13 @@
+(CHECKSUM O 13353747075)
+(SEVENBITSAFEFLAG TRUE)
+(LIGTABLE
+   (LABEL C A)
+   (COMMENT replace (A,B) with (A,C))
+   (/LIG C B C C)
+   (COMMENT replace (A,C) with (A,B))
+   (/LIG C C C B)
+   (STOP)
+)
+(CHARACTER C A)
+(CHARACTER C B)
+(CHARACTER C C)

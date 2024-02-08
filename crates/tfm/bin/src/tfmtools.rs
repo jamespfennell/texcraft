@@ -142,14 +142,23 @@ impl Convert {
                 Ok(())
             }
             TfOrPlPath::Pl(pl_path) => {
-                let pl_file = pl_path.read()?;
+                let mut pl_file = pl_path.read()?;
+                if let Err(err) = tfm::ligkern::CompiledProgram::compile(
+                    &pl_file.lig_kern_instructions,
+                    &[],
+                    pl_file.lig_kern_entrypoints(),
+                ) {
+                    eprintln!("{}", err.pltotf_message());
+                    eprintln!("All ligatures will be cleared.");
+                    pl_file.clear_lig_kern_data();
+                }
                 let tfm_file = tfm::format::File::from_pl_file(&pl_file);
                 let tfm_bytes = tfm_file.serialize();
                 let tfm_path: TfPath = match &self.output {
                     Some(TfOrPlPath::Pl(_pl_path)) => todo!(),
                     Some(TfOrPlPath::Tf(tfm_path)) => tfm_path.clone(),
                     None => {
-                        let mut tfm_path: std::path::PathBuf = pl_path.0.clone().into();
+                        let mut tfm_path: std::path::PathBuf = pl_path.0.clone();
                         tfm_path.set_extension("tfm");
                         TfPath(tfm_path)
                     }
@@ -171,11 +180,11 @@ struct ConvertBatch {
     /// Output directory for the converted files.
     ///
     /// (At least) three ways to do it:
-    /// 
+    ///
     /// - Relative to each original file. Defaults to being next to each file but can be customized
     /// - Relative to the current working directory, with the directory structure preserved
     /// - Relative to the current working directory, but all flattened (--flatten)
-    /// 
+    ///
     /// By default, all of the converted files are written to this directory.
     /// The name of the converted file is the name of the original file with the extension changed accordingly.
     /// Thus

@@ -227,7 +227,7 @@ impl File {
                     }
                 };
                 instruction.operation =
-                    ligkern::lang::Operation::Kern(Number(index.try_into().unwrap()));
+                    ligkern::lang::Operation::KernAtIndex(index.try_into().unwrap());
             }
             lig_kern_instructions.push(instruction);
         }

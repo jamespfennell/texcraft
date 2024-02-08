@@ -124,8 +124,13 @@ pub mod lang {
     #[derive(Debug, PartialEq, Eq, Copy, Clone)]
     pub enum Operation {
         /// Insert a kern between the current character and the next character.
-        /// The variant payload is the index of the kern in the kerns array.
+        ///
+        /// The variant payload is the size of the kern.
         Kern(Number),
+        /// Insert a kern between the current character and the next character.
+        ///
+        /// The variant payload is the index of the kern in the kerns array.
+        KernAtIndex(u16),
         /// Perform a ligature step.
         /// This inserts `char_to_insert` between the left and right characters,
         ///     and then performs the post-lig operation.
@@ -202,9 +207,10 @@ impl CompiledProgram {
     /// Compile a lig/kern program.
     pub fn compile(
         instructions: &[lang::Instruction],
+        kerns: &[Number],
         entry_points: HashMap<Char, usize>,
-    ) -> Result<(CompiledProgram, Vec<CompilationWarning>), CompilationError> {
-        compiler::compile(instructions, &entry_points)
+    ) -> Result<(CompiledProgram, Vec<CompilationWarning>), InfiniteLoopError> {
+        compiler::compile(instructions, kerns, &entry_points)
     }
 
     /// Get an iterator over the full lig/kern replacement for a pair of characters.
@@ -256,13 +262,23 @@ impl CompiledProgram {
 
 /// An error returned from lig/kern compilation.
 #[derive(Debug, PartialEq, Eq)]
-pub struct CompilationError {
+pub struct InfiniteLoopError {
     /// The pair of characters the starts the infinite loop.
     pub starting_pair: (Char, Char),
     /// A sequence of steps forming the infinite loop.
     ///
     /// At the end of these steps, the next pair to replace will be the `starting_pair` again.
     pub infinite_loop: Vec<InfiniteLoopStep>,
+}
+
+impl InfiniteLoopError {
+    pub fn pltotf_message(&self) -> String {
+        // PLtoTF.2014.125
+        format!(
+            "Infinite ligature loop starting with '{:o} and '{:o}!",
+            self.starting_pair.0 .0, self.starting_pair.1 .0
+        )
+    }
 }
 
 /// One step in a lig/kern infinite loop.

@@ -4,10 +4,11 @@ use std::collections::HashSet;
 
 pub fn compile(
     instructions: &[lang::Instruction],
+    kerns: &[Number],
     entry_points: &HashMap<Char, usize>,
-) -> Result<(CompiledProgram, Vec<CompilationWarning>), CompilationError> {
+) -> Result<(CompiledProgram, Vec<CompilationWarning>), InfiniteLoopError> {
     let (pair_to_instruction, warnings) = build_pair_to_instruction_map(instructions, entry_points);
-    let pair_to_replacement = calculate_replacements(instructions, pair_to_instruction)?;
+    let pair_to_replacement = calculate_replacements(instructions, kerns, pair_to_instruction)?;
     let program = lower_and_optimize(pair_to_replacement);
     Ok((program, warnings))
 }
@@ -73,8 +74,9 @@ struct Replacement(Vec<(Char, Number)>, Char);
 
 fn calculate_replacements(
     instructions: &[lang::Instruction],
+    kerns: &[Number],
     pair_to_instruction: HashMap<(Char, Char), usize>,
-) -> Result<HashMap<(Char, Char), Replacement>, CompilationError> {
+) -> Result<HashMap<(Char, Char), Replacement>, InfiniteLoopError> {
     let mut result: HashMap<(Char, Char), Replacement> = Default::default();
     let mut actionable: Vec<OngoingCalculation> = vec![];
     let mut node_to_parents: HashMap<Node, Vec<OngoingCalculation>> = Default::default();
@@ -83,6 +85,13 @@ fn calculate_replacements(
         {
             lang::Operation::Kern(kern) => {
                 result.insert((left, right), Replacement(vec![(left, kern)], right));
+                continue;
+            }
+            lang::Operation::KernAtIndex(index) => {
+                result.insert(
+                    (left, right),
+                    Replacement(vec![(left, kerns[index as usize])], right),
+                );
                 continue;
             }
             lang::Operation::Ligature {
@@ -225,7 +234,7 @@ fn calculate_replacements(
                 instruction_index: pair_to_instruction[&(node.0, node.1)],
             });
         }
-        return Err(CompilationError {
+        return Err(InfiniteLoopError {
             starting_pair,
             infinite_loop: steps,
         });
@@ -363,7 +372,7 @@ mod tests {
                 )
             })
             .collect();
-        let compiled_program = compile(&instructions, &entry_points).unwrap().0;
+        let compiled_program = compile(&instructions, &vec![], &entry_points).unwrap().0;
 
         let mut got: HashMap<(Char, Char), Vec<(Char, Number)>> = Default::default();
         for pair in compiled_program.all_pairs_having_replacement() {
@@ -723,13 +732,13 @@ mod tests {
     fn run_infinite_loop_test(
         instructions: Vec<lang::Instruction>,
         entry_points: Vec<(char, usize)>,
-        want_err: CompilationError,
+        want_err: InfiniteLoopError,
     ) {
         let entry_points: HashMap<Char, usize> = entry_points
             .into_iter()
             .map(|(c, u)| (c.try_into().unwrap(), u))
             .collect();
-        let got_err = compile(&instructions, &entry_points).unwrap_err();
+        let got_err = compile(&instructions, &vec![], &entry_points).unwrap_err();
         assert_eq!(got_err, want_err);
     }
 
@@ -752,7 +761,7 @@ mod tests {
             single_command,
             vec![new_lig(None, 'B', 'A', RetainBothMoveToInserted)],
             vec![('A', 0)],
-            CompilationError {
+            InfiniteLoopError {
                 starting_pair: starting_pair('A', 'B'),
                 infinite_loop: vec![InfiniteLoopStep {
                     instruction_index: 0,
@@ -768,7 +777,7 @@ mod tests {
                 new_lig(None, 'B', 'A', RetainRightMoveToInserted),
             ],
             vec![('A', 0), ('C', 1)],
-            CompilationError {
+            InfiniteLoopError {
                 starting_pair: starting_pair('A', 'B'),
                 infinite_loop: vec![
                     InfiniteLoopStep {
@@ -822,7 +831,7 @@ mod tests {
                 new_lig(None, 'B', 'A', RetainBothMoveToInserted),
             ],
             vec![('A', 0), ('C', 1)],
-            CompilationError {
+            InfiniteLoopError {
                 starting_pair: starting_pair('A', 'B'),
                 infinite_loop: vec![
                     InfiniteLoopStep {
@@ -845,7 +854,7 @@ mod tests {
                 new_lig(None, 'B', 'C', RetainBothMoveToInserted),
             ],
             vec![('A', 0), ('C', 1)],
-            CompilationError {
+            InfiniteLoopError {
                 starting_pair: starting_pair('C', 'B'),
                 infinite_loop: vec![InfiniteLoopStep {
                     instruction_index: 1,

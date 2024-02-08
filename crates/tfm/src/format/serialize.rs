@@ -103,8 +103,10 @@ impl Serializable for ligkern::lang::Instruction {
         b.push(self.next_instruction.unwrap_or(128));
         b.push(self.right_char.0);
         match self.operation {
-            ligkern::lang::Operation::Kern(Number(index)) => {
-                let index: u16 = index.try_into().unwrap();
+            ligkern::lang::Operation::Kern(_) => {
+                panic!("tfm::format::File lig kern programs cannot contains `Kern` operations");
+            }
+            ligkern::lang::Operation::KernAtIndex(index) => {
                 let [hi, lo] = index.to_be_bytes();
                 b.push(hi + 128);
                 b.push(lo);

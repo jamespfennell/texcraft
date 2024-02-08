@@ -486,10 +486,9 @@ impl Deserializable for ligkern::lang::Instruction {
                     },
                 }
             } else {
-                ligkern::lang::Operation::Kern(Number(
-                    // This is an index into the kerns array, not the value itself.
-                    256 * (op_byte as i32 - 128) + remainder as i32,
-                ))
+                ligkern::lang::Operation::KernAtIndex(
+                    256 * (op_byte as u16 - 128) + remainder as u16,
+                )
             },
         }
     }
@@ -822,7 +821,7 @@ mod tests {
                 lig_kern_instructions: vec![ligkern::lang::Instruction {
                     next_instruction: Some(3),
                     right_char: Char(5),
-                    operation: ligkern::lang::Operation::Kern(Number(256 * 2 + 13))
+                    operation: ligkern::lang::Operation::KernAtIndex(256 * 2 + 13)
                 },],
                 ..Default::default()
             },

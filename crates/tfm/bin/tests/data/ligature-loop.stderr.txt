@@ -1,0 +1,2 @@
+Infinite ligature loop starting with '101 and '102!
+All ligatures will be cleared.

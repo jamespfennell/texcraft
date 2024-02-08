@@ -77,6 +77,27 @@ impl File {
         (file, errors)
     }
 
+    /// Return a map from characters to the lig/kern entrypoint for that character.
+    pub fn lig_kern_entrypoints(&self) -> HashMap<Char, usize> {
+        self.char_data
+            .iter()
+            .filter_map(|d| match d.1.tag {
+                CharTag::Ligature(l) => Some((*d.0, l)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Clear all lig/kern data from the file.
+    pub fn clear_lig_kern_data(&mut self) {
+        for (_, data) in self.char_data.iter_mut() {
+            if let CharTag::Ligature(_) = data.tag {
+                data.tag = CharTag::None;
+            }
+        }
+        self.lig_kern_instructions = vec![];
+    }
+
     /// Build a File from an AST.
     pub fn from_ast(ast: ast::Ast, errors: &mut Vec<error::ParseError>) -> File {
         let mut file: File = Default::default();
@@ -296,20 +317,20 @@ impl File {
                 },
             );
         }
-        // TODO: consider having this logic when we deserialize TFM files?
-        // Or should the TFM type be a low level representation of the file?
         let lig_kern_instructions: Vec<ligkern::lang::Instruction> = tfm_file
             .lig_kern_instructions
             .into_iter()
             .map(|mut i| {
-                if let ligkern::lang::Operation::Kern(payload) = &mut i.operation {
+                if let ligkern::lang::Operation::KernAtIndex(index) = &i.operation {
                     // TODO: log a warning if the index is not in the kerns array as
                     // in TFtoPL.2014.76
-                    *payload = tfm_file
-                        .kerns
-                        .get(payload.0 as usize)
-                        .copied()
-                        .unwrap_or_default()
+                    i.operation = ligkern::lang::Operation::Kern(
+                        tfm_file
+                            .kerns
+                            .get(*index as usize)
+                            .copied()
+                            .unwrap_or_default(),
+                    )
                 }
                 i
             })
@@ -434,19 +455,23 @@ impl File {
                 }
             }
         }
-        let build_lig_kern_op =
-            |instruction: &ligkern::lang::Instruction| match instruction.operation {
-                ligkern::lang::Operation::Kern(kern) => {
-                    ast::LigTable::Kern((instruction.right_char, kern).into())
-                }
-                ligkern::lang::Operation::Ligature {
-                    char_to_insert,
-                    post_lig_operation,
-                } => ast::LigTable::Lig(
-                    post_lig_operation,
-                    (instruction.right_char, char_to_insert).into(),
-                ),
-            };
+        let build_lig_kern_op = |instruction: &ligkern::lang::Instruction| match instruction
+            .operation
+        {
+            ligkern::lang::Operation::Kern(kern) => {
+                ast::LigTable::Kern((instruction.right_char, kern).into())
+            }
+            ligkern::lang::Operation::KernAtIndex(_) => {
+                panic!("tfm::pl::File lig kern programs cannot contains `KernAtIndex` operations")
+            }
+            ligkern::lang::Operation::Ligature {
+                char_to_insert,
+                post_lig_operation,
+            } => ast::LigTable::Lig(
+                post_lig_operation,
+                (instruction.right_char, char_to_insert).into(),
+            ),
+        };
         for (index, instruction) in self.lig_kern_instructions.iter().enumerate() {
             for label in index_to_labels.get(&index).unwrap_or(&vec![]) {
                 l.push(ast::LigTable::Label(
