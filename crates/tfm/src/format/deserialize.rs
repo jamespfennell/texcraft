@@ -278,8 +278,8 @@ pub struct SubFileSizes {
     pub np: i16,
 }
 
-impl Deserializable for SubFileSizes {
-    fn deserialize(b: &[u8]) -> Self {
+impl SubFileSizes {
+    pub fn from_bytes(b: &[u8]) -> Self {
         Self {
             lh: i16::deserialize(&b[0..2]),
             bc: i16::deserialize(&b[2..4]),
@@ -293,6 +293,12 @@ impl Deserializable for SubFileSizes {
             ne: i16::deserialize(&b[18..20]),
             np: i16::deserialize(&b[20..22]),
         }
+    }
+}
+
+impl Deserializable for SubFileSizes {
+    fn deserialize(b: &[u8]) -> Self {
+        Self::from_bytes(b)
     }
 }
 
@@ -341,7 +347,7 @@ impl SubFileSizes {
         Ok(())
     }
 
-    fn partition<'a>(&self, mut b: &'a [u8]) -> [&'a [u8]; 10] {
+    pub fn partition<'a>(&self, mut b: &'a [u8]) -> [&'a [u8]; 10] {
         let lens = [
             self.lh,
             self.ec - self.bc + 1,

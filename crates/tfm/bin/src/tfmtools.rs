@@ -122,7 +122,7 @@ impl Convert {
     fn run(&self) -> Result<(), String> {
         match &self.path {
             TfOrPlPath::Tf(tf_path) => {
-                let (tfm_file, _) = tf_path.read()?;
+                let (_, tfm_file, _) = tf_path.read()?;
                 let pl_file = tfm::pl::File::from_tfm_file(tfm_file);
                 let pl_output = format![
                     "{}",
@@ -231,7 +231,32 @@ struct Debug {
 
 impl Debug {
     fn run(&self) -> Result<(), String> {
-        let (tfm_file, _) = self.path.read()?;
+        let (tfm_bytes, tfm_file, _) = self.path.read()?;
+        let sub_file_sizes = tfm::format::SubFileSizes::from_bytes(&tfm_bytes[2..]);
+        println!("{:#?}", sub_file_sizes);
+        let partitions = sub_file_sizes.partition(&tfm_bytes[24..]);
+        let sections = [
+            "header",
+            "char_infos",
+            "widths",
+            "heights",
+            "depths",
+            "italic_corrections",
+            "lig_kern_instructions",
+            "kerns",
+            "extensible_recipes",
+            "params",
+        ];
+        for (i, partition) in partitions.into_iter().enumerate() {
+            println!("------------------[{}]", sections[i]);
+            for (j, byte) in partition.iter().enumerate() {
+                print!("{:4}", byte);
+                if j % 4 == 3 {
+                    println!();
+                }
+            }
+            println!();
+        }
         println!("{:#?}", tfm_file);
         Ok(())
     }

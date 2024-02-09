@@ -66,7 +66,14 @@ impl TfPath {
     #[allow(dead_code)]
     pub fn read(
         &self,
-    ) -> Result<(tfm::format::File, Vec<tfm::format::DeserializeWarning>), String> {
+    ) -> Result<
+        (
+            Vec<u8>,
+            tfm::format::File,
+            Vec<tfm::format::DeserializeWarning>,
+        ),
+        String,
+    > {
         let data = match std::fs::read(&self.0) {
             Ok(data) => data,
             Err(err) => return Err(format!("Failed to read `{}`: {}", self.0.display(), err)),
@@ -78,7 +85,7 @@ impl TfPath {
         for warning in &warnings {
             eprintln!("{}", warning.tf_to_pl_message())
         }
-        Ok((tfm_file, warnings))
+        Ok((data, tfm_file, warnings))
     }
     fn parse(input: &str) -> Result<Self, InvalidExtension> {
         let path_buf: std::path::PathBuf = input.into();

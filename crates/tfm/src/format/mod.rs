@@ -9,6 +9,7 @@ mod serialize;
 use super::*;
 
 pub use deserialize::Error as DeserializeError;
+pub use deserialize::SubFileSizes;
 pub use deserialize::Warning as DeserializeWarning;
 
 /// Complete contents of a TeX font metric (.tfm) file.
