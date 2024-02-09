@@ -108,7 +108,7 @@ impl Default for File {
     fn default() -> Self {
         Self {
             header: Default::default(),
-            smallest_char_code: Default::default(),
+            smallest_char_code: Char(1),
             char_infos: vec![],
             widths: vec![Number::ZERO],
             heights: vec![Number::ZERO],
@@ -131,8 +131,50 @@ impl File {
         serialize::serialize(self)
     }
 
+    /// Return a map from characters to the lig/kern entrypoint for that character.
+    pub fn lig_kern_entrypoints(&self) -> HashMap<Char, u8> {
+        self.char_infos
+            .iter()
+            .enumerate()
+            .filter_map(|f| {
+                f.1.as_ref()
+                    .map(|char_info| (Char((f.0).try_into().unwrap()), char_info))
+            })
+            .filter_map(|(c, d)| match d.tag {
+                CharTag::Ligature(l) => Some((Char(c.0 + self.smallest_char_code.0), l)),
+                _ => None,
+            })
+            .collect()
+    }
+
     pub fn from_pl_file(pl_file: &crate::pl::File) -> Self {
         let mut char_bounds: Option<(Char, Char)> = None;
+
+        let mut lig_kern_instructions = vec![];
+        let mut kerns = vec![];
+        let mut kerns_dedup = HashMap::<Number, usize>::new();
+        for instruction in &pl_file.lig_kern_instructions {
+            let mut instruction = instruction.clone();
+            if let ligkern::lang::Operation::Kern(kern) = instruction.operation {
+                use std::collections::hash_map::Entry;
+                let index = match kerns_dedup.entry(kern) {
+                    Entry::Occupied(o) => *o.get(),
+                    Entry::Vacant(v) => {
+                        let l = kerns.len();
+                        v.insert(l);
+                        kerns.push(kern);
+                        l
+                    }
+                };
+                instruction.operation =
+                    ligkern::lang::Operation::KernAtIndex(index.try_into().unwrap());
+            }
+            lig_kern_instructions.push(instruction);
+        }
+        let lig_kern_entrypoints = crate::ligkern::lang::compress_entrypoints(
+            &mut lig_kern_instructions,
+            pl_file.lig_kern_entrypoints(),
+        );
 
         let mut widths = vec![];
         let mut heights = vec![];
@@ -166,35 +208,46 @@ impl File {
             None => (Char(1), vec![]),
             Some((lower, upper)) => {
                 let mut v = Vec::<Option<CharInfo>>::with_capacity(
-                    upper.0.checked_sub(lower.0).unwrap() as usize + 1,
+                    upper
+                        .0
+                        .checked_sub(lower.0)
+                        .expect("upper.0<=lower.0 from the definition of char_bounds")
+                        as usize
+                        + 1,
                 );
                 for c in lower.0..=upper.0 {
                     v.push(match pl_file.char_data.get(&Char(c)) {
                         None => None,
                         Some(pl_data) => {
-                            let width_index = *width_to_index.get(&pl_data.width).unwrap();
+                            let width_index = *width_to_index.get(&pl_data.width).expect(
+                                "the map returned from compress(_,_) contains every input as a key",
+                            );
                             Some(CharInfo {
-                                width_index: width_index.try_into().unwrap(),
+                                width_index,
                                 // If the height data is missing from the height_to_index map, it's because
                                 // the height is 0.
                                 height_index: height_to_index
                                     .get(&pl_data.height)
                                     .copied()
+                                    .map(NonZeroU8::get)
                                     .unwrap_or(0),
                                 depth_index: depth_to_index
                                     .get(&pl_data.depth)
                                     .copied()
+                                    .map(NonZeroU8::get)
                                     .unwrap_or(0),
                                 italic_index: italic_correction_to_index
                                     .get(&pl_data.italic_correction)
                                     .copied()
+                                    .map(NonZeroU8::get)
                                     .unwrap_or(0),
                                 tag: match &pl_data.tag {
                                     pl::CharTag::None => CharTag::None,
                                     // TODO: we shouldn't unwrap here. There is a mechanism for putting
                                     // a large index here via lig kern commands.
-                                    pl::CharTag::Ligature(i) => {
-                                        CharTag::Ligature((*i).try_into().unwrap())
+                                    pl::CharTag::Ligature(_) => {
+                                        let entrypoint = *lig_kern_entrypoints.get(&Char(c)).expect("the map returned by crate::ligkern::lang::compress_entrypoints has a key for all chars with a lig tag");
+                                        CharTag::Ligature(entrypoint)
                                     }
                                     pl::CharTag::List(c) => CharTag::List(*c),
                                     pl::CharTag::Extension(e) => {
@@ -210,28 +263,6 @@ impl File {
                 (lower, v)
             }
         };
-
-        let mut lig_kern_instructions = vec![];
-        let mut kerns = vec![];
-        let mut kerns_dedup = HashMap::<Number, usize>::new();
-        for instruction in &pl_file.lig_kern_instructions {
-            let mut instruction = instruction.clone();
-            if let ligkern::lang::Operation::Kern(kern) = instruction.operation {
-                use std::collections::hash_map::Entry;
-                let index = match kerns_dedup.entry(kern) {
-                    Entry::Occupied(o) => *o.get(),
-                    Entry::Vacant(v) => {
-                        let l = kerns.len();
-                        v.insert(l);
-                        kerns.push(kern);
-                        l
-                    }
-                };
-                instruction.operation =
-                    ligkern::lang::Operation::KernAtIndex(index.try_into().unwrap());
-            }
-            lig_kern_instructions.push(instruction);
-        }
 
         Self {
             header: pl_file.header.clone(),
@@ -311,7 +342,7 @@ impl File {
 /// By the pigeon-hole principle, there exists a `k` such that the range `[m * 2^{k-1}, m * 2^k]`
 ///     contains O(n^2) elements.
 /// In the worst-case, the solution is the maximum element of this range.
-pub fn compress(values: &[Number], max_size: u8) -> (Vec<Number>, HashMap<Number, u8>) {
+pub fn compress(values: &[Number], max_size: u8) -> (Vec<Number>, HashMap<Number, NonZeroU8>) {
     let max_size = max_size as usize;
     let dedup_values = {
         let s: HashSet<Number> = values.iter().copied().collect();
@@ -324,10 +355,13 @@ pub fn compress(values: &[Number], max_size: u8) -> (Vec<Number>, HashMap<Number
     // After deduplication, it is possible we don't need to compress at all so we can exit early.
     // This also handles the case when the values slice is empty.
     if dedup_values.len() <= max_size {
-        let m: HashMap<Number, u8> = dedup_values
+        let m: HashMap<Number, NonZeroU8> = dedup_values
             .iter()
             .enumerate()
-            .map(|(i, &w)| (w, (i + 1).try_into().unwrap()))
+            .map(|(i, &w)| {
+                let i: u8 = i.try_into().expect("`dedup_values` has at most `max_size` elements, so the index is at most `max_size-1`");
+                let i: NonZeroU8 = (i+1).try_into().expect("`i<=max_size-1<=u8::MAX`, so `i+1<=u8::MAX`");
+                (w, i) })
             .collect();
         let mut dedup_values = dedup_values;
         dedup_values.push(Number::ZERO);
@@ -396,14 +430,18 @@ pub fn compress(values: &[Number], max_size: u8) -> (Vec<Number>, HashMap<Number
         buffer.clear();
     }
 
-    let mut value_to_index = HashMap::<Number, u8>::new();
+    let mut value_to_index = HashMap::<Number, NonZeroU8>::new();
     let mut result = vec![Number::ZERO];
     let mut previous = 0_usize;
     for i in solution {
         let interval = &dedup_values[previous..i];
         previous = i;
         for &v in interval {
-            value_to_index.insert(v, result.len().try_into().unwrap());
+            let index: u8 = result.len().try_into().expect("the `result` array contains at most `1+max_size` elements, so the index it at most `max_size` which is a u8");
+            let index: NonZeroU8 = index
+                .try_into()
+                .expect("the `result` array contains at least 1 element so this is never 0");
+            value_to_index.insert(v, index);
         }
         let replacement = (*interval.last().unwrap() + *interval.first().unwrap()) / 2;
         result.push(replacement);
@@ -419,10 +457,10 @@ mod tests {
     fn run_compress_test(values: Vec<Number>, max_size: u8, want: Vec<Number>, want_map: Vec<u8>) {
         let (got, got_map) = compress(&values, max_size);
         assert_eq!(got, want);
-        let want_map: HashMap<Number, u8> = want_map
+        let want_map: HashMap<Number, NonZeroU8> = want_map
             .into_iter()
             .enumerate()
-            .map(|(i, t)| (values[i], t))
+            .map(|(i, t)| (values[i], t.try_into().unwrap()))
             .collect();
         assert_eq!(got_map, want_map);
     }

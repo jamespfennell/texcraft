@@ -95,7 +95,10 @@ impl Cli {
         // Output
         let tfm_file_path = match self.tfm_file_path {
             None => {
-                let mut path = pl_file_path.clone();
+                let mut path: std::path::PathBuf = pl_file_path
+                    .file_name()
+                    .expect("the path points at a .pl file we've successfully opened")
+                    .into();
                 path.set_extension("tfm");
                 path
             }

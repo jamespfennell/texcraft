@@ -56,6 +56,9 @@ pub enum ParseError {
     InvalidPrefixForDecimal {
         span: std::ops::Range<usize>,
     },
+    LigTableTooLong {
+        span: std::ops::Range<usize>,
+    },
 }
 
 impl ParseError {
@@ -115,6 +118,9 @@ impl ParseError {
             ParseError::InvalidPrefixForDecimal { .. } => {
                 "invalid prefix for decimal constant: need R or D".to_string()
             }
+            ParseError::LigTableTooLong { .. } => {
+                "Sorry, LIGTABLE to long for me to handle".to_string()
+            }
         }
     }
 
@@ -140,6 +146,7 @@ impl ParseError {
             ParseError::InvalidHeaderIndex { .. } => (91, 1),
             ParseError::DecimalTooLarge { .. } => (64, 1),
             ParseError::InvalidPrefixForDecimal { .. } => (62, 1),
+            ParseError::LigTableTooLong { .. } => (101, 1),
         }
     }
 
@@ -222,7 +229,8 @@ mod report {
             | ParseError::InvalidHeaderIndex { span }
             | ParseError::DecimalTooLarge { span }
             | ParseError::InvalidPrefixForDecimal { span }
-            | ParseError::InvalidPrefixForSmallInteger { span } => {
+            | ParseError::InvalidPrefixForSmallInteger { span }
+            | ParseError::LigTableTooLong { span } => {
                 builder.with_label(Label::new(span.clone()).with_message(error.title()))
             }
         };

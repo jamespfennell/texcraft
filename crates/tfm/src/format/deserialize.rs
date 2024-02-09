@@ -165,7 +165,7 @@ pub(super) fn deserialize(b: &[u8]) -> Result<(File, Vec<Warning>), Error> {
         }
     }
     let sub_file_sizes = SubFileSizes::deserialize(&b[2..]);
-    sub_file_sizes.validate(lf)?;
+    let (bc, _) = sub_file_sizes.validate(lf)?;
     #[rustfmt::skip]
     let [
         raw_header,
@@ -182,11 +182,7 @@ pub(super) fn deserialize(b: &[u8]) -> Result<(File, Vec<Warning>), Error> {
 
     let font = File {
         header: Deserializable::deserialize(raw_header),
-        smallest_char_code: if sub_file_sizes.bc <= sub_file_sizes.ec {
-            Char(sub_file_sizes.bc.try_into().unwrap()) // TODO: can't this panic?
-        } else {
-            Char(0)
-        },
+        smallest_char_code: bc,
         char_infos: Deserializable::deserialize(raw_char_infos),
         widths: Deserializable::deserialize(raw_widths),
         heights: Deserializable::deserialize(raw_heights),
@@ -303,7 +299,7 @@ impl Deserializable for SubFileSizes {
 }
 
 impl SubFileSizes {
-    fn validate(&self, lf: i16) -> Result<(), Error> {
+    fn validate(&self, lf: i16) -> Result<(Char, Char), Error> {
         if self.lh < 0
             || self.bc < 0
             || self.ec < 0
@@ -321,9 +317,22 @@ impl SubFileSizes {
         if self.lh < 2 {
             return Err(Error::HeaderLengthIsTooSmall(self.lh));
         }
-        if self.ec > 255 || self.bc > self.ec + 1 {
-            return Err(Error::InvalidCharacterRange(self.bc, self.ec));
-        }
+        let (bc, ec) = match self.bc.cmp(&self.ec.saturating_add(1)) {
+            std::cmp::Ordering::Less => {
+                let ec: u8 = match self.ec.try_into() {
+                    Err(_) => return Err(Error::InvalidCharacterRange(self.bc, self.ec)),
+                    Ok(ec) => ec,
+                };
+                (
+                    Char(self.bc.try_into().expect("bc<ec<=u8::MAX, so bc<=u8::MAX")),
+                    Char(ec),
+                )
+            }
+            std::cmp::Ordering::Equal => (Char(1), Char(0)),
+            std::cmp::Ordering::Greater => {
+                return Err(Error::InvalidCharacterRange(self.bc, self.ec))
+            }
+        };
         if self.nw == 0 || self.nh == 0 || self.nd == 0 || self.ni == 0 {
             return Err(Error::IncompleteSubFiles(self.clone()));
         }
@@ -344,7 +353,7 @@ impl SubFileSizes {
         {
             return Err(Error::InconsistentSubFileSizes(lf, self.clone()));
         }
-        Ok(())
+        Ok((bc, ec))
     }
 
     pub fn partition<'a>(&self, mut b: &'a [u8]) -> [&'a [u8]; 10] {
@@ -460,6 +469,13 @@ impl DeserializableFixed for Option<CharInfo> {
 impl Deserializable for ligkern::lang::Instruction {
     fn deserialize(b: &[u8]) -> Self {
         let (skip_byte, right_char, op_byte, remainder) = (b[0], b[1], b[2], b[3]);
+        if skip_byte > 128 {
+            return ligkern::lang::Instruction {
+                next_instruction: None,
+                right_char: Char(0),
+                operation: ligkern::lang::Operation::Stop(u16::from_be_bytes([b[2], b[3]])),
+            };
+        }
         ligkern::lang::Instruction {
             next_instruction: if skip_byte < 128 {
                 Some(skip_byte)
@@ -952,6 +968,18 @@ mod tests {
                         post_lig_operation:
                             ligkern::lang::PostLigOperation::RetainNeitherMoveToInserted,
                     },
+                },],
+                ..Default::default()
+            },
+        ),
+        (
+            lig_kern_command_special,
+            tfm_file_with_one_lig_kern_command([254, 0, 1, 2]),
+            File {
+                lig_kern_instructions: vec![ligkern::lang::Instruction {
+                    next_instruction: None,
+                    right_char: Char(0),
+                    operation: ligkern::lang::Operation::Stop(u16::from_be_bytes([1, 2])),
                 },],
                 ..Default::default()
             },

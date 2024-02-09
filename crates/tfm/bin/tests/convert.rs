@@ -178,6 +178,11 @@ convert_tests!(
     (cmex10, "data/cmex10.tfm", "data/cmex10.pl"),
     (cminch, "data/cminch.tfm", "data/cminch.pl"),
     (cmsy7, "data/cmsy7.tfm", "data/cmsy7.pl"),
+    (
+        many_ligatures,
+        "data/many-ligatures.tfm",
+        "data/many-ligatures.pl",
+    ),
 );
 
 convert_pltotf_tests!(

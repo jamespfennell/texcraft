@@ -5,7 +5,7 @@ use std::collections::HashSet;
 pub fn compile(
     instructions: &[lang::Instruction],
     kerns: &[Number],
-    entry_points: &HashMap<Char, usize>,
+    entry_points: &HashMap<Char, u16>,
 ) -> Result<(CompiledProgram, Vec<CompilationWarning>), InfiniteLoopError> {
     let (pair_to_instruction, warnings) = build_pair_to_instruction_map(instructions, entry_points);
     let pair_to_replacement = calculate_replacements(instructions, kerns, pair_to_instruction)?;
@@ -34,13 +34,13 @@ impl OngoingCalculation {
 
 fn build_pair_to_instruction_map(
     instructions: &[lang::Instruction],
-    entry_points: &HashMap<Char, usize>,
+    entry_points: &HashMap<Char, u16>,
 ) -> (HashMap<(Char, Char), usize>, Vec<CompilationWarning>) {
     let mut result = HashMap::<(Char, Char), usize>::new();
     let mut reachable_instructions = HashSet::<usize>::with_capacity(instructions.len());
     let mut warnings = vec![];
     for (&left, &entry_point) in entry_points {
-        let mut next_instruction = Some(entry_point);
+        let mut next_instruction = Some(entry_point as usize);
         while let Some(next) = next_instruction {
             let instruction = match instructions.get(next) {
                 None => {
@@ -92,6 +92,10 @@ fn calculate_replacements(
                     (left, right),
                     Replacement(vec![(left, kerns[index as usize])], right),
                 );
+                continue;
+            }
+            lang::Operation::Stop(_) => {
+                // TODO: is this correct?
                 continue;
             }
             lang::Operation::Ligature {
@@ -354,10 +358,10 @@ mod tests {
 
     fn run_success_test(
         instructions: Vec<lang::Instruction>,
-        entry_points: Vec<(char, usize)>,
+        entry_points: Vec<(char, u16)>,
         want: Vec<(char, char, Vec<(char, Number)>)>,
     ) {
-        let entry_points: HashMap<Char, usize> = entry_points
+        let entry_points: HashMap<Char, u16> = entry_points
             .into_iter()
             .map(|(c, u)| (c.try_into().unwrap(), u))
             .collect();
@@ -731,10 +735,10 @@ mod tests {
 
     fn run_infinite_loop_test(
         instructions: Vec<lang::Instruction>,
-        entry_points: Vec<(char, usize)>,
+        entry_points: Vec<(char, u16)>,
         want_err: InfiniteLoopError,
     ) {
-        let entry_points: HashMap<Char, usize> = entry_points
+        let entry_points: HashMap<Char, u16> = entry_points
             .into_iter()
             .map(|(c, u)| (c.try_into().unwrap(), u))
             .collect();

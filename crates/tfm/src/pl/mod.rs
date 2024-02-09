@@ -23,6 +23,30 @@ mod error;
 pub mod lexer;
 pub use error::ParseError;
 
+/// Maximum number of lig/kern instructions in a property list file.
+///
+/// This limit is defined without explanation in PLtoTF.2014.3.
+/// Here's an explanation for the specific value.
+///
+/// First, in a TFM file the sub-file sizes, including the number of lig/kern instructions `nl`,
+///     are 8-bit integers in the range `[0, i16::MAX]`.
+/// (I don't know why the range is restricted like this, maybe for portability.)
+/// Thus the maximum number of lig/kern instructions is less than or equal to `i16::MAX`.
+///
+/// Second, after a PL file is read some additional instructions may need to be prepended to support
+///     LABEL entries with an index larger than u8::MAX.
+/// This is the "embarrassing problem" described in PLtoTF.2014.138.
+/// In TFM files the index for the starting lig/kern instruction for a character is a u8.
+/// To support higher indices, a special lig/kern instruction is prepended to the list of instructions.
+/// This instruction specifies where to actually start.
+/// The payload for this instruction supports 16-bit integers.
+///
+/// There are 257 possible characters (the usual 256 plus the boundary character),
+///     and thus we may need to insert up to 257 additional instructions.
+/// After this we still need to be under the `i16::MAX limit`.
+/// So the limit is `i16::MAX - 257`.
+pub const MAX_LIG_KERN_INSTRUCTIONS: u16 = (i16::MAX as u16) - 257;
+
 /// Data about one character in a .pl file.
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct CharData {
@@ -38,7 +62,7 @@ pub struct CharData {
 pub enum CharTag {
     #[default]
     None,
-    Ligature(usize),
+    Ligature(u16),
     List(Char),
     Extension(format::ExtensibleRecipe),
 }
@@ -50,7 +74,7 @@ pub struct File {
     pub design_units: Number,
     pub char_data: HashMap<Char, CharData>,
     pub lig_kern_boundary_char: Option<Char>,
-    pub lig_kern_boundary_char_entrypoint: Option<usize>,
+    pub lig_kern_boundary_char_entrypoint: Option<u16>,
     pub lig_kern_instructions: Vec<ligkern::lang::Instruction>,
     pub params: Params,
 }
@@ -78,7 +102,7 @@ impl File {
     }
 
     /// Return a map from characters to the lig/kern entrypoint for that character.
-    pub fn lig_kern_entrypoints(&self) -> HashMap<Char, usize> {
+    pub fn lig_kern_entrypoints(&self) -> HashMap<Char, u16> {
         self.char_data
             .iter()
             .filter_map(|d| match d.1.tag {
@@ -152,9 +176,18 @@ impl File {
                 }
                 ast::Root::LigTable(b) => {
                     for node in b.children {
+                        let mut insert_lig_kern_instruction = |instruction, span| {
+                            if file.lig_kern_instructions.len() < MAX_LIG_KERN_INSTRUCTIONS as usize
+                            {
+                                file.lig_kern_instructions.push(instruction);
+                            } else {
+                                // TODO: add a test for this case
+                                errors.push(error::ParseError::LigTableTooLong { span });
+                            }
+                        };
                         match node {
                             ast::LigTable::Label(v) => {
-                                let u = file.lig_kern_instructions.len();
+                                let u: u16 = file.lig_kern_instructions.len().try_into().expect("lig_kern_instructions.len()<= MAX_LIG_KERN_INSTRUCTIONS which is a u16");
                                 match v.data {
                                     ast::LigTableLabel::Char(c) => {
                                         let char_data = file.char_data.entry(c).or_default();
@@ -168,22 +201,30 @@ impl File {
                                 lig_kern_precedes = false;
                             }
                             ast::LigTable::Lig(post_lig_operation, v) => {
-                                file.lig_kern_instructions.push(ligkern::lang::Instruction {
-                                    next_instruction: Some(0),
-                                    right_char: v.left,
-                                    operation: ligkern::lang::Operation::Ligature {
-                                        char_to_insert: v.right,
-                                        post_lig_operation,
+                                insert_lig_kern_instruction(
+                                    ligkern::lang::Instruction {
+                                        next_instruction: Some(0),
+                                        right_char: v.left,
+                                        operation: ligkern::lang::Operation::Ligature {
+                                            char_to_insert: v.right,
+                                            post_lig_operation,
+                                        },
+                                        // TODO: should the span of the entire LIG node not just some of the data
                                     },
-                                });
+                                    v.left_span,
+                                );
                                 lig_kern_precedes = true;
                             }
                             ast::LigTable::Kern(v) => {
-                                file.lig_kern_instructions.push(ligkern::lang::Instruction {
-                                    next_instruction: Some(0),
-                                    right_char: v.left,
-                                    operation: ligkern::lang::Operation::Kern(v.right),
-                                });
+                                insert_lig_kern_instruction(
+                                    ligkern::lang::Instruction {
+                                        next_instruction: Some(0),
+                                        right_char: v.left,
+                                        operation: ligkern::lang::Operation::Kern(v.right),
+                                        // TODO: should the span of the entire KRN node
+                                    },
+                                    v.left_span,
+                                );
                                 lig_kern_precedes = true;
                             }
                             ast::LigTable::Stop(_) => {
@@ -265,11 +306,21 @@ impl File {
             }
         }
 
+        // PLtoTF.2014.116
+        if let Some(final_instruction) = file.lig_kern_instructions.last_mut() {
+            if final_instruction.next_instruction == Some(0) {
+                final_instruction.next_instruction = None;
+            }
+        }
         file
     }
 
     /// Convert a TFM file into a PL file.
     pub fn from_tfm_file(tfm_file: crate::format::File) -> File {
+        let lig_kern_entrypoints = crate::ligkern::lang::decompress_entrypoints(
+            &tfm_file.lig_kern_instructions,
+            tfm_file.lig_kern_entrypoints(),
+        );
         let mut char_data = HashMap::<Char, CharData>::new();
         let mut c = tfm_file.smallest_char_code;
         for info in tfm_file.char_infos.into_iter() {
@@ -304,7 +355,9 @@ impl File {
                         .unwrap_or_default(),
                     tag: match info.tag {
                         format::CharTag::None => CharTag::None,
-                        format::CharTag::Ligature(u) => CharTag::Ligature(u as usize),
+                        format::CharTag::Ligature(_) => {
+                            CharTag::Ligature(*lig_kern_entrypoints.get(&this_c).unwrap())
+                        }
                         format::CharTag::List(c) => CharTag::List(c),
                         format::CharTag::Extension(i) => {
                             // TODO: don't panic
@@ -437,7 +490,9 @@ impl File {
                 ast::FontDimension::NamedParam(named_param, param.into())
             })
             .collect();
-        roots.push(ast::Root::FontDimension(((), params).into()));
+        if !params.is_empty() {
+            roots.push(ast::Root::FontDimension(((), params).into()));
+        }
 
         let ordered_chars = {
             let mut v: Vec<Char> = self.char_data.keys().copied().collect();
@@ -451,7 +506,7 @@ impl File {
         for c in &ordered_chars {
             if let Some(char_data) = self.char_data.get(c) {
                 if let CharTag::Ligature(index) = char_data.tag {
-                    index_to_labels.entry(index).or_default().push(*c);
+                    index_to_labels.entry(index as usize).or_default().push(*c);
                 }
             }
         }
@@ -459,18 +514,19 @@ impl File {
             .operation
         {
             ligkern::lang::Operation::Kern(kern) => {
-                ast::LigTable::Kern((instruction.right_char, kern).into())
+                Some(ast::LigTable::Kern((instruction.right_char, kern).into()))
             }
             ligkern::lang::Operation::KernAtIndex(_) => {
-                panic!("tfm::pl::File lig kern programs cannot contains `KernAtIndex` operations")
+                panic!("tfm::pl::File lig/kern programs cannot contain `KernAtIndex` operations. Use a `Kern` operation instead.");
             }
+            ligkern::lang::Operation::Stop(_) => None,
             ligkern::lang::Operation::Ligature {
                 char_to_insert,
                 post_lig_operation,
-            } => ast::LigTable::Lig(
+            } => Some(ast::LigTable::Lig(
                 post_lig_operation,
                 (instruction.right_char, char_to_insert).into(),
-            ),
+            )),
         };
         for (index, instruction) in self.lig_kern_instructions.iter().enumerate() {
             for label in index_to_labels.get(&index).unwrap_or(&vec![]) {
@@ -478,12 +534,14 @@ impl File {
                     ast::LigTableLabel::Char(*label).into(),
                 ));
             }
-            l.push(build_lig_kern_op(instruction));
-            match instruction.next_instruction {
-                None => l.push(ast::LigTable::Stop(().into())),
-                Some(0) => {}
-                // TODO: potentially write a warning if i is too big like in TFtoPL.2014.74.
-                Some(i) => l.push(ast::LigTable::Skip(i.into())),
+            if let Some(op) = build_lig_kern_op(instruction) {
+                l.push(op);
+                match instruction.next_instruction {
+                    None => l.push(ast::LigTable::Stop(().into())),
+                    Some(0) => {}
+                    // TODO: potentially write a warning if i is too big like in TFtoPL.2014.74.
+                    Some(i) => l.push(ast::LigTable::Skip(i.into())),
+                }
             }
         }
         if !l.is_empty() {
@@ -509,28 +567,28 @@ impl File {
                     data.italic_correction.into(),
                 ));
             }
-            // The corresponding check in TFtoPL.2014.78 is that the tfm file's width index is 0,
-            // not that the width itself is 0. It think there is an edge case where this matters.
-            if v.len() == 1 && data.width == Number::ZERO {
-                continue;
-            }
 
             match &data.tag {
                 CharTag::None => {}
                 CharTag::Ligature(index) => {
                     let mut l = vec![];
-                    let mut index = *index;
+                    let mut index = *index as usize;
                     loop {
                         let instruction = match self.lig_kern_instructions.get(index) {
                             // TODO: potentially write a warning if the index is too big like in TFtoPL.2014.74.
                             None => break,
                             Some(instruction) => instruction,
                         };
-                        l.push(build_lig_kern_op(instruction));
-                        index = match instruction.next_instruction {
+                        match build_lig_kern_op(instruction) {
                             None => break,
-                            Some(inc) => index + 1 + (inc as usize),
-                        };
+                            Some(op) => {
+                                l.push(op);
+                                index = match instruction.next_instruction {
+                                    None => break,
+                                    Some(inc) => index + 1 + (inc as usize),
+                                };
+                            }
+                        }
                     }
                     v.push(ast::Character::Comment(
                         l.into_iter()
@@ -761,7 +819,7 @@ mod tests {
             "(LIGTABLE (KRN C r D 15.0))",
             File {
                 lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: Some(0),
+                    next_instruction: None,
                     right_char: 'r'.try_into().unwrap(),
                     operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
                 },],
@@ -770,13 +828,20 @@ mod tests {
         ),
         (
             kern_with_stop,
-            "(LIGTABLE (KRN C r D 15.0) (STOP))",
+            "(LIGTABLE (KRN C r D 15.0) (STOP) (KRN C t D 15.0))",
             File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: None,
-                    right_char: 'r'.try_into().unwrap(),
-                    operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
-                },],
+                lig_kern_instructions: vec![
+                    ligkern::lang::Instruction {
+                        next_instruction: None,
+                        right_char: 'r'.try_into().unwrap(),
+                        operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
+                    },
+                    ligkern::lang::Instruction {
+                        next_instruction: None,
+                        right_char: 't'.try_into().unwrap(),
+                        operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
+                    },
+                ],
                 ..Default::default()
             },
         ),
@@ -797,7 +862,7 @@ mod tests {
             "(LIGTABLE (LIG/> C r C t))",
             File {
                 lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: Some(0),
+                    next_instruction: None,
                     right_char: 'r'.try_into().unwrap(),
                     operation: ligkern::lang::Operation::Ligature {
                         char_to_insert: 't'.try_into().unwrap(),
@@ -812,7 +877,7 @@ mod tests {
             "(LIGTABLE (LABEL C e) (KRN C r D 15.0) (LABEL C d))",
             File {
                 lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: Some(0),
+                    next_instruction: None,
                     right_char: 'r'.try_into().unwrap(),
                     operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
                 },],
@@ -840,7 +905,7 @@ mod tests {
             "(LIGTABLE (LABEL BOUNDARYCHAR) (KRN C r D 15.0))",
             File {
                 lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: Some(0),
+                    next_instruction: None,
                     right_char: 'r'.try_into().unwrap(),
                     operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
                 },],

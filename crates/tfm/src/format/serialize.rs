@@ -100,14 +100,15 @@ impl Serializable for Number {
 
 impl Serializable for ligkern::lang::Instruction {
     fn serialize(&self, b: &mut Vec<u8>) {
-        b.push(self.next_instruction.unwrap_or(128));
-        b.push(self.right_char.0);
+        // PLtoTF.2014.142
+        let first = [self.next_instruction.unwrap_or(128), self.right_char.0];
         match self.operation {
             ligkern::lang::Operation::Kern(_) => {
-                panic!("tfm::format::File lig kern programs cannot contains `Kern` operations");
+                panic!("tfm::format::File lig/kern programs cannot contain `Kern` operations. Use `KernAtIndex` operations instead and provide an appropriate kerns array.");
             }
             ligkern::lang::Operation::KernAtIndex(index) => {
                 let [hi, lo] = index.to_be_bytes();
+                b.extend(first);
                 b.push(hi + 128);
                 b.push(lo);
             }
@@ -116,6 +117,7 @@ impl Serializable for ligkern::lang::Instruction {
                 post_lig_operation,
             } => {
                 use ligkern::lang::PostLigOperation::*;
+                b.extend(first);
                 b.push(match post_lig_operation {
                     RetainBothMoveNowhere => 3,
                     RetainBothMoveToInserted => 3 + 4,
@@ -127,6 +129,14 @@ impl Serializable for ligkern::lang::Instruction {
                     RetainNeitherMoveToInserted => 0,
                 });
                 b.push(char_to_insert.0);
+            }
+            ligkern::lang::Operation::Stop(index) => {
+                let [hi, lo] = index.to_be_bytes();
+                // TODO: when we support boundary chars this will need to be updated
+                b.push(254);
+                b.push(0);
+                b.push(hi);
+                b.push(lo);
             }
         }
     }

@@ -89,6 +89,8 @@ use std::collections::HashMap;
 /// The types here are put in a separate module because users of this crate are generally not expected to use them.
 /// Instead, users will work with compiled lig/kern programs.
 pub mod lang {
+    use std::collections::HashMap;
+
     use crate::Char;
     use crate::Number;
 
@@ -140,6 +142,7 @@ pub mod lang {
             /// What to do after inserting the character.
             post_lig_operation: PostLigOperation,
         },
+        Stop(u16),
     }
 
     /// A post-lig operation to perform after performing a ligature operation ([`Operation::Ligature`]).
@@ -186,6 +189,68 @@ pub mod lang {
         /// Corresponds to the `LIG` property list element.
         RetainNeitherMoveToInserted,
     }
+
+    pub fn decompress_entrypoints(
+        instructions: &[Instruction],
+        entrypoints: HashMap<Char, u8>,
+    ) -> HashMap<Char, u16> {
+        entrypoints
+            .into_iter()
+            .map(|(c, u)| {
+                (
+                    c,
+                    match instructions[u as usize].operation {
+                        Operation::Stop(u_big) => u_big,
+                        _ => u as u16,
+                    },
+                )
+            })
+            .collect()
+    }
+
+    pub fn compress_entrypoints(
+        instructions: &mut Vec<Instruction>,
+        entrypoints: HashMap<Char, u16>,
+    ) -> HashMap<Char, u8> {
+        let mut offset: u8 = 0;
+        let ordered_entrypoints = {
+            let mut v: Vec<(Char, u16)> = entrypoints.iter().map(|e| (*e.0, *e.1)).collect();
+            v.sort_by(|a, b| a.1.cmp(&b.1));
+            v
+        };
+        let mut new_entrypoints: HashMap<Char, u8> = Default::default();
+        let mut num_new_instructions = 0_u16;
+        for (c, u16_entrypoint) in ordered_entrypoints.iter().rev() {
+            let u: u8 = match (*u16_entrypoint + offset as u16).try_into() {
+                Ok(u) => u,
+                Err(_) => {
+                    let u = offset;
+                    instructions.push(Instruction {
+                        next_instruction: None,
+                        right_char: Char(0),
+                        operation: Operation::Stop(*u16_entrypoint),
+                    });
+                    num_new_instructions += 1;
+                    offset += 1;
+                    u
+                }
+            };
+            new_entrypoints.insert(*c, u);
+        }
+        instructions.rotate_right(num_new_instructions as usize);
+        for instruction in &mut instructions[0..num_new_instructions as usize] {
+            match &mut instruction.operation {
+                Operation::Stop(u) => {
+                    *u = u.checked_add(num_new_instructions).expect("the inputted lig/kern instructions vector doesn't have enough space for new instructions");
+                }
+                _ => panic!(
+                    "the first {} operations are `Stop` operations from above",
+                    num_new_instructions
+                ),
+            }
+        }
+        new_entrypoints
+    }
 }
 
 /// A compiled lig/kern program.
@@ -208,9 +273,9 @@ impl CompiledProgram {
     pub fn compile(
         instructions: &[lang::Instruction],
         kerns: &[Number],
-        entry_points: HashMap<Char, usize>,
+        entrypoints: HashMap<Char, u16>,
     ) -> Result<(CompiledProgram, Vec<CompilationWarning>), InfiniteLoopError> {
-        compiler::compile(instructions, kerns, &entry_points)
+        compiler::compile(instructions, kerns, &entrypoints)
     }
 
     /// Get an iterator over the full lig/kern replacement for a pair of characters.
