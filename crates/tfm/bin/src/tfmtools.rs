@@ -322,6 +322,8 @@ enum Section {
     All,
     /// Sub-file sizes
     SubFileSizes,
+    /// Header
+    Header,
     /// Character data
     CharInfos,
     /// Widths array
@@ -347,6 +349,7 @@ impl Section {
         use Section::*;
         vec![
             SubFileSizes,
+            Header,
             CharInfos,
             Widths,
             Heights,
@@ -369,6 +372,7 @@ impl Section {
                 raw_file.raw_sub_file_sizes,
                 Box::new(&raw_file.sub_file_sizes),
             ),
+            Section::Header => (raw_file.header, Box::new(&file.header)),
             Section::CharInfos => (raw_file.char_infos, Box::new(&file.char_infos)),
             Section::Widths => (raw_file.widths, Box::new(&file.widths)),
             Section::Heights => (raw_file.heights, Box::new(&file.heights)),

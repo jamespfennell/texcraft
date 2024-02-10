@@ -6,7 +6,7 @@ import pathlib
 import os
 import difflib
 
-for tfm_path in pathlib.Path("crates/tfm/src").rglob("*.tfm"):
+for tfm_path in pathlib.Path("crates/tfm").rglob("*.tfm"):
     knuth_pl = os.popen(f"tftopl {tfm_path}").read()
     texcraft_pl = os.popen(f"cargo run --bin tftopl -- {tfm_path}").read()
     if knuth_pl == texcraft_pl:

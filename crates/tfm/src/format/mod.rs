@@ -152,6 +152,40 @@ impl File {
             .collect()
     }
 
+    /// Calculate the checksum of this .tfm file.
+    pub fn checksum(&self) -> u32 {
+        // This checksum algorithm is in PLtoTF.2014.13.
+        let bc = self.smallest_char_code.0;
+        let ec: u8 = (self.smallest_char_code.0 as usize + self.char_infos.len() - 1)
+            .try_into()
+            .expect("bc+len(char_infos)=ec<=u8::MAX");
+        let mut b = [bc, ec, bc, ec];
+        let mut c = self.smallest_char_code;
+        for char_info in &self.char_infos {
+            let this_c = c;
+            c = Char(c.0 + 1);
+            let char_info = match char_info {
+                None => continue,
+                Some(char_info) => char_info,
+            };
+            let width = self.widths[char_info.width_index.get() as usize].0;
+            // TODO: adjust based on the design units
+            let width = width + (this_c.0 as i32 + 4) * 0o20_000_000;
+            let add = |b: u8, m: u8| -> u8 {
+                (((b as i32) + (b as i32) + width) % (m as i32))
+                    .try_into()
+                    .expect("(i32 % u8) is always a u8")
+            };
+            b = [
+                add(b[0], 255),
+                add(b[1], 253),
+                add(b[2], 251),
+                add(b[3], 247),
+            ]
+        }
+        u32::from_be_bytes(b)
+    }
+
     pub fn from_pl_file(pl_file: &crate::pl::File) -> Self {
         let mut char_bounds: Option<(Char, Char)> = None;
 
@@ -269,7 +303,7 @@ impl File {
             }
         };
 
-        Self {
+        let mut file = Self {
             header: pl_file.header.clone(),
             smallest_char_code,
             char_infos,
@@ -281,7 +315,12 @@ impl File {
             kerns,
             extensible_chars,
             params: pl_file.params.clone(),
+        };
+        if file.header.checksum == 0 {
+            file.header.checksum = file.checksum();
         }
+        file.header.seven_bit_safe = Some(true);  // TODO: calculate this
+        file
     }
 }
 

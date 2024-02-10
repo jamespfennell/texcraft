@@ -161,47 +161,48 @@ macro_rules! convert_pltotf_tests {
 }
 
 convert_tests!(
-    (cmr10, "data/cmr10.tfm", "data/cmr10.pl"),
+    (cmr10, "data/computer-modern/cmr10.tfm", "data/computer-modern/cmr10.pl"),
     (
         cmr10_ascii,
-        "data/cmr10.tfm",
-        "data/cmr10_ascii.pl",
+        "data/computer-modern/cmr10.tfm",
+        "data/computer-modern/cmr10_ascii.pl",
         vec!["--charcode-format", "ascii"]
     ),
     (
         cmr10_octal,
-        "data/cmr10.tfm",
-        "data/cmr10_octal.pl",
+        "data/computer-modern/cmr10.tfm",
+        "data/computer-modern/cmr10_octal.pl",
         vec!["--charcode-format", "octal"]
     ),
-    (cmss8, "data/cmss8.tfm", "data/cmss8.pl"),
-    (cmex10, "data/cmex10.tfm", "data/cmex10.pl"),
-    (cminch, "data/cminch.tfm", "data/cminch.pl"),
-    (cmsy7, "data/cmsy7.tfm", "data/cmsy7.pl"),
+    (cmss8, "data/computer-modern/cmss8.tfm", "data/computer-modern/cmss8.pl"),
+    (cmex10, "data/computer-modern/cmex10.tfm", "data/computer-modern/cmex10.pl"),
+    (cminch, "data/computer-modern/cminch.tfm", "data/computer-modern/cminch.pl"),
+    (cmsy7, "data/computer-modern/cmsy7.tfm", "data/computer-modern/cmsy7.pl"),
     (
         many_ligatures,
-        "data/many-ligatures.tfm",
-        "data/many-ligatures.pl",
+        "data/texcraft-originals/many-ligatures.tfm",
+        "data/texcraft-originals/many-ligatures.pl",
     ),
 );
 
 convert_pltotf_tests!(
+    (empty, "data/texcraft-originals/empty.tfm", "data/texcraft-originals/empty.pl", "",),
     (
         empty_varchar,
-        "data/empty-varchar.tfm",
-        "data/empty-varchar.pl",
+        "data/texcraft-originals/empty-varchar.tfm",
+        "data/texcraft-originals/empty-varchar.pl",
         "",
     ),
     (
         zero_width_chars,
-        "data/zero-width-char.tfm",
-        "data/zero-width-char.pl",
+        "data/texcraft-originals/zero-width-char.tfm",
+        "data/texcraft-originals/zero-width-char.pl",
         "",
     ),
     (
         ligature_loop,
-        "data/ligature-loop.tfm",
-        "data/ligature-loop.pl",
-        include_str!["data/ligature-loop.stderr.txt"],
+        "data/texcraft-originals/ligature-loop.tfm",
+        "data/texcraft-originals/ligature-loop.pl",
+        include_str!["data/texcraft-originals/ligature-loop.stderr.txt"],
     ),
 );

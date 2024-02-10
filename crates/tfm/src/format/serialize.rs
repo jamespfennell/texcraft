@@ -4,12 +4,15 @@ use crate::Number;
 pub fn serialize(file: &File) -> Vec<u8> {
     let mut b = vec![0_u8; 24];
 
-    let lh = serialize_section(&file.header, &mut b);
+    serialize_header(&file.header, &mut b);
+    let lh: i16 = (18 + file.header.additional_data.len())
+        .try_into()
+        .expect("header.len()=18+header.additional_data.len()<= i16::MAX");
 
     let (bc, ec) = if file.char_infos.is_empty() {
         (1, 0)
     } else {
-        let bc = file.smallest_char_code.0 as u16;
+        let bc = file.smallest_char_code.0 as i16;
         let diff = serialize_section(&file.char_infos, &mut b);
         (bc, bc + diff - 1)
     };
@@ -38,7 +41,7 @@ pub fn serialize(file: &File) -> Vec<u8> {
     b
 }
 
-fn serialize_section<T: Serializable>(t: &T, b: &mut Vec<u8>) -> u16 {
+fn serialize_section<T: Serializable>(t: &T, b: &mut Vec<u8>) -> i16 {
     let start = b.len();
     t.serialize(b);
     ((b.len() - start) / 4).try_into().unwrap()
@@ -176,22 +179,20 @@ fn serialize_string(s: &str, size: u8, b: &mut Vec<u8>) {
     }
 }
 
-impl Serializable for Header {
-    fn serialize(&self, b: &mut Vec<u8>) {
-        self.checksum.serialize(b);
-        self.design_size.serialize(b);
-        serialize_string(&self.character_coding_scheme, 39, b);
-        serialize_string(&self.font_family, 19, b);
-        if self.seven_bit_safe == Some(true) {
-            // Any value >=128 is interpreted as true, but PLtoTF.2014.133 uses 128 exactly...
-            b.push(128);
-        } else {
-            // ...and 0 for false.
-            b.push(0);
-        }
+fn serialize_header(header: &Header, b: &mut Vec<u8>) {
+    header.checksum.serialize(b);
+    header.design_size.serialize(b);
+    serialize_string(&header.character_coding_scheme, 39, b);
+    serialize_string(&header.font_family, 19, b);
+    if header.seven_bit_safe == Some(true) {
+        // Any value >=128 is interpreted as true, but PLtoTF.2014.133 uses 128 exactly...
+        b.push(128);
+    } else {
+        // ...and 0 for false.
         b.push(0);
-        b.push(0);
-        b.push(self.face.unwrap_or(0_u8.into()).into());
-        self.additional_data.serialize(b);
     }
+    b.push(0);
+    b.push(0);
+    b.push(header.face.unwrap_or(0_u8.into()).into());
+    header.additional_data.serialize(b);
 }
