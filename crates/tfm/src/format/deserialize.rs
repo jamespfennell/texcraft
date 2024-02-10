@@ -53,7 +53,7 @@ pub enum Error {
     /// There are more than 256 extensible characters.
     TooManyExtensibleCharacters(i16),
     /// The sub-file sizes are inconsistent.
-    InconsistentSubFileSizes(i16, SubFileSizes),
+    InconsistentSubFileSizes(SubFileSizes),
 }
 
 impl Error {
@@ -84,7 +84,7 @@ impl Error {
             }
             Error::IncompleteSubFiles(_) => "Incomplete subfiles for character dimensions!".into(),
             Error::TooManyExtensibleCharacters(n) => format!["There are {n} extensible recipes!"],
-            Error::InconsistentSubFileSizes(_, _) => {
+            Error::InconsistentSubFileSizes(_) => {
                 "Subfile sizes don't add up to the stated total!".into()
             }
         }
@@ -104,7 +104,7 @@ impl Error {
             | Error::InvalidCharacterRange(_, _)
             | Error::IncompleteSubFiles(_)
             | Error::TooManyExtensibleCharacters(_)
-            | Error::InconsistentSubFileSizes(_, _) => 21,
+            | Error::InconsistentSubFileSizes(_) => 21,
         }
     }
 }
@@ -137,119 +137,49 @@ impl Warning {
 
 /// Deserialize a TeX font metric (.tfm) file.
 pub(super) fn deserialize(b: &[u8]) -> Result<(File, Vec<Warning>), Error> {
-    let mut warnings: Vec<Warning> = vec![];
-    let actual_file_length = b.len();
-    match actual_file_length {
-        0 => return Err(Error::FileIsEmpty),
-        1 => return Err(Error::FileHasOneByte(b[0])),
-        _ => (),
-    };
-    let lf = i16::deserialize(b);
-    match lf {
-        ..=-1 => return Err(Error::InternalFileLengthIsNegative(lf)),
-        0 => return Err(Error::InternalFileLengthIsZero),
-        1.. => {
-            let claimed_file_length = (lf as usize) * 4;
-            match actual_file_length.cmp(&claimed_file_length) {
-                std::cmp::Ordering::Less => {
-                    return Err(Error::InternalFileLengthIsTooBig(lf, actual_file_length))
-                }
-                std::cmp::Ordering::Equal => (),
-                std::cmp::Ordering::Greater => {
-                    warnings.push(Warning::InternalFileLengthIsSmall(lf, actual_file_length))
-                }
-            }
-            if lf <= 3 {
-                return Err(Error::InternalFileLengthIsTooSmall(lf, actual_file_length));
-            }
-        }
-    }
-    let sub_file_sizes = SubFileSizes::deserialize(&b[2..]);
-    let (bc, _) = sub_file_sizes.validate(lf)?;
-    #[rustfmt::skip]
-    let [
-        raw_header,
-        raw_char_infos, 
-        raw_widths, 
-        raw_heights, 
-        raw_depths, 
-        raw_italic_corrections,
-        raw_lig_kern, 
-        raw_kerns,
-        raw_extensible_chars, 
-        raw_params,
-    ] = sub_file_sizes.partition(&b[24..]);
-
-    let font = File {
-        header: Deserializable::deserialize(raw_header),
-        smallest_char_code: bc,
-        char_infos: Deserializable::deserialize(raw_char_infos),
-        widths: Deserializable::deserialize(raw_widths),
-        heights: Deserializable::deserialize(raw_heights),
-        depths: Deserializable::deserialize(raw_depths),
-        italic_corrections: Deserializable::deserialize(raw_italic_corrections),
-        lig_kern_instructions: Deserializable::deserialize(raw_lig_kern),
-        kerns: Deserializable::deserialize(raw_kerns),
-        extensible_chars: Deserializable::deserialize(raw_extensible_chars),
-        params: Deserializable::deserialize(raw_params),
-    };
-    Ok((font, warnings))
+    let (raw_file, warnings) = RawFile::deserialize(b)?;
+    Ok((from_raw_file(&raw_file), warnings))
 }
 
-trait Deserializable: Sized {
-    fn deserialize(b: &[u8]) -> Self;
-}
-
-/// Implementations of this trait consume a fixed number of bytes when deserializing.
-trait DeserializableFixed: Deserializable {
-    const NUM_BYTES: usize;
-}
-
-impl Deserializable for i16 {
-    #[inline]
-    fn deserialize(b: &[u8]) -> Self {
-        i16::from_be_bytes([b[0], b[1]])
+pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
+    File {
+        header: Header::deserialize(raw_file.header),
+        smallest_char_code: raw_file.begin_char,
+        char_infos: deserialize_array(raw_file.char_infos),
+        widths: deserialize_array(raw_file.widths),
+        heights: deserialize_array(raw_file.heights),
+        depths: deserialize_array(raw_file.depths),
+        italic_corrections: deserialize_array(raw_file.italic_corrections),
+        lig_kern_instructions: deserialize_array(raw_file.lig_kern_instructions),
+        kerns: deserialize_array(raw_file.kerns),
+        extensible_chars: deserialize_array(raw_file.extensible_recipes),
+        params: Params(deserialize_array(raw_file.params)),
     }
 }
 
-impl DeserializableFixed for i16 {
-    const NUM_BYTES: usize = 2;
+/// Raw .tfm file.
+pub struct RawFile<'a> {
+    pub sub_file_sizes: SubFileSizes,
+    pub raw_sub_file_sizes: &'a [u8],
+    pub header: &'a [u8],
+    pub begin_char: Char,
+    pub end_char: Char,
+    pub char_infos: &'a [u8],
+    pub widths: &'a [u8],
+    pub heights: &'a [u8],
+    pub depths: &'a [u8],
+    pub italic_corrections: &'a [u8],
+    pub lig_kern_instructions: &'a [u8],
+    pub kerns: &'a [u8],
+    pub extensible_recipes: &'a [u8],
+    pub params: &'a [u8],
 }
 
-impl Deserializable for u32 {
-    #[inline]
-    fn deserialize(b: &[u8]) -> Self {
-        u32::from_be_bytes([b[0], b[1], b[2], b[3]])
-    }
-}
-
-impl DeserializableFixed for u32 {
-    const NUM_BYTES: usize = 4;
-}
-
-impl Deserializable for Number {
-    #[inline]
-    fn deserialize(b: &[u8]) -> Self {
-        Number(u32::deserialize(b) as i32)
-    }
-}
-
-impl DeserializableFixed for Number {
-    const NUM_BYTES: usize = 4;
-}
-
-impl Deserializable for bool {
-    fn deserialize(b: &[u8]) -> Self {
-        b[0] > 127
-    }
-}
-
-impl DeserializableFixed for bool {
-    const NUM_BYTES: usize = 1;
-}
-
+/// Sub-file sizes in a .tfm file.
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub struct SubFileSizes {
+    /// Length of the file, in words.
+    pub lf: i16,
     /// Length of the header data, in words.
     pub lh: i16,
     /// Smallest character code in the font.
@@ -274,171 +204,189 @@ pub struct SubFileSizes {
     pub np: i16,
 }
 
-impl SubFileSizes {
-    pub fn from_bytes(b: &[u8]) -> Self {
-        Self {
-            lh: i16::deserialize(&b[0..2]),
-            bc: i16::deserialize(&b[2..4]),
-            ec: i16::deserialize(&b[4..6]),
-            nw: i16::deserialize(&b[6..8]),
-            nh: i16::deserialize(&b[8..10]),
-            nd: i16::deserialize(&b[10..12]),
-            ni: i16::deserialize(&b[12..14]),
-            nl: i16::deserialize(&b[14..16]),
-            nk: i16::deserialize(&b[16..18]),
-            ne: i16::deserialize(&b[18..20]),
-            np: i16::deserialize(&b[20..22]),
+impl<'a> RawFile<'a> {
+    pub fn deserialize(b: &'a [u8]) -> Result<(Self, Vec<Warning>), Error> {
+        let deserialize_i16 = |u: usize| -> i16 { i16::from_be_bytes([b[u], b[u + 1]]) };
+        let mut warnings: Vec<Warning> = vec![];
+        let actual_file_length = b.len();
+        match actual_file_length {
+            0 => return Err(Error::FileIsEmpty),
+            1 => return Err(Error::FileHasOneByte(b[0])),
+            _ => (),
+        };
+        let lf = deserialize_i16(0);
+        match lf {
+            ..=-1 => return Err(Error::InternalFileLengthIsNegative(lf)),
+            0 => return Err(Error::InternalFileLengthIsZero),
+            1.. => {
+                let claimed_file_length = (lf as usize) * 4;
+                match actual_file_length.cmp(&claimed_file_length) {
+                    std::cmp::Ordering::Less => {
+                        return Err(Error::InternalFileLengthIsTooBig(lf, actual_file_length))
+                    }
+                    std::cmp::Ordering::Equal => (),
+                    std::cmp::Ordering::Greater => {
+                        warnings.push(Warning::InternalFileLengthIsSmall(lf, actual_file_length))
+                    }
+                }
+                if lf <= 3 {
+                    return Err(Error::InternalFileLengthIsTooSmall(lf, actual_file_length));
+                }
+            }
         }
-    }
-}
+        let s = SubFileSizes {
+            lf,
+            lh: deserialize_i16(2),
+            bc: deserialize_i16(4),
+            ec: deserialize_i16(6),
+            nw: deserialize_i16(8),
+            nh: deserialize_i16(10),
+            nd: deserialize_i16(12),
+            ni: deserialize_i16(14),
+            nl: deserialize_i16(16),
+            nk: deserialize_i16(18),
+            ne: deserialize_i16(20),
+            np: deserialize_i16(22),
+        };
 
-impl Deserializable for SubFileSizes {
-    fn deserialize(b: &[u8]) -> Self {
-        Self::from_bytes(b)
-    }
-}
-
-impl SubFileSizes {
-    fn validate(&self, lf: i16) -> Result<(Char, Char), Error> {
-        if self.lh < 0
-            || self.bc < 0
-            || self.ec < 0
-            || self.nw < 0
-            || self.nh < 0
-            || self.nd < 0
-            || self.ni < 0
-            || self.nl < 0
-            || self.nk < 0
-            || self.ne < 0
-            || self.np < 0
+        if s.lh < 0
+            || s.bc < 0
+            || s.ec < 0
+            || s.nw < 0
+            || s.nh < 0
+            || s.nd < 0
+            || s.ni < 0
+            || s.nl < 0
+            || s.nk < 0
+            || s.ne < 0
+            || s.np < 0
         {
-            return Err(Error::SubFileSizeIsNegative(self.clone()));
+            return Err(Error::SubFileSizeIsNegative(s.clone()));
         }
-        if self.lh < 2 {
-            return Err(Error::HeaderLengthIsTooSmall(self.lh));
+        if s.lh < 2 {
+            return Err(Error::HeaderLengthIsTooSmall(s.lh));
         }
-        let (bc, ec) = match self.bc.cmp(&self.ec.saturating_add(1)) {
+        let (bc, ec) = match s.bc.cmp(&s.ec.saturating_add(1)) {
             std::cmp::Ordering::Less => {
-                let ec: u8 = match self.ec.try_into() {
-                    Err(_) => return Err(Error::InvalidCharacterRange(self.bc, self.ec)),
+                let ec: u8 = match s.ec.try_into() {
+                    Err(_) => return Err(Error::InvalidCharacterRange(s.bc, s.ec)),
                     Ok(ec) => ec,
                 };
                 (
-                    Char(self.bc.try_into().expect("bc<ec<=u8::MAX, so bc<=u8::MAX")),
+                    Char(s.bc.try_into().expect("bc<ec<=u8::MAX, so bc<=u8::MAX")),
                     Char(ec),
                 )
             }
             std::cmp::Ordering::Equal => (Char(1), Char(0)),
-            std::cmp::Ordering::Greater => {
-                return Err(Error::InvalidCharacterRange(self.bc, self.ec))
-            }
+            std::cmp::Ordering::Greater => return Err(Error::InvalidCharacterRange(s.bc, s.ec)),
         };
-        if self.nw == 0 || self.nh == 0 || self.nd == 0 || self.ni == 0 {
-            return Err(Error::IncompleteSubFiles(self.clone()));
+        if s.nw == 0 || s.nh == 0 || s.nd == 0 || s.ni == 0 {
+            return Err(Error::IncompleteSubFiles(s.clone()));
         }
-        if self.ne > 255 {
-            return Err(Error::TooManyExtensibleCharacters(self.ne));
+        if s.ne > 255 {
+            return Err(Error::TooManyExtensibleCharacters(s.ne));
         }
-        if lf
-            != 6 + self.lh
-                + (self.ec - self.bc + 1)
-                + self.nw
-                + self.nh
-                + self.nd
-                + self.ni
-                + self.nl
-                + self.nk
-                + self.ne
-                + self.np
+        if s.lf
+            != 6 + s.lh + (s.ec - s.bc + 1) + s.nw + s.nh + s.nd + s.ni + s.nl + s.nk + s.ne + s.np
         {
-            return Err(Error::InconsistentSubFileSizes(lf, self.clone()));
+            return Err(Error::InconsistentSubFileSizes(s.clone()));
         }
-        Ok((bc, ec))
-    }
 
-    pub fn partition<'a>(&self, mut b: &'a [u8]) -> [&'a [u8]; 10] {
-        let lens = [
-            self.lh,
-            self.ec - self.bc + 1,
-            self.nw,
-            self.nh,
-            self.nd,
-            self.ni,
-            self.nl,
-            self.nk,
-            self.ne,
-            self.np,
-        ];
-        let mut r: [&[u8]; 10] = [&[0_u8; 0]; 10];
-        for i in 0..10 {
-            let len = (lens[i] as usize) * 4;
-            r[i] = &b[..len];
-            b = &b[len..];
-        }
-        r
-    }
-}
-
-impl Deserializable for String {
-    fn deserialize(b: &[u8]) -> Self {
-        let len = match b.first() {
-            None => return String::new(),
-            Some(&tfm_len) => {
-                let max_len: u8 = (b.len() - 1).try_into().unwrap_or(u8::MAX);
-                if max_len < tfm_len {
-                    // TODO: need to return the error in TFtoPL.2014.52.1 here.
-                    max_len
-                } else {
-                    tfm_len
-                }
+        let raw_file = {
+            let mut b = b;
+            let mut get = |u: i16| {
+                let u = (u as usize) * 4;
+                let a = &b[..u];
+                b = &b[u..];
+                a
+            };
+            RawFile {
+                raw_sub_file_sizes: get(6),
+                header: get(s.lh),
+                begin_char: bc,
+                end_char: ec,
+                char_infos: get(s.ec - s.bc + 1),
+                widths: get(s.nw),
+                heights: get(s.nh),
+                depths: get(s.nd),
+                italic_corrections: get(s.ni),
+                lig_kern_instructions: get(s.nl),
+                kerns: get(s.nk),
+                extensible_recipes: get(s.ne),
+                params: get(s.np),
+                sub_file_sizes: s,
             }
         };
-        b[1..=(len as usize)].iter().map(|u| *u as char).collect()
+
+        Ok((raw_file, warnings))
     }
 }
 
-impl Deserializable for Header {
-    fn deserialize(b: &[u8]) -> Self {
-        Self {
-            checksum: Deserializable::deserialize(b),
-            design_size: Deserializable::deserialize(&b[4..]),
-            character_coding_scheme: Deserializable::deserialize(b.get(4 + 4..).unwrap_or(&[0; 0])),
-            font_family: Deserializable::deserialize(b.get(4 + 4 + 40..).unwrap_or(&[0; 0])),
-            seven_bit_safe: Deserializable::deserialize(
-                b.get(4 + 4 + 40 + 20..).unwrap_or(&[0; 0]),
-            ),
-            face: Deserializable::deserialize(b.get(4 + 4 + 40 + 20 + 3..).unwrap_or(&[0; 0])),
-            additional_data: Deserializable::deserialize(
-                b.get(4 + 4 + 40 + 20 + 4..).unwrap_or(&[0; 0]),
-            ),
+fn deserialize_string<const N: u8>(b: &[u8]) -> String {
+    let len = match b.first() {
+        None => return String::new(),
+        Some(&tfm_len) => {
+            if N - 1 < tfm_len {
+                // TODO: need to return the error in TFtoPL.2014.52.1 here.
+                N - 1
+            } else {
+                tfm_len
+            }
         }
-    }
+    };
+    b[1..=(len as usize)].iter().map(|u| *u as char).collect()
 }
 
-impl Deserializable for Option<Face> {
-    fn deserialize(b: &[u8]) -> Self {
-        b.first().map(|b| (*b).into())
-    }
-}
-
-impl<T: DeserializableFixed> Deserializable for Option<T> {
-    fn deserialize(b: &[u8]) -> Self {
-        if b.len() < T::NUM_BYTES {
-            None
-        } else {
-            Some(T::deserialize(b))
-        }
-    }
-}
-
-impl<T: DeserializableFixed> Deserializable for Vec<T> {
+impl Header {
     fn deserialize(mut b: &[u8]) -> Self {
-        let mut r: Self = Default::default();
-        while !b.is_empty() {
-            r.push(T::deserialize(b));
-            b = &b[T::NUM_BYTES..]
+        let checksum = u32::deserialize(b);
+        b = &b[4..];
+        let design_size = Number::deserialize(b);
+        b = b.get(4..).unwrap_or(&[0; 0]);
+        let character_coding_scheme = deserialize_string::<40>(b);
+        b = b.get(40..).unwrap_or(&[0; 0]);
+        let font_family = deserialize_string::<20>(b);
+        b = b.get(20..).unwrap_or(&[0; 0]);
+        let seven_bit_safe = b.first().map(|b| *b > 127);
+        let face = b.get(3).map(|b| (*b).into());
+        let b = b.get(4..).unwrap_or(&[0; 0]);
+        Self {
+            checksum,
+            design_size,
+            character_coding_scheme,
+            font_family,
+            seven_bit_safe,
+            face,
+            additional_data: deserialize_array(b),
         }
-        r
+    }
+}
+
+fn deserialize_array<T: Deserializable>(mut b: &[u8]) -> Vec<T> {
+    let mut r = vec![];
+    while !b.is_empty() {
+        r.push(T::deserialize(b));
+        b = &b[4..]
+    }
+    r
+}
+
+/// Implementations of this trait can be deserialized from a 4-byte word.
+trait Deserializable: Sized {
+    fn deserialize(b: &[u8]) -> Self;
+}
+
+impl Deserializable for u32 {
+    #[inline]
+    fn deserialize(b: &[u8]) -> Self {
+        u32::from_be_bytes([b[0], b[1], b[2], b[3]])
+    }
+}
+
+impl Deserializable for Number {
+    #[inline]
+    fn deserialize(b: &[u8]) -> Self {
+        Number(u32::deserialize(b) as i32)
     }
 }
 
@@ -460,10 +408,6 @@ impl Deserializable for Option<CharInfo> {
             Err(_) => None,
         }
     }
-}
-
-impl DeserializableFixed for Option<CharInfo> {
-    const NUM_BYTES: usize = 4;
 }
 
 impl Deserializable for ligkern::lang::Instruction {
@@ -516,10 +460,6 @@ impl Deserializable for ligkern::lang::Instruction {
     }
 }
 
-impl DeserializableFixed for ligkern::lang::Instruction {
-    const NUM_BYTES: usize = 4;
-}
-
 impl Deserializable for ExtensibleRecipe {
     fn deserialize(b: &[u8]) -> Self {
         let char_or = |b: u8| {
@@ -535,16 +475,6 @@ impl Deserializable for ExtensibleRecipe {
             bottom: char_or(b[2]),
             rep: Char(b[3]),
         }
-    }
-}
-
-impl DeserializableFixed for ExtensibleRecipe {
-    const NUM_BYTES: usize = 4;
-}
-
-impl Deserializable for Params {
-    fn deserialize(b: &[u8]) -> Self {
-        Self(Vec::<Number>::deserialize(b))
     }
 }
 
@@ -626,6 +556,7 @@ mod tests {
             sub_file_size_too_small,
             extend(&[0, 6, 255, 0], 24),
             Err(Error::SubFileSizeIsNegative(SubFileSizes {
+                lf: 6,
                 lh: -256,
                 ..Default::default()
             }))
@@ -660,6 +591,7 @@ mod tests {
                 24
             ),
             Err(Error::IncompleteSubFiles(SubFileSizes {
+                lf: 6,
                 lh: 2,
                 bc: 1,
                 ec: 2,
@@ -692,22 +624,20 @@ mod tests {
                 ],
                 24
             ),
-            Err(Error::InconsistentSubFileSizes(
-                6,
-                SubFileSizes {
-                    lh: 2,
-                    bc: 3,
-                    ec: 4,
-                    nw: 5,
-                    nh: 6,
-                    nd: 7,
-                    ni: 8,
-                    nl: 9,
-                    nk: 10,
-                    ne: 11,
-                    np: 12,
-                }
-            ))
+            Err(Error::InconsistentSubFileSizes(SubFileSizes {
+                lf: 6,
+                lh: 2,
+                bc: 3,
+                ec: 4,
+                nw: 5,
+                nh: 6,
+                nd: 7,
+                ni: 8,
+                nl: 9,
+                nk: 10,
+                ne: 11,
+                np: 12,
+            }))
         ),
         (
             corrupt_string_in_header,
@@ -715,7 +645,9 @@ mod tests {
                 /* checksum */ 0, 0, 0, 7, /* design_size */ 0, 0, 0, 11,
                 /* character_coding_scheme */ 240, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
                 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
-                65, 65, 65, 65, 65, 65, 65,
+                65, 65, 65, 65, 65, 65, 65, /* font_family */ 100, 66, 66, 66, 66, 66, 66, 66,
+                66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, /* seven_bit_safe */ 0, 0, 0,
+                /* face */ 61,
             ]),
             Ok((
                 File {
@@ -723,9 +655,9 @@ mod tests {
                         checksum: 7,
                         design_size: Number(11),
                         character_coding_scheme: "A".repeat(39),
-                        font_family: "".into(),
-                        seven_bit_safe: None,
-                        face: None,
+                        font_family: "B".repeat(19),
+                        seven_bit_safe: Some(false),
+                        face: Some(Face::Other(61)),
                         additional_data: vec![],
                     },
                     ..Default::default()

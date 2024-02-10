@@ -9,6 +9,7 @@ mod serialize;
 use super::*;
 
 pub use deserialize::Error as DeserializeError;
+pub use deserialize::RawFile;
 pub use deserialize::SubFileSizes;
 pub use deserialize::Warning as DeserializeWarning;
 
@@ -125,6 +126,10 @@ impl Default for File {
 impl File {
     pub fn deserialize(b: &[u8]) -> Result<(File, Vec<DeserializeWarning>), DeserializeError> {
         deserialize::deserialize(b)
+    }
+
+    pub fn from_raw_file(raw_file: &RawFile) -> Self {
+        deserialize::from_raw_file(raw_file)
     }
 
     pub fn serialize(&self) -> Vec<u8> {

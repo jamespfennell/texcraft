@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use clap::Parser;
 
 mod common;
@@ -53,7 +55,30 @@ enum Command {
     Convert(Convert),
     /// Convert a batch of .tfm and .pl files.
     ConvertBatch(ConvertBatch),
-    /// Print debugging information about a .tfm file.
+    /// Debug a .tfm file.
+    ///
+    /// This subcommand is used to debug the contents of a .tfm file.
+    /// Unlike .pl files - which are regular ASCII, human-readable,
+    ///   and can thus be debugged by opening them in a text editor -
+    ///   .tfm are binary files and can't be easily debugged.
+    ///
+    /// Invoking the subcommand with no arguments will print all
+    ///   sections of the .tfm file in both "raw" and "parsed" formats:
+    ///
+    ///   $ tfmtools debug path/to/file.tfm
+    ///
+    /// The raw format prints the bytes of the .tfm file,
+    ///   grouped by tfm section and with 1 word (4 bytes) per line.
+    /// (In general .tfm files are word-oriented rather than byte-oriented.)
+    /// The parsed format is a debug output of the fully parsed .tfm
+    ///   data structure, again printed per-section.
+    /// To print only one of the forms pass `--raw` or `--parsed`.
+    ///
+    /// As alluded to above, .tfm files have sections.
+    /// There are 10 sections in a .tfm file, each containing data of a specific type.
+    /// To just print one or more of the sections, use the `-s` or `--section` flag:
+    ///
+    ///     $ tfmtools debug path/to/file.tfml --section widths --section heights
     Debug(Debug),
     /// Format a .pl file.
     Fmt(Format),
@@ -176,7 +201,7 @@ struct ConvertBatch {
     ///
     /// Each path must have either a .tfm or a .pl file extension.
     paths: Vec<TfOrPlPath>,
-
+    /* TODO
     /// Output directory for the converted files.
     ///
     /// (At least) three ways to do it:
@@ -215,6 +240,7 @@ struct ConvertBatch {
     #[arg(short, long)]
     preserve_paths: bool,
     // TODO: allow collisions
+     */
 }
 
 impl ConvertBatch {
@@ -225,40 +251,175 @@ impl ConvertBatch {
 
 #[derive(Clone, Debug, Parser)]
 struct Debug {
-    /// Path to the .tfm to print debugging information for.
+    /// Path to the .tfm to debug.
     path: TfPath,
+
+    /// Sections of the .tfm file to display.
+    ///
+    /// If no sections are provided, all sections will be displayed.
+    #[arg(short, long)]
+    section: Vec<Section>,
+
+    /// Only display raw data.
+    #[arg(long)]
+    raw: bool,
+
+    /// Only display parsed data.
+    #[arg(long)]
+    parsed: bool,
 }
 
 impl Debug {
     fn run(&self) -> Result<(), String> {
         let (tfm_bytes, tfm_file, _) = self.path.read()?;
-        let sub_file_sizes = tfm::format::SubFileSizes::from_bytes(&tfm_bytes[2..]);
-        println!("{:#?}", sub_file_sizes);
-        let partitions = sub_file_sizes.partition(&tfm_bytes[24..]);
-        let sections = [
-            "header",
-            "char_infos",
-            "widths",
-            "heights",
-            "depths",
-            "italic_corrections",
-            "lig_kern_instructions",
-            "kerns",
-            "extensible_recipes",
-            "params",
-        ];
-        for (i, partition) in partitions.into_iter().enumerate() {
-            println!("------------------[{}]", sections[i]);
-            for (j, byte) in partition.iter().enumerate() {
-                print!("{:4}", byte);
-                if j % 4 == 3 {
-                    println!();
+        let (raw_file, _) = tfm::format::RawFile::deserialize(&tfm_bytes).unwrap();
+
+        let sections = {
+            let mut s: HashSet<Section> = self.section.iter().copied().collect();
+            match s.remove(&Section::All) || s.is_empty() {
+                true => Section::all(),
+                false => {
+                    let mut v: Vec<Section> = s.into_iter().collect();
+                    v.sort();
+                    v
                 }
             }
-            println!();
+        };
+        let (raw, parsed) = match (self.raw, self.parsed) {
+            (false, false) => (true, true),
+            t => t,
+        };
+        for section in sections {
+            let (raw_data, parsed_data) = section.get(&raw_file, &tfm_file);
+            if raw {
+                println!("────────────────────────────[{:?} - raw]", section);
+                if raw_data.is_empty() {
+                    println!("[empty]")
+                }
+                for (j, word) in WordIter(raw_data).enumerate() {
+                    println!(
+                        "{} │ {:4}{:4}{:4}{:4}",
+                        section.index(j),
+                        word[0],
+                        word[1],
+                        word[2],
+                        word[3]
+                    );
+                }
+            }
+            if parsed {
+                println!("────────────────────────────[{:?} - parsed]", section);
+                println!("{:#?}", parsed_data);
+            }
         }
-        println!("{:#?}", tfm_file);
         Ok(())
+    }
+}
+
+#[derive(Debug, Hash, Clone, Copy, clap::ValueEnum, PartialEq, Eq, PartialOrd, Ord)]
+enum Section {
+    /// Output all sections
+    All,
+    /// Sub-file sizes
+    SubFileSizes,
+    /// Character data
+    CharInfos,
+    /// Widths array
+    Widths,
+    /// Heights array
+    Heights,
+    /// Depths array
+    Depths,
+    /// Italic corrections array
+    ItalicCorrections,
+    /// Lig/kern instructions
+    LigKern,
+    /// Kerns array
+    Kerns,
+    /// Extensible recipes
+    ExtensibleRecipes,
+    /// Params array
+    Params,
+}
+
+impl Section {
+    fn all() -> Vec<Section> {
+        use Section::*;
+        vec![
+            SubFileSizes,
+            CharInfos,
+            Widths,
+            Heights,
+            Depths,
+            ItalicCorrections,
+            LigKern,
+            Kerns,
+            ExtensibleRecipes,
+            Params,
+        ]
+    }
+    fn get<'a>(
+        &self,
+        raw_file: &'a tfm::format::RawFile<'a>,
+        file: &'a tfm::format::File,
+    ) -> (&'a [u8], Box<dyn std::fmt::Debug + 'a>) {
+        match self {
+            Section::All => panic!("this method doesn't work with Section::All"),
+            Section::SubFileSizes => (
+                raw_file.raw_sub_file_sizes,
+                Box::new(&raw_file.sub_file_sizes),
+            ),
+            Section::CharInfos => (raw_file.char_infos, Box::new(&file.char_infos)),
+            Section::Widths => (raw_file.widths, Box::new(&file.widths)),
+            Section::Heights => (raw_file.heights, Box::new(&file.heights)),
+            Section::Depths => (raw_file.depths, Box::new(&file.depths)),
+            Section::ItalicCorrections => (
+                raw_file.italic_corrections,
+                Box::new(&file.italic_corrections),
+            ),
+            Section::LigKern => (
+                raw_file.lig_kern_instructions,
+                Box::new(&file.lig_kern_instructions),
+            ),
+            Section::Kerns => (raw_file.kerns, Box::new(&file.kerns)),
+            Section::ExtensibleRecipes => (
+                raw_file.extensible_recipes,
+                Box::new(&file.extensible_chars),
+            ),
+            Section::Params => (raw_file.params, Box::new(&file.params)),
+        }
+    }
+    fn index(&self, j: usize) -> String {
+        let default = format!("{:5}", j);
+        if *self != Self::CharInfos {
+            return default;
+        }
+        let raw: u8 = match j.try_into() {
+            Ok(raw) => raw,
+            Err(_) => return default,
+        };
+        let c = raw as char;
+        if c.is_ascii_alphanumeric() || c.is_ascii_graphic() {
+            format!("    {}", c)
+        } else {
+            format!(" 0x{:02x}", j)
+        }
+    }
+}
+
+struct WordIter<'a>(&'a [u8]);
+
+impl<'a> Iterator for WordIter<'a> {
+    type Item = [u8; 4];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.0.get(..4) {
+            None => None,
+            Some(head) => {
+                self.0 = &self.0[4..];
+                Some([head[0], head[1], head[2], head[3]])
+            }
+        }
     }
 }
 
