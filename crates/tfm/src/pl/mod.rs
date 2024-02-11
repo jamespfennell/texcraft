@@ -321,55 +321,52 @@ impl File {
             &tfm_file.lig_kern_instructions,
             tfm_file.lig_kern_entrypoints(),
         );
-        let mut char_data = HashMap::<Char, CharData>::new();
-        let mut c = tfm_file.smallest_char_code;
-        for info in tfm_file.char_infos.into_iter() {
-            let this_c = c;
-            c = Char(c.0.checked_add(1).unwrap());
-            let info = match info {
-                None => continue,
-                Some(info) => info,
-            };
-            char_data.insert(
-                this_c,
-                CharData {
-                    width: tfm_file
-                        .widths
-                        .get(info.width_index.get() as usize)
-                        .copied()
-                        .unwrap_or_default(),
-                    height: tfm_file
-                        .heights
-                        .get(info.height_index as usize)
-                        .copied()
-                        .unwrap_or_default(),
-                    depth: tfm_file
-                        .depths
-                        .get(info.depth_index as usize)
-                        .copied()
-                        .unwrap_or_default(),
-                    italic_correction: tfm_file
-                        .italic_corrections
-                        .get(info.italic_index as usize)
-                        .copied()
-                        .unwrap_or_default(),
-                    tag: match info.tag {
-                        format::CharTag::None => CharTag::None,
-                        format::CharTag::Ligature(_) => {
-                            CharTag::Ligature(*lig_kern_entrypoints.get(&this_c).unwrap())
-                        }
-                        format::CharTag::List(c) => CharTag::List(c),
-                        format::CharTag::Extension(i) => {
-                            // TODO: don't panic
-                            // TODO: audit all unwraps in the crate
-                            CharTag::Extension(
-                                tfm_file.extensible_chars.get(i as usize).cloned().unwrap(),
-                            )
-                        }
+        let char_data = tfm_file
+            .char_infos
+            .into_iter()
+            .map(|(c, info)| {
+                (
+                    c,
+                    CharData {
+                        width: tfm_file
+                            .widths
+                            .get(info.width_index.get() as usize)
+                            .copied()
+                            .unwrap_or_default(),
+                        height: tfm_file
+                            .heights
+                            .get(info.height_index as usize)
+                            .copied()
+                            .unwrap_or_default(),
+                        depth: tfm_file
+                            .depths
+                            .get(info.depth_index as usize)
+                            .copied()
+                            .unwrap_or_default(),
+                        italic_correction: tfm_file
+                            .italic_corrections
+                            .get(info.italic_index as usize)
+                            .copied()
+                            .unwrap_or_default(),
+                        tag: match info.tag {
+                            format::CharTag::None => CharTag::None,
+                            format::CharTag::Ligature(_) => {
+                                CharTag::Ligature(*lig_kern_entrypoints.get(&c).unwrap())
+                            }
+                            format::CharTag::List(c) => CharTag::List(c),
+                            format::CharTag::Extension(i) => {
+                                // TODO: don't panic
+                                // TODO: audit all unwraps in the crate
+                                CharTag::Extension(
+                                    tfm_file.extensible_chars.get(i as usize).cloned().unwrap(),
+                                )
+                            }
+                        },
                     },
-                },
-            );
-        }
+                )
+            })
+            .collect();
+
         let lig_kern_instructions: Vec<ligkern::lang::Instruction> = tfm_file
             .lig_kern_instructions
             .into_iter()
@@ -1039,24 +1036,28 @@ mod tests {
     from_tfm_file_tests!((
         gap_in_chars,
         crate::format::File {
-            smallest_char_code: Char('A'.try_into().unwrap()),
-            char_infos: vec![
-                Some(crate::format::CharInfo {
-                    width_index: 1.try_into().unwrap(),
-                    height_index: 0,
-                    depth_index: 0,
-                    italic_index: 0,
-                    tag: crate::format::CharTag::None,
-                }),
-                None,
-                Some(crate::format::CharInfo {
-                    width_index: 2.try_into().unwrap(),
-                    height_index: 0,
-                    depth_index: 0,
-                    italic_index: 0,
-                    tag: crate::format::CharTag::None,
-                }),
-            ],
+            char_infos: HashMap::from([
+                (
+                    Char('A'.try_into().unwrap()),
+                    crate::format::CharInfo {
+                        width_index: 1.try_into().unwrap(),
+                        height_index: 0,
+                        depth_index: 0,
+                        italic_index: 0,
+                        tag: crate::format::CharTag::None,
+                    }
+                ),
+                (
+                    Char('C'.try_into().unwrap()),
+                    crate::format::CharInfo {
+                        width_index: 2.try_into().unwrap(),
+                        height_index: 0,
+                        depth_index: 0,
+                        italic_index: 0,
+                        tag: crate::format::CharTag::None,
+                    }
+                ),
+            ]),
             widths: vec![Number::ZERO, Number::UNITY, Number::UNITY * 2],
             ..Default::default()
         },

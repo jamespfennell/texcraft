@@ -161,7 +161,11 @@ macro_rules! convert_pltotf_tests {
 }
 
 convert_tests!(
-    (cmr10, "data/computer-modern/cmr10.tfm", "data/computer-modern/cmr10.pl"),
+    (
+        cmr10,
+        "data/computer-modern/cmr10.tfm",
+        "data/computer-modern/cmr10.pl"
+    ),
     (
         cmr10_ascii,
         "data/computer-modern/cmr10.tfm",
@@ -174,10 +178,26 @@ convert_tests!(
         "data/computer-modern/cmr10_octal.pl",
         vec!["--charcode-format", "octal"]
     ),
-    (cmss8, "data/computer-modern/cmss8.tfm", "data/computer-modern/cmss8.pl"),
-    (cmex10, "data/computer-modern/cmex10.tfm", "data/computer-modern/cmex10.pl"),
-    (cminch, "data/computer-modern/cminch.tfm", "data/computer-modern/cminch.pl"),
-    (cmsy7, "data/computer-modern/cmsy7.tfm", "data/computer-modern/cmsy7.pl"),
+    (
+        cmss8,
+        "data/computer-modern/cmss8.tfm",
+        "data/computer-modern/cmss8.pl"
+    ),
+    (
+        cmex10,
+        "data/computer-modern/cmex10.tfm",
+        "data/computer-modern/cmex10.pl"
+    ),
+    (
+        cminch,
+        "data/computer-modern/cminch.tfm",
+        "data/computer-modern/cminch.pl"
+    ),
+    (
+        cmsy7,
+        "data/computer-modern/cmsy7.tfm",
+        "data/computer-modern/cmsy7.pl"
+    ),
     (
         many_ligatures,
         "data/texcraft-originals/many-ligatures.tfm",
@@ -186,7 +206,12 @@ convert_tests!(
 );
 
 convert_pltotf_tests!(
-    (empty, "data/texcraft-originals/empty.tfm", "data/texcraft-originals/empty.pl", "",),
+    (
+        empty,
+        "data/texcraft-originals/empty.tfm",
+        "data/texcraft-originals/empty.pl",
+        "",
+    ),
     (
         empty_varchar,
         "data/texcraft-originals/empty-varchar.tfm",

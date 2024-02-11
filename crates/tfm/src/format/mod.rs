@@ -31,13 +31,10 @@ pub struct File {
     /// Header.
     pub header: Header,
 
-    /// The smallest character in the font.
-    pub smallest_char_code: Char,
-
     /// Character infos.
     ///
     /// The char infos mostly contain indices for other vectors in this struct.
-    pub char_infos: Vec<Option<CharInfo>>,
+    pub char_infos: HashMap<Char, CharInfo>,
 
     /// Character widths
     pub widths: Vec<Number>,
@@ -65,7 +62,7 @@ pub struct File {
 }
 
 /// Data about one character in a .tfm file.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CharInfo {
     /// Index of the width of this character in the widths array.
     ///
@@ -87,7 +84,7 @@ pub struct CharInfo {
 }
 
 /// Tag of a character in a .tfm file.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum CharTag {
     #[default]
     None,
@@ -109,8 +106,7 @@ impl Default for File {
     fn default() -> Self {
         Self {
             header: Default::default(),
-            smallest_char_code: Char(1),
-            char_infos: vec![],
+            char_infos: Default::default(),
             widths: vec![Number::ZERO],
             heights: vec![Number::ZERO],
             depths: vec![Number::ZERO],
@@ -140,37 +136,40 @@ impl File {
     pub fn lig_kern_entrypoints(&self) -> HashMap<Char, u8> {
         self.char_infos
             .iter()
-            .enumerate()
-            .filter_map(|f| {
-                f.1.as_ref()
-                    .map(|char_info| (Char((f.0).try_into().unwrap()), char_info))
-            })
             .filter_map(|(c, d)| match d.tag {
-                CharTag::Ligature(l) => Some((Char(c.0 + self.smallest_char_code.0), l)),
+                CharTag::Ligature(l) => Some((*c, l)),
                 _ => None,
             })
             .collect()
     }
 
+    fn char_info_bounds(&self) -> Option<(Char, Char)> {
+        let mut r: Option<(Char, Char)> = None;
+        for c in self.char_infos.keys().copied() {
+            r = Some(match r {
+                None => (c, c),
+                Some((lower, upper)) => (
+                    if c.0 < lower.0 { c } else { lower },
+                    if c.0 < upper.0 { upper } else { c },
+                ),
+            })
+        }
+        r
+    }
+
     /// Calculate the checksum of this .tfm file.
     pub fn checksum(&self) -> u32 {
         // This checksum algorithm is in PLtoTF.2014.13.
-        let bc = self.smallest_char_code.0;
-        let ec: u8 = (self.smallest_char_code.0 as usize + self.char_infos.len() - 1)
-            .try_into()
-            .expect("bc+len(char_infos)=ec<=u8::MAX");
-        let mut b = [bc, ec, bc, ec];
-        let mut c = self.smallest_char_code;
-        for char_info in &self.char_infos {
-            let this_c = c;
-            c = Char(c.0 + 1);
-            let char_info = match char_info {
+        let (bc, ec) = self.char_info_bounds().unwrap_or((Char(1), Char(0)));
+        let mut b = [bc.0, ec.0, bc.0, ec.0];
+        for c in bc.0..=ec.0 {
+            let char_info = match self.char_infos.get(&Char(c)) {
                 None => continue,
                 Some(char_info) => char_info,
             };
             let width = self.widths[char_info.width_index.get() as usize].0;
             // TODO: adjust based on the design units
-            let width = width + (this_c.0 as i32 + 4) * 0o20_000_000;
+            let width = width + (c as i32 + 4) * 0o20_000_000;
             let add = |b: u8, m: u8| -> u8 {
                 (((b as i32) + (b as i32) + width) % (m as i32))
                     .try_into()
@@ -243,25 +242,19 @@ impl File {
         let (depths, depth_to_index) = compress(&depths, 15);
         let (italic_corrections, italic_correction_to_index) = compress(&italic_corrections, 63);
         let mut extensible_chars = vec![];
-        let (smallest_char_code, char_infos) = match char_bounds {
-            None => (Char(1), vec![]),
+        let char_infos = match char_bounds {
+            None => Default::default(),
             Some((lower, upper)) => {
-                let mut v = Vec::<Option<CharInfo>>::with_capacity(
-                    upper
-                        .0
-                        .checked_sub(lower.0)
-                        .expect("upper.0<=lower.0 from the definition of char_bounds")
-                        as usize
-                        + 1,
-                );
+                let mut m: HashMap<Char, CharInfo> = Default::default();
                 for c in lower.0..=upper.0 {
-                    v.push(match pl_file.char_data.get(&Char(c)) {
-                        None => None,
-                        Some(pl_data) => {
-                            let width_index = *width_to_index.get(&pl_data.width).expect(
-                                "the map returned from compress(_,_) contains every input as a key",
-                            );
-                            Some(CharInfo {
+                    let pl_data = match pl_file.char_data.get(&Char(c)) {
+                        Some(pl_data) => pl_data,
+                        None => continue,
+                    };
+                    let width_index = *width_to_index.get(&pl_data.width).expect(
+                        "the map returned from compress(_,_) contains every input as a key",
+                    );
+                    m.insert(Char(c), CharInfo {
                                 width_index,
                                 // If the height data is missing from the height_to_index map, it's because
                                 // the height is 0.
@@ -295,17 +288,14 @@ impl File {
                                         CharTag::Extension(index)
                                     }
                                 },
-                            })
-                        }
-                    });
+                            });
                 }
-                (lower, v)
+                m
             }
         };
 
         let mut file = Self {
             header: pl_file.header.clone(),
-            smallest_char_code,
             char_infos,
             widths,
             heights,
@@ -319,7 +309,7 @@ impl File {
         if file.header.checksum == 0 {
             file.header.checksum = file.checksum();
         }
-        file.header.seven_bit_safe = Some(true);  // TODO: calculate this
+        file.header.seven_bit_safe = Some(true); // TODO: calculate this
         file
     }
 }

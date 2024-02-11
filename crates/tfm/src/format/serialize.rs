@@ -9,12 +9,12 @@ pub fn serialize(file: &File) -> Vec<u8> {
         .try_into()
         .expect("header.len()=18+header.additional_data.len()<= i16::MAX");
 
-    let (bc, ec) = if file.char_infos.is_empty() {
-        (1, 0)
-    } else {
-        let bc = file.smallest_char_code.0 as i16;
-        let diff = serialize_section(&file.char_infos, &mut b);
-        (bc, bc + diff - 1)
+    let (bc, ec) = match file.char_info_bounds() {
+        None => (1, 0),
+        Some((bc, ec)) => {
+            serialize_char_infos(&file.char_infos, bc, ec, &mut b);
+            (bc.0 as i16, ec.0 as i16)
+        }
     };
 
     let nw = serialize_section(&file.widths, &mut b);
@@ -39,6 +39,14 @@ pub fn serialize(file: &File) -> Vec<u8> {
         [b[2 * u], b[2 * u + 1]] = v.to_be_bytes();
     }
     b
+}
+
+fn serialize_char_infos(char_infos: &HashMap<Char, CharInfo>, bc: Char, ec: Char, b: &mut Vec<u8>) {
+    let mut v: Vec<Option<CharInfo>> = vec![None; (ec.0 as usize) + 1 - (bc.0 as usize)];
+    for (c, char_info) in char_infos {
+        v[(c.0 - bc.0) as usize] = Some(char_info.clone());
+    }
+    serialize_section(&v, b);
 }
 
 fn serialize_section<T: Serializable>(t: &T, b: &mut Vec<u8>) -> i16 {

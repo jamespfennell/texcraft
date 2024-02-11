@@ -142,10 +142,19 @@ pub(super) fn deserialize(b: &[u8]) -> Result<(File, Vec<Warning>), Error> {
 }
 
 pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
+    let mut char_infos = HashMap::<Char, CharInfo>::new();
+    let char_infos_array: Vec<Option<CharInfo>> = deserialize_array(raw_file.char_infos);
+    let mut c = raw_file.begin_char;
+    for char_info in char_infos_array {
+        let this_c = c;
+        c = Char(c.0 + 1);
+        if let Some(char_info) = char_info {
+            char_infos.insert(this_c, char_info);
+        }
+    }
     File {
         header: Header::deserialize(raw_file.header),
-        smallest_char_code: raw_file.begin_char,
-        char_infos: deserialize_array(raw_file.char_infos),
+        char_infos,
         widths: deserialize_array(raw_file.widths),
         heights: deserialize_array(raw_file.heights),
         depths: deserialize_array(raw_file.depths),
@@ -715,35 +724,39 @@ mod tests {
             char_infos,
             extend(
                 &vec![
-                    /* lf */ 0, 14, /* lh */ 0, 2, /* bc */ 0, 70, /* ec */ 0,
-                    71, /* nw */ 0, 1, /* nh */ 0, 1, /* nd */ 0, 1,
+                    /* lf */ 0, 15, /* lh */ 0, 2, /* bc */ 0, 70, /* ec */ 0,
+                    72, /* nw */ 0, 1, /* nh */ 0, 1, /* nd */ 0, 1,
                     /* ni */ 0, 1, /* nl */ 0, 0, /* nk */ 0, 0, /* ne */ 0, 0,
                     /* np */ 0, 0, /* header.checksum */ 0, 0, 0, 0,
                     /* header.design_size */ 0, 0, 0, 0, /* char_infos */ 13, 35, 16, 0,
-                    1, 0, 1, 23,
+                    0, 0, 0, 0, 1, 0, 1, 23,
                 ],
-                14 * 4
+                15 * 4
             ),
             File {
                 header: Default::default(),
-                smallest_char_code: Char(70),
-                char_infos: vec![
-                    Some(CharInfo {
-                        width_index: 13.try_into().unwrap(),
-                        height_index: 2,
-                        depth_index: 3,
-                        italic_index: 4,
-                        tag: CharTag::None,
-                    }),
-                    // None,
-                    Some(CharInfo {
-                        width_index: 1.try_into().unwrap(),
-                        height_index: 0,
-                        depth_index: 0,
-                        italic_index: 0,
-                        tag: CharTag::Ligature(23),
-                    }),
-                ],
+                char_infos: HashMap::from([
+                    (
+                        Char(70),
+                        CharInfo {
+                            width_index: 13.try_into().unwrap(),
+                            height_index: 2,
+                            depth_index: 3,
+                            italic_index: 4,
+                            tag: CharTag::None,
+                        }
+                    ),
+                    (
+                        Char(72),
+                        CharInfo {
+                            width_index: 1.try_into().unwrap(),
+                            height_index: 0,
+                            depth_index: 0,
+                            italic_index: 0,
+                            tag: CharTag::Ligature(23),
+                        }
+                    ),
+                ]),
                 ..Default::default()
             },
         ),
