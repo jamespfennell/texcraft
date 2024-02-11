@@ -78,13 +78,14 @@ impl TfPath {
             Ok(data) => data,
             Err(err) => return Err(format!("Failed to read `{}`: {}", self.0.display(), err)),
         };
-        let (tfm_file, warnings) = match tfm::format::File::deserialize(&data) {
-            Ok(t) => t,
-            Err(err) => return Err(err.tf_to_pl_message()),
-        };
+        let (tfm_file_or, warnings) = tfm::format::File::deserialize(&data);
         for warning in &warnings {
             eprintln!("{}", warning.tf_to_pl_message())
         }
+        let tfm_file = match tfm_file_or {
+            Ok(t) => t,
+            Err(err) => return Err(err.tf_to_pl_message()),
+        };
         Ok((data, tfm_file, warnings))
     }
     fn parse(input: &str) -> Result<Self, InvalidExtension> {

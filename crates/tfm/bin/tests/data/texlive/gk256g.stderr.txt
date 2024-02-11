@@ -1,0 +1,4 @@
+There's some extra junk at the end of the TFM file,
+but I'll proceed as if it weren't there.
+The character code range 30967..18 is illegal!
+Sorry, but I can't go on; are you sure this is a TFM?

@@ -120,7 +120,7 @@ impl Default for File {
 }
 
 impl File {
-    pub fn deserialize(b: &[u8]) -> Result<(File, Vec<DeserializeWarning>), DeserializeError> {
+    pub fn deserialize(b: &[u8]) -> (Result<File, DeserializeError>, Vec<DeserializeWarning>) {
         deserialize::deserialize(b)
     }
 

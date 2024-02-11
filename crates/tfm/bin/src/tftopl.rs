@@ -70,13 +70,19 @@ impl Cli {
         };
 
         // Conversion
-        let (tfm_file, warnings) = match tfm::format::File::deserialize(&tfm_data) {
-            Ok(t) => t,
-            Err(err) => return Err(err.tf_to_pl_message()),
-        };
+        let (tfm_file_or, warnings) = tfm::format::File::deserialize(&tfm_data);
         for warning in warnings {
             eprintln!("{}", warning.tf_to_pl_message())
         }
+        let tfm_file = match tfm_file_or {
+            Ok(tfm_file) => tfm_file,
+            Err(err) => {
+                return Err(format![
+                    "{}\nSorry, but I can't go on; are you sure this is a TFM?",
+                    err.tf_to_pl_message()
+                ])
+            }
+        };
         let pl_file = tfm::pl::File::from_tfm_file(tfm_file);
         let pl_output = format![
             "{}",

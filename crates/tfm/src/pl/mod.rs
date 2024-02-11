@@ -168,7 +168,7 @@ impl File {
                             }
                             ast::FontDimension::IndexedParam(v) => {
                                 // TODO: param=0 not allowed PLtoTF.2014.93
-                                file.params.set(v.left as usize, v.right);
+                                file.params.set(v.left.0 as usize, v.right);
                             }
                             ast::FontDimension::Comment(_) => {}
                         }
@@ -481,7 +481,9 @@ impl File {
                     (12, FontType::TexMathEx) => NamedParam::BigOpSpacing4,
                     (13, FontType::TexMathEx) => NamedParam::BigOpSpacing5,
                     _ => {
-                        return ast::FontDimension::IndexedParam((i, param).into());
+                        return ast::FontDimension::IndexedParam(
+                            (ast::ParameterIndex(i), param).into(),
+                        );
                     }
                 };
                 ast::FontDimension::NamedParam(named_param, param.into())

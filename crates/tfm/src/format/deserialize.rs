@@ -114,6 +114,9 @@ pub enum Warning {
     /// The file length specified inside the TFM file is smaller than the actual file size.
     ///
     /// Additional data after the file length is ignored.
+    ///
+    /// The first element is the number of words specified in the TFM header.
+    /// The second element is the number of bytes in the file.
     InternalFileLengthIsSmall(i16, usize),
 }
 
@@ -136,9 +139,11 @@ impl Warning {
 }
 
 /// Deserialize a TeX font metric (.tfm) file.
-pub(super) fn deserialize(b: &[u8]) -> Result<(File, Vec<Warning>), Error> {
-    let (raw_file, warnings) = RawFile::deserialize(b)?;
-    Ok((from_raw_file(&raw_file), warnings))
+pub(super) fn deserialize(b: &[u8]) -> (Result<File, Error>, Vec<Warning>) {
+    match RawFile::deserialize(b) {
+        (Ok(raw_file), warnings) => (Ok(from_raw_file(&raw_file)), warnings),
+        (Err(err), warnings) => (Err(err), warnings),
+    }
 }
 
 pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
@@ -146,10 +151,12 @@ pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
     let char_infos_array: Vec<Option<CharInfo>> = deserialize_array(raw_file.char_infos);
     let mut c = raw_file.begin_char;
     for char_info in char_infos_array {
-        let this_c = c;
-        c = Char(c.0 + 1);
         if let Some(char_info) = char_info {
-            char_infos.insert(this_c, char_info);
+            char_infos.insert(c, char_info);
+        }
+        c = match c.0.checked_add(1) {
+            None => break,
+            Some(c) => Char(c),
         }
     }
     File {
@@ -214,24 +221,27 @@ pub struct SubFileSizes {
 }
 
 impl<'a> RawFile<'a> {
-    pub fn deserialize(b: &'a [u8]) -> Result<(Self, Vec<Warning>), Error> {
+    pub fn deserialize(b: &'a [u8]) -> (Result<Self, Error>, Vec<Warning>) {
         let deserialize_i16 = |u: usize| -> i16 { i16::from_be_bytes([b[u], b[u + 1]]) };
         let mut warnings: Vec<Warning> = vec![];
         let actual_file_length = b.len();
         match actual_file_length {
-            0 => return Err(Error::FileIsEmpty),
-            1 => return Err(Error::FileHasOneByte(b[0])),
+            0 => return (Err(Error::FileIsEmpty), warnings),
+            1 => return (Err(Error::FileHasOneByte(b[0])), warnings),
             _ => (),
         };
         let lf = deserialize_i16(0);
         match lf {
-            ..=-1 => return Err(Error::InternalFileLengthIsNegative(lf)),
-            0 => return Err(Error::InternalFileLengthIsZero),
+            ..=-1 => return (Err(Error::InternalFileLengthIsNegative(lf)), warnings),
+            0 => return (Err(Error::InternalFileLengthIsZero), warnings),
             1.. => {
                 let claimed_file_length = (lf as usize) * 4;
                 match actual_file_length.cmp(&claimed_file_length) {
                     std::cmp::Ordering::Less => {
-                        return Err(Error::InternalFileLengthIsTooBig(lf, actual_file_length))
+                        return (
+                            Err(Error::InternalFileLengthIsTooBig(lf, actual_file_length)),
+                            warnings,
+                        )
                     }
                     std::cmp::Ordering::Equal => (),
                     std::cmp::Ordering::Greater => {
@@ -239,7 +249,12 @@ impl<'a> RawFile<'a> {
                     }
                 }
                 if lf <= 3 {
-                    return Err(Error::InternalFileLengthIsTooSmall(lf, actual_file_length));
+                    return (
+                        Err(Error::InternalFileLengthIsTooSmall(lf, actual_file_length)),
+                        // TFtoPL doesn't output a warning here.
+                        // Which makes sense because the error already encompasses the warning.
+                        vec![],
+                    );
                 }
             }
         }
@@ -270,15 +285,15 @@ impl<'a> RawFile<'a> {
             || s.ne < 0
             || s.np < 0
         {
-            return Err(Error::SubFileSizeIsNegative(s.clone()));
+            return (Err(Error::SubFileSizeIsNegative(s.clone())), warnings);
         }
         if s.lh < 2 {
-            return Err(Error::HeaderLengthIsTooSmall(s.lh));
+            return (Err(Error::HeaderLengthIsTooSmall(s.lh)), warnings);
         }
         let (bc, ec) = match s.bc.cmp(&s.ec.saturating_add(1)) {
             std::cmp::Ordering::Less => {
                 let ec: u8 = match s.ec.try_into() {
-                    Err(_) => return Err(Error::InvalidCharacterRange(s.bc, s.ec)),
+                    Err(_) => return (Err(Error::InvalidCharacterRange(s.bc, s.ec)), warnings),
                     Ok(ec) => ec,
                 };
                 (
@@ -287,18 +302,20 @@ impl<'a> RawFile<'a> {
                 )
             }
             std::cmp::Ordering::Equal => (Char(1), Char(0)),
-            std::cmp::Ordering::Greater => return Err(Error::InvalidCharacterRange(s.bc, s.ec)),
+            std::cmp::Ordering::Greater => {
+                return (Err(Error::InvalidCharacterRange(s.bc, s.ec)), warnings)
+            }
         };
         if s.nw == 0 || s.nh == 0 || s.nd == 0 || s.ni == 0 {
-            return Err(Error::IncompleteSubFiles(s.clone()));
+            return (Err(Error::IncompleteSubFiles(s.clone())), warnings);
         }
         if s.ne > 255 {
-            return Err(Error::TooManyExtensibleCharacters(s.ne));
+            return (Err(Error::TooManyExtensibleCharacters(s.ne)), warnings);
         }
         if s.lf
             != 6 + s.lh + (s.ec - s.bc + 1) + s.nw + s.nh + s.nd + s.ni + s.nl + s.nk + s.ne + s.np
         {
-            return Err(Error::InconsistentSubFileSizes(s.clone()));
+            return (Err(Error::InconsistentSubFileSizes(s.clone())), warnings);
         }
 
         let raw_file = {
@@ -327,7 +344,7 @@ impl<'a> RawFile<'a> {
             }
         };
 
-        Ok((raw_file, warnings))
+        (Ok(raw_file), warnings)
     }
 }
 
@@ -491,8 +508,8 @@ impl Deserializable for ExtensibleRecipe {
 mod tests {
     use super::*;
 
-    macro_rules! deserialize_error_tests {
-        ( $( ($name: ident, $input: expr, $want: expr), )+ ) => {
+    macro_rules! deserialize_tests {
+        ( $( ($name: ident, $input: expr, $want: expr $( , $warning: expr )? ), )+ ) => {
             $(
                 mod $name {
                     use super::*;
@@ -501,7 +518,8 @@ mod tests {
                         let input = $input;
                         let want = $want;
                         let got = deserialize(&input);
-                        assert_eq!(got, want);
+                        let warnings = vec![ $( $warning )? ];
+                        assert_eq!(got, (want, warnings));
                     }
                 }
             )+
@@ -518,7 +536,7 @@ mod tests {
                         let input = $bytes;
                         let want = $file;
                         let got = deserialize(&input);
-                        assert_eq!(got, Ok((want, vec![])));
+                        assert_eq!(got, (Ok(want), vec![]));
                     }
                     #[test]
                     fn serialize_test() {
@@ -532,7 +550,7 @@ mod tests {
         };
     }
 
-    deserialize_error_tests!(
+    deserialize_tests!(
         (empty_file, [], Err(Error::FileIsEmpty)),
         (single_byte_1, [2], Err(Error::FileHasOneByte(2))),
         (single_byte_2, [255], Err(Error::FileHasOneByte(255))),
@@ -658,21 +676,36 @@ mod tests {
                 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, /* seven_bit_safe */ 0, 0, 0,
                 /* face */ 61,
             ]),
-            Ok((
-                File {
-                    header: Header {
-                        checksum: 7,
-                        design_size: Number(11),
-                        character_coding_scheme: "A".repeat(39),
-                        font_family: "B".repeat(19),
-                        seven_bit_safe: Some(false),
-                        face: Some(Face::Other(61)),
-                        additional_data: vec![],
-                    },
-                    ..Default::default()
+            Ok(File {
+                header: Header {
+                    checksum: 7,
+                    design_size: Number(11),
+                    character_coding_scheme: "A".repeat(39),
+                    font_family: "B".repeat(19),
+                    seven_bit_safe: Some(false),
+                    face: Some(Face::Other(61)),
+                    additional_data: vec![],
                 },
-                vec![]
-            ))
+                ..Default::default()
+            },)
+        ),
+        (
+            file_longer_than_expected,
+            extend(
+                &vec![
+                    /* lf */ 0, 12, /* lh */ 0, 2, /* bc */ 0, 1, /* ec */ 0,
+                    0, /* nw */ 0, 1, /* nh */ 0, 1, /* nd */ 0, 1, /* ni */ 0,
+                    1, /* nl */ 0, 0, /* nk */ 0, 0, /* ne */ 0, 0, /* np */ 0,
+                    0, /* header.checksum */ 0, 0, 0, 0, /* header.design_size */ 0, 0,
+                    0, 0,
+                ],
+                40 * 4
+            ),
+            Ok(File {
+                header: Default::default(),
+                ..Default::default()
+            }),
+            Warning::InternalFileLengthIsSmall(12, 40 * 4)
         ),
     );
 
@@ -757,6 +790,33 @@ mod tests {
                         }
                     ),
                 ]),
+                ..Default::default()
+            },
+        ),
+        (
+            char_infos_large_char,
+            extend(
+                &vec![
+                    /* lf */ 0, 13, /* lh */ 0, 2, /* bc */ 0, 255, /* ec */ 0,
+                    255, /* nw */ 0, 1, /* nh */ 0, 1, /* nd */ 0, 1,
+                    /* ni */ 0, 1, /* nl */ 0, 0, /* nk */ 0, 0, /* ne */ 0, 0,
+                    /* np */ 0, 0, /* header.checksum */ 0, 0, 0, 0,
+                    /* header.design_size */ 0, 0, 0, 0, /* char_infos */ 13, 35, 16, 0,
+                ],
+                13 * 4
+            ),
+            File {
+                header: Default::default(),
+                char_infos: HashMap::from([(
+                    Char(255),
+                    CharInfo {
+                        width_index: 13.try_into().unwrap(),
+                        height_index: 2,
+                        depth_index: 3,
+                        italic_index: 4,
+                        tag: CharTag::None,
+                    }
+                ),]),
                 ..Default::default()
             },
         ),

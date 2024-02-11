@@ -4,7 +4,14 @@ use std::process::Command;
 
 type TfmToPlArgsFn = for<'a> fn(tfm_file_path: &'a str) -> Vec<&'a str>;
 
-fn run_tfm_to_pl_test(tfm: &[u8], pl: &str, command: &str, args_fn: TfmToPlArgsFn) {
+fn run_tfm_to_pl_test(
+    tfm: &[u8],
+    pl: &str,
+    command: &str,
+    args_fn: TfmToPlArgsFn,
+    want_stderr: Option<&str>,
+    want_success: bool,
+) {
     let dir = tempfile::TempDir::new().unwrap();
     let tfm_file_path = dir.path().join("input.tfm");
     let mut tfm_file = std::fs::File::create(&tfm_file_path).unwrap();
@@ -16,14 +23,12 @@ fn run_tfm_to_pl_test(tfm: &[u8], pl: &str, command: &str, args_fn: TfmToPlArgsF
 
     let output = cmd.output().unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(
-        output.status.success(),
-        "failed to run Texcraft command: {}",
-        stderr
-    );
+    assert_eq!(output.status.success(), want_success,);
     let got = String::from_utf8(output.stdout).unwrap();
     similar_asserts::assert_eq!(texcraft: got, knuth: pl.replace("\r\n", "\n"));
-    similar_asserts::assert_eq!(texcraft: stderr, knuth: "");
+    if let Some(want_stderr) = want_stderr {
+        similar_asserts::assert_eq!(texcraft: stderr, knuth: want_stderr.replace("\r\n", "\n"));
+    }
 }
 
 type PlToTfmArgsFn = for<'a> fn(pl_file_path: &'a str, tfm_file_path: &'a str) -> Vec<&'a str>;
@@ -100,7 +105,7 @@ macro_rules! convert_tests {
                             v.extend( $tftopl_args );
                         )?
                         v
-                    });
+                    }, Some(""), true);
                 }
 
                 #[test]
@@ -112,7 +117,7 @@ macro_rules! convert_tests {
                             v.extend( $tftopl_args );
                         )?
                         v
-                    });
+                    }, Some(""), true);
                 }
 
                 #[test]
@@ -154,6 +159,34 @@ macro_rules! convert_pltotf_tests {
                     run_pl_to_tfm_test(TFM, PL, "pltotf", |pl_file_path, tfm_file_path|{
                         vec![pl_file_path, tfm_file_path]
                     }, Some(STDERR));
+                }
+            }
+        )+
+    };
+}
+
+macro_rules! convert_tftopl_tests {
+    ( $( ($name: ident, $tfm_path: expr, $pl: expr, $stderr: expr, $want_success: expr $(,)? ), )+ ) => {
+        $(
+            mod $name {
+                use super::*;
+                const TFM: &'static [u8] = include_bytes!($tfm_path);
+                const PL: &'static str = $pl;
+                const WANT_STDERR: &'static str = $stderr;
+                const WANT_SUCCESS: bool = $want_success;
+
+                #[test]
+                fn tfmtools_convert_tfm_to_pl() {
+                    run_tfm_to_pl_test(TFM, PL, "tfmtools", |tfm_file_path| {
+                            vec!["convert", tfm_file_path]
+                    }, None, WANT_SUCCESS);
+                }
+
+                #[test]
+                fn tftopl() {
+                    run_tfm_to_pl_test(TFM, PL, "tftopl", |tfm_file_path|{
+                            vec![tfm_file_path]
+                    },Some(WANT_STDERR), WANT_SUCCESS);
                 }
             }
         )+
@@ -203,6 +236,11 @@ convert_tests!(
         "data/texcraft-originals/many-ligatures.tfm",
         "data/texcraft-originals/many-ligatures.pl",
     ),
+    (
+        params,
+        "data/texcraft-originals/font-dimen.tfm",
+        "data/texcraft-originals/font-dimen.pl",
+    ),
 );
 
 convert_pltotf_tests!(
@@ -231,3 +269,11 @@ convert_pltotf_tests!(
         include_str!["data/texcraft-originals/ligature-loop.stderr.txt"],
     ),
 );
+
+convert_tftopl_tests!((
+    gk256g,
+    "data/texlive/gk256g.tfm",
+    "",
+    include_str!["data/texlive/gk256g.stderr.txt"],
+    false,
+),);

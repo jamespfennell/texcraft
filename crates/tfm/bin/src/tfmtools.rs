@@ -272,7 +272,7 @@ struct Debug {
 impl Debug {
     fn run(&self) -> Result<(), String> {
         let (tfm_bytes, tfm_file, _) = self.path.read()?;
-        let (raw_file, _) = tfm::format::RawFile::deserialize(&tfm_bytes).unwrap();
+        let raw_file = tfm::format::RawFile::deserialize(&tfm_bytes).0.unwrap();
 
         let sections = {
             let mut s: HashSet<Section> = self.section.iter().copied().collect();
