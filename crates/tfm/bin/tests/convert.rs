@@ -233,47 +233,91 @@ convert_tests!(
     ),
     (
         many_ligatures,
-        "data/texcraft-originals/many-ligatures.tfm",
-        "data/texcraft-originals/many-ligatures.pl",
+        "data/originals/many-ligatures.tfm",
+        "data/originals/many-ligatures.pl",
     ),
     (
         params,
-        "data/texcraft-originals/font-dimen.tfm",
-        "data/texcraft-originals/font-dimen.pl",
+        "data/originals/font-dimen.tfm",
+        "data/originals/font-dimen.pl",
     ),
+    (
+        boundary_char,
+        "data/originals/boundarychar.tfm",
+        "data/originals/boundarychar.pl",
+    ),
+    (
+        boundary_char_unspecified,
+        "data/originals/boundarychar-unspecified.tfm",
+        "data/originals/boundarychar-unspecified.pl",
+    ),
+    (
+        boundary_char_no_entrypoint,
+        "data/originals/boundarychar-noentrypoint.tfm",
+        "data/originals/boundarychar-noentrypoint.pl",
+    ),
+    (
+        many_entrypoints,
+        "data/originals/many-entrypoints.tfm",
+        "data/originals/many-entrypoints.pl",
+    ),
+    /*
+    (
+        theano_old_style,
+        "data/ctan/TheanoOldStyle-Bold-tlf-t1--base.tfm",
+        "data/ctan/TheanoOldStyle-Bold-tlf-t1--base.pl",
+    ),
+     */
 );
 
 convert_pltotf_tests!(
     (
         empty,
-        "data/texcraft-originals/empty.tfm",
-        "data/texcraft-originals/empty.pl",
+        "data/originals/empty.tfm",
+        "data/originals/empty.pl",
         "",
     ),
     (
         empty_varchar,
-        "data/texcraft-originals/empty-varchar.tfm",
-        "data/texcraft-originals/empty-varchar.pl",
+        "data/originals/empty-varchar.tfm",
+        "data/originals/empty-varchar.pl",
         "",
     ),
     (
         zero_width_chars,
-        "data/texcraft-originals/zero-width-char.tfm",
-        "data/texcraft-originals/zero-width-char.pl",
+        "data/originals/zero-width-char.tfm",
+        "data/originals/zero-width-char.pl",
         "",
     ),
     (
         ligature_loop,
-        "data/texcraft-originals/ligature-loop.tfm",
-        "data/texcraft-originals/ligature-loop.pl",
-        include_str!["data/texcraft-originals/ligature-loop.stderr.txt"],
+        "data/originals/ligature-loop.tfm",
+        "data/originals/ligature-loop.pl",
+        include_str!["data/originals/ligature-loop.stderr.txt"],
+    ),
+    (
+        orphan_lig_kerns_pltotf,
+        "data/originals/orphan-lig-kerns.tfm",
+        "data/originals/orphan-lig-kerns.pl",
+        "",
     ),
 );
 
-convert_tftopl_tests!((
-    gk256g,
-    "data/texlive/gk256g.tfm",
-    "",
-    include_str!["data/texlive/gk256g.stderr.txt"],
-    false,
-),);
+convert_tftopl_tests!(
+    (
+        gk256g,
+        "data/ctan/gk256g.tfm",
+        "",
+        include_str!["data/ctan/gk256g.stderr.txt"],
+        false,
+    ),
+    /* TODO: reenable
+    (
+        orphan_lig_kerns_tftopl,
+        "data/originals/orphan-lig-kerns.tfm",
+        include_str!("data/originals/orphan-lig-kerns-recovered.pl"),
+        "",
+        true,
+    ),
+     */
+);

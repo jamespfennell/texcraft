@@ -48,6 +48,12 @@ pub struct File {
     /// Character italic corrections
     pub italic_corrections: Vec<Number>,
 
+    /// Boundary char
+    pub lig_kern_boundary_char: Option<Char>,
+
+    /// Boundary char entrypoint
+    pub lig_kern_boundary_char_entrypoint: Option<u16>,
+
     /// Lig kern instructions.
     pub lig_kern_instructions: Vec<ligkern::lang::Instruction>,
 
@@ -111,6 +117,8 @@ impl Default for File {
             heights: vec![Number::ZERO],
             depths: vec![Number::ZERO],
             italic_corrections: vec![Number::ZERO],
+            lig_kern_boundary_char: None,
+            lig_kern_boundary_char_entrypoint: None,
             lig_kern_instructions: vec![],
             kerns: vec![],
             extensible_chars: vec![],
@@ -212,6 +220,8 @@ impl File {
         let lig_kern_entrypoints = crate::ligkern::lang::compress_entrypoints(
             &mut lig_kern_instructions,
             pl_file.lig_kern_entrypoints(),
+            pl_file.lig_kern_boundary_char,
+            pl_file.lig_kern_boundary_char_entrypoint,
         );
 
         let mut widths = vec![];
@@ -301,6 +311,8 @@ impl File {
             heights,
             depths,
             italic_corrections,
+            lig_kern_boundary_char: pl_file.lig_kern_boundary_char,
+            lig_kern_boundary_char_entrypoint: pl_file.lig_kern_boundary_char_entrypoint,
             lig_kern_instructions,
             kerns,
             extensible_chars,

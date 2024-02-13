@@ -94,7 +94,7 @@ fn calculate_replacements(
                 );
                 continue;
             }
-            lang::Operation::Stop(_) => {
+            lang::Operation::EntrypointRedirect(_, _) => {
                 // TODO: is this correct?
                 continue;
             }

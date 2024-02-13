@@ -1,0 +1,16 @@
+
+(LIGTABLE
+    (KRN C A D 1)
+    (LABEL C A)
+    (KRN C B D 1)
+    (SKIP O 1)
+    (KRN C C D 1)
+    (KRN C D D 1)
+    (STOP)
+    (KRN C E D 1)
+)
+(CHARACTER C A)
+(CHARACTER C B)
+(CHARACTER C C)
+(CHARACTER C D)
+(CHARACTER C E)

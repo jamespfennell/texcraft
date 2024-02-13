@@ -17,19 +17,23 @@ pub fn serialize(file: &File) -> Vec<u8> {
         }
     };
 
-    let nw = serialize_section(&file.widths, &mut b);
+    let nw = serialize_section(&file.widths, &mut b, None);
 
-    let nh = serialize_section(&file.heights, &mut b);
+    let nh = serialize_section(&file.heights, &mut b, None);
 
-    let nd = serialize_section(&file.depths, &mut b);
+    let nd = serialize_section(&file.depths, &mut b, None);
 
-    let ni = serialize_section(&file.italic_corrections, &mut b);
+    let ni = serialize_section(&file.italic_corrections, &mut b, None);
 
-    let nl = serialize_section(&file.lig_kern_instructions, &mut b);
-    let nk = serialize_section(&file.kerns, &mut b);
-    let ne = serialize_section(&file.extensible_chars, &mut b);
+    let nl = serialize_section(
+        &file.lig_kern_instructions,
+        &mut b,
+        file.lig_kern_boundary_char,
+    );
+    let nk = serialize_section(&file.kerns, &mut b, None);
+    let ne = serialize_section(&file.extensible_chars, &mut b, None);
 
-    let np = serialize_section(&file.params, &mut b);
+    let np = serialize_section(&file.params.0, &mut b, None);
 
     let lf = 6 + lh + (ec + 1 - bc) + nw + nh + nd + ni + nl + nk + ne + np;
     for (u, v) in [lf, lh, bc, ec, nw, nh, nd, ni, nl, nk, ne, np]
@@ -46,27 +50,29 @@ fn serialize_char_infos(char_infos: &HashMap<Char, CharInfo>, bc: Char, ec: Char
     for (c, char_info) in char_infos {
         v[(c.0 - bc.0) as usize] = Some(char_info.clone());
     }
-    serialize_section(&v, b);
+    serialize_section(&v, b, None);
 }
 
-fn serialize_section<T: Serializable>(t: &T, b: &mut Vec<u8>) -> i16 {
+fn serialize_section<T: Serializable>(t: &[T], b: &mut Vec<u8>, c: Option<Char>) -> i16 {
     let start = b.len();
-    t.serialize(b);
+    for element in t {
+        element.serialize(b, c);
+    }
     ((b.len() - start) / 4).try_into().unwrap()
 }
 
 trait Serializable: Sized {
-    fn serialize(&self, b: &mut Vec<u8>);
+    fn serialize(&self, b: &mut Vec<u8>, _: Option<Char>);
 }
 
 impl Serializable for u32 {
-    fn serialize(&self, b: &mut Vec<u8>) {
+    fn serialize(&self, b: &mut Vec<u8>, _: Option<Char>) {
         b.extend(self.to_be_bytes())
     }
 }
 
 impl Serializable for Option<CharInfo> {
-    fn serialize(&self, b: &mut Vec<u8>) {
+    fn serialize(&self, b: &mut Vec<u8>, _: Option<Char>) {
         match self {
             None => b.extend([0; 4]),
             Some(char_info) => {
@@ -95,22 +101,14 @@ impl Serializable for Option<CharInfo> {
     }
 }
 
-impl<T: Serializable> Serializable for Vec<T> {
-    fn serialize(&self, b: &mut Vec<u8>) {
-        for element in self {
-            element.serialize(b)
-        }
-    }
-}
-
 impl Serializable for Number {
-    fn serialize(&self, b: &mut Vec<u8>) {
-        (self.0 as u32).serialize(b)
+    fn serialize(&self, b: &mut Vec<u8>, _: Option<Char>) {
+        (self.0 as u32).serialize(b, None)
     }
 }
 
 impl Serializable for ligkern::lang::Instruction {
-    fn serialize(&self, b: &mut Vec<u8>) {
+    fn serialize(&self, b: &mut Vec<u8>, _boundary_char: Option<Char>) {
         // PLtoTF.2014.142
         let first = [self.next_instruction.unwrap_or(128), self.right_char.0];
         match self.operation {
@@ -141,30 +139,23 @@ impl Serializable for ligkern::lang::Instruction {
                 });
                 b.push(char_to_insert.0);
             }
-            ligkern::lang::Operation::Stop(index) => {
-                let [hi, lo] = index.to_be_bytes();
-                // TODO: when we support boundary chars this will need to be updated
-                b.push(254);
-                b.push(0);
-                b.push(hi);
-                b.push(lo);
+            ligkern::lang::Operation::EntrypointRedirect(index, char) => {
+                b.extend(match char {
+                    None => [254, 0],
+                    Some(c) => [255, c.0],
+                });
+                b.extend(index.to_be_bytes());
             }
         }
     }
 }
 
 impl Serializable for ExtensibleRecipe {
-    fn serialize(&self, b: &mut Vec<u8>) {
+    fn serialize(&self, b: &mut Vec<u8>, _: Option<Char>) {
         b.push(self.top.unwrap_or(Char(0)).0);
         b.push(self.middle.unwrap_or(Char(0)).0);
         b.push(self.bottom.unwrap_or(Char(0)).0);
         b.push(self.rep.0);
-    }
-}
-
-impl Serializable for Params {
-    fn serialize(&self, b: &mut Vec<u8>) {
-        self.0.serialize(b)
     }
 }
 
@@ -188,8 +179,8 @@ fn serialize_string(s: &str, size: u8, b: &mut Vec<u8>) {
 }
 
 fn serialize_header(header: &Header, b: &mut Vec<u8>) {
-    header.checksum.serialize(b);
-    header.design_size.serialize(b);
+    header.checksum.serialize(b, None);
+    header.design_size.serialize(b, None);
     serialize_string(&header.character_coding_scheme, 39, b);
     serialize_string(&header.font_family, 19, b);
     if header.seven_bit_safe == Some(true) {
@@ -202,5 +193,5 @@ fn serialize_header(header: &Header, b: &mut Vec<u8>) {
     b.push(0);
     b.push(0);
     b.push(header.face.unwrap_or(0_u8.into()).into());
-    header.additional_data.serialize(b);
+    serialize_section(&header.additional_data, b, None);
 }

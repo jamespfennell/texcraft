@@ -373,7 +373,14 @@ impl Section {
                 Box::new(&raw_file.sub_file_sizes),
             ),
             Section::Header => (raw_file.header, Box::new(&file.header)),
-            Section::CharInfos => (raw_file.char_infos, Box::new(&file.char_infos)),
+            Section::CharInfos => {
+                // TODO: if char_infos used a custom map type with defined ordering
+                // we wouldn't need to do this.
+                let mut v: Vec<(&tfm::Char, &tfm::format::CharInfo)> =
+                    file.char_infos.iter().collect();
+                v.sort_by_key(|(c, _)| **c);
+                (raw_file.char_infos, Box::new(v))
+            }
             Section::Widths => (raw_file.widths, Box::new(&file.widths)),
             Section::Heights => (raw_file.heights, Box::new(&file.heights)),
             Section::Depths => (raw_file.depths, Box::new(&file.depths)),

@@ -407,7 +407,7 @@ pub enum FontDimension {
 }
 
 /// Index of a non-named parameter.
-/// 
+///
 /// This is just a wrapper around a [`u8`].
 /// We have a wrapper because parameter indices are output in decimal form when lowering the AST.
 #[derive(Debug, PartialEq, Eq)]

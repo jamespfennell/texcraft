@@ -142,7 +142,13 @@ pub mod lang {
             /// What to do after inserting the character.
             post_lig_operation: PostLigOperation,
         },
-        Stop(u16),
+        /// If the entrypoint for a character is this operation, go to the instruction indexed by the payload.
+        ///
+        /// This redirect mechanism exists because in .tfm files entrypoints are [`u8`]s but lig/kern
+        ///     programs can contain more than 256 instructions.
+        ///
+        /// If this operation is encountered in another situation, it is an unconditional stop.
+        EntrypointRedirect(u16, Option<Char>),
     }
 
     /// A post-lig operation to perform after performing a ligature operation ([`Operation::Ligature`]).
@@ -200,7 +206,7 @@ pub mod lang {
                 (
                     c,
                     match instructions[u as usize].operation {
-                        Operation::Stop(u_big) => u_big,
+                        Operation::EntrypointRedirect(u_big, _) => u_big,
                         _ => u as u16,
                     },
                 )
@@ -211,43 +217,72 @@ pub mod lang {
     pub fn compress_entrypoints(
         instructions: &mut Vec<Instruction>,
         entrypoints: HashMap<Char, u16>,
+        boundary_char: Option<Char>,
+        boundary_char_entrypoint: Option<u16>,
     ) -> HashMap<Char, u8> {
-        let mut offset: u8 = 0;
         let ordered_entrypoints = {
-            let mut v: Vec<(Char, u16)> = entrypoints.iter().map(|e| (*e.0, *e.1)).collect();
-            v.sort_by(|a, b| a.1.cmp(&b.1));
+            let mut m: HashMap<u16, Vec<Char>> = Default::default();
+            for (c, u) in entrypoints {
+                m.entry(u).or_default().push(c);
+            }
+            let mut v: Vec<(u16, Vec<Char>)> = m.into_iter().collect();
+            v.sort_by_key(|(u, _)| *u);
             v
         };
+        let mut offset: u8 = if boundary_char.is_some() {
+            // In .tfm files the boundary char is transmitted in each entrypoint redirect instruction.
+            // If there is a boundary char, we need at least one entrypoint redirect to exist so
+            // that the boundary char is there.
+            instructions.push(Instruction {
+                next_instruction: None,
+                right_char: boundary_char.unwrap_or(Char(0)),
+                operation: Operation::EntrypointRedirect(0, boundary_char),
+            });
+            1
+        } else {
+            0
+        };
         let mut new_entrypoints: HashMap<Char, u8> = Default::default();
-        let mut num_new_instructions = 0_u16;
-        for (c, u16_entrypoint) in ordered_entrypoints.iter().rev() {
-            let u: u8 = match (*u16_entrypoint + offset as u16).try_into() {
+        let mut redirects: Vec<u16> = vec![];
+        for (i, (u16_entrypoint, chars)) in ordered_entrypoints.into_iter().rev().enumerate() {
+            let u: u8 = match (u16_entrypoint + offset as u16).try_into() {
                 Ok(u) => u,
                 Err(_) => {
                     let u = offset;
-                    instructions.push(Instruction {
-                        next_instruction: None,
-                        right_char: Char(0),
-                        operation: Operation::Stop(*u16_entrypoint),
-                    });
-                    num_new_instructions += 1;
-                    offset += 1;
+                    redirects.push(u16_entrypoint);
+                    if i == 0 && boundary_char.is_some() {
+                        // This implements the "optimization" "location 0 can do double duty" in PLtoTF.2014.141
+                        instructions.pop();
+                        offset = 0;
+                    }
+                    offset = offset.checked_add(1).expect("offset is incremented at most once per 8-bit-char and so cannot exceed 256");
                     u
                 }
             };
-            new_entrypoints.insert(*c, u);
-        }
-        instructions.rotate_right(num_new_instructions as usize);
-        for instruction in &mut instructions[0..num_new_instructions as usize] {
-            match &mut instruction.operation {
-                Operation::Stop(u) => {
-                    *u = u.checked_add(num_new_instructions).expect("the inputted lig/kern instructions vector doesn't have enough space for new instructions");
-                }
-                _ => panic!(
-                    "the first {} operations are `Stop` operations from above",
-                    num_new_instructions
-                ),
+            for c in chars {
+                new_entrypoints.insert(c, u);
             }
+        }
+        for redirect in redirects {
+            instructions.push(Instruction {
+                next_instruction: None,
+                right_char: boundary_char.unwrap_or(Char(0)),
+                operation: Operation::EntrypointRedirect(
+                    redirect.checked_add(offset as u16).expect("the inputted lig/kern instructions vector doesn't have enough space for new instructions"),
+                boundary_char,
+            ),
+            });
+        }
+        instructions.rotate_right(offset as usize);
+        if let Some(boundary_char_entrypoint) = boundary_char_entrypoint {
+            instructions.push(Instruction {
+                next_instruction: None,
+                right_char: Char(0),
+                operation: Operation::EntrypointRedirect(
+                    boundary_char_entrypoint + offset as u16,
+                    Some(Char(0)),
+                ),
+            })
         }
         new_entrypoints
     }

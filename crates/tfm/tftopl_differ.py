@@ -1,6 +1,8 @@
 """
 Python script to check that Texcraft's implementation of tftopl gives the same
 result as Knuth's original version. Run from the root of the Texcraft repo.
+
+rsync -zarvm --include="*/" --include="*.tfm" --exclude="*" rsync://mirrors.mit.edu/CTAN/ .
 """
 import pathlib
 import sys

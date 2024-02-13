@@ -389,8 +389,8 @@ impl File {
             header: tfm_file.header,
             design_units: Number::UNITY,
             char_data,
-            lig_kern_boundary_char: None,
-            lig_kern_boundary_char_entrypoint: None,
+            lig_kern_boundary_char: tfm_file.lig_kern_boundary_char,
+            lig_kern_boundary_char_entrypoint: tfm_file.lig_kern_boundary_char_entrypoint,
             lig_kern_instructions,
             params: tfm_file.params,
         }
@@ -500,6 +500,9 @@ impl File {
         };
 
         // Ligtable
+        if let Some(boundary_char) = self.lig_kern_boundary_char {
+            roots.push(ast::Root::BoundaryChar(boundary_char.into()));
+        }
         let mut l = Vec::<ast::LigTable>::new();
         let mut index_to_labels = HashMap::<usize, Vec<Char>>::new();
         for c in &ordered_chars {
@@ -518,7 +521,8 @@ impl File {
             ligkern::lang::Operation::KernAtIndex(_) => {
                 panic!("tfm::pl::File lig/kern programs cannot contain `KernAtIndex` operations. Use a `Kern` operation instead.");
             }
-            ligkern::lang::Operation::Stop(_) => None,
+            // TODO: shouldn't this emit a stop?
+            ligkern::lang::Operation::EntrypointRedirect(_, _) => None,
             ligkern::lang::Operation::Ligature {
                 char_to_insert,
                 post_lig_operation,
@@ -528,6 +532,13 @@ impl File {
             )),
         };
         for (index, instruction) in self.lig_kern_instructions.iter().enumerate() {
+            if let Some(e) = self.lig_kern_boundary_char_entrypoint {
+                if (e as usize) == index {
+                    l.push(ast::LigTable::Label(
+                        ast::LigTableLabel::BoundaryChar.into(),
+                    ));
+                }
+            }
             for label in index_to_labels.get(&index).unwrap_or(&vec![]) {
                 l.push(ast::LigTable::Label(
                     ast::LigTableLabel::Char(*label).into(),

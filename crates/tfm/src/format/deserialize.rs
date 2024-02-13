@@ -166,6 +166,10 @@ pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
         heights: deserialize_array(raw_file.heights),
         depths: deserialize_array(raw_file.depths),
         italic_corrections: deserialize_array(raw_file.italic_corrections),
+        lig_kern_boundary_char: deserialize_boundary_char(raw_file.lig_kern_instructions),
+        lig_kern_boundary_char_entrypoint: deserialize_boundary_char_entrypoint(
+            raw_file.lig_kern_instructions,
+        ),
         lig_kern_instructions: deserialize_array(raw_file.lig_kern_instructions),
         kerns: deserialize_array(raw_file.kerns),
         extensible_chars: deserialize_array(raw_file.extensible_recipes),
@@ -388,6 +392,35 @@ impl Header {
     }
 }
 
+fn deserialize_boundary_char(b: &[u8]) -> Option<Char> {
+    // TFtoTPL.2014.69
+    match b.get(..2) {
+        None => None,
+        Some(b) => {
+            if b[0] == 255 {
+                Some(Char(b[1]))
+            } else {
+                None
+            }
+        }
+    }
+}
+
+fn deserialize_boundary_char_entrypoint(b: &[u8]) -> Option<u16> {
+    // TFtoTPL.2014.69
+    match b.len().checked_sub(4) {
+        None => None,
+        Some(r) => {
+            let b = &b[r..];
+            if b[0] == 255 {
+                Some(u16::from_be_bytes([b[2], b[3]]))
+            } else {
+                None
+            }
+        }
+    }
+}
+
 fn deserialize_array<T: Deserializable>(mut b: &[u8]) -> Vec<T> {
     let mut r = vec![];
     while !b.is_empty() {
@@ -443,7 +476,14 @@ impl Deserializable for ligkern::lang::Instruction {
             return ligkern::lang::Instruction {
                 next_instruction: None,
                 right_char: Char(0),
-                operation: ligkern::lang::Operation::Stop(u16::from_be_bytes([b[2], b[3]])),
+                operation: ligkern::lang::Operation::EntrypointRedirect(
+                    u16::from_be_bytes([b[2], b[3]]),
+                    if skip_byte == 255 {
+                        Some(Char(b[1]))
+                    } else {
+                        None
+                    },
+                ),
             };
         }
         ligkern::lang::Instruction {
@@ -453,34 +493,35 @@ impl Deserializable for ligkern::lang::Instruction {
                 None
             },
             right_char: Char(right_char),
-            operation: if op_byte < 128 {
-                // TFtoPL.2014.77
-                let delete_next_char = (op_byte % 2) == 0;
-                let op_byte = op_byte / 2;
-                let delete_current_char = (op_byte % 2) == 0;
-                let skip = op_byte / 2;
-                use ligkern::lang::PostLigOperation::*;
-                ligkern::lang::Operation::Ligature {
-                    char_to_insert: Char(remainder),
-                    post_lig_operation: match (delete_current_char, delete_next_char, skip) {
-                        (false, false, 0) => RetainBothMoveNowhere,
-                        (false, false, 1) => RetainBothMoveToInserted,
-                        (false, false, 2) => RetainBothMoveToRight,
-                        (false, true, 0) => RetainLeftMoveNowhere,
-                        (false, true, 1) => RetainLeftMoveToInserted,
-                        (true, false, 0) => RetainRightMoveToInserted,
-                        (true, false, 1) => RetainRightMoveToRight,
-                        (true, true, 0) => RetainNeitherMoveToInserted,
-                        _ => {
-                            // TODO: issue a warning
-                            RetainNeitherMoveToInserted
-                        }
-                    },
+            operation: match op_byte.checked_sub(128) {
+                Some(r) => {
+                    ligkern::lang::Operation::KernAtIndex(u16::from_be_bytes([r, remainder]))
                 }
-            } else {
-                ligkern::lang::Operation::KernAtIndex(
-                    256 * (op_byte as u16 - 128) + remainder as u16,
-                )
+                None => {
+                    // TFtoPL.2014.77
+                    let delete_next_char = (op_byte % 2) == 0;
+                    let op_byte = op_byte / 2;
+                    let delete_current_char = (op_byte % 2) == 0;
+                    let skip = op_byte / 2;
+                    use ligkern::lang::PostLigOperation::*;
+                    ligkern::lang::Operation::Ligature {
+                        char_to_insert: Char(remainder),
+                        post_lig_operation: match (delete_current_char, delete_next_char, skip) {
+                            (false, false, 0) => RetainBothMoveNowhere,
+                            (false, false, 1) => RetainBothMoveToInserted,
+                            (false, false, 2) => RetainBothMoveToRight,
+                            (false, true, 0) => RetainLeftMoveNowhere,
+                            (false, true, 1) => RetainLeftMoveToInserted,
+                            (true, false, 0) => RetainRightMoveToInserted,
+                            (true, false, 1) => RetainRightMoveToRight,
+                            (true, true, 0) => RetainNeitherMoveToInserted,
+                            _ => {
+                                // TODO: issue a warning
+                                RetainNeitherMoveToInserted
+                            }
+                        },
+                    }
+                }
             },
         }
     }
@@ -984,7 +1025,10 @@ mod tests {
                 lig_kern_instructions: vec![ligkern::lang::Instruction {
                     next_instruction: None,
                     right_char: Char(0),
-                    operation: ligkern::lang::Operation::Stop(u16::from_be_bytes([1, 2])),
+                    operation: ligkern::lang::Operation::EntrypointRedirect(
+                        u16::from_be_bytes([1, 2]),
+                        None,
+                    ),
                 },],
                 ..Default::default()
             },
