@@ -73,9 +73,7 @@ pub struct File {
     pub header: Header,
     pub design_units: Number,
     pub char_data: HashMap<Char, CharData>,
-    pub lig_kern_boundary_char: Option<Char>,
-    pub lig_kern_boundary_char_entrypoint: Option<u16>,
-    pub lig_kern_instructions: Vec<ligkern::lang::Instruction>,
+    pub lig_kern_program: ligkern::lang::Program,
     pub params: Params,
 }
 
@@ -85,9 +83,7 @@ impl Default for File {
             header: Header::property_list_default(),
             design_units: Number::UNITY,
             char_data: Default::default(),
-            lig_kern_boundary_char: Default::default(),
-            lig_kern_boundary_char_entrypoint: None,
-            lig_kern_instructions: Default::default(),
+            lig_kern_program: Default::default(),
             params: Default::default(),
         }
     }
@@ -119,7 +115,7 @@ impl File {
                 data.tag = CharTag::None;
             }
         }
-        self.lig_kern_instructions = vec![];
+        self.lig_kern_program.instructions = vec![];
     }
 
     /// Build a File from an AST.
@@ -177,9 +173,10 @@ impl File {
                 ast::Root::LigTable(b) => {
                     for node in b.children {
                         let mut insert_lig_kern_instruction = |instruction, span| {
-                            if file.lig_kern_instructions.len() < MAX_LIG_KERN_INSTRUCTIONS as usize
+                            if file.lig_kern_program.instructions.len()
+                                < MAX_LIG_KERN_INSTRUCTIONS as usize
                             {
-                                file.lig_kern_instructions.push(instruction);
+                                file.lig_kern_program.instructions.push(instruction);
                             } else {
                                 // TODO: add a test for this case
                                 errors.push(error::ParseError::LigTableTooLong { span });
@@ -187,7 +184,7 @@ impl File {
                         };
                         match node {
                             ast::LigTable::Label(v) => {
-                                let u: u16 = file.lig_kern_instructions.len().try_into().expect("lig_kern_instructions.len()<= MAX_LIG_KERN_INSTRUCTIONS which is a u16");
+                                let u: u16 = file.lig_kern_program.instructions.len().try_into().expect("lig_kern_instructions.len()<= MAX_LIG_KERN_INSTRUCTIONS which is a u16");
                                 match v.data {
                                     ast::LigTableLabel::Char(c) => {
                                         let char_data = file.char_data.entry(c).or_default();
@@ -195,7 +192,7 @@ impl File {
                                         char_data.tag = CharTag::Ligature(u);
                                     }
                                     ast::LigTableLabel::BoundaryChar => {
-                                        file.lig_kern_boundary_char_entrypoint = Some(u);
+                                        file.lig_kern_program.boundary_char_entrypoint = Some(u);
                                     }
                                 }
                                 lig_kern_precedes = false;
@@ -229,7 +226,8 @@ impl File {
                             }
                             ast::LigTable::Stop(_) => {
                                 if lig_kern_precedes {
-                                    file.lig_kern_instructions
+                                    file.lig_kern_program
+                                        .instructions
                                         .last_mut()
                                         .unwrap()
                                         .next_instruction = None;
@@ -240,7 +238,8 @@ impl File {
                             }
                             ast::LigTable::Skip(v) => {
                                 if lig_kern_precedes {
-                                    file.lig_kern_instructions
+                                    file.lig_kern_program
+                                        .instructions
                                         .last_mut()
                                         .unwrap()
                                         .next_instruction = Some(v.data);
@@ -254,7 +253,7 @@ impl File {
                     }
                 }
                 ast::Root::BoundaryChar(v) => {
-                    file.lig_kern_boundary_char = Some(v.data);
+                    file.lig_kern_program.boundary_char = Some(v.data);
                 }
                 ast::Root::Character(b) => {
                     let char_data = file.char_data.entry(b.data).or_default();
@@ -307,7 +306,7 @@ impl File {
         }
 
         // PLtoTF.2014.116
-        if let Some(final_instruction) = file.lig_kern_instructions.last_mut() {
+        if let Some(final_instruction) = file.lig_kern_program.instructions.last_mut() {
             if final_instruction.next_instruction == Some(0) {
                 final_instruction.next_instruction = None;
             }
@@ -317,10 +316,11 @@ impl File {
 
     /// Convert a TFM file into a PL file.
     pub fn from_tfm_file(tfm_file: crate::format::File) -> File {
-        let lig_kern_entrypoints = crate::ligkern::lang::decompress_entrypoints(
-            &tfm_file.lig_kern_instructions,
-            tfm_file.lig_kern_entrypoints(),
-        );
+        let lig_kern_entrypoints = tfm_file.lig_kern_entrypoints();
+        let mut lig_kern_program = tfm_file.lig_kern_program;
+        lig_kern_program.pack_kerns(&tfm_file.kerns);
+        let lig_kern_entrypoints = lig_kern_program.unpack_entrypoints(lig_kern_entrypoints);
+
         let char_data = tfm_file
             .char_infos
             .into_iter()
@@ -366,32 +366,11 @@ impl File {
                 )
             })
             .collect();
-
-        let lig_kern_instructions: Vec<ligkern::lang::Instruction> = tfm_file
-            .lig_kern_instructions
-            .into_iter()
-            .map(|mut i| {
-                if let ligkern::lang::Operation::KernAtIndex(index) = &i.operation {
-                    // TODO: log a warning if the index is not in the kerns array as
-                    // in TFtoPL.2014.76
-                    i.operation = ligkern::lang::Operation::Kern(
-                        tfm_file
-                            .kerns
-                            .get(*index as usize)
-                            .copied()
-                            .unwrap_or_default(),
-                    )
-                }
-                i
-            })
-            .collect();
         File {
             header: tfm_file.header,
             design_units: Number::UNITY,
             char_data,
-            lig_kern_boundary_char: tfm_file.lig_kern_boundary_char,
-            lig_kern_boundary_char_entrypoint: tfm_file.lig_kern_boundary_char_entrypoint,
-            lig_kern_instructions,
+            lig_kern_program,
             params: tfm_file.params,
         }
     }
@@ -500,7 +479,7 @@ impl File {
         };
 
         // Ligtable
-        if let Some(boundary_char) = self.lig_kern_boundary_char {
+        if let Some(boundary_char) = self.lig_kern_program.boundary_char {
             roots.push(ast::Root::BoundaryChar(boundary_char.into()));
         }
         let mut l = Vec::<ast::LigTable>::new();
@@ -531,8 +510,8 @@ impl File {
                 (instruction.right_char, char_to_insert).into(),
             )),
         };
-        for (index, instruction) in self.lig_kern_instructions.iter().enumerate() {
-            if let Some(e) = self.lig_kern_boundary_char_entrypoint {
+        for (index, instruction) in self.lig_kern_program.instructions.iter().enumerate() {
+            if let Some(e) = self.lig_kern_program.boundary_char_entrypoint {
                 if (e as usize) == index {
                     l.push(ast::LigTable::Label(
                         ast::LigTableLabel::BoundaryChar.into(),
@@ -584,7 +563,7 @@ impl File {
                     let mut l = vec![];
                     let mut index = *index as usize;
                     loop {
-                        let instruction = match self.lig_kern_instructions.get(index) {
+                        let instruction = match self.lig_kern_program.instructions.get(index) {
                             // TODO: potentially write a warning if the index is too big like in TFtoPL.2014.74.
                             None => break,
                             Some(instruction) => instruction,
@@ -804,7 +783,11 @@ mod tests {
             boundary_char,
             "(BOUNDARYCHAR C a)",
             File {
-                lig_kern_boundary_char: Some('a'.try_into().unwrap()),
+                lig_kern_program: ligkern::lang::Program {
+                    instructions: vec![],
+                    boundary_char: Some('a'.try_into().unwrap()),
+                    boundary_char_entrypoint: None,
+                },
                 ..Default::default()
             },
         ),
@@ -828,11 +811,15 @@ mod tests {
             kern,
             "(LIGTABLE (KRN C r D 15.0))",
             File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: None,
-                    right_char: 'r'.try_into().unwrap(),
-                    operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
-                },],
+                lig_kern_program: ligkern::lang::Program {
+                    instructions: vec![ligkern::lang::Instruction {
+                        next_instruction: None,
+                        right_char: 'r'.try_into().unwrap(),
+                        operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
+                    },],
+                    boundary_char: None,
+                    boundary_char_entrypoint: None,
+                },
                 ..Default::default()
             },
         ),
@@ -840,18 +827,22 @@ mod tests {
             kern_with_stop,
             "(LIGTABLE (KRN C r D 15.0) (STOP) (KRN C t D 15.0))",
             File {
-                lig_kern_instructions: vec![
-                    ligkern::lang::Instruction {
-                        next_instruction: None,
-                        right_char: 'r'.try_into().unwrap(),
-                        operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
-                    },
-                    ligkern::lang::Instruction {
-                        next_instruction: None,
-                        right_char: 't'.try_into().unwrap(),
-                        operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
-                    },
-                ],
+                lig_kern_program: ligkern::lang::Program {
+                    instructions: vec![
+                        ligkern::lang::Instruction {
+                            next_instruction: None,
+                            right_char: 'r'.try_into().unwrap(),
+                            operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
+                        },
+                        ligkern::lang::Instruction {
+                            next_instruction: None,
+                            right_char: 't'.try_into().unwrap(),
+                            operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
+                        },
+                    ],
+                    boundary_char: None,
+                    boundary_char_entrypoint: None,
+                },
                 ..Default::default()
             },
         ),
@@ -859,11 +850,15 @@ mod tests {
             kern_with_skip,
             "(LIGTABLE (KRN C r D 15.0) (SKIP D 3))",
             File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: Some(3),
-                    right_char: 'r'.try_into().unwrap(),
-                    operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
-                },],
+                lig_kern_program: ligkern::lang::Program {
+                    instructions: vec![ligkern::lang::Instruction {
+                        next_instruction: Some(3),
+                        right_char: 'r'.try_into().unwrap(),
+                        operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
+                    },],
+                    boundary_char: None,
+                    boundary_char_entrypoint: None,
+                },
                 ..Default::default()
             },
         ),
@@ -871,14 +866,19 @@ mod tests {
             lig,
             "(LIGTABLE (LIG/> C r C t))",
             File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: None,
-                    right_char: 'r'.try_into().unwrap(),
-                    operation: ligkern::lang::Operation::Ligature {
-                        char_to_insert: 't'.try_into().unwrap(),
-                        post_lig_operation: ligkern::lang::PostLigOperation::RetainRightMoveToRight,
-                    },
-                },],
+                lig_kern_program: ligkern::lang::Program {
+                    instructions: vec![ligkern::lang::Instruction {
+                        next_instruction: None,
+                        right_char: 'r'.try_into().unwrap(),
+                        operation: ligkern::lang::Operation::Ligature {
+                            char_to_insert: 't'.try_into().unwrap(),
+                            post_lig_operation:
+                                ligkern::lang::PostLigOperation::RetainRightMoveToRight,
+                        },
+                    },],
+                    boundary_char: None,
+                    boundary_char_entrypoint: None,
+                },
                 ..Default::default()
             },
         ),
@@ -886,11 +886,15 @@ mod tests {
             lig_kern_entrypoints,
             "(LIGTABLE (LABEL C e) (KRN C r D 15.0) (LABEL C d))",
             File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: None,
-                    right_char: 'r'.try_into().unwrap(),
-                    operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
-                },],
+                lig_kern_program: ligkern::lang::Program {
+                    instructions: vec![ligkern::lang::Instruction {
+                        next_instruction: None,
+                        right_char: 'r'.try_into().unwrap(),
+                        operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
+                    },],
+                    boundary_char: None,
+                    boundary_char_entrypoint: None,
+                },
                 char_data: HashMap::from([
                     (
                         'e'.try_into().unwrap(),
@@ -914,12 +918,15 @@ mod tests {
             lig_kern_boundary_char_entrypoint,
             "(LIGTABLE (LABEL BOUNDARYCHAR) (KRN C r D 15.0))",
             File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: None,
-                    right_char: 'r'.try_into().unwrap(),
-                    operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
-                },],
-                lig_kern_boundary_char_entrypoint: Some(0),
+                lig_kern_program: ligkern::lang::Program {
+                    instructions: vec![ligkern::lang::Instruction {
+                        next_instruction: None,
+                        right_char: 'r'.try_into().unwrap(),
+                        operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
+                    },],
+                    boundary_char: None,
+                    boundary_char_entrypoint: Some(0),
+                },
                 ..Default::default()
             },
         ),

@@ -26,9 +26,9 @@ pub fn serialize(file: &File) -> Vec<u8> {
     let ni = serialize_section(&file.italic_corrections, &mut b, None);
 
     let nl = serialize_section(
-        &file.lig_kern_instructions,
+        &file.lig_kern_program.instructions,
         &mut b,
-        file.lig_kern_boundary_char,
+        file.lig_kern_program.boundary_char,
     );
     let nk = serialize_section(&file.kerns, &mut b, None);
     let ne = serialize_section(&file.extensible_chars, &mut b, None);
@@ -108,7 +108,7 @@ impl Serializable for Number {
 }
 
 impl Serializable for ligkern::lang::Instruction {
-    fn serialize(&self, b: &mut Vec<u8>, _boundary_char: Option<Char>) {
+    fn serialize(&self, b: &mut Vec<u8>, boundary_char: Option<Char>) {
         // PLtoTF.2014.142
         let first = [self.next_instruction.unwrap_or(128), self.right_char.0];
         match self.operation {
@@ -141,8 +141,11 @@ impl Serializable for ligkern::lang::Instruction {
             }
             ligkern::lang::Operation::EntrypointRedirect(index, char) => {
                 b.extend(match char {
-                    None => [254, 0],
-                    Some(c) => [255, c.0],
+                    false => [255, 0],
+                    true => match boundary_char {
+                        None => [254, 0],
+                        Some(c) => [255, c.0],
+                    },
                 });
                 b.extend(index.to_be_bytes());
             }

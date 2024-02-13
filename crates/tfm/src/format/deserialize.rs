@@ -166,11 +166,13 @@ pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
         heights: deserialize_array(raw_file.heights),
         depths: deserialize_array(raw_file.depths),
         italic_corrections: deserialize_array(raw_file.italic_corrections),
-        lig_kern_boundary_char: deserialize_boundary_char(raw_file.lig_kern_instructions),
-        lig_kern_boundary_char_entrypoint: deserialize_boundary_char_entrypoint(
-            raw_file.lig_kern_instructions,
-        ),
-        lig_kern_instructions: deserialize_array(raw_file.lig_kern_instructions),
+        lig_kern_program: ligkern::lang::Program {
+            instructions: deserialize_array(raw_file.lig_kern_instructions),
+            boundary_char: deserialize_boundary_char(raw_file.lig_kern_instructions),
+            boundary_char_entrypoint: deserialize_boundary_char_entrypoint(
+                raw_file.lig_kern_instructions,
+            ),
+        },
         kerns: deserialize_array(raw_file.kerns),
         extensible_chars: deserialize_array(raw_file.extensible_recipes),
         params: Params(deserialize_array(raw_file.params)),
@@ -478,11 +480,7 @@ impl Deserializable for ligkern::lang::Instruction {
                 right_char: Char(0),
                 operation: ligkern::lang::Operation::EntrypointRedirect(
                     u16::from_be_bytes([b[2], b[3]]),
-                    if skip_byte == 255 {
-                        Some(Char(b[1]))
-                    } else {
-                        None
-                    },
+                    true,
                 ),
             };
         }
@@ -516,7 +514,7 @@ impl Deserializable for ligkern::lang::Instruction {
                             (true, false, 1) => RetainRightMoveToRight,
                             (true, true, 0) => RetainNeitherMoveToInserted,
                             _ => {
-                                // TODO: issue a warning
+                                // TODO: issue a warning TFtoPL.2014.77
                                 RetainNeitherMoveToInserted
                             }
                         },
@@ -884,154 +882,121 @@ mod tests {
         ),
         (
             lig_kern_command_1,
-            tfm_file_with_one_lig_kern_command([3, 5, 130, 13]),
-            File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: Some(3),
-                    right_char: Char(5),
-                    operation: ligkern::lang::Operation::KernAtIndex(256 * 2 + 13)
-                },],
-                ..Default::default()
-            },
+            tfm_bytes_with_one_lig_kern_command([3, 5, 130, 13]),
+            tfm_file_with_one_lig_kern_instruction(ligkern::lang::Instruction {
+                next_instruction: Some(3),
+                right_char: Char(5),
+                operation: ligkern::lang::Operation::KernAtIndex(256 * 2 + 13)
+            }),
         ),
         (
             lig_kern_command_2,
-            tfm_file_with_one_lig_kern_command([3, 6, 3, 17]),
-            File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: Some(3),
-                    right_char: Char(6),
-                    operation: ligkern::lang::Operation::Ligature {
-                        char_to_insert: Char(17),
-                        post_lig_operation: ligkern::lang::PostLigOperation::RetainBothMoveNowhere,
-                    },
-                },],
-                ..Default::default()
-            },
+            tfm_bytes_with_one_lig_kern_command([3, 6, 3, 17]),
+            tfm_file_with_one_lig_kern_instruction(ligkern::lang::Instruction {
+                next_instruction: Some(3),
+                right_char: Char(6),
+                operation: ligkern::lang::Operation::Ligature {
+                    char_to_insert: Char(17),
+                    post_lig_operation: ligkern::lang::PostLigOperation::RetainBothMoveNowhere,
+                },
+            }),
         ),
         (
             lig_kern_command_3,
-            tfm_file_with_one_lig_kern_command([3, 7, 3 + 4, 19]),
-            File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: Some(3),
-                    right_char: Char(7),
-                    operation: ligkern::lang::Operation::Ligature {
-                        char_to_insert: Char(19),
-                        post_lig_operation:
-                            ligkern::lang::PostLigOperation::RetainBothMoveToInserted,
-                    },
-                },],
-                ..Default::default()
-            },
+            tfm_bytes_with_one_lig_kern_command([3, 7, 3 + 4, 19]),
+            tfm_file_with_one_lig_kern_instruction(ligkern::lang::Instruction {
+                next_instruction: Some(3),
+                right_char: Char(7),
+                operation: ligkern::lang::Operation::Ligature {
+                    char_to_insert: Char(19),
+                    post_lig_operation: ligkern::lang::PostLigOperation::RetainBothMoveToInserted,
+                },
+            }),
         ),
         (
             lig_kern_command_4,
-            tfm_file_with_one_lig_kern_command([128, 8, 3 + 8, 23]),
-            File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: None,
-                    right_char: Char(8),
-                    operation: ligkern::lang::Operation::Ligature {
-                        char_to_insert: Char(23),
-                        post_lig_operation: ligkern::lang::PostLigOperation::RetainBothMoveToRight,
-                    },
-                },],
-                ..Default::default()
-            },
+            tfm_bytes_with_one_lig_kern_command([128, 8, 3 + 8, 23]),
+            tfm_file_with_one_lig_kern_instruction(ligkern::lang::Instruction {
+                next_instruction: None,
+                right_char: Char(8),
+                operation: ligkern::lang::Operation::Ligature {
+                    char_to_insert: Char(23),
+                    post_lig_operation: ligkern::lang::PostLigOperation::RetainBothMoveToRight,
+                },
+            }),
         ),
         (
             lig_kern_command_5,
-            tfm_file_with_one_lig_kern_command([128, 8, 1, 23]),
-            File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: None,
-                    right_char: Char(8),
-                    operation: ligkern::lang::Operation::Ligature {
-                        char_to_insert: Char(23),
-                        post_lig_operation:
-                            ligkern::lang::PostLigOperation::RetainRightMoveToInserted,
-                    },
-                },],
-                ..Default::default()
-            },
+            tfm_bytes_with_one_lig_kern_command([128, 8, 1, 23]),
+            tfm_file_with_one_lig_kern_instruction(ligkern::lang::Instruction {
+                next_instruction: None,
+                right_char: Char(8),
+                operation: ligkern::lang::Operation::Ligature {
+                    char_to_insert: Char(23),
+                    post_lig_operation: ligkern::lang::PostLigOperation::RetainRightMoveToInserted,
+                },
+            }),
         ),
         (
             lig_kern_command_6,
-            tfm_file_with_one_lig_kern_command([128, 8, 1 + 4, 23]),
-            File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: None,
-                    right_char: Char(8),
-                    operation: ligkern::lang::Operation::Ligature {
-                        char_to_insert: Char(23),
-                        post_lig_operation: ligkern::lang::PostLigOperation::RetainRightMoveToRight,
-                    },
-                },],
-                ..Default::default()
-            },
+            tfm_bytes_with_one_lig_kern_command([128, 8, 1 + 4, 23]),
+            tfm_file_with_one_lig_kern_instruction(ligkern::lang::Instruction {
+                next_instruction: None,
+                right_char: Char(8),
+                operation: ligkern::lang::Operation::Ligature {
+                    char_to_insert: Char(23),
+                    post_lig_operation: ligkern::lang::PostLigOperation::RetainRightMoveToRight,
+                },
+            }),
         ),
         (
             lig_kern_command_7,
-            tfm_file_with_one_lig_kern_command([128, 8, 2, 23]),
-            File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: None,
-                    right_char: Char(8),
-                    operation: ligkern::lang::Operation::Ligature {
-                        char_to_insert: Char(23),
-                        post_lig_operation: ligkern::lang::PostLigOperation::RetainLeftMoveNowhere,
-                    },
-                },],
-                ..Default::default()
-            },
+            tfm_bytes_with_one_lig_kern_command([128, 8, 2, 23]),
+            tfm_file_with_one_lig_kern_instruction(ligkern::lang::Instruction {
+                next_instruction: None,
+                right_char: Char(8),
+                operation: ligkern::lang::Operation::Ligature {
+                    char_to_insert: Char(23),
+                    post_lig_operation: ligkern::lang::PostLigOperation::RetainLeftMoveNowhere,
+                },
+            }),
         ),
         (
             lig_kern_command_8,
-            tfm_file_with_one_lig_kern_command([128, 8, 2 + 4, 23]),
-            File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: None,
-                    right_char: Char(8),
-                    operation: ligkern::lang::Operation::Ligature {
-                        char_to_insert: Char(23),
-                        post_lig_operation:
-                            ligkern::lang::PostLigOperation::RetainLeftMoveToInserted,
-                    },
-                },],
-                ..Default::default()
-            },
+            tfm_bytes_with_one_lig_kern_command([128, 8, 2 + 4, 23]),
+            tfm_file_with_one_lig_kern_instruction(ligkern::lang::Instruction {
+                next_instruction: None,
+                right_char: Char(8),
+                operation: ligkern::lang::Operation::Ligature {
+                    char_to_insert: Char(23),
+                    post_lig_operation: ligkern::lang::PostLigOperation::RetainLeftMoveToInserted,
+                },
+            }),
         ),
         (
             lig_kern_command_9,
-            tfm_file_with_one_lig_kern_command([128, 8, 0, 23]),
-            File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: None,
-                    right_char: Char(8),
-                    operation: ligkern::lang::Operation::Ligature {
-                        char_to_insert: Char(23),
-                        post_lig_operation:
-                            ligkern::lang::PostLigOperation::RetainNeitherMoveToInserted,
-                    },
-                },],
-                ..Default::default()
-            },
+            tfm_bytes_with_one_lig_kern_command([128, 8, 0, 23]),
+            tfm_file_with_one_lig_kern_instruction(ligkern::lang::Instruction {
+                next_instruction: None,
+                right_char: Char(8),
+                operation: ligkern::lang::Operation::Ligature {
+                    char_to_insert: Char(23),
+                    post_lig_operation:
+                        ligkern::lang::PostLigOperation::RetainNeitherMoveToInserted,
+                },
+            }),
         ),
         (
             lig_kern_command_special,
-            tfm_file_with_one_lig_kern_command([254, 0, 1, 2]),
-            File {
-                lig_kern_instructions: vec![ligkern::lang::Instruction {
-                    next_instruction: None,
-                    right_char: Char(0),
-                    operation: ligkern::lang::Operation::EntrypointRedirect(
-                        u16::from_be_bytes([1, 2]),
-                        None,
-                    ),
-                },],
-                ..Default::default()
-            },
+            tfm_bytes_with_one_lig_kern_command([254, 0, 1, 2]),
+            tfm_file_with_one_lig_kern_instruction(ligkern::lang::Instruction {
+                next_instruction: None,
+                right_char: Char(0),
+                operation: ligkern::lang::Operation::EntrypointRedirect(
+                    u16::from_be_bytes([1, 2]),
+                    true,
+                ),
+            }),
         ),
         (
             extensible_chars,
@@ -1093,7 +1058,18 @@ mod tests {
         v
     }
 
-    fn tfm_file_with_one_lig_kern_command(lig_kern_command: [u8; 4]) -> Vec<u8> {
+    fn tfm_file_with_one_lig_kern_instruction(instruction: ligkern::lang::Instruction) -> File {
+        File {
+            lig_kern_program: ligkern::lang::Program {
+                instructions: vec![instruction],
+                boundary_char: None,
+                boundary_char_entrypoint: None,
+            },
+            ..Default::default()
+        }
+    }
+
+    fn tfm_bytes_with_one_lig_kern_command(lig_kern_command: [u8; 4]) -> Vec<u8> {
         let mut v = vec![
             /* lf */ 0, 13, /* lh */ 0, 2, /* bc */ 0, 1, /* ec */ 0, 0,
             /* nw */ 0, 1, /* nh */ 0, 1, /* nd */ 0, 1, /* ni */ 0, 1,

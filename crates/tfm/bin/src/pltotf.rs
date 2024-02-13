@@ -81,7 +81,7 @@ impl Cli {
             }
         }
         if let Err(err) = tfm::ligkern::CompiledProgram::compile(
-            &pl_file.lig_kern_instructions,
+            &pl_file.lig_kern_program.instructions,
             &[],
             pl_file.lig_kern_entrypoints(),
         ) {

@@ -48,14 +48,8 @@ pub struct File {
     /// Character italic corrections
     pub italic_corrections: Vec<Number>,
 
-    /// Boundary char
-    pub lig_kern_boundary_char: Option<Char>,
-
-    /// Boundary char entrypoint
-    pub lig_kern_boundary_char_entrypoint: Option<u16>,
-
-    /// Lig kern instructions.
-    pub lig_kern_instructions: Vec<ligkern::lang::Instruction>,
+    /// Lig kern program.
+    pub lig_kern_program: ligkern::lang::Program,
 
     /// Kerns. These are referenced from inside the lig kern commands.
     pub kerns: Vec<Number>,
@@ -117,9 +111,7 @@ impl Default for File {
             heights: vec![Number::ZERO],
             depths: vec![Number::ZERO],
             italic_corrections: vec![Number::ZERO],
-            lig_kern_boundary_char: None,
-            lig_kern_boundary_char_entrypoint: None,
-            lig_kern_instructions: vec![],
+            lig_kern_program: Default::default(),
             kerns: vec![],
             extensible_chars: vec![],
             params: Default::default(),
@@ -196,33 +188,10 @@ impl File {
     pub fn from_pl_file(pl_file: &crate::pl::File) -> Self {
         let mut char_bounds: Option<(Char, Char)> = None;
 
-        let mut lig_kern_instructions = vec![];
-        let mut kerns = vec![];
-        let mut kerns_dedup = HashMap::<Number, usize>::new();
-        for instruction in &pl_file.lig_kern_instructions {
-            let mut instruction = instruction.clone();
-            if let ligkern::lang::Operation::Kern(kern) = instruction.operation {
-                use std::collections::hash_map::Entry;
-                let index = match kerns_dedup.entry(kern) {
-                    Entry::Occupied(o) => *o.get(),
-                    Entry::Vacant(v) => {
-                        let l = kerns.len();
-                        v.insert(l);
-                        kerns.push(kern);
-                        l
-                    }
-                };
-                instruction.operation =
-                    ligkern::lang::Operation::KernAtIndex(index.try_into().unwrap());
-            }
-            lig_kern_instructions.push(instruction);
-        }
-        let lig_kern_entrypoints = crate::ligkern::lang::compress_entrypoints(
-            &mut lig_kern_instructions,
-            pl_file.lig_kern_entrypoints(),
-            pl_file.lig_kern_boundary_char,
-            pl_file.lig_kern_boundary_char_entrypoint,
-        );
+        let mut lig_kern_program = pl_file.lig_kern_program.clone();
+        let kerns = lig_kern_program.unpack_kerns();
+        let lig_kern_entrypoints =
+            lig_kern_program.pack_entrypoints(pl_file.lig_kern_entrypoints());
 
         let mut widths = vec![];
         let mut heights = vec![];
@@ -311,9 +280,7 @@ impl File {
             heights,
             depths,
             italic_corrections,
-            lig_kern_boundary_char: pl_file.lig_kern_boundary_char,
-            lig_kern_boundary_char_entrypoint: pl_file.lig_kern_boundary_char_entrypoint,
-            lig_kern_instructions,
+            lig_kern_program,
             kerns,
             extensible_chars,
             params: pl_file.params.clone(),

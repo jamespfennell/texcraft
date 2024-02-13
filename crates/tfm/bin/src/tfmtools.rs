@@ -169,7 +169,7 @@ impl Convert {
             TfOrPlPath::Pl(pl_path) => {
                 let mut pl_file = pl_path.read()?;
                 if let Err(err) = tfm::ligkern::CompiledProgram::compile(
-                    &pl_file.lig_kern_instructions,
+                    &pl_file.lig_kern_program.instructions,
                     &[],
                     pl_file.lig_kern_entrypoints(),
                 ) {
@@ -390,7 +390,7 @@ impl Section {
             ),
             Section::LigKern => (
                 raw_file.lig_kern_instructions,
-                Box::new(&file.lig_kern_instructions),
+                Box::new(&file.lig_kern_program),
             ),
             Section::Kerns => (raw_file.kerns, Box::new(&file.kerns)),
             Section::ExtensibleRecipes => (
