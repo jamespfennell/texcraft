@@ -15,10 +15,16 @@ pub enum CharcodeFormat {
 
 impl CharcodeFormat {
     #[allow(dead_code)]
-    pub fn to_display_format(&self, character_coding_scheme: &str) -> tfm::pl::CharDisplayFormat {
+    pub fn to_display_format(
+        &self,
+        character_coding_scheme: &Option<String>,
+    ) -> tfm::pl::CharDisplayFormat {
         match self {
             Self::Default => {
-                let scheme = character_coding_scheme.to_uppercase();
+                let scheme = match character_coding_scheme {
+                    None => String::new(),
+                    Some(scheme) => scheme.to_uppercase(),
+                };
                 if scheme.starts_with("TEX MATH SY") || scheme.starts_with("TEX MATH EX") {
                     tfm::pl::CharDisplayFormat::Octal
                 } else {

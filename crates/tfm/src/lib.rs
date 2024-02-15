@@ -13,8 +13,8 @@ pub struct Header {
     pub checksum: u32,
     /// In TeX82, this is stored in the `font_dsize` array (TeX82.2021.549).
     pub design_size: Number,
-    pub character_coding_scheme: String,
-    pub font_family: String,
+    pub character_coding_scheme: Option<String>,
+    pub font_family: Option<String>,
     pub seven_bit_safe: Option<bool>,
     pub face: Option<Face>,
     /// The TFM format allows the header to contain arbitrary additional data.
@@ -29,8 +29,8 @@ impl Header {
         Header {
             checksum: 0,
             design_size: Number::UNITY * 10,
-            character_coding_scheme: "UNSPECIFIED".into(),
-            font_family: "UNSPECIFIED".into(),
+            character_coding_scheme: Some("UNSPECIFIED".into()),
+            font_family: Some("UNSPECIFIED".into()),
             seven_bit_safe: Some(false),
             face: Some(0.into()),
             additional_data: vec![],

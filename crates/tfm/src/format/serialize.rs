@@ -162,8 +162,12 @@ impl Serializable for ExtensibleRecipe {
     }
 }
 
-fn serialize_string(s: &str, size: u8, b: &mut Vec<u8>) {
+fn serialize_string(s: &Option<String>, size: u8, b: &mut Vec<u8>) {
     // TODO: issue a warning as in PLtoTF.2014.87 if the string doesn't fit
+    let s = match s {
+        None => "",
+        Some(s) => s,
+    };
     let len_padding_or = match s.len().try_into() {
         Ok(len) => size.checked_sub(len).map(|padding| (len, padding)),
         Err(_) => None,

@@ -135,10 +135,10 @@ impl File {
                     file.design_units = v.data;
                 }
                 ast::Root::CodingScheme(v) => {
-                    file.header.character_coding_scheme = v.data;
+                    file.header.character_coding_scheme = Some(v.data);
                 }
                 ast::Root::Family(v) => {
-                    file.header.font_family = v.data;
+                    file.header.font_family = Some(v.data);
                 }
                 ast::Root::Face(v) => {
                     file.header.face = Some(v.data);
@@ -380,8 +380,8 @@ impl File {
         let mut roots = vec![];
 
         // First output the header. This is TFtoPL.2014.48-57.
-        if !self.header.font_family.is_empty() {
-            let s = sanitize_string(&self.header.font_family);
+        if let Some(font_family) = &self.header.font_family {
+            let s = sanitize_string(font_family);
             roots.push(ast::Root::Family(s.into()))
         }
         if let Some(face) = self.header.face {
@@ -389,7 +389,7 @@ impl File {
         }
         for (i, &u) in self.header.additional_data.iter().enumerate() {
             let i: u8 = i.try_into().unwrap();
-            let i = i.checked_add(18).unwrap();  // TODO: gotta be a warning here
+            let i = i.checked_add(18).unwrap(); // TODO: gotta be a warning here
             roots.push(ast::Root::Header((ast::DecimalU8(i), u).into()))
         }
         #[derive(Clone, Copy)]
@@ -399,7 +399,10 @@ impl File {
             TexMathEx,
         }
         let font_type = {
-            let scheme = self.header.character_coding_scheme.to_uppercase();
+            let scheme = match &self.header.character_coding_scheme {
+                None => String::new(),
+                Some(scheme) => scheme.to_uppercase(),
+            };
             if scheme.starts_with("TEX MATH SY") {
                 FontType::TexMathSy
             } else if scheme.starts_with("TEX MATH EX") {
@@ -408,8 +411,10 @@ impl File {
                 FontType::Vanilla
             }
         };
+        if let Some(scheme) = &self.header.character_coding_scheme {
+            roots.push(ast::Root::CodingScheme(sanitize_string(scheme).into()));
+        }
         roots.extend([
-            ast::Root::CodingScheme(sanitize_string(&self.header.character_coding_scheme).into()),
             ast::Root::DesignSize(self.header.design_size.into()),
             ast::Root::Comment(vec!["DESIGNSIZE IS IN POINTS".into()]),
             ast::Root::Comment(vec!["OTHER SIZES ARE MULTIPLES OF DESIGNSIZE".into()]),
@@ -736,7 +741,7 @@ mod tests {
             "(CODINGSCHEME Hola Mundo)",
             File {
                 header: Header {
-                    character_coding_scheme: "Hola Mundo".into(),
+                    character_coding_scheme: Some("Hola Mundo".into()),
                     ..Header::property_list_default()
                 },
                 ..Default::default()
@@ -747,7 +752,7 @@ mod tests {
             "(FAMILY Hello World)",
             File {
                 header: Header {
-                    font_family: "Hello World".into(),
+                    font_family: Some("Hello World".into()),
                     ..Header::property_list_default()
                 },
                 ..Default::default()

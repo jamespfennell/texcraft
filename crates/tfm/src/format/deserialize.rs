@@ -205,7 +205,10 @@ pub(super) fn from_raw_file(raw_file: &RawFile, warnings: &mut Vec<Warning>) -> 
     };
 
     {
-        let scheme = file.header.character_coding_scheme.to_uppercase();
+        let scheme = match &file.header.character_coding_scheme {
+            None => "".to_string(),
+            Some(scheme) => scheme.to_uppercase(),
+        };
         let num_params = file.params.0.len();
         if scheme.starts_with("TEX MATH SY") && num_params != 22 {
             warnings.push(Warning::UnusualNumberOfParameters {
@@ -399,9 +402,9 @@ impl<'a> RawFile<'a> {
     }
 }
 
-fn deserialize_string<const N: u8>(b: &[u8]) -> String {
+fn deserialize_string<const N: u8>(b: &[u8]) -> Option<String> {
     let len = match b.first() {
-        None => return String::new(),
+        None => return None,
         Some(&tfm_len) => {
             if N - 1 < tfm_len {
                 // TODO: need to return the error in TFtoPL.2014.52.1 here.
@@ -411,7 +414,7 @@ fn deserialize_string<const N: u8>(b: &[u8]) -> String {
             }
         }
     };
-    b[1..=(len as usize)].iter().map(|u| *u as char).collect()
+    Some(b[1..=(len as usize)].iter().map(|u| *u as char).collect())
 }
 
 impl Header {
@@ -764,8 +767,8 @@ mod tests {
                 header: Header {
                     checksum: 7,
                     design_size: Number(11),
-                    character_coding_scheme: "A".repeat(39),
-                    font_family: "B".repeat(19),
+                    character_coding_scheme: Some("A".repeat(39)),
+                    font_family: Some("B".repeat(19)),
                     seven_bit_safe: Some(false),
                     face: Some(Face::Other(61)),
                     additional_data: vec![],
@@ -801,8 +804,8 @@ mod tests {
                 header: Header {
                     checksum: 7,
                     design_size: Number(11),
-                    character_coding_scheme: "".into(),
-                    font_family: "".into(),
+                    character_coding_scheme: None,
+                    font_family: None,
                     seven_bit_safe: None,
                     face: None,
                     additional_data: vec![],
@@ -824,8 +827,8 @@ mod tests {
                 header: Header {
                     checksum: 7,
                     design_size: Number(11),
-                    character_coding_scheme: "ABC".into(),
-                    font_family: "DEF".into(),
+                    character_coding_scheme: Some("ABC".into()),
+                    font_family: Some("DEF".into()),
                     seven_bit_safe: Some(true),
                     face: Some(Face::Valid(
                         FaceWeight::Bold,

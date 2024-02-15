@@ -369,4 +369,11 @@ convert_tftopl_tests!(
         "",
         true,
     ),
+    (
+        xcyeuat12,
+        "data/ctan/xyeuat12.tfm",
+        include_str!("data/ctan/xyeuat12.pl"),
+        "",
+        true,
+    ),
 );
