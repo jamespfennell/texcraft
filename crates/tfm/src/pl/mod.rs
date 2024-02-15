@@ -146,7 +146,7 @@ impl File {
                 ast::Root::SevenBitSafeFlag(v) => {
                     file.header.seven_bit_safe = Some(v.data);
                 }
-                ast::Root::Header(v) => match v.left.checked_sub(18) {
+                ast::Root::Header(v) => match v.left.0.checked_sub(18) {
                     None => errors.push(ParseError::InvalidHeaderIndex { span: v.left_span }),
                     Some(i) => {
                         let i = i as usize;
@@ -389,7 +389,8 @@ impl File {
         }
         for (i, &u) in self.header.additional_data.iter().enumerate() {
             let i: u8 = i.try_into().unwrap();
-            roots.push(ast::Root::Header((i, u).into()))
+            let i = i.checked_add(18).unwrap();  // TODO: gotta be a warning here
+            roots.push(ast::Root::Header((ast::DecimalU8(i), u).into()))
         }
         #[derive(Clone, Copy)]
         enum FontType {
@@ -457,9 +458,7 @@ impl File {
                     (12, FontType::TexMathEx) => NamedParam::BigOpSpacing4,
                     (13, FontType::TexMathEx) => NamedParam::BigOpSpacing5,
                     _ => {
-                        return ast::FontDimension::IndexedParam(
-                            (ast::ParameterIndex(i), param).into(),
-                        );
+                        return ast::FontDimension::IndexedParam((ast::DecimalU8(i), param).into());
                     }
                 };
                 ast::FontDimension::NamedParam(named_param, param.into())
@@ -536,15 +535,13 @@ impl File {
                     l.push(lig_kern_op);
                     match skip_override {
                         // Note in the first branch here we may push Skip(0)
-                        Some(i) => l.push(ast::LigTable::Skip(ast::ParameterIndex(i).into())),
+                        Some(i) => l.push(ast::LigTable::Skip(ast::DecimalU8(i).into())),
                         None => {
                             match instruction.next_instruction {
                                 None => l.push(ast::LigTable::Stop(().into())),
                                 Some(0) => {}
                                 // TODO: potentially write a warning if i is too big like in TFtoPL.2014.74.
-                                Some(i) => {
-                                    l.push(ast::LigTable::Skip(ast::ParameterIndex(i).into()))
-                                }
+                                Some(i) => l.push(ast::LigTable::Skip(ast::DecimalU8(i).into())),
                             }
                         }
                     }

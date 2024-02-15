@@ -347,7 +347,7 @@ pub enum Root {
     ///     for example, to set `header[18]=1`, one may write `(HEADER D 18 O 1)`.
     /// This notation is used for header information that is presently unnamed.
     /// (TeX ignores it.)
-    Header(TupleValue<u8, u32>),
+    Header(TupleValue<DecimalU8, u32>),
 
     /// Font dimensions property list.
     FontDimension(Branch<(), FontDimension>),
@@ -401,23 +401,20 @@ pub enum FontDimension {
     /// The notation `PARAMETER n` provides another way to specify the nth parameter;
     ///     for example, `(PARAMETER D 1 R −.25)` is another way to specify that the `SLANT` is −0.25.
     /// The value of n must be positive and less than max param words.
-    IndexedParam(TupleValue<ParameterIndex, Number>),
+    IndexedParam(TupleValue<DecimalU8, Number>),
 
     /// A comment that is ignored.
     Comment(Vec<cst::BalancedElem>),
 }
 
-/// Index of a non-named parameter.
-///
-/// This is just a wrapper around a [`u8`].
-/// We have a wrapper because parameter indices are output in decimal form when lowering the AST.
+/// A [`u8`] that is output in decimal when lowering the AST to a CST.
 #[derive(Debug, PartialEq, Eq)]
-pub struct ParameterIndex(pub u8);
+pub struct DecimalU8(pub u8);
 
-impl Parse for ParameterIndex {
+impl Parse for DecimalU8 {
     fn parse(input: &mut Input) -> (Self, Range<usize>) {
         let (a, b) = u8::parse(input);
-        (ParameterIndex(a), b)
+        (DecimalU8(a), b)
     }
 
     fn to_string(self, _: &LowerOpts) -> Option<String> {
@@ -624,7 +621,7 @@ pub enum LigTable {
     /// A skip instruction specifies continuation of a ligature/kern program after
     /// the specified number of LIG or KRN steps has been skipped over.
     /// The number of subsequent LIG and KRN instructions must therefore exceed this specified amount.
-    Skip(SingleValue<ParameterIndex>),
+    Skip(SingleValue<DecimalU8>),
 
     /// A comment that is ignored.
     Comment(Vec<cst::BalancedElem>),
@@ -1338,7 +1335,7 @@ mod tests {
             one_byte_four_byte,
             r"(Header D19HA)",
             vec![Root::Header(TupleValue {
-                left: 19,
+                left: DecimalU8(19),
                 left_span: 8..11,
                 right: 0xA,
                 right_span: 11..13,
@@ -1587,7 +1584,7 @@ mod tests {
                             }
                         ),
                         LigTable::Skip(SingleValue {
-                            data: ParameterIndex(1),
+                            data: DecimalU8(1),
                             data_span: 639..642
                         }),
                         LigTable::Label(SingleValue {

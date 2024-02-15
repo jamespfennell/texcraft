@@ -271,6 +271,13 @@ convert_tests!(
         "data/originals/orphan-lig-kerns-4.tfm",
         "data/originals/orphan-lig-kerns-5.pl",
     ),
+    /* TODO: reenable and then delete the tftopl test
+    (
+        cprbn8t,
+        "data/ctan/cprbn8t.tfm",
+        "data/ctan/cprbn8t.pl",
+    ),
+     */
 );
 
 convert_pltotf_tests!(
@@ -352,6 +359,13 @@ convert_tftopl_tests!(
         md_grbr7m,
         "data/ctan/md-grbr7m.tfm",
         include_str!("data/ctan/md-grbr7m.pl"),
+        "",
+        true,
+    ),
+    (
+        cprbn8t,
+        "data/ctan/cprbn8t.tfm",
+        include_str!("data/ctan/cprbn8t.pl"),
         "",
         true,
     ),
