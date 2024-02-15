@@ -116,7 +116,7 @@ impl std::fmt::Display for Number {
         if self.0 < 0 {
             write!(f, "-")?;
         }
-        let integer_part = self.0 / Number::UNITY.0;
+        let integer_part = self.0.abs() / Number::UNITY.0;
         write!(f, "{integer_part}.")?;
         let mut fp = (self.0 % Number::UNITY.0).abs();
         fp = 10 * fp + 5;

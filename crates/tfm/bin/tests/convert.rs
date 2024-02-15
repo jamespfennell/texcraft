@@ -278,6 +278,13 @@ convert_tests!(
         "data/ctan/cprbn8t.pl",
     ),
      */
+    /* TODO: reenable and then delete the tftopl test
+    (
+        rashii2,
+        "data/ctan/rashii2.tfm",
+        "data/ctan/rashii2.pl",
+    ),
+     */
 );
 
 convert_pltotf_tests!(
@@ -373,6 +380,13 @@ convert_tftopl_tests!(
         xcyeuat12,
         "data/ctan/xyeuat12.tfm",
         include_str!("data/ctan/xyeuat12.pl"),
+        "",
+        true,
+    ),
+    (
+        rashii2,
+        "data/ctan/rashii2.tfm",
+        include_str!("data/ctan/rashii2.pl"),
         "",
         true,
     ),
