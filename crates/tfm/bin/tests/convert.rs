@@ -341,4 +341,11 @@ convert_tftopl_tests!(
         "Unusual number of fontdimen parameters for a math symbols font (0 not 22).\n",
         true,
     ),
+    (
+        empty_coding_scheme,
+        "data/ctan/md-utree.tfm",
+        include_str!("data/ctan/md-utree.pl"),
+        "",
+        true,
+    ),
 );

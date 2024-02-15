@@ -407,11 +407,8 @@ impl File {
                 FontType::Vanilla
             }
         };
-        if !self.header.character_coding_scheme.is_empty() {
-            let s = sanitize_string(&self.header.character_coding_scheme);
-            roots.push(ast::Root::CodingScheme(s.into()))
-        }
         roots.extend([
+            ast::Root::CodingScheme(sanitize_string(&self.header.character_coding_scheme).into()),
             ast::Root::DesignSize(self.header.design_size.into()),
             ast::Root::Comment(vec!["DESIGNSIZE IS IN POINTS".into()]),
             ast::Root::Comment(vec!["OTHER SIZES ARE MULTIPLES OF DESIGNSIZE".into()]),

@@ -84,8 +84,8 @@ impl Node {
             }
             NodeValue::Regular(v) => {
                 write!(f, "{}({}", " ".repeat(current_indent), &v.key)?;
-                if !v.data.is_empty() {
-                    write!(f, " {}", &v.data)?;
+                if let Some(data) = &v.data {
+                    write!(f, " {}", data)?;
                 }
                 if let Some(children) = &v.children {
                     writeln!(f)?;
@@ -106,9 +106,9 @@ impl Node {
             NodeValue::Comment(v) => v.clone(),
             NodeValue::Regular(regular_node_value) => {
                 let mut s = regular_node_value.key.clone();
-                if !regular_node_value.data.is_empty() {
+                if let Some(data) = &regular_node_value.data {
                     s.push(' ');
-                    s.push_str(&regular_node_value.data);
+                    s.push_str(data);
                 }
                 let mut v = vec![BalancedElem::String(s)];
                 if let Some(children) = &regular_node_value.children {
@@ -139,14 +139,19 @@ pub struct RegularNodeValue {
     /// Span of the key in the source file
     pub key_span: std::ops::Range<usize>,
     /// Raw data of the node.
-    pub data: String,
+    ///
+    /// The values `None` and `Some("".to_string())` are semantically the same.
+    /// However they are displayed differently.
+    /// For example the stop node is displayed as `(STOP)` but an empty coding scheme node
+    ///     is displayed as `(CODINGSCHEME )`.
+    pub data: Option<String>,
     /// Span of the raw data in the source file.
     pub data_span: std::ops::Range<usize>,
     /// Child nodes, for nodes that themselves contain property lists. E.g. `CHARACTER`.
     ///
     /// The values `None` and `Some(vec![])` are semantically the same.
     /// However they are displayed differently.
-    /// For example the stop node is displayed as `(STOP)` but an empty lig table
+    /// For example the stop node is displayed as `(STOP)` but an empty lig table node
     ///     is displayed as `(LIGTABLE\n)`.
     pub children: Option<Vec<Node>>,
 }
@@ -319,7 +324,7 @@ fn parse_node(input: &mut Input, opening_parenthesis_span: usize) -> Node {
             NodeValue::Regular(RegularNodeValue {
                 key,
                 key_span,
-                data,
+                data: Some(data),
                 data_span,
                 children: Some(children),
             }),
@@ -432,7 +437,7 @@ mod tests {
                 value: NodeValue::Regular(RegularNodeValue {
                     key: "Hello".into(),
                     key_span: 2..7,
-                    data: "World".into(),
+                    data: Some("World".into()),
                     data_span: 8..13,
                     children: vec![
                         Node {
@@ -440,7 +445,7 @@ mod tests {
                             value: NodeValue::Regular(RegularNodeValue {
                                 key: "Nested".into(),
                                 key_span: 15..21,
-                                data: "One".into(),
+                                data: Some("One".into()),
                                 data_span: 22..25,
                                 children: vec![].into(),
                             }),
@@ -451,7 +456,7 @@ mod tests {
                             value: NodeValue::Regular(RegularNodeValue {
                                 key: "Nested".into(),
                                 key_span: 28..34,
-                                data: "Two Two".into(),
+                                data: Some("Two Two".into()),
                                 data_span: 36..43,
                                 children: vec![].into(),
                             }),
@@ -462,7 +467,7 @@ mod tests {
                             value: NodeValue::Regular(RegularNodeValue {
                                 key: "Nested".into(),
                                 key_span: 46..52,
-                                data: "Three Three".into(),
+                                data: Some("Three Three".into()),
                                 data_span: 53..64,
                                 children: vec![].into(),
                             }),
@@ -483,7 +488,7 @@ mod tests {
                 value: NodeValue::Regular(RegularNodeValue {
                     key: "Hello".into(),
                     key_span: 1..6,
-                    data: "".into(),
+                    data: Some("".into()),
                     data_span: 6..6,
                     children: vec![].into(),
                 }),
@@ -502,7 +507,7 @@ mod tests {
                 value: NodeValue::Regular(RegularNodeValue {
                     key: "".into(),
                     key_span: 1..1,
-                    data: "".into(),
+                    data: Some("".into()),
                     data_span: 1..1,
                     children: vec![].into(),
                 }),
@@ -521,7 +526,7 @@ mod tests {
                 value: NodeValue::Regular(RegularNodeValue {
                     key: "".into(),
                     key_span: 1..1,
-                    data: "".into(),
+                    data: Some("".into()),
                     data_span: 1..1,
                     children: vec![].into(),
                 }),
@@ -538,7 +543,7 @@ mod tests {
                     value: NodeValue::Regular(RegularNodeValue {
                         key: "Hello".into(),
                         key_span: 1..6,
-                        data: "World".into(),
+                        data: Some("World".into()),
                         data_span: 7..12,
                         children: vec![].into(),
                     }),
@@ -549,7 +554,7 @@ mod tests {
                     value: NodeValue::Regular(RegularNodeValue {
                         key: "Hola".into(),
                         key_span: 23..27,
-                        data: "Mundo".into(),
+                        data: Some("Mundo".into()),
                         data_span: 28..33,
                         children: vec![].into(),
                     }),
@@ -570,7 +575,7 @@ mod tests {
                     value: NodeValue::Regular(RegularNodeValue {
                         key: "Hello".into(),
                         key_span: 1..6,
-                        data: "World".into(),
+                        data: Some("World".into()),
                         data_span: 7..12,
                         children: vec![].into(),
                     }),
@@ -581,7 +586,7 @@ mod tests {
                     value: NodeValue::Regular(RegularNodeValue {
                         key: "Hola".into(),
                         key_span: 17..21,
-                        data: "Mundo".into(),
+                        data: Some("Mundo".into()),
                         data_span: 22..27,
                         children: vec![].into(),
                     }),
@@ -656,7 +661,7 @@ mod tests {
                 value: NodeValue::Regular(RegularNodeValue {
                     key: "Hello".into(),
                     key_span: 1..6,
-                    data: "World".into(),
+                    data: Some("World".into()),
                     data_span: 7..12,
                     children: vec![].into(),
                 }),

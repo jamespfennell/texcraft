@@ -169,11 +169,11 @@ impl<D: TryParse, E: Parse> ToFromCstNode for TupleValue<D, E> {
         cst::RegularNodeValue {
             key: key.into(),
             key_span: 0..0,
-            data: format![
+            data: Some(format![
                 "{} {}",
-                TryParse::to_string(self.left, opts),
-                Parse::to_string(self.right, opts)
-            ],
+                TryParse::to_string(self.left, opts).expect("In TupleValue<D, E>, D != ()"),
+                Parse::to_string(self.right, opts).expect("In TupleValue<D, E>, E != ()")
+            ]),
             data_span: self.left_span.start..self.right_span.end,
             children: None,
         }
@@ -420,8 +420,8 @@ impl Parse for ParameterIndex {
         (ParameterIndex(a), b)
     }
 
-    fn to_string(self, _: &LowerOpts) -> String {
-        format!["D {}", self.0]
+    fn to_string(self, _: &LowerOpts) -> Option<String> {
+        Some(format!["D {}", self.0])
     }
 }
 
@@ -653,10 +653,10 @@ impl Parse for LigTableLabel {
             }
         }
     }
-    fn to_string(self, opts: &LowerOpts) -> String {
+    fn to_string(self, opts: &LowerOpts) -> Option<String> {
         match self {
             LigTableLabel::Char(c) => Parse::to_string(c, opts),
-            LigTableLabel::BoundaryChar => "BOUNDARYCHAR".into(),
+            LigTableLabel::BoundaryChar => Some("BOUNDARYCHAR".into()),
         }
     }
 }
@@ -709,19 +709,19 @@ node_impl!(
 
 trait Parse: Sized {
     fn parse(input: &mut Input) -> (Self, Range<usize>);
-    fn to_string(self, opts: &LowerOpts) -> String;
+    fn to_string(self, opts: &LowerOpts) -> Option<String>;
 }
 
 trait TryParse: Sized {
     fn try_parse(input: &mut Input) -> Option<(Self, Range<usize>)>;
-    fn to_string(self, opts: &LowerOpts) -> String;
+    fn to_string(self, opts: &LowerOpts) -> Option<String>;
 }
 
 impl<T: Parse> TryParse for T {
     fn try_parse(input: &mut Input) -> Option<(Self, Range<usize>)> {
         Some(Parse::parse(input))
     }
-    fn to_string(self, opts: &LowerOpts) -> String {
+    fn to_string(self, opts: &LowerOpts) -> Option<String> {
         Parse::to_string(self, opts)
     }
 }
@@ -737,7 +737,7 @@ impl<'a> Input<'a> {
     fn new(p: cst::RegularNodeValue, errors: &'a mut Vec<ParseError>) -> (Self, Vec<cst::Node>) {
         (
             Input {
-                raw_data: p.data,
+                raw_data: p.data.unwrap_or_default(),
                 raw_data_offset: 0,
                 errors,
                 raw_data_span: p.data_span,
@@ -794,8 +794,8 @@ impl Parse for () {
     fn parse(input: &mut Input) -> (Self, Range<usize>) {
         ((), input.raw_data_span.start..input.raw_data_span.start)
     }
-    fn to_string(self, _: &LowerOpts) -> String {
-        "".into()
+    fn to_string(self, _: &LowerOpts) -> Option<String> {
+        None
     }
 }
 
@@ -849,8 +849,8 @@ impl Parse for u32 {
         }
         (acc, start_span..input.raw_data_span.start)
     }
-    fn to_string(self, _: &LowerOpts) -> String {
-        format!("O {self:o}")
+    fn to_string(self, _: &LowerOpts) -> Option<String> {
+        Some(format!("O {self:o}"))
     }
 }
 
@@ -953,8 +953,8 @@ impl Parse for u8 {
         input.consume_spaces();
         (u, span_start..span_end)
     }
-    fn to_string(self, _: &LowerOpts) -> String {
-        format!["O {self:o}"]
+    fn to_string(self, _: &LowerOpts) -> Option<String> {
+        Some(format!["O {self:o}"])
     }
 }
 
@@ -963,10 +963,10 @@ impl Parse for Char {
         let (u, span) = u8::parse(input);
         (Char(u), span)
     }
-    fn to_string(self, opts: &LowerOpts) -> String {
+    fn to_string(self, opts: &LowerOpts) -> Option<String> {
         // TFtoPL.2014.38 and my interpretation of `man tftopl`
-        // TODO: figure out where the ASCII is coming from! The Knuth source code
-        // doesn't seem to handle it at all.
+        // Note that the Pascal code is changed as part of compiling web2c, and these
+        // changes influence the behavior here.
         use super::CharDisplayFormat;
         let output_as_ascii = match (opts.char_display_format, self.0 as char) {
             (CharDisplayFormat::Default, 'a'..='z' | 'A'..='Z' | '0'..='9') => true,
@@ -975,7 +975,7 @@ impl Parse for Char {
             _ => false,
         };
         if output_as_ascii {
-            format!("C {}", self.0 as char)
+            Some(format!("C {}", self.0 as char))
         } else {
             Parse::to_string(self.0, opts)
         }
@@ -989,8 +989,8 @@ impl Parse for String {
         let l = s.len();
         (s, span_start..span_start + l)
     }
-    fn to_string(self, _: &LowerOpts) -> String {
-        self
+    fn to_string(self, _: &LowerOpts) -> Option<String> {
+        Some(self)
     }
 }
 
@@ -999,28 +999,26 @@ impl Parse for Face {
         let (u, span) = u8::parse(input);
         (u.into(), span)
     }
-    fn to_string(self, opts: &LowerOpts) -> String {
+    fn to_string(self, opts: &LowerOpts) -> Option<String> {
         // TFtoPL.2014.39
         match self {
-            Face::Valid(w, s, e) => {
-                format!(
-                    "F {}{}{}",
-                    match w {
-                        crate::FaceWeight::Light => 'L',
-                        crate::FaceWeight::Medium => 'M',
-                        crate::FaceWeight::Bold => 'B',
-                    },
-                    match s {
-                        crate::FaceSlope::Roman => 'R',
-                        crate::FaceSlope::Italic => 'I',
-                    },
-                    match e {
-                        crate::FaceExpansion::Regular => 'R',
-                        crate::FaceExpansion::Condensed => 'C',
-                        crate::FaceExpansion::Extended => 'E',
-                    },
-                )
-            }
+            Face::Valid(w, s, e) => Some(format!(
+                "F {}{}{}",
+                match w {
+                    crate::FaceWeight::Light => 'L',
+                    crate::FaceWeight::Medium => 'M',
+                    crate::FaceWeight::Bold => 'B',
+                },
+                match s {
+                    crate::FaceSlope::Roman => 'R',
+                    crate::FaceSlope::Italic => 'I',
+                },
+                match e {
+                    crate::FaceExpansion::Regular => 'R',
+                    crate::FaceExpansion::Condensed => 'C',
+                    crate::FaceExpansion::Extended => 'E',
+                },
+            )),
             Face::Other(u) => Parse::to_string(u, opts),
         }
     }
@@ -1046,8 +1044,8 @@ impl TryParse for bool {
         input.skip_to_end();
         Some((b, span_start..span_end))
     }
-    fn to_string(self, _: &LowerOpts) -> String {
-        if self { "TRUE" } else { "FALSE" }.into()
+    fn to_string(self, _: &LowerOpts) -> Option<String> {
+        Some(if self { "TRUE" } else { "FALSE" }.into())
     }
 }
 
@@ -1145,8 +1143,8 @@ impl Parse for Number {
         };
         (Number(result), span_start..input.raw_data_span.start)
     }
-    fn to_string(self, _: &LowerOpts) -> String {
-        format!["R {self}"]
+    fn to_string(self, _: &LowerOpts) -> Option<String> {
+        Some(format!["R {self}"])
     }
 }
 
