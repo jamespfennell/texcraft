@@ -87,13 +87,11 @@ impl Node {
                 if !v.data.is_empty() {
                     write!(f, " {}", &v.data)?;
                 }
-                if !v.children.is_empty() {
+                if let Some(children) = &v.children {
                     writeln!(f)?;
-                }
-                for child in &v.children {
-                    child.write(f, indent, current_indent + indent)?;
-                }
-                if !v.children.is_empty() {
+                    for child in children {
+                        child.write(f, indent, current_indent + indent)?;
+                    }
                     write!(f, "{}", " ".repeat(current_indent + indent))?;
                 }
                 writeln!(f, ")")?;
@@ -113,8 +111,10 @@ impl Node {
                     s.push_str(&regular_node_value.data);
                 }
                 let mut v = vec![BalancedElem::String(s)];
-                for child in &regular_node_value.children {
-                    v.push(BalancedElem::Vec(child.into_balanced_elements()))
+                if let Some(children) = &regular_node_value.children {
+                    for child in children {
+                        v.push(BalancedElem::Vec(child.into_balanced_elements()))
+                    }
                 }
                 v
             }
@@ -143,7 +143,12 @@ pub struct RegularNodeValue {
     /// Span of the raw data in the source file.
     pub data_span: std::ops::Range<usize>,
     /// Child nodes, for nodes that themselves contain property lists. E.g. `CHARACTER`.
-    pub children: Vec<Node>,
+    ///
+    /// The values `None` and `Some(vec![])` are semantically the same.
+    /// However they are displayed differently.
+    /// For example the stop node is displayed as `(STOP)` but an empty lig table
+    ///     is displayed as `(LIGTABLE\n)`.
+    pub children: Option<Vec<Node>>,
 }
 
 /// Element of a comment node.
@@ -316,7 +321,7 @@ fn parse_node(input: &mut Input, opening_parenthesis_span: usize) -> Node {
                 key_span,
                 data,
                 data_span,
-                children,
+                children: Some(children),
             }),
             closing_token,
         )
@@ -437,7 +442,7 @@ mod tests {
                                 key_span: 15..21,
                                 data: "One".into(),
                                 data_span: 22..25,
-                                children: vec![],
+                                children: vec![].into(),
                             }),
                             closing_parenthesis_span: 25,
                         },
@@ -448,7 +453,7 @@ mod tests {
                                 key_span: 28..34,
                                 data: "Two Two".into(),
                                 data_span: 36..43,
-                                children: vec![],
+                                children: vec![].into(),
                             }),
                             closing_parenthesis_span: 43,
                         },
@@ -459,11 +464,12 @@ mod tests {
                                 key_span: 46..52,
                                 data: "Three Three".into(),
                                 data_span: 53..64,
-                                children: vec![],
+                                children: vec![].into(),
                             }),
                             closing_parenthesis_span: 64,
                         },
-                    ],
+                    ]
+                    .into(),
                 }),
                 closing_parenthesis_span: 65,
             }],
@@ -479,7 +485,7 @@ mod tests {
                     key_span: 1..6,
                     data: "".into(),
                     data_span: 6..6,
-                    children: vec![],
+                    children: vec![].into(),
                 }),
                 closing_parenthesis_span: 6,
             }],
@@ -498,7 +504,7 @@ mod tests {
                     key_span: 1..1,
                     data: "".into(),
                     data_span: 1..1,
-                    children: vec![],
+                    children: vec![].into(),
                 }),
                 closing_parenthesis_span: 1,
             }],
@@ -517,7 +523,7 @@ mod tests {
                     key_span: 1..1,
                     data: "".into(),
                     data_span: 1..1,
-                    children: vec![],
+                    children: vec![].into(),
                 }),
                 closing_parenthesis_span: 1,
             }],
@@ -534,7 +540,7 @@ mod tests {
                         key_span: 1..6,
                         data: "World".into(),
                         data_span: 7..12,
-                        children: vec![],
+                        children: vec![].into(),
                     }),
                     closing_parenthesis_span: 12,
                 },
@@ -545,7 +551,7 @@ mod tests {
                         key_span: 23..27,
                         data: "Mundo".into(),
                         data_span: 28..33,
-                        children: vec![],
+                        children: vec![].into(),
                     }),
                     closing_parenthesis_span: 33,
                 },
@@ -566,7 +572,7 @@ mod tests {
                         key_span: 1..6,
                         data: "World".into(),
                         data_span: 7..12,
-                        children: vec![],
+                        children: vec![].into(),
                     }),
                     closing_parenthesis_span: 12,
                 },
@@ -577,7 +583,7 @@ mod tests {
                         key_span: 17..21,
                         data: "Mundo".into(),
                         data_span: 22..27,
-                        children: vec![],
+                        children: vec![].into(),
                     }),
                     closing_parenthesis_span: 27,
                 },
@@ -652,7 +658,7 @@ mod tests {
                     key_span: 1..6,
                     data: "World".into(),
                     data_span: 7..12,
-                    children: vec![],
+                    children: vec![].into(),
                 }),
                 closing_parenthesis_span: 15,
             }],

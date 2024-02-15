@@ -242,7 +242,7 @@ impl File {
                                         .instructions
                                         .last_mut()
                                         .unwrap()
-                                        .next_instruction = Some(v.data);
+                                        .next_instruction = Some(v.data.0);
                                 } else {
                                     // TODO: error
                                 }
@@ -483,11 +483,11 @@ impl File {
             roots.push(ast::Root::BoundaryChar(boundary_char.into()));
         }
         let mut l = Vec::<ast::LigTable>::new();
-        let mut index_to_labels = HashMap::<usize, Vec<Char>>::new();
+        let mut index_to_labels = HashMap::<u16, Vec<Char>>::new();
         for c in &ordered_chars {
             if let Some(char_data) = self.char_data.get(c) {
                 if let CharTag::Ligature(index) = char_data.tag {
-                    index_to_labels.entry(index as usize).or_default().push(*c);
+                    index_to_labels.entry(index).or_default().push(*c);
                 }
             }
         }
@@ -495,45 +495,78 @@ impl File {
             .operation
         {
             ligkern::lang::Operation::Kern(kern) => {
-                Some(ast::LigTable::Kern((instruction.right_char, kern).into()))
+                ast::LigTable::Kern((instruction.right_char, kern).into())
             }
             ligkern::lang::Operation::KernAtIndex(_) => {
                 panic!("tfm::pl::File lig/kern programs cannot contain `KernAtIndex` operations. Use a `Kern` operation instead.");
             }
-            // TODO: shouldn't this emit a stop?
-            ligkern::lang::Operation::EntrypointRedirect(_, _) => None,
+            ligkern::lang::Operation::EntrypointRedirect(_, _) => {
+                panic!("tfm::ligkern::lang::ReachableIter does not return `EntrypointRedirect` operations.");
+            }
             ligkern::lang::Operation::Ligature {
                 char_to_insert,
                 post_lig_operation,
-            } => Some(ast::LigTable::Lig(
+            } => ast::LigTable::Lig(
                 post_lig_operation,
                 (instruction.right_char, char_to_insert).into(),
-            )),
+            ),
         };
-        for (index, instruction) in self.lig_kern_program.instructions.iter().enumerate() {
-            if let Some(e) = self.lig_kern_program.boundary_char_entrypoint {
-                if (e as usize) == index {
-                    l.push(ast::LigTable::Label(
-                        ast::LigTableLabel::BoundaryChar.into(),
-                    ));
+
+        // When we fixed the (LIGTABLE (LABEL BOUNDARYCHAR) bug, number of failures went from 26652 -> 12004
+        for item in self
+            .lig_kern_program
+            .reachable_iter(index_to_labels.keys().copied())
+        {
+            match item {
+                ligkern::lang::ReachableIterItem::Reachable {
+                    instruction,
+                    index,
+                    skip_override,
+                } => {
+                    if let Some(e) = self.lig_kern_program.boundary_char_entrypoint {
+                        if e == index {
+                            l.push(ast::LigTable::Label(
+                                ast::LigTableLabel::BoundaryChar.into(),
+                            ));
+                        }
+                    }
+                    for label in index_to_labels.get(&index).unwrap_or(&vec![]) {
+                        l.push(ast::LigTable::Label(
+                            ast::LigTableLabel::Char(*label).into(),
+                        ));
+                    }
+                    let lig_kern_op = build_lig_kern_op(instruction);
+                    l.push(lig_kern_op);
+                    match skip_override {
+                        // Note in the first branch here we may push Skip(0)
+                        Some(i) => l.push(ast::LigTable::Skip(ast::ParameterIndex(i).into())),
+                        None => {
+                            match instruction.next_instruction {
+                                None => l.push(ast::LigTable::Stop(().into())),
+                                Some(0) => {}
+                                // TODO: potentially write a warning if i is too big like in TFtoPL.2014.74.
+                                Some(i) => {
+                                    l.push(ast::LigTable::Skip(ast::ParameterIndex(i).into()))
+                                }
+                            }
+                        }
+                    }
                 }
-            }
-            for label in index_to_labels.get(&index).unwrap_or(&vec![]) {
-                l.push(ast::LigTable::Label(
-                    ast::LigTableLabel::Char(*label).into(),
-                ));
-            }
-            if let Some(op) = build_lig_kern_op(instruction) {
-                l.push(op);
-                match instruction.next_instruction {
-                    None => l.push(ast::LigTable::Stop(().into())),
-                    Some(0) => {}
-                    // TODO: potentially write a warning if i is too big like in TFtoPL.2014.74.
-                    Some(i) => l.push(ast::LigTable::Skip(i.into())),
+                ligkern::lang::ReachableIterItem::Unreachable(instructions) => {
+                    let mut balanced_elems = vec![cst::BalancedElem::String(
+                        "THIS PART OF THE PROGRAM IS NEVER USED!".to_string(),
+                    )];
+                    for instruction in instructions {
+                        let op = build_lig_kern_op(instruction);
+                        balanced_elems.push(cst::BalancedElem::Vec(
+                            op.into_balanced_elements(char_display_format),
+                        ));
+                    }
+                    l.push(ast::LigTable::Comment(balanced_elems))
                 }
             }
         }
-        if !l.is_empty() {
+        if !self.lig_kern_program.instructions.is_empty() {
             roots.push(ast::Root::LigTable(((), l).into()))
         }
 
@@ -559,35 +592,17 @@ impl File {
 
             match &data.tag {
                 CharTag::None => {}
-                CharTag::Ligature(index) => {
-                    let mut l = vec![];
-                    let mut index = *index as usize;
-                    loop {
-                        let instruction = match self.lig_kern_program.instructions.get(index) {
-                            // TODO: potentially write a warning if the index is too big like in TFtoPL.2014.74.
-                            None => break,
-                            Some(instruction) => instruction,
-                        };
-                        match build_lig_kern_op(instruction) {
-                            None => break,
-                            Some(op) => {
-                                l.push(op);
-                                index = match instruction.next_instruction {
-                                    None => break,
-                                    Some(inc) => index + 1 + (inc as usize),
-                                };
-                            }
-                        }
-                    }
-                    v.push(ast::Character::Comment(
-                        l.into_iter()
-                            .map(|n| {
-                                cst::BalancedElem::Vec(
-                                    n.into_balanced_elements(char_display_format),
-                                )
-                            })
-                            .collect(),
-                    ));
+                CharTag::Ligature(entrypoint) => {
+                    let l: Vec<cst::BalancedElem> = self
+                        .lig_kern_program
+                        .instructions_for_entrypoint(*entrypoint)
+                        .map(build_lig_kern_op)
+                        .map(|n| {
+                            cst::BalancedElem::Vec(n.into_balanced_elements(char_display_format))
+                        })
+                        .collect();
+                    // TODO: what if l.is_empty()?
+                    v.push(ast::Character::Comment(l));
                 }
                 CharTag::List(c) => v.push(ast::Character::NextLarger((*c).into())),
                 CharTag::Extension(recipe) => {

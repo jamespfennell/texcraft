@@ -145,7 +145,7 @@ impl<D: TryParse> ToFromCstNode for SingleValue<D> {
             key_span: 0..0,
             data: TryParse::to_string(self.data, opts),
             data_span: self.data_span,
-            children: vec![],
+            children: None,
         }
     }
 }
@@ -175,7 +175,7 @@ impl<D: TryParse, E: Parse> ToFromCstNode for TupleValue<D, E> {
                 Parse::to_string(self.right, opts)
             ],
             data_span: self.left_span.start..self.right_span.end,
-            children: vec![],
+            children: None,
         }
     }
 }
@@ -201,11 +201,12 @@ impl<D: Parse, E: Node> ToFromCstNode for Branch<D, E> {
             key_span: 0..0,
             data: TryParse::to_string(self.data, opts),
             data_span: self.data_span,
-            children: self
-                .children
-                .into_iter()
-                .map(|c| E::lower(c, opts))
-                .collect(),
+            children: Some(
+                self.children
+                    .into_iter()
+                    .map(|c| E::lower(c, opts))
+                    .collect(),
+            ),
         }
     }
 }
@@ -623,7 +624,7 @@ pub enum LigTable {
     /// A skip instruction specifies continuation of a ligature/kern program after
     /// the specified number of LIG or KRN steps has been skipped over.
     /// The number of subsequent LIG and KRN instructions must therefore exceed this specified amount.
-    Skip(SingleValue<u8>),
+    Skip(SingleValue<ParameterIndex>),
 
     /// A comment that is ignored.
     Comment(Vec<cst::BalancedElem>),
@@ -741,7 +742,7 @@ impl<'a> Input<'a> {
                 errors,
                 raw_data_span: p.data_span,
             },
-            p.children,
+            p.children.unwrap_or(vec![]),
         )
     }
     fn skip_error(&mut self, error: ParseError) {
@@ -1588,7 +1589,7 @@ mod tests {
                             }
                         ),
                         LigTable::Skip(SingleValue {
-                            data: 1,
+                            data: ParameterIndex(1),
                             data_span: 639..642
                         }),
                         LigTable::Label(SingleValue {

@@ -76,7 +76,7 @@ pub enum Operation {
     ///     programs can contain more than 256 instructions.
     ///
     /// If this operation is encountered in another situation, it is an unconditional stop.
-    /// 
+    ///
     /// The boolean value in the payload is true if the boundary character should be
     ///     serialized inside the instruction.
     EntrypointRedirect(u16, bool),
@@ -251,5 +251,125 @@ impl Program {
                     Operation::Kern(kerns.get(*index as usize).copied().unwrap_or_default())
             }
         }
+    }
+
+    pub fn reachable_iter<I: Iterator<Item = u16>>(&self, entrypoints: I) -> ReachableIter {
+        let mut reachable = vec![false; self.instructions.len()];
+        // TFtoPL.2014.68
+        for entrypoint in entrypoints {
+            if let Some(slot) = reachable.get_mut(entrypoint as usize) {
+                *slot = true
+            }
+        }
+        // TFtoPL.2014.70
+        for i in 0..reachable.len() {
+            if !reachable[i] {
+                continue;
+            }
+            if let Some(inc) = self.instructions[i].next_instruction {
+                if let Some(slot) = reachable.get_mut(i + inc as usize + 1) {
+                    *slot = true
+                }
+            }
+        }
+        ReachableIter {
+            next: 0,
+            reachable,
+            instructions: &self.instructions,
+        }
+    }
+
+    /// Iterate over the lig/kern instructions for a specific entrypoint.
+    pub fn instructions_for_entrypoint(&self, entrypoint: u16) -> InstructionsForEntrypointIter {
+        InstructionsForEntrypointIter {
+            next: entrypoint as usize,
+            instructions: &self.instructions,
+        }
+    }
+}
+
+pub struct ReachableIter<'a> {
+    next: u16,
+    reachable: Vec<bool>,
+    instructions: &'a [Instruction],
+}
+
+pub enum ReachableIterItem<'a> {
+    Reachable {
+        instruction: &'a Instruction,
+        index: u16,
+        skip_override: Option<u8>,
+    },
+    Unreachable(&'a [Instruction]),
+}
+
+impl<'a> Iterator for ReachableIter<'a> {
+    type Item = ReachableIterItem<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let this = self.next;
+            let instruction = match self.instructions.get(this as usize) {
+                None => return None,
+                Some(instruction) => instruction,
+            };
+            self.next += 1;
+            if let Operation::EntrypointRedirect(_, _) = instruction.operation {
+                continue;
+            }
+            return Some(if self.reachable[this as usize] {
+                let skip_override = match instruction.next_instruction {
+                    None | Some(0) => None,
+                    Some(inc) => {
+                        let reachable_skipped: u8 = self.reachable
+                            [this as usize + 1..this as usize+ 1+ inc as usize]
+                            .iter()
+                            .filter(|reachable| **reachable)
+                            .count()
+                            .try_into()
+                            .expect("iterating over at most u8::MAX elements, so the count will be at most u8::MAX");
+                        Some(reachable_skipped)
+                    }
+                };
+                ReachableIterItem::Reachable {
+                    instruction,
+                    index: this,
+                    skip_override,
+                }
+            } else {
+                let mut upper_bound = this + 1;
+                while self.reachable.get(upper_bound as usize).copied() == Some(false) {
+                    upper_bound += 1;
+                }
+                self.next = upper_bound;
+                ReachableIterItem::Unreachable(
+                    &self.instructions[this as usize..upper_bound as usize],
+                )
+            });
+        }
+    }
+}
+
+/// Iterator over the lig/kern instructions for a specific entrypoint.
+///
+/// Create using [`Program::instructions_for_entrypoint`].
+pub struct InstructionsForEntrypointIter<'a> {
+    next: usize,
+    instructions: &'a [Instruction],
+}
+
+impl<'a> Iterator for InstructionsForEntrypointIter<'a> {
+    type Item = &'a Instruction;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.instructions.get(self.next).map(|i| {
+            // TODO what if i is a EntrypointRedirect? Should return None?
+            // Can we find these kinds of cases by fuzzing over the raw lig/kern bytes?
+            self.next = match i.next_instruction {
+                None => usize::MAX,
+                Some(inc) => self.next + inc as usize + 1,
+            };
+            i
+        })
     }
 }

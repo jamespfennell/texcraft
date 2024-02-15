@@ -261,13 +261,16 @@ convert_tests!(
         "data/originals/many-entrypoints.tfm",
         "data/originals/many-entrypoints.pl",
     ),
-    /*
     (
         theano_old_style,
         "data/ctan/TheanoOldStyle-Bold-tlf-t1--base.tfm",
         "data/ctan/TheanoOldStyle-Bold-tlf-t1--base.pl",
     ),
-     */
+    (
+        orphan_lig_kerns_4_5,
+        "data/originals/orphan-lig-kerns-4.tfm",
+        "data/originals/orphan-lig-kerns-5.pl",
+    ),
 );
 
 convert_pltotf_tests!(
@@ -296,9 +299,15 @@ convert_pltotf_tests!(
         include_str!["data/originals/ligature-loop.stderr.txt"],
     ),
     (
-        orphan_lig_kerns_pltotf,
-        "data/originals/orphan-lig-kerns.tfm",
-        "data/originals/orphan-lig-kerns.pl",
+        orphan_lig_kerns_1_2,
+        "data/originals/orphan-lig-kerns-2.tfm",
+        "data/originals/orphan-lig-kerns-1.pl",
+        "",
+    ),
+    (
+        orphan_lig_kerns_3_4,
+        "data/originals/orphan-lig-kerns-4.tfm",
+        "data/originals/orphan-lig-kerns-3.pl",
         "",
     ),
 );
@@ -311,13 +320,18 @@ convert_tftopl_tests!(
         include_str!["data/ctan/gk256g.stderr.txt"],
         false,
     ),
-    /* TODO: reenable
     (
-        orphan_lig_kerns_tftopl,
-        "data/originals/orphan-lig-kerns.tfm",
-        include_str!("data/originals/orphan-lig-kerns-recovered.pl"),
+        orphan_lig_kerns_2_3,
+        "data/originals/orphan-lig-kerns-2.tfm",
+        include_str!("data/originals/orphan-lig-kerns-3.pl"),
         "",
         true,
     ),
-     */
+    (
+        txbmi,
+        "data/ctan/txbmi.tfm",
+        include_str!("data/ctan/txbmi.pl"),
+        "",
+        true,
+    ),
 );
