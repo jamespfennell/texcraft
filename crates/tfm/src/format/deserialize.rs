@@ -147,6 +147,7 @@ impl Warning {
                 };
                 format!["Unusual number of fontdimen parameters for {font_description} font ({got} not {expected})."]
         },
+        // TODO: warning for invalid depth/width/height indices
         }
     }
 

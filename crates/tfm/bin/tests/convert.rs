@@ -348,4 +348,11 @@ convert_tftopl_tests!(
         "",
         true,
     ),
+    (
+        md_grbr7m,
+        "data/ctan/md-grbr7m.tfm",
+        include_str!("data/ctan/md-grbr7m.pl"),
+        "",
+        true,
+    ),
 );

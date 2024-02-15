@@ -51,9 +51,9 @@ pub const MAX_LIG_KERN_INSTRUCTIONS: u16 = (i16::MAX as u16) - 257;
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct CharData {
     pub width: Number,
-    pub height: Number,
-    pub depth: Number,
-    pub italic_correction: Number,
+    pub height: Option<Number>,
+    pub depth: Option<Number>,
+    pub italic_correction: Option<Number>,
     pub tag: CharTag,
 }
 
@@ -263,13 +263,13 @@ impl File {
                                 char_data.width = v.data;
                             }
                             ast::Character::Height(v) => {
-                                char_data.height = v.data;
+                                char_data.height = Some(v.data);
                             }
                             ast::Character::Depth(v) => {
-                                char_data.depth = v.data;
+                                char_data.depth = Some(v.data);
                             }
                             ast::Character::ItalicCorrection(v) => {
-                                char_data.italic_correction = v.data;
+                                char_data.italic_correction = Some(v.data);
                             }
                             ast::Character::NextLarger(c) => {
                                 // TODO: warning if tag != CharTag::None
@@ -333,21 +333,21 @@ impl File {
                             .get(info.width_index.get() as usize)
                             .copied()
                             .unwrap_or_default(),
-                        height: tfm_file
-                            .heights
-                            .get(info.height_index as usize)
-                            .copied()
-                            .unwrap_or_default(),
-                        depth: tfm_file
-                            .depths
-                            .get(info.depth_index as usize)
-                            .copied()
-                            .unwrap_or_default(),
-                        italic_correction: tfm_file
-                            .italic_corrections
-                            .get(info.italic_index as usize)
-                            .copied()
-                            .unwrap_or_default(),
+                        height: if info.height_index == 0 {
+                            None
+                        } else {
+                            Some(tfm_file.heights[info.height_index as usize])
+                        },
+                        depth: if info.depth_index == 0 {
+                            None
+                        } else {
+                            Some(tfm_file.depths[info.depth_index as usize])
+                        },
+                        italic_correction: if info.italic_index == 0 {
+                            None
+                        } else {
+                            Some(tfm_file.italic_corrections[info.italic_index as usize])
+                        },
                         tag: match info.tag {
                             format::CharTag::None => CharTag::None,
                             format::CharTag::Ligature(_) => {
@@ -575,16 +575,14 @@ impl File {
             };
             let mut v = vec![];
             v.push(ast::Character::Width(data.width.into()));
-            if data.height != Number::ZERO {
-                v.push(ast::Character::Height(data.height.into()));
+            if let Some(height) = data.height {
+                v.push(ast::Character::Height(height.into()));
             }
-            if data.depth != Number::ZERO {
-                v.push(ast::Character::Depth(data.depth.into()));
+            if let Some(depth) = data.depth {
+                v.push(ast::Character::Depth(depth.into()));
             }
-            if data.italic_correction != Number::ZERO {
-                v.push(ast::Character::ItalicCorrection(
-                    data.italic_correction.into(),
-                ));
+            if let Some(italic_correction) = data.italic_correction {
+                v.push(ast::Character::ItalicCorrection(italic_correction.into()));
             }
 
             match &data.tag {
@@ -963,7 +961,7 @@ mod tests {
                 char_data: HashMap::from([(
                     'r'.try_into().unwrap(),
                     CharData {
-                        height: Number::UNITY * 15,
+                        height: Some(Number::UNITY * 15),
                         ..Default::default()
                     }
                 )]),
@@ -977,7 +975,7 @@ mod tests {
                 char_data: HashMap::from([(
                     'r'.try_into().unwrap(),
                     CharData {
-                        depth: Number::UNITY * 15,
+                        depth: Some(Number::UNITY * 15),
                         ..Default::default()
                     }
                 )]),
@@ -991,7 +989,7 @@ mod tests {
                 char_data: HashMap::from([(
                     'r'.try_into().unwrap(),
                     CharData {
-                        italic_correction: Number::UNITY * 15,
+                        italic_correction: Some(Number::UNITY * 15),
                         ..Default::default()
                     }
                 )]),

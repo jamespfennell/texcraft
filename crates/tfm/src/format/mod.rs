@@ -199,14 +199,17 @@ impl File {
         let mut italic_corrections = vec![];
         for (char, char_data) in &pl_file.char_data {
             widths.push(char_data.width);
-            if char_data.height != Number::ZERO {
-                heights.push(char_data.height);
+            match char_data.height {
+                None | Some(Number::ZERO) => {}
+                Some(height) => heights.push(height),
             }
-            if char_data.depth != Number::ZERO {
-                depths.push(char_data.depth);
+            match char_data.depth {
+                None | Some(Number::ZERO) => {}
+                Some(depth) => depths.push(depth),
             }
-            if char_data.italic_correction != Number::ZERO {
-                italic_corrections.push(char_data.italic_correction);
+            match char_data.italic_correction {
+                None | Some(Number::ZERO) => {}
+                Some(italic_correction) => italic_corrections.push(italic_correction),
             }
             char_bounds = Some(match char_bounds {
                 None => (*char, *char),
@@ -235,27 +238,40 @@ impl File {
                     );
                     m.insert(Char(c), CharInfo {
                                 width_index,
-                                // If the height data is missing from the height_to_index map, it's because
-                                // the height is 0.
-                                height_index: height_to_index
-                                    .get(&pl_data.height)
-                                    .copied()
-                                    .map(NonZeroU8::get)
-                                    .unwrap_or(0),
-                                depth_index: depth_to_index
-                                    .get(&pl_data.depth)
-                                    .copied()
-                                    .map(NonZeroU8::get)
-                                    .unwrap_or(0),
-                                italic_index: italic_correction_to_index
-                                    .get(&pl_data.italic_correction)
-                                    .copied()
-                                    .map(NonZeroU8::get)
-                                    .unwrap_or(0),
+                                height_index: match pl_data.height {
+                                    None => 0,
+                                    Some(height) => {
+                                        // If the height data is missing from the height_to_index map, it's because
+                                        // the height is 0. Similar with depths and italic corrections.
+                                        height_to_index
+                                        .get(&height)
+                                        .copied()
+                                        .map(NonZeroU8::get)
+                                        .unwrap_or(0)
+                                    }
+                                },
+                                depth_index: match pl_data.depth {
+                                    None => 0,
+                                    Some(depth) => {
+                                        depth_to_index
+                                        .get(&depth)
+                                        .copied()
+                                        .map(NonZeroU8::get)
+                                        .unwrap_or(0)
+                                    }
+                                },
+                                italic_index: match pl_data.italic_correction {
+                                    None => 0,
+                                    Some(italic_correction) => {
+                                        italic_correction_to_index
+                                        .get(&italic_correction)
+                                        .copied()
+                                        .map(NonZeroU8::get)
+                                        .unwrap_or(0)
+                                    }
+                                },
                                 tag: match &pl_data.tag {
                                     pl::CharTag::None => CharTag::None,
-                                    // TODO: we shouldn't unwrap here. There is a mechanism for putting
-                                    // a large index here via lig kern commands.
                                     pl::CharTag::Ligature(_) => {
                                         let entrypoint = *lig_kern_entrypoints.get(&Char(c)).expect("the map returned by crate::ligkern::lang::compress_entrypoints has a key for all chars with a lig tag");
                                         CharTag::Ligature(entrypoint)
