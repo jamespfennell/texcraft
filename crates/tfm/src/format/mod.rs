@@ -124,8 +124,8 @@ impl File {
         deserialize::deserialize(b)
     }
 
-    pub fn from_raw_file(raw_file: &RawFile) -> Self {
-        deserialize::from_raw_file(raw_file)
+    pub fn from_raw_file(raw_file: &RawFile, warnings: &mut Vec<DeserializeWarning>) -> Self {
+        deserialize::from_raw_file(raw_file, warnings)
     }
 
     pub fn serialize(&self) -> Vec<u8> {

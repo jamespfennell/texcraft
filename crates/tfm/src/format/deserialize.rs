@@ -118,22 +118,44 @@ pub enum Warning {
     /// The first element is the number of words specified in the TFM header.
     /// The second element is the number of bytes in the file.
     InternalFileLengthIsSmall(i16, usize),
+
+    /// Unusual number of parameters.
+    ///
+    /// Math symbol fonts usually contain 22 parameters and math extension fonts 13.
+    /// This warning indicates that a different number was in the .tfm file.
+    UnusualNumberOfParameters {
+        /// True if this is a math symbols font; false if it's a math extension font.
+        is_math_symbols_font: bool,
+        /// Number of parameters in the .tfm file.
+        got: usize,
+    },
 }
 
 impl Warning {
     /// Returns the warning message the TFtoPL program prints for this kind of error.
     pub fn tf_to_pl_message(&self) -> String {
+        use Warning::*;
         match self {
-            Warning::InternalFileLengthIsSmall(_, _) => {
+            InternalFileLengthIsSmall(_, _) => {
                 "There's some extra junk at the end of the TFM file,\nbut I'll proceed as if it weren't there.".into()
             },
+            UnusualNumberOfParameters { is_math_symbols_font, got } => {
+                let (font_description, expected) = if *is_math_symbols_font {
+                    ("a math symbols", 22)
+                } else {
+                    ("an extension", 13)
+                };
+                format!["Unusual number of fontdimen parameters for {font_description} font ({got} not {expected})."]
+        },
         }
     }
 
     /// Returns the section in Knuth's TFtoPL (version 2014) in which this warning occurs.
     pub fn tf_to_pl_section(&self) -> usize {
+        use Warning::*;
         match self {
-            Warning::InternalFileLengthIsSmall(_, _) => 20,
+            InternalFileLengthIsSmall(_, _) => 20,
+            UnusualNumberOfParameters { .. } => 59,
         }
     }
 }
@@ -141,12 +163,15 @@ impl Warning {
 /// Deserialize a TeX font metric (.tfm) file.
 pub(super) fn deserialize(b: &[u8]) -> (Result<File, Error>, Vec<Warning>) {
     match RawFile::deserialize(b) {
-        (Ok(raw_file), warnings) => (Ok(from_raw_file(&raw_file)), warnings),
+        (Ok(raw_file), mut warnings) => {
+            let file = from_raw_file(&raw_file, &mut warnings);
+            (Ok(file), warnings)
+        }
         (Err(err), warnings) => (Err(err), warnings),
     }
 }
 
-pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
+pub(super) fn from_raw_file(raw_file: &RawFile, warnings: &mut Vec<Warning>) -> File {
     let mut char_infos = HashMap::<Char, CharInfo>::new();
     let char_infos_array: Vec<Option<CharInfo>> = deserialize_array(raw_file.char_infos);
     let mut c = raw_file.begin_char;
@@ -159,7 +184,7 @@ pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
             Some(c) => Char(c),
         }
     }
-    File {
+    let file = File {
         header: Header::deserialize(raw_file.header),
         char_infos,
         widths: deserialize_array(raw_file.widths),
@@ -176,7 +201,26 @@ pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
         kerns: deserialize_array(raw_file.kerns),
         extensible_chars: deserialize_array(raw_file.extensible_recipes),
         params: Params(deserialize_array(raw_file.params)),
+    };
+
+    {
+        let scheme = file.header.character_coding_scheme.to_uppercase();
+        let num_params = file.params.0.len();
+        if scheme.starts_with("TEX MATH SY") && num_params != 22 {
+            warnings.push(Warning::UnusualNumberOfParameters {
+                is_math_symbols_font: true,
+                got: num_params,
+            })
+        }
+        if scheme.starts_with("TEX MATH EX") && num_params != 13 {
+            warnings.push(Warning::UnusualNumberOfParameters {
+                is_math_symbols_font: false,
+                got: num_params,
+            })
+        }
     }
+
+    file
 }
 
 /// Raw .tfm file.

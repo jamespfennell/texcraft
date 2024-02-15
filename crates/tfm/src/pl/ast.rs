@@ -742,7 +742,7 @@ impl<'a> Input<'a> {
                 errors,
                 raw_data_span: p.data_span,
             },
-            p.children.unwrap_or(vec![]),
+            p.children.unwrap_or_default(),
         )
     }
     fn skip_error(&mut self, error: ParseError) {

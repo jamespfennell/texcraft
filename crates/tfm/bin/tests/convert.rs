@@ -334,4 +334,11 @@ convert_tftopl_tests!(
         "",
         true,
     ),
+    (
+        unusual_num_params,
+        "data/originals/unusual-num-params.tfm",
+        include_str!("data/originals/unusual-num-params.pl"),
+        "Unusual number of fontdimen parameters for a math symbols font (0 not 22).\n",
+        true,
+    ),
 );
