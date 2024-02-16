@@ -284,6 +284,12 @@ convert_tests!(
         "data/ctan/rashii2.tfm",
         "data/ctan/rashii2.pl",
     ),
+    TODO: reenable and then delete the tftopl test
+    (
+        veracruz_6vcr8r,
+        "data/ctan/6vcr8r.tfm",
+        "data/ctan/6vcr8r.pl",
+    ),
      */
 );
 
@@ -387,6 +393,13 @@ convert_tftopl_tests!(
         rashii2,
         "data/ctan/rashii2.tfm",
         include_str!("data/ctan/rashii2.pl"),
+        "",
+        true,
+    ),
+    (
+        veracruz_6vcr8r,
+        "data/ctan/6vcr8r.tfm",
+        include_str!("data/ctan/6vcr8r.pl"),
         "",
         true,
     ),

@@ -12,7 +12,7 @@ pub fn serialize(file: &File) -> Vec<u8> {
     let (bc, ec) = match file.char_info_bounds() {
         None => (1, 0),
         Some((bc, ec)) => {
-            serialize_char_infos(&file.char_infos, bc, ec, &mut b);
+            serialize_char_infos(&file.char_infos, &file.char_tags, bc, ec, &mut b);
             (bc.0 as i16, ec.0 as i16)
         }
     };
@@ -45,10 +45,20 @@ pub fn serialize(file: &File) -> Vec<u8> {
     b
 }
 
-fn serialize_char_infos(char_infos: &HashMap<Char, CharInfo>, bc: Char, ec: Char, b: &mut Vec<u8>) {
-    let mut v: Vec<Option<CharInfo>> = vec![None; (ec.0 as usize) + 1 - (bc.0 as usize)];
+fn serialize_char_infos(
+    char_infos: &HashMap<Char, CharInfo>,
+    char_tags: &HashMap<Char, CharTag>,
+    bc: Char,
+    ec: Char,
+    b: &mut Vec<u8>,
+) {
+    let mut v: Vec<(Option<CharInfo>, CharTag)> =
+        vec![(None, CharTag::None); (ec.0 as usize) + 1 - (bc.0 as usize)];
     for (c, char_info) in char_infos {
-        v[(c.0 - bc.0) as usize] = Some(char_info.clone());
+        v[(c.0 - bc.0) as usize].0 = Some(char_info.clone());
+    }
+    for (c, char_tag) in char_tags {
+        v[(c.0 - bc.0) as usize].1 = char_tag.clone();
     }
     serialize_section(&v, b, None);
 }
@@ -71,10 +81,13 @@ impl Serializable for u32 {
     }
 }
 
-impl Serializable for Option<CharInfo> {
+impl Serializable for (Option<CharInfo>, CharTag) {
     fn serialize(&self, b: &mut Vec<u8>, _: Option<Char>) {
-        match self {
-            None => b.extend([0; 4]),
+        let italic = match &self.0 {
+            None => {
+                b.extend([0; 2]);
+                0
+            }
             Some(char_info) => {
                 b.push(char_info.width_index.get());
                 b.push(
@@ -83,21 +96,17 @@ impl Serializable for Option<CharInfo> {
                         .wrapping_mul(16)
                         .wrapping_add(char_info.depth_index),
                 );
-                let (discriminant, payload) = match char_info.tag {
-                    CharTag::None => (0_u8, 0_u8),
-                    CharTag::Ligature(p) => (1, p),
-                    CharTag::List(p) => (2, p.0),
-                    CharTag::Extension(p) => (3, p),
-                };
-                b.push(
-                    char_info
-                        .italic_index
-                        .wrapping_mul(4)
-                        .wrapping_add(discriminant),
-                );
-                b.push(payload);
+                char_info.italic_index
             }
-        }
+        };
+        let (discriminant, payload) = match self.1 {
+            CharTag::None => (0_u8, 0_u8),
+            CharTag::Ligature(p) => (1, p),
+            CharTag::List(p) => (2, p.0),
+            CharTag::Extension(p) => (3, p),
+        };
+        b.push(italic.wrapping_mul(4).wrapping_add(discriminant));
+        b.push(payload);
     }
 }
 

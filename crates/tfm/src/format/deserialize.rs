@@ -174,12 +174,14 @@ pub(super) fn deserialize(b: &[u8]) -> (Result<File, Error>, Vec<Warning>) {
 
 pub(super) fn from_raw_file(raw_file: &RawFile, warnings: &mut Vec<Warning>) -> File {
     let mut char_infos = HashMap::<Char, CharInfo>::new();
-    let char_infos_array: Vec<Option<CharInfo>> = deserialize_array(raw_file.char_infos);
+    let mut char_tags = HashMap::<Char, CharTag>::new();
+    let char_infos_array: Vec<(Option<CharInfo>, CharTag)> = deserialize_array(raw_file.char_infos);
     let mut c = raw_file.begin_char;
-    for char_info in char_infos_array {
+    for (char_info, char_tag) in char_infos_array {
         if let Some(char_info) = char_info {
             char_infos.insert(c, char_info);
         }
+        char_tags.insert(c, char_tag);
         c = match c.0.checked_add(1) {
             None => break,
             Some(c) => Char(c),
@@ -188,6 +190,7 @@ pub(super) fn from_raw_file(raw_file: &RawFile, warnings: &mut Vec<Warning>) -> 
     let file = File {
         header: Header::deserialize(raw_file.header),
         char_infos,
+        char_tags,
         widths: deserialize_array(raw_file.widths),
         heights: deserialize_array(raw_file.heights),
         depths: deserialize_array(raw_file.depths),
@@ -499,23 +502,24 @@ impl Deserializable for Number {
     }
 }
 
-impl Deserializable for Option<CharInfo> {
+impl Deserializable for (Option<CharInfo>, CharTag) {
     fn deserialize(b: &[u8]) -> Self {
-        match b[0].try_into() {
+        let info = match b[0].try_into() {
             Ok(width_index) => Some(CharInfo {
                 width_index,
                 height_index: b[1] / (1 << 4),
                 depth_index: b[1] % (1 << 4),
                 italic_index: b[2] / (1 << 2),
-                tag: match b[2] % (1 << 2) {
-                    0 => CharTag::None,
-                    1 => CharTag::Ligature(b[3]),
-                    2 => CharTag::List(Char(b[3])),
-                    _ => CharTag::Extension(b[3]),
-                },
             }),
             Err(_) => None,
-        }
+        };
+        let tag = match b[2] % (1 << 2) {
+            0 => CharTag::None,
+            1 => CharTag::Ligature(b[3]),
+            2 => CharTag::List(Char(b[3])),
+            _ => CharTag::Extension(b[3]),
+        };
+        (info, tag)
     }
 }
 
@@ -863,7 +867,6 @@ mod tests {
                             height_index: 2,
                             depth_index: 3,
                             italic_index: 4,
-                            tag: CharTag::None,
                         }
                     ),
                     (
@@ -873,9 +876,13 @@ mod tests {
                             height_index: 0,
                             depth_index: 0,
                             italic_index: 0,
-                            tag: CharTag::Ligature(23),
                         }
                     ),
+                ]),
+                char_tags: HashMap::from([
+                    (Char(70), CharTag::None,),
+                    (Char(71), CharTag::None,),
+                    (Char(72), CharTag::Ligature(23),),
                 ]),
                 ..Default::default()
             },
@@ -901,9 +908,9 @@ mod tests {
                         height_index: 2,
                         depth_index: 3,
                         italic_index: 4,
-                        tag: CharTag::None,
                     }
                 ),]),
+                char_tags: HashMap::from([(Char(255), CharTag::None,),]),
                 ..Default::default()
             },
         ),

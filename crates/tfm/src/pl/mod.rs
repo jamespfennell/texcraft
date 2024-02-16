@@ -54,7 +54,6 @@ pub struct CharData {
     pub height: Option<Number>,
     pub depth: Option<Number>,
     pub italic_correction: Option<Number>,
-    pub tag: CharTag,
 }
 
 /// Tag of a character in a .pl file.
@@ -72,7 +71,8 @@ pub enum CharTag {
 pub struct File {
     pub header: Header,
     pub design_units: Number,
-    pub char_data: HashMap<Char, CharData>,
+    pub char_data: HashMap<Char, CharData>, // TODO: rename?
+    pub char_tags: HashMap<Char, CharTag>,
     pub lig_kern_program: ligkern::lang::Program,
     pub params: Params,
 }
@@ -83,6 +83,7 @@ impl Default for File {
             header: Header::property_list_default(),
             design_units: Number::UNITY,
             char_data: Default::default(),
+            char_tags: Default::default(),
             lig_kern_program: Default::default(),
             params: Default::default(),
         }
@@ -99,10 +100,10 @@ impl File {
 
     /// Return a map from characters to the lig/kern entrypoint for that character.
     pub fn lig_kern_entrypoints(&self) -> HashMap<Char, u16> {
-        self.char_data
+        self.char_tags
             .iter()
-            .filter_map(|d| match d.1.tag {
-                CharTag::Ligature(l) => Some((*d.0, l)),
+            .filter_map(|d| match d.1 {
+                CharTag::Ligature(l) => Some((*d.0, *l)),
                 _ => None,
             })
             .collect()
@@ -110,9 +111,9 @@ impl File {
 
     /// Clear all lig/kern data from the file.
     pub fn clear_lig_kern_data(&mut self) {
-        for (_, data) in self.char_data.iter_mut() {
-            if let CharTag::Ligature(_) = data.tag {
-                data.tag = CharTag::None;
+        for (_, tag) in self.char_tags.iter_mut() {
+            if let CharTag::Ligature(_) = tag {
+                *tag = CharTag::None;
             }
         }
         self.lig_kern_program.instructions = vec![];
@@ -187,9 +188,8 @@ impl File {
                                 let u: u16 = file.lig_kern_program.instructions.len().try_into().expect("lig_kern_instructions.len()<= MAX_LIG_KERN_INSTRUCTIONS which is a u16");
                                 match v.data {
                                     ast::LigTableLabel::Char(c) => {
-                                        let char_data = file.char_data.entry(c).or_default();
                                         // TODO: error if the tag is already set
-                                        char_data.tag = CharTag::Ligature(u);
+                                        file.char_tags.insert(c, CharTag::Ligature(u));
                                     }
                                     ast::LigTableLabel::BoundaryChar => {
                                         file.lig_kern_program.boundary_char_entrypoint = Some(u);
@@ -273,7 +273,7 @@ impl File {
                             }
                             ast::Character::NextLarger(c) => {
                                 // TODO: warning if tag != CharTag::None
-                                char_data.tag = CharTag::List(c.data);
+                                file.char_tags.insert(b.data, CharTag::List(c.data));
                             }
                             ast::Character::ExtensibleCharacter(e) => {
                                 let mut recipe: ExtensibleRecipe = Default::default();
@@ -295,7 +295,7 @@ impl File {
                                     }
                                 }
                                 // TODO: warning if tag != CharTag::None
-                                char_data.tag = CharTag::Extension(recipe)
+                                file.char_tags.insert(b.data, CharTag::Extension(recipe));
                             }
                             ast::Character::Comment(_) => {}
                         }
@@ -316,17 +316,12 @@ impl File {
 
     /// Convert a TFM file into a PL file.
     pub fn from_tfm_file(tfm_file: crate::format::File) -> File {
-        let lig_kern_entrypoints = tfm_file.lig_kern_entrypoints();
-        let mut lig_kern_program = tfm_file.lig_kern_program;
-        lig_kern_program.pack_kerns(&tfm_file.kerns);
-        let lig_kern_entrypoints = lig_kern_program.unpack_entrypoints(lig_kern_entrypoints);
-
-        let char_data = tfm_file
+        let char_data: HashMap<Char, CharData> = tfm_file
             .char_infos
-            .into_iter()
+            .iter()
             .map(|(c, info)| {
                 (
-                    c,
+                    *c,
                     CharData {
                         width: tfm_file
                             .widths
@@ -348,28 +343,45 @@ impl File {
                         } else {
                             Some(tfm_file.italic_corrections[info.italic_index as usize])
                         },
-                        tag: match info.tag {
-                            format::CharTag::None => CharTag::None,
-                            format::CharTag::Ligature(_) => {
-                                CharTag::Ligature(*lig_kern_entrypoints.get(&c).unwrap())
-                            }
-                            format::CharTag::List(c) => CharTag::List(c),
-                            format::CharTag::Extension(i) => {
-                                // TODO: don't panic
-                                // TODO: audit all unwraps in the crate
-                                CharTag::Extension(
-                                    tfm_file.extensible_chars.get(i as usize).cloned().unwrap(),
-                                )
-                            }
-                        },
                     },
                 )
             })
             .collect();
+
+        let lig_kern_entrypoints = tfm_file.lig_kern_entrypoints();
+        let mut lig_kern_program = tfm_file.lig_kern_program;
+        lig_kern_program.pack_kerns(&tfm_file.kerns);
+        let lig_kern_entrypoints = lig_kern_program.unpack_entrypoints(lig_kern_entrypoints);
+
+        let char_tags = tfm_file
+            .char_tags
+            .into_iter()
+            .map(|(c, tag)| {
+                (
+                    c,
+                    match tag {
+                        format::CharTag::None => CharTag::None,
+                        format::CharTag::Ligature(_) => {
+                            CharTag::Ligature(*lig_kern_entrypoints.get(&c).unwrap())
+                        }
+                        format::CharTag::List(c) => CharTag::List(c),
+                        format::CharTag::Extension(i) => {
+                            // TODO: don't panic
+                            // TODO: audit all unwraps in the crate
+                            CharTag::Extension(
+                                tfm_file.extensible_chars.get(i as usize).cloned().unwrap(),
+                            )
+                        }
+                    },
+                )
+            })
+            .collect();
+
         File {
             header: tfm_file.header,
             design_units: Number::UNITY,
             char_data,
+            char_tags,
             lig_kern_program,
             params: tfm_file.params,
         }
@@ -473,25 +485,21 @@ impl File {
             roots.push(ast::Root::FontDimension(((), params).into()));
         }
 
-        let ordered_chars = {
-            let mut v: Vec<Char> = self.char_data.keys().copied().collect();
-            v.sort();
-            v
-        };
-
         // Ligtable
         if let Some(boundary_char) = self.lig_kern_program.boundary_char {
             roots.push(ast::Root::BoundaryChar(boundary_char.into()));
         }
-        let mut l = Vec::<ast::LigTable>::new();
-        let mut index_to_labels = HashMap::<u16, Vec<Char>>::new();
-        for c in &ordered_chars {
-            if let Some(char_data) = self.char_data.get(c) {
-                if let CharTag::Ligature(index) = char_data.tag {
-                    index_to_labels.entry(index).or_default().push(*c);
+        let index_to_labels = {
+            let mut m = HashMap::<u16, Vec<Char>>::new();
+            for (c, tag) in &self.char_tags {
+                if let CharTag::Ligature(index) = tag {
+                    m.entry(*index).or_default().push(*c);
                 }
             }
-        }
+            m.values_mut().for_each(|v| v.sort());
+            m
+        };
+        let mut l = Vec::<ast::LigTable>::new();
         let build_lig_kern_op = |instruction: &ligkern::lang::Instruction| match instruction
             .operation
         {
@@ -570,9 +578,14 @@ impl File {
         }
 
         // Characters
+        let ordered_chars = {
+            let mut v: Vec<Char> = self.char_data.keys().copied().collect();
+            v.sort();
+            v
+        };
         for c in &ordered_chars {
             let data = match self.char_data.get(c) {
-                None => continue,
+                None => continue, // TODO: this can't happen. Fix
                 Some(data) => data,
             };
             let mut v = vec![];
@@ -587,12 +600,12 @@ impl File {
                 v.push(ast::Character::ItalicCorrection(italic_correction.into()));
             }
 
-            match &data.tag {
+            match self.char_tags.get(c).cloned().unwrap_or_default() {
                 CharTag::None => {}
                 CharTag::Ligature(entrypoint) => {
                     let l: Vec<cst::BalancedElem> = self
                         .lig_kern_program
-                        .instructions_for_entrypoint(*entrypoint)
+                        .instructions_for_entrypoint(entrypoint)
                         .map(build_lig_kern_op)
                         .map(|n| {
                             cst::BalancedElem::Vec(n.into_balanced_elements(char_display_format))
@@ -601,7 +614,7 @@ impl File {
                     // TODO: what if l.is_empty()?
                     v.push(ast::Character::Comment(l));
                 }
-                CharTag::List(c) => v.push(ast::Character::NextLarger((*c).into())),
+                CharTag::List(c) => v.push(ast::Character::NextLarger((c).into())),
                 CharTag::Extension(recipe) => {
                     let mut r = vec![];
                     if let Some(top) = recipe.top {
@@ -907,21 +920,9 @@ mod tests {
                     boundary_char: None,
                     boundary_char_entrypoint: None,
                 },
-                char_data: HashMap::from([
-                    (
-                        'e'.try_into().unwrap(),
-                        CharData {
-                            tag: CharTag::Ligature(0),
-                            ..Default::default()
-                        }
-                    ),
-                    (
-                        'd'.try_into().unwrap(),
-                        CharData {
-                            tag: CharTag::Ligature(1),
-                            ..Default::default()
-                        }
-                    ),
+                char_tags: HashMap::from([
+                    ('e'.try_into().unwrap(), CharTag::Ligature(0),),
+                    ('d'.try_into().unwrap(), CharTag::Ligature(1),),
                 ]),
                 ..Default::default()
             },
@@ -1005,9 +1006,12 @@ mod tests {
                 char_data: HashMap::from([(
                     'r'.try_into().unwrap(),
                     CharData {
-                        tag: CharTag::List('A'.try_into().unwrap()),
                         ..Default::default()
                     }
+                )]),
+                char_tags: HashMap::from([(
+                    'r'.try_into().unwrap(),
+                    CharTag::List('A'.try_into().unwrap()),
                 )]),
                 ..Default::default()
             },
@@ -1019,9 +1023,12 @@ mod tests {
                 char_data: HashMap::from([(
                     'r'.try_into().unwrap(),
                     CharData {
-                        tag: CharTag::Extension(Default::default()),
                         ..Default::default()
                     }
+                )]),
+                char_tags: HashMap::from([(
+                    'r'.try_into().unwrap(),
+                    CharTag::Extension(Default::default()),
                 )]),
                 ..Default::default()
             },
@@ -1033,14 +1040,17 @@ mod tests {
                 char_data: HashMap::from([(
                     'r'.try_into().unwrap(),
                     CharData {
-                        tag: CharTag::Extension(ExtensibleRecipe {
-                            top: Some(Char(1)),
-                            middle: Some(Char(2)),
-                            bottom: Some(Char(3)),
-                            rep: Char(4),
-                        }),
                         ..Default::default()
                     }
+                )]),
+                char_tags: HashMap::from([(
+                    'r'.try_into().unwrap(),
+                    CharTag::Extension(ExtensibleRecipe {
+                        top: Some(Char(1)),
+                        middle: Some(Char(2)),
+                        bottom: Some(Char(3)),
+                        rep: Char(4),
+                    }),
                 )]),
                 ..Default::default()
             },
@@ -1076,7 +1086,6 @@ mod tests {
                         height_index: 0,
                         depth_index: 0,
                         italic_index: 0,
-                        tag: crate::format::CharTag::None,
                     }
                 ),
                 (
@@ -1086,7 +1095,6 @@ mod tests {
                         height_index: 0,
                         depth_index: 0,
                         italic_index: 0,
-                        tag: crate::format::CharTag::None,
                     }
                 ),
             ]),

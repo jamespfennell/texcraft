@@ -36,6 +36,8 @@ pub struct File {
     /// The char infos mostly contain indices for other vectors in this struct.
     pub char_infos: HashMap<Char, CharInfo>,
 
+    pub char_tags: HashMap<Char, CharTag>,
+
     /// Character widths
     pub widths: Vec<Number>,
 
@@ -80,7 +82,6 @@ pub struct CharInfo {
     pub height_index: u8,
     pub depth_index: u8,
     pub italic_index: u8,
-    pub tag: CharTag,
 }
 
 /// Tag of a character in a .tfm file.
@@ -107,6 +108,7 @@ impl Default for File {
         Self {
             header: Default::default(),
             char_infos: Default::default(),
+            char_tags: Default::default(),
             widths: vec![Number::ZERO],
             heights: vec![Number::ZERO],
             depths: vec![Number::ZERO],
@@ -133,10 +135,11 @@ impl File {
     }
 
     /// Return a map from characters to the lig/kern entrypoint for that character.
+    /// TODO: can probably return impl Iterator<Item=(Char, u8)>
     pub fn lig_kern_entrypoints(&self) -> HashMap<Char, u8> {
-        self.char_infos
+        self.char_tags
             .iter()
-            .filter_map(|(c, d)| match d.tag {
+            .filter_map(|(c, d)| match *d {
                 CharTag::Ligature(l) => Some((*c, l)),
                 _ => None,
             })
@@ -236,62 +239,71 @@ impl File {
                     let width_index = *width_to_index.get(&pl_data.width).expect(
                         "the map returned from compress(_,_) contains every input as a key",
                     );
-                    m.insert(Char(c), CharInfo {
-                                width_index,
-                                height_index: match pl_data.height {
-                                    None => 0,
-                                    Some(height) => {
-                                        // If the height data is missing from the height_to_index map, it's because
-                                        // the height is 0. Similar with depths and italic corrections.
-                                        height_to_index
+                    m.insert(
+                        Char(c),
+                        CharInfo {
+                            width_index,
+                            height_index: match pl_data.height {
+                                None => 0,
+                                Some(height) => {
+                                    // If the height data is missing from the height_to_index map, it's because
+                                    // the height is 0. Similar with depths and italic corrections.
+                                    height_to_index
                                         .get(&height)
                                         .copied()
                                         .map(NonZeroU8::get)
                                         .unwrap_or(0)
-                                    }
-                                },
-                                depth_index: match pl_data.depth {
-                                    None => 0,
-                                    Some(depth) => {
-                                        depth_to_index
-                                        .get(&depth)
-                                        .copied()
-                                        .map(NonZeroU8::get)
-                                        .unwrap_or(0)
-                                    }
-                                },
-                                italic_index: match pl_data.italic_correction {
-                                    None => 0,
-                                    Some(italic_correction) => {
-                                        italic_correction_to_index
-                                        .get(&italic_correction)
-                                        .copied()
-                                        .map(NonZeroU8::get)
-                                        .unwrap_or(0)
-                                    }
-                                },
-                                tag: match &pl_data.tag {
-                                    pl::CharTag::None => CharTag::None,
-                                    pl::CharTag::Ligature(_) => {
-                                        let entrypoint = *lig_kern_entrypoints.get(&Char(c)).expect("the map returned by crate::ligkern::lang::compress_entrypoints has a key for all chars with a lig tag");
-                                        CharTag::Ligature(entrypoint)
-                                    }
-                                    pl::CharTag::List(c) => CharTag::List(*c),
-                                    pl::CharTag::Extension(e) => {
-                                        let index: u8 = extensible_chars.len().try_into().unwrap();
-                                        extensible_chars.push(e.clone());
-                                        CharTag::Extension(index)
-                                    }
-                                },
-                            });
+                                }
+                            },
+                            depth_index: match pl_data.depth {
+                                None => 0,
+                                Some(depth) => depth_to_index
+                                    .get(&depth)
+                                    .copied()
+                                    .map(NonZeroU8::get)
+                                    .unwrap_or(0),
+                            },
+                            italic_index: match pl_data.italic_correction {
+                                None => 0,
+                                Some(italic_correction) => italic_correction_to_index
+                                    .get(&italic_correction)
+                                    .copied()
+                                    .map(NonZeroU8::get)
+                                    .unwrap_or(0),
+                            },
+                        },
+                    );
                 }
                 m
             }
         };
+        let ordered_chars = {
+            let mut m: Vec<Char> = pl_file.char_tags.keys().copied().collect();
+            m.sort();
+            m
+        };
+        let char_tags = ordered_chars.into_iter().map(|c| {
+            (c,
+                match pl_file.char_tags.get(&c).unwrap() {
+                    pl::CharTag::None => CharTag::None,
+                    pl::CharTag::Ligature(_) => {
+                        let entrypoint = *lig_kern_entrypoints.get(&c).expect("the map returned by crate::ligkern::lang::compress_entrypoints has a key for all chars with a lig tag");
+                        CharTag::Ligature(entrypoint)
+                    }
+                    pl::CharTag::List(c) => CharTag::List(*c),
+                    pl::CharTag::Extension(e) => {
+                        let index: u8 = extensible_chars.len().try_into().unwrap();
+                        extensible_chars.push(e.clone());
+                        CharTag::Extension(index)
+                    }
+                },
+            )
+        }).collect();
 
         let mut file = Self {
             header: pl_file.header.clone(),
             char_infos,
+            char_tags,
             widths,
             heights,
             depths,
