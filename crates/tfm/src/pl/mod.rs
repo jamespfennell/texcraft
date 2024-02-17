@@ -49,7 +49,7 @@ pub const MAX_LIG_KERN_INSTRUCTIONS: u16 = (i16::MAX as u16) - 257;
 
 /// Data about one character in a .pl file.
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
-pub struct CharData {
+pub struct CharDimensions {
     pub width: Number,
     pub height: Option<Number>,
     pub depth: Option<Number>,
@@ -57,10 +57,8 @@ pub struct CharData {
 }
 
 /// Tag of a character in a .pl file.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CharTag {
-    #[default]
-    None,
     Ligature(u16),
     List(Char),
     Extension(format::ExtensibleRecipe),
@@ -71,7 +69,7 @@ pub enum CharTag {
 pub struct File {
     pub header: Header,
     pub design_units: Number,
-    pub char_data: HashMap<Char, CharData>, // TODO: rename?
+    pub char_dimens: HashMap<Char, CharDimensions>,
     pub char_tags: HashMap<Char, CharTag>,
     pub lig_kern_program: ligkern::lang::Program,
     pub params: Params,
@@ -82,7 +80,7 @@ impl Default for File {
         Self {
             header: Header::property_list_default(),
             design_units: Number::UNITY,
-            char_data: Default::default(),
+            char_dimens: Default::default(),
             char_tags: Default::default(),
             lig_kern_program: Default::default(),
             params: Default::default(),
@@ -111,11 +109,14 @@ impl File {
 
     /// Clear all lig/kern data from the file.
     pub fn clear_lig_kern_data(&mut self) {
-        for (_, tag) in self.char_tags.iter_mut() {
-            if let CharTag::Ligature(_) = tag {
-                *tag = CharTag::None;
-            }
-        }
+        self.char_tags = self
+            .char_tags
+            .iter()
+            .filter_map(|(c, tag)| match tag {
+                CharTag::Ligature(_) => None,
+                _ => Some((*c, tag.clone())),
+            })
+            .collect();
         self.lig_kern_program.instructions = vec![];
     }
 
@@ -256,20 +257,20 @@ impl File {
                     file.lig_kern_program.boundary_char = Some(v.data);
                 }
                 ast::Root::Character(b) => {
-                    let char_data = file.char_data.entry(b.data).or_default();
+                    let char_dimens = file.char_dimens.entry(b.data).or_default();
                     for node in b.children {
                         match node {
                             ast::Character::Width(v) => {
-                                char_data.width = v.data;
+                                char_dimens.width = v.data;
                             }
                             ast::Character::Height(v) => {
-                                char_data.height = Some(v.data);
+                                char_dimens.height = Some(v.data);
                             }
                             ast::Character::Depth(v) => {
-                                char_data.depth = Some(v.data);
+                                char_dimens.depth = Some(v.data);
                             }
                             ast::Character::ItalicCorrection(v) => {
-                                char_data.italic_correction = Some(v.data);
+                                char_dimens.italic_correction = Some(v.data);
                             }
                             ast::Character::NextLarger(c) => {
                                 // TODO: warning if tag != CharTag::None
@@ -316,13 +317,13 @@ impl File {
 
     /// Convert a TFM file into a PL file.
     pub fn from_tfm_file(tfm_file: crate::format::File) -> File {
-        let char_data: HashMap<Char, CharData> = tfm_file
-            .char_infos
+        let char_dimens: HashMap<Char, CharDimensions> = tfm_file
+            .char_dimens
             .iter()
             .map(|(c, info)| {
                 (
                     *c,
-                    CharData {
+                    CharDimensions {
                         width: tfm_file
                             .widths
                             .get(info.width_index.get() as usize)
@@ -360,7 +361,6 @@ impl File {
                 (
                     c,
                     match tag {
-                        format::CharTag::None => CharTag::None,
                         format::CharTag::Ligature(_) => {
                             CharTag::Ligature(*lig_kern_entrypoints.get(&c).unwrap())
                         }
@@ -380,7 +380,7 @@ impl File {
         File {
             header: tfm_file.header,
             design_units: Number::UNITY,
-            char_data,
+            char_dimens,
             char_tags,
             lig_kern_program,
             params: tfm_file.params,
@@ -579,12 +579,12 @@ impl File {
 
         // Characters
         let ordered_chars = {
-            let mut v: Vec<Char> = self.char_data.keys().copied().collect();
+            let mut v: Vec<Char> = self.char_dimens.keys().copied().collect();
             v.sort();
             v
         };
         for c in &ordered_chars {
-            let data = match self.char_data.get(c) {
+            let data = match self.char_dimens.get(c) {
                 None => continue, // TODO: this can't happen. Fix
                 Some(data) => data,
             };
@@ -600,12 +600,12 @@ impl File {
                 v.push(ast::Character::ItalicCorrection(italic_correction.into()));
             }
 
-            match self.char_tags.get(c).cloned().unwrap_or_default() {
-                CharTag::None => {}
-                CharTag::Ligature(entrypoint) => {
+            match self.char_tags.get(c) {
+                None => {}
+                Some(CharTag::Ligature(entrypoint)) => {
                     let l: Vec<cst::BalancedElem> = self
                         .lig_kern_program
-                        .instructions_for_entrypoint(entrypoint)
+                        .instructions_for_entrypoint(*entrypoint)
                         .map(build_lig_kern_op)
                         .map(|n| {
                             cst::BalancedElem::Vec(n.into_balanced_elements(char_display_format))
@@ -614,8 +614,8 @@ impl File {
                     // TODO: what if l.is_empty()?
                     v.push(ast::Character::Comment(l));
                 }
-                CharTag::List(c) => v.push(ast::Character::NextLarger((c).into())),
-                CharTag::Extension(recipe) => {
+                Some(CharTag::List(c)) => v.push(ast::Character::NextLarger((*c).into())),
+                Some(CharTag::Extension(recipe)) => {
                     let mut r = vec![];
                     if let Some(top) = recipe.top {
                         r.push(ast::ExtensibleCharacter::Top(top.into()));
@@ -947,9 +947,9 @@ mod tests {
             char_width,
             "(CHARACTER C r (CHARWD D 15.0))",
             File {
-                char_data: HashMap::from([(
+                char_dimens: HashMap::from([(
                     'r'.try_into().unwrap(),
-                    CharData {
+                    CharDimensions {
                         width: Number::UNITY * 15,
                         ..Default::default()
                     }
@@ -961,9 +961,9 @@ mod tests {
             char_height,
             "(CHARACTER C r (CHARHT D 15.0))",
             File {
-                char_data: HashMap::from([(
+                char_dimens: HashMap::from([(
                     'r'.try_into().unwrap(),
-                    CharData {
+                    CharDimensions {
                         height: Some(Number::UNITY * 15),
                         ..Default::default()
                     }
@@ -975,9 +975,9 @@ mod tests {
             char_depth,
             "(CHARACTER C r (CHARDP D 15.0))",
             File {
-                char_data: HashMap::from([(
+                char_dimens: HashMap::from([(
                     'r'.try_into().unwrap(),
-                    CharData {
+                    CharDimensions {
                         depth: Some(Number::UNITY * 15),
                         ..Default::default()
                     }
@@ -989,9 +989,9 @@ mod tests {
             char_italic_correction,
             "(CHARACTER C r (CHARIC D 15.0))",
             File {
-                char_data: HashMap::from([(
+                char_dimens: HashMap::from([(
                     'r'.try_into().unwrap(),
-                    CharData {
+                    CharDimensions {
                         italic_correction: Some(Number::UNITY * 15),
                         ..Default::default()
                     }
@@ -1003,9 +1003,9 @@ mod tests {
             char_next_larger,
             "(CHARACTER C r (NEXTLARGER C A))",
             File {
-                char_data: HashMap::from([(
+                char_dimens: HashMap::from([(
                     'r'.try_into().unwrap(),
-                    CharData {
+                    CharDimensions {
                         ..Default::default()
                     }
                 )]),
@@ -1020,9 +1020,9 @@ mod tests {
             char_extensible_recipe_empty,
             "(CHARACTER C r (VARCHAR))",
             File {
-                char_data: HashMap::from([(
+                char_dimens: HashMap::from([(
                     'r'.try_into().unwrap(),
-                    CharData {
+                    CharDimensions {
                         ..Default::default()
                     }
                 )]),
@@ -1037,9 +1037,9 @@ mod tests {
             char_extensible_recipe_data,
             "(CHARACTER C r (VARCHAR (TOP O 1) (MID O 2) (BOT O 3) (REP O 4)))",
             File {
-                char_data: HashMap::from([(
+                char_dimens: HashMap::from([(
                     'r'.try_into().unwrap(),
-                    CharData {
+                    CharDimensions {
                         ..Default::default()
                     }
                 )]),
@@ -1078,10 +1078,10 @@ mod tests {
     from_tfm_file_tests!((
         gap_in_chars,
         crate::format::File {
-            char_infos: HashMap::from([
+            char_dimens: HashMap::from([
                 (
                     Char('A'.try_into().unwrap()),
-                    crate::format::CharInfo {
+                    crate::format::CharDimensions {
                         width_index: 1.try_into().unwrap(),
                         height_index: 0,
                         depth_index: 0,
@@ -1090,7 +1090,7 @@ mod tests {
                 ),
                 (
                     Char('C'.try_into().unwrap()),
-                    crate::format::CharInfo {
+                    crate::format::CharDimensions {
                         width_index: 2.try_into().unwrap(),
                         height_index: 0,
                         depth_index: 0,
@@ -1102,17 +1102,17 @@ mod tests {
             ..Default::default()
         },
         File {
-            char_data: HashMap::from([
+            char_dimens: HashMap::from([
                 (
                     'A'.try_into().unwrap(),
-                    CharData {
+                    CharDimensions {
                         width: Number::UNITY,
                         ..Default::default()
                     }
                 ),
                 (
                     'C'.try_into().unwrap(),
-                    CharData {
+                    CharDimensions {
                         width: Number::UNITY * 2,
                         ..Default::default()
                     }

@@ -374,12 +374,7 @@ impl Section {
             ),
             Section::Header => (raw_file.header, Box::new(&file.header)),
             Section::CharInfos => {
-                // TODO: if char_infos used a custom map type with defined ordering
-                // we wouldn't need to do this.
-                let mut v: Vec<(&tfm::Char, &tfm::format::CharInfo)> =
-                    file.char_infos.iter().collect();
-                v.sort_by_key(|(c, _)| **c);
-                (raw_file.char_infos, Box::new(v))
+                (raw_file.char_infos, Box::new(CharInfoDisplay{ file }))
             }
             Section::Widths => (raw_file.widths, Box::new(&file.widths)),
             Section::Heights => (raw_file.heights, Box::new(&file.heights)),
@@ -409,12 +404,7 @@ impl Section {
             Ok(raw) => raw,
             Err(_) => return default,
         };
-        let c = raw as char;
-        if c.is_ascii_alphanumeric() || c.is_ascii_graphic() {
-            format!("    {}", c)
-        } else {
-            format!(" 0x{:02x}", j)
-        }
+        format_char(tfm::Char(raw))
     }
 }
 
@@ -452,5 +442,34 @@ struct Format {
 impl Format {
     fn run(&self) -> Result<(), String> {
         todo!()
+    }
+}
+
+
+struct CharInfoDisplay<'a> {
+    file: &'a tfm::format::File,
+}
+
+impl<'a> std::fmt::Debug for CharInfoDisplay<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for u in 0_u8..=255 {
+            writeln!(f,"{}:", format_char(tfm::Char(u)))?;
+            if let Some(dimens) = self.file.char_dimens.get(&tfm::Char(u)) {
+                writeln![f, "      dimens={:?}", dimens]?;
+            }
+            if let Some(tag) = self.file.char_tags.get(&tfm::Char(u)) {
+                    writeln![f, "      tag={:?}", tag]?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn format_char(c: tfm::Char) -> String {
+    let ch = c.0 as char;
+    if ch.is_ascii_alphanumeric() || ch.is_ascii_graphic() {
+        format!("   {}", ch)
+    } else {
+        format!("0x{:02x}", c.0)
     }
 }

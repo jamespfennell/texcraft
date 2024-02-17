@@ -31,11 +31,15 @@ pub struct File {
     /// Header.
     pub header: Header,
 
-    /// Character infos.
-    ///
-    /// The char infos mostly contain indices for other vectors in this struct.
-    pub char_infos: HashMap<Char, CharInfo>,
+    /// Character dimensions.
+    pub char_dimens: HashMap<Char, CharDimensions>,
 
+    /// Character tags.
+    /// 
+    /// Note there is no correlation between a character having
+    ///     a tag and a character having a dimension.
+    /// All four combinations of (has or hasn't dimensions) and (has or hasn't a tag)
+    ///     are possible.
     pub char_tags: HashMap<Char, CharTag>,
 
     /// Character widths
@@ -65,7 +69,7 @@ pub struct File {
 
 /// Data about one character in a .tfm file.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CharInfo {
+pub struct CharDimensions {
     /// Index of the width of this character in the widths array.
     ///
     /// In TFM files, if the width index is zero it means there is no data for the character in the file.
@@ -85,10 +89,8 @@ pub struct CharInfo {
 }
 
 /// Tag of a character in a .tfm file.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CharTag {
-    #[default]
-    None,
     Ligature(u8),
     List(Char),
     Extension(u8),
@@ -107,7 +109,7 @@ impl Default for File {
     fn default() -> Self {
         Self {
             header: Default::default(),
-            char_infos: Default::default(),
+            char_dimens: Default::default(),
             char_tags: Default::default(),
             widths: vec![Number::ZERO],
             heights: vec![Number::ZERO],
@@ -148,7 +150,7 @@ impl File {
 
     fn char_info_bounds(&self) -> Option<(Char, Char)> {
         let mut r: Option<(Char, Char)> = None;
-        for c in self.char_infos.keys().copied() {
+        for c in self.char_dimens.keys().copied() {
             r = Some(match r {
                 None => (c, c),
                 Some((lower, upper)) => (
@@ -166,11 +168,11 @@ impl File {
         let (bc, ec) = self.char_info_bounds().unwrap_or((Char(1), Char(0)));
         let mut b = [bc.0, ec.0, bc.0, ec.0];
         for c in bc.0..=ec.0 {
-            let char_info = match self.char_infos.get(&Char(c)) {
+            let char_dimens = match self.char_dimens.get(&Char(c)) {
                 None => continue,
-                Some(char_info) => char_info,
+                Some(char_dimens) => char_dimens,
             };
-            let width = self.widths[char_info.width_index.get() as usize].0;
+            let width = self.widths[char_dimens.width_index.get() as usize].0;
             // TODO: adjust based on the design units
             let width = width + (c as i32 + 4) * 0o20_000_000;
             let add = |b: u8, m: u8| -> u8 {
@@ -200,17 +202,17 @@ impl File {
         let mut heights = vec![];
         let mut depths = vec![];
         let mut italic_corrections = vec![];
-        for (char, char_data) in &pl_file.char_data {
-            widths.push(char_data.width);
-            match char_data.height {
+        for (char, char_dimens) in &pl_file.char_dimens {
+            widths.push(char_dimens.width);
+            match char_dimens.height {
                 None | Some(Number::ZERO) => {}
                 Some(height) => heights.push(height),
             }
-            match char_data.depth {
+            match char_dimens.depth {
                 None | Some(Number::ZERO) => {}
                 Some(depth) => depths.push(depth),
             }
-            match char_data.italic_correction {
+            match char_dimens.italic_correction {
                 None | Some(Number::ZERO) => {}
                 Some(italic_correction) => italic_corrections.push(italic_correction),
             }
@@ -227,12 +229,12 @@ impl File {
         let (depths, depth_to_index) = compress(&depths, 15);
         let (italic_corrections, italic_correction_to_index) = compress(&italic_corrections, 63);
         let mut extensible_chars = vec![];
-        let char_infos = match char_bounds {
+        let char_dimens = match char_bounds {
             None => Default::default(),
             Some((lower, upper)) => {
-                let mut m: HashMap<Char, CharInfo> = Default::default();
+                let mut m: HashMap<Char, CharDimensions> = Default::default();
                 for c in lower.0..=upper.0 {
-                    let pl_data = match pl_file.char_data.get(&Char(c)) {
+                    let pl_data = match pl_file.char_dimens.get(&Char(c)) {
                         Some(pl_data) => pl_data,
                         None => continue,
                     };
@@ -241,7 +243,7 @@ impl File {
                     );
                     m.insert(
                         Char(c),
-                        CharInfo {
+                        CharDimensions {
                             width_index,
                             height_index: match pl_data.height {
                                 None => 0,
@@ -285,7 +287,6 @@ impl File {
         let char_tags = ordered_chars.into_iter().map(|c| {
             (c,
                 match pl_file.char_tags.get(&c).unwrap() {
-                    pl::CharTag::None => CharTag::None,
                     pl::CharTag::Ligature(_) => {
                         let entrypoint = *lig_kern_entrypoints.get(&c).expect("the map returned by crate::ligkern::lang::compress_entrypoints has a key for all chars with a lig tag");
                         CharTag::Ligature(entrypoint)
@@ -302,7 +303,7 @@ impl File {
 
         let mut file = Self {
             header: pl_file.header.clone(),
-            char_infos,
+            char_dimens,
             char_tags,
             widths,
             heights,

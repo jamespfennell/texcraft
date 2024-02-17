@@ -19,6 +19,7 @@
         "countdef",
         "DESIGNSIZE",
         "DESIGNUNITS",
+        "dimens",
         "dsize",
         "endinput",
         "endlinechar",
