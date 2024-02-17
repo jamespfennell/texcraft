@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::num::NonZeroU8;
 
+mod debug;
 mod deserialize;
 mod serialize;
 
@@ -35,7 +36,7 @@ pub struct File {
     pub char_dimens: HashMap<Char, CharDimensions>,
 
     /// Character tags.
-    /// 
+    ///
     /// Note there is no correlation between a character having
     ///     a tag and a character having a dimension.
     /// All four combinations of (has or hasn't dimensions) and (has or hasn't a tag)
@@ -73,13 +74,15 @@ pub struct CharDimensions {
     /// Index of the width of this character in the widths array.
     ///
     /// In TFM files, if the width index is zero it means there is no data for the character in the file.
-    /// In this case the other indices are necessarily zero and the tag is [CharTag::None].
+    /// In this case the other indices are necessarily zero.
     /// See TFtoPL.2014.? (where blocks of data with a zero width index are skipped)
     ///     and PLtoTF.2014.? (where missing characters are written with all indices 0)
     ///
-    /// In this crate we represent the TFM data for each character as [`Option<CharInfo>`].
+    /// Note that even if a character doesn't have dimensions, it can still have a tag.
+    ///
+    /// In this crate we represent the TFM data for each character as [`Option<CharDimensions>`].
     /// If the width index is zero, the data is [None].
-    /// Otherwise the data is a [CharInfo] value with an index that is statically guaranteed to be non-zero.
+    /// Otherwise the data is a [CharDimensions] value with an index that is statically guaranteed to be non-zero.
     /// This makes the illegal state of a zero width index and non-zero height index un-representable.
     pub width_index: NonZeroU8,
     /// Index of the height of this character in the height array.
@@ -120,6 +123,23 @@ impl Default for File {
             extensible_chars: vec![],
             params: Default::default(),
         }
+    }
+}
+
+/// Start printing debugging information about a .tfm file.
+pub fn debug<'a>(
+    path: Option<&'a str>,
+    sub_file_sizes: SubFileSizes,
+    tfm_file: Option<&'a File>,
+    raw_file: Option<&'a RawFile<'a>>,
+    sections: Vec<Section>,
+) -> impl std::fmt::Display + 'a {
+    debug::Debug {
+        sub_file_sizes,
+        path,
+        raw_file,
+        tfm_file,
+        sections,
     }
 }
 
@@ -490,6 +510,80 @@ pub fn compress(values: &[Number], max_size: u8) -> (Vec<Number>, HashMap<Number
     }
 
     (result, value_to_index)
+}
+
+#[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Section {
+    /// Sub-file sizes
+    SubFileSizes,
+    /// Header
+    Header,
+    /// Character data
+    CharInfos,
+    /// Widths array
+    Widths,
+    /// Heights array
+    Heights,
+    /// Depths array
+    Depths,
+    /// Italic corrections array
+    ItalicCorrections,
+    /// Lig/kern instructions
+    LigKern,
+    /// Kerns array
+    Kerns,
+    /// Extensible recipes
+    ExtensibleRecipes,
+    /// Params array
+    Params,
+}
+
+impl Section {
+    pub const NAMES: [&'static str; 11] = [
+        "sub-file-sizes",
+        "header",
+        "char-infos",
+        "widths",
+        "heights",
+        "depths",
+        "italic-corrections",
+        "lig-kern",
+        "kerns",
+        "extensible-recipes",
+        "params",
+    ];
+    pub const ALL_SECTIONS: [Section; 11] = [
+        Section::SubFileSizes,
+        Section::Header,
+        Section::CharInfos,
+        Section::Widths,
+        Section::Heights,
+        Section::Depths,
+        Section::ItalicCorrections,
+        Section::LigKern,
+        Section::Kerns,
+        Section::ExtensibleRecipes,
+        Section::Params,
+    ];
+}
+
+impl TryFrom<&str> for Section {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        for i in 0..Section::NAMES.len() {
+            if Section::NAMES[i] == value {
+                return Ok(Section::ALL_SECTIONS[i]);
+            }
+        }
+        Err(())
+    }
+}
+
+impl std::fmt::Display for Section {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", Section::NAMES[*self as usize])
+    }
 }
 
 #[cfg(test)]

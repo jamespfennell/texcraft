@@ -2,45 +2,40 @@ use super::*;
 use crate::Number;
 
 pub fn serialize(file: &File) -> Vec<u8> {
+    // We leave space at the start of the buffer for the sub file sizes section.
+    // This will be populated at the end after we determine all the section lengths.
     let mut b = vec![0_u8; 24];
-
-    serialize_header(&file.header, &mut b);
-    let lh: i16 = (18 + file.header.additional_data.len())
-        .try_into()
-        .expect("header.len()=18+header.additional_data.len()<= i16::MAX");
-
-    let (bc, ec) = match file.char_info_bounds() {
-        None => (1, 0),
-        Some((bc, ec)) => {
-            serialize_char_infos(&file.char_dimens, &file.char_tags, bc, ec, &mut b);
-            (bc.0 as i16, ec.0 as i16)
-        }
+    let mut sub_files_sizes = SubFileSizes {
+        lf: 0,
+        lh: serialize_header(&file.header, &mut b),
+        bc: match file.char_info_bounds() {
+            None => 1,
+            Some((Char(bc), _)) => bc as i16,
+        },
+        ec: match file.char_info_bounds() {
+            None => 0,
+            Some((bc, ec)) => {
+                serialize_char_infos(&file.char_dimens, &file.char_tags, bc, ec, &mut b);
+                ec.0 as i16
+            }
+        },
+        nw: serialize_section(&file.widths, &mut b, None),
+        nh: serialize_section(&file.heights, &mut b, None),
+        nd: serialize_section(&file.depths, &mut b, None),
+        ni: serialize_section(&file.italic_corrections, &mut b, None),
+        nl: serialize_section(
+            &file.lig_kern_program.instructions,
+            &mut b,
+            file.lig_kern_program.boundary_char,
+        ),
+        nk: serialize_section(&file.kerns, &mut b, None),
+        ne: serialize_section(&file.extensible_chars, &mut b, None),
+        np: serialize_section(&file.params.0, &mut b, None),
     };
-
-    let nw = serialize_section(&file.widths, &mut b, None);
-
-    let nh = serialize_section(&file.heights, &mut b, None);
-
-    let nd = serialize_section(&file.depths, &mut b, None);
-
-    let ni = serialize_section(&file.italic_corrections, &mut b, None);
-
-    let nl = serialize_section(
-        &file.lig_kern_program.instructions,
-        &mut b,
-        file.lig_kern_program.boundary_char,
-    );
-    let nk = serialize_section(&file.kerns, &mut b, None);
-    let ne = serialize_section(&file.extensible_chars, &mut b, None);
-
-    let np = serialize_section(&file.params.0, &mut b, None);
-
-    let lf = 6 + lh + (ec + 1 - bc) + nw + nh + nd + ni + nl + nk + ne + np;
-    for (u, v) in [lf, lh, bc, ec, nw, nh, nd, ni, nl, nk, ne, np]
-        .into_iter()
-        .enumerate()
-    {
-        [b[2 * u], b[2 * u + 1]] = v.to_be_bytes();
+    sub_files_sizes.lf = sub_files_sizes.valid_lf();
+    let sfs_b: [u8; 24] = sub_files_sizes.into();
+    for (i, byte) in sfs_b.into_iter().enumerate() {
+        b[i] = byte;
     }
     b
 }
@@ -194,7 +189,7 @@ fn serialize_string(s: &Option<String>, size: u8, b: &mut Vec<u8>) {
     }
 }
 
-fn serialize_header(header: &Header, b: &mut Vec<u8>) {
+fn serialize_header(header: &Header, b: &mut Vec<u8>) -> i16 {
     header.checksum.serialize(b, None);
     header.design_size.serialize(b, None);
     serialize_string(&header.character_coding_scheme, 39, b);
@@ -210,4 +205,7 @@ fn serialize_header(header: &Header, b: &mut Vec<u8>) {
     b.push(0);
     b.push(header.face.unwrap_or(0_u8.into()).into());
     serialize_section(&header.additional_data, b, None);
+    (18 + header.additional_data.len())
+        .try_into()
+        .expect("header.len()=18+header.additional_data.len()<= i16::MAX")
 }

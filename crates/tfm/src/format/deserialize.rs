@@ -280,21 +280,90 @@ pub struct SubFileSizes {
     pub np: i16,
 }
 
+impl SubFileSizes {
+    /// Calculate the valid value of lf, given all of the other fields.
+    pub fn valid_lf(&self) -> i16 {
+        let s = self;
+        6 + s.lh + (s.ec - s.bc + 1) + s.nw + s.nh + s.nd + s.ni + s.nl + s.nk + s.ne + s.np
+    }
+}
+
+impl From<[u8; 24]> for SubFileSizes {
+    fn from(value: [u8; 24]) -> Self {
+        let d = |u: usize| -> i16 { i16::from_be_bytes([value[u], value[u + 1]]) };
+        Self {
+            lf: d(0),
+            lh: d(2),
+            bc: d(4),
+            ec: d(6),
+            nw: d(8),
+            nh: d(10),
+            nd: d(12),
+            ni: d(14),
+            nl: d(16),
+            nk: d(18),
+            ne: d(20),
+            np: d(22),
+        }
+    }
+}
+
+impl From<SubFileSizes> for [u8; 24] {
+    fn from(v: SubFileSizes) -> Self {
+        let a = |u: i16| u.to_be_bytes()[0];
+        let b = |u: i16| u.to_be_bytes()[1];
+        [
+            a(v.lf),
+            b(v.lf),
+            a(v.lh),
+            b(v.lh),
+            a(v.bc),
+            b(v.bc),
+            a(v.ec),
+            b(v.ec),
+            a(v.nw),
+            b(v.nw),
+            a(v.nh),
+            b(v.nh),
+            a(v.nd),
+            b(v.nd),
+            a(v.ni),
+            b(v.ni),
+            a(v.nl),
+            b(v.nl),
+            a(v.nk),
+            b(v.nk),
+            a(v.ne),
+            b(v.ne),
+            a(v.np),
+            b(v.np),
+        ]
+    }
+}
+
 impl<'a> RawFile<'a> {
+    pub fn from_debug_output(s: &str) -> Result<Vec<u8>, (String, usize)> {
+        debug::parse(s)
+    }
+
     pub fn deserialize(b: &'a [u8]) -> (Result<Self, Error>, Vec<Warning>) {
-        let deserialize_i16 = |u: usize| -> i16 { i16::from_be_bytes([b[u], b[u + 1]]) };
-        let mut warnings: Vec<Warning> = vec![];
-        let actual_file_length = b.len();
-        match actual_file_length {
-            0 => return (Err(Error::FileIsEmpty), warnings),
-            1 => return (Err(Error::FileHasOneByte(b[0])), warnings),
-            _ => (),
+        let lf = {
+            let b0 = match b.first() {
+                Some(b0) => *b0,
+                None => return (Err(Error::FileIsEmpty), vec![]),
+            };
+            let b1 = match b.get(1) {
+                Some(b1) => *b1,
+                None => return (Err(Error::FileHasOneByte(b0)), vec![]),
+            };
+            i16::from_be_bytes([b0, b1])
         };
-        let lf = deserialize_i16(0);
+        let mut warnings = vec![];
         match lf {
             ..=-1 => return (Err(Error::InternalFileLengthIsNegative(lf)), warnings),
             0 => return (Err(Error::InternalFileLengthIsZero), warnings),
             1.. => {
+                let actual_file_length = b.len();
                 let claimed_file_length = (lf as usize) * 4;
                 match actual_file_length.cmp(&claimed_file_length) {
                     std::cmp::Ordering::Less => {
@@ -318,19 +387,13 @@ impl<'a> RawFile<'a> {
                 }
             }
         }
-        let s = SubFileSizes {
-            lf,
-            lh: deserialize_i16(2),
-            bc: deserialize_i16(4),
-            ec: deserialize_i16(6),
-            nw: deserialize_i16(8),
-            nh: deserialize_i16(10),
-            nd: deserialize_i16(12),
-            ni: deserialize_i16(14),
-            nl: deserialize_i16(16),
-            nk: deserialize_i16(18),
-            ne: deserialize_i16(20),
-            np: deserialize_i16(22),
+        let s: SubFileSizes = {
+            let sb: [u8; 24] = b
+                .get(0..24)
+                .expect("3 < lf <= b.len()")
+                .try_into()
+                .expect("slice has 24 elements so fits in 24 length const array");
+            sb.into()
         };
 
         if s.lh < 0
@@ -372,39 +435,37 @@ impl<'a> RawFile<'a> {
         if s.ne > 255 {
             return (Err(Error::TooManyExtensibleCharacters(s.ne)), warnings);
         }
-        if s.lf
-            != 6 + s.lh + (s.ec - s.bc + 1) + s.nw + s.nh + s.nd + s.ni + s.nl + s.nk + s.ne + s.np
-        {
+        if s.lf != s.valid_lf() {
             return (Err(Error::InconsistentSubFileSizes(s.clone())), warnings);
         }
 
-        let raw_file = {
-            let mut b = b;
-            let mut get = |u: i16| {
-                let u = (u as usize) * 4;
-                let a = &b[..u];
-                b = &b[u..];
-                a
-            };
-            RawFile {
-                raw_sub_file_sizes: get(6),
-                header: get(s.lh),
-                begin_char: bc,
-                end_char: ec,
-                char_infos: get(s.ec - s.bc + 1),
-                widths: get(s.nw),
-                heights: get(s.nh),
-                depths: get(s.nd),
-                italic_corrections: get(s.ni),
-                lig_kern_instructions: get(s.nl),
-                kerns: get(s.nk),
-                extensible_recipes: get(s.ne),
-                params: get(s.np),
-                sub_file_sizes: s,
-            }
-        };
+        (Ok(Self::finish_deserialization(b, s, bc, ec)), warnings)
+    }
 
-        (Ok(raw_file), warnings)
+    pub(crate) fn finish_deserialization(b: &[u8], s: SubFileSizes, bc: Char, ec: Char) -> RawFile {
+        let mut b = b;
+        let mut get = |u: i16| {
+            let u = (u as usize) * 4;
+            let a = &b[..u];
+            b = &b[u..];
+            a
+        };
+        RawFile {
+            raw_sub_file_sizes: get(6),
+            header: get(s.lh),
+            begin_char: bc,
+            end_char: ec,
+            char_infos: get(s.ec - s.bc + 1),
+            widths: get(s.nw),
+            heights: get(s.nh),
+            depths: get(s.nd),
+            italic_corrections: get(s.ni),
+            lig_kern_instructions: get(s.nl),
+            kerns: get(s.nk),
+            extensible_recipes: get(s.ne),
+            params: get(s.np),
+            sub_file_sizes: s,
+        }
     }
 }
 

@@ -7,7 +7,9 @@ use common::*;
 
 fn main() {
     if let Err(err) = Cli::parse().run() {
-        eprintln!("{err}");
+        if !err.is_empty() {
+            eprintln!("{err}");
+        }
         std::process::exit(1);
     }
 }
@@ -43,6 +45,7 @@ impl Cli {
             Command::ConvertBatch(convert_batch) => convert_batch.run(),
             Command::Debug(debug) => debug.run(),
             Command::Fmt(format) => format.run(),
+            Command::Undebug(undebug) => undebug.run(),
         }
     }
 }
@@ -55,7 +58,7 @@ enum Command {
     Convert(Convert),
     /// Convert a batch of .tfm and .pl files.
     ConvertBatch(ConvertBatch),
-    /// Debug a .tfm file.
+    /// Print debugging information about a .tfm file.
     ///
     /// This subcommand is used to debug the contents of a .tfm file.
     /// Unlike .pl files - which are regular ASCII, human-readable,
@@ -78,10 +81,47 @@ enum Command {
     /// There are 10 sections in a .tfm file, each containing data of a specific type.
     /// To just print one or more of the sections, use the `-s` or `--section` flag:
     ///
-    ///     $ tfmtools debug path/to/file.tfml --section widths --section heights
+    ///     $ tfmtools debug path/to/file.tfm --section widths --section heights
     Debug(Debug),
     /// Format a .pl file.
     Fmt(Format),
+    /// Create a .tfm file from the (potentially modified) output of `tfmtools debug`
+    ///
+    /// The `tfmtools debug` command outputs a plain text representation of the binary
+    ///     data in a .tfm file.
+    /// This command reconstructs .tfm binary files from this plain text output.
+    ///
+    /// There are at least two use cases for this command:
+    ///
+    /// 1.
+    ///     If you have a corrupted .tfm file and know enough about the format to fix it,
+    ///     you can run `tfmtools debug`,
+    ///     manually fix the bytes in the text output,
+    ///     and then create a hopefully valid .tfm from the modified output using `tfmtools undebug`.
+    ///
+    /// 2.
+    ///     If you're writing code that reads .tfm files (potentially using Texcraft's tfm crate)
+    ///     you can use this command to create invalid or otherwise unusual .tfm files
+    ///     for testing.
+    ///
+    /// If you're modifying the debug output it may be useful to some of the parsing rules:
+    ///
+    /// 1.
+    ///     You can omit .tfm sections.
+    ///     In the outputted .tfm file, all unspecified sections will be output as empty
+    ///     sections with the exception of the sub file sizes section, which is calculated
+    ///     correctly.
+    ///
+    /// 2.
+    ///     Only data within binary data sections is parsed.
+    ///     Text in other sections is completely ignored.
+    ///
+    /// 3.
+    ///     Within binary data sections, all lines beginning with // are ignored.
+    ///
+    /// 4.
+    ///     Within binary data sections, all data before the first | character is ignored.
+    Undebug(Undebug),
 }
 
 #[derive(Clone, Debug, Parser)]
@@ -257,7 +297,7 @@ struct Debug {
     /// Sections of the .tfm file to display.
     ///
     /// If no sections are provided, all sections will be displayed.
-    #[arg(short, long)]
+    #[arg(short, long, value_enum)]
     section: Vec<Section>,
 
     /// Only display raw data.
@@ -267,6 +307,43 @@ struct Debug {
     /// Only display parsed data.
     #[arg(long)]
     parsed: bool,
+
+    /// Omit the .tfm path in the output.
+    ///
+    /// This is useful if you're using the output to diff two .tfm files.
+    #[arg(long)]
+    omit_tfm_path: bool,
+}
+
+#[derive(Clone, Debug)]
+struct Section(tfm::format::Section);
+
+impl Section {
+    const ALL_VARIANTS: [Section; 11] = [
+        Section(tfm::format::Section::SubFileSizes),
+        Section(tfm::format::Section::Header),
+        Section(tfm::format::Section::CharInfos),
+        Section(tfm::format::Section::Widths),
+        Section(tfm::format::Section::Heights),
+        Section(tfm::format::Section::Depths),
+        Section(tfm::format::Section::ItalicCorrections),
+        Section(tfm::format::Section::LigKern),
+        Section(tfm::format::Section::Kerns),
+        Section(tfm::format::Section::ExtensibleRecipes),
+        Section(tfm::format::Section::Params),
+    ];
+}
+
+impl clap::ValueEnum for Section {
+    fn value_variants<'a>() -> &'a [Self] {
+        &Section::ALL_VARIANTS
+    }
+
+    fn to_possible_value(&self) -> Option<clap::builder::PossibleValue> {
+        Some(clap::builder::PossibleValue::new(
+            tfm::format::Section::NAMES[self.0 as usize],
+        ))
+    }
 }
 
 impl Debug {
@@ -274,153 +351,34 @@ impl Debug {
         let (tfm_bytes, tfm_file, _) = self.path.read()?;
         let raw_file = tfm::format::RawFile::deserialize(&tfm_bytes).0.unwrap();
 
-        let sections = {
-            let mut s: HashSet<Section> = self.section.iter().copied().collect();
-            match s.remove(&Section::All) || s.is_empty() {
-                true => Section::all(),
+        let path = if self.omit_tfm_path {
+            None
+        } else {
+            self.path.0.to_str()
+        };
+
+        let sub_file_sizes = raw_file.sub_file_sizes.clone();
+        let (raw_file, tfm_file) = match (self.raw, self.parsed) {
+            (false, false) | (true, true) => (Some(&raw_file), Some(&tfm_file)),
+            (true, false) => (Some(&raw_file), None),
+            (false, true) => (None, Some(&tfm_file)),
+        };
+        let sections: Vec<tfm::format::Section> = {
+            let s: HashSet<tfm::format::Section> = self.section.iter().map(|s| s.0).collect();
+            match s.is_empty() {
+                true => tfm::format::Section::ALL_SECTIONS.into(),
                 false => {
-                    let mut v: Vec<Section> = s.into_iter().collect();
+                    let mut v: Vec<tfm::format::Section> = s.into_iter().collect();
                     v.sort();
                     v
                 }
             }
         };
-        let (raw, parsed) = match (self.raw, self.parsed) {
-            (false, false) => (true, true),
-            t => t,
-        };
-        for section in sections {
-            let (raw_data, parsed_data) = section.get(&raw_file, &tfm_file);
-            if raw {
-                println!("────────────────────────────[{:?} - raw]", section);
-                if raw_data.is_empty() {
-                    println!("[empty]")
-                }
-                for (j, word) in WordIter(raw_data).enumerate() {
-                    println!(
-                        "{} │ {:4}{:4}{:4}{:4}",
-                        section.index(j),
-                        word[0],
-                        word[1],
-                        word[2],
-                        word[3]
-                    );
-                }
-            }
-            if parsed {
-                println!("────────────────────────────[{:?} - parsed]", section);
-                println!("{:#?}", parsed_data);
-            }
-        }
+        print!(
+            "{}",
+            tfm::format::debug(path, sub_file_sizes, tfm_file, raw_file, sections)
+        );
         Ok(())
-    }
-}
-
-#[derive(Debug, Hash, Clone, Copy, clap::ValueEnum, PartialEq, Eq, PartialOrd, Ord)]
-enum Section {
-    /// Output all sections
-    All,
-    /// Sub-file sizes
-    SubFileSizes,
-    /// Header
-    Header,
-    /// Character data
-    CharInfos,
-    /// Widths array
-    Widths,
-    /// Heights array
-    Heights,
-    /// Depths array
-    Depths,
-    /// Italic corrections array
-    ItalicCorrections,
-    /// Lig/kern instructions
-    LigKern,
-    /// Kerns array
-    Kerns,
-    /// Extensible recipes
-    ExtensibleRecipes,
-    /// Params array
-    Params,
-}
-
-impl Section {
-    fn all() -> Vec<Section> {
-        use Section::*;
-        vec![
-            SubFileSizes,
-            Header,
-            CharInfos,
-            Widths,
-            Heights,
-            Depths,
-            ItalicCorrections,
-            LigKern,
-            Kerns,
-            ExtensibleRecipes,
-            Params,
-        ]
-    }
-    fn get<'a>(
-        &self,
-        raw_file: &'a tfm::format::RawFile<'a>,
-        file: &'a tfm::format::File,
-    ) -> (&'a [u8], Box<dyn std::fmt::Debug + 'a>) {
-        match self {
-            Section::All => panic!("this method doesn't work with Section::All"),
-            Section::SubFileSizes => (
-                raw_file.raw_sub_file_sizes,
-                Box::new(&raw_file.sub_file_sizes),
-            ),
-            Section::Header => (raw_file.header, Box::new(&file.header)),
-            Section::CharInfos => {
-                (raw_file.char_infos, Box::new(CharInfoDisplay{ file }))
-            }
-            Section::Widths => (raw_file.widths, Box::new(&file.widths)),
-            Section::Heights => (raw_file.heights, Box::new(&file.heights)),
-            Section::Depths => (raw_file.depths, Box::new(&file.depths)),
-            Section::ItalicCorrections => (
-                raw_file.italic_corrections,
-                Box::new(&file.italic_corrections),
-            ),
-            Section::LigKern => (
-                raw_file.lig_kern_instructions,
-                Box::new(&file.lig_kern_program),
-            ),
-            Section::Kerns => (raw_file.kerns, Box::new(&file.kerns)),
-            Section::ExtensibleRecipes => (
-                raw_file.extensible_recipes,
-                Box::new(&file.extensible_chars),
-            ),
-            Section::Params => (raw_file.params, Box::new(&file.params)),
-        }
-    }
-    fn index(&self, j: usize) -> String {
-        let default = format!("{:5}", j);
-        if *self != Self::CharInfos {
-            return default;
-        }
-        let raw: u8 = match j.try_into() {
-            Ok(raw) => raw,
-            Err(_) => return default,
-        };
-        format_char(tfm::Char(raw))
-    }
-}
-
-struct WordIter<'a>(&'a [u8]);
-
-impl<'a> Iterator for WordIter<'a> {
-    type Item = [u8; 4];
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.0.get(..4) {
-            None => None,
-            Some(head) => {
-                self.0 = &self.0[4..];
-                Some([head[0], head[1], head[2], head[3]])
-            }
-        }
     }
 }
 
@@ -445,31 +403,62 @@ impl Format {
     }
 }
 
+#[derive(Clone, Debug, Parser)]
+struct Undebug {
+    /// Path to the output of `tfmtools debug`.
+    input: std::path::PathBuf,
 
-struct CharInfoDisplay<'a> {
-    file: &'a tfm::format::File,
+    /// Path to write the .tfm file.
+    output: TfPath,
 }
 
-impl<'a> std::fmt::Debug for CharInfoDisplay<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for u in 0_u8..=255 {
-            writeln!(f,"{}:", format_char(tfm::Char(u)))?;
-            if let Some(dimens) = self.file.char_dimens.get(&tfm::Char(u)) {
-                writeln![f, "      dimens={:?}", dimens]?;
+impl Undebug {
+    fn run(&self) -> Result<(), String> {
+        let data = match std::fs::read_to_string(&self.input) {
+            Ok(data) => data,
+            Err(err) => {
+                return Err(format!(
+                    "Failed to read `{}`: {}",
+                    self.input.display(),
+                    err
+                ))
             }
-            if let Some(tag) = self.file.char_tags.get(&tfm::Char(u)) {
-                    writeln![f, "      tag={:?}", tag]?;
+        };
+        match tfm::format::RawFile::from_debug_output(&data) {
+            Ok(b) => {
+                self.output.write(&b)?;
+                Ok(())
+            }
+            Err((err, n)) => {
+                // TODO: this logic should be behind an arg type like TfmFile?
+                let source = common::AriadneSource {
+                    path: self.input.clone(),
+                    source: data.clone().into(),
+                };
+
+                let range = line_range(&data, n);
+                let builder = ariadne::Report::build(ariadne::ReportKind::Error, (), range.start)
+                    .with_message("failed to parse `tfmtool debug` output");
+                let builder = builder.with_label(
+                    ariadne::Label::new(range)
+                        .with_message(err)
+                        .with_color(ariadne::Color::Red),
+                );
+                let report = builder.finish();
+                report.eprint(&source).unwrap();
+                Err("".into())
             }
         }
-        Ok(())
     }
 }
 
-fn format_char(c: tfm::Char) -> String {
-    let ch = c.0 as char;
-    if ch.is_ascii_alphanumeric() || ch.is_ascii_graphic() {
-        format!("   {}", ch)
-    } else {
-        format!("0x{:02x}", c.0)
+fn line_range(s: &str, n: usize) -> std::ops::Range<usize> {
+    let mut consumed = 0;
+    for (m, line) in s.lines().enumerate() {
+        if m == n {
+            return consumed..consumed + line.len();
+        }
+        consumed += 1 + line.len();
     }
+    panic!("s contains a line with index n");
 }
