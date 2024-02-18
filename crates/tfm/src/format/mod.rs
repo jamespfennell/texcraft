@@ -73,22 +73,37 @@ pub struct File {
 pub struct CharDimensions {
     /// Index of the width of this character in the widths array.
     ///
-    /// In TFM files, if the width index is zero it means there is no data for the character in the file.
-    /// In this case the other indices are necessarily zero.
+    /// In valid TFM files, this index will always be non-zero.
+    /// This is because if the width index is zero it means there is no data for the character in the file.
+    /// In this case the other indices (height, etc.) are necessarily zero.
     /// See TFtoPL.2014.? (where blocks of data with a zero width index are skipped)
-    ///     and PLtoTF.2014.? (where missing characters are written with all indices 0)
+    ///     and PLtoTF.2014.? (where missing characters are written with all indices 0).
+    ///
+    /// There is one edge case where this index can be zero.
+    /// This is if the width index is invalid.
+    /// In this case tftopl essentially sets the width index to 0.
     ///
     /// Note that even if a character doesn't have dimensions, it can still have a tag.
-    ///
-    /// In this crate we represent the TFM data for each character as [`Option<CharDimensions>`].
-    /// If the width index is zero, the data is [None].
-    /// Otherwise the data is a [CharDimensions] value with an index that is statically guaranteed to be non-zero.
-    /// This makes the illegal state of a zero width index and non-zero height index un-representable.
-    pub width_index: NonZeroU8,
+    pub width_index: WidthIndex,
     /// Index of the height of this character in the height array.
     pub height_index: u8,
     pub depth_index: u8,
     pub italic_index: u8,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum WidthIndex {
+    Invalid,
+    Valid(NonZeroU8),
+}
+
+impl WidthIndex {
+    pub fn get(&self) -> u8 {
+        match self {
+            WidthIndex::Invalid => 0,
+            WidthIndex::Valid(n) => n.get(),
+        }
+    }
 }
 
 /// Tag of a character in a .tfm file.
@@ -184,7 +199,7 @@ impl File {
 
     /// Calculate the checksum of this .tfm file.
     pub fn checksum(&self) -> u32 {
-        // This checksum algorithm is in PLtoTF.2014.13.
+        // This checksum algorithm is in PLtoTF.2014.134.
         let (bc, ec) = self.char_info_bounds().unwrap_or((Char(1), Char(0)));
         let mut b = [bc.0, ec.0, bc.0, ec.0];
         for c in bc.0..=ec.0 {
@@ -223,7 +238,7 @@ impl File {
         let mut depths = vec![];
         let mut italic_corrections = vec![];
         for (char, char_dimens) in &pl_file.char_dimens {
-            widths.push(char_dimens.width);
+            widths.push(char_dimens.width.unwrap_or_default());
             match char_dimens.height {
                 None | Some(Number::ZERO) => {}
                 Some(height) => heights.push(height),
@@ -258,13 +273,14 @@ impl File {
                         Some(pl_data) => pl_data,
                         None => continue,
                     };
-                    let width_index = *width_to_index.get(&pl_data.width).expect(
+                    let width = pl_data.width.unwrap_or_default();
+                    let width_index = *width_to_index.get(&width).expect(
                         "the map returned from compress(_,_) contains every input as a key",
                     );
                     m.insert(
                         Char(c),
                         CharDimensions {
-                            width_index,
+                            width_index: WidthIndex::Valid(width_index),
                             height_index: match pl_data.height {
                                 None => 0,
                                 Some(height) => {
@@ -334,8 +350,8 @@ impl File {
             extensible_chars,
             params: pl_file.params.clone(),
         };
-        if file.header.checksum == 0 {
-            file.header.checksum = file.checksum();
+        if file.header.checksum.is_none() {
+            file.header.checksum = Some(file.checksum());
         }
         file.header.seven_bit_safe = Some(true); // TODO: calculate this
         file

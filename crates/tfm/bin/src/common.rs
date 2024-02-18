@@ -86,11 +86,11 @@ impl TfPath {
         };
         let (tfm_file_or, warnings) = tfm::format::File::deserialize(&data);
         for warning in &warnings {
-            eprintln!("{}", warning.tf_to_pl_message())
+            eprintln!("{}", warning.tftopl_message())
         }
         let tfm_file = match tfm_file_or {
             Ok(t) => t,
-            Err(err) => return Err(err.tf_to_pl_message()),
+            Err(err) => return Err(err.tftopl_message()),
         };
         Ok((data, tfm_file, warnings))
     }

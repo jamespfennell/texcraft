@@ -1,0 +1,248 @@
+Bad TFM file: Width 1 is too big;
+I have set it to zero.
+Bad TFM file: Width 2 is too big;
+I have set it to zero.
+Bad TFM file: Width 3 is too big;
+I have set it to zero.
+Bad TFM file: Width 4 is too big;
+I have set it to zero.
+Bad TFM file: Width 5 is too big;
+I have set it to zero.
+Bad TFM file: Width 6 is too big;
+I have set it to zero.
+Bad TFM file: Width 7 is too big;
+I have set it to zero.
+Bad TFM file: Width 8 is too big;
+I have set it to zero.
+Bad TFM file: Width 9 is too big;
+I have set it to zero.
+Bad TFM file: Width 10 is too big;
+I have set it to zero.
+Bad TFM file: Width 11 is too big;
+I have set it to zero.
+Bad TFM file: Width 12 is too big;
+I have set it to zero.
+Bad TFM file: Width 13 is too big;
+I have set it to zero.
+Bad TFM file: Width 14 is too big;
+I have set it to zero.
+Bad TFM file: Width 15 is too big;
+I have set it to zero.
+Bad TFM file: Width 16 is too big;
+I have set it to zero.
+Bad TFM file: Width 17 is too big;
+I have set it to zero.
+Bad TFM file: Width 18 is too big;
+I have set it to zero.
+Bad TFM file: Width 19 is too big;
+I have set it to zero.
+Bad TFM file: Width 20 is too big;
+I have set it to zero.
+Bad TFM file: Width 21 is too big;
+I have set it to zero.
+Bad TFM file: Width 22 is too big;
+I have set it to zero.
+Bad TFM file: Width 23 is too big;
+I have set it to zero.
+Bad TFM file: Width 24 is too big;
+I have set it to zero.
+Bad TFM file: Width 25 is too big;
+I have set it to zero.
+Bad TFM file: Width 26 is too big;
+I have set it to zero.
+Bad TFM file: Width 27 is too big;
+I have set it to zero.
+Bad TFM file: Width 28 is too big;
+I have set it to zero.
+Bad TFM file: Width 29 is too big;
+I have set it to zero.
+Bad TFM file: Width 30 is too big;
+I have set it to zero.
+Bad TFM file: Width 31 is too big;
+I have set it to zero.
+Bad TFM file: Width 32 is too big;
+I have set it to zero.
+Bad TFM file: Width 33 is too big;
+I have set it to zero.
+Bad TFM file: Width 34 is too big;
+I have set it to zero.
+Bad TFM file: Width 35 is too big;
+I have set it to zero.
+Bad TFM file: Width 36 is too big;
+I have set it to zero.
+Bad TFM file: Width 37 is too big;
+I have set it to zero.
+Bad TFM file: Width 38 is too big;
+I have set it to zero.
+Bad TFM file: Width 39 is too big;
+I have set it to zero.
+Bad TFM file: Width 40 is too big;
+I have set it to zero.
+Bad TFM file: Width 41 is too big;
+I have set it to zero.
+Bad TFM file: Width 42 is too big;
+I have set it to zero.
+Bad TFM file: Width 43 is too big;
+I have set it to zero.
+Bad TFM file: Width 44 is too big;
+I have set it to zero.
+Bad TFM file: Width 45 is too big;
+I have set it to zero.
+Bad TFM file: Width 46 is too big;
+I have set it to zero.
+Bad TFM file: Width 47 is too big;
+I have set it to zero.
+Bad TFM file: Width 48 is too big;
+I have set it to zero.
+Bad TFM file: Width 49 is too big;
+I have set it to zero.
+Bad TFM file: Width 50 is too big;
+I have set it to zero.
+Bad TFM file: Width 51 is too big;
+I have set it to zero.
+Bad TFM file: Width 52 is too big;
+I have set it to zero.
+Bad TFM file: Width 53 is too big;
+I have set it to zero.
+Bad TFM file: Width 54 is too big;
+I have set it to zero.
+Bad TFM file: Width 55 is too big;
+I have set it to zero.
+Bad TFM file: Width 56 is too big;
+I have set it to zero.
+Bad TFM file: Width 57 is too big;
+I have set it to zero.
+Bad TFM file: Width 58 is too big;
+I have set it to zero.
+Bad TFM file: Width 59 is too big;
+I have set it to zero.
+Bad TFM file: Width 60 is too big;
+I have set it to zero.
+Bad TFM file: Width 61 is too big;
+I have set it to zero.
+Bad TFM file: Width 62 is too big;
+I have set it to zero.
+Bad TFM file: Width 63 is too big;
+I have set it to zero.
+Bad TFM file: Width 64 is too big;
+I have set it to zero.
+Bad TFM file: Width 65 is too big;
+I have set it to zero.
+Bad TFM file: Width 66 is too big;
+I have set it to zero.
+Bad TFM file: Height 2 is too big;
+I have set it to zero.
+Bad TFM file: Height 3 is too big;
+I have set it to zero.
+Bad TFM file: Height 4 is too big;
+I have set it to zero.
+Bad TFM file: Height 5 is too big;
+I have set it to zero.
+Bad TFM file: Height 6 is too big;
+I have set it to zero.
+Bad TFM file: Height 7 is too big;
+I have set it to zero.
+Bad TFM file: Height 8 is too big;
+I have set it to zero.
+Bad TFM file: Height 9 is too big;
+I have set it to zero.
+Bad TFM file: Height 10 is too big;
+I have set it to zero.
+Bad TFM file: Height 11 is too big;
+I have set it to zero.
+Bad TFM file: Height 12 is too big;
+I have set it to zero.
+Bad TFM file: Height 13 is too big;
+I have set it to zero.
+Bad TFM file: Height 14 is too big;
+I have set it to zero.
+Bad TFM file: Height 15 is too big;
+I have set it to zero.
+Bad TFM file: Depth 1 is too big;
+I have set it to zero.
+Bad TFM file: Depth 2 is too big;
+I have set it to zero.
+Bad TFM file: Depth 3 is too big;
+I have set it to zero.
+Bad TFM file: Depth 4 is too big;
+I have set it to zero.
+Bad TFM file: Depth 5 is too big;
+I have set it to zero.
+Bad TFM file: Depth 6 is too big;
+I have set it to zero.
+Bad TFM file: Depth 7 is too big;
+I have set it to zero.
+Bad TFM file: Depth 8 is too big;
+I have set it to zero.
+Bad TFM file: Depth 9 is too big;
+I have set it to zero.
+Bad TFM file: Depth 10 is too big;
+I have set it to zero.
+Bad TFM file: Depth 12 is too big;
+I have set it to zero.
+Bad TFM file: Depth 13 is too big;
+I have set it to zero.
+Bad TFM file: Depth 14 is too big;
+I have set it to zero.
+Bad TFM file: Depth 15 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 1 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 2 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 3 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 4 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 5 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 6 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 7 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 8 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 9 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 10 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 11 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 12 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 13 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 14 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 15 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 16 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 17 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 18 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 19 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 20 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 21 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 22 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 23 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 24 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 25 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 26 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 27 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 28 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 29 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 30 is too big;
+I have set it to zero.

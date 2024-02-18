@@ -501,7 +501,7 @@ node_impl!(
 #[derive(PartialEq, Eq, Debug)]
 pub enum Character {
     /// The character's width in design units.
-    Width(SingleValue<Number>),
+    Width(SingleValue<Option<Number>>),
 
     /// The character's height in design units.
     Height(SingleValue<Number>),
@@ -1145,6 +1145,20 @@ impl Parse for Number {
     }
 }
 
+impl Parse for Option<Number> {
+    fn parse(input: &mut Input) -> (Self, Range<usize>) {
+        let (n, r) = Number::parse(input);
+        (Some(n), r)
+    }
+
+    fn to_string(self, opts: &LowerOpts) -> Option<String> {
+        match self {
+            None => None,
+            Some(n) => Parse::to_string(n, opts),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::pl::cst::BalancedElem;
@@ -1626,7 +1640,7 @@ mod tests {
                     data_span: 828..831,
                     children: vec![
                         Character::Width(SingleValue {
-                            data: Number::UNITY * 6,
+                            data: Some(Number::UNITY * 6),
                             data_span: 855..858,
                         }),
                         Character::Height(SingleValue {

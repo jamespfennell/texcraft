@@ -1,0 +1,12 @@
+ 
+Width index for character '130 is too large;
+so I reset it to zero.
+ 
+Depth index for character '130 is too large;
+so I reset it to zero.
+ 
+Italic correction index for character '130 is too large;
+so I reset it to zero.
+ 
+Height index for character '131 is too large;
+so I reset it to zero.

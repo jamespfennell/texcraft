@@ -50,7 +50,7 @@ pub const MAX_LIG_KERN_INSTRUCTIONS: u16 = (i16::MAX as u16) - 257;
 /// Data about one character in a .pl file.
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct CharDimensions {
-    pub width: Number,
+    pub width: Option<Number>,
     pub height: Option<Number>,
     pub depth: Option<Number>,
     pub italic_correction: Option<Number>,
@@ -78,7 +78,7 @@ pub struct File {
 impl Default for File {
     fn default() -> Self {
         Self {
-            header: Header::property_list_default(),
+            header: Header::pl_default(),
             design_units: Number::UNITY,
             char_dimens: Default::default(),
             char_tags: Default::default(),
@@ -128,7 +128,7 @@ impl File {
         for node in ast.0 {
             match node {
                 ast::Root::Checksum(v) => {
-                    file.header.checksum = v.data;
+                    file.header.checksum = Some(v.data);
                 }
                 ast::Root::DesignSize(v) => {
                     file.header.design_size = v.data;
@@ -324,11 +324,10 @@ impl File {
                 (
                     *c,
                     CharDimensions {
-                        width: tfm_file
-                            .widths
-                            .get(info.width_index.get() as usize)
-                            .copied()
-                            .unwrap_or_default(),
+                        width: match info.width_index {
+                            format::WidthIndex::Invalid => None,
+                            format::WidthIndex::Valid(n) => Some(tfm_file.widths[n.get() as usize]),
+                        },
                         height: if info.height_index == 0 {
                             None
                         } else {
@@ -430,7 +429,7 @@ impl File {
             ast::Root::DesignSize(self.header.design_size.into()),
             ast::Root::Comment(vec!["DESIGNSIZE IS IN POINTS".into()]),
             ast::Root::Comment(vec!["OTHER SIZES ARE MULTIPLES OF DESIGNSIZE".into()]),
-            ast::Root::Checksum(self.header.checksum.into()),
+            ast::Root::Checksum(self.header.checksum.unwrap_or_default().into()),
         ]);
         if self.header.seven_bit_safe == Some(true) {
             roots.push(ast::Root::SevenBitSafeFlag(true.into()));
@@ -589,7 +588,14 @@ impl File {
                 Some(data) => data,
             };
             let mut v = vec![];
-            v.push(ast::Character::Width(data.width.into()));
+            match data.width {
+                None => {
+                    v.push(ast::Character::Width(None.into()));
+                }
+                Some(width) => {
+                    v.push(ast::Character::Width(Some(width).into()));
+                }
+            };
             if let Some(height) = data.height {
                 v.push(ast::Character::Height(height.into()));
             }
@@ -693,7 +699,7 @@ pub enum CharDisplayFormat {
 
 #[cfg(test)]
 mod tests {
-    use crate::Face;
+    use crate::{format::WidthIndex, Face};
 
     use self::format::ExtensibleRecipe;
 
@@ -724,8 +730,19 @@ mod tests {
             "(CHECKSUM H 7)",
             File {
                 header: Header {
-                    checksum: 0x7,
-                    ..Header::property_list_default()
+                    checksum: Some(0x7),
+                    ..Header::pl_default()
+                },
+                ..Default::default()
+            },
+        ),
+        (
+            checksum_0,
+            "(CHECKSUM O 0)",
+            File {
+                header: Header {
+                    checksum: Some(0),
+                    ..Header::pl_default()
                 },
                 ..Default::default()
             },
@@ -736,7 +753,7 @@ mod tests {
             File {
                 header: Header {
                     design_size: Number::UNITY * 3,
-                    ..Header::property_list_default()
+                    ..Header::pl_default()
                 },
                 ..Default::default()
             },
@@ -755,7 +772,7 @@ mod tests {
             File {
                 header: Header {
                     character_coding_scheme: Some("Hola Mundo".into()),
-                    ..Header::property_list_default()
+                    ..Header::pl_default()
                 },
                 ..Default::default()
             },
@@ -766,7 +783,7 @@ mod tests {
             File {
                 header: Header {
                     font_family: Some("Hello World".into()),
-                    ..Header::property_list_default()
+                    ..Header::pl_default()
                 },
                 ..Default::default()
             },
@@ -777,7 +794,7 @@ mod tests {
             File {
                 header: Header {
                     face: Some(Face::Other(0x29)),
-                    ..Header::property_list_default()
+                    ..Header::pl_default()
                 },
                 ..Default::default()
             },
@@ -788,7 +805,7 @@ mod tests {
             File {
                 header: Header {
                     seven_bit_safe: Some(true),
-                    ..Header::property_list_default()
+                    ..Header::pl_default()
                 },
                 ..Default::default()
             },
@@ -799,7 +816,7 @@ mod tests {
             File {
                 header: Header {
                     additional_data: vec![0, 0, 0x1234567],
-                    ..Header::property_list_default()
+                    ..Header::pl_default()
                 },
                 ..Default::default()
             },
@@ -950,7 +967,7 @@ mod tests {
                 char_dimens: HashMap::from([(
                     'r'.try_into().unwrap(),
                     CharDimensions {
-                        width: Number::UNITY * 15,
+                        width: Some(Number::UNITY * 15),
                         ..Default::default()
                     }
                 )]),
@@ -1082,7 +1099,7 @@ mod tests {
                 (
                     Char('A'.try_into().unwrap()),
                     crate::format::CharDimensions {
-                        width_index: 1.try_into().unwrap(),
+                        width_index: WidthIndex::Valid(1.try_into().unwrap()),
                         height_index: 0,
                         depth_index: 0,
                         italic_index: 0,
@@ -1091,7 +1108,16 @@ mod tests {
                 (
                     Char('C'.try_into().unwrap()),
                     crate::format::CharDimensions {
-                        width_index: 2.try_into().unwrap(),
+                        width_index: WidthIndex::Valid(2.try_into().unwrap()),
+                        height_index: 0,
+                        depth_index: 0,
+                        italic_index: 0,
+                    }
+                ),
+                (
+                    Char('E'.try_into().unwrap()),
+                    crate::format::CharDimensions {
+                        width_index: WidthIndex::Invalid,
                         height_index: 0,
                         depth_index: 0,
                         italic_index: 0,
@@ -1106,14 +1132,21 @@ mod tests {
                 (
                     'A'.try_into().unwrap(),
                     CharDimensions {
-                        width: Number::UNITY,
+                        width: Some(Number::UNITY),
                         ..Default::default()
                     }
                 ),
                 (
                     'C'.try_into().unwrap(),
                     CharDimensions {
-                        width: Number::UNITY * 2,
+                        width: Some(Number::UNITY * 2),
+                        ..Default::default()
+                    }
+                ),
+                (
+                    'E'.try_into().unwrap(),
+                    CharDimensions {
+                        width: None,
                         ..Default::default()
                     }
                 ),

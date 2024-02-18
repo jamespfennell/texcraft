@@ -1,0 +1,4 @@
+Bad TFM file: width[0] should be zero.
+Bad TFM file: height[0] should be zero.
+Bad TFM file: depth[0] should be zero.
+Bad TFM file: italic[0] should be zero.

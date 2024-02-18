@@ -1,0 +1,3 @@
+An "R" or "D" value is needed here (line 10).
+   (CHARWD 
+          )  

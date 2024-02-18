@@ -9,8 +9,17 @@ pub mod pl;
 /// This is defined in TFtoPL.2014.10.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Header {
+    /// The font checksum, if specified.
+    ///
+    /// In .tfm files checksums are always specified because the format has no
+    ///     way to omit a checksum.
+    ///
+    /// In .pl files checksums are specified if the `CHECKSUM` node appears.
+    /// If no checksum is specified in a .pl file, pltotf calculates the
+    ///     correct value and writes that.
+    ///
     /// In TeX82, this is stored in the `font_check` array (TeX82.2021.549).
-    pub checksum: u32,
+    pub checksum: Option<u32>,
     /// In TeX82, this is stored in the `font_dsize` array (TeX82.2021.549).
     pub design_size: Number,
     pub character_coding_scheme: Option<String>,
@@ -25,14 +34,29 @@ impl Header {
     /// Returns the default header when parsing property list files.
     ///
     /// This is defined in PLtoTF.2014.70.
-    pub fn property_list_default() -> Header {
+    pub fn pl_default() -> Header {
         Header {
-            checksum: 0,
+            checksum: None,
             design_size: Number::UNITY * 10,
             character_coding_scheme: Some("UNSPECIFIED".into()),
             font_family: Some("UNSPECIFIED".into()),
             seven_bit_safe: Some(false),
             face: Some(0.into()),
+            additional_data: vec![],
+        }
+    }
+
+    /// Returns the default header when parsing .tfm files.
+    ///
+    /// This is defined in PLtoTF.2014.70.
+    pub fn tfm_default() -> Header {
+        Header {
+            checksum: Some(0),
+            design_size: Number::ZERO,
+            character_coding_scheme: None,
+            font_family: None,
+            seven_bit_safe: None,
+            face: None,
             additional_data: vec![],
         }
     }

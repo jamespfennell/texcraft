@@ -71,26 +71,36 @@ impl Cli {
 
         // Conversion
         let (tfm_file_or, warnings) = tfm::format::File::deserialize(&tfm_data);
-        for warning in warnings {
-            eprintln!("{}", warning.tf_to_pl_message())
+        for warning in &warnings {
+            eprintln!("{}", warning.tftopl_message())
         }
         let tfm_file = match tfm_file_or {
             Ok(tfm_file) => tfm_file,
             Err(err) => {
                 return Err(format![
                     "{}\nSorry, but I can't go on; are you sure this is a TFM?",
-                    err.tf_to_pl_message()
+                    err.tftopl_message()
                 ])
             }
         };
         let pl_file = tfm::pl::File::from_tfm_file(tfm_file);
+        let tfm_modified = warnings
+            .iter()
+            .map(tfm::format::DeserializeWarning::tfm_file_modified)
+            .any(|t| t);
+        let suffix = if tfm_modified {
+            "(COMMENT THE TFM FILE WAS BAD, SO THE DATA HAS BEEN CHANGED!)\n"
+        } else {
+            ""
+        };
         let pl_output = format![
-            "{}",
+            "{}{}",
             pl_file.display(
                 3,
                 self.charcode_format
                     .to_display_format(&pl_file.header.character_coding_scheme)
-            )
+            ),
+            suffix
         ];
 
         // Output

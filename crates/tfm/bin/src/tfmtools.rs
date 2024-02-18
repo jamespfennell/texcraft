@@ -187,7 +187,7 @@ impl Convert {
     fn run(&self) -> Result<(), String> {
         match &self.path {
             TfOrPlPath::Tf(tf_path) => {
-                let (_, tfm_file, _) = tf_path.read()?;
+                let (_, tfm_file, warnings) = tf_path.read()?;
                 let pl_file = tfm::pl::File::from_tfm_file(tfm_file);
                 let pl_output = format![
                     "{}",
@@ -197,8 +197,17 @@ impl Convert {
                             .to_display_format(&pl_file.header.character_coding_scheme)
                     )
                 ];
+                let tfm_modified = warnings
+                    .iter()
+                    .map(tfm::format::DeserializeWarning::tfm_file_modified)
+                    .any(|t| t);
+                let suffix = if tfm_modified {
+                    "(COMMENT THE TFM FILE WAS BAD, SO THE DATA HAS BEEN CHANGED!)\n"
+                } else {
+                    ""
+                };
                 match &self.output {
-                    None => print!("{pl_output}"),
+                    None => print!("{pl_output}{suffix}"),
                     Some(TfOrPlPath::Pl(pl_path)) => {
                         pl_path.write(&pl_output)?;
                     }

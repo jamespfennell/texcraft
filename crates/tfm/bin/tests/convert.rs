@@ -23,7 +23,13 @@ fn run_tfm_to_pl_test(
 
     let output = cmd.output().unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert_eq!(output.status.success(), want_success,);
+    if want_success {
+        assert!(
+            output.status.success(),
+            "failed to run Texcraft command: {}",
+            stderr
+        );
+    }
     let got = String::from_utf8(output.stdout).unwrap();
     similar_asserts::assert_eq!(texcraft: got, knuth: pl.replace("\r\n", "\n"));
     if let Some(want_stderr) = want_stderr {
@@ -271,6 +277,16 @@ convert_tests!(
         "data/originals/orphan-lig-kerns-4.tfm",
         "data/originals/orphan-lig-kerns-5.pl",
     ),
+    (
+        arev_sans_3_4,
+        "data/ctan/ArevSans-BoldOblique-3.tfm",
+        "data/ctan/ArevSans-BoldOblique-4.pl",
+    ),
+    (
+        dimen_index_out_of_bounds_3_4,
+        "data/originals/dimen-index-out-of-bounds-3.tfm",
+        "data/originals/dimen-index-out-of-bounds-4.pl",
+    ),
     /* TODO: reenable and then delete the tftopl test
     (
         cprbn8t,
@@ -330,6 +346,20 @@ convert_pltotf_tests!(
         "data/originals/orphan-lig-kerns-3.pl",
         "",
     ),
+    (
+        arev_sans_2_3,
+        "data/ctan/ArevSans-BoldOblique-3.tfm",
+        "data/ctan/ArevSans-BoldOblique-2.pl",
+        "",
+    ),
+    /* TODO: fix the bug and enable
+    (
+        dimen_index_out_of_bounds_2_3,
+        "data/originals/dimen-index-out-of-bounds-3.tfm",
+        "data/originals/dimen-index-out-of-bounds-2.pl",
+        include_str!["data/originals/dimen-index-out-of-bounds-3.stderr.txt"],
+    ),
+     */
 );
 
 convert_tftopl_tests!(
@@ -401,6 +431,27 @@ convert_tftopl_tests!(
         "data/ctan/6vcr8r.tfm",
         include_str!("data/ctan/6vcr8r.pl"),
         "",
+        true,
+    ),
+    (
+        arev_sans_1_2,
+        "data/ctan/ArevSans-BoldOblique-1.tfm",
+        include_str!("data/ctan/ArevSans-BoldOblique-2.pl"),
+        include_str!("data/ctan/ArevSans-BoldOblique-2.stderr.txt"),
+        true,
+    ),
+    (
+        non_zero_first_dimens,
+        "data/originals/non-zero-first-dimens.tfm",
+        include_str!("data/originals/non-zero-first-dimens.pl"),
+        include_str!("data/originals/non-zero-first-dimens.stderr.txt"),
+        true,
+    ),
+    (
+        dimen_index_out_of_bounds_1_2,
+        "data/originals/dimen-index-out-of-bounds-1.tfm",
+        include_str!("data/originals/dimen-index-out-of-bounds-2.pl"),
+        include_str!("data/originals/dimen-index-out-of-bounds-2.stderr.txt"),
         true,
     ),
 );

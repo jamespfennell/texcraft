@@ -190,7 +190,7 @@ fn serialize_string(s: &Option<String>, size: u8, b: &mut Vec<u8>) {
 }
 
 fn serialize_header(header: &Header, b: &mut Vec<u8>) -> i16 {
-    header.checksum.serialize(b, None);
+    header.checksum.unwrap_or_default().serialize(b, None);
     header.design_size.serialize(b, None);
     serialize_string(&header.character_coding_scheme, 39, b);
     serialize_string(&header.font_family, 19, b);

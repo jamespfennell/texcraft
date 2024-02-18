@@ -58,7 +58,7 @@ pub enum Error {
 
 impl Error {
     /// Returns the error message the TFtoPL program prints for this kind of error.
-    pub fn tf_to_pl_message(&self) -> String {
+    pub fn tftopl_message(&self) -> String {
         match self {
             Error::FileHasOneByte(0..=127) => "The input file is only one byte long!".into(),
             Error::InternalFileLengthIsZero => {
@@ -91,7 +91,7 @@ impl Error {
     }
 
     /// Returns the section in Knuth's TFtoPL (version 2014) in which this error occurs.
-    pub fn tf_to_pl_section(&self) -> usize {
+    pub fn tftopl_section(&self) -> usize {
         match self {
             Error::FileIsEmpty
             | Error::FileHasOneByte(_)
@@ -118,7 +118,6 @@ pub enum Warning {
     /// The first element is the number of words specified in the TFM header.
     /// The second element is the number of bytes in the file.
     InternalFileLengthIsSmall(i16, usize),
-
     /// Unusual number of parameters.
     ///
     /// Math symbol fonts usually contain 22 parameters and math extension fonts 13.
@@ -129,11 +128,23 @@ pub enum Warning {
         /// Number of parameters in the .tfm file.
         got: usize,
     },
+    FirstWidthIsNonZero,
+    FirstDepthIsNonZero,
+    FirstHeightIsNonZero,
+    FirstItalicCorrectionIsNonZero,
+    WidthIsTooBig(usize),
+    HeightIsTooBig(usize),
+    DepthIsTooBig(usize),
+    ItalicCorrectionIsTooBig(usize),
+    InvalidWidthIndex(Char, u8),
+    InvalidHeightIndex(Char, u8),
+    InvalidDepthIndex(Char, u8),
+    InvalidItalicCorrectionIndex(Char, u8),
 }
 
 impl Warning {
     /// Returns the warning message the TFtoPL program prints for this kind of error.
-    pub fn tf_to_pl_message(&self) -> String {
+    pub fn tftopl_message(&self) -> String {
         use Warning::*;
         match self {
             InternalFileLengthIsSmall(_, _) => {
@@ -147,16 +158,63 @@ impl Warning {
                 };
                 format!["Unusual number of fontdimen parameters for {font_description} font ({got} not {expected})."]
         },
-        // TODO: warning for invalid depth/width/height indices
+            FirstWidthIsNonZero => "Bad TFM file: width[0] should be zero.".into(),
+            FirstDepthIsNonZero => "Bad TFM file: depth[0] should be zero.".into(),
+            FirstHeightIsNonZero => "Bad TFM file: height[0] should be zero.".into(),
+            FirstItalicCorrectionIsNonZero => "Bad TFM file: italic[0] should be zero.".into(),
+            WidthIsTooBig(i) => format!["Bad TFM file: Width {} is too big;\nI have set it to zero.", i],
+            HeightIsTooBig(i) => format!["Bad TFM file: Height {} is too big;\nI have set it to zero.", i],
+            DepthIsTooBig(i) =>  format!["Bad TFM file: Depth {} is too big;\nI have set it to zero.", i],
+            ItalicCorrectionIsTooBig(i) => format!["Bad TFM file: Italic correction {} is too big;\nI have set it to zero.", i],
+            // The following 4 warning messages intentionally start with a new line.
+            // I think this is a bug in tftopl: in the range_error macro in TFtoPL.2014.47,
+            //  the print_ln(` `) invocation should be guarded behind a check on chars_on_line,
+            //  like the other macros.
+            InvalidWidthIndex(c, _) => format![" \nWidth index for character '{:o} is too large;\nso I reset it to zero.", c.0],
+            InvalidHeightIndex(c, _) =>  format![" \nHeight index for character '{:o} is too large;\nso I reset it to zero.", c.0],
+            InvalidDepthIndex(c, _) =>  format![" \nDepth index for character '{:o} is too large;\nso I reset it to zero.", c.0],
+            InvalidItalicCorrectionIndex(c, _) => format![" \nItalic correction index for character '{:o} is too large;\nso I reset it to zero.", c.0],
         }
     }
 
     /// Returns the section in Knuth's TFtoPL (version 2014) in which this warning occurs.
-    pub fn tf_to_pl_section(&self) -> usize {
+    pub fn tftopl_section(&self) -> usize {
         use Warning::*;
         match self {
             InternalFileLengthIsSmall(_, _) => 20,
             UnusualNumberOfParameters { .. } => 59,
+            FirstWidthIsNonZero
+            | FirstDepthIsNonZero
+            | FirstHeightIsNonZero
+            | FirstItalicCorrectionIsNonZero
+            | WidthIsTooBig(_)
+            | HeightIsTooBig(_)
+            | DepthIsTooBig(_)
+            | ItalicCorrectionIsTooBig(_) => 62,
+            InvalidWidthIndex(_, _) => 79,
+            InvalidHeightIndex(_, _) => 80,
+            InvalidDepthIndex(_, _) => 81,
+            InvalidItalicCorrectionIndex(_, _) => 82,
+        }
+    }
+
+    /// Returns true if this warning means the .tfm file was modified.
+    pub fn tfm_file_modified(&self) -> bool {
+        use Warning::*;
+        match self {
+            InternalFileLengthIsSmall(_, _) | UnusualNumberOfParameters { .. } => false,
+            FirstWidthIsNonZero
+            | FirstDepthIsNonZero
+            | FirstHeightIsNonZero
+            | FirstItalicCorrectionIsNonZero
+            | WidthIsTooBig(_)
+            | HeightIsTooBig(_)
+            | DepthIsTooBig(_)
+            | ItalicCorrectionIsTooBig(_)
+            | InvalidWidthIndex(_, _)
+            | InvalidHeightIndex(_, _)
+            | InvalidDepthIndex(_, _)
+            | InvalidItalicCorrectionIndex(_, _) => true,
         }
     }
 }
@@ -179,7 +237,26 @@ pub(super) fn from_raw_file(raw_file: &RawFile, warnings: &mut Vec<Warning>) -> 
         deserialize_array(raw_file.char_infos);
     let mut c = raw_file.begin_char;
     for (dimens, tag) in char_infos {
-        if let Some(dimens) = dimens {
+        if let Some(mut dimens) = dimens {
+            if dimens.width_index.get() as i16 >= raw_file.sub_file_sizes.nw {
+                warnings.push(Warning::InvalidWidthIndex(c, dimens.width_index.get()));
+                dimens.width_index = WidthIndex::Invalid;
+            }
+            if dimens.height_index as i16 >= raw_file.sub_file_sizes.nh {
+                warnings.push(Warning::InvalidHeightIndex(c, dimens.height_index));
+                dimens.height_index = 0;
+            }
+            if dimens.depth_index as i16 >= raw_file.sub_file_sizes.nd {
+                warnings.push(Warning::InvalidDepthIndex(c, dimens.depth_index));
+                dimens.depth_index = 0;
+            }
+            if dimens.italic_index as i16 >= raw_file.sub_file_sizes.ni {
+                warnings.push(Warning::InvalidItalicCorrectionIndex(
+                    c,
+                    dimens.italic_index,
+                ));
+                dimens.italic_index = 0
+            }
             char_dimens.insert(c, dimens);
         }
         if let Some(tag) = tag {
@@ -194,10 +271,30 @@ pub(super) fn from_raw_file(raw_file: &RawFile, warnings: &mut Vec<Warning>) -> 
         header: Header::deserialize(raw_file.header),
         char_dimens,
         char_tags,
-        widths: deserialize_array(raw_file.widths),
-        heights: deserialize_array(raw_file.heights),
-        depths: deserialize_array(raw_file.depths),
-        italic_corrections: deserialize_array(raw_file.italic_corrections),
+        widths: deserialize_dimensions(
+            raw_file.widths,
+            warnings,
+            Warning::FirstWidthIsNonZero,
+            &Warning::WidthIsTooBig,
+        ),
+        heights: deserialize_dimensions(
+            raw_file.heights,
+            warnings,
+            Warning::FirstHeightIsNonZero,
+            &Warning::HeightIsTooBig,
+        ),
+        depths: deserialize_dimensions(
+            raw_file.depths,
+            warnings,
+            Warning::FirstDepthIsNonZero,
+            &Warning::DepthIsTooBig,
+        ),
+        italic_corrections: deserialize_dimensions(
+            raw_file.italic_corrections,
+            warnings,
+            Warning::FirstItalicCorrectionIsNonZero,
+            &Warning::ItalicCorrectionIsTooBig,
+        ),
         lig_kern_program: ligkern::lang::Program {
             instructions: deserialize_array(raw_file.lig_kern_instructions),
             boundary_char: deserialize_boundary_char(raw_file.lig_kern_instructions),
@@ -486,7 +583,7 @@ fn deserialize_string<const N: u8>(b: &[u8]) -> Option<String> {
 
 impl Header {
     fn deserialize(mut b: &[u8]) -> Self {
-        let checksum = u32::deserialize(b);
+        let checksum = Some(u32::deserialize(b));
         b = &b[4..];
         let design_size = Number::deserialize(b);
         b = b.get(4..).unwrap_or(&[0; 0]);
@@ -547,6 +644,30 @@ fn deserialize_array<T: Deserializable>(mut b: &[u8]) -> Vec<T> {
     r
 }
 
+fn deserialize_dimensions(
+    b: &[u8],
+    warnings: &mut Vec<Warning>,
+    first_dimension_non_zero: Warning,
+    dimension_too_big: &dyn Fn(usize) -> Warning,
+) -> Vec<Number> {
+    let v = deserialize_array(b);
+    if v[0] != Number::ZERO {
+        warnings.push(first_dimension_non_zero);
+    }
+    v.into_iter()
+        .enumerate()
+        .map(|(i, n)| {
+            // TODO: test the boundary cases when n=-16 and n=+16
+            if n >= Number::UNITY * 16 || n < Number::UNITY * -16 {
+                warnings.push(dimension_too_big(i));
+                Number::ZERO
+            } else {
+                n
+            }
+        })
+        .collect()
+}
+
 /// Implementations of this trait can be deserialized from a 4-byte word.
 trait Deserializable: Sized {
     fn deserialize(b: &[u8]) -> Self;
@@ -569,8 +690,8 @@ impl Deserializable for Number {
 impl Deserializable for (Option<CharDimensions>, Option<CharTag>) {
     fn deserialize(b: &[u8]) -> Self {
         let info = match b[0].try_into() {
-            Ok(width_index) => Some(CharDimensions {
-                width_index,
+            Ok(n) => Some(CharDimensions {
+                width_index: WidthIndex::Valid(n),
                 height_index: b[1] / (1 << 4),
                 depth_index: b[1] % (1 << 4),
                 italic_index: b[2] / (1 << 2),
@@ -833,7 +954,7 @@ mod tests {
             ]),
             Ok(File {
                 header: Header {
-                    checksum: 7,
+                    checksum: Some(7),
                     design_size: Number(11),
                     character_coding_scheme: Some("A".repeat(39)),
                     font_family: Some("B".repeat(19)),
@@ -857,7 +978,7 @@ mod tests {
                 40 * 4
             ),
             Ok(File {
-                header: Default::default(),
+                header: Header::tfm_default(),
                 ..Default::default()
             }),
             Warning::InternalFileLengthIsSmall(12, 40 * 4)
@@ -870,7 +991,7 @@ mod tests {
             build_from_header(&[/* checksum */ 0, 0, 0, 7, /* design_size */ 0, 0, 0, 11,]),
             File {
                 header: Header {
-                    checksum: 7,
+                    checksum: Some(7),
                     design_size: Number(11),
                     character_coding_scheme: None,
                     font_family: None,
@@ -893,7 +1014,7 @@ mod tests {
             ]),
             File {
                 header: Header {
-                    checksum: 7,
+                    checksum: Some(7),
                     design_size: Number(11),
                     character_coding_scheme: Some("ABC".into()),
                     font_family: Some("DEF".into()),
@@ -912,22 +1033,27 @@ mod tests {
             char_infos,
             extend(
                 &vec![
-                    /* lf */ 0, 15, /* lh */ 0, 2, /* bc */ 0, 70, /* ec */ 0,
-                    72, /* nw */ 0, 1, /* nh */ 0, 1, /* nd */ 0, 1,
-                    /* ni */ 0, 1, /* nl */ 0, 0, /* nk */ 0, 0, /* ne */ 0, 0,
+                    /* lf */ 0, 29, /* lh */ 0, 2, /* bc */ 0, 70, /* ec */ 0,
+                    72, /* nw */ 0, 6, /* nh */ 0, 3, /* nd */ 0, 4,
+                    /* ni */ 0, 5, /* nl */ 0, 0, /* nk */ 0, 0, /* ne */ 0, 0,
                     /* np */ 0, 0, /* header.checksum */ 0, 0, 0, 0,
-                    /* header.design_size */ 0, 0, 0, 0, /* char_infos */ 13, 35, 16, 0,
-                    0, 0, 0, 0, 1, 0, 1, 23,
+                    /* header.design_size */ 0, 0, 0, 0, /* char_infos */ 5, 35, 16, 0,
+                    0, 0, 0, 0, 1, 0, 1, 23, /* widths */
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4,
+                    /* heights */
+                    0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, /* depths */
+                    0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, /* italic_corrections */
+                    0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4,
                 ],
                 15 * 4
             ),
             File {
-                header: Default::default(),
+                header: Header::tfm_default(),
                 char_dimens: HashMap::from([
                     (
                         Char(70),
                         CharDimensions {
-                            width_index: 13.try_into().unwrap(),
+                            width_index: WidthIndex::Valid(5.try_into().unwrap()),
                             height_index: 2,
                             depth_index: 3,
                             italic_index: 4,
@@ -936,7 +1062,7 @@ mod tests {
                     (
                         Char(72),
                         CharDimensions {
-                            width_index: 1.try_into().unwrap(),
+                            width_index: WidthIndex::Valid(1.try_into().unwrap()),
                             height_index: 0,
                             depth_index: 0,
                             italic_index: 0,
@@ -944,6 +1070,17 @@ mod tests {
                     ),
                 ]),
                 char_tags: HashMap::from([(Char(72), CharTag::Ligature(23)),]),
+                widths: vec![
+                    Number(0),
+                    Number(0),
+                    Number(1),
+                    Number(2),
+                    Number(3),
+                    Number(4)
+                ],
+                heights: vec![Number(0), Number(1), Number(2)],
+                depths: vec![Number(0), Number(1), Number(2), Number(3)],
+                italic_corrections: vec![Number(0), Number(1), Number(2), Number(3), Number(4)],
                 ..Default::default()
             },
         ),
@@ -951,25 +1088,42 @@ mod tests {
             char_infos_large_char,
             extend(
                 &vec![
-                    /* lf */ 0, 13, /* lh */ 0, 2, /* bc */ 0, 255, /* ec */ 0,
-                    255, /* nw */ 0, 1, /* nh */ 0, 1, /* nd */ 0, 1,
-                    /* ni */ 0, 1, /* nl */ 0, 0, /* nk */ 0, 0, /* ne */ 0, 0,
+                    /* lf */ 0, 27, /* lh */ 0, 2, /* bc */ 0, 255, /* ec */ 0,
+                    255, /* nw */ 0, 6, /* nh */ 0, 3, /* nd */ 0, 4,
+                    /* ni */ 0, 5, /* nl */ 0, 0, /* nk */ 0, 0, /* ne */ 0, 0,
                     /* np */ 0, 0, /* header.checksum */ 0, 0, 0, 0,
-                    /* header.design_size */ 0, 0, 0, 0, /* char_infos */ 13, 35, 16, 0,
+                    /* header.design_size */ 0, 0, 0, 0, /* char_infos */ 5, 35, 16, 0,
+                    /* widths */
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4,
+                    /* heights */
+                    0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, /* depths */
+                    0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, /* italic_corrections */
+                    0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4,
                 ],
                 13 * 4
             ),
             File {
-                header: Default::default(),
+                header: Header::tfm_default(),
                 char_dimens: HashMap::from([(
                     Char(255),
                     CharDimensions {
-                        width_index: 13.try_into().unwrap(),
+                        width_index: WidthIndex::Valid(5.try_into().unwrap()),
                         height_index: 2,
                         depth_index: 3,
                         italic_index: 4,
                     }
                 ),]),
+                widths: vec![
+                    Number(0),
+                    Number(0),
+                    Number(1),
+                    Number(2),
+                    Number(3),
+                    Number(4)
+                ],
+                heights: vec![Number(0), Number(1), Number(2)],
+                depths: vec![Number(0), Number(1), Number(2), Number(3)],
+                italic_corrections: vec![Number(0), Number(1), Number(2), Number(3), Number(4)],
                 ..Default::default()
             },
         ),
@@ -986,6 +1140,7 @@ mod tests {
                 /* kerns */ 0, 0, 0, 37
             ],
             File {
+                header: Header::tfm_default(),
                 widths: vec![Number::ZERO, Number(23)],
                 heights: vec![Number::ZERO, Number(29)],
                 depths: vec![Number::ZERO, Number(31)],
@@ -1124,6 +1279,7 @@ mod tests {
                 /* kerns */ /* extensible_chars */ 17, 19, 23, 27
             ],
             File {
+                header: Header::tfm_default(),
                 extensible_chars: vec![ExtensibleRecipe {
                     top: Some(Char(17)),
                     middle: Some(Char(19)),
@@ -1147,6 +1303,7 @@ mod tests {
                 0, 31, 0, 0, 0, 37, 0, 0, 0, 41, 0, 0, 0, 43,
             ],
             File {
+                header: Header::tfm_default(),
                 params: Params(vec![
                     Number(11),
                     Number(13),
@@ -1174,6 +1331,7 @@ mod tests {
 
     fn tfm_file_with_one_lig_kern_instruction(instruction: ligkern::lang::Instruction) -> File {
         File {
+            header: Header::tfm_default(),
             lig_kern_program: ligkern::lang::Program {
                 instructions: vec![instruction],
                 boundary_char: None,
