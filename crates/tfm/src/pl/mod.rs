@@ -364,13 +364,13 @@ impl File {
                             CharTag::Ligature(*lig_kern_entrypoints.get(&c).unwrap())
                         }
                         format::CharTag::List(c) => CharTag::List(c),
-                        format::CharTag::Extension(i) => {
-                            // TODO: don't panic
-                            // TODO: audit all unwraps in the crate
-                            CharTag::Extension(
-                                tfm_file.extensible_chars.get(i as usize).cloned().unwrap(),
-                            )
-                        }
+                        format::CharTag::Extension(i) => CharTag::Extension(
+                            tfm_file
+                                .extensible_chars
+                                .get(i as usize)
+                                .cloned()
+                                .expect("extension index is valid for the extensions arrays"),
+                        ),
                     },
                 )
             })

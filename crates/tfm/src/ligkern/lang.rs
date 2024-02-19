@@ -328,7 +328,8 @@ impl<'a> Iterator for ReachableIter<'a> {
                     None | Some(0) => None,
                     Some(inc) => {
                         let reachable_skipped: u8 = self.reachable
-                            [this as usize + 1..this as usize+ 1+ inc as usize]
+                            .get(this as usize + 1..this as usize+ 1+ inc as usize)
+                            .expect("lig/kern skip produces an index within bounds")
                             .iter()
                             .filter(|reachable| **reachable)
                             .count()

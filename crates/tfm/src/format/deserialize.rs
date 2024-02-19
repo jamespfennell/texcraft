@@ -140,6 +140,9 @@ pub enum Warning {
     InvalidHeightIndex(Char, u8),
     InvalidDepthIndex(Char, u8),
     InvalidItalicCorrectionIndex(Char, u8),
+    InvalidExtensibleRecipeIndex(Char, u8),
+    LigKernSkipsTooFar(usize),
+    LigatureStepForNonExistentCharacter(Char),
 }
 
 impl Warning {
@@ -157,7 +160,7 @@ impl Warning {
                     ("an extension", 13)
                 };
                 format!["Unusual number of fontdimen parameters for {font_description} font ({got} not {expected})."]
-        },
+            },
             FirstWidthIsNonZero => "Bad TFM file: width[0] should be zero.".into(),
             FirstDepthIsNonZero => "Bad TFM file: depth[0] should be zero.".into(),
             FirstHeightIsNonZero => "Bad TFM file: height[0] should be zero.".into(),
@@ -166,7 +169,7 @@ impl Warning {
             HeightIsTooBig(i) => format!["Bad TFM file: Height {} is too big;\nI have set it to zero.", i],
             DepthIsTooBig(i) =>  format!["Bad TFM file: Depth {} is too big;\nI have set it to zero.", i],
             ItalicCorrectionIsTooBig(i) => format!["Bad TFM file: Italic correction {} is too big;\nI have set it to zero.", i],
-            // The following 4 warning messages intentionally start with a new line.
+            // The following invalid index warning messages intentionally start with a new line.
             // I think this is a bug in tftopl: in the range_error macro in TFtoPL.2014.47,
             //  the print_ln(` `) invocation should be guarded behind a check on chars_on_line,
             //  like the other macros.
@@ -174,6 +177,9 @@ impl Warning {
             InvalidHeightIndex(c, _) =>  format![" \nHeight index for character '{:o} is too large;\nso I reset it to zero.", c.0],
             InvalidDepthIndex(c, _) =>  format![" \nDepth index for character '{:o} is too large;\nso I reset it to zero.", c.0],
             InvalidItalicCorrectionIndex(c, _) => format![" \nItalic correction index for character '{:o} is too large;\nso I reset it to zero.", c.0],
+            InvalidExtensibleRecipeIndex(c, _ ) => format![" \nExtension index for character '{:o} is too large;\nso I reset it to zero.", c.0],
+            LigKernSkipsTooFar(i) => format!["Bad TFM file: Ligature/kern step {i} skips too far;"],
+            LigatureStepForNonExistentCharacter(c) => format!["Bad TFM file: Ligature step for nonexistent character '{:o}", c.0],
         }
     }
 
@@ -195,6 +201,9 @@ impl Warning {
             InvalidHeightIndex(_, _) => 80,
             InvalidDepthIndex(_, _) => 81,
             InvalidItalicCorrectionIndex(_, _) => 82,
+            InvalidExtensibleRecipeIndex(_, _) => 85,
+            LigKernSkipsTooFar(_) => 70,
+            LigatureStepForNonExistentCharacter(_) => 77,
         }
     }
 
@@ -214,7 +223,10 @@ impl Warning {
             | InvalidWidthIndex(_, _)
             | InvalidHeightIndex(_, _)
             | InvalidDepthIndex(_, _)
-            | InvalidItalicCorrectionIndex(_, _) => true,
+            | InvalidItalicCorrectionIndex(_, _)
+            | InvalidExtensibleRecipeIndex(_, _)
+            | LigKernSkipsTooFar(_)
+            | LigatureStepForNonExistentCharacter(_) => true,
         }
     }
 }
@@ -232,9 +244,9 @@ pub(super) fn deserialize(b: &[u8]) -> (Result<File, Error>, Vec<Warning>) {
 
 pub(super) fn from_raw_file(raw_file: &RawFile, warnings: &mut Vec<Warning>) -> File {
     let mut char_dimens = HashMap::<Char, CharDimensions>::new();
-    let mut char_tags = HashMap::<Char, CharTag>::new();
     let char_infos: Vec<(Option<CharDimensions>, Option<CharTag>)> =
         deserialize_array(raw_file.char_infos);
+    let mut char_tags = HashMap::<Char, CharTag>::new();
     let mut c = raw_file.begin_char;
     for (dimens, tag) in char_infos {
         if let Some(mut dimens) = dimens {
@@ -260,6 +272,16 @@ pub(super) fn from_raw_file(raw_file: &RawFile, warnings: &mut Vec<Warning>) -> 
             char_dimens.insert(c, dimens);
         }
         if let Some(tag) = tag {
+            match tag {
+                CharTag::Ligature(_) => {}
+                CharTag::List(_) => {}
+                CharTag::Extension(e) => {
+                    if e as i16 >= raw_file.sub_file_sizes.ne {
+                        warnings.push(Warning::InvalidExtensibleRecipeIndex(c, e));
+                        continue;
+                    }
+                }
+            }
             char_tags.insert(c, tag);
         }
         c = match c.0.checked_add(1) {
@@ -296,7 +318,7 @@ pub(super) fn from_raw_file(raw_file: &RawFile, warnings: &mut Vec<Warning>) -> 
             &Warning::ItalicCorrectionIsTooBig,
         ),
         lig_kern_program: ligkern::lang::Program {
-            instructions: deserialize_array(raw_file.lig_kern_instructions),
+            instructions: deserialize_lig_kern(raw_file.lig_kern_instructions, warnings),
             boundary_char: deserialize_boundary_char(raw_file.lig_kern_instructions),
             boundary_char_entrypoint: deserialize_boundary_char_entrypoint(
                 raw_file.lig_kern_instructions,
@@ -642,6 +664,20 @@ fn deserialize_array<T: Deserializable>(mut b: &[u8]) -> Vec<T> {
         b = &b[4..]
     }
     r
+}
+
+fn deserialize_lig_kern(b: &[u8], warnings: &mut Vec<Warning>) -> Vec<ligkern::lang::Instruction> {
+    let mut v: Vec<ligkern::lang::Instruction> = deserialize_array(b);
+    let n = v.len();
+    for (i, e) in v.iter_mut().enumerate() {
+        if let Some(inc) = e.next_instruction {
+            if i + (inc as usize) + 1 >= n {
+                warnings.push(Warning::LigKernSkipsTooFar(i));
+                e.next_instruction = None;
+            }
+        }
+    }
+    v
 }
 
 fn deserialize_dimensions(
@@ -1151,18 +1187,18 @@ mod tests {
         ),
         (
             lig_kern_command_1,
-            tfm_bytes_with_one_lig_kern_command([3, 5, 130, 13]),
+            tfm_bytes_with_one_lig_kern_command([0, 5, 130, 13]),
             tfm_file_with_one_lig_kern_instruction(ligkern::lang::Instruction {
-                next_instruction: Some(3),
+                next_instruction: Some(0),
                 right_char: Char(5),
                 operation: ligkern::lang::Operation::KernAtIndex(256 * 2 + 13)
             }),
         ),
         (
             lig_kern_command_2,
-            tfm_bytes_with_one_lig_kern_command([3, 6, 3, 17]),
+            tfm_bytes_with_one_lig_kern_command([0, 6, 3, 17]),
             tfm_file_with_one_lig_kern_instruction(ligkern::lang::Instruction {
-                next_instruction: Some(3),
+                next_instruction: Some(0),
                 right_char: Char(6),
                 operation: ligkern::lang::Operation::Ligature {
                     char_to_insert: Char(17),
@@ -1172,9 +1208,9 @@ mod tests {
         ),
         (
             lig_kern_command_3,
-            tfm_bytes_with_one_lig_kern_command([3, 7, 3 + 4, 19]),
+            tfm_bytes_with_one_lig_kern_command([0, 7, 3 + 4, 19]),
             tfm_file_with_one_lig_kern_instruction(ligkern::lang::Instruction {
-                next_instruction: Some(3),
+                next_instruction: Some(0),
                 right_char: Char(7),
                 operation: ligkern::lang::Operation::Ligature {
                     char_to_insert: Char(19),
@@ -1333,7 +1369,14 @@ mod tests {
         File {
             header: Header::tfm_default(),
             lig_kern_program: ligkern::lang::Program {
-                instructions: vec![instruction],
+                instructions: vec![
+                    instruction,
+                    ligkern::lang::Instruction {
+                        next_instruction: None,
+                        right_char: Char(0),
+                        operation: ligkern::lang::Operation::KernAtIndex(0),
+                    },
+                ],
                 boundary_char: None,
                 boundary_char_entrypoint: None,
             },
@@ -1343,15 +1386,16 @@ mod tests {
 
     fn tfm_bytes_with_one_lig_kern_command(lig_kern_command: [u8; 4]) -> Vec<u8> {
         let mut v = vec![
-            /* lf */ 0, 13, /* lh */ 0, 2, /* bc */ 0, 1, /* ec */ 0, 0,
+            /* lf */ 0, 14, /* lh */ 0, 2, /* bc */ 0, 1, /* ec */ 0, 0,
             /* nw */ 0, 1, /* nh */ 0, 1, /* nd */ 0, 1, /* ni */ 0, 1,
-            /* nl */ 0, 1, /* nk */ 0, 0, /* ne */ 0, 0, /* np */ 0, 0,
+            /* nl */ 0, 2, /* nk */ 0, 0, /* ne */ 0, 0, /* np */ 0, 0,
             /* header.checksum */ 0, 0, 0, 0, /* header.design_size */ 0, 0, 0, 0,
             /* widths */ 0, 0, 0, 0, /* heights */ 0, 0, 0, 0, /* depths */ 0, 0, 0,
             0, /* italic_corrections */ 0, 0, 0, 0,
         ];
         /* lig_kern_commands */
         v.extend(lig_kern_command);
+        v.extend([128, 0, 128, 0]);
         v
     }
 

@@ -1,0 +1,278 @@
+There's some extra junk at the end of the TFM file,
+but I'll proceed as if it weren't there.
+Bad TFM file: Parameter 3 is too big;
+I have set it to zero.
+Bad TFM file: Parameter 4 is too big;
+I have set it to zero.
+Bad TFM file: Parameter 5 is too big;
+I have set it to zero.
+Bad TFM file: Parameter 6 is too big;
+I have set it to zero.
+Bad TFM file: Parameter 7 is too big;
+I have set it to zero.
+Bad TFM file: Width 3 is too big;
+I have set it to zero.
+Bad TFM file: Width 4 is too big;
+I have set it to zero.
+Bad TFM file: Width 5 is too big;
+I have set it to zero.
+Bad TFM file: Width 6 is too big;
+I have set it to zero.
+Bad TFM file: Width 7 is too big;
+I have set it to zero.
+Bad TFM file: Width 8 is too big;
+I have set it to zero.
+Bad TFM file: Width 9 is too big;
+I have set it to zero.
+Bad TFM file: Width 10 is too big;
+I have set it to zero.
+Bad TFM file: Width 11 is too big;
+I have set it to zero.
+Bad TFM file: Width 12 is too big;
+I have set it to zero.
+Bad TFM file: Width 13 is too big;
+I have set it to zero.
+Bad TFM file: Width 14 is too big;
+I have set it to zero.
+Bad TFM file: Width 15 is too big;
+I have set it to zero.
+Bad TFM file: Width 16 is too big;
+I have set it to zero.
+Bad TFM file: Width 17 is too big;
+I have set it to zero.
+Bad TFM file: Width 18 is too big;
+I have set it to zero.
+Bad TFM file: Width 19 is too big;
+I have set it to zero.
+Bad TFM file: Width 20 is too big;
+I have set it to zero.
+Bad TFM file: Width 21 is too big;
+I have set it to zero.
+Bad TFM file: Width 22 is too big;
+I have set it to zero.
+Bad TFM file: Width 23 is too big;
+I have set it to zero.
+Bad TFM file: Width 24 is too big;
+I have set it to zero.
+Bad TFM file: Width 25 is too big;
+I have set it to zero.
+Bad TFM file: Width 26 is too big;
+I have set it to zero.
+Bad TFM file: Width 27 is too big;
+I have set it to zero.
+Bad TFM file: Width 28 is too big;
+I have set it to zero.
+Bad TFM file: Width 29 is too big;
+I have set it to zero.
+Bad TFM file: Width 30 is too big;
+I have set it to zero.
+Bad TFM file: Width 31 is too big;
+I have set it to zero.
+Bad TFM file: Width 32 is too big;
+I have set it to zero.
+Bad TFM file: Width 33 is too big;
+I have set it to zero.
+Bad TFM file: Width 34 is too big;
+I have set it to zero.
+Bad TFM file: Width 35 is too big;
+I have set it to zero.
+Bad TFM file: Width 36 is too big;
+I have set it to zero.
+Bad TFM file: Width 37 is too big;
+I have set it to zero.
+Bad TFM file: Width 38 is too big;
+I have set it to zero.
+Bad TFM file: Width 39 is too big;
+I have set it to zero.
+Bad TFM file: Width 40 is too big;
+I have set it to zero.
+Bad TFM file: Height 2 is too big;
+I have set it to zero.
+Bad TFM file: Height 3 is too big;
+I have set it to zero.
+Bad TFM file: Height 4 is too big;
+I have set it to zero.
+Bad TFM file: Height 5 is too big;
+I have set it to zero.
+Bad TFM file: Height 6 is too big;
+I have set it to zero.
+Bad TFM file: Height 7 is too big;
+I have set it to zero.
+Bad TFM file: Height 8 is too big;
+I have set it to zero.
+Bad TFM file: Height 9 is too big;
+I have set it to zero.
+Bad TFM file: Height 10 is too big;
+I have set it to zero.
+Bad TFM file: Height 11 is too big;
+I have set it to zero.
+Bad TFM file: Height 12 is too big;
+I have set it to zero.
+Bad TFM file: Depth 2 is too big;
+I have set it to zero.
+Bad TFM file: Depth 3 is too big;
+I have set it to zero.
+Bad TFM file: Depth 4 is too big;
+I have set it to zero.
+Bad TFM file: Depth 5 is too big;
+I have set it to zero.
+Bad TFM file: Depth 6 is too big;
+I have set it to zero.
+Bad TFM file: Depth 7 is too big;
+I have set it to zero.
+Bad TFM file: Depth 8 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 2 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 3 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 4 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 5 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 6 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 8 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 9 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 10 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 11 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 12 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 13 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 14 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 15 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 16 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 17 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 18 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 19 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 20 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 21 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 22 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 23 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 24 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 25 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 26 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 27 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 28 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 29 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 30 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 31 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 32 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 33 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 34 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 35 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 36 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 37 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 38 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 39 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 40 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 41 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 43 is too big;
+I have set it to zero.
+Bad TFM file: Kern 0 is too big;
+I have set it to zero.
+Bad TFM file: Kern 1 is too big;
+I have set it to zero.
+Bad TFM file: Kern 2 is too big;
+I have set it to zero.
+Bad TFM file: Kern 3 is too big;
+I have set it to zero.
+Bad TFM file: Kern 4 is too big;
+I have set it to zero.
+Bad TFM file: Kern 5 is too big;
+I have set it to zero.
+Bad TFM file: Ligature/kern step 0 skips too far;
+I made it stop.
+Bad TFM file: Ligature step for nonexistent character '040.
+Bad TFM file: Ligature step produces the nonexistent character '151.
+Bad TFM file: Ligature step produces the nonexistent character '154.
+Bad TFM file: Kern index too large.
+Bad TFM file: Ligature step produces the nonexistent character '151.
+Bad TFM file: Ligature step produces the nonexistent character '154.
+Bad TFM file: Kern index too large.
+Bad TFM file: Kern index too large.
+Bad TFM file: Ligature step produces the nonexistent character '157.
+Bad TFM file: Ligature step produces the nonexistent character '165.
+Bad TFM file: Ligature step produces the nonexistent character '162.
+Bad TFM file: Kern index too large.
+Bad TFM file: Ligature step produces the nonexistent character '171.
+Bad TFM file: Ligature step produces the nonexistent character '157.
+Bad TFM file: Ligature step produces the nonexistent character '162.
+Bad TFM file: Ligature step produces the nonexistent character '165.
+Bad TFM file: Kern index too large.
+Bad TFM file: Kern index too large.
+Bad TFM file: Ligature step produces the nonexistent character '156.
+Bad TFM file: Ligature step produces the nonexistent character '154.
+Bad TFM file: Ligature step produces the nonexistent character '162.
+Bad TFM file: Ligature step produces the nonexistent character '165.
+Bad TFM file: Ligature step produces the nonexistent character '164.
+Bad TFM file: Ligature step produces the nonexistent character '151.
+Bad TFM file: Ligature step produces the nonexistent character '150.
+Bad TFM file: Ligature step produces the nonexistent character '153.
+Bad TFM file: Ligature step produces the nonexistent character '166.
+Bad TFM file: Ligature step produces the nonexistent character '167.
+Bad TFM file: Ligature step produces the nonexistent character '157.
+Bad TFM file: Kern index too large.
+Bad TFM file: Kern index too large.
+Bad TFM file: Kern index too large.
+Bad TFM file: Kern index too large.
+ 
+Width index for character '160 is too large;
+so I reset it to zero.
+ 
+Depth index for character '160 is too large;
+so I reset it to zero.
+ 
+Extensible index for character '160 is too large;
+so I reset it to zero.
+ 
+Width index for character '161 is too large;
+so I reset it to zero.
+ 
+Depth index for character '161 is too large;
+so I reset it to zero.
+ 
+Extensible index for character '161 is too large;
+so I reset it to zero.
+ 
+Width index for character '163 is too large;
+so I reset it to zero.
+ 
+Depth index for character '163 is too large;
+so I reset it to zero.
+ 
+Depth index for character '170 is too large;
+so I reset it to zero.
