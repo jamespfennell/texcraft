@@ -703,6 +703,8 @@ pub enum CharDisplayFormat {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use crate::{format::WidthIndex, Face};
 
     use self::format::ExtensibleRecipe;
@@ -1099,7 +1101,7 @@ mod tests {
     from_tfm_file_tests!((
         gap_in_chars,
         crate::format::File {
-            char_dimens: HashMap::from([
+            char_dimens: BTreeMap::from([
                 (
                     Char('A'.try_into().unwrap()),
                     crate::format::CharDimensions {

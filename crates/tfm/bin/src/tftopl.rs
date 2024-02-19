@@ -86,7 +86,7 @@ impl Cli {
         let pl_file = tfm::pl::File::from_tfm_file(tfm_file);
         let tfm_modified = warnings
             .iter()
-            .map(tfm::format::DeserializeWarning::tfm_file_modified)
+            .map(tfm::format::Warning::tfm_file_modified)
             .any(|t| t);
         let suffix = if tfm_modified {
             "(COMMENT THE TFM FILE WAS BAD, SO THE DATA HAS BEEN CHANGED!)\n"

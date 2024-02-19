@@ -292,6 +292,50 @@ impl Program {
             instructions: &self.instructions,
         }
     }
+
+    pub fn validate_and_fix(&mut self) -> Vec<ValidationWarning> {
+        let mut warnings: Vec<ValidationWarning> = vec![];
+
+        let n = self.instructions.len();
+        for (i, e) in self.instructions.iter_mut().enumerate() {
+            if let Some(inc) = e.next_instruction {
+                if i + (inc as usize) + 1 >= n {
+                    warnings.push(ValidationWarning::SkipTooLarge(i));
+                    e.next_instruction = None;
+                }
+            }
+        }
+
+        warnings
+    }
+}
+
+pub enum ValidationWarning {
+    SkipTooLarge(usize),
+    LigatureStepForNonExistentCharacter(usize, Char),
+}
+
+impl ValidationWarning {
+    /// Returns the warning message the TFtoPL program prints for this kind of error.
+    pub fn tftopl_message(&self) -> String {
+        use ValidationWarning::*;
+        match self {
+            SkipTooLarge(i) => format!["Bad TFM file: Ligature/kern step {i} skips too far;"],
+            LigatureStepForNonExistentCharacter(_, c) => format![
+                "Bad TFM file: Ligature step for nonexistent character '{:o}",
+                c.0
+            ],
+        }
+    }
+
+    /// Returns the section in Knuth's TFtoPL (version 2014) in which this warning occurs.
+    pub fn tftopl_section(&self) -> usize {
+        use ValidationWarning::*;
+        match self {
+            SkipTooLarge(_) => 70,
+            LigatureStepForNonExistentCharacter(_, _) => 77,
+        }
+    }
 }
 
 pub struct ReachableIter<'a> {

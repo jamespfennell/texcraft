@@ -1,4 +1,5 @@
 //! The TeX font metric (.tfm) file format
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::num::NonZeroU8;
@@ -6,13 +7,15 @@ use std::num::NonZeroU8;
 mod debug;
 mod deserialize;
 mod serialize;
+mod validate;
 
 use super::*;
 
-pub use deserialize::Error as DeserializeError;
+pub use deserialize::DeserializationError as DeserializeError;
+pub use deserialize::DeserializationWarning as DeserializeWarning;
 pub use deserialize::RawFile;
 pub use deserialize::SubFileSizes;
-pub use deserialize::Warning as DeserializeWarning;
+pub use validate::ValidationWarning;
 
 /// Complete contents of a TeX font metric (.tfm) file.
 ///
@@ -33,7 +36,7 @@ pub struct File {
     pub header: Header,
 
     /// Character dimensions.
-    pub char_dimens: HashMap<Char, CharDimensions>,
+    pub char_dimens: BTreeMap<Char, CharDimensions>,
 
     /// Character tags.
     ///
@@ -41,7 +44,7 @@ pub struct File {
     ///     a tag and a character having a dimension.
     /// All four combinations of (has or hasn't dimensions) and (has or hasn't a tag)
     ///     are possible.
-    pub char_tags: HashMap<Char, CharTag>,
+    pub char_tags: BTreeMap<Char, CharTag>,
 
     /// Character widths
     pub widths: Vec<Number>,
@@ -158,13 +161,50 @@ pub fn debug<'a>(
     }
 }
 
+pub enum Warning {
+    DeserializationWarning(DeserializeWarning),
+    ValidationWarning(ValidationWarning),
+}
+impl Warning {
+    /// Returns the warning message the TFtoPL program prints for this kind of warning.
+    pub fn tftopl_message(&self) -> String {
+        match self {
+            Warning::DeserializationWarning(warning) => warning.tftopl_message(),
+            Warning::ValidationWarning(warning) => warning.tftopl_message(),
+        }
+    }
+    /// Returns true if this warning means the .tfm file was modified.
+    pub fn tfm_file_modified(&self) -> bool {
+        match self {
+            Warning::DeserializationWarning(warning) => warning.tfm_file_modified(),
+            Warning::ValidationWarning(warning) => warning.tfm_file_modified(),
+        }
+    }
+}
+
 impl File {
-    pub fn deserialize(b: &[u8]) -> (Result<File, DeserializeError>, Vec<DeserializeWarning>) {
-        deserialize::deserialize(b)
+    pub fn from_raw_file(raw_file: &RawFile) -> Self {
+        deserialize::from_raw_file(raw_file)
     }
 
-    pub fn from_raw_file(raw_file: &RawFile, warnings: &mut Vec<DeserializeWarning>) -> Self {
-        deserialize::from_raw_file(raw_file, warnings)
+    pub fn validate_and_fix(&mut self) -> Vec<ValidationWarning> {
+        validate::validate_and_fix(self)
+    }
+
+    pub fn deserialize(b: &[u8]) -> (Result<File, DeserializeError>, Vec<Warning>) {
+        let (mut result, warnings) = deserialize::deserialize(b);
+        let mut warnings: Vec<Warning> = warnings
+            .into_iter()
+            .map(Warning::DeserializationWarning)
+            .collect();
+        if let Ok(file) = &mut result {
+            warnings.extend(
+                file.validate_and_fix()
+                    .into_iter()
+                    .map(Warning::ValidationWarning),
+            )
+        }
+        (result, warnings)
     }
 
     pub fn serialize(&self) -> Vec<u8> {
@@ -267,7 +307,7 @@ impl File {
         let char_dimens = match char_bounds {
             None => Default::default(),
             Some((lower, upper)) => {
-                let mut m: HashMap<Char, CharDimensions> = Default::default();
+                let mut m: BTreeMap<Char, CharDimensions> = Default::default();
                 for c in lower.0..=upper.0 {
                     let pl_data = match pl_file.char_dimens.get(&Char(c)) {
                         Some(pl_data) => pl_data,

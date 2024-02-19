@@ -41,8 +41,8 @@ pub fn serialize(file: &File) -> Vec<u8> {
 }
 
 fn serialize_char_infos(
-    char_dimens: &HashMap<Char, CharDimensions>,
-    char_tags: &HashMap<Char, CharTag>,
+    char_dimens: &BTreeMap<Char, CharDimensions>,
+    char_tags: &BTreeMap<Char, CharTag>,
     bc: Char,
     ec: Char,
     b: &mut Vec<u8>,

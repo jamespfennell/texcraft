@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Error {
+pub enum DeserializationError {
     /// The TFM file is empty (i.e., 0 bytes).
     ///
     /// Knuth's TFToPL doesn't handle this case explicitly.
@@ -56,61 +56,57 @@ pub enum Error {
     InconsistentSubFileSizes(SubFileSizes),
 }
 
-impl Error {
+impl DeserializationError {
     /// Returns the error message the TFtoPL program prints for this kind of error.
     pub fn tftopl_message(&self) -> String {
+        use DeserializationError::*;
         match self {
-            Error::FileHasOneByte(0..=127) => "The input file is only one byte long!".into(),
-            Error::InternalFileLengthIsZero => {
+            FileHasOneByte(0..=127) => "The input file is only one byte long!".into(),
+            InternalFileLengthIsZero => {
                 "The file claims to have length zero, but that's impossible!".into()
             }
-            Error::FileHasOneByte(128..=255)
-            | Error::InternalFileLengthIsNegative(_)
-            | Error::FileIsEmpty => {
+            FileHasOneByte(128..=255) | InternalFileLengthIsNegative(_) | FileIsEmpty => {
                 // See documentation on [Error::FileIsEmpty] for why we return this string in the case
                 // when the file is empty. While two error messages are possible, this is the one I
                 // observed on my machine today.
                 "The first byte of the input file exceeds 127!".into()
             }
-            Error::InternalFileLengthIsTooBig(_, _) => {
-                "The file has fewer bytes than it claims!".into()
-            }
-            Error::InternalFileLengthIsTooSmall(_, _) | Error::SubFileSizeIsNegative(_) => {
+            InternalFileLengthIsTooBig(_, _) => "The file has fewer bytes than it claims!".into(),
+            InternalFileLengthIsTooSmall(_, _) | SubFileSizeIsNegative(_) => {
                 "One of the subfile sizes is negative!".into()
             }
-            Error::HeaderLengthIsTooSmall(lh) => format!["The header length is only {lh}!"],
-            Error::InvalidCharacterRange(l, u) => {
+            HeaderLengthIsTooSmall(lh) => format!["The header length is only {lh}!"],
+            InvalidCharacterRange(l, u) => {
                 format!("The character code range {l}..{u} is illegal!")
             }
-            Error::IncompleteSubFiles(_) => "Incomplete subfiles for character dimensions!".into(),
-            Error::TooManyExtensibleCharacters(n) => format!["There are {n} extensible recipes!"],
-            Error::InconsistentSubFileSizes(_) => {
-                "Subfile sizes don't add up to the stated total!".into()
-            }
+            IncompleteSubFiles(_) => "Incomplete subfiles for character dimensions!".into(),
+            TooManyExtensibleCharacters(n) => format!["There are {n} extensible recipes!"],
+            InconsistentSubFileSizes(_) => "Subfile sizes don't add up to the stated total!".into(),
         }
     }
 
     /// Returns the section in Knuth's TFtoPL (version 2014) in which this error occurs.
     pub fn tftopl_section(&self) -> usize {
+        use DeserializationError::*;
         match self {
-            Error::FileIsEmpty
-            | Error::FileHasOneByte(_)
-            | Error::InternalFileLengthIsZero
-            | Error::InternalFileLengthIsNegative(_)
-            | Error::InternalFileLengthIsTooBig(_, _) => 20,
-            Error::InternalFileLengthIsTooSmall(_, _)
-            | Error::SubFileSizeIsNegative(_)
-            | Error::HeaderLengthIsTooSmall(_)
-            | Error::InvalidCharacterRange(_, _)
-            | Error::IncompleteSubFiles(_)
-            | Error::TooManyExtensibleCharacters(_)
-            | Error::InconsistentSubFileSizes(_) => 21,
+            FileIsEmpty
+            | FileHasOneByte(_)
+            | InternalFileLengthIsZero
+            | InternalFileLengthIsNegative(_)
+            | InternalFileLengthIsTooBig(_, _) => 20,
+            InternalFileLengthIsTooSmall(_, _)
+            | SubFileSizeIsNegative(_)
+            | HeaderLengthIsTooSmall(_)
+            | InvalidCharacterRange(_, _)
+            | IncompleteSubFiles(_)
+            | TooManyExtensibleCharacters(_)
+            | InconsistentSubFileSizes(_) => 21,
         }
     }
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Warning {
+pub enum DeserializationWarning {
     /// The file length specified inside the TFM file is smaller than the actual file size.
     ///
     /// Additional data after the file length is ignored.
@@ -118,207 +114,73 @@ pub enum Warning {
     /// The first element is the number of words specified in the TFM header.
     /// The second element is the number of bytes in the file.
     InternalFileLengthIsSmall(i16, usize),
-    /// Unusual number of parameters.
-    ///
-    /// Math symbol fonts usually contain 22 parameters and math extension fonts 13.
-    /// This warning indicates that a different number was in the .tfm file.
-    UnusualNumberOfParameters {
-        /// True if this is a math symbols font; false if it's a math extension font.
-        is_math_symbols_font: bool,
-        /// Number of parameters in the .tfm file.
-        got: usize,
-    },
-    FirstWidthIsNonZero,
-    FirstDepthIsNonZero,
-    FirstHeightIsNonZero,
-    FirstItalicCorrectionIsNonZero,
-    WidthIsTooBig(usize),
-    HeightIsTooBig(usize),
-    DepthIsTooBig(usize),
-    ItalicCorrectionIsTooBig(usize),
-    InvalidWidthIndex(Char, u8),
-    InvalidHeightIndex(Char, u8),
-    InvalidDepthIndex(Char, u8),
-    InvalidItalicCorrectionIndex(Char, u8),
-    InvalidExtensibleRecipeIndex(Char, u8),
-    LigKernSkipsTooFar(usize),
-    LigatureStepForNonExistentCharacter(Char),
 }
 
-impl Warning {
+impl DeserializationWarning {
     /// Returns the warning message the TFtoPL program prints for this kind of error.
     pub fn tftopl_message(&self) -> String {
-        use Warning::*;
+        use DeserializationWarning::*;
         match self {
             InternalFileLengthIsSmall(_, _) => {
                 "There's some extra junk at the end of the TFM file,\nbut I'll proceed as if it weren't there.".into()
             },
-            UnusualNumberOfParameters { is_math_symbols_font, got } => {
-                let (font_description, expected) = if *is_math_symbols_font {
-                    ("a math symbols", 22)
-                } else {
-                    ("an extension", 13)
-                };
-                format!["Unusual number of fontdimen parameters for {font_description} font ({got} not {expected})."]
-            },
-            FirstWidthIsNonZero => "Bad TFM file: width[0] should be zero.".into(),
-            FirstDepthIsNonZero => "Bad TFM file: depth[0] should be zero.".into(),
-            FirstHeightIsNonZero => "Bad TFM file: height[0] should be zero.".into(),
-            FirstItalicCorrectionIsNonZero => "Bad TFM file: italic[0] should be zero.".into(),
-            WidthIsTooBig(i) => format!["Bad TFM file: Width {} is too big;\nI have set it to zero.", i],
-            HeightIsTooBig(i) => format!["Bad TFM file: Height {} is too big;\nI have set it to zero.", i],
-            DepthIsTooBig(i) =>  format!["Bad TFM file: Depth {} is too big;\nI have set it to zero.", i],
-            ItalicCorrectionIsTooBig(i) => format!["Bad TFM file: Italic correction {} is too big;\nI have set it to zero.", i],
-            // The following invalid index warning messages intentionally start with a new line.
-            // I think this is a bug in tftopl: in the range_error macro in TFtoPL.2014.47,
-            //  the print_ln(` `) invocation should be guarded behind a check on chars_on_line,
-            //  like the other macros.
-            InvalidWidthIndex(c, _) => format![" \nWidth index for character '{:o} is too large;\nso I reset it to zero.", c.0],
-            InvalidHeightIndex(c, _) =>  format![" \nHeight index for character '{:o} is too large;\nso I reset it to zero.", c.0],
-            InvalidDepthIndex(c, _) =>  format![" \nDepth index for character '{:o} is too large;\nso I reset it to zero.", c.0],
-            InvalidItalicCorrectionIndex(c, _) => format![" \nItalic correction index for character '{:o} is too large;\nso I reset it to zero.", c.0],
-            InvalidExtensibleRecipeIndex(c, _ ) => format![" \nExtension index for character '{:o} is too large;\nso I reset it to zero.", c.0],
-            LigKernSkipsTooFar(i) => format!["Bad TFM file: Ligature/kern step {i} skips too far;"],
-            LigatureStepForNonExistentCharacter(c) => format!["Bad TFM file: Ligature step for nonexistent character '{:o}", c.0],
         }
     }
 
     /// Returns the section in Knuth's TFtoPL (version 2014) in which this warning occurs.
     pub fn tftopl_section(&self) -> usize {
-        use Warning::*;
+        use DeserializationWarning::*;
         match self {
             InternalFileLengthIsSmall(_, _) => 20,
-            UnusualNumberOfParameters { .. } => 59,
-            FirstWidthIsNonZero
-            | FirstDepthIsNonZero
-            | FirstHeightIsNonZero
-            | FirstItalicCorrectionIsNonZero
-            | WidthIsTooBig(_)
-            | HeightIsTooBig(_)
-            | DepthIsTooBig(_)
-            | ItalicCorrectionIsTooBig(_) => 62,
-            InvalidWidthIndex(_, _) => 79,
-            InvalidHeightIndex(_, _) => 80,
-            InvalidDepthIndex(_, _) => 81,
-            InvalidItalicCorrectionIndex(_, _) => 82,
-            InvalidExtensibleRecipeIndex(_, _) => 85,
-            LigKernSkipsTooFar(_) => 70,
-            LigatureStepForNonExistentCharacter(_) => 77,
         }
     }
 
     /// Returns true if this warning means the .tfm file was modified.
     pub fn tfm_file_modified(&self) -> bool {
-        use Warning::*;
+        use DeserializationWarning::*;
         match self {
-            InternalFileLengthIsSmall(_, _) | UnusualNumberOfParameters { .. } => false,
-            FirstWidthIsNonZero
-            | FirstDepthIsNonZero
-            | FirstHeightIsNonZero
-            | FirstItalicCorrectionIsNonZero
-            | WidthIsTooBig(_)
-            | HeightIsTooBig(_)
-            | DepthIsTooBig(_)
-            | ItalicCorrectionIsTooBig(_)
-            | InvalidWidthIndex(_, _)
-            | InvalidHeightIndex(_, _)
-            | InvalidDepthIndex(_, _)
-            | InvalidItalicCorrectionIndex(_, _)
-            | InvalidExtensibleRecipeIndex(_, _)
-            | LigKernSkipsTooFar(_)
-            | LigatureStepForNonExistentCharacter(_) => true,
+            InternalFileLengthIsSmall(_, _) => false,
         }
     }
 }
 
 /// Deserialize a TeX font metric (.tfm) file.
-pub(super) fn deserialize(b: &[u8]) -> (Result<File, Error>, Vec<Warning>) {
+pub(super) fn deserialize(
+    b: &[u8],
+) -> (
+    Result<File, DeserializationError>,
+    Vec<DeserializationWarning>,
+) {
     match RawFile::deserialize(b) {
-        (Ok(raw_file), mut warnings) => {
-            let file = from_raw_file(&raw_file, &mut warnings);
+        (Ok(raw_file), warnings) => {
+            let file = from_raw_file(&raw_file);
             (Ok(file), warnings)
         }
         (Err(err), warnings) => (Err(err), warnings),
     }
 }
 
-pub(super) fn from_raw_file(raw_file: &RawFile, warnings: &mut Vec<Warning>) -> File {
-    let mut char_dimens = HashMap::<Char, CharDimensions>::new();
+pub(super) fn from_raw_file(
+    raw_file: &RawFile,
+) -> File {
     let char_infos: Vec<(Option<CharDimensions>, Option<CharTag>)> =
         deserialize_array(raw_file.char_infos);
-    let mut char_tags = HashMap::<Char, CharTag>::new();
-    let mut c = raw_file.begin_char;
-    for (dimens, tag) in char_infos {
-        if let Some(mut dimens) = dimens {
-            if dimens.width_index.get() as i16 >= raw_file.sub_file_sizes.nw {
-                warnings.push(Warning::InvalidWidthIndex(c, dimens.width_index.get()));
-                dimens.width_index = WidthIndex::Invalid;
-            }
-            if dimens.height_index as i16 >= raw_file.sub_file_sizes.nh {
-                warnings.push(Warning::InvalidHeightIndex(c, dimens.height_index));
-                dimens.height_index = 0;
-            }
-            if dimens.depth_index as i16 >= raw_file.sub_file_sizes.nd {
-                warnings.push(Warning::InvalidDepthIndex(c, dimens.depth_index));
-                dimens.depth_index = 0;
-            }
-            if dimens.italic_index as i16 >= raw_file.sub_file_sizes.ni {
-                warnings.push(Warning::InvalidItalicCorrectionIndex(
-                    c,
-                    dimens.italic_index,
-                ));
-                dimens.italic_index = 0
-            }
-            char_dimens.insert(c, dimens);
-        }
-        if let Some(tag) = tag {
-            match tag {
-                CharTag::Ligature(_) => {}
-                CharTag::List(_) => {}
-                CharTag::Extension(e) => {
-                    if e as i16 >= raw_file.sub_file_sizes.ne {
-                        warnings.push(Warning::InvalidExtensibleRecipeIndex(c, e));
-                        continue;
-                    }
-                }
-            }
-            char_tags.insert(c, tag);
-        }
-        c = match c.0.checked_add(1) {
-            None => break,
-            Some(c) => Char(c),
-        }
-    }
-    let file = File {
+    File {
         header: Header::deserialize(raw_file.header),
-        char_dimens,
-        char_tags,
-        widths: deserialize_dimensions(
-            raw_file.widths,
-            warnings,
-            Warning::FirstWidthIsNonZero,
-            &Warning::WidthIsTooBig,
-        ),
-        heights: deserialize_dimensions(
-            raw_file.heights,
-            warnings,
-            Warning::FirstHeightIsNonZero,
-            &Warning::HeightIsTooBig,
-        ),
-        depths: deserialize_dimensions(
-            raw_file.depths,
-            warnings,
-            Warning::FirstDepthIsNonZero,
-            &Warning::DepthIsTooBig,
-        ),
-        italic_corrections: deserialize_dimensions(
-            raw_file.italic_corrections,
-            warnings,
-            Warning::FirstItalicCorrectionIsNonZero,
-            &Warning::ItalicCorrectionIsTooBig,
-        ),
+        char_dimens: (raw_file.begin_char.0..=raw_file.end_char.0)
+            .zip(char_infos.iter())
+            .filter_map(|(c, (d, _))| (d.clone().map(|d| (Char(c), d))))
+            .collect(),
+        char_tags: (raw_file.begin_char.0..=raw_file.end_char.0)
+            .zip(char_infos.iter())
+            .filter_map(|(c, (_, d))| (d.clone().map(|d| (Char(c), d))))
+            .collect(),
+        widths: deserialize_array(raw_file.widths),
+        heights: deserialize_array(raw_file.heights),
+        depths: deserialize_array(raw_file.depths),
+        italic_corrections: deserialize_array(raw_file.italic_corrections),
         lig_kern_program: ligkern::lang::Program {
-            instructions: deserialize_lig_kern(raw_file.lig_kern_instructions, warnings),
+            instructions: deserialize_array(raw_file.lig_kern_instructions),
             boundary_char: deserialize_boundary_char(raw_file.lig_kern_instructions),
             boundary_char_entrypoint: deserialize_boundary_char_entrypoint(
                 raw_file.lig_kern_instructions,
@@ -327,29 +189,7 @@ pub(super) fn from_raw_file(raw_file: &RawFile, warnings: &mut Vec<Warning>) -> 
         kerns: deserialize_array(raw_file.kerns),
         extensible_chars: deserialize_array(raw_file.extensible_recipes),
         params: Params(deserialize_array(raw_file.params)),
-    };
-
-    {
-        let scheme = match &file.header.character_coding_scheme {
-            None => "".to_string(),
-            Some(scheme) => scheme.to_uppercase(),
-        };
-        let num_params = file.params.0.len();
-        if scheme.starts_with("TEX MATH SY") && num_params != 22 {
-            warnings.push(Warning::UnusualNumberOfParameters {
-                is_math_symbols_font: true,
-                got: num_params,
-            })
-        }
-        if scheme.starts_with("TEX MATH EX") && num_params != 13 {
-            warnings.push(Warning::UnusualNumberOfParameters {
-                is_math_symbols_font: false,
-                got: num_params,
-            })
-        }
     }
-
-    file
 }
 
 /// Raw .tfm file.
@@ -465,40 +305,61 @@ impl<'a> RawFile<'a> {
         debug::parse(s)
     }
 
-    pub fn deserialize(b: &'a [u8]) -> (Result<Self, Error>, Vec<Warning>) {
+    pub fn deserialize(
+        b: &'a [u8],
+    ) -> (
+        Result<Self, DeserializationError>,
+        Vec<DeserializationWarning>,
+    ) {
         let lf = {
             let b0 = match b.first() {
                 Some(b0) => *b0,
-                None => return (Err(Error::FileIsEmpty), vec![]),
+                None => return (Err(DeserializationError::FileIsEmpty), vec![]),
             };
             let b1 = match b.get(1) {
                 Some(b1) => *b1,
-                None => return (Err(Error::FileHasOneByte(b0)), vec![]),
+                None => return (Err(DeserializationError::FileHasOneByte(b0)), vec![]),
             };
             i16::from_be_bytes([b0, b1])
         };
         let mut warnings = vec![];
         match lf {
-            ..=-1 => return (Err(Error::InternalFileLengthIsNegative(lf)), warnings),
-            0 => return (Err(Error::InternalFileLengthIsZero), warnings),
+            ..=-1 => {
+                return (
+                    Err(DeserializationError::InternalFileLengthIsNegative(lf)),
+                    warnings,
+                )
+            }
+            0 => {
+                return (
+                    Err(DeserializationError::InternalFileLengthIsZero),
+                    warnings,
+                )
+            }
             1.. => {
                 let actual_file_length = b.len();
                 let claimed_file_length = (lf as usize) * 4;
                 match actual_file_length.cmp(&claimed_file_length) {
                     std::cmp::Ordering::Less => {
                         return (
-                            Err(Error::InternalFileLengthIsTooBig(lf, actual_file_length)),
+                            Err(DeserializationError::InternalFileLengthIsTooBig(
+                                lf,
+                                actual_file_length,
+                            )),
                             warnings,
                         )
                     }
                     std::cmp::Ordering::Equal => (),
-                    std::cmp::Ordering::Greater => {
-                        warnings.push(Warning::InternalFileLengthIsSmall(lf, actual_file_length))
-                    }
+                    std::cmp::Ordering::Greater => warnings.push(
+                        DeserializationWarning::InternalFileLengthIsSmall(lf, actual_file_length),
+                    ),
                 }
                 if lf <= 3 {
                     return (
-                        Err(Error::InternalFileLengthIsTooSmall(lf, actual_file_length)),
+                        Err(DeserializationError::InternalFileLengthIsTooSmall(
+                            lf,
+                            actual_file_length,
+                        )),
                         // TFtoPL doesn't output a warning here.
                         // Which makes sense because the error already encompasses the warning.
                         vec![],
@@ -527,15 +388,26 @@ impl<'a> RawFile<'a> {
             || s.ne < 0
             || s.np < 0
         {
-            return (Err(Error::SubFileSizeIsNegative(s.clone())), warnings);
+            return (
+                Err(DeserializationError::SubFileSizeIsNegative(s.clone())),
+                warnings,
+            );
         }
         if s.lh < 2 {
-            return (Err(Error::HeaderLengthIsTooSmall(s.lh)), warnings);
+            return (
+                Err(DeserializationError::HeaderLengthIsTooSmall(s.lh)),
+                warnings,
+            );
         }
         let (bc, ec) = match s.bc.cmp(&s.ec.saturating_add(1)) {
             std::cmp::Ordering::Less => {
                 let ec: u8 = match s.ec.try_into() {
-                    Err(_) => return (Err(Error::InvalidCharacterRange(s.bc, s.ec)), warnings),
+                    Err(_) => {
+                        return (
+                            Err(DeserializationError::InvalidCharacterRange(s.bc, s.ec)),
+                            warnings,
+                        )
+                    }
                     Ok(ec) => ec,
                 };
                 (
@@ -545,17 +417,29 @@ impl<'a> RawFile<'a> {
             }
             std::cmp::Ordering::Equal => (Char(1), Char(0)),
             std::cmp::Ordering::Greater => {
-                return (Err(Error::InvalidCharacterRange(s.bc, s.ec)), warnings)
+                return (
+                    Err(DeserializationError::InvalidCharacterRange(s.bc, s.ec)),
+                    warnings,
+                )
             }
         };
         if s.nw == 0 || s.nh == 0 || s.nd == 0 || s.ni == 0 {
-            return (Err(Error::IncompleteSubFiles(s.clone())), warnings);
+            return (
+                Err(DeserializationError::IncompleteSubFiles(s.clone())),
+                warnings,
+            );
         }
         if s.ne > 255 {
-            return (Err(Error::TooManyExtensibleCharacters(s.ne)), warnings);
+            return (
+                Err(DeserializationError::TooManyExtensibleCharacters(s.ne)),
+                warnings,
+            );
         }
         if s.lf != s.valid_lf() {
-            return (Err(Error::InconsistentSubFileSizes(s.clone())), warnings);
+            return (
+                Err(DeserializationError::InconsistentSubFileSizes(s.clone())),
+                warnings,
+            );
         }
 
         (Ok(Self::finish_deserialization(b, s, bc, ec)), warnings)
@@ -664,44 +548,6 @@ fn deserialize_array<T: Deserializable>(mut b: &[u8]) -> Vec<T> {
         b = &b[4..]
     }
     r
-}
-
-fn deserialize_lig_kern(b: &[u8], warnings: &mut Vec<Warning>) -> Vec<ligkern::lang::Instruction> {
-    let mut v: Vec<ligkern::lang::Instruction> = deserialize_array(b);
-    let n = v.len();
-    for (i, e) in v.iter_mut().enumerate() {
-        if let Some(inc) = e.next_instruction {
-            if i + (inc as usize) + 1 >= n {
-                warnings.push(Warning::LigKernSkipsTooFar(i));
-                e.next_instruction = None;
-            }
-        }
-    }
-    v
-}
-
-fn deserialize_dimensions(
-    b: &[u8],
-    warnings: &mut Vec<Warning>,
-    first_dimension_non_zero: Warning,
-    dimension_too_big: &dyn Fn(usize) -> Warning,
-) -> Vec<Number> {
-    let v = deserialize_array(b);
-    if v[0] != Number::ZERO {
-        warnings.push(first_dimension_non_zero);
-    }
-    v.into_iter()
-        .enumerate()
-        .map(|(i, n)| {
-            // TODO: test the boundary cases when n=-16 and n=+16
-            if n >= Number::UNITY * 16 || n < Number::UNITY * -16 {
-                warnings.push(dimension_too_big(i));
-                Number::ZERO
-            } else {
-                n
-            }
-        })
-        .collect()
 }
 
 /// Implementations of this trait can be deserialized from a 4-byte word.
@@ -863,38 +709,46 @@ mod tests {
     }
 
     deserialize_tests!(
-        (empty_file, [], Err(Error::FileIsEmpty)),
-        (single_byte_1, [2], Err(Error::FileHasOneByte(2))),
-        (single_byte_2, [255], Err(Error::FileHasOneByte(255))),
+        (empty_file, [], Err(DeserializationError::FileIsEmpty)),
+        (
+            single_byte_1,
+            [2],
+            Err(DeserializationError::FileHasOneByte(2))
+        ),
+        (
+            single_byte_2,
+            [255],
+            Err(DeserializationError::FileHasOneByte(255))
+        ),
         (
             internal_file_length_is_negative,
             [255, 0],
-            Err(Error::InternalFileLengthIsNegative(-256))
+            Err(DeserializationError::InternalFileLengthIsNegative(-256))
         ),
         (
             internal_file_length_is_zero,
             [0, 0, 1, 1],
-            Err(Error::InternalFileLengthIsZero)
+            Err(DeserializationError::InternalFileLengthIsZero)
         ),
         (
             internal_file_length_is_too_big,
             [0, 2, 1, 1],
-            Err(Error::InternalFileLengthIsTooBig(2, 4))
+            Err(DeserializationError::InternalFileLengthIsTooBig(2, 4))
         ),
         (
             internal_file_length_is_too_small,
             extend(&[0, 2, 255, 0], 24),
-            Err(Error::InternalFileLengthIsTooSmall(2, 24))
+            Err(DeserializationError::InternalFileLengthIsTooSmall(2, 24))
         ),
         (
             tfm_file_contains_only_sub_file_sizes,
             extend(&[0, 3, 0, 0], 12),
-            Err(Error::InternalFileLengthIsTooSmall(3, 12))
+            Err(DeserializationError::InternalFileLengthIsTooSmall(3, 12))
         ),
         (
             sub_file_size_too_small,
             extend(&[0, 6, 255, 0], 24),
-            Err(Error::SubFileSizeIsNegative(SubFileSizes {
+            Err(DeserializationError::SubFileSizeIsNegative(SubFileSizes {
                 lf: 6,
                 lh: -256,
                 ..Default::default()
@@ -903,22 +757,22 @@ mod tests {
         (
             header_length_too_small_0,
             extend(&[0, 6, 0, 0], 24),
-            Err(Error::HeaderLengthIsTooSmall(0))
+            Err(DeserializationError::HeaderLengthIsTooSmall(0))
         ),
         (
             header_length_too_small_1,
             extend(&[0, 6, 0, 1], 24),
-            Err(Error::HeaderLengthIsTooSmall(1))
+            Err(DeserializationError::HeaderLengthIsTooSmall(1))
         ),
         (
             invalid_character_range_1,
             extend(&[0, 6, 0, 2, 0, 2, 0, 0], 24),
-            Err(Error::InvalidCharacterRange(2, 0))
+            Err(DeserializationError::InvalidCharacterRange(2, 0))
         ),
         (
             invalid_character_range_2,
             extend(&[0, 6, 0, 2, 0, 2, 1, 0], 24),
-            Err(Error::InvalidCharacterRange(2, 256))
+            Err(DeserializationError::InvalidCharacterRange(2, 256))
         ),
         (
             incomplete_sub_files,
@@ -929,7 +783,7 @@ mod tests {
                 ],
                 24
             ),
-            Err(Error::IncompleteSubFiles(SubFileSizes {
+            Err(DeserializationError::IncompleteSubFiles(SubFileSizes {
                 lf: 6,
                 lh: 2,
                 bc: 1,
@@ -950,7 +804,7 @@ mod tests {
                 ],
                 24
             ),
-            Err(Error::TooManyExtensibleCharacters(257))
+            Err(DeserializationError::TooManyExtensibleCharacters(257))
         ),
         (
             inconsistent_sub_file_sizes,
@@ -963,20 +817,22 @@ mod tests {
                 ],
                 24
             ),
-            Err(Error::InconsistentSubFileSizes(SubFileSizes {
-                lf: 6,
-                lh: 2,
-                bc: 3,
-                ec: 4,
-                nw: 5,
-                nh: 6,
-                nd: 7,
-                ni: 8,
-                nl: 9,
-                nk: 10,
-                ne: 11,
-                np: 12,
-            }))
+            Err(DeserializationError::InconsistentSubFileSizes(
+                SubFileSizes {
+                    lf: 6,
+                    lh: 2,
+                    bc: 3,
+                    ec: 4,
+                    nw: 5,
+                    nh: 6,
+                    nd: 7,
+                    ni: 8,
+                    nl: 9,
+                    nk: 10,
+                    ne: 11,
+                    np: 12,
+                }
+            ))
         ),
         (
             corrupt_string_in_header,
@@ -1017,7 +873,7 @@ mod tests {
                 header: Header::tfm_default(),
                 ..Default::default()
             }),
-            Warning::InternalFileLengthIsSmall(12, 40 * 4)
+            DeserializationWarning::InternalFileLengthIsSmall(12, 40 * 4)
         ),
     );
 
@@ -1085,7 +941,7 @@ mod tests {
             ),
             File {
                 header: Header::tfm_default(),
-                char_dimens: HashMap::from([
+                char_dimens: BTreeMap::from([
                     (
                         Char(70),
                         CharDimensions {
@@ -1105,7 +961,7 @@ mod tests {
                         }
                     ),
                 ]),
-                char_tags: HashMap::from([(Char(72), CharTag::Ligature(23)),]),
+                char_tags: BTreeMap::from([(Char(72), CharTag::Ligature(23)),]),
                 widths: vec![
                     Number(0),
                     Number(0),
@@ -1140,7 +996,7 @@ mod tests {
             ),
             File {
                 header: Header::tfm_default(),
-                char_dimens: HashMap::from([(
+                char_dimens: BTreeMap::from([(
                     Char(255),
                     CharDimensions {
                         width_index: WidthIndex::Valid(5.try_into().unwrap()),

@@ -70,16 +70,7 @@ pub struct TfPath(pub std::path::PathBuf);
 
 impl TfPath {
     #[allow(dead_code)]
-    pub fn read(
-        &self,
-    ) -> Result<
-        (
-            Vec<u8>,
-            tfm::format::File,
-            Vec<tfm::format::DeserializeWarning>,
-        ),
-        String,
-    > {
+    pub fn read(&self) -> Result<(Vec<u8>, tfm::format::File, Vec<tfm::format::Warning>), String> {
         let data = match std::fs::read(&self.0) {
             Ok(data) => data,
             Err(err) => return Err(format!("Failed to read `{}`: {}", self.0.display(), err)),
