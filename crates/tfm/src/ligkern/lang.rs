@@ -257,9 +257,15 @@ impl Program {
         let mut reachable = vec![false; self.instructions.len()];
         // TFtoPL.2014.68
         for entrypoint in entrypoints {
-            if let Some(slot) = reachable.get_mut(entrypoint as usize) {
-                *slot = true
-            }
+            *reachable
+                .get_mut(entrypoint as usize)
+                .expect("each entrypoint is a valid index for the instructions vector") = true;
+        }
+        if let Some(entrypoint) = self.boundary_char_entrypoint {
+            *reachable
+                .get_mut(entrypoint as usize)
+                .expect("boundary_char_entrypoint is a valid index for the instructions vector") =
+                true;
         }
         // TFtoPL.2014.70
         for i in 0..reachable.len() {
@@ -338,7 +344,15 @@ impl<'a> Iterator for ReachableIter<'a> {
                 }
             } else {
                 let mut upper_bound = this + 1;
-                while self.reachable.get(upper_bound as usize).copied() == Some(false) {
+                loop {
+                    if let Some(instruction) = self.instructions.get(upper_bound as usize) {
+                        if let Operation::EntrypointRedirect(_, _) = instruction.operation {
+                            break;
+                        }
+                    }
+                    if self.reachable.get(upper_bound as usize).copied() != Some(false) {
+                        break;
+                    }
                     upper_bound += 1;
                 }
                 self.next = upper_bound;
@@ -362,14 +376,17 @@ impl<'a> Iterator for InstructionsForEntrypointIter<'a> {
     type Item = &'a Instruction;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.instructions.get(self.next).map(|i| {
-            // TODO what if i is a EntrypointRedirect? Should return None?
-            // Can we find these kinds of cases by fuzzing over the raw lig/kern bytes?
-            self.next = match i.next_instruction {
-                None => usize::MAX,
-                Some(inc) => self.next + inc as usize + 1,
-            };
-            i
-        })
+        self.instructions
+            .get(self.next)
+            .and_then(|i| {
+                if let Operation::EntrypointRedirect(_, _) = i.operation {
+                    return None;
+                }
+                self.next = match i.next_instruction {
+                    None => usize::MAX,
+                    Some(inc) => self.next + inc as usize + 1,
+                };
+                Some(i)
+            })
     }
 }

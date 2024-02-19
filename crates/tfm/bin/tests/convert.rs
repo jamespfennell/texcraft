@@ -287,6 +287,13 @@ convert_tests!(
         "data/originals/dimen-index-out-of-bounds-3.tfm",
         "data/originals/dimen-index-out-of-bounds-4.pl",
     ),
+    /* TODO: re-enable after fixing seven bit safe
+    (
+        smfebsl10_2_3,
+        "data/ctan/smfebsl10-3.tfm",
+        "data/ctan/smfebsl10-2.pl",
+    ),
+     */
     /* TODO: reenable and then delete the tftopl test
     (
         cprbn8t,
@@ -452,6 +459,13 @@ convert_tftopl_tests!(
         "data/originals/dimen-index-out-of-bounds-1.tfm",
         include_str!("data/originals/dimen-index-out-of-bounds-2.pl"),
         include_str!("data/originals/dimen-index-out-of-bounds-2.stderr.txt"),
+        true,
+    ),
+    (
+        smfebsl10_1_2,
+        "data/ctan/smfebsl10-1.tfm",
+        include_str!("data/ctan/smfebsl10-2.pl"),
+        "",
         true,
     ),
 );
