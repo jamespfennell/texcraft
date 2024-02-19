@@ -401,7 +401,7 @@ pub enum FontDimension {
     /// The notation `PARAMETER n` provides another way to specify the nth parameter;
     ///     for example, `(PARAMETER D 1 R −.25)` is another way to specify that the `SLANT` is −0.25.
     /// The value of n must be positive and less than max param words.
-    IndexedParam(TupleValue<DecimalU8, Number>),
+    IndexedParam(TupleValue<ParameterIndex, Number>),
 
     /// A comment that is ignored.
     Comment(Vec<cst::BalancedElem>),
@@ -415,6 +415,21 @@ impl Parse for DecimalU8 {
     fn parse(input: &mut Input) -> (Self, Range<usize>) {
         let (a, b) = u8::parse(input);
         (DecimalU8(a), b)
+    }
+
+    fn to_string(self, _: &LowerOpts) -> Option<String> {
+        Some(format!["D {}", self.0])
+    }
+}
+
+/// A parameter index.
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParameterIndex(pub i16);
+
+impl Parse for ParameterIndex {
+    fn parse(input: &mut Input) -> (Self, Range<usize>) {
+        let (a, b) = u8::parse(input);
+        (ParameterIndex(a as i16), b)
     }
 
     fn to_string(self, _: &LowerOpts) -> Option<String> {

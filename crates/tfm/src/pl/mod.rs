@@ -441,7 +441,9 @@ impl File {
             .iter()
             .enumerate()
             .map(|(i, &param)| {
-                let i: u8 = (i + 1).try_into().unwrap();
+                let i: i16 = (i + 1)
+                    .try_into()
+                    .expect("cannot be more than i16::MAX parameters");
                 // TFtoPL.2014.61
                 // TODO: check that each parameter *except* SLANT is in the range [-16.0, 16.0] per TFtoPL.2014.60
                 let named_param = match (i, font_type) {
@@ -474,7 +476,9 @@ impl File {
                     (12, FontType::TexMathEx) => NamedParam::BigOpSpacing4,
                     (13, FontType::TexMathEx) => NamedParam::BigOpSpacing5,
                     _ => {
-                        return ast::FontDimension::IndexedParam((ast::DecimalU8(i), param).into());
+                        return ast::FontDimension::IndexedParam(
+                            (ast::ParameterIndex(i), param).into(),
+                        );
                     }
                 };
                 ast::FontDimension::NamedParam(named_param, param.into())

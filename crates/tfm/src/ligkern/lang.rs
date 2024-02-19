@@ -376,17 +376,15 @@ impl<'a> Iterator for InstructionsForEntrypointIter<'a> {
     type Item = &'a Instruction;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.instructions
-            .get(self.next)
-            .and_then(|i| {
-                if let Operation::EntrypointRedirect(_, _) = i.operation {
-                    return None;
-                }
-                self.next = match i.next_instruction {
-                    None => usize::MAX,
-                    Some(inc) => self.next + inc as usize + 1,
-                };
-                Some(i)
-            })
+        self.instructions.get(self.next).and_then(|i| {
+            if let Operation::EntrypointRedirect(_, _) = i.operation {
+                return None;
+            }
+            self.next = match i.next_instruction {
+                None => usize::MAX,
+                Some(inc) => self.next + inc as usize + 1,
+            };
+            Some(i)
+        })
     }
 }

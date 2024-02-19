@@ -367,6 +367,18 @@ convert_pltotf_tests!(
         include_str!["data/originals/dimen-index-out-of-bounds-3.stderr.txt"],
     ),
      */
+
+    /*
+    The problem in this one is that pltotf imposes max params of 254.
+    (It's not 255 because in the CST -> AST step, number bigger than this become 255
+    due to how Knuth does the get_byte method. So with 254 we can still check for this condition)
+    Do we want to support that?
+        (
+        bxjatoucs_jis_roundtrip,
+        "data/ctan/bxjatoucs-jis-3.tfm",
+        "data/ctan/bxjatoucs-jis-2.pl",
+    ),
+     */
 );
 
 convert_tftopl_tests!(
@@ -465,6 +477,13 @@ convert_tftopl_tests!(
         smfebsl10_1_2,
         "data/ctan/smfebsl10-1.tfm",
         include_str!("data/ctan/smfebsl10-2.pl"),
+        "",
+        true,
+    ),
+    (
+        bxjatoucs_jis,
+        "data/ctan/bxjatoucs-jis-1.tfm",
+        include_str!("data/ctan/bxjatoucs-jis-2.pl"),
         "",
         true,
     ),
