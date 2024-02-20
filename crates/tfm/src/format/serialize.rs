@@ -128,6 +128,7 @@ impl Serializable for ligkern::lang::Instruction {
             ligkern::lang::Operation::Ligature {
                 char_to_insert,
                 post_lig_operation,
+                post_lig_tag_invalid: _,
             } => {
                 use ligkern::lang::PostLigOperation::*;
                 b.extend(first);

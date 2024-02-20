@@ -69,6 +69,13 @@ pub enum Operation {
         char_to_insert: Char,
         /// What to do after inserting the character.
         post_lig_operation: PostLigOperation,
+        /// If the tag in the .tfm file was invalid, this will be true.
+        /// In this case the post_lig_operation will be [`PostLigOperation::RetainNeitherMoveToInserted`].
+        ///
+        /// This field is used in the .tfm validation function to generate a warning for this case.
+        /// We could also generate a warning in the deserialization code itself but then the
+        /// ordering of the warning would be incorrect with respect to other validation warnings.
+        post_lig_tag_invalid: bool,
     },
     /// If the entrypoint for a character is this operation, go to the instruction indexed by the payload.
     ///
@@ -312,13 +319,21 @@ impl Program {
                         instruction.operation = Operation::Kern(Number::ZERO);
                     }
                 }
-                Operation::Ligature { char_to_insert, .. } => {
+                Operation::Ligature {
+                    char_to_insert,
+                    post_lig_tag_invalid,
+                    ..
+                } => {
                     if !char_exists(*char_to_insert) {
                         warnings.push(ValidationWarning::LigatureStepProducesNonExistentCharacter(
                             i,
                             *char_to_insert,
                         ));
                         *char_to_insert = smallest_char.unwrap_or(Char(0));
+                    }
+                    if *post_lig_tag_invalid {
+                        warnings.push(ValidationWarning::InvalidLigTag(i));
+                        *post_lig_tag_invalid = false;
                     }
                 }
                 Operation::EntrypointRedirect(_, _) => {}
@@ -363,6 +378,7 @@ pub enum ValidationWarning {
     KernStepForNonExistentCharacter(usize, Char),
     LigatureStepProducesNonExistentCharacter(usize, Char),
     KernIndexTooBig(usize),
+    InvalidLigTag(usize),
 }
 
 impl ValidationWarning {
@@ -386,6 +402,7 @@ impl ValidationWarning {
                 c.0
             ],
             KernIndexTooBig(_) => "Bad TFM file: Kern index too large.".to_string(),
+            InvalidLigTag(_) => "Ligature step with nonstandard code changed to LIG".to_string(),
         }
     }
 
@@ -395,7 +412,8 @@ impl ValidationWarning {
         match self {
             SkipTooLarge(_) => 70,
             LigatureStepForNonExistentCharacter(_, _)
-            | LigatureStepProducesNonExistentCharacter(_, _) => 77,
+            | LigatureStepProducesNonExistentCharacter(_, _)
+            | InvalidLigTag(_) => 77,
             KernStepForNonExistentCharacter(_, _) | KernIndexTooBig(_) => 76,
         }
     }

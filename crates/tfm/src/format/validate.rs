@@ -140,8 +140,7 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
         if i == 0 {
             continue;
         }
-        // TODO: test the boundary cases when n=-16 and n=+16
-        if *elem >= Number::UNITY * 16 || *elem < Number::UNITY * -16 {
+        if !elem.is_abs_less_than_16() {
             warnings.push(ValidationWarning::ParameterIsTooBig(i + 1));
             *elem = Number::ZERO
         }
@@ -167,41 +166,45 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
         }
     }
 
-    for (array, first_dimension_non_zero, dimension_too_big) in [
-        (
-            &mut file.widths,
-            Some(ValidationWarning::FirstWidthIsNonZero),
-            ValidationWarning::WidthIsTooBig as fn(usize) -> ValidationWarning,
-        ),
-        (
-            &mut file.heights,
-            Some(ValidationWarning::FirstHeightIsNonZero),
-            ValidationWarning::HeightIsTooBig,
-        ),
-        (
-            &mut file.depths,
-            Some(ValidationWarning::FirstDepthIsNonZero),
-            ValidationWarning::DepthIsTooBig,
-        ),
+    for (array, first_dimension_non_zero) in [
+        (&mut file.widths, ValidationWarning::FirstWidthIsNonZero),
+        (&mut file.heights, ValidationWarning::FirstHeightIsNonZero),
+        (&mut file.depths, ValidationWarning::FirstDepthIsNonZero),
         (
             &mut file.italic_corrections,
-            Some(ValidationWarning::FirstItalicCorrectionIsNonZero),
-            ValidationWarning::ItalicCorrectionIsTooBig,
+            ValidationWarning::FirstItalicCorrectionIsNonZero,
         ),
-        (&mut file.kerns, None, ValidationWarning::KernIsTooBig),
     ] {
-        if let Some(first_dimension_non_zero) = first_dimension_non_zero {
-            if let Some(first) = array.first_mut() {
-                if *first != Number::ZERO {
-                    warnings.push(first_dimension_non_zero);
-                    *first = Number::ZERO;
-                }
+        if let Some(first) = array.first_mut() {
+            if *first != Number::ZERO {
+                warnings.push(first_dimension_non_zero);
+                // We zero out the number below because we may still want to issue
+                // a warning for number too big.
             }
         }
+    }
+
+    for (array, dimension_too_big, zero_first_element) in [
+        (
+            &mut file.widths,
+            ValidationWarning::WidthIsTooBig as fn(usize) -> ValidationWarning,
+            true,
+        ),
+        (&mut file.heights, ValidationWarning::HeightIsTooBig, true),
+        (&mut file.depths, ValidationWarning::DepthIsTooBig, true),
+        (
+            &mut file.italic_corrections,
+            ValidationWarning::ItalicCorrectionIsTooBig,
+            true,
+        ),
+        (&mut file.kerns, ValidationWarning::KernIsTooBig, false),
+    ] {
         for (i, elem) in array.iter_mut().enumerate() {
-            // TODO: test the boundary cases when n=-16 and n=+16
-            if *elem >= Number::UNITY * 16 || *elem < Number::UNITY * -16 {
+            if !elem.is_abs_less_than_16() {
                 warnings.push(dimension_too_big(i));
+                *elem = Number::ZERO
+            }
+            if i == 0 && zero_first_element {
                 *elem = Number::ZERO
             }
         }

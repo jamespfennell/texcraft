@@ -624,22 +624,22 @@ impl Deserializable for ligkern::lang::Instruction {
                     let delete_current_char = (op_byte % 2) == 0;
                     let skip = op_byte / 2;
                     use ligkern::lang::PostLigOperation::*;
+                    let (post_lig_operation, post_lig_tag_invalid) =
+                        match (delete_current_char, delete_next_char, skip) {
+                            (false, false, 0) => (RetainBothMoveNowhere, false),
+                            (false, false, 1) => (RetainBothMoveToInserted, false),
+                            (false, false, 2) => (RetainBothMoveToRight, false),
+                            (false, true, 0) => (RetainLeftMoveNowhere, false),
+                            (false, true, 1) => (RetainLeftMoveToInserted, false),
+                            (true, false, 0) => (RetainRightMoveToInserted, false),
+                            (true, false, 1) => (RetainRightMoveToRight, false),
+                            (true, true, 0) => (RetainNeitherMoveToInserted, false),
+                            _ => (RetainNeitherMoveToInserted, true),
+                        };
                     ligkern::lang::Operation::Ligature {
                         char_to_insert: Char(remainder),
-                        post_lig_operation: match (delete_current_char, delete_next_char, skip) {
-                            (false, false, 0) => RetainBothMoveNowhere,
-                            (false, false, 1) => RetainBothMoveToInserted,
-                            (false, false, 2) => RetainBothMoveToRight,
-                            (false, true, 0) => RetainLeftMoveNowhere,
-                            (false, true, 1) => RetainLeftMoveToInserted,
-                            (true, false, 0) => RetainRightMoveToInserted,
-                            (true, false, 1) => RetainRightMoveToRight,
-                            (true, true, 0) => RetainNeitherMoveToInserted,
-                            _ => {
-                                // TODO: issue a warning TFtoPL.2014.77
-                                RetainNeitherMoveToInserted
-                            }
-                        },
+                        post_lig_operation,
+                        post_lig_tag_invalid,
                     }
                 }
             },
@@ -878,6 +878,22 @@ mod tests {
             }),
             DeserializationWarning::InternalFileLengthIsSmall(12, 40 * 4)
         ),
+        (
+            lig_kern_invalid_lig_tag,
+            tfm_bytes_with_one_lig_kern_command([128, 8, 70, 23]),
+            Ok(tfm_file_with_one_lig_kern_instruction(
+                ligkern::lang::Instruction {
+                    next_instruction: None,
+                    right_char: Char(8),
+                    operation: ligkern::lang::Operation::Ligature {
+                        char_to_insert: Char(23),
+                        post_lig_operation:
+                            ligkern::lang::PostLigOperation::RetainNeitherMoveToInserted,
+                        post_lig_tag_invalid: true,
+                    },
+                }
+            ))
+        ),
     );
 
     serde_tests!(
@@ -1064,6 +1080,7 @@ mod tests {
                 operation: ligkern::lang::Operation::Ligature {
                     char_to_insert: Char(17),
                     post_lig_operation: ligkern::lang::PostLigOperation::RetainBothMoveNowhere,
+                    post_lig_tag_invalid: false,
                 },
             }),
         ),
@@ -1076,6 +1093,7 @@ mod tests {
                 operation: ligkern::lang::Operation::Ligature {
                     char_to_insert: Char(19),
                     post_lig_operation: ligkern::lang::PostLigOperation::RetainBothMoveToInserted,
+                    post_lig_tag_invalid: false,
                 },
             }),
         ),
@@ -1088,6 +1106,7 @@ mod tests {
                 operation: ligkern::lang::Operation::Ligature {
                     char_to_insert: Char(23),
                     post_lig_operation: ligkern::lang::PostLigOperation::RetainBothMoveToRight,
+                    post_lig_tag_invalid: false,
                 },
             }),
         ),
@@ -1100,6 +1119,7 @@ mod tests {
                 operation: ligkern::lang::Operation::Ligature {
                     char_to_insert: Char(23),
                     post_lig_operation: ligkern::lang::PostLigOperation::RetainRightMoveToInserted,
+                    post_lig_tag_invalid: false,
                 },
             }),
         ),
@@ -1112,6 +1132,7 @@ mod tests {
                 operation: ligkern::lang::Operation::Ligature {
                     char_to_insert: Char(23),
                     post_lig_operation: ligkern::lang::PostLigOperation::RetainRightMoveToRight,
+                    post_lig_tag_invalid: false,
                 },
             }),
         ),
@@ -1124,6 +1145,7 @@ mod tests {
                 operation: ligkern::lang::Operation::Ligature {
                     char_to_insert: Char(23),
                     post_lig_operation: ligkern::lang::PostLigOperation::RetainLeftMoveNowhere,
+                    post_lig_tag_invalid: false,
                 },
             }),
         ),
@@ -1136,6 +1158,7 @@ mod tests {
                 operation: ligkern::lang::Operation::Ligature {
                     char_to_insert: Char(23),
                     post_lig_operation: ligkern::lang::PostLigOperation::RetainLeftMoveToInserted,
+                    post_lig_tag_invalid: false,
                 },
             }),
         ),
@@ -1149,6 +1172,7 @@ mod tests {
                     char_to_insert: Char(23),
                     post_lig_operation:
                         ligkern::lang::PostLigOperation::RetainNeitherMoveToInserted,
+                    post_lig_tag_invalid: false,
                 },
             }),
         ),

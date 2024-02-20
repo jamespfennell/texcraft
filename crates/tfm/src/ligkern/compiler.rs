@@ -101,6 +101,7 @@ fn calculate_replacements(
             lang::Operation::Ligature {
                 char_to_insert,
                 post_lig_operation,
+                post_lig_tag_invalid: _,
             } => match post_lig_operation {
                 lang::PostLigOperation::RetainBothMoveNowhere => {
                     (TC::None, left, TC::Two(char_to_insert, right))
@@ -352,6 +353,7 @@ mod tests {
             operation: lang::Operation::Ligature {
                 char_to_insert: char_to_insert.try_into().unwrap(),
                 post_lig_operation,
+                post_lig_tag_invalid: false,
             },
         }
     }

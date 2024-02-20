@@ -103,6 +103,14 @@ impl Number {
 
     /// Representation of the number 1 as a [Number].
     pub const UNITY: Number = Number(1 << 20);
+
+    /// Returns true if the number is less than 16.0 in magnitude according to Knuth.
+    ///
+    /// See `check_fix` in TFtoPL.2014.60.
+    pub fn is_abs_less_than_16(&self) -> bool {
+        // TODO: test the boundary cases when n=-16 and n=+16
+        *self >= Number::UNITY * -16 && *self < Number::UNITY * 16
+    }
 }
 
 impl std::ops::Add<Number> for Number {

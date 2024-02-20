@@ -206,6 +206,7 @@ impl File {
                                         operation: ligkern::lang::Operation::Ligature {
                                             char_to_insert: v.right,
                                             post_lig_operation,
+                                            post_lig_tag_invalid: false,
                                         },
                                         // TODO: should the span of the entire LIG node not just some of the data
                                     },
@@ -516,6 +517,7 @@ impl File {
             ligkern::lang::Operation::Ligature {
                 char_to_insert,
                 post_lig_operation,
+                post_lig_tag_invalid: _,
             } => ast::LigTable::Lig(
                 post_lig_operation,
                 (instruction.right_char, char_to_insert).into(),
@@ -921,6 +923,7 @@ mod tests {
                             char_to_insert: 't'.try_into().unwrap(),
                             post_lig_operation:
                                 ligkern::lang::PostLigOperation::RetainRightMoveToRight,
+                            post_lig_tag_invalid: false,
                         },
                     },],
                     boundary_char: None,

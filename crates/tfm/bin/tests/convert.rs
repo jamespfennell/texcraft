@@ -495,6 +495,13 @@ convert_tftopl_tests!(
         true,
     ),
     (
+        quicspool_wwfonts_b_1_2,
+        "data/ctan/quicspool_wwfonts_b-1.tfm",
+        include_str!("data/ctan/quicspool_wwfonts_b-2.pl"),
+        include_str!("data/ctan/quicspool_wwfonts_b-2.stderr.txt"),
+        true,
+    ),
+    (
         duplicate_lig_kern_warnings,
         "data/originals/duplicate-lig-kern-warnings-1.tfm",
         include_str!("data/originals/duplicate-lig-kern-warnings-2.pl"),
