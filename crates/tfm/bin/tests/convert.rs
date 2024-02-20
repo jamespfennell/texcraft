@@ -502,10 +502,10 @@ convert_tftopl_tests!(
         true,
     ),
     (
-        duplicate_lig_kern_warnings,
-        "data/originals/duplicate-lig-kern-warnings-1.tfm",
-        include_str!("data/originals/duplicate-lig-kern-warnings-2.pl"),
-        include_str!("data/originals/duplicate-lig-kern-warnings-2.stderr.txt"),
+        number_limit_16,
+        "data/originals/number-limit-16-1.tfm",
+        include_str!("data/originals/number-limit-16-2.pl"),
+        include_str!("data/originals/number-limit-16-2.stderr.txt"),
         true,
     ),
 );

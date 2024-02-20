@@ -106,9 +106,10 @@ impl Number {
 
     /// Returns true if the number is less than 16.0 in magnitude according to Knuth.
     ///
+    /// The number +16.0 is not allowed.
+    /// This is covered in the E2E tests.
     /// See `check_fix` in TFtoPL.2014.60.
     pub fn is_abs_less_than_16(&self) -> bool {
-        // TODO: test the boundary cases when n=-16 and n=+16
         *self >= Number::UNITY * -16 && *self < Number::UNITY * 16
     }
 }

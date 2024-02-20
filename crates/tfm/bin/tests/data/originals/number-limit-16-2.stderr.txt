@@ -1,0 +1,8 @@
+Bad TFM file: Parameter 9 is too big;
+I have set it to zero.
+Bad TFM file: Parameter 10 is too big;
+I have set it to zero.
+Bad TFM file: Parameter 13 is too big;
+I have set it to zero.
+Bad TFM file: Parameter 14 is too big;
+I have set it to zero.
