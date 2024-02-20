@@ -348,31 +348,29 @@ impl File {
             })
             .collect();
 
-        let lig_kern_entrypoints = tfm_file.lig_kern_entrypoints();
         let mut lig_kern_program = tfm_file.lig_kern_program;
         lig_kern_program.pack_kerns(&tfm_file.kerns);
-        let lig_kern_entrypoints = lig_kern_program.unpack_entrypoints(lig_kern_entrypoints);
+        let lig_kern_entrypoints = lig_kern_program.unpack_entrypoints(
+            tfm_file
+                .char_tags
+                .iter()
+                .filter_map(|(c, t)| t.ligature().map(|l| (*c, l))),
+        );
 
         let char_tags = tfm_file
             .char_tags
             .into_iter()
-            .map(|(c, tag)| {
-                (
-                    c,
-                    match tag {
-                        format::CharTag::Ligature(_) => {
-                            CharTag::Ligature(*lig_kern_entrypoints.get(&c).unwrap())
-                        }
-                        format::CharTag::List(c) => CharTag::List(c),
-                        format::CharTag::Extension(i) => CharTag::Extension(
-                            tfm_file
-                                .extensible_chars
-                                .get(i as usize)
-                                .cloned()
-                                .expect("extension index is valid for the extensions arrays"),
-                        ),
-                    },
-                )
+            .filter_map(|(c, tag)| match tag {
+                format::CharTag::Ligature(_) => {
+                    Some((c, CharTag::Ligature(*lig_kern_entrypoints.get(&c).unwrap())))
+                }
+                format::CharTag::List(l) => Some((c, CharTag::List(l))),
+                // If the extension index is invalid we drop the tag.
+                format::CharTag::Extension(i) => tfm_file
+                    .extensible_chars
+                    .get(i as usize)
+                    .cloned()
+                    .map(|t| (c, CharTag::Extension(t))),
             })
             .collect();
 
@@ -616,6 +614,7 @@ impl File {
                     let l: Vec<cst::BalancedElem> = self
                         .lig_kern_program
                         .instructions_for_entrypoint(*entrypoint)
+                        .map(|(_, b)| b)
                         .map(build_lig_kern_op)
                         .map(|n| {
                             cst::BalancedElem::Vec(n.into_balanced_elements(char_display_format))

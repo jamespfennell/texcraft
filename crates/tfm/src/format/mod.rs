@@ -11,8 +11,8 @@ mod validate;
 
 use super::*;
 
-pub use deserialize::DeserializationError as DeserializeError;
-pub use deserialize::DeserializationWarning as DeserializeWarning;
+pub use deserialize::DeserializationError;
+pub use deserialize::DeserializationWarning;
 pub use deserialize::RawFile;
 pub use deserialize::SubFileSizes;
 pub use validate::ValidationWarning;
@@ -34,6 +34,9 @@ pub use validate::ValidationWarning;
 pub struct File {
     /// Header.
     pub header: Header,
+
+    /// Smallest character in the .tfm.
+    pub smallest_char: Option<Char>,
 
     /// Character dimensions.
     pub char_dimens: BTreeMap<Char, CharDimensions>,
@@ -117,6 +120,14 @@ pub enum CharTag {
     Extension(u8),
 }
 
+impl CharTag {
+    pub fn ligature(&self) -> Option<u8> {
+        match self {
+            CharTag::Ligature(l) => Some(*l),
+            CharTag::List(_) | CharTag::Extension(_) => None,
+        }
+    }
+}
 /// Extensible recipe instruction in a .tfm file.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ExtensibleRecipe {
@@ -130,6 +141,7 @@ impl Default for File {
     fn default() -> Self {
         Self {
             header: Default::default(),
+            smallest_char: None,
             char_dimens: Default::default(),
             char_tags: Default::default(),
             widths: vec![Number::ZERO],
@@ -162,9 +174,10 @@ pub fn debug<'a>(
 }
 
 pub enum Warning {
-    DeserializationWarning(DeserializeWarning),
+    DeserializationWarning(DeserializationWarning),
     ValidationWarning(ValidationWarning),
 }
+
 impl Warning {
     /// Returns the warning message the TFtoPL program prints for this kind of warning.
     pub fn tftopl_message(&self) -> String {
@@ -191,7 +204,7 @@ impl File {
         validate::validate_and_fix(self)
     }
 
-    pub fn deserialize(b: &[u8]) -> (Result<File, DeserializeError>, Vec<Warning>) {
+    pub fn deserialize(b: &[u8]) -> (Result<File, DeserializationError>, Vec<Warning>) {
         let (mut result, warnings) = deserialize::deserialize(b);
         let mut warnings: Vec<Warning> = warnings
             .into_iter()
@@ -379,6 +392,7 @@ impl File {
 
         let mut file = Self {
             header: pl_file.header.clone(),
+            smallest_char: char_bounds.map(|t| t.0),
             char_dimens,
             char_tags,
             widths,

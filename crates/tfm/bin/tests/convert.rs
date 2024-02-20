@@ -487,7 +487,6 @@ convert_tftopl_tests!(
         "",
         true,
     ),
-    /* TODO: enable after fixing all the bugs
     (
         quicspool_wwfonts_i_1_2,
         "data/ctan/quicspool_wwfonts_i-1.tfm",
@@ -495,5 +494,11 @@ convert_tftopl_tests!(
         include_str!("data/ctan/quicspool_wwfonts_i-2.stderr.txt"),
         true,
     ),
-     */
+    (
+        duplicate_lig_kern_warnings,
+        "data/originals/duplicate-lig-kern-warnings-1.tfm",
+        include_str!("data/originals/duplicate-lig-kern-warnings-2.pl"),
+        include_str!("data/originals/duplicate-lig-kern-warnings-2.stderr.txt"),
+        true,
+    ),
 );

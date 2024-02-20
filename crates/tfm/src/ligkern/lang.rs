@@ -127,26 +127,20 @@ pub enum PostLigOperation {
     RetainNeitherMoveToInserted,
 }
 
-// Need a function that takes in a vector of instructions and outputs
-// (1) a vector of reachable|unreachable|entrypoint
-// (2) a vector of cumulative unreachable|entrypoint counts. The diffs of these
-//     counts can be used to efficiently calculate skip adjustments
-// This function will likely be in the same place a decompress_entrypoints?
-// 66-77
-
 impl Program {
-    pub fn unpack_entrypoints(&self, entrypoints: HashMap<Char, u8>) -> HashMap<Char, u16> {
+    pub fn unpack_entrypoint(&self, entrypoint: u8) -> u16 {
+        match self.instructions[entrypoint as usize].operation {
+            Operation::EntrypointRedirect(u_big, _) => u_big,
+            _ => entrypoint as u16,
+        }
+    }
+
+    pub fn unpack_entrypoints<I: Iterator<Item = (Char, u8)>>(
+        &self,
+        entrypoints: I,
+    ) -> HashMap<Char, u16> {
         entrypoints
-            .into_iter()
-            .map(|(c, u)| {
-                (
-                    c,
-                    match self.instructions[u as usize].operation {
-                        Operation::EntrypointRedirect(u_big, _) => u_big,
-                        _ => u as u16,
-                    },
-                )
-            })
+            .map(|(c, u)| (c, self.unpack_entrypoint(u)))
             .collect()
     }
 
@@ -254,6 +248,87 @@ impl Program {
     }
 
     pub fn reachable_iter<I: Iterator<Item = u16>>(&self, entrypoints: I) -> ReachableIter {
+        ReachableIter {
+            next: 0,
+            reachable: self.reachable_array(entrypoints),
+            instructions: &self.instructions,
+        }
+    }
+
+    /// Iterate over the lig/kern instructions for a specific entrypoint.
+    pub fn instructions_for_entrypoint(&self, entrypoint: u16) -> InstructionsForEntrypointIter {
+        InstructionsForEntrypointIter {
+            next: entrypoint as usize,
+            instructions: &self.instructions,
+        }
+    }
+
+    pub fn validate_and_fix<T>(
+        &mut self,
+        smallest_char: Option<Char>,
+        char_exists: T,
+        num_kerns: usize,
+    ) -> Vec<ValidationWarning>
+    where
+        T: Fn(Char) -> bool,
+    {
+        let mut warnings: Vec<ValidationWarning> = vec![];
+
+        let n = self.instructions.len();
+        for (i, instruction) in self.instructions.iter_mut().enumerate() {
+            let is_kern_step = match instruction.operation {
+                Operation::Kern(_) => true,
+                Operation::KernAtIndex(_) => true,
+                Operation::Ligature { .. } => false,
+                Operation::EntrypointRedirect(_, _) => continue,
+            };
+            if let Operation::EntrypointRedirect(_, _) = instruction.operation {
+                continue;
+            }
+            if let Some(inc) = instruction.next_instruction {
+                if i + (inc as usize) + 1 >= n {
+                    warnings.push(ValidationWarning::SkipTooLarge(i));
+                    instruction.next_instruction = None;
+                }
+            }
+            if !char_exists(instruction.right_char)
+                && Some(instruction.right_char) != self.boundary_char
+            {
+                warnings.push(if is_kern_step {
+                    ValidationWarning::KernStepForNonExistentCharacter(i, instruction.right_char)
+                } else {
+                    ValidationWarning::LigatureStepForNonExistentCharacter(
+                        i,
+                        instruction.right_char,
+                    )
+                });
+                instruction.right_char = smallest_char.unwrap_or(Char(0));
+            }
+            match &mut instruction.operation {
+                Operation::Kern(_) => {}
+                Operation::KernAtIndex(k) => {
+                    if *k as usize >= num_kerns {
+                        warnings.push(ValidationWarning::KernIndexTooBig(i));
+                        instruction.operation = Operation::Kern(Number::ZERO);
+                    }
+                }
+                Operation::Ligature { char_to_insert, .. } => {
+                    if !char_exists(*char_to_insert) {
+                        warnings.push(ValidationWarning::LigatureStepProducesNonExistentCharacter(
+                            i,
+                            *char_to_insert,
+                        ));
+                        *char_to_insert = smallest_char.unwrap_or(Char(0));
+                    }
+                }
+                Operation::EntrypointRedirect(_, _) => {}
+            }
+        }
+
+        warnings
+    }
+
+    pub fn reachable_array<I: Iterator<Item = u16>>(&self, entrypoints: I) -> Vec<bool> {
         let mut reachable = vec![false; self.instructions.len()];
         // TFtoPL.2014.68
         for entrypoint in entrypoints {
@@ -278,41 +353,16 @@ impl Program {
                 }
             }
         }
-        ReachableIter {
-            next: 0,
-            reachable,
-            instructions: &self.instructions,
-        }
-    }
-
-    /// Iterate over the lig/kern instructions for a specific entrypoint.
-    pub fn instructions_for_entrypoint(&self, entrypoint: u16) -> InstructionsForEntrypointIter {
-        InstructionsForEntrypointIter {
-            next: entrypoint as usize,
-            instructions: &self.instructions,
-        }
-    }
-
-    pub fn validate_and_fix(&mut self) -> Vec<ValidationWarning> {
-        let mut warnings: Vec<ValidationWarning> = vec![];
-
-        let n = self.instructions.len();
-        for (i, e) in self.instructions.iter_mut().enumerate() {
-            if let Some(inc) = e.next_instruction {
-                if i + (inc as usize) + 1 >= n {
-                    warnings.push(ValidationWarning::SkipTooLarge(i));
-                    e.next_instruction = None;
-                }
-            }
-        }
-
-        warnings
+        reachable
     }
 }
 
 pub enum ValidationWarning {
     SkipTooLarge(usize),
     LigatureStepForNonExistentCharacter(usize, Char),
+    KernStepForNonExistentCharacter(usize, Char),
+    LigatureStepProducesNonExistentCharacter(usize, Char),
+    KernIndexTooBig(usize),
 }
 
 impl ValidationWarning {
@@ -320,11 +370,22 @@ impl ValidationWarning {
     pub fn tftopl_message(&self) -> String {
         use ValidationWarning::*;
         match self {
-            SkipTooLarge(i) => format!["Bad TFM file: Ligature/kern step {i} skips too far;"],
+            SkipTooLarge(i) => {
+                format!["Bad TFM file: Ligature/kern step {i} skips too far;\nI made it stop."]
+            }
             LigatureStepForNonExistentCharacter(_, c) => format![
-                "Bad TFM file: Ligature step for nonexistent character '{:o}",
+                "Bad TFM file: Ligature step for nonexistent character '{:03o}.",
                 c.0
             ],
+            KernStepForNonExistentCharacter(_, c) => format![
+                "Bad TFM file: Kern step for nonexistent character '{:03o}.",
+                c.0
+            ],
+            LigatureStepProducesNonExistentCharacter(_, c) => format![
+                "Bad TFM file: Ligature step produces the nonexistent character '{:03o}.",
+                c.0
+            ],
+            KernIndexTooBig(_) => "Bad TFM file: Kern index too large.".to_string(),
         }
     }
 
@@ -333,7 +394,9 @@ impl ValidationWarning {
         use ValidationWarning::*;
         match self {
             SkipTooLarge(_) => 70,
-            LigatureStepForNonExistentCharacter(_, _) => 77,
+            LigatureStepForNonExistentCharacter(_, _)
+            | LigatureStepProducesNonExistentCharacter(_, _) => 77,
+            KernStepForNonExistentCharacter(_, _) | KernIndexTooBig(_) => 76,
         }
     }
 }
@@ -418,18 +481,19 @@ pub struct InstructionsForEntrypointIter<'a> {
 }
 
 impl<'a> Iterator for InstructionsForEntrypointIter<'a> {
-    type Item = &'a Instruction;
+    type Item = (usize, &'a Instruction);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.instructions.get(self.next).and_then(|i| {
             if let Operation::EntrypointRedirect(_, _) = i.operation {
                 return None;
             }
+            let this = self.next;
             self.next = match i.next_instruction {
                 None => usize::MAX,
                 Some(inc) => self.next + inc as usize + 1,
             };
-            Some(i)
+            Some((this, i))
         })
     }
 }

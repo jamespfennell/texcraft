@@ -2,6 +2,7 @@ use super::*;
 use crate::ligkern::lang;
 
 pub enum ValidationWarning {
+    ParameterIsTooBig(usize),
     /// Unusual number of parameters.
     ///
     /// Math symbol fonts usually contain 22 parameters and math extension fonts 13.
@@ -25,6 +26,7 @@ pub enum ValidationWarning {
     HeightIsTooBig(usize),
     DepthIsTooBig(usize),
     ItalicCorrectionIsTooBig(usize),
+    KernIsTooBig(usize),
     LigKernWarning(lang::ValidationWarning),
 }
 
@@ -33,6 +35,10 @@ impl ValidationWarning {
     pub fn tftopl_message(&self) -> String {
         use ValidationWarning::*;
         match self {
+            ParameterIsTooBig(i) => format![
+                "Bad TFM file: Parameter {} is too big;\nI have set it to zero.",
+                i
+            ],
             UnusualNumberOfParameters { is_math_symbols_font, got } => {
                 let (font_description, expected) = if *is_math_symbols_font {
                     ("a math symbols", 22)
@@ -45,11 +51,11 @@ impl ValidationWarning {
             // I think this is a bug in tftopl: in the range_error macro in TFtoPL.2014.47,
             //  the print_ln(` `) invocation should be guarded behind a check on chars_on_line,
             //  like the other macros.
-            InvalidWidthIndex(c, _) => format![" \nWidth index for character '{:o} is too large;\nso I reset it to zero.", c.0],
-            InvalidHeightIndex(c, _) =>  format![" \nHeight index for character '{:o} is too large;\nso I reset it to zero.", c.0],
-            InvalidDepthIndex(c, _) =>  format![" \nDepth index for character '{:o} is too large;\nso I reset it to zero.", c.0],
-            InvalidItalicCorrectionIndex(c, _) => format![" \nItalic correction index for character '{:o} is too large;\nso I reset it to zero.", c.0],
-            InvalidExtensibleRecipeIndex(c, _ ) => format![" \nExtension index for character '{:o} is too large;\nso I reset it to zero.", c.0],
+            InvalidWidthIndex(c, _) => format![" \nWidth index for character '{:03o} is too large;\nso I reset it to zero.", c.0],
+            InvalidHeightIndex(c, _) =>  format![" \nHeight index for character '{:03o} is too large;\nso I reset it to zero.", c.0],
+            InvalidDepthIndex(c, _) =>  format![" \nDepth index for character '{:03o} is too large;\nso I reset it to zero.", c.0],
+            InvalidItalicCorrectionIndex(c, _) => format![" \nItalic correction index for character '{:03o} is too large;\nso I reset it to zero.", c.0],
+            InvalidExtensibleRecipeIndex(c, _ ) => format![" \nExtensible index for character '{:03o} is too large;\nso I reset it to zero.", c.0],
             FirstWidthIsNonZero => "Bad TFM file: width[0] should be zero.".into(),
             FirstDepthIsNonZero => "Bad TFM file: depth[0] should be zero.".into(),
             FirstHeightIsNonZero => "Bad TFM file: height[0] should be zero.".into(),
@@ -70,6 +76,10 @@ impl ValidationWarning {
                 "Bad TFM file: Italic correction {} is too big;\nI have set it to zero.",
                 i
             ],
+            KernIsTooBig(i) => format![
+                "Bad TFM file: Kern {} is too big;\nI have set it to zero.",
+                i
+            ],
             LigKernWarning(warning) => warning.tftopl_message(),
         }
     }
@@ -78,6 +88,7 @@ impl ValidationWarning {
     pub fn tftopl_section(&self) -> usize {
         use ValidationWarning::*;
         match self {
+            ParameterIsTooBig(_) => 60,
             UnusualNumberOfParameters { .. } => 59,
             InvalidWidthIndex(_, _) => 79,
             InvalidHeightIndex(_, _) => 80,
@@ -91,7 +102,8 @@ impl ValidationWarning {
             | WidthIsTooBig(_)
             | HeightIsTooBig(_)
             | DepthIsTooBig(_)
-            | ItalicCorrectionIsTooBig(_) => 62,
+            | ItalicCorrectionIsTooBig(_)
+            | KernIsTooBig(_) => 62,
             LigKernWarning(warning) => warning.tftopl_section(),
         }
     }
@@ -100,6 +112,7 @@ impl ValidationWarning {
     pub fn tfm_file_modified(&self) -> bool {
         use ValidationWarning::*;
         match self {
+            ParameterIsTooBig(_) => true,
             UnusualNumberOfParameters { .. } => false,
             InvalidWidthIndex(_, _)
             | InvalidHeightIndex(_, _)
@@ -114,6 +127,7 @@ impl ValidationWarning {
             | HeightIsTooBig(_)
             | DepthIsTooBig(_)
             | ItalicCorrectionIsTooBig(_)
+            | KernIsTooBig(_)
             | LigKernWarning(_) => true,
         }
     }
@@ -121,6 +135,17 @@ impl ValidationWarning {
 
 pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
     let mut warnings = vec![];
+
+    for (i, elem) in file.params.0.iter_mut().enumerate() {
+        if i == 0 {
+            continue;
+        }
+        // TODO: test the boundary cases when n=-16 and n=+16
+        if *elem >= Number::UNITY * 16 || *elem < Number::UNITY * -16 {
+            warnings.push(ValidationWarning::ParameterIsTooBig(i + 1));
+            *elem = Number::ZERO
+        }
+    }
 
     {
         let scheme = match &file.header.character_coding_scheme {
@@ -141,6 +166,71 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
             })
         }
     }
+
+    for (array, first_dimension_non_zero, dimension_too_big) in [
+        (
+            &mut file.widths,
+            Some(ValidationWarning::FirstWidthIsNonZero),
+            ValidationWarning::WidthIsTooBig as fn(usize) -> ValidationWarning,
+        ),
+        (
+            &mut file.heights,
+            Some(ValidationWarning::FirstHeightIsNonZero),
+            ValidationWarning::HeightIsTooBig,
+        ),
+        (
+            &mut file.depths,
+            Some(ValidationWarning::FirstDepthIsNonZero),
+            ValidationWarning::DepthIsTooBig,
+        ),
+        (
+            &mut file.italic_corrections,
+            Some(ValidationWarning::FirstItalicCorrectionIsNonZero),
+            ValidationWarning::ItalicCorrectionIsTooBig,
+        ),
+        (&mut file.kerns, None, ValidationWarning::KernIsTooBig),
+    ] {
+        if let Some(first_dimension_non_zero) = first_dimension_non_zero {
+            if let Some(first) = array.first_mut() {
+                if *first != Number::ZERO {
+                    warnings.push(first_dimension_non_zero);
+                    *first = Number::ZERO;
+                }
+            }
+        }
+        for (i, elem) in array.iter_mut().enumerate() {
+            // TODO: test the boundary cases when n=-16 and n=+16
+            if *elem >= Number::UNITY * 16 || *elem < Number::UNITY * -16 {
+                warnings.push(dimension_too_big(i));
+                *elem = Number::ZERO
+            }
+        }
+    }
+
+    let lig_kern_warnings = file.lig_kern_program.validate_and_fix(
+        file.smallest_char,
+        |c| file.char_dimens.contains_key(&c),
+        file.kerns.len(),
+    );
+    // There is a bug in Knuth's tftopl in which the same kern-index-too-big warning is printed
+    // more than once. It is printed when the lig/kern instruction is output in the LIGTABLE
+    // list, and also each time the instruction appears in a lig/kern COMMENT for a character.
+    // The cause of the bug is that the buggy index is never fixed in memory, and so when the
+    // instruction is seen multiple times the warning is triggered again. For other lig/kern warnings,
+    // the bad data is fixed when the warning is printed, so the next time the instruction is
+    // seen it is valid.
+    let kern_index_too_big_indices: HashSet<usize> = lig_kern_warnings
+        .iter()
+        .filter_map(|warning| match warning {
+            lang::ValidationWarning::KernIndexTooBig(u) => Some(*u),
+            _ => None,
+        })
+        .collect();
+    warnings.extend(
+        lig_kern_warnings
+            .into_iter()
+            .map(ValidationWarning::LigKernWarning),
+    );
 
     for (c, dimens) in &mut file.char_dimens {
         if dimens.width_index.get() as usize >= file.widths.len() {
@@ -168,64 +258,27 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
             ));
             dimens.italic_index = 0
         }
-    }
-
-    for (c, tag) in &mut file.char_tags {
-        match tag {
-            CharTag::Ligature(_) => {}
-            CharTag::List(_) => {}
-            CharTag::Extension(e) => {
+        match file.char_tags.get(c) {
+            Some(CharTag::Extension(e)) => {
                 if *e as usize >= file.extensible_chars.len() {
                     warnings.push(ValidationWarning::InvalidExtensibleRecipeIndex(*c, *e));
-                    continue;
+                    file.char_tags.remove(c);
                 }
             }
+            Some(CharTag::Ligature(l)) => {
+                let entrypoint = file.lig_kern_program.unpack_entrypoint(*l);
+                warnings.extend(
+                    file.lig_kern_program
+                        .instructions_for_entrypoint(entrypoint)
+                        .map(|t| t.0)
+                        .filter(|u| kern_index_too_big_indices.contains(u))
+                        .map(lang::ValidationWarning::KernIndexTooBig)
+                        .map(ValidationWarning::LigKernWarning),
+                );
+            }
+            _ => {}
         }
     }
-
-    for (array, first_dimension_non_zero, dimension_too_big) in [
-        (
-            &mut file.widths,
-            ValidationWarning::FirstWidthIsNonZero,
-            ValidationWarning::WidthIsTooBig as fn(usize) -> ValidationWarning,
-        ),
-        (
-            &mut file.heights,
-            ValidationWarning::FirstHeightIsNonZero,
-            ValidationWarning::HeightIsTooBig,
-        ),
-        (
-            &mut file.depths,
-            ValidationWarning::FirstDepthIsNonZero,
-            ValidationWarning::DepthIsTooBig,
-        ),
-        (
-            &mut file.italic_corrections,
-            ValidationWarning::FirstItalicCorrectionIsNonZero,
-            ValidationWarning::ItalicCorrectionIsTooBig,
-        ),
-    ] {
-        if let Some(first) = array.first_mut() {
-            if *first != Number::ZERO {
-                warnings.push(first_dimension_non_zero);
-                *first = Number::ZERO;
-            }
-        }
-        for (i, elem) in array.iter_mut().enumerate() {
-            // TODO: test the boundary cases when n=-16 and n=+16
-            if *elem >= Number::UNITY * 16 || *elem < Number::UNITY * -16 {
-                warnings.push(dimension_too_big(i));
-                *elem = Number::ZERO
-            }
-        }
-    }
-
-    warnings.extend(
-        file.lig_kern_program
-            .validate_and_fix()
-            .into_iter()
-            .map(ValidationWarning::LigKernWarning),
-    );
 
     warnings
 }

@@ -8,8 +8,8 @@ pub enum DeserializationError {
     /// Providing an empty file to the TFtoPL always returns an error.
     /// However, the error message is non-deterministic
     ///     and depends on the initial value of a specific byte of memory (`tfm[0]`).
-    /// If that byte is greater than 127 the message for [`Error::InternalFileLengthIsNegative`]
-    ///     is printed; otherwise the message for [`Error::FileHasOneByte`] is printed.
+    /// If that byte is greater than 127 the message for [`DeserializationError::InternalFileLengthIsNegative`]
+    ///     is printed; otherwise the message for [`DeserializationError::FileHasOneByte`] is printed.
     FileIsEmpty,
     /// The TFM file consists of a single byte.
     FileHasOneByte(u8),
@@ -31,8 +31,8 @@ pub enum DeserializationError {
     ///
     /// Knuth's TFToPL doesn't handle this case explicitly.
     /// When this buggy input is provided,
-    ///     a [Error::SubFileSizeIsNegative] error is thrown in some cases,
-    ///     and a [Error::HeaderLengthIsTooSmall] in other cases.
+    ///     a [DeserializationError::SubFileSizeIsNegative] error is thrown in some cases,
+    ///     and a [DeserializationError::HeaderLengthIsTooSmall] in other cases.
     /// Although the result is deterministic, there seems to be undefined behavior here
     ///     because it seems to depend on the value of uninitialized memory.
     InternalFileLengthIsTooSmall(i16, usize),
@@ -66,7 +66,7 @@ impl DeserializationError {
                 "The file claims to have length zero, but that's impossible!".into()
             }
             FileHasOneByte(128..=255) | InternalFileLengthIsNegative(_) | FileIsEmpty => {
-                // See documentation on [Error::FileIsEmpty] for why we return this string in the case
+                // See documentation on [DeserializationError::FileIsEmpty] for why we return this string in the case
                 // when the file is empty. While two error messages are possible, this is the one I
                 // observed on my machine today.
                 "The first byte of the input file exceeds 127!".into()
@@ -160,13 +160,16 @@ pub(super) fn deserialize(
     }
 }
 
-pub(super) fn from_raw_file(
-    raw_file: &RawFile,
-) -> File {
+pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
     let char_infos: Vec<(Option<CharDimensions>, Option<CharTag>)> =
         deserialize_array(raw_file.char_infos);
     File {
         header: Header::deserialize(raw_file.header),
+        smallest_char: if raw_file.begin_char.0 <= raw_file.end_char.0 {
+            Some(raw_file.begin_char)
+        } else {
+            None
+        },
         char_dimens: (raw_file.begin_char.0..=raw_file.end_char.0)
             .zip(char_infos.iter())
             .filter_map(|(c, (d, _))| (d.clone().map(|d| (Char(c), d))))
@@ -941,6 +944,7 @@ mod tests {
             ),
             File {
                 header: Header::tfm_default(),
+                smallest_char: Some(Char(70)),
                 char_dimens: BTreeMap::from([
                     (
                         Char(70),
@@ -996,6 +1000,7 @@ mod tests {
             ),
             File {
                 header: Header::tfm_default(),
+                smallest_char: Some(Char(255)),
                 char_dimens: BTreeMap::from([(
                     Char(255),
                     CharDimensions {
