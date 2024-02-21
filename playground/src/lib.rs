@@ -158,7 +158,6 @@ fn new_vm(minutes_since_midnight: i32, day: i32, month: i32, year: i32) -> vm::V
 mod tests {
     use super::*;
     use std::collections::HashSet;
-    use texlang_stdlib;
 
     #[test]
     fn built_in_commands_contain_all_std_lib_commands() {

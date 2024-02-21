@@ -1,7 +1,6 @@
 //! The `\the` primitive
 
 use std::char;
-use std::convert::TryInto;
 use texlang::traits::*;
 use texlang::*;
 

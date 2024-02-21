@@ -1,5 +1,4 @@
 use super::*;
-use crate::Char;
 use std::collections::HashSet;
 
 pub fn compile(

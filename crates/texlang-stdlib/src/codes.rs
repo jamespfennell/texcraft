@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 use std::fmt::Debug;
-use texlang::token;
 use texlang::traits::*;
 use texlang::types::CatCode;
 use texlang::*;
@@ -114,8 +113,6 @@ fn get_command<T: Code, S: HasComponent<Component<T>>>() -> command::BuiltIn<S> 
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use super::*;
     use crate::the;
     use texlang_testing::*;

@@ -1,5 +1,4 @@
 use super::*;
-use crate::Number;
 
 pub fn serialize(file: &File) -> Vec<u8> {
     // We leave space at the start of the buffer for the sub file sizes section.

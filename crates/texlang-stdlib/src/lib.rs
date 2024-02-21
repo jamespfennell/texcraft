@@ -14,7 +14,6 @@ use texlang::types;
 use texlang::types::CatCode;
 use texlang::vm;
 use texlang::vm::implement_has_component;
-use texlang::vm::HasDefaultBuiltInCommands;
 
 pub mod alias;
 pub mod alloc;
@@ -337,7 +336,6 @@ impl HasComponent<texlang_testing::TestingComponent> for StdLibState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use texlang::command;
     use texlang_testing::*;
 
     fn built_in_commands() -> HashMap<&'static str, command::BuiltIn<StdLibState>> {

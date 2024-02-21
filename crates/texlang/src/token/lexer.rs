@@ -561,7 +561,6 @@ impl RawLexer {
 mod tests {
     use super::*;
     use crate::token::CommandRef;
-    use crate::token::CsNameInterner;
     use crate::token::Value;
     use crate::types::CatCode::*;
     use std::collections::HashMap;

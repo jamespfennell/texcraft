@@ -7,7 +7,6 @@
 use crate::token::trace;
 use crate::token::Value;
 use crate::traits::*;
-use crate::variable;
 use crate::*;
 
 impl<S: TexlangState> Parsable<S> for i32 {

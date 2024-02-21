@@ -194,10 +194,7 @@ impl<K: Key, S: hash::BuildHasher> Interner<K, S> {
 }
 
 fn hash<S: hash::BuildHasher>(hash_builder: &S, s: &str) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = hash_builder.build_hasher();
-    s.hash(&mut hasher);
-    hasher.finish()
+    hash_builder.hash_one(s)
 }
 
 type DeDupMap<K> = HashMap<u64, LinkedList<K>, hash::BuildHasherDefault<SingleU64Hasher>>;

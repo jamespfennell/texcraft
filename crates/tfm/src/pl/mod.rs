@@ -720,11 +720,7 @@ pub enum CharDisplayFormat {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-
     use crate::{format::WidthIndex, Face};
-
-    use self::format::ExtensibleRecipe;
-
     use super::*;
 
     fn run_from_pl_source_code_test(source: &str, want: File) {
