@@ -502,6 +502,20 @@ convert_tftopl_tests!(
         true,
     ),
     (
+        quicspool_wwfonts_cw_1_2,
+        "data/ctan/quicspool_wwfonts_cw-1.tfm",
+        include_str!("data/ctan/quicspool_wwfonts_cw-2.pl"),
+        include_str!("data/ctan/quicspool_wwfonts_cw-2.stderr.txt"),
+        true,
+    ),
+    (
+        quicspool_wwfonts_r_1_2,
+        "data/ctan/quicspool_wwfonts_r-1.tfm",
+        include_str!("data/ctan/quicspool_wwfonts_r-2.pl"),
+        include_str!("data/ctan/quicspool_wwfonts_r-2.stderr.txt"),
+        true,
+    ),
+    (
         number_limit_16,
         "data/originals/number-limit-16-1.tfm",
         include_str!("data/originals/number-limit-16-2.pl"),

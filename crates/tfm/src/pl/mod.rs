@@ -64,6 +64,15 @@ pub enum CharTag {
     Extension(format::ExtensibleRecipe),
 }
 
+impl CharTag {
+    pub fn ligature(&self) -> Option<u16> {
+        match self {
+            CharTag::Ligature(l) => Some(*l),
+            _ => None,
+        }
+    }
+}
+
 /// Complete contents of a property list (.pl) file.
 #[derive(PartialEq, Eq, Debug)]
 pub struct File {
@@ -351,12 +360,14 @@ impl File {
 
         let mut lig_kern_program = tfm_file.lig_kern_program;
         lig_kern_program.pack_kerns(&tfm_file.kerns);
-        let lig_kern_entrypoints = lig_kern_program.unpack_entrypoints(
-            tfm_file
-                .char_tags
-                .iter()
-                .filter_map(|(c, t)| t.ligature().map(|l| (*c, l))),
-        );
+        let lig_kern_entrypoints: HashMap<Char, u16> = lig_kern_program
+            .unpack_entrypoints(
+                tfm_file
+                    .char_tags
+                    .iter()
+                    .filter_map(|(c, t)| t.ligature().map(|l| (*c, l))),
+            )
+            .collect();
 
         let char_tags = tfm_file
             .char_tags
@@ -525,10 +536,11 @@ impl File {
         };
 
         // When we fixed the (LIGTABLE (LABEL BOUNDARYCHAR) bug, number of failures went from 26652 -> 12004
-        for item in self
-            .lig_kern_program
-            .reachable_iter(index_to_labels.keys().copied())
-        {
+        for item in self.lig_kern_program.reachable_iter(
+            self.char_tags
+                .iter()
+                .filter_map(|(c, t)| t.ligature().map(|l| (*c, l))),
+        ) {
             match item {
                 ligkern::lang::ReachableIterItem::Reachable {
                     instruction,
@@ -622,8 +634,11 @@ impl File {
                             cst::BalancedElem::Vec(n.into_balanced_elements(char_display_format))
                         })
                         .collect();
-                    // TODO: what if l.is_empty()?
-                    v.push(ast::Character::Comment(l));
+                    // TODO: is there an edge case in which an empty (COMMENT) is printed?
+                    // Perhaps if the entrypoint is invalid?
+                    if !l.is_empty() {
+                        v.push(ast::Character::Comment(l));
+                    }
                 }
                 Some(CharTag::List(c)) => v.push(ast::Character::NextLarger((*c).into())),
                 Some(CharTag::Extension(recipe)) => {

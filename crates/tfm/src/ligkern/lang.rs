@@ -142,13 +142,11 @@ impl Program {
         }
     }
 
-    pub fn unpack_entrypoints<I: Iterator<Item = (Char, u8)>>(
-        &self,
+    pub fn unpack_entrypoints<'a, I: Iterator<Item = (Char, u8)> + 'a>(
+        &'a self,
         entrypoints: I,
-    ) -> HashMap<Char, u16> {
-        entrypoints
-            .map(|(c, u)| (c, self.unpack_entrypoint(u)))
-            .collect()
+    ) -> impl Iterator<Item = (Char, u16)> + 'a {
+        entrypoints.map(|(c, u)| (c, self.unpack_entrypoint(u)))
     }
 
     pub fn pack_entrypoints(&mut self, entrypoints: HashMap<Char, u16>) -> HashMap<Char, u8> {
@@ -254,10 +252,11 @@ impl Program {
         }
     }
 
-    pub fn reachable_iter<I: Iterator<Item = u16>>(&self, entrypoints: I) -> ReachableIter {
+    pub fn reachable_iter<I: Iterator<Item = (Char, u16)>>(&self, entrypoints: I) -> ReachableIter {
+        let (reachable, _) = self.reachable_array(entrypoints);
         ReachableIter {
             next: 0,
-            reachable: self.reachable_array(entrypoints),
+            reachable,
             instructions: &self.instructions,
         }
     }
@@ -270,34 +269,38 @@ impl Program {
         }
     }
 
-    pub fn validate_and_fix<T>(
+    pub fn validate_and_fix<I, T>(
         &mut self,
         smallest_char: Option<Char>,
+        entrypoints: I,
         char_exists: T,
         num_kerns: usize,
     ) -> Vec<ValidationWarning>
     where
+        I: Iterator<Item = (Char, u8)>,
         T: Fn(Char) -> bool,
     {
-        let mut warnings: Vec<ValidationWarning> = vec![];
+        let (_, mut warnings) = self.reachable_array(self.unpack_entrypoints(entrypoints));
+        warnings
+            .iter()
+            .filter_map(|w| match w {
+                ValidationWarning::SkipTooLarge(u) => Some(u),
+                _ => None,
+            })
+            .for_each(|u| self.instructions[*u].next_instruction = None);
 
         let n = self.instructions.len();
         for (i, instruction) in self.instructions.iter_mut().enumerate() {
             let is_kern_step = match instruction.operation {
-                Operation::Kern(_) => true,
-                Operation::KernAtIndex(_) => true,
+                Operation::Kern(_) | Operation::KernAtIndex(_) => true,
                 Operation::Ligature { .. } => false,
-                Operation::EntrypointRedirect(_, _) => continue,
-            };
-            if let Operation::EntrypointRedirect(_, _) = instruction.operation {
-                continue;
-            }
-            if let Some(inc) = instruction.next_instruction {
-                if i + (inc as usize) + 1 >= n {
-                    warnings.push(ValidationWarning::SkipTooLarge(i));
-                    instruction.next_instruction = None;
+                Operation::EntrypointRedirect(i, _) => {
+                    if i as usize >= n {
+                        warnings.push(ValidationWarning::EntrypointRedirectTooBig(n));
+                    }
+                    continue;
                 }
-            }
+            };
             if !char_exists(instruction.right_char)
                 && Some(instruction.right_char) != self.boundary_char
             {
@@ -343,19 +346,26 @@ impl Program {
         warnings
     }
 
-    pub fn reachable_array<I: Iterator<Item = u16>>(&self, entrypoints: I) -> Vec<bool> {
+    fn reachable_array<I: Iterator<Item = (Char, u16)>>(
+        &self,
+        entrypoints: I,
+    ) -> (Vec<bool>, Vec<ValidationWarning>) {
         let mut reachable = vec![false; self.instructions.len()];
+        let mut warnings = vec![];
         // TFtoPL.2014.68
-        for entrypoint in entrypoints {
-            *reachable
-                .get_mut(entrypoint as usize)
-                .expect("each entrypoint is a valid index for the instructions vector") = true;
+        for (c, entrypoint) in entrypoints {
+            match reachable.get_mut(entrypoint as usize) {
+                None => {
+                    warnings.push(ValidationWarning::InvalidEntrypoint(c));
+                }
+                Some(slot) => *slot = true,
+            }
         }
         if let Some(entrypoint) = self.boundary_char_entrypoint {
-            *reachable
-                .get_mut(entrypoint as usize)
-                .expect("boundary_char_entrypoint is a valid index for the instructions vector") =
-                true;
+            // TODO: warning
+            if let Some(slot) = reachable.get_mut(entrypoint as usize) {
+                *slot = true;
+            }
         }
         // TFtoPL.2014.70
         for i in 0..reachable.len() {
@@ -363,12 +373,13 @@ impl Program {
                 continue;
             }
             if let Some(inc) = self.instructions[i].next_instruction {
-                if let Some(slot) = reachable.get_mut(i + inc as usize + 1) {
-                    *slot = true
+                match reachable.get_mut(i + inc as usize + 1) {
+                    None => warnings.push(ValidationWarning::SkipTooLarge(i)),
+                    Some(slot) => *slot = true,
                 }
             }
         }
-        reachable
+        (reachable, warnings)
     }
 }
 
@@ -379,6 +390,8 @@ pub enum ValidationWarning {
     LigatureStepProducesNonExistentCharacter(usize, Char),
     KernIndexTooBig(usize),
     InvalidLigTag(usize),
+    EntrypointRedirectTooBig(usize),
+    InvalidEntrypoint(Char),
 }
 
 impl ValidationWarning {
@@ -403,6 +416,12 @@ impl ValidationWarning {
             ],
             KernIndexTooBig(_) => "Bad TFM file: Kern index too large.".to_string(),
             InvalidLigTag(_) => "Ligature step with nonstandard code changed to LIG".to_string(),
+            EntrypointRedirectTooBig(_) => {
+                "Bad TFM file: Ligature unconditional stop command address is too big.".to_string()
+            }
+            InvalidEntrypoint(c) => {
+                format![" \nLigature/kern starting index for character '{:03o} is too large;\nso I removed it.", c.0]
+            }
         }
     }
 
@@ -415,6 +434,8 @@ impl ValidationWarning {
             | LigatureStepProducesNonExistentCharacter(_, _)
             | InvalidLigTag(_) => 77,
             KernStepForNonExistentCharacter(_, _) | KernIndexTooBig(_) => 76,
+            EntrypointRedirectTooBig(_) => 74,
+            InvalidEntrypoint(_) => 67,
         }
     }
 }
@@ -452,15 +473,21 @@ impl<'a> Iterator for ReachableIter<'a> {
                 let skip_override = match instruction.next_instruction {
                     None | Some(0) => None,
                     Some(inc) => {
-                        let reachable_skipped: u8 = self.reachable
-                            .get(this as usize + 1..this as usize+ 1+ inc as usize)
-                            .expect("lig/kern skip produces an index within bounds")
-                            .iter()
-                            .filter(|reachable| **reachable)
-                            .count()
-                            .try_into()
-                            .expect("iterating over at most u8::MAX elements, so the count will be at most u8::MAX");
-                        Some(reachable_skipped)
+                        match self
+                            .reachable
+                            .get(this as usize + 1..this as usize + 1 + inc as usize)
+                        {
+                            None => None,
+                            Some(n) => {
+                                let reachable_skipped: u8 =
+                                n.iter()
+                                .filter(|reachable| **reachable)
+                                .count()
+                                .try_into()
+                                .expect("iterating over at most u8::MAX elements, so the count will be at most u8::MAX");
+                                Some(reachable_skipped)
+                            }
+                        }
                     }
                 };
                 ReachableIterItem::Reachable {
@@ -489,6 +516,8 @@ impl<'a> Iterator for ReachableIter<'a> {
         }
     }
 }
+
+pub struct InvalidEntrypointError;
 
 /// Iterator over the lig/kern instructions for a specific entrypoint.
 ///

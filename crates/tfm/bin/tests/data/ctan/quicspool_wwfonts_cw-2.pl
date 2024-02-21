@@ -1,0 +1,443 @@
+(FAMILY CMTT)
+(FACE O 352)
+(CODINGSCHEME TROFF TEXT)
+(DESIGNSIZE R 10.0)
+(COMMENT DESIGNSIZE IS IN POINTS)
+(COMMENT OTHER SIZES ARE MULTIPLES OF DESIGNSIZE)
+(CHECKSUM O 12605352303)
+(FONTDIMEN
+   (SLANT R 1456.0)
+   (SPACE R 0.00205)
+   (STRETCH R 0.0)
+   (SHRINK R 0.0)
+   (XHEIGHT R 0.001681)
+   (QUAD R 0.0)
+   (EXTRASPACE R 0.0)
+   )
+(LIGTABLE
+   (LABEL C f)
+   (LABEL C j)
+   (LABEL C p)
+   (LABEL C q)
+   (LABEL C y)
+   (LABEL O 174)
+   (LIG O 0 O 0)
+   (LIG O 0 O 0)
+   (SKIP D 0)
+   (COMMENT THIS PART OF THE PROGRAM IS NEVER USED!
+      (LIG O 0 O 0)
+      )
+   (LIG O 0 O 0)
+   (SKIP D 0)
+   (COMMENT THIS PART OF THE PROGRAM IS NEVER USED!
+      (LIG O 0 O 0)
+      (LIG O 0 O 0)
+      )
+   (LIG O 0 O 0)
+   (LABEL O 3)
+   (LIG O 0 O 0)
+   (LIG O 0 O 0)
+   (STOP)
+   (COMMENT THIS PART OF THE PROGRAM IS NEVER USED!
+      (LIG O 0 O 0)
+      (LIG O 0 O 0)
+      (LIG O 0 O 0)
+      (LIG O 0 O 0)
+      )
+   )
+(CHARACTER O 0
+   (CHARWD R 0.0)
+   )
+(CHARACTER O 1
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 2
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 3
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (COMMENT
+      (LIG O 0 O 0)
+      (LIG O 0 O 0)
+      )
+   )
+(CHARACTER O 4
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 5
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 6
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 7
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 10
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 11
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 12
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 13
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 14
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 15
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 16
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 17
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 20
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 21
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 22
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 23
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 24
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 25
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 26
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 27
+   (CHARWD R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 30
+   (CHARWD R 0.0)
+   (CHARHT R 0.000488)
+   )
+(CHARACTER O 41
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 44
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 45
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 46
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 47
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 50
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 51
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 52
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 53
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 54
+   (CHARWD R 0.0)
+   (CHARHT R 0.000488)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 55
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 56
+   (CHARWD R 0.0)
+   (CHARHT R 0.000488)
+   )
+(CHARACTER O 57
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER C 0
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C 1
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C 2
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C 3
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C 4
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C 5
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C 6
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C 7
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C 8
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C 9
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 72
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 73
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 75
+   (CHARWD R 0.0)
+   (CHARHT R 0.001623)
+   (CHARDP R 15.999236)
+   )
+(CHARACTER O 77
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C A
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C B
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C C
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C D
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C E
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C F
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C G
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C H
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C I
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C J
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C K
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C L
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C M
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C N
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C O
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C P
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C Q
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER C R
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C S
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C T
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C U
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C V
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C W
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C X
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C Y
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C Z
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER O 133
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 135
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 137
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   )
+(CHARACTER O 140
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C a
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C b
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C c
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C d
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C e
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   )
+(CHARACTER C f
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (COMMENT
+      (LIG O 0 O 0)
+      (LIG O 0 O 0)
+      (LIG O 0 O 0)
+      (LIG O 0 O 0)
+      (LIG O 0 O 0)
+      (LIG O 0 O 0)
+      )
+   )
+(CHARACTER C g
+   (CHARWD R 0.0)
+   (CHARHT R 0.0)
+   (CHARDP R 0.0)
+   (NEXTLARGER O 0)
+   )
+(COMMENT THE TFM FILE WAS BAD, SO THE DATA HAS BEEN CHANGED!)

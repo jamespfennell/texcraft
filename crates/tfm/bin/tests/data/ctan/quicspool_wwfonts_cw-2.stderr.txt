@@ -1,0 +1,79 @@
+There's some extra junk at the end of the TFM file,
+but I'll proceed as if it weren't there.
+Bad TFM file: Parameter 3 is too big;
+I have set it to zero.
+Bad TFM file: Parameter 6 is too big;
+I have set it to zero.
+Bad TFM file: Parameter 7 is too big;
+I have set it to zero.
+Bad TFM file: height[0] should be zero.
+Bad TFM file: depth[0] should be zero.
+Bad TFM file: italic[0] should be zero.
+Bad TFM file: Width 3 is too big;
+I have set it to zero.
+Bad TFM file: Width 4 is too big;
+I have set it to zero.
+Bad TFM file: Height 0 is too big;
+I have set it to zero.
+Bad TFM file: Height 3 is too big;
+I have set it to zero.
+Bad TFM file: Height 4 is too big;
+I have set it to zero.
+Bad TFM file: Height 5 is too big;
+I have set it to zero.
+Bad TFM file: Height 6 is too big;
+I have set it to zero.
+Bad TFM file: Height 7 is too big;
+I have set it to zero.
+Bad TFM file: Height 8 is too big;
+I have set it to zero.
+Bad TFM file: Height 9 is too big;
+I have set it to zero.
+Bad TFM file: Depth 0 is too big;
+I have set it to zero.
+Bad TFM file: Depth 2 is too big;
+I have set it to zero.
+Bad TFM file: Depth 3 is too big;
+I have set it to zero.
+Bad TFM file: Depth 4 is too big;
+I have set it to zero.
+Bad TFM file: Depth 5 is too big;
+I have set it to zero.
+Bad TFM file: Depth 6 is too big;
+I have set it to zero.
+Bad TFM file: Depth 7 is too big;
+I have set it to zero.
+Bad TFM file: Depth 8 is too big;
+I have set it to zero.
+Bad TFM file: Depth 9 is too big;
+I have set it to zero.
+Bad TFM file: Italic correction 0 is too big;
+I have set it to zero.
+Bad TFM file: Ligature/kern step 8 skips too far;
+I made it stop.
+Ligature step with nonstandard code changed to LIG
+Ligature step with nonstandard code changed to LIG
+Ligature step with nonstandard code changed to LIG
+Bad TFM file: Ligature step produces the nonexistent character '200.
+Ligature step with nonstandard code changed to LIG
+Bad TFM file: Ligature step produces the nonexistent character '200.
+Ligature step with nonstandard code changed to LIG
+Bad TFM file: Ligature step produces the nonexistent character '200.
+Ligature step with nonstandard code changed to LIG
+Bad TFM file: Ligature step for nonexistent character '200.
+Bad TFM file: Ligature step produces the nonexistent character '200.
+Ligature step with nonstandard code changed to LIG
+Ligature step with nonstandard code changed to LIG
+Ligature step with nonstandard code changed to LIG
+Bad TFM file: Ligature step produces the nonexistent character '200.
+Ligature step with nonstandard code changed to LIG
+Bad TFM file: Ligature step produces the nonexistent character '200.
+Ligature step with nonstandard code changed to LIG
+Bad TFM file: Ligature step produces the nonexistent character '200.
+Ligature step with nonstandard code changed to LIG
+Bad TFM file: Ligature step for nonexistent character '200.
+Bad TFM file: Ligature step produces the nonexistent character '200.
+Ligature step with nonstandard code changed to LIG
+ 
+Italic correction index for character '147 is too large;
+so I reset it to zero.

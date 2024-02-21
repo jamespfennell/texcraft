@@ -212,15 +212,27 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
 
     let lig_kern_warnings = file.lig_kern_program.validate_and_fix(
         file.smallest_char,
+        file.char_tags
+            .iter()
+            .filter_map(|(c, t)| t.ligature().map(|l| (*c, l))),
         |c| file.char_dimens.contains_key(&c),
         file.kerns.len(),
     );
+    lig_kern_warnings
+        .iter()
+        .filter_map(|w| match w {
+            lang::ValidationWarning::InvalidEntrypoint(c) => Some(c),
+            _ => None,
+        })
+        .for_each(|c| {
+            file.char_tags.remove(c);
+        });
     // There is a bug in Knuth's tftopl in which the same kern-index-too-big warning is printed
     // more than once. It is printed when the lig/kern instruction is output in the LIGTABLE
     // list, and also each time the instruction appears in a lig/kern COMMENT for a character.
     // The cause of the bug is that the buggy index is never fixed in memory, and so when the
     // instruction is seen multiple times the warning is triggered again. For other lig/kern warnings,
-    // the bad data is fixed when the warning is printed, so the next time the instruction is
+    // the bad data is fixed when the warning is first printed, so the next time the instruction is
     // seen it is valid.
     let kern_index_too_big_indices: HashSet<usize> = lig_kern_warnings
         .iter()
