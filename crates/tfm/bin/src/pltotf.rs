@@ -67,18 +67,8 @@ impl Cli {
 
         // Conversion
         let (mut pl_file, warnings) = tfm::pl::File::from_pl_source_code(&pl_data);
-        let ariadne_source = common::AriadneSource {
-            path: pl_file_path.clone(),
-            source: pl_data.into(),
-        };
         for warning in warnings {
-            if let Err(err) = warning.ariadne_report().eprint(&ariadne_source) {
-                return Err(format!(
-                    "failed to write warning {}: {}",
-                    warning.title(),
-                    err
-                ));
-            }
+            eprintln!("{}", warning.pltotf_message());
         }
         if let Err(err) = tfm::ligkern::CompiledProgram::compile(
             &pl_file.lig_kern_program.instructions,

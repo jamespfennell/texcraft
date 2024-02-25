@@ -10,11 +10,11 @@ The property list (.pl) file format
 
 */
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::{
     format::{self, ExtensibleRecipe},
-    ligkern, Char, Header, NamedParam, Number, Params,
+    ligkern, Char, Header, NamedParam, NextLargerProgram, NextLargerProgramWarning, Number, Params,
 };
 
 pub mod ast;
@@ -71,6 +71,12 @@ impl CharTag {
             _ => None,
         }
     }
+    pub fn list(&self) -> Option<Char> {
+        match self {
+            CharTag::List(c) => Some(*c),
+            _ => None,
+        }
+    }
 }
 
 /// Complete contents of a property list (.pl) file.
@@ -78,8 +84,10 @@ impl CharTag {
 pub struct File {
     pub header: Header,
     pub design_units: Number,
-    pub char_dimens: HashMap<Char, CharDimensions>,
-    pub char_tags: HashMap<Char, CharTag>,
+    pub char_dimens: BTreeMap<Char, CharDimensions>,
+    pub char_tags: BTreeMap<Char, CharTag>,
+    /// Tags that have been unset, but whose discriminant is still written to a .tfm file by PLtoTF.
+    pub unset_char_tags: BTreeMap<Char, u8>,
     pub lig_kern_program: ligkern::lang::Program,
     pub params: Params,
 }
@@ -91,6 +99,7 @@ impl Default for File {
             design_units: Number::UNITY,
             char_dimens: Default::default(),
             char_tags: Default::default(),
+            unset_char_tags: Default::default(),
             lig_kern_program: Default::default(),
             params: Default::default(),
         }
@@ -133,6 +142,8 @@ impl File {
     pub fn from_ast(ast: ast::Ast, errors: &mut Vec<error::ParseError>) -> File {
         let mut file: File = Default::default();
         let mut lig_kern_precedes = false;
+
+        let mut next_larger_span = HashMap::<Char, std::ops::Range<usize>>::new();
 
         for node in ast.0 {
             match node {
@@ -285,6 +296,7 @@ impl File {
                             ast::Character::NextLarger(c) => {
                                 // TODO: warning if tag != CharTag::None
                                 file.char_tags.insert(b.data, CharTag::List(c.data));
+                                next_larger_span.insert(b.data, c.data_span);
                             }
                             ast::Character::ExtensibleCharacter(e) => {
                                 let mut recipe: ExtensibleRecipe = Default::default();
@@ -322,12 +334,52 @@ impl File {
                 final_instruction.next_instruction = None;
             }
         }
+
+        {
+            let (_, next_larger_warnings) = NextLargerProgram::new(
+                file.char_tags
+                    .iter()
+                    .filter_map(|(c, t)| t.list().map(|next_larger| (*c, next_larger))),
+                |c| file.char_dimens.contains_key(&c),
+                false,
+            );
+            for warning in next_larger_warnings {
+                match &warning {
+                    NextLargerProgramWarning::NonExistentCharacter {
+                        original: _,
+                        next_larger,
+                    } => {
+                        file.char_dimens.insert(
+                            *next_larger,
+                            CharDimensions {
+                                width: Some(Number::ZERO),
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    NextLargerProgramWarning::InfiniteLoop(c) => {
+                        let discriminant = file
+                            .char_tags
+                            .remove(c)
+                            .and_then(|t| t.list())
+                            .expect("this char has a NEXTLARGER SPEC");
+                        file.unset_char_tags.insert(*c, discriminant.0);
+                    }
+                }
+                let span = next_larger_span
+                    .get(&warning.bad_char())
+                    .cloned()
+                    .expect("every char with a next larger tag had a NEXTLARGER AST node");
+                errors.push(ParseError::NextLargerWarning { warning, span });
+            }
+        }
+
         file
     }
 
     /// Convert a TFM file into a PL file.
     pub fn from_tfm_file(tfm_file: crate::format::File) -> File {
-        let char_dimens: HashMap<Char, CharDimensions> = tfm_file
+        let char_dimens: BTreeMap<Char, CharDimensions> = tfm_file
             .char_dimens
             .iter()
             .map(|(c, info)| {
@@ -391,6 +443,7 @@ impl File {
             design_units: Number::UNITY,
             char_dimens,
             char_tags,
+            unset_char_tags: Default::default(),
             lig_kern_program,
             params: tfm_file.params,
         }
@@ -719,9 +772,8 @@ pub enum CharDisplayFormat {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-    use crate::{format::WidthIndex, Face};
     use super::*;
+    use crate::{format::WidthIndex, Face};
 
     fn run_from_pl_source_code_test(source: &str, want: File) {
         let (got, errors) = File::from_pl_source_code(source);
@@ -956,7 +1008,7 @@ mod tests {
                     boundary_char: None,
                     boundary_char_entrypoint: None,
                 },
-                char_tags: HashMap::from([
+                char_tags: BTreeMap::from([
                     ('e'.try_into().unwrap(), CharTag::Ligature(0),),
                     ('d'.try_into().unwrap(), CharTag::Ligature(1),),
                 ]),
@@ -983,7 +1035,7 @@ mod tests {
             char_width,
             "(CHARACTER C r (CHARWD D 15.0))",
             File {
-                char_dimens: HashMap::from([(
+                char_dimens: BTreeMap::from([(
                     'r'.try_into().unwrap(),
                     CharDimensions {
                         width: Some(Number::UNITY * 15),
@@ -997,7 +1049,7 @@ mod tests {
             char_height,
             "(CHARACTER C r (CHARHT D 15.0))",
             File {
-                char_dimens: HashMap::from([(
+                char_dimens: BTreeMap::from([(
                     'r'.try_into().unwrap(),
                     CharDimensions {
                         height: Some(Number::UNITY * 15),
@@ -1011,7 +1063,7 @@ mod tests {
             char_depth,
             "(CHARACTER C r (CHARDP D 15.0))",
             File {
-                char_dimens: HashMap::from([(
+                char_dimens: BTreeMap::from([(
                     'r'.try_into().unwrap(),
                     CharDimensions {
                         depth: Some(Number::UNITY * 15),
@@ -1025,7 +1077,7 @@ mod tests {
             char_italic_correction,
             "(CHARACTER C r (CHARIC D 15.0))",
             File {
-                char_dimens: HashMap::from([(
+                char_dimens: BTreeMap::from([(
                     'r'.try_into().unwrap(),
                     CharDimensions {
                         italic_correction: Some(Number::UNITY * 15),
@@ -1037,15 +1089,23 @@ mod tests {
         ),
         (
             char_next_larger,
-            "(CHARACTER C r (NEXTLARGER C A))",
+            "(CHARACTER C A) (CHARACTER C r (NEXTLARGER C A))",
             File {
-                char_dimens: HashMap::from([(
-                    'r'.try_into().unwrap(),
-                    CharDimensions {
-                        ..Default::default()
-                    }
-                )]),
-                char_tags: HashMap::from([(
+                char_dimens: BTreeMap::from([
+                    (
+                        'r'.try_into().unwrap(),
+                        CharDimensions {
+                            ..Default::default()
+                        }
+                    ),
+                    (
+                        'A'.try_into().unwrap(),
+                        CharDimensions {
+                            ..Default::default()
+                        }
+                    ),
+                ]),
+                char_tags: BTreeMap::from([(
                     'r'.try_into().unwrap(),
                     CharTag::List('A'.try_into().unwrap()),
                 )]),
@@ -1056,13 +1116,13 @@ mod tests {
             char_extensible_recipe_empty,
             "(CHARACTER C r (VARCHAR))",
             File {
-                char_dimens: HashMap::from([(
+                char_dimens: BTreeMap::from([(
                     'r'.try_into().unwrap(),
                     CharDimensions {
                         ..Default::default()
                     }
                 )]),
-                char_tags: HashMap::from([(
+                char_tags: BTreeMap::from([(
                     'r'.try_into().unwrap(),
                     CharTag::Extension(Default::default()),
                 )]),
@@ -1073,13 +1133,13 @@ mod tests {
             char_extensible_recipe_data,
             "(CHARACTER C r (VARCHAR (TOP O 1) (MID O 2) (BOT O 3) (REP O 4)))",
             File {
-                char_dimens: HashMap::from([(
+                char_dimens: BTreeMap::from([(
                     'r'.try_into().unwrap(),
                     CharDimensions {
                         ..Default::default()
                     }
                 )]),
-                char_tags: HashMap::from([(
+                char_tags: BTreeMap::from([(
                     'r'.try_into().unwrap(),
                     CharTag::Extension(ExtensibleRecipe {
                         top: Some(Char(1)),
@@ -1147,7 +1207,7 @@ mod tests {
             ..Default::default()
         },
         File {
-            char_dimens: HashMap::from([
+            char_dimens: BTreeMap::from([
                 (
                     'A'.try_into().unwrap(),
                     CharDimensions {

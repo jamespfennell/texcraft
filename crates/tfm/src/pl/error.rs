@@ -1,5 +1,7 @@
 //! Errors relating to property list file parsing
 
+use crate::NextLargerProgramWarning;
+
 /// Errors while parsing a property list file
 #[derive(PartialEq, Eq, Debug)]
 pub enum ParseError {
@@ -59,10 +61,15 @@ pub enum ParseError {
     LigTableTooLong {
         span: std::ops::Range<usize>,
     },
+    NextLargerWarning {
+        warning: NextLargerProgramWarning,
+        span: std::ops::Range<usize>,
+    },
 }
 
 impl ParseError {
-    pub fn title(&self) -> String {
+    pub fn pltotf_message(&self) -> String {
+        use ParseError::*;
         match self {
             ParseError::InvalidCharacter(c, _) => {
                 format!["invalid character {} (U+{:04X})", *c, *c as u32]
@@ -121,10 +128,12 @@ impl ParseError {
             ParseError::LigTableTooLong { .. } => {
                 "Sorry, LIGTABLE to long for me to handle".to_string()
             }
+            NextLargerWarning { warning, span: _ } => warning.pltotf_message(),
         }
     }
 
     pub fn pl_to_tf_section(&self) -> (u8, u8) {
+        use ParseError::*;
         match self {
             ParseError::InvalidCharacter(_, _) => (32, 1),
             ParseError::InvalidPropertyName { .. } => (49, 1),
@@ -147,6 +156,7 @@ impl ParseError {
             ParseError::DecimalTooLarge { .. } => (64, 1),
             ParseError::InvalidPrefixForDecimal { .. } => (62, 1),
             ParseError::LigTableTooLong { .. } => (101, 1),
+            NextLargerWarning { warning, span: _ } => (warning.pltotf_section(), 1),
         }
     }
 
@@ -170,12 +180,17 @@ mod report {
                 error.pl_to_tf_section().0,
                 error.pl_to_tf_section().1
             ])
-            .with_message(error.title());
+            .with_message(error.pltotf_message());
+        use ParseError::*;
         let builder = match error {
             ParseError::InvalidCharacter(c, offset) => {
                 let range = *offset..*offset + c.len_utf8();
                 builder
-                    .with_label(Label::new(range).with_message(error.title()).with_color(a))
+                    .with_label(
+                        Label::new(range)
+                            .with_message(error.pltotf_message())
+                            .with_color(a),
+                    )
                     .with_note("property list files can only contain printable ASCII characters")
             }
             ParseError::InvalidPropertyName {
@@ -185,7 +200,7 @@ mod report {
             } => builder
                 .with_label(
                     Label::new(name_span.clone())
-                        .with_message(error.title())
+                        .with_message(error.pltotf_message())
                         .with_color(a),
                 )
                 .with_note(format![
@@ -217,9 +232,8 @@ mod report {
                 )
                 .with_help("all right parentheses must be matched by an opening left parenthesis")
                 .with_note("the parenthesis was ignored"),
-            ParseError::InvalidOctalDigit { c: _, span } => {
-                builder.with_label(Label::new(*span..*span + 1).with_message(error.title()))
-            }
+            ParseError::InvalidOctalDigit { c: _, span } => builder
+                .with_label(Label::new(*span..*span + 1).with_message(error.pltotf_message())),
             ParseError::InvalidPrefixForInteger { span }
             | ParseError::IntegerTooBig { span }
             | ParseError::SmallIntegerTooBig { span, .. }
@@ -230,8 +244,9 @@ mod report {
             | ParseError::DecimalTooLarge { span }
             | ParseError::InvalidPrefixForDecimal { span }
             | ParseError::InvalidPrefixForSmallInteger { span }
+            | NextLargerWarning { warning: _, span }
             | ParseError::LigTableTooLong { span } => {
-                builder.with_label(Label::new(span.clone()).with_message(error.title()))
+                builder.with_label(Label::new(span.clone()).with_message(error.pltotf_message()))
             }
         };
         builder.finish()

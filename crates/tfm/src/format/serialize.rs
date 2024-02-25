@@ -14,7 +14,7 @@ pub fn serialize(file: &File) -> Vec<u8> {
         ec: match file.char_info_bounds() {
             None => 0,
             Some((bc, ec)) => {
-                serialize_char_infos(&file.char_dimens, &file.char_tags, bc, ec, &mut b);
+                serialize_char_infos(file, bc, ec, &mut b);
                 ec.0 as i16
             }
         },
@@ -39,20 +39,24 @@ pub fn serialize(file: &File) -> Vec<u8> {
     b
 }
 
-fn serialize_char_infos(
-    char_dimens: &BTreeMap<Char, CharDimensions>,
-    char_tags: &BTreeMap<Char, CharTag>,
-    bc: Char,
-    ec: Char,
-    b: &mut Vec<u8>,
-) {
-    let mut v: Vec<(Option<CharDimensions>, Option<CharTag>)> =
-        vec![(None, None); (ec.0 as usize) + 1 - (bc.0 as usize)];
-    for (c, dimens) in char_dimens {
+#[derive(Clone)]
+enum SerializableCharTag {
+    None,
+    Valid(CharTag),
+    Unset(u8),
+}
+
+fn serialize_char_infos(file: &File, bc: Char, ec: Char, b: &mut Vec<u8>) {
+    let mut v: Vec<(Option<CharDimensions>, SerializableCharTag)> =
+        vec![(None, SerializableCharTag::None); (ec.0 as usize) + 1 - (bc.0 as usize)];
+    for (c, dimens) in &file.char_dimens {
         v[(c.0 - bc.0) as usize].0 = Some(dimens.clone());
     }
-    for (c, tag) in char_tags {
-        v[(c.0 - bc.0) as usize].1 = Some(tag.clone());
+    for (c, tag) in &file.char_tags {
+        v[(c.0 - bc.0) as usize].1 = SerializableCharTag::Valid(tag.clone());
+    }
+    for (c, tag) in &file.unset_char_tags {
+        v[(c.0 - bc.0) as usize].1 = SerializableCharTag::Unset(*tag);
     }
     serialize_section(&v, b, None);
 }
@@ -75,7 +79,7 @@ impl Serializable for u32 {
     }
 }
 
-impl Serializable for (Option<CharDimensions>, Option<CharTag>) {
+impl Serializable for (Option<CharDimensions>, SerializableCharTag) {
     fn serialize(&self, b: &mut Vec<u8>, _: Option<Char>) {
         let italic = match &self.0 {
             None => {
@@ -93,11 +97,14 @@ impl Serializable for (Option<CharDimensions>, Option<CharTag>) {
                 char_dimens.italic_index
             }
         };
-        let (discriminant, payload) = match self.1 {
-            None => (0_u8, 0_u8),
-            Some(CharTag::Ligature(p)) => (1, p),
-            Some(CharTag::List(p)) => (2, p.0),
-            Some(CharTag::Extension(p)) => (3, p),
+        let (discriminant, payload) = match &self.1 {
+            SerializableCharTag::None => (0_u8, 0_u8),
+            SerializableCharTag::Valid(char_tag) => match char_tag {
+                CharTag::Ligature(p) => (1, *p),
+                CharTag::List(p) => (2, p.0),
+                CharTag::Extension(p) => (3, *p),
+            },
+            SerializableCharTag::Unset(u) => (0, *u),
         };
         b.push(italic.wrapping_mul(4).wrapping_add(discriminant));
         b.push(payload);

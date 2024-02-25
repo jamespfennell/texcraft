@@ -2,7 +2,6 @@
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::num::NonZeroU8;
 
 mod debug;
 mod deserialize;
@@ -48,6 +47,9 @@ pub struct File {
     /// All four combinations of (has or hasn't dimensions) and (has or hasn't a tag)
     ///     are possible.
     pub char_tags: BTreeMap<Char, CharTag>,
+
+    /// Tags that have been unset, but whose discriminant is still written to a .tfm file by PLtoTF.
+    pub unset_char_tags: BTreeMap<Char, u8>,
 
     /// Character widths
     pub widths: Vec<Number>,
@@ -127,6 +129,12 @@ impl CharTag {
             CharTag::List(_) | CharTag::Extension(_) => None,
         }
     }
+    pub fn list(&self) -> Option<Char> {
+        match self {
+            CharTag::List(c) => Some(*c),
+            CharTag::Ligature(_) | CharTag::Extension(_) => None,
+        }
+    }
 }
 /// Extensible recipe instruction in a .tfm file.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -144,6 +152,7 @@ impl Default for File {
             smallest_char: None,
             char_dimens: Default::default(),
             char_tags: Default::default(),
+            unset_char_tags: Default::default(),
             widths: vec![Number::ZERO],
             heights: vec![Number::ZERO],
             depths: vec![Number::ZERO],
@@ -395,6 +404,7 @@ impl File {
             smallest_char: char_bounds.map(|t| t.0),
             char_dimens,
             char_tags,
+            unset_char_tags: pl_file.unset_char_tags.clone(),
             widths,
             heights,
             depths,

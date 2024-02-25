@@ -342,6 +342,12 @@ convert_pltotf_tests!(
         include_str!["data/originals/ligature-loop.stderr.txt"],
     ),
     (
+        next_larger_loop_pl,
+        "data/originals/next-larger-loop-pl.tfm",
+        "data/originals/next-larger-loop-pl.pl",
+        include_str!["data/originals/next-larger-loop-pl.stderr.txt"],
+    ),
+    (
         orphan_lig_kerns_1_2,
         "data/originals/orphan-lig-kerns-2.tfm",
         "data/originals/orphan-lig-kerns-1.pl",
@@ -520,6 +526,13 @@ convert_tftopl_tests!(
         "data/originals/number-limit-16-1.tfm",
         include_str!("data/originals/number-limit-16-2.pl"),
         include_str!("data/originals/number-limit-16-2.stderr.txt"),
+        true,
+    ),
+    (
+        next_larger_loop_tfm,
+        "data/originals/next-larger-loop-tfm.tfm",
+        include_str!("data/originals/next-larger-loop-tfm.pl"),
+        include_str!["data/originals/next-larger-loop-tfm.stderr.txt"],
         true,
     ),
 );

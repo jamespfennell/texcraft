@@ -1,0 +1,4 @@
+The character NEXTLARGER than '104 had no CHARACTER spec.
+The character NEXTLARGER than '144 had no CHARACTER spec.
+A cycle of NEXTLARGER characters has been broken at '103.
+A cycle of NEXTLARGER characters has been broken at '143.

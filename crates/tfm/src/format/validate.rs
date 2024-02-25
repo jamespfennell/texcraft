@@ -27,6 +27,7 @@ pub enum ValidationWarning {
     DepthIsTooBig(usize),
     ItalicCorrectionIsTooBig(usize),
     KernIsTooBig(usize),
+    NextLargerWarning(NextLargerProgramWarning),
     LigKernWarning(lang::ValidationWarning),
 }
 
@@ -80,12 +81,13 @@ impl ValidationWarning {
                 "Bad TFM file: Kern {} is too big;\nI have set it to zero.",
                 i
             ],
+            NextLargerWarning(warning) => warning.tftopl_message(),
             LigKernWarning(warning) => warning.tftopl_message(),
         }
     }
 
     /// Returns the section in Knuth's TFtoPL (version 2014) in which this warning occurs.
-    pub fn tftopl_section(&self) -> usize {
+    pub fn tftopl_section(&self) -> u8 {
         use ValidationWarning::*;
         match self {
             ParameterIsTooBig(_) => 60,
@@ -104,6 +106,7 @@ impl ValidationWarning {
             | DepthIsTooBig(_)
             | ItalicCorrectionIsTooBig(_)
             | KernIsTooBig(_) => 62,
+            NextLargerWarning(warning) => warning.tftopl_section(),
             LigKernWarning(warning) => warning.tftopl_section(),
         }
     }
@@ -128,7 +131,8 @@ impl ValidationWarning {
             | DepthIsTooBig(_)
             | ItalicCorrectionIsTooBig(_)
             | KernIsTooBig(_)
-            | LigKernWarning(_) => true,
+            | NextLargerWarning(_) => true,
+            LigKernWarning(_) => true,
         }
     }
 }
@@ -210,6 +214,18 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
         }
     }
 
+    let (_, next_larger_warnings) = NextLargerProgram::new(
+        file.char_tags
+            .iter()
+            .filter_map(|(c, t)| t.list().map(|l| (*c, l))),
+        |c| file.char_dimens.contains_key(&c),
+        true,
+    );
+    let mut next_larger_warnings: HashMap<Char, NextLargerProgramWarning> = next_larger_warnings
+        .into_iter()
+        .map(|w| (w.bad_char(), w))
+        .collect();
+
     let lig_kern_warnings = file.lig_kern_program.validate_and_fix(
         file.smallest_char,
         file.char_tags
@@ -274,6 +290,12 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
             dimens.italic_index = 0
         }
         match file.char_tags.get(c) {
+            Some(CharTag::List(_)) => {
+                if let Some(warning) = next_larger_warnings.remove(c) {
+                    warnings.push(ValidationWarning::NextLargerWarning(warning));
+                    file.char_tags.remove(c);
+                }
+            }
             Some(CharTag::Extension(e)) => {
                 if *e as usize >= file.extensible_chars.len() {
                     warnings.push(ValidationWarning::InvalidExtensibleRecipeIndex(*c, *e));

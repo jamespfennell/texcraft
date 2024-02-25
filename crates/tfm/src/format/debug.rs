@@ -168,7 +168,7 @@ impl<'a> std::fmt::Display for Debug<'a> {
                     writeln!(
                         f,
                         "{} {} {:4}{:4}{:4}{:4}",
-                        index(section, j),
+                        index(self.sub_file_sizes.bc, section, j),
                         INDEX_DIVIDER,
                         word[0],
                         word[1],
@@ -225,11 +225,12 @@ impl<'a> Iterator for WordIter<'a> {
     }
 }
 
-fn index(section: Section, j: usize) -> String {
+fn index(bc: i16, section: Section, j: usize) -> String {
     let default = format!("{:5}", j);
     if section != Section::CharInfos {
         return default;
     }
+    let j = j + bc as usize;
     let raw: u8 = match j.try_into() {
         Ok(raw) => raw,
         Err(_) => return default,

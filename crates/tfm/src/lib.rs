@@ -1,5 +1,10 @@
 //! Parsers for the TeX font metric (.tfm) and property list (.pl) file formats
 
+use std::{
+    collections::{BTreeSet, HashMap, HashSet},
+    num::NonZeroU8,
+};
+
 pub mod format;
 pub mod ligkern;
 pub mod pl;
@@ -81,6 +86,25 @@ impl TryFrom<char> for Char {
         let u: u8 = value.try_into()?;
         Ok(Char(u))
     }
+}
+
+macro_rules! const_chars {
+    ( $( ($name: ident, $value: expr), )+ ) => {
+        $(
+            pub const $name: Char = Char($value);
+        )+
+    };
+}
+
+impl Char {
+    const_chars![
+        (A, b'A'),
+        (B, b'B'),
+        (C, b'C'),
+        (D, b'D'),
+        (X, b'X'),
+        (Y, b'Y'),
+    ];
 }
 
 /// Fixed-width numeric type used in TFM files.
@@ -328,5 +352,487 @@ impl NamedParam {
             NamedParam::BigOpSpacing4 => 12,
             NamedParam::BigOpSpacing5 => 13,
         }
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum NextLargerProgramWarning {
+    NonExistentCharacter { original: Char, next_larger: Char },
+    InfiniteLoop(Char),
+}
+
+impl NextLargerProgramWarning {
+    pub fn bad_char(&self) -> Char {
+        match self {
+            NextLargerProgramWarning::NonExistentCharacter {
+                original,
+                next_larger: _,
+            } => *original,
+            NextLargerProgramWarning::InfiniteLoop(c) => *c,
+        }
+    }
+
+    /// Returns the warning message the TFtoPL program prints for this kind of error.
+    pub fn tftopl_message(&self) -> String {
+        match self {
+            NextLargerProgramWarning::NonExistentCharacter {
+                original: _,
+                next_larger,
+            } => {
+                format![
+                    "Bad TFM file: Character list link to nonexistent character '{:03o}.",
+                    next_larger.0
+                ]
+            }
+            NextLargerProgramWarning::InfiniteLoop(c) => {
+                format!["Bad TFM file: Cycle in a character list!\nCharacter '{:03o} now ends the list.", c.0]
+            }
+        }
+    }
+
+    /// Returns the section in Knuth's TFtoPL (version 2014) in which this warning occurs.
+    pub fn tftopl_section(&self) -> u8 {
+        84
+    }
+
+    /// Returns the section in Knuth's PLtoTF (version 2014) in which this warning occurs.
+    pub fn pltotf_section(&self) -> u8 {
+        match self {
+            NextLargerProgramWarning::NonExistentCharacter { .. } => 111,
+            NextLargerProgramWarning::InfiniteLoop(_) => 113,
+        }
+    }
+
+    /// Returns the warning message the PLtoTF program prints for this kind of error.
+    pub fn pltotf_message(&self) -> String {
+        match self {
+            NextLargerProgramWarning::NonExistentCharacter {
+                original,
+                next_larger: _,
+            } => {
+                format![
+                    "The character NEXTLARGER than '{:03o} had no CHARACTER spec.",
+                    original.0
+                ]
+            }
+            NextLargerProgramWarning::InfiniteLoop(c) => {
+                format![
+                    "A cycle of NEXTLARGER characters has been broken at '{:03o}.",
+                    c.0
+                ]
+            }
+        }
+    }
+}
+/// Next larger characters
+///
+/// The .tfm file format can associate a "next larger" character to any character in a font.
+/// Next larger characters form sequences: i.e. B can be the next larger character for A,
+///     and C can be the next larger character for B,
+///     leading to the sequences A-B-C.
+/// These next larger characters are used at certain points in TeX.
+/// TeX occasionally traverses the entire sequence for a given starting character (e.g. A).
+///
+/// As with ligatures, next larger specifications can contain infinite loops -
+///     e.g, if X is the next larger character for Y
+///      and Y is the next larger character for X.
+/// These loops are invalid and removed by TFtoPL and PLtoTF.
+///
+/// Motivated by the idea of "parse don't validate", this type represents
+///     a compiled version of the next larger specifications in which infinite loops
+///     are statically guaranteed not to exist.
+///
+/// The basic use of a valid program looks like this:
+///
+/// ```
+/// # use tfm::*;
+/// let edges = vec![
+///     (Char::A, Char::B),
+///     (Char::B, Char::C),
+/// ];
+/// let (next_larger_program, warnings) = NextLargerProgram::new(edges.into_iter(), |_| true, true);
+///
+/// assert_eq![warnings, vec![]];
+///
+/// let sequence_A: Vec<Char> = next_larger_program.get(Char::A).collect();
+/// assert_eq!(sequence_A, vec![Char::B, Char::C]);
+///
+/// let sequence_B: Vec<Char> = next_larger_program.get(Char::B).collect();
+/// assert_eq!(sequence_B, vec![Char::C]);
+///
+/// let sequence_C: Vec<Char> = next_larger_program.get(Char::C).collect();
+/// assert_eq!(sequence_C, vec![]);
+///
+/// // Character that is not in the program.
+/// let sequence_D: Vec<Char> = next_larger_program.get(Char::D).collect();
+/// assert_eq!(sequence_D, vec![]);
+/// ```
+///
+/// ## Warnings
+///
+/// There are two types of error that can occur when constructing the next
+///     larger program.
+/// Both of these errors are handled gracefully, so we officially refer to them as warnings.
+/// The constructor returns them as values of type [`NextLargerProgramWarning`].
+///
+/// ### Infinite loops
+///
+/// The first error is that next larger programs can contain infinite loops -
+///     e.g, if X is the next larger character for Y
+///      and Y is the next larger character for X.
+/// In this case the loop is broken by removing the next larger program for the
+///     character with the largest 8-bit code, in this case Y.
+/// A [`NextLargerProgramWarning::InfiniteLoop`] warning is returned
+///     from the program constructor.
+///
+/// ```
+/// # use tfm::*;
+/// let edges = vec![
+///     (Char::X, Char::Y),
+///     (Char::Y, Char::X),
+/// ];
+/// let (next_larger_program, warnings) = NextLargerProgram::new(edges.into_iter(), |_| true, true);
+///
+/// assert_eq!(warnings, vec![NextLargerProgramWarning::InfiniteLoop(Char::Y)]);
+///
+/// let sequence_X: Vec<Char> = next_larger_program.get(Char::X).collect();
+/// assert_eq!(sequence_X, vec![Char::Y]);
+///
+/// let sequence_Y: Vec<Char> = next_larger_program.get(Char::Y).collect();
+/// assert_eq!(sequence_Y, vec![]);
+/// ```
+///
+/// ### Non-existent characters
+///
+/// The second error is that characters referred to in the next larger program
+///     may not be defined in the .tfm or .pl file.
+/// For example, a .pl file may contain the snippet `(CHARACTER C X (NEXTLARGER C Y))`
+///     without defining the character Y.
+/// The constructor [`NextLargerProgram::new`] accepts a function for checking if a
+///     character exists.
+/// In all cases a [`NextLargerProgramWarning::NonExistentCharacter`] warning is returned
+///     if a non-existent character is encountered.
+///
+/// The behavior of the resulting next larger program is configured using the
+///     `drop_non_existent_characters` argument.
+/// If this is false, then the behavior is the same as PLtoTF and the program still
+///     contains the character.
+///
+/// ```
+/// # use tfm::*;
+/// let edges = vec![
+///     (Char::X, Char::Y),
+/// ];
+/// let character_exists = |c| {
+///     if c == Char::Y {
+///         false
+///     } else {
+///         true
+///     }
+/// };
+/// let (next_larger_program, warnings) = NextLargerProgram::new(edges.into_iter(), character_exists, false);
+///
+/// assert_eq!(warnings, vec![NextLargerProgramWarning::NonExistentCharacter{
+///     original: Char::X,
+///     next_larger: Char::Y,
+/// }]);
+///
+/// let sequence_X: Vec<Char> = next_larger_program.get(Char::X).collect();
+/// assert_eq!(sequence_X, vec![Char::Y]);
+/// ```
+///
+/// If `drop_non_existent_characters` is true, next larger instructions pointing at non-existent
+///     characters are dropped.
+/// This is how TFtoPL behaves.
+///
+///
+/// ```
+/// # use tfm::*;
+/// let edges = vec![
+///     (Char::X, Char::Y),
+/// ];
+/// let character_exists = |c| {
+///     if c == Char::Y {
+///         false
+///     } else {
+///         true
+///     }
+/// };
+/// let (next_larger_program, warnings) = NextLargerProgram::new(edges.into_iter(), character_exists, true);
+///
+/// assert_eq!(warnings, vec![NextLargerProgramWarning::NonExistentCharacter{
+///     original: Char::X,
+///     next_larger: Char::Y,
+/// }]);
+///
+/// let sequence_X: Vec<Char> = next_larger_program.get(Char::X).collect();
+/// assert_eq!(sequence_X, vec![]);
+/// ```
+///
+#[derive(Clone, Debug)]
+pub struct NextLargerProgram {
+    entrypoints: HashMap<Char, u8>,
+    next_larger: Vec<(Char, NonZeroU8)>,
+}
+
+impl NextLargerProgram {
+    /// Build a new next larger program from an iterator over edges.
+    pub fn new<I: Iterator<Item = (Char, Char)>, F: Fn(Char) -> bool>(
+        edges: I,
+        character_exists: F,
+        drop_non_existent_characters: bool,
+    ) -> (Self, Vec<NextLargerProgramWarning>) {
+        // This function implements functionality in TFtoPL.2014.84 and PLtoTF.2014.{110,111,113}.
+        let mut warnings: Vec<NextLargerProgramWarning> = vec![];
+
+        let mut node_to_parent = HashMap::<Char, Char>::new();
+        let mut node_to_num_children = HashMap::<Char, usize>::new();
+        for (child, parent) in edges {
+            if !character_exists(parent) {
+                warnings.push(NextLargerProgramWarning::NonExistentCharacter {
+                    original: child,
+                    next_larger: parent,
+                });
+                if drop_non_existent_characters {
+                    continue;
+                }
+            }
+            node_to_parent.insert(child, parent);
+            node_to_num_children.entry(child).or_default();
+            *node_to_num_children.entry(parent).or_default() += 1;
+        }
+
+        let mut leaves: Vec<Char> = vec![];
+        let mut non_leaves: BTreeSet<Char> = Default::default();
+        for (node, num_children) in &node_to_num_children {
+            if *num_children == 0 {
+                leaves.push(*node);
+            } else {
+                non_leaves.insert(*node);
+            }
+        }
+
+        let mut sorted_chars = vec![];
+        let mut infinite_loop_warnings = vec![];
+        loop {
+            while let Some(leaf) = leaves.pop() {
+                if let Some(parent) = node_to_parent.get(&leaf).copied() {
+                    let n = node_to_num_children
+                        .get_mut(&parent)
+                        .expect("`node_to_num_children` contains all nodes");
+                    *n = n
+                        .checked_sub(1)
+                        .expect("the parent of a child must have at least one child");
+                    if *n == 0 {
+                        leaves.push(parent);
+                        non_leaves.remove(&parent);
+                    }
+                }
+                sorted_chars.push(leaf);
+            }
+
+            // There could be pending nodes left because of a cycle.
+            // We break the cycle at the largest node.
+            let child = match non_leaves.last() {
+                None => break,
+                Some(child) => *child,
+            };
+            infinite_loop_warnings.push(NextLargerProgramWarning::InfiniteLoop(child));
+            let parent = node_to_parent.remove(&child).expect(
+                "General graph fact: sum_(node)#in_edges(node)=sum_(node)#out_edges(node).
+                Fact about the next larger graph: #out_edges(node)<=1, because each char has at most one next larger char.
+                If #out_edge(child)=0 then sum_(node)#in_edges(node)=sum_(node)#out_edges(node) < #nodes.
+                Thus there exists another node with #in_edges(node)=0 and that node is a leaf.
+                But `leaves.len()=0` at this line of code",
+            );
+            leaves.push(parent);
+            non_leaves.remove(&parent);
+        }
+        warnings.extend(infinite_loop_warnings.into_iter().rev());
+
+        let next_larger = {
+            let parents: HashSet<Char> = node_to_parent.values().copied().collect();
+            let mut node_to_position = HashMap::<Char, u8>::new();
+            let mut next_larger: Vec<(Char, NonZeroU8)> = vec![];
+
+            for c in sorted_chars.iter().rev() {
+                if !parents.contains(c) {
+                    continue;
+                }
+                // The present character is the parent of at least one child, aka it is the next larger
+                // character for another character. So it needs to be in the next_larger array.
+                let child_position: u8 = next_larger
+                    .len()
+                    .try_into()
+                    .expect("there are at most u8::MAX chars in the `next_larger` array");
+                let offset = match node_to_parent.get(c) {
+                    // The next_larger array contains at most 256 elements: one for each char.
+                    // (Actually it contains at most 255 because one character necessarily does not
+                    // have a child node and this character does not appear in the array.)
+                    // Anyway, an offset of 256 sends the index outside the array bound, and so
+                    // subsequent calls to iterator return None.
+                    None => NonZeroU8::MAX,
+                    Some(parent) => {
+                        let parent_position = *node_to_position
+                            .get(parent)
+                            .expect("parent has already been inserted");
+                        child_position
+                            .checked_sub(parent_position)
+                            .expect("parent inserted before so its position it is strictly smaller")
+                            .try_into()
+                            .expect("parent inserted before so its position it is strictly smaller")
+                    }
+                };
+                next_larger.push((*c, offset));
+                node_to_position.insert(*c, child_position);
+            }
+            next_larger.reverse();
+            next_larger
+        };
+
+        let entrypoints = {
+            let node_to_position: HashMap<Char, u8> = next_larger
+                .iter()
+                .enumerate()
+                .map(|(i, (c, _))| {
+                    let u: u8 = i
+                        .try_into()
+                        .expect("there are at most u8::MAX chars in the `next_larger` array");
+                    (*c, u)
+                })
+                .collect();
+            let mut entrypoints = HashMap::<Char, u8>::new();
+            for c in sorted_chars.iter().rev() {
+                if let Some(parent) = node_to_parent.get(c) {
+                    entrypoints.insert(
+                        *c,
+                        *node_to_position
+                            .get(parent)
+                            .expect("parent has already been inserted"),
+                    );
+                }
+            }
+            entrypoints
+        };
+
+        (
+            Self {
+                entrypoints,
+                next_larger,
+            },
+            warnings,
+        )
+    }
+
+    /// Get the next larger sequence for a character
+    pub fn get(&self, c: Char) -> impl Iterator<Item = Char> + '_ {
+        NextLargerProgramIter {
+            current: self.entrypoints.get(&c).copied(),
+            program: self,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct NextLargerProgramIter<'a> {
+    current: Option<u8>,
+    program: &'a NextLargerProgram,
+}
+
+impl<'a> Iterator for NextLargerProgramIter<'a> {
+    type Item = Char;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Note that the iterator is statically guaranteed to terminate!
+        // If it returns None, it has already terminated.
+        // If it returns Some, then self.current will be incremented by a strictly
+        //  positive number.
+        // Incrementing like this can only happen a finite number of times before overflow
+        //  occurs, and then self.current is None and the iterator is terminated.
+        match self.current {
+            None => None,
+            Some(current) => match self.program.next_larger.get(current as usize) {
+                None => None,
+                Some((c, inc)) => {
+                    self.current = current.checked_add(inc.get());
+                    Some(*c)
+                }
+            },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod next_larger_tests {
+        use super::*;
+
+        fn run(
+            edges: Vec<(Char, Char)>,
+            want_sequences: HashMap<Char, Vec<Char>>,
+            want_warnings: Vec<NextLargerProgramWarning>,
+        ) {
+            let (program, got_warnings) = NextLargerProgram::new(edges.into_iter(), |_| true, true);
+            assert_eq!(got_warnings, want_warnings);
+            for u in 0..=u8::MAX {
+                let want_sequence = want_sequences
+                    .get(&Char(u))
+                    .map(Vec::as_slice)
+                    .unwrap_or_default();
+                let got_sequence: Vec<Char> = program.get(Char(u)).collect();
+                assert_eq!(
+                    got_sequence, want_sequence,
+                    "got/want sequences for {u} do not match"
+                );
+            }
+        }
+
+        fn big_infinite_loop_edges() -> Vec<(Char, Char)> {
+            (0..=u8::MAX)
+                .into_iter()
+                .map(|u| (Char(u), Char(u.wrapping_add(1))))
+                .collect()
+        }
+
+        fn big_infinite_loop_sequences() -> HashMap<Char, Vec<Char>> {
+            (0..=u8::MAX)
+                .into_iter()
+                .map(|u| {
+                    let v: Vec<Char> = match u.checked_add(1) {
+                        None => vec![],
+                        Some(w) => (w..=u8::MAX).into_iter().map(Char).collect(),
+                    };
+                    (Char(u), v)
+                })
+                .collect()
+        }
+
+        macro_rules! next_larger_tests {
+            ( $( ($name: ident, $edges: expr, $want_sequences: expr, $want_warnings: expr, ), )+ ) => {
+                $(
+                    #[test]
+                    fn $name () {
+                        run($edges, $want_sequences, $want_warnings);
+                    }
+                )+
+            };
+        }
+
+        next_larger_tests!(
+            (
+                same_node_loop,
+                vec![(Char::A, Char::A)],
+                HashMap::from([(Char::A, vec![])]),
+                vec![NextLargerProgramWarning::InfiniteLoop(Char::A)],
+            ),
+            (
+                big_infinite_loop,
+                big_infinite_loop_edges(),
+                big_infinite_loop_sequences(),
+                vec![NextLargerProgramWarning::InfiniteLoop(Char(u8::MAX))],
+            ),
+        );
     }
 }

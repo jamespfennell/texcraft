@@ -426,7 +426,7 @@ impl ValidationWarning {
     }
 
     /// Returns the section in Knuth's TFtoPL (version 2014) in which this warning occurs.
-    pub fn tftopl_section(&self) -> usize {
+    pub fn tftopl_section(&self) -> u8 {
         use ValidationWarning::*;
         match self {
             SkipTooLarge(_) => 70,

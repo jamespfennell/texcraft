@@ -178,6 +178,7 @@ pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
             .zip(char_infos.iter())
             .filter_map(|(c, (_, d))| (d.clone().map(|d| (Char(c), d))))
             .collect(),
+        unset_char_tags: Default::default(),
         widths: deserialize_array(raw_file.widths),
         heights: deserialize_array(raw_file.heights),
         depths: deserialize_array(raw_file.depths),
