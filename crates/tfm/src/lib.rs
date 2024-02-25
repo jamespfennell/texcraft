@@ -105,6 +105,10 @@ impl Char {
         (X, b'X'),
         (Y, b'Y'),
     ];
+
+    pub fn is_seven_bit(&self) -> bool {
+        self.0 <= 127
+    }
 }
 
 /// Fixed-width numeric type used in TFM files.
@@ -730,6 +734,41 @@ impl NextLargerProgram {
             current: self.entrypoints.get(&c).copied(),
             program: self,
         }
+    }
+
+    /// Returns whether this program is seven-bit safe.
+    ///
+    /// A program is seven-bit safe if the next larger sequences for
+    ///     seven-bit characters only contain seven-bit characters.
+    /// Conversely a program is seven-bit unsafe if there is a seven-bit
+    ///     character whose next larger sequence contains a non-seven-bit character.
+    ///
+    /// ```
+    /// # use tfm::*;
+    /// let edges = vec![
+    ///     (Char(250), Char(125)),
+    ///     (Char(125), Char(126)),
+    /// ];
+    /// let (next_larger_program, _) = NextLargerProgram::new(edges.into_iter(), |_| true, true);
+    /// assert_eq!(true, next_larger_program.is_seven_bit_safe());
+    ///
+    /// let edges = vec![
+    ///     (Char(125), Char(250)),
+    /// ];
+    /// let (next_larger_program, _) = NextLargerProgram::new(edges.into_iter(), |_| true, true);
+    /// assert_eq!(false, next_larger_program.is_seven_bit_safe());
+    /// ```
+    pub fn is_seven_bit_safe(&self) -> bool {
+        // For each c, we only need to check the first element in c's next larger sequence.
+        // If there is a subsequent element d of the sequence that is seven-bit unsafe,
+        // we will find it when considering one of d's children.
+        // This optimization makes this function O(n), rather than worst case O(n^2).
+        self.entrypoints
+            .keys()
+            .copied()
+            .filter(Char::is_seven_bit)
+            .filter_map(|c| self.get(c).next())
+            .all(|c| c.is_seven_bit())
     }
 }
 
