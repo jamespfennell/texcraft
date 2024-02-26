@@ -297,6 +297,12 @@ fn finish_accumulating_string(
                 }
                 whitespace_to_flush += *n;
             }
+            Some(Token(TokenKind::ClosedParenthesis, _)) => {
+                for _ in 0..whitespace_to_flush {
+                    data.push(' ');
+                }
+                break;
+            }
             _ => {
                 break;
             }
@@ -655,7 +661,7 @@ mod tests {
         ),
         (
             lexer_error_propagated,
-            "(Hello World ä)",
+            "(Hello Worldä)",
             vec![Node {
                 opening_parenthesis_span: 0,
                 value: NodeValue::Regular(RegularNodeValue {
@@ -665,9 +671,28 @@ mod tests {
                     data_span: 7..12,
                     children: vec![].into(),
                 }),
-                closing_parenthesis_span: 15,
+                closing_parenthesis_span: 14,
             }],
-            vec![ParseError::InvalidCharacter('ä', 13)],
+            
+            vec![ParseError::InvalidCharacter('ä', 12)],
+        ),
+        (
+            trailing_space,
+            "(Hello World )",
+            vec![
+                Node {
+                    opening_parenthesis_span: 0,
+                    value: NodeValue::Regular(RegularNodeValue {
+                        key: "Hello".into(),
+                        key_span: 1..6,
+                        data: Some("World ".into()),
+                        data_span: 7..13,
+                        children: vec![].into(),
+                    }),
+                    closing_parenthesis_span: 13,
+                },
+            ],
+            vec![],
         ),
     );
 }

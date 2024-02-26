@@ -394,7 +394,7 @@ convert_pltotf_tests!(
     ),
     (aebkri, "data/ctan/aebkri.tfm", "data/ctan/aebkri.pl", "",),
     (mt2exa, "data/ctan/mt2exa.tfm", "data/ctan/mt2exa.pl", "",),
-    //
+    (copti, "data/ctan/copti.tfm", "data/ctan/copti.pl", "",),
     (
         xcharter_bolditalic_tlf_ot1g,
         "data/ctan/XCharter-BoldItalic-tlf-ot1G.tfm",

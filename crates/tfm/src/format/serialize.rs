@@ -53,10 +53,14 @@ fn serialize_char_infos(file: &File, bc: Char, ec: Char, b: &mut Vec<u8>) {
         v[(c.0 - bc.0) as usize].0 = Some(dimens.clone());
     }
     for (c, tag) in &file.char_tags {
-        v[(c.0 - bc.0) as usize].1 = SerializableCharTag::Valid(tag.clone());
+        if let Some(slot) = v.get_mut((c.0 - bc.0) as usize) {
+            slot.1 = SerializableCharTag::Valid(tag.clone());
+        }
     }
     for (c, tag) in &file.unset_char_tags {
-        v[(c.0 - bc.0) as usize].1 = SerializableCharTag::Unset(*tag);
+        if let Some(slot) = v.get_mut((c.0 - bc.0) as usize) {
+            slot.1 = SerializableCharTag::Unset(*tag);
+        }
     }
     serialize_section(&v, b, None);
 }
