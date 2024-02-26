@@ -135,7 +135,14 @@ impl CharTag {
             CharTag::Ligature(_) | CharTag::Extension(_) => None,
         }
     }
+    pub fn extension(&self) -> Option<u8> {
+        match self {
+            CharTag::Extension(u) => Some(*u),
+            CharTag::Ligature(_) | CharTag::List(_) => None,
+        }
+    }
 }
+
 /// Extensible recipe instruction in a .tfm file.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ExtensibleRecipe {
@@ -143,6 +150,15 @@ pub struct ExtensibleRecipe {
     pub middle: Option<Char>,
     pub bottom: Option<Char>,
     pub rep: Char,
+}
+
+impl ExtensibleRecipe {
+    pub fn is_seven_bit(&self) -> bool {
+        [self.top, self.middle, self.bottom, Some(self.rep)]
+            .into_iter()
+            .flatten()
+            .all(|c| c.is_seven_bit())
+    }
 }
 
 impl Default for File {
@@ -293,7 +309,7 @@ impl File {
         let mut lig_kern_program = pl_file.lig_kern_program.clone();
         let kerns = lig_kern_program.unpack_kerns();
         let lig_kern_entrypoints =
-            lig_kern_program.pack_entrypoints(pl_file.lig_kern_entrypoints());
+            lig_kern_program.pack_entrypoints(pl_file.lig_kern_entrypoints(true));
 
         let mut widths = vec![];
         let mut heights = vec![];
@@ -417,7 +433,6 @@ impl File {
         if file.header.checksum.is_none() {
             file.header.checksum = Some(file.checksum());
         }
-        file.header.seven_bit_safe = Some(true); // TODO: calculate this
         file
     }
 }

@@ -216,16 +216,7 @@ impl Convert {
                 Ok(())
             }
             TfOrPlPath::Pl(pl_path) => {
-                let mut pl_file = pl_path.read()?;
-                if let Err(err) = tfm::ligkern::CompiledProgram::compile(
-                    &pl_file.lig_kern_program.instructions,
-                    &[],
-                    pl_file.lig_kern_entrypoints(),
-                ) {
-                    eprintln!("{}", err.pltotf_message());
-                    eprintln!("All ligatures will be cleared.");
-                    pl_file.clear_lig_kern_data();
-                }
+                let pl_file = pl_path.read()?;
                 let tfm_file = tfm::format::File::from_pl_file(&pl_file);
                 let tfm_bytes = tfm_file.serialize();
                 let tfm_path: TfPath = match &self.output {

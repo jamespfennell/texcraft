@@ -77,6 +77,12 @@ impl CharTag {
             _ => None,
         }
     }
+    pub fn extension(&self) -> Option<ExtensibleRecipe> {
+        match self {
+            CharTag::Extension(u) => Some(u.clone()),
+            CharTag::Ligature(_) | CharTag::List(_) => None,
+        }
+    }
 }
 
 /// Complete contents of a property list (.pl) file.
@@ -115,9 +121,10 @@ impl File {
     }
 
     /// Return a map from characters to the lig/kern entrypoint for that character.
-    pub fn lig_kern_entrypoints(&self) -> HashMap<Char, u16> {
+    pub fn lig_kern_entrypoints(&self, include_orphans: bool) -> HashMap<Char, u16> {
         self.char_tags
             .iter()
+            .filter(|(c, _)| self.char_dimens.contains_key(c) || include_orphans)
             .filter_map(|d| match d.1 {
                 CharTag::Ligature(l) => Some((*d.0, *l)),
                 _ => None,
@@ -335,8 +342,27 @@ impl File {
             }
         }
 
-        {
-            let (_, next_larger_warnings) = NextLargerProgram::new(
+        // Validate and fix the lig kern program.
+        let lig_kern_seven_bit_safe = {
+            match crate::ligkern::CompiledProgram::compile(
+                &file.lig_kern_program.instructions,
+                &[],
+                file.lig_kern_entrypoints(true), // todo include orphans?
+            ) {
+                // TODO: warnings from the compilation?
+                Ok(_) => {}
+                Err(err) => {
+                    errors.push(ParseError::InfiniteLoopInLigKernProgram(err));
+                    file.clear_lig_kern_data();
+                }
+            };
+            file.lig_kern_program
+                .is_seven_bit_safe(file.lig_kern_entrypoints(false))
+        };
+
+        // Validate and fix next larger tags
+        let next_larger_seven_bit_safe = {
+            let (program, next_larger_warnings) = NextLargerProgram::new(
                 file.char_tags
                     .iter()
                     .filter_map(|(c, t)| t.list().map(|next_larger| (*c, next_larger))),
@@ -372,7 +398,21 @@ impl File {
                     .expect("every char with a next larger tag had a NEXTLARGER AST node");
                 errors.push(ParseError::NextLargerWarning { warning, span });
             }
+            program.is_seven_bit_safe()
+        };
+
+        let extensible_seven_bit_safe = file
+            .char_tags
+            .iter()
+            .filter(|(c, _)| c.is_seven_bit())
+            .filter_map(|(_, t)| t.extension())
+            .all(|e| e.is_seven_bit());
+        let seven_bit_safe =
+            lig_kern_seven_bit_safe && next_larger_seven_bit_safe && extensible_seven_bit_safe;
+        if file.header.seven_bit_safe == Some(true) && !seven_bit_safe {
+            errors.push(ParseError::NotReallySevenBitSafe);
         }
+        file.header.seven_bit_safe = Some(seven_bit_safe);
 
         file
     }
@@ -775,7 +815,8 @@ mod tests {
     use super::*;
     use crate::{format::WidthIndex, Face};
 
-    fn run_from_pl_source_code_test(source: &str, want: File) {
+    fn run_from_pl_source_code_test(source: &str, mut want: File) {
+        want.header.seven_bit_safe = Some(true);
         let (got, errors) = File::from_pl_source_code(source);
         assert_eq!(errors, vec![]);
         assert_eq!(got, want);
@@ -871,10 +912,10 @@ mod tests {
         ),
         (
             seven_bit_safe_flag,
-            "(SEVENBITSAFEFLAG TRUE)",
+            "(SEVENBITSAFEFLAG FALSE)",
             File {
                 header: Header {
-                    seven_bit_safe: Some(true),
+                    seven_bit_safe: Some(false),
                     ..Header::pl_default()
                 },
                 ..Default::default()

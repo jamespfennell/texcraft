@@ -1,6 +1,6 @@
 //! Errors relating to property list file parsing
 
-use crate::NextLargerProgramWarning;
+use crate::{ligkern::InfiniteLoopError, NextLargerProgramWarning};
 
 /// Errors while parsing a property list file
 #[derive(PartialEq, Eq, Debug)]
@@ -65,6 +65,8 @@ pub enum ParseError {
         warning: NextLargerProgramWarning,
         span: std::ops::Range<usize>,
     },
+    InfiniteLoopInLigKernProgram(InfiniteLoopError),
+    NotReallySevenBitSafe,
 }
 
 impl ParseError {
@@ -129,6 +131,10 @@ impl ParseError {
                 "Sorry, LIGTABLE to long for me to handle".to_string()
             }
             NextLargerWarning { warning, span: _ } => warning.pltotf_message(),
+            InfiniteLoopInLigKernProgram(err) => {
+                format!("{}\nAll ligatures will be cleared.", err.pltotf_message())
+            }
+            NotReallySevenBitSafe => "The font is not really seven-bit-safe!".to_string(),
         }
     }
 
@@ -157,6 +163,8 @@ impl ParseError {
             ParseError::InvalidPrefixForDecimal { .. } => (62, 1),
             ParseError::LigTableTooLong { .. } => (101, 1),
             NextLargerWarning { warning, span: _ } => (warning.pltotf_section(), 1),
+            InfiniteLoopInLigKernProgram(err) => (err.pltotf_section(), 1),
+            NotReallySevenBitSafe => (110, 1),
         }
     }
 
@@ -248,6 +256,7 @@ mod report {
             | ParseError::LigTableTooLong { span } => {
                 builder.with_label(Label::new(span.clone()).with_message(error.pltotf_message()))
             }
+            InfiniteLoopInLigKernProgram(_) | NotReallySevenBitSafe => builder,
         };
         builder.finish()
     }

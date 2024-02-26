@@ -66,18 +66,9 @@ impl Cli {
         };
 
         // Conversion
-        let (mut pl_file, warnings) = tfm::pl::File::from_pl_source_code(&pl_data);
+        let (pl_file, warnings) = tfm::pl::File::from_pl_source_code(&pl_data);
         for warning in warnings {
             eprintln!("{}", warning.pltotf_message());
-        }
-        if let Err(err) = tfm::ligkern::CompiledProgram::compile(
-            &pl_file.lig_kern_program.instructions,
-            &[],
-            pl_file.lig_kern_entrypoints(),
-        ) {
-            eprintln!("{}", err.pltotf_message());
-            eprintln!("All ligatures will be cleared.");
-            pl_file.clear_lig_kern_data();
         }
         let tfm_file = tfm::format::File::from_pl_file(&pl_file);
         let tfm_output: Vec<u8> = tfm_file.serialize();

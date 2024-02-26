@@ -287,36 +287,31 @@ convert_tests!(
         "data/originals/dimen-index-out-of-bounds-3.tfm",
         "data/originals/dimen-index-out-of-bounds-4.pl",
     ),
-    /* TODO: re-enable after fixing seven bit safe
     (
-        smfebsl10_2_3,
+        smfebsl10_3_4,
         "data/ctan/smfebsl10-3.tfm",
-        "data/ctan/smfebsl10-2.pl",
+        "data/ctan/smfebsl10-4.pl",
     ),
-     */
-    /* TODO: reenable and then delete the tftopl test
+    (cprbn8t, "data/ctan/cprbn8t.tfm", "data/ctan/cprbn8t.pl",),
     (
-        cprbn8t,
-        "data/ctan/cprbn8t.tfm",
-        "data/ctan/cprbn8t.pl",
+        rashii2_3_4,
+        "data/ctan/rashii2-3.tfm",
+        "data/ctan/rashii2-4.pl",
     ),
-     */
-    /* TODO: reenable and then delete the tftopl test
-    (
-        rashii2,
-        "data/ctan/rashii2.tfm",
-        "data/ctan/rashii2.pl",
-    ),
-    TODO: reenable and then delete the tftopl test
     (
         veracruz_6vcr8r,
         "data/ctan/6vcr8r.tfm",
         "data/ctan/6vcr8r.pl",
     ),
-     */
 );
 
 convert_pltotf_tests!(
+    (
+        rashii2_2_3,
+        "data/ctan/rashii2-3.tfm",
+        "data/ctan/rashii2-2.pl",
+        ""
+    ),
     (
         empty,
         "data/originals/empty.tfm",
@@ -365,6 +360,12 @@ convert_pltotf_tests!(
         "data/ctan/ArevSans-BoldOblique-2.pl",
         "",
     ),
+    (
+        theano_old_style_bold_tlf_lgr,
+        "data/ctan/TheanoOldStyle-Bold-tlf-lgr.tfm",
+        "data/ctan/TheanoOldStyle-Bold-tlf-lgr.pl",
+        "",
+    ),
     /* TODO: fix the bug and enable
     (
         dimen_index_out_of_bounds_2_3,
@@ -385,9 +386,31 @@ convert_pltotf_tests!(
         "data/ctan/bxjatoucs-jis-2.pl",
     ),
      */
+    (
+        smfebsl10_2_3,
+        "data/ctan/smfebsl10-3.tfm",
+        "data/ctan/smfebsl10-2.pl",
+        "",
+    ),
+    (aebkri, "data/ctan/aebkri.tfm", "data/ctan/aebkri.pl", "",),
+    (mt2exa, "data/ctan/mt2exa.tfm", "data/ctan/mt2exa.pl", "",),
+    //
+    (
+        xcharter_bolditalic_tlf_ot1g,
+        "data/ctan/XCharter-BoldItalic-tlf-ot1G.tfm",
+        "data/ctan/XCharter-BoldItalic-tlf-ot1G.pl",
+        "",
+    ),
 );
 
 convert_tftopl_tests!(
+    (
+        rashii2_1_2,
+        "data/ctan/rashii2-1.tfm",
+        include_str!("data/ctan/rashii2-2.pl"),
+        "",
+        true,
+    ),
     (
         gk256g,
         "data/ctan/gk256g.tfm",
@@ -431,30 +454,9 @@ convert_tftopl_tests!(
         true,
     ),
     (
-        cprbn8t,
-        "data/ctan/cprbn8t.tfm",
-        include_str!("data/ctan/cprbn8t.pl"),
-        "",
-        true,
-    ),
-    (
         xcyeuat12,
         "data/ctan/xyeuat12.tfm",
         include_str!("data/ctan/xyeuat12.pl"),
-        "",
-        true,
-    ),
-    (
-        rashii2,
-        "data/ctan/rashii2.tfm",
-        include_str!("data/ctan/rashii2.pl"),
-        "",
-        true,
-    ),
-    (
-        veracruz_6vcr8r,
-        "data/ctan/6vcr8r.tfm",
-        include_str!("data/ctan/6vcr8r.pl"),
         "",
         true,
     ),

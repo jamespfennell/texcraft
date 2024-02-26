@@ -45,7 +45,7 @@ impl Header {
             design_size: Number::UNITY * 10,
             character_coding_scheme: Some("UNSPECIFIED".into()),
             font_family: Some("UNSPECIFIED".into()),
-            seven_bit_safe: Some(false),
+            seven_bit_safe: None,
             face: Some(0.into()),
             additional_data: vec![],
         }
@@ -738,7 +738,7 @@ impl NextLargerProgram {
 
     /// Returns whether this program is seven-bit safe.
     ///
-    /// A program is seven-bit safe if the next larger sequences for
+    /// A next larger program is seven-bit safe if the next larger sequences for
     ///     seven-bit characters only contain seven-bit characters.
     /// Conversely a program is seven-bit unsafe if there is a seven-bit
     ///     character whose next larger sequence contains a non-seven-bit character.

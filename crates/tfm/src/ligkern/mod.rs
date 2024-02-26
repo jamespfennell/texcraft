@@ -153,6 +153,21 @@ impl CompiledProgram {
             program: self,
         }
     }
+
+    /// Returns whether this program is seven-bit safe.
+    ///
+    /// A lig/kern program is seven-bit safe if the replacement for any
+    ///     pair of seven-bit safe characters
+    ///     consists only of seven-bit characters.
+    /// Conversely a program is seven-bit unsafe if there is a
+    ///     pair of seven-bit characters whose replacement
+    ///     contains a non-seven-bit character.
+    pub fn is_seven_bit_safe(&self) -> bool {
+        self.all_pairs_having_replacement()
+            .filter(|(l, r)| l.is_seven_bit() && r.is_seven_bit())
+            .flat_map(|(l, r)| self.get_replacement_iter(l, r))
+            .all(|(c, _kern)| c.is_seven_bit())
+    }
 }
 
 /// An error returned from lig/kern compilation.
@@ -168,11 +183,13 @@ pub struct InfiniteLoopError {
 
 impl InfiniteLoopError {
     pub fn pltotf_message(&self) -> String {
-        // PLtoTF.2014.125
         format!(
             "Infinite ligature loop starting with '{:o} and '{:o}!",
             self.starting_pair.0 .0, self.starting_pair.1 .0
         )
+    }
+    pub fn pltotf_section(&self) -> u8 {
+        125
     }
 }
 

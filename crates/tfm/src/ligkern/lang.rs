@@ -179,16 +179,16 @@ impl Program {
             let u: u8 = match (u16_entrypoint + offset as u16).try_into() {
                 Ok(u) => u,
                 Err(_) => {
-                    let u = offset;
                     redirects.push(u16_entrypoint);
                     if i == 0 && self.boundary_char.is_some() {
                         // This implements the "optimization" "location 0 can do double duty" in PLtoTF.2014.141
                         instructions.pop();
                         offset = 0;
                     }
+                    let u = offset;
                     offset = offset.checked_add(1).expect(
-                    "offset is incremented at most once per 8-bit-char and so cannot exceed 256",
-                );
+                        "offset is incremented at most once per 8-bit-char and so cannot exceed 256",
+                    );
                     u
                 }
             };
@@ -267,6 +267,19 @@ impl Program {
             next: entrypoint as usize,
             instructions: &self.instructions,
         }
+    }
+
+    pub fn is_seven_bit_safe(&self, entrypoints: HashMap<Char, u16>) -> bool {
+        entrypoints
+            .into_iter()
+            .filter(|(c, _)| c.is_seven_bit())
+            .flat_map(|(_, e)| self.instructions_for_entrypoint(e))
+            .filter(|(_, instruction)| instruction.right_char.is_seven_bit())
+            .filter_map(|(_, instruction)| match instruction.operation {
+                Operation::Ligature { char_to_insert, .. } => Some(char_to_insert),
+                _ => None,
+            })
+            .all(|c| c.is_seven_bit())
     }
 
     pub fn validate_and_fix<I, T>(
