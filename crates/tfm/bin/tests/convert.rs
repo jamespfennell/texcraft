@@ -396,6 +396,12 @@ convert_pltotf_tests!(
     (mt2exa, "data/ctan/mt2exa.tfm", "data/ctan/mt2exa.pl", "",),
     (copti, "data/ctan/copti.tfm", "data/ctan/copti.pl", "",),
     (
+        bxjatoucs_cid,
+        "data/ctan/bxjatoucs-cid.tfm",
+        "data/ctan/bxjatoucs-cid.pl",
+        include_str!["data/ctan/bxjatoucs-cid.stderr.txt"],
+    ),
+    (
         xcharter_bolditalic_tlf_ot1g,
         "data/ctan/XCharter-BoldItalic-tlf-ot1G.tfm",
         "data/ctan/XCharter-BoldItalic-tlf-ot1G.pl",

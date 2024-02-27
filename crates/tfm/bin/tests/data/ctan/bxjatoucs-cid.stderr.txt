@@ -1,0 +1,213 @@
+This PARAMETER index is too big for my present table size (line 264).
+   (PARAMETER D 255 
+                    R 0.000046)  
+This value shouldn't exceed 255 (line 265).
+   (PARAMETER D 256 
+                    R 0.000047)  
+PARAMETER index must not be zero (line 265).
+   (PARAMETER D 256 R 0.00004 
+                             7)  
+This value shouldn't exceed 255 (line 266).
+   (PARAMETER D 257 
+                    R 0.000048)  
+PARAMETER index must not be zero (line 266).
+   (PARAMETER D 257 R 0.00004 
+                             8)  
+This value shouldn't exceed 255 (line 267).
+   (PARAMETER D 258 
+                    R 0.000049)  
+PARAMETER index must not be zero (line 267).
+   (PARAMETER D 258 R 0.00004 
+                             9)  
+This value shouldn't exceed 255 (line 268).
+   (PARAMETER D 259 
+                    R 0.00005)  
+PARAMETER index must not be zero (line 268).
+   (PARAMETER D 259 R 0.0000 
+                            5)  
+This value shouldn't exceed 255 (line 269).
+   (PARAMETER D 260 
+                    R 0.000051)  
+PARAMETER index must not be zero (line 269).
+   (PARAMETER D 260 R 0.00005 
+                             1)  
+This value shouldn't exceed 255 (line 270).
+   (PARAMETER D 261 
+                    R 0.0000515)  
+PARAMETER index must not be zero (line 270).
+   (PARAMETER D 261 R 0.000051 
+                              5)  
+This value shouldn't exceed 255 (line 271).
+   (PARAMETER D 262 
+                    R 0.000052)  
+PARAMETER index must not be zero (line 271).
+   (PARAMETER D 262 R 0.00005 
+                             2)  
+This value shouldn't exceed 255 (line 272).
+   (PARAMETER D 263 
+                    R 0.000053)  
+PARAMETER index must not be zero (line 272).
+   (PARAMETER D 263 R 0.00005 
+                             3)  
+This value shouldn't exceed 255 (line 273).
+   (PARAMETER D 264 
+                    R 0.000054)  
+PARAMETER index must not be zero (line 273).
+   (PARAMETER D 264 R 0.00005 
+                             4)  
+This value shouldn't exceed 255 (line 274).
+   (PARAMETER D 265 
+                    R 0.000055)  
+PARAMETER index must not be zero (line 274).
+   (PARAMETER D 265 R 0.00005 
+                             5)  
+This value shouldn't exceed 255 (line 275).
+   (PARAMETER D 266 
+                    R 0.000056)  
+PARAMETER index must not be zero (line 275).
+   (PARAMETER D 266 R 0.00005 
+                             6)  
+This value shouldn't exceed 255 (line 276).
+   (PARAMETER D 267 
+                    R 0.000057)  
+PARAMETER index must not be zero (line 276).
+   (PARAMETER D 267 R 0.00005 
+                             7)  
+This value shouldn't exceed 255 (line 277).
+   (PARAMETER D 268 
+                    R 0.000058)  
+PARAMETER index must not be zero (line 277).
+   (PARAMETER D 268 R 0.00005 
+                             8)  
+This value shouldn't exceed 255 (line 278).
+   (PARAMETER D 269 
+                    R 0.000059)  
+PARAMETER index must not be zero (line 278).
+   (PARAMETER D 269 R 0.00005 
+                             9)  
+This value shouldn't exceed 255 (line 279).
+   (PARAMETER D 270 
+                    R 0.00006)  
+PARAMETER index must not be zero (line 279).
+   (PARAMETER D 270 R 0.0000 
+                            6)  
+This value shouldn't exceed 255 (line 280).
+   (PARAMETER D 271 
+                    R 0.000061)  
+PARAMETER index must not be zero (line 280).
+   (PARAMETER D 271 R 0.00006 
+                             1)  
+This value shouldn't exceed 255 (line 281).
+   (PARAMETER D 272 
+                    R 0.000062)  
+PARAMETER index must not be zero (line 281).
+   (PARAMETER D 272 R 0.00006 
+                             2)  
+This value shouldn't exceed 255 (line 282).
+   (PARAMETER D 273 
+                    R 0.000063)  
+PARAMETER index must not be zero (line 282).
+   (PARAMETER D 273 R 0.00006 
+                             3)  
+This value shouldn't exceed 255 (line 283).
+   (PARAMETER D 274 
+                    R 0.000064)  
+PARAMETER index must not be zero (line 283).
+   (PARAMETER D 274 R 0.00006 
+                             4)  
+This value shouldn't exceed 255 (line 284).
+   (PARAMETER D 275 
+                    R 0.000065)  
+PARAMETER index must not be zero (line 284).
+   (PARAMETER D 275 R 0.00006 
+                             5)  
+This value shouldn't exceed 255 (line 285).
+   (PARAMETER D 276 
+                    R 0.000066)  
+PARAMETER index must not be zero (line 285).
+   (PARAMETER D 276 R 0.00006 
+                             6)  
+This value shouldn't exceed 255 (line 286).
+   (PARAMETER D 277 
+                    R 0.000067)  
+PARAMETER index must not be zero (line 286).
+   (PARAMETER D 277 R 0.00006 
+                             7)  
+This value shouldn't exceed 255 (line 287).
+   (PARAMETER D 278 
+                    R 0.000068)  
+PARAMETER index must not be zero (line 287).
+   (PARAMETER D 278 R 0.00006 
+                             8)  
+This value shouldn't exceed 255 (line 288).
+   (PARAMETER D 279 
+                    R 0.000069)  
+PARAMETER index must not be zero (line 288).
+   (PARAMETER D 279 R 0.00006 
+                             9)  
+This value shouldn't exceed 255 (line 289).
+   (PARAMETER D 280 
+                    R 0.00007)  
+PARAMETER index must not be zero (line 289).
+   (PARAMETER D 280 R 0.0000 
+                            7)  
+This value shouldn't exceed 255 (line 290).
+   (PARAMETER D 281 
+                    R 0.000071)  
+PARAMETER index must not be zero (line 290).
+   (PARAMETER D 281 R 0.00007 
+                             1)  
+This value shouldn't exceed 255 (line 291).
+   (PARAMETER D 282 
+                    R 0.000072)  
+PARAMETER index must not be zero (line 291).
+   (PARAMETER D 282 R 0.00007 
+                             2)  
+This value shouldn't exceed 255 (line 292).
+   (PARAMETER D 283 
+                    R 0.0000725)  
+PARAMETER index must not be zero (line 292).
+   (PARAMETER D 283 R 0.000072 
+                              5)  
+This value shouldn't exceed 255 (line 293).
+   (PARAMETER D 284 
+                    R 0.000073)  
+PARAMETER index must not be zero (line 293).
+   (PARAMETER D 284 R 0.00007 
+                             3)  
+This value shouldn't exceed 255 (line 294).
+   (PARAMETER D 285 
+                    R 0.000074)  
+PARAMETER index must not be zero (line 294).
+   (PARAMETER D 285 R 0.00007 
+                             4)  
+This value shouldn't exceed 255 (line 295).
+   (PARAMETER D 286 
+                    R 0.000075)  
+PARAMETER index must not be zero (line 295).
+   (PARAMETER D 286 R 0.00007 
+                             5)  
+This value shouldn't exceed 255 (line 296).
+   (PARAMETER D 287 
+                    R 0.000076)  
+PARAMETER index must not be zero (line 296).
+   (PARAMETER D 287 R 0.00007 
+                             6)  
+This value shouldn't exceed 255 (line 297).
+   (PARAMETER D 288 
+                    R 0.000077)  
+PARAMETER index must not be zero (line 297).
+   (PARAMETER D 288 R 0.00007 
+                             7)  
+This value shouldn't exceed 255 (line 298).
+   (PARAMETER D 289 
+                    R 0.000078)  
+PARAMETER index must not be zero (line 298).
+   (PARAMETER D 289 R 0.00007 
+                             8)  
+This value shouldn't exceed 255 (line 299).
+   (PARAMETER D 290 
+                    R 0.000079)  
+PARAMETER index must not be zero (line 299).
+   (PARAMETER D 290 R 0.00007 
+                             9)  

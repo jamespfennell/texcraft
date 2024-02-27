@@ -673,25 +673,22 @@ mod tests {
                 }),
                 closing_parenthesis_span: 14,
             }],
-            
             vec![ParseError::InvalidCharacter('ä', 12)],
         ),
         (
             trailing_space,
             "(Hello World )",
-            vec![
-                Node {
-                    opening_parenthesis_span: 0,
-                    value: NodeValue::Regular(RegularNodeValue {
-                        key: "Hello".into(),
-                        key_span: 1..6,
-                        data: Some("World ".into()),
-                        data_span: 7..13,
-                        children: vec![].into(),
-                    }),
-                    closing_parenthesis_span: 13,
-                },
-            ],
+            vec![Node {
+                opening_parenthesis_span: 0,
+                value: NodeValue::Regular(RegularNodeValue {
+                    key: "Hello".into(),
+                    key_span: 1..6,
+                    data: Some("World ".into()),
+                    data_span: 7..13,
+                    children: vec![].into(),
+                }),
+                closing_parenthesis_span: 13,
+            },],
             vec![],
         ),
     );

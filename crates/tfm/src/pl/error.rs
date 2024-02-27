@@ -67,104 +67,168 @@ pub enum ParseError {
     },
     InfiniteLoopInLigKernProgram(InfiniteLoopError),
     NotReallySevenBitSafe,
+    ParameterNumberTooBig {
+        span: std::ops::Range<usize>,
+    },
+    ParameterNumberIsZero {
+        span: std::ops::Range<usize>,
+    },
 }
 
 impl ParseError {
-    pub fn pltotf_message(&self) -> String {
+    pub fn pltotf_message(&self, pl_source: &str) -> String {
         use ParseError::*;
+        let ctx = |a, b| add_pltotf_error_context(pl_source, a, b);
         match self {
-            ParseError::InvalidCharacter(c, _) => {
+            InvalidCharacter(c, _) => {
                 format!["invalid character {} (U+{:04X})", *c, *c as u32]
             }
-            ParseError::InvalidPropertyName { name, .. } => {
+            InvalidPropertyName { name, .. } => {
                 format!["invalid property name {name}"]
             }
-            ParseError::UnbalancedOpeningParenthesis { .. } => {
+            UnbalancedOpeningParenthesis { .. } => {
                 "file ended before opening parenthesis was closed".to_string()
             }
-            ParseError::JunkInPropertyList { value, .. } => {
+            JunkInPropertyList { value, .. } => {
                 format!["unexpected junk string '{value}' in the middle of a property list",]
             }
-            ParseError::UnexpectedRightParenthesis { .. } => {
-                "unexpected right parenthesis".to_string()
-            }
-            ParseError::InvalidPrefixForInteger { .. } => {
+            UnexpectedRightParenthesis { .. } => "unexpected right parenthesis".to_string(),
+            InvalidPrefixForInteger { .. } => {
                 "invalid prefix for integer constant: an octal 'O' or hexadecimal 'H' is required"
                     .to_string()
             }
-            ParseError::IntegerTooBig { .. } => {
+            IntegerTooBig { .. } => {
                 "integer too big: the largest allowed value is O37777777777 or HFFFFFFF".to_string()
             }
-            ParseError::InvalidOctalDigit { c, .. } => {
+            InvalidOctalDigit { c, .. } => {
                 format!["invalid octal digit {c}: only digits 0 through 7 inclusive may appear"]
             }
-            ParseError::SmallIntegerTooBig { radix, .. } => {
+            SmallIntegerTooBig { radix, span } => {
                 let max = match radix {
                     8 => "0o377",
                     10 => "255",
                     _ => "0xFF,",
                 };
-                format!["integer too big: the largest allowed value is {max}"]
+                ctx(format!["This value shouldn't exceed {max}"], span.end)
             }
-            ParseError::InvalidFaceCode { .. } => {
-                "invalid face code; using MRR instead".to_string()
-            }
-            ParseError::InvalidCharacterForSmallInteger { .. } => {
+            InvalidFaceCode { .. } => "invalid face code; using MRR instead".to_string(),
+            InvalidCharacterForSmallInteger { .. } => {
                 "invalid character; only printable ASCII characters are allowed".to_string()
             }
-            ParseError::InvalidPrefixForSmallInteger { .. } => {
+            InvalidPrefixForSmallInteger { .. } => {
                 "invalid prefix for integer constant: need C/O/D/H/F".to_string()
             }
-            ParseError::InvalidBoolean { .. } => {
-                "invalid boolean: must be TRUE or FALSE".to_string()
-            }
-            ParseError::InvalidHeaderIndex { .. } => {
-                "invalid header index: must be 18 or larger".to_string()
-            }
-            ParseError::DecimalTooLarge { .. } => {
-                "real constants must be less than 2048".to_string()
-            }
-            ParseError::InvalidPrefixForDecimal { .. } => {
+            InvalidBoolean { .. } => "invalid boolean: must be TRUE or FALSE".to_string(),
+            InvalidHeaderIndex { .. } => "invalid header index: must be 18 or larger".to_string(),
+            DecimalTooLarge { .. } => "real constants must be less than 2048".to_string(),
+            InvalidPrefixForDecimal { .. } => {
                 "invalid prefix for decimal constant: need R or D".to_string()
             }
-            ParseError::LigTableTooLong { .. } => {
-                "Sorry, LIGTABLE to long for me to handle".to_string()
-            }
+            LigTableTooLong { .. } => "Sorry, LIGTABLE to long for me to handle".to_string(),
             NextLargerWarning { warning, span: _ } => warning.pltotf_message(),
             InfiniteLoopInLigKernProgram(err) => {
                 format!("{}\nAll ligatures will be cleared.", err.pltotf_message())
             }
             NotReallySevenBitSafe => "The font is not really seven-bit-safe!".to_string(),
+            ParameterNumberTooBig { span } => ctx(
+                "This PARAMETER index is too big for my present table size".into(),
+                span.end,
+            ),
+            ParameterNumberIsZero { span } => {
+                ctx("PARAMETER index must not be zero".into(), span.end - 1)
+            }
         }
     }
 
-    pub fn pl_to_tf_section(&self) -> (u8, u8) {
+    pub fn title(&self) -> String {
         use ParseError::*;
         match self {
-            ParseError::InvalidCharacter(_, _) => (32, 1),
-            ParseError::InvalidPropertyName { .. } => (49, 1),
-            ParseError::UnbalancedOpeningParenthesis { .. } => (33, 1),
-            ParseError::JunkInPropertyList { .. } => (83, 1),
-            ParseError::UnexpectedRightParenthesis { .. } => (82, 1),
-            ParseError::InvalidPrefixForInteger { .. } => (59, 1),
-            ParseError::IntegerTooBig { .. } => (60, 1),
-            ParseError::InvalidOctalDigit { .. } => (60, 2),
-            ParseError::SmallIntegerTooBig { radix, .. } => match radix {
+            InvalidCharacter(c, _) => {
+                format!["invalid character {} (U+{:04X})", *c, *c as u32]
+            }
+            InvalidPropertyName { name, .. } => {
+                format!["invalid property name {name}"]
+            }
+            UnbalancedOpeningParenthesis { .. } => {
+                "file ended before opening parenthesis was closed".to_string()
+            }
+            JunkInPropertyList { value, .. } => {
+                format!["unexpected junk string '{value}' in the middle of a property list",]
+            }
+            UnexpectedRightParenthesis { .. } => "unexpected right parenthesis".to_string(),
+            InvalidPrefixForInteger { .. } => {
+                "invalid prefix for integer constant: an octal 'O' or hexadecimal 'H' is required"
+                    .to_string()
+            }
+            IntegerTooBig { .. } => {
+                "integer too big: the largest allowed value is O37777777777 or HFFFFFFF".to_string()
+            }
+            InvalidOctalDigit { c, .. } => {
+                format!["invalid octal digit {c}: only digits 0 through 7 inclusive may appear"]
+            }
+            SmallIntegerTooBig { radix, .. } => {
+                let max = match radix {
+                    8 => "0o377",
+                    10 => "255",
+                    _ => "0xFF,",
+                };
+                format!["This value shouldn't exceed {max} (line X)"]
+            }
+            InvalidFaceCode { .. } => "invalid face code; using MRR instead".to_string(),
+            InvalidCharacterForSmallInteger { .. } => {
+                "invalid character; only printable ASCII characters are allowed".to_string()
+            }
+            InvalidPrefixForSmallInteger { .. } => {
+                "invalid prefix for integer constant: need C/O/D/H/F".to_string()
+            }
+            InvalidBoolean { .. } => "invalid boolean: must be TRUE or FALSE".to_string(),
+            InvalidHeaderIndex { .. } => "invalid header index: must be 18 or larger".to_string(),
+            DecimalTooLarge { .. } => "real constants must be less than 2048".to_string(),
+            InvalidPrefixForDecimal { .. } => {
+                "invalid prefix for decimal constant: need R or D".to_string()
+            }
+            LigTableTooLong { .. } => "Sorry, LIGTABLE to long for me to handle".to_string(),
+            NextLargerWarning { warning, span: _ } => warning.pltotf_message(),
+            InfiniteLoopInLigKernProgram(err) => {
+                format!("{}\nAll ligatures will be cleared.", err.pltotf_message())
+            }
+            NotReallySevenBitSafe => "The font is not really seven-bit-safe!".to_string(),
+            ParameterNumberTooBig { span: _ } => {
+                "This parameter number is too big: the maximum is 254".to_string()
+            }
+            ParameterNumberIsZero { span: _ } => "A parameter number cannot be 0".to_string(),
+        }
+    }
+
+    pub fn pltotf_section(&self) -> (u8, u8) {
+        use ParseError::*;
+        match self {
+            InvalidCharacter(_, _) => (32, 1),
+            InvalidPropertyName { .. } => (49, 1),
+            UnbalancedOpeningParenthesis { .. } => (33, 1),
+            JunkInPropertyList { .. } => (83, 1),
+            UnexpectedRightParenthesis { .. } => (82, 1),
+            InvalidPrefixForInteger { .. } => (59, 1),
+            IntegerTooBig { .. } => (60, 1),
+            InvalidOctalDigit { .. } => (60, 2),
+            SmallIntegerTooBig { radix, .. } => match radix {
                 8 => (54, 1),
                 10 => (53, 1),
                 _ => (55, 1),
             },
-            ParseError::InvalidFaceCode { .. } => (56, 1),
-            ParseError::InvalidCharacterForSmallInteger { .. } => (52, 1),
-            ParseError::InvalidPrefixForSmallInteger { .. } => (51, 1),
-            ParseError::InvalidBoolean { .. } => (90, 1),
-            ParseError::InvalidHeaderIndex { .. } => (91, 1),
-            ParseError::DecimalTooLarge { .. } => (64, 1),
-            ParseError::InvalidPrefixForDecimal { .. } => (62, 1),
-            ParseError::LigTableTooLong { .. } => (101, 1),
+            InvalidFaceCode { .. } => (56, 1),
+            InvalidCharacterForSmallInteger { .. } => (52, 1),
+            InvalidPrefixForSmallInteger { .. } => (51, 1),
+            InvalidBoolean { .. } => (90, 1),
+            InvalidHeaderIndex { .. } => (91, 1),
+            DecimalTooLarge { .. } => (64, 1),
+            InvalidPrefixForDecimal { .. } => (62, 1),
+            LigTableTooLong { .. } => (101, 1),
             NextLargerWarning { warning, span: _ } => (warning.pltotf_section(), 1),
             InfiniteLoopInLigKernProgram(err) => (err.pltotf_section(), 1),
             NotReallySevenBitSafe => (110, 1),
+            ParameterNumberTooBig { .. } => (93, 2),
+            ParameterNumberIsZero { .. } => (93, 1),
         }
     }
 
@@ -172,6 +236,32 @@ impl ParseError {
     pub fn ariadne_report(&self) -> ariadne::Report {
         report::build(self)
     }
+}
+
+fn add_pltotf_error_context(pl_source: &str, error_message: String, error_point: usize) -> String {
+    let mut line_index = 0;
+    let mut line_offset = 0;
+    for (i, c) in pl_source.chars().enumerate() {
+        if error_point == i {
+            break;
+        }
+        line_offset += c.len_utf8();
+        if c == '\n' {
+            line_index += 1;
+            line_offset = 0;
+        }
+    }
+    let line = pl_source
+        .lines()
+        .nth(line_index)
+        .expect("we know there are line_index+1 lines in the file");
+    let start = &line[..line_offset];
+    let end = &line[line_offset..];
+    let line_number = line_index + 1;
+    format!(
+        "{error_message} (line {line_number}).\n{start} \n{}{end}  ",
+        " ".repeat(start.len())
+    )
 }
 
 #[cfg(feature = "ariadne")]
@@ -185,37 +275,33 @@ mod report {
         let builder = Report::build(ReportKind::Error, (), 3)
             .with_code(format![
                 "{}.{}",
-                error.pl_to_tf_section().0,
-                error.pl_to_tf_section().1
+                error.pltotf_section().0,
+                error.pltotf_section().1
             ])
-            .with_message(error.pltotf_message());
+            .with_message(error.title());
         use ParseError::*;
         let builder = match error {
-            ParseError::InvalidCharacter(c, offset) => {
+            InvalidCharacter(c, offset) => {
                 let range = *offset..*offset + c.len_utf8();
                 builder
-                    .with_label(
-                        Label::new(range)
-                            .with_message(error.pltotf_message())
-                            .with_color(a),
-                    )
+                    .with_label(Label::new(range).with_message(error.title()).with_color(a))
                     .with_note("property list files can only contain printable ASCII characters")
             }
-            ParseError::InvalidPropertyName {
+            InvalidPropertyName {
                 name_span,
                 allowed_property_names,
                 ..
             } => builder
                 .with_label(
                     Label::new(name_span.clone())
-                        .with_message(error.pltotf_message())
+                        .with_message(error.title())
                         .with_color(a),
                 )
                 .with_note(format![
                     "the following property names are allowed: {}",
                     allowed_property_names.join(", ")
                 ]),
-            ParseError::UnbalancedOpeningParenthesis {
+            UnbalancedOpeningParenthesis {
                 opening_parenthesis_span,
                 end_span,
             } => {
@@ -231,30 +317,33 @@ mod report {
                     )
                     .with_note("a additional closing parenthesis was added at the end of the file")
             }
-            ParseError::JunkInPropertyList { span, .. } => builder
+            JunkInPropertyList { span, .. } => builder
                 .with_label(Label::new(span.clone()).with_message("unexpected junk string"))
                 .with_note("the string was ignored"),
-            ParseError::UnexpectedRightParenthesis { span, .. } => builder
+            UnexpectedRightParenthesis { span, .. } => builder
                 .with_label(
                     Label::new(*span..*span + 1).with_message("unexpected right parenthesis"),
                 )
                 .with_help("all right parentheses must be matched by an opening left parenthesis")
                 .with_note("the parenthesis was ignored"),
-            ParseError::InvalidOctalDigit { c: _, span } => builder
-                .with_label(Label::new(*span..*span + 1).with_message(error.pltotf_message())),
-            ParseError::InvalidPrefixForInteger { span }
-            | ParseError::IntegerTooBig { span }
-            | ParseError::SmallIntegerTooBig { span, .. }
-            | ParseError::InvalidFaceCode { span }
-            | ParseError::InvalidCharacterForSmallInteger { span }
-            | ParseError::InvalidBoolean { span }
-            | ParseError::InvalidHeaderIndex { span }
-            | ParseError::DecimalTooLarge { span }
-            | ParseError::InvalidPrefixForDecimal { span }
-            | ParseError::InvalidPrefixForSmallInteger { span }
+            InvalidOctalDigit { c: _, span } => {
+                builder.with_label(Label::new(*span..*span + 1).with_message(error.title()))
+            }
+            InvalidPrefixForInteger { span }
+            | IntegerTooBig { span }
+            | SmallIntegerTooBig { span, .. }
+            | InvalidFaceCode { span }
+            | InvalidCharacterForSmallInteger { span }
+            | InvalidBoolean { span }
+            | InvalidHeaderIndex { span }
+            | DecimalTooLarge { span }
+            | InvalidPrefixForDecimal { span }
+            | InvalidPrefixForSmallInteger { span }
             | NextLargerWarning { warning: _, span }
-            | ParseError::LigTableTooLong { span } => {
-                builder.with_label(Label::new(span.clone()).with_message(error.pltotf_message()))
+            | ParameterNumberTooBig { span }
+            | ParameterNumberIsZero { span }
+            | LigTableTooLong { span } => {
+                builder.with_label(Label::new(span.clone()).with_message(error.title()))
             }
             InfiniteLoopInLigKernProgram(_) | NotReallySevenBitSafe => builder,
         };

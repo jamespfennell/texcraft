@@ -68,7 +68,7 @@ impl Cli {
         // Conversion
         let (pl_file, warnings) = tfm::pl::File::from_pl_source_code(&pl_data);
         for warning in warnings {
-            eprintln!("{}", warning.pltotf_message());
+            eprintln!("{}", warning.pltotf_message(&pl_data));
         }
         let tfm_file = tfm::format::File::from_pl_file(&pl_file);
         let tfm_output: Vec<u8> = tfm_file.serialize();

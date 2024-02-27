@@ -2,7 +2,7 @@
 
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
-    num::NonZeroU8,
+    num::{NonZeroI16, NonZeroU8},
 };
 
 pub mod format;
@@ -279,15 +279,44 @@ impl From<Face> for u8 {
 pub struct Params(pub Vec<Number>);
 
 impl Params {
-    pub fn set(&mut self, number: usize, value: Number) {
-        if self.0.len() <= number {
-            self.0.resize(number, Default::default());
+    pub fn set(&mut self, number: ParameterNumber, value: Number) {
+        let i = number.index();
+        let min_len = number.get() as usize;
+        if self.0.len() <= min_len {
+            self.0.resize(min_len, Default::default());
         }
-        self.0[number - 1] = value;
+        self.0[i] = value;
     }
 
     pub fn set_named(&mut self, named_param: NamedParam, value: Number) {
-        self.set(named_param.number() as usize, value)
+        self.set(named_param.number(), value)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParameterNumber(NonZeroI16);
+
+impl ParameterNumber {
+    pub fn new(u: i16) -> Option<Self> {
+        if u < 0 {
+            None
+        } else {
+            match u.try_into() {
+                Ok(u) => Some(Self(u)),
+                Err(_) => None,
+            }
+        }
+    }
+    fn get(&self) -> i16 {
+        self.0.get()
+    }
+    fn index(&self) -> usize {
+        self.0
+            .get()
+            .checked_sub(1)
+            .expect("payload is non-zero")
+            .try_into()
+            .expect("payload is non-negative")
     }
 }
 
@@ -325,8 +354,8 @@ pub enum NamedParam {
 }
 
 impl NamedParam {
-    pub fn number(&self) -> u8 {
-        match self {
+    pub fn number(&self) -> ParameterNumber {
+        let i = match self {
             NamedParam::Slant => 1,
             NamedParam::Space => 2,
             NamedParam::Stretch => 3,
@@ -355,7 +384,8 @@ impl NamedParam {
             NamedParam::BigOpSpacing3 => 11,
             NamedParam::BigOpSpacing4 => 12,
             NamedParam::BigOpSpacing5 => 13,
-        }
+        };
+        ParameterNumber(i.try_into().expect("all numbers are in range"))
     }
 }
 

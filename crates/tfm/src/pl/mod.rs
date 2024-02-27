@@ -14,7 +14,8 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::{
     format::{self, ExtensibleRecipe},
-    ligkern, Char, Header, NamedParam, NextLargerProgram, NextLargerProgramWarning, Number, Params,
+    ligkern, Char, Header, NamedParam, NextLargerProgram, NextLargerProgramWarning, Number,
+    ParameterNumber, Params,
 };
 
 pub mod ast;
@@ -192,8 +193,7 @@ impl File {
                                 file.params.set_named(named_param, v.data);
                             }
                             ast::FontDimension::IndexedParam(v) => {
-                                // TODO: param=0 not allowed PLtoTF.2014.93
-                                file.params.set(v.left.0 as usize, v.right);
+                                file.params.set(v.left, v.right);
                             }
                             ast::FontDimension::Comment(_) => {}
                         }
@@ -547,6 +547,7 @@ impl File {
                 let i: i16 = (i + 1)
                     .try_into()
                     .expect("cannot be more than i16::MAX parameters");
+                // TODO: should just drop bigger parameters? Or encode this invariant in the params type
                 // TFtoPL.2014.61
                 // TODO: check that each parameter *except* SLANT is in the range [-16.0, 16.0] per TFtoPL.2014.60
                 let named_param = match (i, font_type) {
@@ -579,9 +580,8 @@ impl File {
                     (12, FontType::TexMathEx) => NamedParam::BigOpSpacing4,
                     (13, FontType::TexMathEx) => NamedParam::BigOpSpacing5,
                     _ => {
-                        return ast::FontDimension::IndexedParam(
-                            (ast::ParameterIndex(i), param).into(),
-                        );
+                        let parameter_number = ParameterNumber::new(i).expect("i is non-negative");
+                        return ast::FontDimension::IndexedParam((parameter_number, param).into());
                     }
                 };
                 ast::FontDimension::NamedParam(named_param, param.into())
