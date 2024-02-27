@@ -495,7 +495,7 @@ impl Header {
     fn deserialize(mut b: &[u8]) -> Self {
         let checksum = Some(u32::deserialize(b));
         b = &b[4..];
-        let design_size = Number::deserialize(b);
+        let design_size = Number::deserialize(b).into();
         b = b.get(4..).unwrap_or(&[0; 0]);
         let character_coding_scheme = deserialize_string::<40>(b);
         b = b.get(40..).unwrap_or(&[0; 0]);
@@ -851,7 +851,7 @@ mod tests {
             Ok(File {
                 header: Header {
                     checksum: Some(7),
-                    design_size: Number(11),
+                    design_size: Number(11).into(),
                     character_coding_scheme: Some("A".repeat(39)),
                     font_family: Some("B".repeat(19)),
                     seven_bit_safe: Some(false),
@@ -904,7 +904,7 @@ mod tests {
             File {
                 header: Header {
                     checksum: Some(7),
-                    design_size: Number(11),
+                    design_size: Number(11).into(),
                     character_coding_scheme: None,
                     font_family: None,
                     seven_bit_safe: None,
@@ -927,7 +927,7 @@ mod tests {
             File {
                 header: Header {
                     checksum: Some(7),
-                    design_size: Number(11),
+                    design_size: Number(11).into(),
                     character_coding_scheme: Some("ABC".into()),
                     font_family: Some("DEF".into()),
                     seven_bit_safe: Some(true),

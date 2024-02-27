@@ -4,7 +4,7 @@ pub fn serialize(file: &File) -> Vec<u8> {
     // We leave space at the start of the buffer for the sub file sizes section.
     // This will be populated at the end after we determine all the section lengths.
     let mut b = vec![0_u8; 24];
-    let mut sub_files_sizes = SubFileSizes {
+    let mut sub_file_sizes = SubFileSizes {
         lf: 0,
         lh: serialize_header(&file.header, &mut b),
         bc: match file.char_info_bounds() {
@@ -31,8 +31,8 @@ pub fn serialize(file: &File) -> Vec<u8> {
         ne: serialize_section(&file.extensible_chars, &mut b, None),
         np: serialize_section(&file.params.0, &mut b, None),
     };
-    sub_files_sizes.lf = sub_files_sizes.valid_lf();
-    let sfs_b: [u8; 24] = sub_files_sizes.into();
+    sub_file_sizes.lf = sub_file_sizes.valid_lf();
+    let sfs_b: [u8; 24] = sub_file_sizes.into();
     for (i, byte) in sfs_b.into_iter().enumerate() {
         b[i] = byte;
     }
@@ -202,7 +202,7 @@ fn serialize_string(s: &Option<String>, size: u8, b: &mut Vec<u8>) {
 
 fn serialize_header(header: &Header, b: &mut Vec<u8>) -> i16 {
     header.checksum.unwrap_or_default().serialize(b, None);
-    header.design_size.serialize(b, None);
+    header.design_size.get().serialize(b, None);
     serialize_string(&header.character_coding_scheme, 39, b);
     serialize_string(&header.font_family, 19, b);
     if header.seven_bit_safe == Some(true) {

@@ -47,6 +47,7 @@
         "jobname",
         "Klad",
         "lastpenalty",
+        "libfuzzer",
         "ligkern",
         "LIGTABLE",
         "linepenalty",

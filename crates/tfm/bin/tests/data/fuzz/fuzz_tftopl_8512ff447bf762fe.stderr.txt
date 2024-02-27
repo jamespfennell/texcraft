@@ -1,0 +1,2 @@
+Bad TFM file: Design size too small!
+I've set it to 10 points.

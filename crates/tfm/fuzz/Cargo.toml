@@ -1,0 +1,22 @@
+[package]
+name = "texcraft-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+tfm = { path = ".." }
+tempfile = "3.9.0"
+similar-asserts = "1.5.0"
+
+[[bin]]
+name = "fuzz_tftopl"
+path = "fuzz_targets/fuzz_tftopl.rs"
+test = false
+doc = false
+bench = false

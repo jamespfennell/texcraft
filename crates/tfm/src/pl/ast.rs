@@ -4,7 +4,9 @@
 
 use super::cst;
 use super::error::ParseError;
-use crate::{ligkern::lang::PostLigOperation, Char, Face, NamedParam, Number, ParameterNumber};
+use crate::{
+    ligkern::lang::PostLigOperation, Char, DesignSize, Face, NamedParam, Number, ParameterNumber,
+};
 use std::ops::Range;
 
 /// Abstract syntax tree for property list files
@@ -305,7 +307,7 @@ pub enum Root {
     ///     the design size in the TFM file is ignored and effectively replaced by 15 points;
     ///     but if one simply says `\font\A=cmr10` the stated design size is used.
     /// This quantity is always in units of printer's points.
-    DesignSize(SingleValue<Number>),
+    DesignSize(SingleValue<DesignSize>),
 
     /// The design units specifies how many units equals the design size
     ///     (or the eventual ‘at’ size, if the font is being scaled).
@@ -1167,6 +1169,19 @@ impl Parse for Number {
     }
 }
 
+impl Parse for DesignSize {
+    fn parse(input: &mut Input) -> (Self, Range<usize>) {
+        let (n, r) = Number::parse(input);
+        (n.into(), r)
+    }
+    fn to_string(self, opts: &LowerOpts) -> Option<String> {
+        match self {
+            DesignSize::Valid(n) => Parse::to_string(n, opts),
+            DesignSize::Invalid => Some("D 10".to_string()),
+        }
+    }
+}
+
 impl Parse for Option<Number> {
     fn parse(input: &mut Input) -> (Self, Range<usize>) {
         let (n, r) = Number::parse(input);
@@ -1436,7 +1451,7 @@ mod tests {
             fix_word_integer,
             r"(DESIGNSIZE D 1)",
             vec![Root::DesignSize(SingleValue {
-                data: Number::UNITY,
+                data: Number::UNITY.into(),
                 data_span: 12..15,
             })],
             vec![],
@@ -1445,7 +1460,7 @@ mod tests {
             fix_word_decimal,
             r"(DESIGNSIZE D 11.5)",
             vec![Root::DesignSize(SingleValue {
-                data: Number::UNITY * 23 / 2,
+                data: (Number::UNITY * 23 / 2).into(),
                 data_span: 12..18,
             })],
             vec![],
@@ -1454,7 +1469,7 @@ mod tests {
             fix_word_negative,
             r"(DESIGNSIZE D -11.5)",
             vec![Root::DesignSize(SingleValue {
-                data: Number::UNITY * -23 / 2,
+                data: (Number::UNITY * -23 / 2).into(),
                 data_span: 12..19,
             })],
             vec![],
@@ -1463,7 +1478,7 @@ mod tests {
             fix_word_too_big_1,
             r"(DESIGNSIZE D 2049.1)",
             vec![Root::DesignSize(SingleValue {
-                data: Number::ZERO,
+                data: Number::ZERO.into(),
                 data_span: 12..20
             })],
             vec![ParseError::DecimalTooLarge { span: 14..20 }],
@@ -1472,7 +1487,7 @@ mod tests {
             fix_word_too_big_2,
             r"(DESIGNSIZE D 2047.9999999)",
             vec![Root::DesignSize(SingleValue {
-                data: Number::UNITY,
+                data: Number::UNITY.into(),
                 data_span: 12..26,
             })],
             vec![ParseError::DecimalTooLarge { span: 14..26 }],
@@ -1481,7 +1496,7 @@ mod tests {
             fix_word_invalid_prefix,
             r"(DESIGNSIZE W 2047.9999999)",
             vec![Root::DesignSize(SingleValue {
-                data: Number::ZERO,
+                data: Number::ZERO.into(),
                 data_span: 12..13
             })],
             vec![ParseError::InvalidPrefixForDecimal { span: 12..13 }],
@@ -1539,7 +1554,7 @@ mod tests {
                     data_span: 78..83,
                 }),
                 Root::DesignSize(SingleValue {
-                    data: Number::UNITY * 10,
+                    data: (Number::UNITY * 10).into(),
                     data_span: 109..113,
                 }),
                 Root::DesignUnits(SingleValue {

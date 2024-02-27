@@ -4,7 +4,9 @@ mod common;
 
 fn main() {
     if let Err(err) = Cli::parse().run() {
-        eprintln!("{err}");
+        if !err.is_empty() {
+            eprintln!("{err}");
+        }
         std::process::exit(1);
     }
 }
@@ -70,45 +72,22 @@ impl Cli {
         };
 
         // Conversion
-        let (tfm_file_or, warnings) = tfm::format::File::deserialize(&tfm_data);
-        for warning in &warnings {
-            eprintln!("{}", warning.tftopl_message())
+        let output = tfm::algorithms::tfm_to_pl(&tfm_data, &|pl_file| {
+            self.charcode_format
+                .to_display_format(&pl_file.header.character_coding_scheme)
+        })
+        .unwrap();
+        eprint!("{}", output.error_messages);
+        if !output.success {
+            return Err("".to_string());
         }
-        let tfm_file = match tfm_file_or {
-            Ok(tfm_file) => tfm_file,
-            Err(err) => {
-                return Err(format![
-                    "{}\nSorry, but I can't go on; are you sure this is a TFM?",
-                    err.tftopl_message()
-                ])
-            }
-        };
-        let pl_file = tfm::pl::File::from_tfm_file(tfm_file);
-        let tfm_modified = warnings
-            .iter()
-            .map(tfm::format::Warning::tfm_file_modified)
-            .any(|t| t);
-        let suffix = if tfm_modified {
-            "(COMMENT THE TFM FILE WAS BAD, SO THE DATA HAS BEEN CHANGED!)\n"
-        } else {
-            ""
-        };
-        let pl_output = format![
-            "{}{}",
-            pl_file.display(
-                3,
-                self.charcode_format
-                    .to_display_format(&pl_file.header.character_coding_scheme)
-            ),
-            suffix
-        ];
 
         // Output
         match self.pl_file_path {
-            None => print!("{pl_output}"),
+            None => print!("{}", output.pl_data),
             Some(pl_file_path) => {
                 let pl_file_path = with_default_file_extension(pl_file_path, "pl");
-                if let Err(err) = std::fs::write(&pl_file_path, pl_output) {
+                if let Err(err) = std::fs::write(&pl_file_path, output.pl_data) {
                     return Err(format!(
                         "Failed to write file `{}`: {}",
                         pl_file_path.display(),

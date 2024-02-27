@@ -28,6 +28,8 @@
 
 # Project governance
 
+- [Fuzz testing guide](fuzzing.md)
+
 - [License information](license.md)
 
 # Texcraft Rust reference

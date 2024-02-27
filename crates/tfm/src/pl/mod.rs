@@ -863,7 +863,7 @@ mod tests {
             "(DESIGNSIZE R 3.0)",
             File {
                 header: Header {
-                    design_size: Number::UNITY * 3,
+                    design_size: (Number::UNITY * 3).into(),
                     ..Header::pl_default()
                 },
                 ..Default::default()

@@ -2,6 +2,8 @@ use super::*;
 use crate::ligkern::lang;
 
 pub enum ValidationWarning {
+    DesignSizeIsTooSmall,
+    DesignSizeIsNegative,
     ParameterIsTooBig(usize),
     /// Unusual number of parameters.
     ///
@@ -36,6 +38,8 @@ impl ValidationWarning {
     pub fn tftopl_message(&self) -> String {
         use ValidationWarning::*;
         match self {
+            DesignSizeIsTooSmall => "Bad TFM file: Design size too small!\nI've set it to 10 points.".to_string(),
+            DesignSizeIsNegative => "Bad TFM file: Design size negative!\nI've set it to 10 points.".to_string(),
             ParameterIsTooBig(i) => format![
                 "Bad TFM file: Parameter {} is too big;\nI have set it to zero.",
                 i
@@ -90,6 +94,7 @@ impl ValidationWarning {
     pub fn tftopl_section(&self) -> u8 {
         use ValidationWarning::*;
         match self {
+            DesignSizeIsNegative | DesignSizeIsTooSmall => 51,
             ParameterIsTooBig(_) => 60,
             UnusualNumberOfParameters { .. } => 59,
             InvalidWidthIndex(_, _) => 79,
@@ -115,7 +120,7 @@ impl ValidationWarning {
     pub fn tfm_file_modified(&self) -> bool {
         use ValidationWarning::*;
         match self {
-            ParameterIsTooBig(_) => true,
+            DesignSizeIsNegative | DesignSizeIsTooSmall | ParameterIsTooBig(_) => true,
             UnusualNumberOfParameters { .. } => false,
             InvalidWidthIndex(_, _)
             | InvalidHeightIndex(_, _)
@@ -139,6 +144,15 @@ impl ValidationWarning {
 
 pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
     let mut warnings = vec![];
+
+    if file.header.design_size.get() < Number::ZERO {
+        warnings.push(ValidationWarning::DesignSizeIsNegative);
+        file.header.design_size = DesignSize::Invalid;
+    }
+    if file.header.design_size.get() < Number::UNITY {
+        warnings.push(ValidationWarning::DesignSizeIsTooSmall);
+        file.header.design_size = DesignSize::Invalid;
+    }
 
     for (i, elem) in file.params.0.iter_mut().enumerate() {
         if i == 0 {

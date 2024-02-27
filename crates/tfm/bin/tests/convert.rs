@@ -30,11 +30,11 @@ fn run_tfm_to_pl_test(
             stderr
         );
     }
-    let got = String::from_utf8(output.stdout).unwrap();
-    similar_asserts::assert_eq!(texcraft: got, knuth: pl.replace("\r\n", "\n"));
     if let Some(want_stderr) = want_stderr {
         similar_asserts::assert_eq!(texcraft: stderr, knuth: want_stderr.replace("\r\n", "\n"));
     }
+    let got = String::from_utf8(output.stdout).unwrap();
+    similar_asserts::assert_eq!(texcraft: got, knuth: pl.replace("\r\n", "\n"));
 }
 
 type PlToTfmArgsFn = for<'a> fn(pl_file_path: &'a str, tfm_file_path: &'a str) -> Vec<&'a str>;
@@ -541,6 +541,13 @@ convert_tftopl_tests!(
         "data/originals/next-larger-loop-tfm.tfm",
         include_str!("data/originals/next-larger-loop-tfm.pl"),
         include_str!["data/originals/next-larger-loop-tfm.stderr.txt"],
+        true,
+    ),
+    (
+        zero_design_size,
+        "data/fuzz/fuzz_tftopl_8512ff447bf762fe.tfm",
+        include_str!("data/fuzz/fuzz_tftopl_8512ff447bf762fe.pl"),
+        include_str!["data/fuzz/fuzz_tftopl_8512ff447bf762fe.stderr.txt"],
         true,
     ),
 );
