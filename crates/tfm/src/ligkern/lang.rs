@@ -136,9 +136,13 @@ pub enum PostLigOperation {
 
 impl Program {
     pub fn unpack_entrypoint(&self, entrypoint: u8) -> u16 {
-        match self.instructions[entrypoint as usize].operation {
-            Operation::EntrypointRedirect(u_big, _) => u_big,
-            _ => entrypoint as u16,
+        match self.instructions.get(entrypoint as usize) {
+            // Invalid entrypoint
+            None => entrypoint as u16,
+            Some(instruction) => match instruction.operation {
+                Operation::EntrypointRedirect(u_big, _) => u_big,
+                _ => entrypoint as u16,
+            },
         }
     }
 

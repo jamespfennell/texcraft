@@ -550,4 +550,11 @@ convert_tftopl_tests!(
         include_str!["data/fuzz/fuzz_tftopl_8512ff447bf762fe.stderr.txt"],
         true,
     ),
+    (
+        lig_kern_out_of_bounds,
+        "data/fuzz/fuzz_tftopl_794bb506a827c3f.tfm",
+        include_str!("data/fuzz/fuzz_tftopl_794bb506a827c3f.pl"),
+        include_str!["data/fuzz/fuzz_tftopl_794bb506a827c3f.stderr.txt"],
+        true,
+    ),
 );

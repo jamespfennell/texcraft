@@ -1,0 +1,5 @@
+Bad TFM file: Design size too small!
+I've set it to 10 points.
+ 
+Ligature/kern starting index for character '000 is too large;
+so I removed it.

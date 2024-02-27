@@ -23,9 +23,11 @@ fuzz_target!(|input: Input| {
     let knuth_stderr = std::str::from_utf8(&knuth_output.stderr).unwrap();
 
     let texcraft_output = tfm::algorithms::tfm_to_pl(&tfm_bytes, &|_| Default::default()).unwrap();
-    assert!(texcraft_output.success);
 
-    if knuth_stdout == texcraft_output.pl_data && knuth_stderr == texcraft_output.error_messages {
+    if texcraft_output.success
+        && knuth_stdout == texcraft_output.pl_data
+        && knuth_stderr == texcraft_output.error_messages
+    {
         return;
     }
 
@@ -39,7 +41,12 @@ fuzz_target!(|input: Input| {
         std::fs::write(format!["{base_path}.stderr.txt"], knuth_stderr).unwrap();
     }
 
-    similar_asserts::assert_eq!(texraft: texcraft_output.pl_data, knuth: knuth_stdout);
+    assert!(
+        texcraft_output.success,
+        "failed to run Texcraft tftopl: {}",
+        texcraft_output.error_messages
+    );
+    similar_asserts::assert_eq!(texcraft: texcraft_output.pl_data, knuth: knuth_stdout);
     similar_asserts::assert_eq!(texcraft: texcraft_output.error_messages, knuth: knuth_stderr);
 });
 
@@ -62,7 +69,7 @@ impl Input {
             ec: if self.char_infos.is_empty() {
                 0
             } else {
-                append_bytes(&mut b, &self.char_infos, 0, u8::MAX as i16)
+                append_bytes(&mut b, &self.char_infos, 0, 256) - 1
             },
             nw: append_bytes(&mut b, &self.widths, 1, i16::MAX),
             nh: append_bytes(&mut b, &self.heights, 1, i16::MAX),
