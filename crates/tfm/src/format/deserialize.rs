@@ -476,19 +476,20 @@ impl<'a> RawFile<'a> {
     }
 }
 
-fn deserialize_string<const N: u8>(b: &[u8]) -> Option<String> {
-    let len = match b.first() {
-        None => return None,
-        Some(&tfm_len) => {
-            if N - 1 < tfm_len {
-                // TODO: need to return the error in TFtoPL.2014.52.1 here.
-                N - 1
-            } else {
-                tfm_len
+fn deserialize_string(b: &[u8]) -> Option<String> {
+    b.first().map(|tfm_len| {
+        match b.get(1..(*tfm_len as usize) + 1) {
+            Some(b) => {
+                b.iter().map(|u| *u as char).collect()
+            },
+            None => {
+                let first_char = *b.get(1)
+                    .expect("from the calling sites, b.len()E{0,20,40}, and b.len()>=1 because b.first().is_some()");
+                // The string is truncated later in the validate function.
+                format!("{}{}",first_char as char, " ".repeat((*tfm_len as usize)-2))
             }
         }
-    };
-    Some(b[1..=(len as usize)].iter().map(|u| *u as char).collect())
+    })
 }
 
 impl Header {
@@ -497,9 +498,9 @@ impl Header {
         b = &b[4..];
         let design_size = Number::deserialize(b).into();
         b = b.get(4..).unwrap_or(&[0; 0]);
-        let character_coding_scheme = deserialize_string::<40>(b);
+        let character_coding_scheme = deserialize_string(b.get(0..40).unwrap_or(&[0; 0]));
         b = b.get(40..).unwrap_or(&[0; 0]);
-        let font_family = deserialize_string::<20>(b);
+        let font_family = deserialize_string(b.get(0..20).unwrap_or(&[0; 0]));
         b = b.get(20..).unwrap_or(&[0; 0]);
         let seven_bit_safe = b.first().map(|b| *b > 127);
         let face = b.get(3).map(|b| (*b).into());
@@ -839,7 +840,7 @@ mod tests {
             ))
         ),
         (
-            corrupt_string_in_header,
+            corrupt_strings_in_header,
             build_from_header(&[
                 /* checksum */ 0, 0, 0, 7, /* design_size */ 0, 0, 0, 11,
                 /* character_coding_scheme */ 240, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
@@ -852,8 +853,8 @@ mod tests {
                 header: Header {
                     checksum: Some(7),
                     design_size: Number(11).into(),
-                    character_coding_scheme: Some("A".repeat(39)),
-                    font_family: Some("B".repeat(19)),
+                    character_coding_scheme: Some(format!["A{}", " ".repeat(238)]),
+                    font_family: Some(format!["B{}", " ".repeat(98)]),
                     seven_bit_safe: Some(false),
                     face: Some(Face::Other(61)),
                     additional_data: vec![],

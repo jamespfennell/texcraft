@@ -1,0 +1,8 @@
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Parenthesis in string has been changed to slash.
+Bad TFM file: Parenthesis in string has been changed to slash.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Parenthesis in string has been changed to slash.
+Bad TFM file: Parenthesis in string has been changed to slash.

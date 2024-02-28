@@ -495,8 +495,7 @@ impl File {
 
         // First output the header. This is TFtoPL.2014.48-57.
         if let Some(font_family) = &self.header.font_family {
-            let s = sanitize_string(font_family);
-            roots.push(ast::Root::Family(s.into()))
+            roots.push(ast::Root::Family(font_family.clone().into()))
         }
         if let Some(face) = self.header.face {
             roots.push(ast::Root::Face(face.into()))
@@ -526,7 +525,7 @@ impl File {
             }
         };
         if let Some(scheme) = &self.header.character_coding_scheme {
-            roots.push(ast::Root::CodingScheme(sanitize_string(scheme).into()));
+            roots.push(ast::Root::CodingScheme(scheme.clone().into()));
         }
         roots.extend([
             ast::Root::DesignSize(self.header.design_size.into()),
@@ -766,16 +765,6 @@ impl File {
             char_display_format,
         }
     }
-}
-
-fn sanitize_string(s: &str) -> String {
-    s.chars()
-        .map(|c| match c {
-            '(' | ')' => '/', // todo: log a warning
-            ' '..='~' => c.to_ascii_uppercase(),
-            _ => '?', // todo: log a warning
-        })
-        .collect()
 }
 
 /// Helper type for displaying files.

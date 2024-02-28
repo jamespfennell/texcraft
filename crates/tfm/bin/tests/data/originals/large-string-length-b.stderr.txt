@@ -1,0 +1,2 @@
+Bad TFM file: String is too long; I've shortened it drastically.
+Bad TFM file: String is too long; I've shortened it drastically.

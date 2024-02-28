@@ -4,6 +4,9 @@ use crate::ligkern::lang;
 pub enum ValidationWarning {
     DesignSizeIsTooSmall,
     DesignSizeIsNegative,
+    StringIsTooLong(usize),
+    StringContainsParenthesis,
+    StringContainsNonstandardAsciiCharacter(char),
     ParameterIsTooBig(usize),
     /// Unusual number of parameters.
     ///
@@ -40,6 +43,9 @@ impl ValidationWarning {
         match self {
             DesignSizeIsTooSmall => "Bad TFM file: Design size too small!\nI've set it to 10 points.".to_string(),
             DesignSizeIsNegative => "Bad TFM file: Design size negative!\nI've set it to 10 points.".to_string(),
+            StringIsTooLong(_) => "Bad TFM file: String is too long; I've shortened it drastically.".to_string(),
+            StringContainsParenthesis => "Bad TFM file: Parenthesis in string has been changed to slash.".to_string(),
+            StringContainsNonstandardAsciiCharacter(_) => "Bad TFM file: Nonstandard ASCII code has been blotted out.".to_string(),
             ParameterIsTooBig(i) => format![
                 "Bad TFM file: Parameter {} is too big;\nI have set it to zero.",
                 i
@@ -95,6 +101,9 @@ impl ValidationWarning {
         use ValidationWarning::*;
         match self {
             DesignSizeIsNegative | DesignSizeIsTooSmall => 51,
+            StringIsTooLong(_)
+            | StringContainsParenthesis
+            | StringContainsNonstandardAsciiCharacter(_) => 52,
             ParameterIsTooBig(_) => 60,
             UnusualNumberOfParameters { .. } => 59,
             InvalidWidthIndex(_, _) => 79,
@@ -120,7 +129,12 @@ impl ValidationWarning {
     pub fn tfm_file_modified(&self) -> bool {
         use ValidationWarning::*;
         match self {
-            DesignSizeIsNegative | DesignSizeIsTooSmall | ParameterIsTooBig(_) => true,
+            DesignSizeIsNegative
+            | DesignSizeIsTooSmall
+            | StringIsTooLong(_)
+            | StringContainsParenthesis
+            | StringContainsNonstandardAsciiCharacter(_)
+            | ParameterIsTooBig(_) => true,
             UnusualNumberOfParameters { .. } => false,
             InvalidWidthIndex(_, _)
             | InvalidHeightIndex(_, _)
@@ -152,6 +166,13 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
     if file.header.design_size.get() < Number::UNITY {
         warnings.push(ValidationWarning::DesignSizeIsTooSmall);
         file.header.design_size = DesignSize::Invalid;
+    }
+
+    if let Some(scheme) = &mut file.header.character_coding_scheme {
+        validate_string(scheme, 39, &mut warnings);
+    }
+    if let Some(family) = &mut file.header.font_family {
+        validate_string(family, 19, &mut warnings);
     }
 
     for (i, elem) in file.params.0.iter_mut().enumerate() {
@@ -332,4 +353,28 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
     }
 
     warnings
+}
+
+fn validate_string(s: &mut String, max_len: usize, warnings: &mut Vec<ValidationWarning>) {
+    if s.len() > max_len {
+        warnings.push(ValidationWarning::StringIsTooLong(s.len()));
+        *s = format!("{}", s.chars().next().unwrap_or(' '))
+    }
+    let new_s: String = s
+        .chars()
+        .map(|c| match c {
+            '(' | ')' => {
+                warnings.push(ValidationWarning::StringContainsParenthesis);
+                '/'
+            }
+            ' '..='~' => c.to_ascii_uppercase(),
+            _ => {
+                warnings.push(ValidationWarning::StringContainsNonstandardAsciiCharacter(
+                    c,
+                ));
+                '?'
+            }
+        })
+        .collect();
+    *s = new_s;
 }

@@ -557,4 +557,32 @@ convert_tftopl_tests!(
         include_str!["data/fuzz/fuzz_tftopl_794bb506a827c3f.stderr.txt"],
         true,
     ),
+    (
+        truncated_string_in_header,
+        "data/fuzz/fuzz_tftopl_f89546ae5b0f1d5d.tfm",
+        include_str!("data/fuzz/fuzz_tftopl_f89546ae5b0f1d5d.pl"),
+        "",
+        true,
+    ),
+    (
+        header_size_too_big_a,
+        "data/originals/large-string-length-a.tfm",
+        include_str!("data/originals/large-string-length-a.pl"),
+        "",
+        true,
+    ),
+    (
+        header_size_too_big_b,
+        "data/originals/large-string-length-b.tfm",
+        include_str!("data/originals/large-string-length-b.pl"),
+        include_str!("data/originals/large-string-length-b.stderr.txt"),
+        true,
+    ),
+    (
+        bad_chars_in_string,
+        "data/originals/bad-chars-in-string.tfm",
+        include_str!("data/originals/bad-chars-in-string.pl"),
+        include_str!("data/originals/bad-chars-in-string.stderr.txt"),
+        true,
+    ),
 );
