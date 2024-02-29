@@ -27,15 +27,14 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all-features
  
       - name: Build the binaries
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --bins --all-features
+          args: --bin randtex --bin texcraft --bin pltotf --bin tftopl --bin tfmtools
 
-  compile-benchmarks:
+  compile-dev-targets:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -52,6 +51,12 @@ jobs:
         with:
           command: bench 
           args: --no-run
+
+      - name: Compile the fuzz targets
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --bin tfm-fuzz
 
   style-enforcement:
     runs-on: ubuntu-latest

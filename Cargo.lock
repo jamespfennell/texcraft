@@ -1283,17 +1283,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "texcraft-fuzz"
-version = "0.0.0"
-dependencies = [
- "arbitrary",
- "libfuzzer-sys",
- "similar-asserts",
- "tempfile",
- "tfm",
-]
-
-[[package]]
 name = "texcraft-playground"
 version = "0.0.0"
 dependencies = [
@@ -1383,6 +1372,17 @@ dependencies = [
  "assert_cmd",
  "clap 4.4.8",
  "predicates",
+ "similar-asserts",
+ "tempfile",
+ "tfm",
+]
+
+[[package]]
+name = "tfm-fuzz"
+version = "0.0.0"
+dependencies = [
+ "arbitrary",
+ "libfuzzer-sys",
  "similar-asserts",
  "tempfile",
  "tfm",
