@@ -595,10 +595,10 @@ impl File {
             roots.push(ast::Root::BoundaryChar(boundary_char.into()));
         }
         let index_to_labels = {
-            let mut m = HashMap::<u16, Vec<Char>>::new();
+            let mut m = HashMap::<usize, Vec<Char>>::new();
             for (c, tag) in &self.char_tags {
                 if let CharTag::Ligature(index) = tag {
-                    m.entry(*index).or_default().push(*c);
+                    m.entry(*index as usize).or_default().push(*c);
                 }
             }
             m.values_mut().for_each(|v| v.sort());
@@ -614,9 +614,7 @@ impl File {
             ligkern::lang::Operation::KernAtIndex(_) => {
                 panic!("tfm::pl::File lig/kern programs cannot contain `KernAtIndex` operations. Use a `Kern` operation instead.");
             }
-            ligkern::lang::Operation::EntrypointRedirect(_, _) => {
-                panic!("tfm::ligkern::lang::ReachableIter does not return `EntrypointRedirect` operations.");
-            }
+            ligkern::lang::Operation::EntrypointRedirect(_, _) => ast::LigTable::Stop(().into()),
             ligkern::lang::Operation::Ligature {
                 char_to_insert,
                 post_lig_operation,
@@ -628,19 +626,24 @@ impl File {
         };
 
         // When we fixed the (LIGTABLE (LABEL BOUNDARYCHAR) bug, number of failures went from 26652 -> 12004
-        for item in self.lig_kern_program.reachable_iter(
-            self.char_tags
-                .iter()
-                .filter_map(|(c, t)| t.ligature().map(|l| (*c, l))),
-        ) {
-            match item {
-                ligkern::lang::ReachableIterItem::Reachable {
-                    instruction,
-                    index,
-                    skip_override,
-                } => {
+        let mut unreachable_elems: Option<Vec<cst::BalancedElem>> = None;
+        for (index, (reachable, instruction)) in self
+            .lig_kern_program
+            .reachable_iter(
+                self.char_tags
+                    .iter()
+                    .filter_map(|(c, t)| t.ligature().map(|l| (*c, l))),
+            )
+            .zip(&self.lig_kern_program.instructions)
+            .enumerate()
+        {
+            match reachable {
+                ligkern::lang::ReachableIterItem::Reachable { adjusted_skip } => {
+                    if let Some(unreachable_elems) = unreachable_elems.take() {
+                        l.push(ast::LigTable::Comment(unreachable_elems))
+                    }
                     if let Some(e) = self.lig_kern_program.boundary_char_entrypoint {
-                        if e == index {
+                        if e as usize == index {
                             l.push(ast::LigTable::Label(
                                 ast::LigTableLabel::BoundaryChar.into(),
                             ));
@@ -653,7 +656,7 @@ impl File {
                     }
                     let lig_kern_op = build_lig_kern_op(instruction);
                     l.push(lig_kern_op);
-                    match skip_override {
+                    match adjusted_skip {
                         // Note in the first branch here we may push Skip(0)
                         Some(i) => l.push(ast::LigTable::Skip(ast::DecimalU8(i).into())),
                         None => {
@@ -666,19 +669,28 @@ impl File {
                         }
                     }
                 }
-                ligkern::lang::ReachableIterItem::Unreachable(instructions) => {
-                    let mut balanced_elems = vec![cst::BalancedElem::String(
-                        "THIS PART OF THE PROGRAM IS NEVER USED!".to_string(),
-                    )];
-                    for instruction in instructions {
-                        let op = build_lig_kern_op(instruction);
-                        balanced_elems.push(cst::BalancedElem::Vec(
-                            op.into_balanced_elements(char_display_format),
-                        ));
+                ligkern::lang::ReachableIterItem::Unreachable => {
+                    let op = build_lig_kern_op(instruction);
+                    let unreachable_elems = unreachable_elems.get_or_insert_with(|| {
+                        vec![cst::BalancedElem::String(
+                            "THIS PART OF THE PROGRAM IS NEVER USED!".to_string(),
+                        )]
+                    });
+                    if let ast::LigTable::Stop(_) = op {
+                        continue;
                     }
-                    l.push(ast::LigTable::Comment(balanced_elems))
+                    unreachable_elems.push(cst::BalancedElem::Vec(
+                        op.into_balanced_elements(char_display_format),
+                    ));
                 }
+                ligkern::lang::ReachableIterItem::Passthrough => {}
             }
+        }
+        if let Some(mut unreachable_elems) = unreachable_elems.take() {
+            if unreachable_elems.len() == 1 {
+                unreachable_elems.push(cst::BalancedElem::String("".to_string()));
+            }
+            l.push(ast::LigTable::Comment(unreachable_elems))
         }
         if !self.lig_kern_program.instructions.is_empty() {
             roots.push(ast::Root::LigTable(((), l).into()))
@@ -929,6 +941,7 @@ mod tests {
                     instructions: vec![],
                     boundary_char: Some('a'.try_into().unwrap()),
                     boundary_char_entrypoint: None,
+                    passthrough: Default::default(),
                 },
                 ..Default::default()
             },
@@ -961,6 +974,7 @@ mod tests {
                     },],
                     boundary_char: None,
                     boundary_char_entrypoint: None,
+                    passthrough: Default::default(),
                 },
                 ..Default::default()
             },
@@ -984,6 +998,7 @@ mod tests {
                     ],
                     boundary_char: None,
                     boundary_char_entrypoint: None,
+                    passthrough: Default::default(),
                 },
                 ..Default::default()
             },
@@ -1000,6 +1015,7 @@ mod tests {
                     },],
                     boundary_char: None,
                     boundary_char_entrypoint: None,
+                    passthrough: Default::default(),
                 },
                 ..Default::default()
             },
@@ -1021,6 +1037,7 @@ mod tests {
                     },],
                     boundary_char: None,
                     boundary_char_entrypoint: None,
+                    passthrough: Default::default(),
                 },
                 ..Default::default()
             },
@@ -1037,6 +1054,7 @@ mod tests {
                     },],
                     boundary_char: None,
                     boundary_char_entrypoint: None,
+                    passthrough: Default::default(),
                 },
                 char_tags: BTreeMap::from([
                     ('e'.try_into().unwrap(), CharTag::Ligature(0),),
@@ -1057,6 +1075,7 @@ mod tests {
                     },],
                     boundary_char: None,
                     boundary_char_entrypoint: Some(0),
+                    passthrough: Default::default(),
                 },
                 ..Default::default()
             },

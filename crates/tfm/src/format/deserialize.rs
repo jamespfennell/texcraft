@@ -165,11 +165,7 @@ pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
         deserialize_array(raw_file.char_infos);
     File {
         header: Header::deserialize(raw_file.header),
-        smallest_char: if raw_file.begin_char.0 <= raw_file.end_char.0 {
-            Some(raw_file.begin_char)
-        } else {
-            None
-        },
+        smallest_char: raw_file.begin_char,
         char_dimens: (raw_file.begin_char.0..=raw_file.end_char.0)
             .zip(char_infos.iter())
             .filter_map(|(c, (d, _))| (d.clone().map(|d| (Char(c), d))))
@@ -183,13 +179,7 @@ pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
         heights: deserialize_array(raw_file.heights),
         depths: deserialize_array(raw_file.depths),
         italic_corrections: deserialize_array(raw_file.italic_corrections),
-        lig_kern_program: ligkern::lang::Program {
-            instructions: deserialize_array(raw_file.lig_kern_instructions),
-            boundary_char: deserialize_boundary_char(raw_file.lig_kern_instructions),
-            boundary_char_entrypoint: deserialize_boundary_char_entrypoint(
-                raw_file.lig_kern_instructions,
-            ),
-        },
+        lig_kern_program: deserialize_lig_kern_program(raw_file.lig_kern_instructions),
         kerns: deserialize_array(raw_file.kerns),
         extensible_chars: deserialize_array(raw_file.extensible_recipes),
         params: Params(deserialize_array(raw_file.params)),
@@ -517,32 +507,52 @@ impl Header {
     }
 }
 
-fn deserialize_boundary_char(b: &[u8]) -> Option<Char> {
-    // TFtoTPL.2014.69
-    match b.get(..2) {
+fn deserialize_lig_kern_program(b: &[u8]) -> ligkern::lang::Program {
+    let instructions: Vec<ligkern::lang::Instruction> = deserialize_array(b);
+    let mut passthrough: HashSet<u16> = Default::default();
+    // Boundary chars are deserialized in TFtoTPL.2014.69
+    let boundary_char = match b.get(..2) {
         None => None,
         Some(b) => {
             if b[0] == 255 {
+                passthrough.insert(0);
                 Some(Char(b[1]))
             } else {
                 None
             }
         }
-    }
-}
-
-fn deserialize_boundary_char_entrypoint(b: &[u8]) -> Option<u16> {
-    // TFtoTPL.2014.69
-    match b.len().checked_sub(4) {
+    };
+    let boundary_char_entrypoint = match b.len().checked_sub(4) {
         None => None,
         Some(r) => {
             let b = &b[r..];
             if b[0] == 255 {
-                Some(u16::from_be_bytes([b[2], b[3]]))
+                passthrough.insert(
+                    (instructions.len() - 1)
+                        .try_into()
+                        .expect("cannot be more than u16::MAX instructions"),
+                );
+                let r = u16::from_be_bytes([b[2], b[3]]);
+                // There is an edge case when the entrypoint for the boundary char
+                // points at the last instruction - i.e., the instruction containing the
+                // boundary char entrypoint. In this case TFtoPL behaves as if the
+                // boundary char has no program.
+                if r as usize == instructions.len() - 1 {
+                    None
+                } else {
+                    // TODO: need to validate that the result is not bigger than the array
+                    Some(r)
+                }
             } else {
                 None
             }
         }
+    };
+    ligkern::lang::Program {
+        instructions,
+        boundary_char,
+        boundary_char_entrypoint,
+        passthrough,
     }
 }
 
@@ -962,7 +972,7 @@ mod tests {
             ),
             File {
                 header: Header::tfm_default(),
-                smallest_char: Some(Char(70)),
+                smallest_char: Char(70),
                 char_dimens: BTreeMap::from([
                     (
                         Char(70),
@@ -1018,7 +1028,7 @@ mod tests {
             ),
             File {
                 header: Header::tfm_default(),
-                smallest_char: Some(Char(255)),
+                smallest_char: Char(255),
                 char_dimens: BTreeMap::from([(
                     Char(255),
                     CharDimensions {
@@ -1266,6 +1276,7 @@ mod tests {
                 ],
                 boundary_char: None,
                 boundary_char_entrypoint: None,
+                passthrough: Default::default(),
             },
             ..Default::default()
         }

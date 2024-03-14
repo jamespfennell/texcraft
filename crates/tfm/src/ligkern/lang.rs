@@ -6,6 +6,7 @@
 //! Instead, users will work with compiled lig/kern programs.
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use crate::Char;
 use crate::Number;
@@ -20,6 +21,7 @@ pub struct Program {
     pub instructions: Vec<Instruction>,
     pub boundary_char: Option<Char>,
     pub boundary_char_entrypoint: Option<u16>,
+    pub passthrough: HashSet<u16>,
 }
 
 /// A single instruction in a lig/kern program.
@@ -135,19 +137,22 @@ pub enum PostLigOperation {
 }
 
 impl Program {
-    pub fn unpack_entrypoint(&self, entrypoint: u8) -> u16 {
+    pub fn unpack_entrypoint(&mut self, entrypoint: u8) -> u16 {
         match self.instructions.get(entrypoint as usize) {
             // Invalid entrypoint
             None => entrypoint as u16,
             Some(instruction) => match instruction.operation {
-                Operation::EntrypointRedirect(u_big, _) => u_big,
+                Operation::EntrypointRedirect(u_big, _) => {
+                    self.passthrough.insert(entrypoint as u16);
+                    u_big
+                }
                 _ => entrypoint as u16,
             },
         }
     }
 
     pub fn unpack_entrypoints<'a, I: Iterator<Item = (Char, u8)> + 'a>(
-        &'a self,
+        &'a mut self,
         entrypoints: I,
     ) -> impl Iterator<Item = (Char, u16)> + 'a {
         entrypoints.map(|(c, u)| (c, self.unpack_entrypoint(u)))
@@ -261,7 +266,7 @@ impl Program {
         ReachableIter {
             next: 0,
             reachable,
-            instructions: &self.instructions,
+            program: self,
         }
     }
 
@@ -288,7 +293,7 @@ impl Program {
 
     pub fn validate_and_fix<I, T>(
         &mut self,
-        smallest_char: Option<Char>,
+        smallest_char: Char,
         entrypoints: I,
         char_exists: T,
         num_kerns: usize,
@@ -297,7 +302,11 @@ impl Program {
         I: Iterator<Item = (Char, u8)>,
         T: Fn(Char) -> bool,
     {
-        let (_, mut warnings) = self.reachable_array(self.unpack_entrypoints(entrypoints));
+        let (_, mut warnings) = {
+            let unpacked_entrypoints: Vec<(Char, u16)> =
+                self.unpack_entrypoints(entrypoints).collect();
+            self.reachable_array(unpacked_entrypoints.into_iter())
+        };
         warnings
             .iter()
             .filter_map(|w| match w {
@@ -329,7 +338,7 @@ impl Program {
                         instruction.right_char,
                     )
                 });
-                instruction.right_char = smallest_char.unwrap_or(Char(0));
+                instruction.right_char = smallest_char;
             }
             match &mut instruction.operation {
                 Operation::Kern(_) => {}
@@ -349,7 +358,7 @@ impl Program {
                             i,
                             *char_to_insert,
                         ));
-                        *char_to_insert = smallest_char.unwrap_or(Char(0));
+                        *char_to_insert = smallest_char;
                     }
                     if *post_lig_tag_invalid {
                         warnings.push(ValidationWarning::InvalidLigTag(i));
@@ -460,77 +469,52 @@ impl ValidationWarning {
 pub struct ReachableIter<'a> {
     next: u16,
     reachable: Vec<bool>,
-    instructions: &'a [Instruction],
+    program: &'a Program,
 }
 
-pub enum ReachableIterItem<'a> {
-    Reachable {
-        instruction: &'a Instruction,
-        index: u16,
-        skip_override: Option<u8>,
-    },
-    Unreachable(&'a [Instruction]),
+pub enum ReachableIterItem {
+    Reachable { adjusted_skip: Option<u8> },
+    Unreachable,
+    Passthrough,
 }
 
 impl<'a> Iterator for ReachableIter<'a> {
-    type Item = ReachableIterItem<'a>;
+    type Item = ReachableIterItem;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let this = self.next;
-            let instruction = match self.instructions.get(this as usize) {
-                None => return None,
-                Some(instruction) => instruction,
-            };
-            self.next += 1;
-            if let Operation::EntrypointRedirect(_, _) = instruction.operation {
-                continue;
-            }
-            return Some(if self.reachable[this as usize] {
-                let skip_override = match instruction.next_instruction {
-                    None | Some(0) => None,
-                    Some(inc) => {
-                        match self
-                            .reachable
-                            .get(this as usize + 1..this as usize + 1 + inc as usize)
-                        {
-                            None => None,
-                            Some(n) => {
-                                let reachable_skipped: u8 =
+        let this = self.next;
+        let instruction = match self.program.instructions.get(this as usize) {
+            None => return None,
+            Some(instruction) => instruction,
+        };
+        self.next += 1;
+        Some(if self.reachable[this as usize] {
+            let adjusted_skip = match instruction.next_instruction {
+                None | Some(0) => None,
+                Some(inc) => {
+                    match self
+                        .reachable
+                        .get(this as usize + 1..this as usize + 1 + inc as usize)
+                    {
+                        None => None,
+                        Some(n) => {
+                            let reachable_skipped: u8 =
                                 n.iter()
                                 .filter(|reachable| **reachable)
                                 .count()
                                 .try_into()
                                 .expect("iterating over at most u8::MAX elements, so the count will be at most u8::MAX");
-                                Some(reachable_skipped)
-                            }
+                            Some(reachable_skipped)
                         }
                     }
-                };
-                ReachableIterItem::Reachable {
-                    instruction,
-                    index: this,
-                    skip_override,
                 }
-            } else {
-                let mut upper_bound = this + 1;
-                loop {
-                    if let Some(instruction) = self.instructions.get(upper_bound as usize) {
-                        if let Operation::EntrypointRedirect(_, _) = instruction.operation {
-                            break;
-                        }
-                    }
-                    if self.reachable.get(upper_bound as usize).copied() != Some(false) {
-                        break;
-                    }
-                    upper_bound += 1;
-                }
-                self.next = upper_bound;
-                ReachableIterItem::Unreachable(
-                    &self.instructions[this as usize..upper_bound as usize],
-                )
-            });
-        }
+            };
+            ReachableIterItem::Reachable { adjusted_skip }
+        } else if self.program.passthrough.contains(&this) {
+            ReachableIterItem::Passthrough
+        } else {
+            ReachableIterItem::Unreachable
+        })
     }
 }
 

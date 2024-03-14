@@ -80,7 +80,12 @@ impl Node {
         match &self.value {
             NodeValue::Comment(e) => {
                 write!(f, "{}(COMMENT", " ".repeat(current_indent))?;
-                write_balanced_elements(e, f, current_indent + indent, true)?;
+                write_balanced_elements(
+                    e,
+                    f,
+                    current_indent + indent,
+                    WriteBalancedElementsState::Start,
+                )?;
             }
             NodeValue::Regular(v) => {
                 write!(f, "{}({}", " ".repeat(current_indent), &v.key)?;
@@ -163,32 +168,45 @@ pub enum BalancedElem {
     Vec(Vec<BalancedElem>),
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+enum WriteBalancedElementsState {
+    Start,
+    AfterString,
+    AfterVec,
+}
+
 fn write_balanced_elements(
     elements: &[BalancedElem],
     f: &mut std::fmt::Formatter<'_>,
     current_indent: usize,
-    mut word_before: bool,
+    mut state: WriteBalancedElementsState,
 ) -> std::fmt::Result {
     for element in elements {
         match element {
             BalancedElem::String(s) => {
-                if word_before {
-                    write!(f, " ")?;
+                match state {
+                    WriteBalancedElementsState::Start => {
+                        write!(f, " ")?;
+                    }
+                    WriteBalancedElementsState::AfterString => {
+                        write!(f, "\n{}", " ".repeat(current_indent))?;
+                    }
+                    WriteBalancedElementsState::AfterVec => {}
                 }
                 write!(f, "{s}")?;
-                word_before = true;
+                state = WriteBalancedElementsState::AfterString;
             }
             BalancedElem::Vec(v) => {
-                if word_before {
+                if state != WriteBalancedElementsState::AfterVec {
                     writeln!(f)?;
                 }
                 write!(f, "{}(", " ".repeat(current_indent))?;
-                write_balanced_elements(v, f, current_indent, false)?;
-                word_before = false;
+                state = WriteBalancedElementsState::AfterVec;
+                write_balanced_elements(v, f, current_indent, state)?;
             }
         }
     }
-    if !word_before {
+    if state == WriteBalancedElementsState::AfterVec {
         write!(f, "{}", " ".repeat(current_indent))?;
     }
     writeln!(f, ")")?;

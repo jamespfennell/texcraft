@@ -35,7 +35,7 @@ pub struct File {
     pub header: Header,
 
     /// Smallest character in the .tfm.
-    pub smallest_char: Option<Char>,
+    pub smallest_char: Char,
 
     /// Character dimensions.
     pub char_dimens: BTreeMap<Char, CharDimensions>,
@@ -165,7 +165,7 @@ impl Default for File {
     fn default() -> Self {
         Self {
             header: Default::default(),
-            smallest_char: None,
+            smallest_char: Char(1),
             char_dimens: Default::default(),
             char_tags: Default::default(),
             unset_char_tags: Default::default(),
@@ -417,7 +417,7 @@ impl File {
 
         let mut file = Self {
             header: pl_file.header.clone(),
-            smallest_char: char_bounds.map(|t| t.0),
+            smallest_char: char_bounds.map(|t| t.0).unwrap_or(Char(1)),
             char_dimens,
             char_tags,
             unset_char_tags: pl_file.unset_char_tags.clone(),

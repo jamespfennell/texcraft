@@ -1,0 +1,61 @@
+Bad TFM file: Design size too small!
+I've set it to 10 points.
+Bad TFM file: Extensible recipe involves the nonexistent character '052.
+Bad TFM file: Extensible recipe involves the nonexistent character '053.
+Bad TFM file: Extensible recipe involves the nonexistent character '054.
+Bad TFM file: Extensible recipe involves the nonexistent character '055.
+ 
+Width index for character '000 is too large;
+so I reset it to zero.
+ 
+Height index for character '000 is too large;
+so I reset it to zero.
+ 
+Depth index for character '000 is too large;
+so I reset it to zero.
+ 
+Italic correction index for character '000 is too large;
+so I reset it to zero.
+ 
+Width index for character '001 is too large;
+so I reset it to zero.
+ 
+Height index for character '001 is too large;
+so I reset it to zero.
+ 
+Depth index for character '001 is too large;
+so I reset it to zero.
+ 
+Italic correction index for character '001 is too large;
+so I reset it to zero.
+ 
+Extensible index for character '001 is too large;
+so I reset it to zero.
+ 
+Width index for character '002 is too large;
+so I reset it to zero.
+ 
+Height index for character '002 is too large;
+so I reset it to zero.
+ 
+Depth index for character '002 is too large;
+so I reset it to zero.
+ 
+Italic correction index for character '002 is too large;
+so I reset it to zero.
+ 
+Extensible index for character '002 is too large;
+so I reset it to zero.
+ 
+Width index for character '003 is too large;
+so I reset it to zero.
+ 
+Height index for character '003 is too large;
+so I reset it to zero.
+ 
+Depth index for character '003 is too large;
+so I reset it to zero.
+ 
+Italic correction index for character '003 is too large;
+so I reset it to zero.
+Bad TFM file: Character list link to nonexistent character '377.

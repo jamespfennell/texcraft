@@ -1,0 +1,5 @@
+Bad TFM file: Design size too small!
+I've set it to 10 points.
+Bad TFM file: Ligature step for nonexistent character '000.
+Bad TFM file: Ligature step produces the nonexistent character '000.
+Bad TFM file: Extensible recipe involves the nonexistent character '000.

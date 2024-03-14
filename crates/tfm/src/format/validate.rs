@@ -18,6 +18,7 @@ pub enum ValidationWarning {
         /// Number of parameters in the .tfm file.
         got: usize,
     },
+    InvalidCharacterInExtensibleRecipe(Char),
     InvalidWidthIndex(Char, u8),
     InvalidHeightIndex(Char, u8),
     InvalidDepthIndex(Char, u8),
@@ -58,6 +59,7 @@ impl ValidationWarning {
                 };
                 format!["Unusual number of fontdimen parameters for {font_description} font ({got} not {expected})."]
             },
+            InvalidCharacterInExtensibleRecipe(c) => format!["Bad TFM file: Extensible recipe involves the nonexistent character '{:03o}.", c.0],
             // The following invalid index warning messages intentionally start with a new line.
             // I think this is a bug in tftopl: in the range_error macro in TFtoPL.2014.47,
             //  the print_ln(` `) invocation should be guarded behind a check on chars_on_line,
@@ -106,6 +108,7 @@ impl ValidationWarning {
             | StringContainsNonstandardAsciiCharacter(_) => 52,
             ParameterIsTooBig(_) => 60,
             UnusualNumberOfParameters { .. } => 59,
+            InvalidCharacterInExtensibleRecipe(_) => 87,
             InvalidWidthIndex(_, _) => 79,
             InvalidHeightIndex(_, _) => 80,
             InvalidDepthIndex(_, _) => 81,
@@ -136,7 +139,8 @@ impl ValidationWarning {
             | StringContainsNonstandardAsciiCharacter(_)
             | ParameterIsTooBig(_) => true,
             UnusualNumberOfParameters { .. } => false,
-            InvalidWidthIndex(_, _)
+            InvalidCharacterInExtensibleRecipe(_)
+            | InvalidWidthIndex(_, _)
             | InvalidHeightIndex(_, _)
             | InvalidDepthIndex(_, _)
             | InvalidItalicCorrectionIndex(_, _)
@@ -297,6 +301,24 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
             .into_iter()
             .map(ValidationWarning::LigKernWarning),
     );
+
+    file.extensible_chars.iter_mut().for_each(|e| {
+        for piece in [&mut e.top, &mut e.middle, &mut e.bottom] {
+            let c = match piece {
+                None => continue,
+                Some(c) => *c,
+            };
+            if file.char_dimens.contains_key(&c) {
+                continue;
+            }
+            warnings.push(ValidationWarning::InvalidCharacterInExtensibleRecipe(c));
+            *piece = None;
+        }
+        if !file.char_dimens.contains_key(&e.rep) {
+            warnings.push(ValidationWarning::InvalidCharacterInExtensibleRecipe(e.rep));
+            e.rep = Char(0);
+        }
+    });
 
     for (c, dimens) in &mut file.char_dimens {
         if dimens.width_index.get() as usize >= file.widths.len() {

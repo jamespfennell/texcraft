@@ -58,12 +58,17 @@ pub struct Input {
     pub heights: Vec<u32>,
     pub depths: Vec<u32>,
     pub italic_corrections: Vec<u32>,
+    pub lig_kern_instructions: Vec<u32>,
+    pub kerns: Vec<u32>,
+    pub extensible_recipes: Vec<u32>,
+    pub params: Vec<u32>,
 }
 
 impl Input {
     fn tfm_bytes(&self) -> Vec<u8> {
         let mut b = vec![0_u8; 24];
         let mut sub_file_sizes = SubFileSizes {
+            lf: 0, // correct value populated later
             lh: append_bytes(&mut b, &self.header, 2, i16::MAX),
             bc: if self.char_infos.is_empty() { 1 } else { 0 },
             ec: if self.char_infos.is_empty() {
@@ -75,7 +80,10 @@ impl Input {
             nh: append_bytes(&mut b, &self.heights, 1, i16::MAX),
             nd: append_bytes(&mut b, &self.depths, 1, i16::MAX),
             ni: append_bytes(&mut b, &self.italic_corrections, 1, i16::MAX),
-            ..Default::default()
+            nl: append_bytes(&mut b, &self.lig_kern_instructions, 0, i16::MAX),
+            nk: append_bytes(&mut b, &self.kerns, 0, i16::MAX),
+            ne: append_bytes(&mut b, &self.extensible_recipes, 0, i16::MAX),
+            np: append_bytes(&mut b, &self.params, 0, i16::MAX),
         };
         sub_file_sizes.lf = sub_file_sizes.valid_lf();
         let sfs_b: [u8; 24] = sub_file_sizes.into();

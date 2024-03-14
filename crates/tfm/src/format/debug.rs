@@ -184,6 +184,12 @@ impl<'a> std::fmt::Display for Debug<'a> {
                     Section::Header => writeln!(f, "{:#?}", tfm_file.header),
                     Section::CharInfos => {
                         for u in 0_u8..=255 {
+                            if (u as i16) < self.sub_file_sizes.bc {
+                                continue;
+                            }
+                            if (u as i16) > self.sub_file_sizes.ec {
+                                continue;
+                            }
                             writeln!(f, "{}:", format_char(Char(u)))?;
                             if let Some(dimens) = tfm_file.char_dimens.get(&Char(u)) {
                                 writeln![f, "      dimens={:?}", dimens]?;

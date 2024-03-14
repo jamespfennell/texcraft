@@ -585,4 +585,25 @@ convert_tftopl_tests!(
         include_str!("data/originals/bad-chars-in-string.stderr.txt"),
         true,
     ),
+    (
+        lig_kern_instruction_references_non_existent_character,
+        "data/fuzz/fuzz_tftopl_10e324e0595b2934.tfm",
+        include_str!("data/fuzz/fuzz_tftopl_10e324e0595b2934.pl"),
+        include_str!("data/fuzz/fuzz_tftopl_10e324e0595b2934.stderr.txt"),
+        true,
+    ),
+    (
+        extensible_character_references_non_existent_character,
+        "data/fuzz/fuzz_tftopl_e1f1c0de87caa4a0.tfm",
+        include_str!("data/fuzz/fuzz_tftopl_e1f1c0de87caa4a0.pl"),
+        include_str!("data/fuzz/fuzz_tftopl_e1f1c0de87caa4a0.stderr.txt"),
+        true,
+    ),
+    (
+        lig_kern_empty_invisible_section,
+        "data/fuzz/fuzz_tftopl_764173f545c18b72.tfm",
+        include_str!("data/fuzz/fuzz_tftopl_764173f545c18b72.pl"),
+        include_str!("data/fuzz/fuzz_tftopl_764173f545c18b72.stderr.txt"),
+        true,
+    ),
 );

@@ -56,7 +56,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --bin tfm-fuzz
+          args: --bin fuzz_tftopl
 
   style-enforcement:
     runs-on: ubuntu-latest
