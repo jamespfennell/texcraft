@@ -289,10 +289,11 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
     // instruction is seen multiple times the warning is triggered again. For other lig/kern warnings,
     // the bad data is fixed when the warning is first printed, so the next time the instruction is
     // seen it is valid.
-    let kern_index_too_big_indices: HashSet<usize> = lig_kern_warnings
+    let duplicated_warnings: HashMap<usize, lang::ValidationWarning> = lig_kern_warnings
         .iter()
         .filter_map(|warning| match warning {
-            lang::ValidationWarning::KernIndexTooBig(u) => Some(*u),
+            lang::ValidationWarning::KernIndexTooBig(u) => Some((*u, warning.clone())),
+            lang::ValidationWarning::EntrypointRedirectTooBig(u) => Some((*u, warning.clone())),
             _ => None,
         })
         .collect();
@@ -360,15 +361,16 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
                 }
             }
             Some(CharTag::Ligature(l)) => {
-                let entrypoint = file.lig_kern_program.unpack_entrypoint(*l);
-                warnings.extend(
-                    file.lig_kern_program
-                        .instructions_for_entrypoint(entrypoint)
-                        .map(|t| t.0)
-                        .filter(|u| kern_index_too_big_indices.contains(u))
-                        .map(lang::ValidationWarning::KernIndexTooBig)
-                        .map(ValidationWarning::LigKernWarning),
-                );
+                if let Ok(entrypoint) = file.lig_kern_program.unpack_entrypoint(*l) {
+                    warnings.extend(
+                        file.lig_kern_program
+                            .instructions_for_entrypoint(entrypoint)
+                            .map(|t| t.0)
+                            .filter_map(|u| duplicated_warnings.get(&u))
+                            .cloned()
+                            .map(ValidationWarning::LigKernWarning),
+                    );
+                }
             }
             _ => {}
         }

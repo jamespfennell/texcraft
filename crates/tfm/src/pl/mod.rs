@@ -452,22 +452,23 @@ impl File {
 
         let mut lig_kern_program = tfm_file.lig_kern_program;
         lig_kern_program.pack_kerns(&tfm_file.kerns);
-        let lig_kern_entrypoints: HashMap<Char, u16> = lig_kern_program
-            .unpack_entrypoints(
-                tfm_file
-                    .char_tags
-                    .iter()
-                    .filter_map(|(c, t)| t.ligature().map(|l| (*c, l))),
-            )
+        let lig_kern_entrypoints: HashMap<Char, u16> = tfm_file
+            .char_tags
+            .iter()
+            .filter_map(|(c, t)| {
+                t.ligature()
+                    .and_then(|l| lig_kern_program.unpack_entrypoint(l).ok())
+                    .map(|e| (*c, e))
+            })
             .collect();
 
         let char_tags = tfm_file
             .char_tags
             .into_iter()
             .filter_map(|(c, tag)| match tag {
-                format::CharTag::Ligature(_) => {
-                    Some((c, CharTag::Ligature(*lig_kern_entrypoints.get(&c).unwrap())))
-                }
+                format::CharTag::Ligature(_) => lig_kern_entrypoints
+                    .get(&c)
+                    .map(|e| (c, CharTag::Ligature(*e))),
                 format::CharTag::List(l) => Some((c, CharTag::List(l))),
                 // If the extension index is invalid we drop the tag.
                 format::CharTag::Extension(i) => tfm_file
@@ -609,20 +610,20 @@ impl File {
             .operation
         {
             ligkern::lang::Operation::Kern(kern) => {
-                ast::LigTable::Kern((instruction.right_char, kern).into())
+                Some(ast::LigTable::Kern((instruction.right_char, kern).into()))
             }
             ligkern::lang::Operation::KernAtIndex(_) => {
                 panic!("tfm::pl::File lig/kern programs cannot contain `KernAtIndex` operations. Use a `Kern` operation instead.");
             }
-            ligkern::lang::Operation::EntrypointRedirect(_, _) => ast::LigTable::Stop(().into()),
+            ligkern::lang::Operation::EntrypointRedirect(_, _) => None,
             ligkern::lang::Operation::Ligature {
                 char_to_insert,
                 post_lig_operation,
                 post_lig_tag_invalid: _,
-            } => ast::LigTable::Lig(
+            } => Some(ast::LigTable::Lig(
                 post_lig_operation,
                 (instruction.right_char, char_to_insert).into(),
-            ),
+            )),
         };
 
         // When we fixed the (LIGTABLE (LABEL BOUNDARYCHAR) bug, number of failures went from 26652 -> 12004
@@ -654,8 +655,9 @@ impl File {
                             ast::LigTableLabel::Char(*label).into(),
                         ));
                     }
-                    let lig_kern_op = build_lig_kern_op(instruction);
-                    l.push(lig_kern_op);
+                    if let Some(op) = build_lig_kern_op(instruction) {
+                        l.push(op);
+                    }
                     match adjusted_skip {
                         // Note in the first branch here we may push Skip(0)
                         Some(i) => l.push(ast::LigTable::Skip(ast::DecimalU8(i).into())),
@@ -670,18 +672,16 @@ impl File {
                     }
                 }
                 ligkern::lang::ReachableIterItem::Unreachable => {
-                    let op = build_lig_kern_op(instruction);
                     let unreachable_elems = unreachable_elems.get_or_insert_with(|| {
                         vec![cst::BalancedElem::String(
                             "THIS PART OF THE PROGRAM IS NEVER USED!".to_string(),
                         )]
                     });
-                    if let ast::LigTable::Stop(_) = op {
-                        continue;
+                    if let Some(op) = build_lig_kern_op(instruction) {
+                        unreachable_elems.push(cst::BalancedElem::Vec(
+                            op.into_balanced_elements(char_display_format),
+                        ));
                     }
-                    unreachable_elems.push(cst::BalancedElem::Vec(
-                        op.into_balanced_elements(char_display_format),
-                    ));
                 }
                 ligkern::lang::ReachableIterItem::Passthrough => {}
             }
@@ -733,14 +733,17 @@ impl File {
                         .lig_kern_program
                         .instructions_for_entrypoint(*entrypoint)
                         .map(|(_, b)| b)
-                        .map(build_lig_kern_op)
+                        .filter_map(build_lig_kern_op)
                         .map(|n| {
                             cst::BalancedElem::Vec(n.into_balanced_elements(char_display_format))
                         })
                         .collect();
-                    // TODO: is there an edge case in which an empty (COMMENT) is printed?
-                    // Perhaps if the entrypoint is invalid?
-                    if !l.is_empty() {
+                    if l.is_empty() {
+                        v.push(ast::Character::Comment(vec![
+                            cst::BalancedElem::String("".to_string()),
+                            cst::BalancedElem::String("".to_string()),
+                        ]));
+                    } else {
                         v.push(ast::Character::Comment(l));
                     }
                 }

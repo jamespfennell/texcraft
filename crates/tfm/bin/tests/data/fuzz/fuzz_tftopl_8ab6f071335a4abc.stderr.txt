@@ -1,0 +1,7 @@
+Bad TFM file: Design size too small!
+I've set it to 10 points.
+Bad TFM file: Kern 0 is too big;
+I have set it to zero.
+Bad TFM file: Kern 1 is too big;
+I have set it to zero.
+Bad TFM file: Ligature unconditional stop command address is too big.

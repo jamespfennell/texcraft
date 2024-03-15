@@ -488,6 +488,20 @@ convert_tftopl_tests!(
         true,
     ),
     (
+        duplicate_lig_stop_warning,
+        "data/originals/duplicate-lig-stop-warnings.tfm",
+        include_str!("data/originals/duplicate-lig-stop-warnings.pl"),
+        include_str!("data/originals/duplicate-lig-stop-warnings.stderr.txt"),
+        true,
+    ),
+    (
+        duplicate_lig_kern_warning,
+        "data/originals/duplicate-lig-kern-warnings-1.tfm",
+        include_str!("data/originals/duplicate-lig-kern-warnings-2.pl"),
+        include_str!("data/originals/duplicate-lig-kern-warnings-2.stderr.txt"),
+        true,
+    ),
+    (
         smfebsl10_1_2,
         "data/ctan/smfebsl10-1.tfm",
         include_str!("data/ctan/smfebsl10-2.pl"),
@@ -604,6 +618,13 @@ convert_tftopl_tests!(
         "data/fuzz/fuzz_tftopl_764173f545c18b72.tfm",
         include_str!("data/fuzz/fuzz_tftopl_764173f545c18b72.pl"),
         include_str!("data/fuzz/fuzz_tftopl_764173f545c18b72.stderr.txt"),
+        true,
+    ),
+    (
+        lig_kern_stop_address_too_big,
+        "data/fuzz/fuzz_tftopl_8ab6f071335a4abc.tfm",
+        include_str!("data/fuzz/fuzz_tftopl_8ab6f071335a4abc.pl"),
+        include_str!("data/fuzz/fuzz_tftopl_8ab6f071335a4abc.stderr.txt"),
         true,
     ),
 );

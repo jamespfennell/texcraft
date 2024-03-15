@@ -1,0 +1,2 @@
+Bad TFM file: Ligature unconditional stop command address is too big.
+Bad TFM file: Ligature unconditional stop command address is too big.

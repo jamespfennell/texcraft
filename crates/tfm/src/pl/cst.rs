@@ -186,7 +186,9 @@ fn write_balanced_elements(
             BalancedElem::String(s) => {
                 match state {
                     WriteBalancedElementsState::Start => {
-                        write!(f, " ")?;
+                        if !s.is_empty() {
+                            write!(f, " ")?;
+                        }
                     }
                     WriteBalancedElementsState::AfterString => {
                         write!(f, "\n{}", " ".repeat(current_indent))?;

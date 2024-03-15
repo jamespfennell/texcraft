@@ -136,25 +136,36 @@ pub enum PostLigOperation {
     RetainNeitherMoveToInserted,
 }
 
+pub enum InvalidEntrypointError {
+    Direct { entrypoint: u8 },
+    Indirect { packed: u8, unpacked: u16 },
+}
+
 impl Program {
-    pub fn unpack_entrypoint(&mut self, entrypoint: u8) -> u16 {
+    pub fn unpack_entrypoint(&mut self, entrypoint: u8) -> Result<u16, InvalidEntrypointError> {
         match self.instructions.get(entrypoint as usize) {
-            // Invalid entrypoint
-            None => entrypoint as u16,
+            None => Err(InvalidEntrypointError::Direct { entrypoint }),
             Some(instruction) => match instruction.operation {
                 Operation::EntrypointRedirect(u_big, _) => {
-                    self.passthrough.insert(entrypoint as u16);
-                    u_big
+                    if (u_big as usize) < self.instructions.len() {
+                        self.passthrough.insert(entrypoint as u16);
+                        Ok(u_big)
+                    } else {
+                        Err(InvalidEntrypointError::Indirect {
+                            packed: entrypoint,
+                            unpacked: u_big,
+                        })
+                    }
                 }
-                _ => entrypoint as u16,
+                _ => Ok(entrypoint as u16),
             },
         }
     }
 
-    pub fn unpack_entrypoints<'a, I: Iterator<Item = (Char, u8)> + 'a>(
+    fn unpack_entrypoints<'a, I: Iterator<Item = (Char, u8)> + 'a>(
         &'a mut self,
         entrypoints: I,
-    ) -> impl Iterator<Item = (Char, u16)> + 'a {
+    ) -> impl Iterator<Item = (Char, Result<u16, InvalidEntrypointError>)> + 'a {
         entrypoints.map(|(c, u)| (c, self.unpack_entrypoint(u)))
     }
 
@@ -262,7 +273,7 @@ impl Program {
     }
 
     pub fn reachable_iter<I: Iterator<Item = (Char, u16)>>(&self, entrypoints: I) -> ReachableIter {
-        let (reachable, _) = self.reachable_array(entrypoints);
+        let (reachable, _) = self.reachable_array(entrypoints.map(|(c, e)| (c, Ok(e))));
         ReachableIter {
             next: 0,
             reachable,
@@ -302,8 +313,8 @@ impl Program {
         I: Iterator<Item = (Char, u8)>,
         T: Fn(Char) -> bool,
     {
-        let (_, mut warnings) = {
-            let unpacked_entrypoints: Vec<(Char, u16)> =
+        let (reachable, mut warnings) = {
+            let unpacked_entrypoints: Vec<(Char, Result<u16, InvalidEntrypointError>)> =
                 self.unpack_entrypoints(entrypoints).collect();
             self.reachable_array(unpacked_entrypoints.into_iter())
         };
@@ -316,13 +327,20 @@ impl Program {
             .for_each(|u| self.instructions[*u].next_instruction = None);
 
         let n = self.instructions.len();
-        for (i, instruction) in self.instructions.iter_mut().enumerate() {
+        for (i, (instruction, reachable)) in self.instructions.iter_mut().zip(reachable).enumerate()
+        {
             let is_kern_step = match instruction.operation {
                 Operation::Kern(_) | Operation::KernAtIndex(_) => true,
                 Operation::Ligature { .. } => false,
-                Operation::EntrypointRedirect(i, _) => {
-                    if i as usize >= n {
-                        warnings.push(ValidationWarning::EntrypointRedirectTooBig(n));
+                Operation::EntrypointRedirect(r, _) => {
+                    if let Ok(u) = i.try_into() {
+                        // If it's a passthrough instruction, don't issue a warning.
+                        if !reachable && self.passthrough.contains(&u) {
+                            continue;
+                        }
+                    }
+                    if r as usize >= n {
+                        warnings.push(ValidationWarning::EntrypointRedirectTooBig(i));
                     }
                     continue;
                 }
@@ -372,19 +390,24 @@ impl Program {
         warnings
     }
 
-    fn reachable_array<I: Iterator<Item = (Char, u16)>>(
+    fn reachable_array<I: Iterator<Item = (Char, Result<u16, InvalidEntrypointError>)>>(
         &self,
         entrypoints: I,
     ) -> (Vec<bool>, Vec<ValidationWarning>) {
         let mut reachable = vec![false; self.instructions.len()];
         let mut warnings = vec![];
         // TFtoPL.2014.68
-        for (c, entrypoint) in entrypoints {
-            match reachable.get_mut(entrypoint as usize) {
-                None => {
+        for (c, entrypoint_or_err) in entrypoints {
+            match entrypoint_or_err {
+                Ok(entrypoint) => {
+                    *reachable
+                        .get_mut(entrypoint as usize)
+                        .expect("entrypoint is valid so indexes into the reachable array") = true;
+                }
+                Err(_) => {
+                    // TODO: move this warning into the unpacking code?
                     warnings.push(ValidationWarning::InvalidEntrypoint(c));
                 }
-                Some(slot) => *slot = true,
             }
         }
         if let Some(entrypoint) = self.boundary_char_entrypoint {
@@ -409,6 +432,7 @@ impl Program {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum ValidationWarning {
     SkipTooLarge(usize),
     LigatureStepForNonExistentCharacter(usize, Char),
@@ -472,6 +496,7 @@ pub struct ReachableIter<'a> {
     program: &'a Program,
 }
 
+#[derive(Debug)]
 pub enum ReachableIterItem {
     Reachable { adjusted_skip: Option<u8> },
     Unreachable,
@@ -518,8 +543,6 @@ impl<'a> Iterator for ReachableIter<'a> {
     }
 }
 
-pub struct InvalidEntrypointError;
-
 /// Iterator over the lig/kern instructions for a specific entrypoint.
 ///
 /// Create using [`Program::instructions_for_entrypoint`].
@@ -532,16 +555,13 @@ impl<'a> Iterator for InstructionsForEntrypointIter<'a> {
     type Item = (usize, &'a Instruction);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.instructions.get(self.next).and_then(|i| {
-            if let Operation::EntrypointRedirect(_, _) = i.operation {
-                return None;
-            }
+        self.instructions.get(self.next).map(|i| {
             let this = self.next;
             self.next = match i.next_instruction {
                 None => usize::MAX,
                 Some(inc) => self.next + inc as usize + 1,
             };
-            Some((this, i))
+            (this, i)
         })
     }
 }
