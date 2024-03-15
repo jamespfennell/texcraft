@@ -5,11 +5,11 @@ pub fn compile(
     instructions: &[lang::Instruction],
     kerns: &[Number],
     entry_points: &HashMap<Char, u16>,
-) -> Result<(CompiledProgram, Vec<CompilationWarning>), InfiniteLoopError> {
-    let (pair_to_instruction, warnings) = build_pair_to_instruction_map(instructions, entry_points);
+) -> Result<CompiledProgram, InfiniteLoopError> {
+    let pair_to_instruction = build_pair_to_instruction_map(instructions, entry_points);
     let pair_to_replacement = calculate_replacements(instructions, kerns, pair_to_instruction)?;
     let program = lower_and_optimize(pair_to_replacement);
-    Ok((program, warnings))
+    Ok(program)
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
@@ -34,39 +34,27 @@ impl OngoingCalculation {
 fn build_pair_to_instruction_map(
     instructions: &[lang::Instruction],
     entry_points: &HashMap<Char, u16>,
-) -> (HashMap<(Char, Char), usize>, Vec<CompilationWarning>) {
+) -> HashMap<(Char, Char), usize> {
     let mut result = HashMap::<(Char, Char), usize>::new();
-    let mut reachable_instructions = HashSet::<usize>::with_capacity(instructions.len());
-    let mut warnings = vec![];
     for (&left, &entry_point) in entry_points {
         let mut next_instruction = Some(entry_point as usize);
         while let Some(next) = next_instruction {
             let instruction = match instructions.get(next) {
                 None => {
-                    warnings.push(CompilationWarning::InvalidNextInstruction);
+                    // Invalid next instruction
                     break;
                 }
                 Some(instruction) => instruction,
             };
-            reachable_instructions.insert(next);
             next_instruction = instruction
                 .next_instruction
                 .map(|increment| next + 1 + (increment as usize));
 
-            let right = instruction.right_char;
-            if let Some(_old_instruction) = result.insert((left, right), next) {
-                warnings.push(CompilationWarning::DuplicateRule);
-            }
+            // We only insert the element if it doesn't already exist.
+            result.entry((left, instruction.right_char)).or_insert(next);
         }
     }
-    if reachable_instructions.len() < instructions.len() {
-        for (i, _) in instructions.iter().enumerate() {
-            if !reachable_instructions.contains(&i) {
-                warnings.push(CompilationWarning::OrphanRule);
-            }
-        }
-    }
-    (result, warnings)
+    result
 }
 
 struct Replacement(Vec<(Char, Number)>, Char);
@@ -357,6 +345,18 @@ mod tests {
         }
     }
 
+    pub fn new_stop(
+        next_instruction: Option<u8>,
+        right_char: char,
+        entrypoint_redirect: u16,
+    ) -> lang::Instruction {
+        lang::Instruction {
+            next_instruction,
+            right_char: right_char.try_into().unwrap(),
+            operation: lang::Operation::EntrypointRedirect(entrypoint_redirect, true),
+        }
+    }
+
     fn run_success_test(
         instructions: Vec<lang::Instruction>,
         entry_points: Vec<(char, u16)>,
@@ -377,7 +377,7 @@ mod tests {
                 )
             })
             .collect();
-        let compiled_program = compile(&instructions, &vec![], &entry_points).unwrap().0;
+        let compiled_program = compile(&instructions, &vec![], &entry_points).unwrap();
 
         let mut got: HashMap<(Char, Char), Vec<(Char, Number)>> = Default::default();
         for pair in compiled_program.all_pairs_having_replacement() {
@@ -431,7 +431,7 @@ mod tests {
             vec![(
                 'A',
                 'V',
-                vec![('A', Number::UNITY * 3), ('V', Number::ZERO)]
+                vec![('A', Number::UNITY * 2), ('V', Number::ZERO)]
             ),],
         ),
         (
@@ -772,6 +772,22 @@ mod tests {
                     instruction_index: 0,
                     post_replacement: post_replacement("AAB"),
                     post_cursor_position: 1,
+                }]
+            },
+        ),
+        (
+            duplicate_command_single_char,
+            vec![
+                new_lig(Some(0), 'A', 'A', RetainLeftMoveNowhere),
+                new_stop(None, 'A', 225),
+            ],
+            vec![('A', 0)],
+            InfiniteLoopError {
+                starting_pair: starting_pair('A', 'A'),
+                infinite_loop: vec![InfiniteLoopStep {
+                    instruction_index: 0,
+                    post_replacement: post_replacement("AA"),
+                    post_cursor_position: 0,
                 }]
             },
         ),

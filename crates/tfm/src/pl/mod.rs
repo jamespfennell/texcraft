@@ -428,22 +428,27 @@ impl File {
                     CharDimensions {
                         width: match info.width_index {
                             format::WidthIndex::Invalid => None,
-                            format::WidthIndex::Valid(n) => Some(tfm_file.widths[n.get() as usize]),
+                            format::WidthIndex::Valid(n) => {
+                                tfm_file.widths.get(n.get() as usize).copied()
+                            }
                         },
                         height: if info.height_index == 0 {
                             None
                         } else {
-                            Some(tfm_file.heights[info.height_index as usize])
+                            tfm_file.heights.get(info.height_index as usize).copied()
                         },
                         depth: if info.depth_index == 0 {
                             None
                         } else {
-                            Some(tfm_file.depths[info.depth_index as usize])
+                            tfm_file.depths.get(info.depth_index as usize).copied()
                         },
                         italic_correction: if info.italic_index == 0 {
                             None
                         } else {
-                            Some(tfm_file.italic_corrections[info.italic_index as usize])
+                            tfm_file
+                                .italic_corrections
+                                .get(info.italic_index as usize)
+                                .copied()
                         },
                     },
                 )

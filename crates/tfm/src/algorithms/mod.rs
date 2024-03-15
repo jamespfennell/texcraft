@@ -32,11 +32,23 @@ pub fn tfm_to_pl(
         }
     };
     let pl_file = crate::pl::File::from_tfm_file(tfm_file);
+    let infinite_loop = warnings.iter().any(|w| {
+        matches!(
+            w,
+            crate::format::Warning::ValidationWarning(
+                crate::format::ValidationWarning::LigKernWarning(
+                    crate::ligkern::lang::ValidationWarning::InfiniteLoop(_),
+                )
+            )
+        )
+    });
     let tfm_modified = warnings
         .iter()
         .map(crate::format::Warning::tfm_file_modified)
         .any(|t| t);
-    let suffix = if tfm_modified {
+    let suffix = if infinite_loop {
+        "(INFINITE LIGATURE LOOP MUST BE BROKEN!)"
+    } else if tfm_modified {
         "(COMMENT THE TFM FILE WAS BAD, SO THE DATA HAS BEEN CHANGED!)\n"
     } else {
         ""

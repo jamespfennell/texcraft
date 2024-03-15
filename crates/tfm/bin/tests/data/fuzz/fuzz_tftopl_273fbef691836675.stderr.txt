@@ -1,0 +1,7 @@
+Bad TFM file: Design size too small!
+I've set it to 10 points.
+Bad TFM file: depth[0] should be zero.
+Bad TFM file: Kern index too large.
+Bad TFM file: Ligature step for nonexistent character '346.
+Bad TFM file: Ligature unconditional stop command address is too big.
+Infinite ligature loop starting with '000 and '000!

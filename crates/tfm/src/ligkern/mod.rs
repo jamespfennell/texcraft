@@ -104,7 +104,7 @@ impl CompiledProgram {
         instructions: &[lang::Instruction],
         kerns: &[Number],
         entrypoints: HashMap<Char, u16>,
-    ) -> Result<(CompiledProgram, Vec<CompilationWarning>), InfiniteLoopError> {
+    ) -> Result<CompiledProgram, InfiniteLoopError> {
         compiler::compile(instructions, kerns, &entrypoints)
     }
 
@@ -171,7 +171,7 @@ impl CompiledProgram {
 }
 
 /// An error returned from lig/kern compilation.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InfiniteLoopError {
     /// The pair of characters the starts the infinite loop.
     pub starting_pair: (Char, Char),
@@ -196,7 +196,7 @@ impl InfiniteLoopError {
 /// One step in a lig/kern infinite loop.
 ///
 /// A vector of these steps is returned in a [`InfiniteLoopError`].
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InfiniteLoopStep {
     /// The index of the instruction to apply in this step.
     pub instruction_index: usize,
@@ -204,14 +204,6 @@ pub struct InfiniteLoopStep {
     pub post_replacement: Vec<Char>,
     /// The position of the cursor after applying this step.
     pub post_cursor_position: usize,
-}
-
-/// A warning returned from lig/kern compilation.
-#[derive(Debug)]
-pub enum CompilationWarning {
-    InvalidNextInstruction,
-    DuplicateRule,
-    OrphanRule,
 }
 
 /// Data structure describing the replacement of a character pair in a lig/kern program.

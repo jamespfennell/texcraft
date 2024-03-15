@@ -197,11 +197,24 @@ impl Convert {
                             .to_display_format(&pl_file.header.character_coding_scheme)
                     )
                 ];
+                // TODO: deduplicate this code between here and algorithms
+                let infinite_loop = warnings.iter().any(|w| {
+                    matches!(
+                        w,
+                        tfm::format::Warning::ValidationWarning(
+                            tfm::format::ValidationWarning::LigKernWarning(
+                                tfm::ligkern::lang::ValidationWarning::InfiniteLoop(_),
+                            )
+                        )
+                    )
+                });
                 let tfm_modified = warnings
                     .iter()
                     .map(tfm::format::Warning::tfm_file_modified)
                     .any(|t| t);
-                let suffix = if tfm_modified {
+                let suffix = if infinite_loop {
+                    "(INFINITE LIGATURE LOOP MUST BE BROKEN!)"
+                } else if tfm_modified {
                     "(COMMENT THE TFM FILE WAS BAD, SO THE DATA HAS BEEN CHANGED!)\n"
                 } else {
                     ""

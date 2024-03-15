@@ -627,4 +627,11 @@ convert_tftopl_tests!(
         include_str!("data/fuzz/fuzz_tftopl_8ab6f071335a4abc.stderr.txt"),
         true,
     ),
+    (
+        infinite_ligature_loop,
+        "data/fuzz/fuzz_tftopl_273fbef691836675.tfm",
+        include_str!("data/fuzz/fuzz_tftopl_273fbef691836675.plst"),
+        include_str!("data/fuzz/fuzz_tftopl_273fbef691836675.stderr.txt"),
+        true,
+    ),
 );

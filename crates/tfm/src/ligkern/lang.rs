@@ -136,6 +136,7 @@ pub enum PostLigOperation {
     RetainNeitherMoveToInserted,
 }
 
+#[derive(Clone, Debug)]
 pub enum InvalidEntrypointError {
     Direct { entrypoint: u8 },
     Indirect { packed: u8, unpacked: u16 },
@@ -307,17 +308,16 @@ impl Program {
         smallest_char: Char,
         entrypoints: I,
         char_exists: T,
-        num_kerns: usize,
-    ) -> Vec<ValidationWarning>
+        kerns: &[Number],
+    ) -> (Vec<ValidationWarning>, Option<super::CompiledProgram>)
     where
         I: Iterator<Item = (Char, u8)>,
         T: Fn(Char) -> bool,
     {
-        let (reachable, mut warnings) = {
-            let unpacked_entrypoints: Vec<(Char, Result<u16, InvalidEntrypointError>)> =
-                self.unpack_entrypoints(entrypoints).collect();
-            self.reachable_array(unpacked_entrypoints.into_iter())
-        };
+        let unpacked_entrypoints: Vec<(Char, Result<u16, InvalidEntrypointError>)> =
+            self.unpack_entrypoints(entrypoints).collect();
+        let (reachable, mut warnings) =
+            { self.reachable_array(unpacked_entrypoints.clone().into_iter()) };
         warnings
             .iter()
             .filter_map(|w| match w {
@@ -361,7 +361,7 @@ impl Program {
             match &mut instruction.operation {
                 Operation::Kern(_) => {}
                 Operation::KernAtIndex(k) => {
-                    if *k as usize >= num_kerns {
+                    if *k as usize >= kerns.len() {
                         warnings.push(ValidationWarning::KernIndexTooBig(i));
                         instruction.operation = Operation::Kern(Number::ZERO);
                     }
@@ -387,7 +387,19 @@ impl Program {
             }
         }
 
-        warnings
+        let entrypoints: HashMap<Char, u16> = unpacked_entrypoints
+            .into_iter()
+            .filter_map(|(c, e_or)| e_or.ok().map(|e| (c, e)))
+            .collect();
+        let program_or =
+            match super::CompiledProgram::compile(&self.instructions, kerns, entrypoints) {
+                Ok(program) => Some(program),
+                Err(err) => {
+                    warnings.push(ValidationWarning::InfiniteLoop(err));
+                    None
+                }
+            };
+        (warnings, program_or)
     }
 
     fn reachable_array<I: Iterator<Item = (Char, Result<u16, InvalidEntrypointError>)>>(
@@ -442,6 +454,7 @@ pub enum ValidationWarning {
     InvalidLigTag(usize),
     EntrypointRedirectTooBig(usize),
     InvalidEntrypoint(Char),
+    InfiniteLoop(super::InfiniteLoopError),
 }
 
 impl ValidationWarning {
@@ -472,6 +485,13 @@ impl ValidationWarning {
             InvalidEntrypoint(c) => {
                 format![" \nLigature/kern starting index for character '{:03o} is too large;\nso I removed it.", c.0]
             }
+            InfiniteLoop(err) => {
+                // TODO: the error can involve a boundary char
+                format![
+                    "Infinite ligature loop starting with '{:03o} and '{:03o}!",
+                    err.starting_pair.0 .0, err.starting_pair.1 .0
+                ]
+            }
         }
     }
 
@@ -486,6 +506,7 @@ impl ValidationWarning {
             KernStepForNonExistentCharacter(_, _) | KernIndexTooBig(_) => 76,
             EntrypointRedirectTooBig(_) => 74,
             InvalidEntrypoint(_) => 67,
+            InfiniteLoop(_) => 90,
         }
     }
 }
