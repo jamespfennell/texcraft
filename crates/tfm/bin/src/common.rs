@@ -47,11 +47,11 @@ impl TfOrPlPath {
     pub fn parse(input: &str) -> Result<Self, InvalidExtension> {
         let path_buf: std::path::PathBuf = input.into();
         match path_buf.extension().and_then(std::ffi::OsStr::to_str) {
-            Some("pl") => Ok(TfOrPlPath::Pl(PlPath(path_buf))),
+            Some("pl") | Some("plst") => Ok(TfOrPlPath::Pl(PlPath(path_buf))),
             Some("tfm") => Ok(TfOrPlPath::Tf(TfPath(path_buf))),
             extension => Err(InvalidExtension {
                 provided: extension.map(str::to_string),
-                allowed: vec!["pl", "tfm"],
+                allowed: vec!["pl", "plst", "tfm"],
             }),
         }
     }

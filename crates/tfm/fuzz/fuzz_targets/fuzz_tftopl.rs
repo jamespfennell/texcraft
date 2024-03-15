@@ -36,7 +36,7 @@ fuzz_target!(|input: Input| {
         input.calculate_hash()
     ];
     std::fs::copy(tfm_file_path, format!["{base_path}.tfm"]).unwrap();
-    std::fs::write(format!["{base_path}.pl"], knuth_stdout).unwrap();
+    std::fs::write(format!["{base_path}.plst"], knuth_stdout).unwrap();
     if !knuth_stderr.is_empty() {
         std::fs::write(format!["{base_path}.stderr.txt"], knuth_stderr).unwrap();
     }

@@ -8,6 +8,6 @@ fn incorrect_extension() {
     cmd.args(["convert", "incorrect_extension.rs"]);
     // TODO: stop using predicates lib
     cmd.assert().failure().stderr(predicate::str::contains(
-        "the file extension must be .pl or .tfm but it is .rs",
+        "the file extension must be .pl or .plst or .tfm but it is .rs",
     ));
 }
