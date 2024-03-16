@@ -1,0 +1,10 @@
+Bad TFM file: Design size too small!
+I've set it to 10 points.
+Bad TFM file: Ligature step produces the nonexistent character '001.
+Ligature step with nonstandard code changed to LIG
+Bad TFM file: Ligature step for nonexistent character '140.
+Bad TFM file: Ligature step produces the nonexistent character '203.
+Ligature step with nonstandard code changed to LIG
+ 
+Width index for character '000 is too large;
+so I reset it to zero.

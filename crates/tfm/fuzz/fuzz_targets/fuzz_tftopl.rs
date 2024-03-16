@@ -22,6 +22,10 @@ fuzz_target!(|input: Input| {
     let knuth_stdout = std::str::from_utf8(&knuth_output.stdout).unwrap();
     let knuth_stderr = std::str::from_utf8(&knuth_output.stderr).unwrap();
 
+    if output_always() {
+        write_input_and_correct_output(&input, &tfm_file_path, knuth_stdout, knuth_stderr);
+    }
+
     let texcraft_output = tfm::algorithms::tfm_to_pl(&tfm_bytes, &|_| Default::default()).unwrap();
 
     if texcraft_output.success
@@ -31,15 +35,7 @@ fuzz_target!(|input: Input| {
         return;
     }
 
-    let base_path = format![
-        "crates/tfm/bin/tests/data/fuzz/fuzz_tftopl_{:x}",
-        input.calculate_hash()
-    ];
-    std::fs::copy(tfm_file_path, format!["{base_path}.tfm"]).unwrap();
-    std::fs::write(format!["{base_path}.plst"], knuth_stdout).unwrap();
-    if !knuth_stderr.is_empty() {
-        std::fs::write(format!["{base_path}.stderr.txt"], knuth_stderr).unwrap();
-    }
+    write_input_and_correct_output(&input, &tfm_file_path, knuth_stdout, knuth_stderr);
 
     assert!(
         texcraft_output.success,
@@ -49,6 +45,27 @@ fuzz_target!(|input: Input| {
     similar_asserts::assert_eq!(texcraft: texcraft_output.pl_data, knuth: knuth_stdout);
     similar_asserts::assert_eq!(texcraft: texcraft_output.error_messages, knuth: knuth_stderr);
 });
+
+fn output_always() -> bool {
+    std::env::var("TEXCRAFT_FUZZ_OUTPUT_ALWAYS").is_ok()
+}
+
+fn write_input_and_correct_output(
+    input: &Input,
+    tfm_file_path: &std::path::Path,
+    knuth_stdout: &str,
+    knuth_stderr: &str,
+) {
+    let base_path = format![
+        "crates/tfm/bin/tests/data/fuzz/fuzz_tftopl_{:x}",
+        input.calculate_hash()
+    ];
+    std::fs::copy(tfm_file_path, format!["{base_path}.tfm"]).unwrap();
+    std::fs::write(format!["{base_path}.plst"], knuth_stdout).unwrap();
+    if !knuth_stderr.is_empty() {
+        std::fs::write(format!["{base_path}.stderr.txt"], knuth_stderr).unwrap();
+    }
+}
 
 #[derive(Clone, Debug, arbitrary::Arbitrary)]
 pub struct Input {

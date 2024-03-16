@@ -683,4 +683,11 @@ convert_tftopl_tests!(
         include_str!("data/fuzz/fuzz_tftopl_e604027d3275b06e.stderr.txt"),
         true,
     ),
+    (
+        todo,
+        "data/fuzz/fuzz_tftopl_ef0432d46c78f8a.tfm",
+        include_str!("data/fuzz/fuzz_tftopl_ef0432d46c78f8a.plst"),
+        include_str!("data/fuzz/fuzz_tftopl_ef0432d46c78f8a.stderr.txt"),
+        true,
+    ),
 );
