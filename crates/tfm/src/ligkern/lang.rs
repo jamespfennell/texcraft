@@ -163,13 +163,6 @@ impl Program {
         }
     }
 
-    fn unpack_entrypoints<'a, I: Iterator<Item = (Char, u8)> + 'a>(
-        &'a mut self,
-        entrypoints: I,
-    ) -> impl Iterator<Item = (Char, Result<u16, InvalidEntrypointError>)> + 'a {
-        entrypoints.map(|(c, u)| (c, self.unpack_entrypoint(u)))
-    }
-
     pub fn pack_entrypoints(&mut self, entrypoints: HashMap<Char, u16>) -> HashMap<Char, u8> {
         let instructions = &mut self.instructions;
         let ordered_entrypoints = {
@@ -274,10 +267,9 @@ impl Program {
     }
 
     pub fn reachable_iter<I: Iterator<Item = (Char, u16)>>(&self, entrypoints: I) -> ReachableIter {
-        let (reachable, _) = self.reachable_array(entrypoints.map(|(c, e)| (c, Ok(e))));
         ReachableIter {
             next: 0,
-            reachable,
+            reachable: self.reachable_array(entrypoints),
             program: self,
         }
     }
@@ -314,19 +306,44 @@ impl Program {
         I: Iterator<Item = (Char, u8)>,
         T: Fn(Char) -> bool,
     {
-        let unpacked_entrypoints: Vec<(Char, Result<u16, InvalidEntrypointError>)> =
-            self.unpack_entrypoints(entrypoints).collect();
-        let (reachable, mut warnings) =
-            { self.reachable_array(unpacked_entrypoints.clone().into_iter()) };
-        warnings
-            .iter()
-            .filter_map(|w| match w {
-                ValidationWarning::SkipTooLarge(u) => Some(u),
-                _ => None,
+        let mut warnings = vec![];
+        // TFtoPL.2014.68
+        if let Some(entrypoint) = self.boundary_char_entrypoint {
+            if self.instructions.len() <= entrypoint as usize {
+                self.boundary_char_entrypoint = None;
+                warnings.push(ValidationWarning::InvalidBoundaryCharEntrypoint);
+            }
+        }
+        // TFtoPL.2014.69
+        let unpacked_entrypoints: Vec<(Char, u16)> = entrypoints
+            .into_iter()
+            .filter_map(|(c, e)| match self.unpack_entrypoint(e) {
+                Ok(e) => Some((c, e)),
+                Err(_) => {
+                    warnings.push(ValidationWarning::InvalidEntrypoint(c));
+                    None
+                }
             })
-            .for_each(|u| self.instructions[*u].next_instruction = None);
-
+            .collect();
+        let reachable = self.reachable_array(unpacked_entrypoints.iter().cloned());
         let n = self.instructions.len();
+        // TFtoPL.2014.70
+        self.instructions
+            .iter_mut()
+            .zip(reachable.iter())
+            .enumerate()
+            .filter(|(_, (_, reachable))| **reachable)
+            .filter_map(|(i, (instruction, _))| {
+                instruction
+                    .next_instruction
+                    .map(|inc| (i, inc, instruction))
+            })
+            .filter(|(i, inc, _)| *i + (*inc as usize) + 1 >= n)
+            .for_each(|(i, _, instruction)| {
+                instruction.next_instruction = None;
+                warnings.push(ValidationWarning::SkipTooLarge(i));
+            });
+
         for (i, (instruction, reachable)) in self.instructions.iter_mut().zip(reachable).enumerate()
         {
             let is_kern_step = match instruction.operation {
@@ -354,6 +371,7 @@ impl Program {
                     ValidationWarning::LigatureStepForNonExistentCharacter(
                         i,
                         instruction.right_char,
+                        smallest_char,
                     )
                 });
                 instruction.right_char = smallest_char;
@@ -375,6 +393,7 @@ impl Program {
                         warnings.push(ValidationWarning::LigatureStepProducesNonExistentCharacter(
                             i,
                             *char_to_insert,
+                            smallest_char,
                         ));
                         *char_to_insert = smallest_char;
                     }
@@ -387,10 +406,7 @@ impl Program {
             }
         }
 
-        let entrypoints: HashMap<Char, u16> = unpacked_entrypoints
-            .into_iter()
-            .filter_map(|(c, e_or)| e_or.ok().map(|e| (c, e)))
-            .collect();
+        let entrypoints: HashMap<Char, u16> = unpacked_entrypoints.into_iter().collect();
         let program_or =
             match super::CompiledProgram::compile(&self.instructions, kerns, entrypoints) {
                 Ok(program) => Some(program),
@@ -402,30 +418,24 @@ impl Program {
         (warnings, program_or)
     }
 
-    fn reachable_array<I: Iterator<Item = (Char, Result<u16, InvalidEntrypointError>)>>(
-        &self,
-        entrypoints: I,
-    ) -> (Vec<bool>, Vec<ValidationWarning>) {
+    fn reachable_array<I: Iterator<Item = (Char, u16)>>(&self, entrypoints: I) -> Vec<bool> {
         let mut reachable = vec![false; self.instructions.len()];
-        let mut warnings = vec![];
         // TFtoPL.2014.68
-        for (c, entrypoint_or_err) in entrypoints {
-            match entrypoint_or_err {
-                Ok(entrypoint) => {
-                    *reachable
-                        .get_mut(entrypoint as usize)
-                        .expect("entrypoint is valid so indexes into the reachable array") = true;
-                }
-                Err(_) => {
-                    // TODO: move this warning into the unpacking code?
-                    warnings.push(ValidationWarning::InvalidEntrypoint(c));
-                }
-            }
-        }
-        if let Some(entrypoint) = self.boundary_char_entrypoint {
-            // TODO: warning
+        for (_, entrypoint) in entrypoints {
             if let Some(slot) = reachable.get_mut(entrypoint as usize) {
                 *slot = true;
+            }
+        }
+        // TFtoPL.2014.69
+        if let Some(entrypoint) = self.boundary_char_entrypoint {
+            // There is a bug (?) in Knuth's TFtoPL when the entrypoint for the boundary char
+            // points at the last instruction - i.e., the instruction containing the
+            // boundary char entrypoint. In this case the last instruction is marked as passthrough
+            // and not accessible.
+            if entrypoint as usize != self.instructions.len() - 1 {
+                if let Some(slot) = reachable.get_mut(entrypoint as usize) {
+                    *slot = true;
+                }
             }
         }
         // TFtoPL.2014.70
@@ -434,26 +444,26 @@ impl Program {
                 continue;
             }
             if let Some(inc) = self.instructions[i].next_instruction {
-                match reachable.get_mut(i + inc as usize + 1) {
-                    None => warnings.push(ValidationWarning::SkipTooLarge(i)),
-                    Some(slot) => *slot = true,
+                if let Some(slot) = reachable.get_mut(i + inc as usize + 1) {
+                    *slot = true;
                 }
             }
         }
-        (reachable, warnings)
+        reachable
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum ValidationWarning {
     SkipTooLarge(usize),
-    LigatureStepForNonExistentCharacter(usize, Char),
+    LigatureStepForNonExistentCharacter(usize, Char, Char),
     KernStepForNonExistentCharacter(usize, Char),
-    LigatureStepProducesNonExistentCharacter(usize, Char),
+    LigatureStepProducesNonExistentCharacter(usize, Char, Char),
     KernIndexTooBig(usize),
     InvalidLigTag(usize),
     EntrypointRedirectTooBig(usize),
     InvalidEntrypoint(Char),
+    InvalidBoundaryCharEntrypoint,
     InfiniteLoop(super::InfiniteLoopError),
 }
 
@@ -465,7 +475,7 @@ impl ValidationWarning {
             SkipTooLarge(i) => {
                 format!["Bad TFM file: Ligature/kern step {i} skips too far;\nI made it stop."]
             }
-            LigatureStepForNonExistentCharacter(_, c) => format![
+            LigatureStepForNonExistentCharacter(_, c, _) => format![
                 "Bad TFM file: Ligature step for nonexistent character '{:03o}.",
                 c.0
             ],
@@ -473,7 +483,7 @@ impl ValidationWarning {
                 "Bad TFM file: Kern step for nonexistent character '{:03o}.",
                 c.0
             ],
-            LigatureStepProducesNonExistentCharacter(_, c) => format![
+            LigatureStepProducesNonExistentCharacter(_, c, _) => format![
                 "Bad TFM file: Ligature step produces the nonexistent character '{:03o}.",
                 c.0
             ],
@@ -484,6 +494,10 @@ impl ValidationWarning {
             }
             InvalidEntrypoint(c) => {
                 format![" \nLigature/kern starting index for character '{:03o} is too large;\nso I removed it.", c.0]
+            }
+            InvalidBoundaryCharEntrypoint => {
+                " \nLigature/kern starting index for boundarychar is too large;so I removed it."
+                    .to_string()
             }
             InfiniteLoop(err) => {
                 // TODO: the error can involve a boundary char
@@ -500,12 +514,13 @@ impl ValidationWarning {
         use ValidationWarning::*;
         match self {
             SkipTooLarge(_) => 70,
-            LigatureStepForNonExistentCharacter(_, _)
-            | LigatureStepProducesNonExistentCharacter(_, _)
+            LigatureStepForNonExistentCharacter(_, _, _)
+            | LigatureStepProducesNonExistentCharacter(_, _, _)
             | InvalidLigTag(_) => 77,
             KernStepForNonExistentCharacter(_, _) | KernIndexTooBig(_) => 76,
             EntrypointRedirectTooBig(_) => 74,
             InvalidEntrypoint(_) => 67,
+            InvalidBoundaryCharEntrypoint => 69,
             InfiniteLoop(_) => 90,
         }
     }

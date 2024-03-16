@@ -1,0 +1,3 @@
+Bad TFM file: String is too long; I've shortened it drastically.
+Bad TFM file: Design size negative!
+I've set it to 10 points.

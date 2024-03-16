@@ -1,0 +1,19 @@
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Nonstandard ASCII code has been blotted out.
+Bad TFM file: Ligature step for nonexistent character '000.
+Bad TFM file: Ligature step produces the nonexistent character '377.

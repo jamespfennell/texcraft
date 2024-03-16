@@ -1,0 +1,13 @@
+Bad TFM file: Design size too small!
+I've set it to 10 points.
+Bad TFM file: depth[0] should be zero.
+Bad TFM file: Depth 0 is too big;
+I have set it to zero.
+ 
+Ligature/kern starting index for character '001 is too large;
+so I removed it.
+Bad TFM file: Ligature/kern step 1 skips too far;
+I made it stop.
+Bad TFM file: Ligature unconditional stop command address is too big.
+Bad TFM file: Ligature step for nonexistent character '341.
+Infinite ligature loop starting with '000 and '000!

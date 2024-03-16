@@ -163,6 +163,12 @@ impl ValidationWarning {
 pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
     let mut warnings = vec![];
 
+    if let Some(scheme) = &mut file.header.character_coding_scheme {
+        validate_string(scheme, 39, &mut warnings);
+    }
+    if let Some(family) = &mut file.header.font_family {
+        validate_string(family, 19, &mut warnings);
+    }
     if file.header.design_size.get() < Number::ZERO {
         warnings.push(ValidationWarning::DesignSizeIsNegative);
         file.header.design_size = DesignSize::Invalid;
@@ -170,13 +176,6 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
     if file.header.design_size.get() < Number::UNITY {
         warnings.push(ValidationWarning::DesignSizeIsTooSmall);
         file.header.design_size = DesignSize::Invalid;
-    }
-
-    if let Some(scheme) = &mut file.header.character_coding_scheme {
-        validate_string(scheme, 39, &mut warnings);
-    }
-    if let Some(family) = &mut file.header.font_family {
-        validate_string(family, 19, &mut warnings);
     }
 
     for (i, elem) in file.params.0.iter_mut().enumerate() {
@@ -282,21 +281,55 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
         .for_each(|c| {
             file.char_tags.remove(c);
         });
-    // There is a bug in Knuth's tftopl in which the same kern-index-too-big warning is printed
-    // more than once. It is printed when the lig/kern instruction is output in the LIGTABLE
+    // There is a bug in Knuth's tftopl in which the some lig/kern warnings are printed
+    // more than once. They are is printed when the lig/kern instruction is output in the LIGTABLE
     // list, and also each time the instruction appears in a lig/kern COMMENT for a character.
-    // The cause of the bug is that the buggy index is never fixed in memory, and so when the
-    // instruction is seen multiple times the warning is triggered again. For other lig/kern warnings,
-    // the bad data is fixed when the warning is first printed, so the next time the instruction is
-    // seen it is valid.
-    let duplicated_warnings: HashMap<usize, lang::ValidationWarning> = lig_kern_warnings
-        .iter()
-        .filter_map(|warning| match warning {
-            lang::ValidationWarning::KernIndexTooBig(u) => Some((*u, warning.clone())),
-            lang::ValidationWarning::EntrypointRedirectTooBig(u) => Some((*u, warning.clone())),
-            _ => None,
-        })
-        .collect();
+    //
+    // The cause of the bug depends on the warning. Each is documented below.
+    let duplicated_warnings = {
+        let mut m: HashMap<usize, Vec<lang::ValidationWarning>> = Default::default();
+        lig_kern_warnings
+            .iter()
+            .filter_map(|warning| match warning {
+                // When this warning is raised in the lig/kern validator, the buggy index is never fixed. When the
+                // instruction is seen again the warning is raised again.
+                lang::ValidationWarning::KernIndexTooBig(u) => Some((*u, warning.clone())),
+                // As with KernIndexTooBig, the buggy data is never fixed.
+                lang::ValidationWarning::EntrypointRedirectTooBig(u) => Some((*u, warning.clone())),
+                // When this warning is raised the non-existent character is replaced by bc; i.e., the smallest
+                // character in the .tfm file. However that character may also not exist! When the instruction
+                // is seen again it will be raised again, except the character being warned about is the smallest
+                // character.
+                lang::ValidationWarning::LigatureStepForNonExistentCharacter(u, _, c) => {
+                    if file.char_dimens.contains_key(c) {
+                        None
+                    } else {
+                        Some((
+                            *u,
+                            lang::ValidationWarning::LigatureStepForNonExistentCharacter(
+                                *u, *c, *c,
+                            ),
+                        ))
+                    }
+                }
+                // Same as LigatureStepForNonExistentCharacter.
+                lang::ValidationWarning::LigatureStepProducesNonExistentCharacter(u, _, c) => {
+                    if file.char_dimens.contains_key(c) {
+                        None
+                    } else {
+                        Some((
+                            *u,
+                            lang::ValidationWarning::LigatureStepProducesNonExistentCharacter(
+                                *u, *c, *c,
+                            ),
+                        ))
+                    }
+                }
+                _ => None,
+            })
+            .for_each(|(u, w)| m.entry(u).or_default().push(w));
+        m
+    };
     warnings.extend(
         lig_kern_warnings
             .into_iter()
@@ -308,6 +341,7 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
     }
 
     file.extensible_chars.iter_mut().for_each(|e| {
+        // TFtoPL.2014.87
         for piece in [&mut e.top, &mut e.middle, &mut e.bottom] {
             let c = match piece {
                 None => continue,
@@ -321,7 +355,6 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
         }
         if !file.char_dimens.contains_key(&e.rep) {
             warnings.push(ValidationWarning::InvalidCharacterInExtensibleRecipe(e.rep));
-            e.rep = Char(0);
         }
     });
 
@@ -371,6 +404,7 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
                             .instructions_for_entrypoint(entrypoint)
                             .map(|t| t.0)
                             .filter_map(|u| duplicated_warnings.get(&u))
+                            .flatten()
                             .cloned()
                             .map(ValidationWarning::LigKernWarning),
                     );
@@ -384,7 +418,7 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
 }
 
 fn validate_string(s: &mut String, max_len: usize, warnings: &mut Vec<ValidationWarning>) {
-    if s.len() > max_len {
+    if s.chars().count() > max_len {
         warnings.push(ValidationWarning::StringIsTooLong(s.len()));
         *s = format!("{}", s.chars().next().unwrap_or(' '))
     }

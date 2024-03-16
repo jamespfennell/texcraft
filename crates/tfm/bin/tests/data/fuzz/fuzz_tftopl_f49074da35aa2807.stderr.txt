@@ -1,0 +1,21 @@
+Bad TFM file: Design size too small!
+I've set it to 10 points.
+Bad TFM file: depth[0] should be zero.
+ 
+Ligature/kern starting index for boundarychar is too large;so I removed it.
+Bad TFM file: Ligature unconditional stop command address is too big.
+ 
+Width index for character '000 is too large;
+so I reset it to zero.
+ 
+Height index for character '000 is too large;
+so I reset it to zero.
+ 
+Depth index for character '000 is too large;
+so I reset it to zero.
+ 
+Italic correction index for character '000 is too large;
+so I reset it to zero.
+ 
+Extensible index for character '000 is too large;
+so I reset it to zero.

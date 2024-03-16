@@ -533,16 +533,7 @@ fn deserialize_lig_kern_program(b: &[u8]) -> ligkern::lang::Program {
                         .expect("cannot be more than u16::MAX instructions"),
                 );
                 let r = u16::from_be_bytes([b[2], b[3]]);
-                // There is an edge case when the entrypoint for the boundary char
-                // points at the last instruction - i.e., the instruction containing the
-                // boundary char entrypoint. In this case TFtoPL behaves as if the
-                // boundary char has no program.
-                if r as usize == instructions.len() - 1 {
-                    None
-                } else {
-                    // TODO: need to validate that the result is not bigger than the array
-                    Some(r)
-                }
+                Some(r)
             } else {
                 None
             }

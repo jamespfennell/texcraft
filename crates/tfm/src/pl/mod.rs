@@ -633,6 +633,15 @@ impl File {
 
         // When we fixed the (LIGTABLE (LABEL BOUNDARYCHAR) bug, number of failures went from 26652 -> 12004
         let mut unreachable_elems: Option<Vec<cst::BalancedElem>> = None;
+        let flush_unreachable_elems =
+            |elems: &mut Option<Vec<cst::BalancedElem>>, l: &mut Vec<ast::LigTable>| {
+                if let Some(mut elems) = elems.take() {
+                    if elems.len() == 1 {
+                        elems.push(cst::BalancedElem::String("".to_string()));
+                    }
+                    l.push(ast::LigTable::Comment(elems))
+                }
+            };
         for (index, (reachable, instruction)) in self
             .lig_kern_program
             .reachable_iter(
@@ -645,9 +654,7 @@ impl File {
         {
             match reachable {
                 ligkern::lang::ReachableIterItem::Reachable { adjusted_skip } => {
-                    if let Some(unreachable_elems) = unreachable_elems.take() {
-                        l.push(ast::LigTable::Comment(unreachable_elems))
-                    }
+                    flush_unreachable_elems(&mut unreachable_elems, &mut l);
                     if let Some(e) = self.lig_kern_program.boundary_char_entrypoint {
                         if e as usize == index {
                             l.push(ast::LigTable::Label(
@@ -691,6 +698,7 @@ impl File {
                 ligkern::lang::ReachableIterItem::Passthrough => {}
             }
         }
+        flush_unreachable_elems(&mut unreachable_elems, &mut l);
         if let Some(mut unreachable_elems) = unreachable_elems.take() {
             if unreachable_elems.len() == 1 {
                 unreachable_elems.push(cst::BalancedElem::String("".to_string()));
@@ -754,6 +762,7 @@ impl File {
                 }
                 Some(CharTag::List(c)) => v.push(ast::Character::NextLarger((*c).into())),
                 Some(CharTag::Extension(recipe)) => {
+                    // TFtoPL.2014.86
                     let mut r = vec![];
                     if let Some(top) = recipe.top {
                         r.push(ast::ExtensibleCharacter::Top(top.into()));
@@ -764,7 +773,12 @@ impl File {
                     if let Some(bottom) = recipe.bottom {
                         r.push(ast::ExtensibleCharacter::Bottom(bottom.into()));
                     }
-                    r.push(ast::ExtensibleCharacter::Replicated(recipe.rep.into()));
+                    let rep = if self.char_dimens.contains_key(&recipe.rep) {
+                        recipe.rep
+                    } else {
+                        *c
+                    };
+                    r.push(ast::ExtensibleCharacter::Replicated(rep.into()));
                     v.push(ast::Character::ExtensibleCharacter(((), r).into()))
                 }
             }
