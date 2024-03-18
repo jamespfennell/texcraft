@@ -16,7 +16,7 @@ pub fn tfm_to_pl(
     display_format: &dyn Fn(&crate::pl::File) -> crate::pl::CharDisplayFormat,
 ) -> Result<TfmToPlOutput, std::fmt::Error> {
     let mut output: TfmToPlOutput = Default::default();
-    let (tfm_file_or, warnings) = crate::format::File::deserialize(tfm_data);
+    let (tfm_file_or, warnings) = crate::format::File::deserialize(tfm_data, false);
     for warning in &warnings {
         writeln!(&mut output.error_messages, "{}", warning.tftopl_message())?;
     }

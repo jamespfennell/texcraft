@@ -229,18 +229,23 @@ impl File {
         validate::validate_and_fix(self)
     }
 
-    pub fn deserialize(b: &[u8]) -> (Result<File, DeserializationError>, Vec<Warning>) {
+    pub fn deserialize(
+        b: &[u8],
+        skip_validation: bool,
+    ) -> (Result<File, DeserializationError>, Vec<Warning>) {
         let (mut result, warnings) = deserialize::deserialize(b);
         let mut warnings: Vec<Warning> = warnings
             .into_iter()
             .map(Warning::DeserializationWarning)
             .collect();
         if let Ok(file) = &mut result {
-            warnings.extend(
-                file.validate_and_fix()
-                    .into_iter()
-                    .map(Warning::ValidationWarning),
-            )
+            if !skip_validation {
+                warnings.extend(
+                    file.validate_and_fix()
+                        .into_iter()
+                        .map(Warning::ValidationWarning),
+                )
+            }
         }
         (result, warnings)
     }

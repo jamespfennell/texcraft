@@ -70,12 +70,15 @@ pub struct TfPath(pub std::path::PathBuf);
 
 impl TfPath {
     #[allow(dead_code)]
-    pub fn read(&self) -> Result<(Vec<u8>, tfm::format::File, Vec<tfm::format::Warning>), String> {
+    pub fn read(
+        &self,
+        skip_validation: bool,
+    ) -> Result<(Vec<u8>, tfm::format::File, Vec<tfm::format::Warning>), String> {
         let data = match std::fs::read(&self.0) {
             Ok(data) => data,
             Err(err) => return Err(format!("Failed to read `{}`: {}", self.0.display(), err)),
         };
-        let (tfm_file_or, warnings) = tfm::format::File::deserialize(&data);
+        let (tfm_file_or, warnings) = tfm::format::File::deserialize(&data, skip_validation);
         for warning in &warnings {
             eprintln!("{}", warning.tftopl_message())
         }

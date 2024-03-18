@@ -220,7 +220,8 @@ impl File {
                                         file.char_tags.insert(c, CharTag::Ligature(u));
                                     }
                                     ast::LigTableLabel::BoundaryChar => {
-                                        file.lig_kern_program.boundary_char_entrypoint = Some(u);
+                                        file.lig_kern_program.left_boundary_char_entrypoint =
+                                            Some(u);
                                     }
                                 }
                                 lig_kern_precedes = false;
@@ -282,7 +283,7 @@ impl File {
                     }
                 }
                 ast::Root::BoundaryChar(v) => {
-                    file.lig_kern_program.boundary_char = Some(v.data);
+                    file.lig_kern_program.right_boundary_char = Some(v.data);
                 }
                 ast::Root::Character(b) => {
                     let char_dimens = file.char_dimens.entry(b.data).or_default();
@@ -597,7 +598,7 @@ impl File {
         }
 
         // Ligtable
-        if let Some(boundary_char) = self.lig_kern_program.boundary_char {
+        if let Some(boundary_char) = self.lig_kern_program.right_boundary_char {
             roots.push(ast::Root::BoundaryChar(boundary_char.into()));
         }
         let index_to_labels = {
@@ -655,7 +656,7 @@ impl File {
             match reachable {
                 ligkern::lang::ReachableIterItem::Reachable { adjusted_skip } => {
                     flush_unreachable_elems(&mut unreachable_elems, &mut l);
-                    if let Some(e) = self.lig_kern_program.boundary_char_entrypoint {
+                    if let Some(e) = self.lig_kern_program.left_boundary_char_entrypoint {
                         if e as usize == index {
                             l.push(ast::LigTable::Label(
                                 ast::LigTableLabel::BoundaryChar.into(),
@@ -961,8 +962,8 @@ mod tests {
             File {
                 lig_kern_program: ligkern::lang::Program {
                     instructions: vec![],
-                    boundary_char: Some('a'.try_into().unwrap()),
-                    boundary_char_entrypoint: None,
+                    right_boundary_char: Some('a'.try_into().unwrap()),
+                    left_boundary_char_entrypoint: None,
                     passthrough: Default::default(),
                 },
                 ..Default::default()
@@ -994,8 +995,8 @@ mod tests {
                         right_char: 'r'.try_into().unwrap(),
                         operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
                     },],
-                    boundary_char: None,
-                    boundary_char_entrypoint: None,
+                    right_boundary_char: None,
+                    left_boundary_char_entrypoint: None,
                     passthrough: Default::default(),
                 },
                 ..Default::default()
@@ -1018,8 +1019,8 @@ mod tests {
                             operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
                         },
                     ],
-                    boundary_char: None,
-                    boundary_char_entrypoint: None,
+                    right_boundary_char: None,
+                    left_boundary_char_entrypoint: None,
                     passthrough: Default::default(),
                 },
                 ..Default::default()
@@ -1035,8 +1036,8 @@ mod tests {
                         right_char: 'r'.try_into().unwrap(),
                         operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
                     },],
-                    boundary_char: None,
-                    boundary_char_entrypoint: None,
+                    right_boundary_char: None,
+                    left_boundary_char_entrypoint: None,
                     passthrough: Default::default(),
                 },
                 ..Default::default()
@@ -1057,8 +1058,8 @@ mod tests {
                             post_lig_tag_invalid: false,
                         },
                     },],
-                    boundary_char: None,
-                    boundary_char_entrypoint: None,
+                    right_boundary_char: None,
+                    left_boundary_char_entrypoint: None,
                     passthrough: Default::default(),
                 },
                 ..Default::default()
@@ -1074,8 +1075,8 @@ mod tests {
                         right_char: 'r'.try_into().unwrap(),
                         operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
                     },],
-                    boundary_char: None,
-                    boundary_char_entrypoint: None,
+                    right_boundary_char: None,
+                    left_boundary_char_entrypoint: None,
                     passthrough: Default::default(),
                 },
                 char_tags: BTreeMap::from([
@@ -1095,8 +1096,8 @@ mod tests {
                         right_char: 'r'.try_into().unwrap(),
                         operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
                     },],
-                    boundary_char: None,
-                    boundary_char_entrypoint: Some(0),
+                    right_boundary_char: None,
+                    left_boundary_char_entrypoint: Some(0),
                     passthrough: Default::default(),
                 },
                 ..Default::default()

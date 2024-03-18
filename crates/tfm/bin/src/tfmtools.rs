@@ -187,7 +187,7 @@ impl Convert {
     fn run(&self) -> Result<(), String> {
         match &self.path {
             TfOrPlPath::Tf(tf_path) => {
-                let (_, tfm_file, warnings) = tf_path.read()?;
+                let (_, tfm_file, warnings) = tf_path.read(false)?;
                 let pl_file = tfm::pl::File::from_tfm_file(tfm_file);
                 let pl_output = format![
                     "{}",
@@ -326,6 +326,10 @@ struct Debug {
     /// This is useful if you're using the output to diff two .tfm files.
     #[arg(long)]
     omit_tfm_path: bool,
+
+    /// Don't validate and fix the .tfm file.
+    #[arg(long)]
+    skip_validation: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -361,7 +365,7 @@ impl clap::ValueEnum for Section {
 
 impl Debug {
     fn run(&self) -> Result<(), String> {
-        let (tfm_bytes, tfm_file, _) = self.path.read()?;
+        let (tfm_bytes, tfm_file, _) = self.path.read(self.skip_validation)?;
         let raw_file = tfm::format::RawFile::deserialize(&tfm_bytes).0.unwrap();
 
         let path = if self.omit_tfm_path {

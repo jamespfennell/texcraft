@@ -684,10 +684,31 @@ convert_tftopl_tests!(
         true,
     ),
     (
-        todo,
+        slant_param_is_i32_min,
         "data/fuzz/fuzz_tftopl_ef0432d46c78f8a.tfm",
         include_str!("data/fuzz/fuzz_tftopl_ef0432d46c78f8a.plst"),
         include_str!("data/fuzz/fuzz_tftopl_ef0432d46c78f8a.stderr.txt"),
+        true,
+    ),
+    (
+        phantom_ligature_bug,
+        "data/fuzz/fuzz_tftopl_90cbce0c1d734f4e.tfm",
+        include_str!("data/fuzz/fuzz_tftopl_90cbce0c1d734f4e.plst"),
+        include_str!("data/fuzz/fuzz_tftopl_90cbce0c1d734f4e.stderr.txt"),
+        true,
+    ),
+    (
+        phantom_ligature_bug_minimal_repro_1,
+        "data/originals/phantom-ligature-bug-minimal-repro-1.tfm",
+        include_str!("data/originals/phantom-ligature-bug-minimal-repro-1.plst"),
+        include_str!("data/originals/phantom-ligature-bug-minimal-repro-1.stderr.txt"),
+        true,
+    ),
+    (
+        phantom_ligature_bug_minimal_repro_2,
+        "data/originals/phantom-ligature-bug-minimal-repro-2.tfm",
+        include_str!("data/originals/phantom-ligature-bug-minimal-repro-2.plst"),
+        include_str!("data/originals/phantom-ligature-bug-minimal-repro-2.stderr.txt"),
         true,
     ),
 );

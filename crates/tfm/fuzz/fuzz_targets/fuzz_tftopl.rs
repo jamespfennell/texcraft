@@ -85,8 +85,9 @@ impl Input {
     fn tfm_bytes(&self) -> Vec<u8> {
         let mut b = vec![0_u8; 24];
         let mut sub_file_sizes = SubFileSizes {
-            lf: 0, // correct value populated later
+            lf: 0, // the correct value is calculated later
             lh: append_bytes(&mut b, &self.header, 2, i16::MAX),
+            // TODO: we should also fuzz the value of bc
             bc: if self.char_infos.is_empty() { 1 } else { 0 },
             ec: if self.char_infos.is_empty() {
                 0

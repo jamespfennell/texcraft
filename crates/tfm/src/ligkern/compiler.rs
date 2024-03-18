@@ -68,8 +68,17 @@ fn calculate_replacements(
     let mut actionable: Vec<OngoingCalculation> = vec![];
     let mut node_to_parents: HashMap<Node, Vec<OngoingCalculation>> = Default::default();
     for (&(left, right), &index) in &pair_to_instruction {
-        let (pre_cursor, cursor, post_cursor): (TC, Char, TC) = match instructions[index].operation
-        {
+        let operation = instructions[index].operation;
+        let operation = match operation {
+            lang::Operation::EntrypointRedirect(u, _) => {
+                // This reimplements the phantom ligature bug in tftopl.
+                // TODO: in tfmtools don't reimplement these bugs.
+                let [op_byte, remainder] = u.to_be_bytes();
+                lang::Operation::lig_kern_operation_from_bytes(op_byte, remainder)
+            }
+            operation => operation,
+        };
+        let (pre_cursor, cursor, post_cursor): (TC, Char, TC) = match operation {
             lang::Operation::Kern(kern) => {
                 result.insert((left, right), Replacement(vec![(left, kern)], right));
                 continue;
@@ -77,12 +86,14 @@ fn calculate_replacements(
             lang::Operation::KernAtIndex(index) => {
                 result.insert(
                     (left, right),
-                    Replacement(vec![(left, kerns[index as usize])], right),
+                    Replacement(
+                        vec![(left, kerns.get(index as usize).copied().unwrap_or_default())],
+                        right,
+                    ),
                 );
                 continue;
             }
             lang::Operation::EntrypointRedirect(_, _) => {
-                // TODO: is this correct?
                 continue;
             }
             lang::Operation::Ligature {

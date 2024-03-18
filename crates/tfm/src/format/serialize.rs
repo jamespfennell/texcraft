@@ -25,7 +25,7 @@ pub fn serialize(file: &File) -> Vec<u8> {
         nl: serialize_section(
             &file.lig_kern_program.instructions,
             &mut b,
-            file.lig_kern_program.boundary_char,
+            file.lig_kern_program.right_boundary_char,
         ),
         nk: serialize_section(&file.kerns, &mut b, None),
         ne: serialize_section(&file.extensible_chars, &mut b, None),

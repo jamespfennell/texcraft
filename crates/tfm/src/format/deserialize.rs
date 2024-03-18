@@ -541,8 +541,8 @@ fn deserialize_lig_kern_program(b: &[u8]) -> ligkern::lang::Program {
     };
     ligkern::lang::Program {
         instructions,
-        boundary_char,
-        boundary_char_entrypoint,
+        right_boundary_char: boundary_char,
+        left_boundary_char_entrypoint: boundary_char_entrypoint,
         passthrough,
     }
 }
@@ -598,11 +598,11 @@ impl Deserializable for (Option<CharDimensions>, Option<CharTag>) {
 
 impl Deserializable for ligkern::lang::Instruction {
     fn deserialize(b: &[u8]) -> Self {
-        let (skip_byte, right_char, op_byte, remainder) = (b[0], b[1], b[2], b[3]);
+        let (skip_byte, right_char, op_byte, remainder) = (b[0], Char(b[1]), b[2], b[3]);
         if skip_byte > 128 {
             return ligkern::lang::Instruction {
                 next_instruction: None,
-                right_char: Char(0),
+                right_char,
                 operation: ligkern::lang::Operation::EntrypointRedirect(
                     u16::from_be_bytes([b[2], b[3]]),
                     true,
@@ -615,37 +615,8 @@ impl Deserializable for ligkern::lang::Instruction {
             } else {
                 None
             },
-            right_char: Char(right_char),
-            operation: match op_byte.checked_sub(128) {
-                Some(r) => {
-                    ligkern::lang::Operation::KernAtIndex(u16::from_be_bytes([r, remainder]))
-                }
-                None => {
-                    // TFtoPL.2014.77
-                    let delete_next_char = (op_byte % 2) == 0;
-                    let op_byte = op_byte / 2;
-                    let delete_current_char = (op_byte % 2) == 0;
-                    let skip = op_byte / 2;
-                    use ligkern::lang::PostLigOperation::*;
-                    let (post_lig_operation, post_lig_tag_invalid) =
-                        match (delete_current_char, delete_next_char, skip) {
-                            (false, false, 0) => (RetainBothMoveNowhere, false),
-                            (false, false, 1) => (RetainBothMoveToInserted, false),
-                            (false, false, 2) => (RetainBothMoveToRight, false),
-                            (false, true, 0) => (RetainLeftMoveNowhere, false),
-                            (false, true, 1) => (RetainLeftMoveToInserted, false),
-                            (true, false, 0) => (RetainRightMoveToInserted, false),
-                            (true, false, 1) => (RetainRightMoveToRight, false),
-                            (true, true, 0) => (RetainNeitherMoveToInserted, false),
-                            _ => (RetainNeitherMoveToInserted, true),
-                        };
-                    ligkern::lang::Operation::Ligature {
-                        char_to_insert: Char(remainder),
-                        post_lig_operation,
-                        post_lig_tag_invalid,
-                    }
-                }
-            },
+            right_char,
+            operation: ligkern::lang::Operation::lig_kern_operation_from_bytes(op_byte, remainder),
         }
     }
 }
@@ -1265,8 +1236,8 @@ mod tests {
                         operation: ligkern::lang::Operation::KernAtIndex(0),
                     },
                 ],
-                boundary_char: None,
-                boundary_char_entrypoint: None,
+                right_boundary_char: None,
+                left_boundary_char_entrypoint: None,
                 passthrough: Default::default(),
             },
             ..Default::default()

@@ -13,14 +13,16 @@ use crate::Number;
 
 /// A lig/kern program.
 ///
-/// In theory the program also requires entrypoints.
+/// In theory the program also includes entrypoints.
 /// However because these are provided in different ways in .tfm and .pl files,
 /// it's easier to exclude them on this type and pass them in when needed.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Program {
     pub instructions: Vec<Instruction>,
-    pub boundary_char: Option<Char>,
-    pub boundary_char_entrypoint: Option<u16>,
+    // TODO: rename left_boundary_char_entrypoint everywhere
+    pub left_boundary_char_entrypoint: Option<u16>,
+    // TODO: rename right_boundary_char everywhere
+    pub right_boundary_char: Option<Char>,
     pub passthrough: HashSet<u16>,
 }
 
@@ -89,6 +91,39 @@ pub enum Operation {
     /// The boolean value in the payload is true if the boundary character should be
     ///     serialized inside the instruction.
     EntrypointRedirect(u16, bool),
+}
+
+impl Operation {
+    pub(crate) fn lig_kern_operation_from_bytes(op_byte: u8, remainder: u8) -> Self {
+        match op_byte.checked_sub(128) {
+            Some(r) => Self::KernAtIndex(u16::from_be_bytes([r, remainder])),
+            None => {
+                // TFtoPL.2014.77
+                let delete_next_char = (op_byte % 2) == 0;
+                let op_byte = op_byte / 2;
+                let delete_current_char = (op_byte % 2) == 0;
+                let skip = op_byte / 2;
+                use PostLigOperation::*;
+                let (post_lig_operation, post_lig_tag_invalid) =
+                    match (delete_current_char, delete_next_char, skip) {
+                        (false, false, 0) => (RetainBothMoveNowhere, false),
+                        (false, false, 1) => (RetainBothMoveToInserted, false),
+                        (false, false, 2) => (RetainBothMoveToRight, false),
+                        (false, true, 0) => (RetainLeftMoveNowhere, false),
+                        (false, true, 1) => (RetainLeftMoveToInserted, false),
+                        (true, false, 0) => (RetainRightMoveToInserted, false),
+                        (true, false, 1) => (RetainRightMoveToRight, false),
+                        (true, true, 0) => (RetainNeitherMoveToInserted, false),
+                        _ => (RetainNeitherMoveToInserted, true),
+                    };
+                Self::Ligature {
+                    char_to_insert: Char(remainder),
+                    post_lig_operation,
+                    post_lig_tag_invalid,
+                }
+            }
+        }
+    }
 }
 
 /// A post-lig operation to perform after performing a ligature operation ([`Operation::Ligature`]).
@@ -174,13 +209,13 @@ impl Program {
             v.sort_by_key(|(u, _)| *u);
             v
         };
-        let mut offset: u8 = if self.boundary_char.is_some() {
+        let mut offset: u8 = if self.right_boundary_char.is_some() {
             // In .tfm files the boundary char is transmitted in each entrypoint redirect instruction.
             // If there is a boundary char, we need at least one entrypoint redirect to exist so
             // that the boundary char is there.
             instructions.push(Instruction {
                 next_instruction: None,
-                right_char: self.boundary_char.unwrap_or(Char(0)),
+                right_char: self.right_boundary_char.unwrap_or(Char(0)),
                 operation: Operation::EntrypointRedirect(0, true),
             });
             1
@@ -194,7 +229,7 @@ impl Program {
                 Ok(u) => u,
                 Err(_) => {
                     redirects.push(u16_entrypoint);
-                    if i == 0 && self.boundary_char.is_some() {
+                    if i == 0 && self.right_boundary_char.is_some() {
                         // This implements the "optimization" "location 0 can do double duty" in PLtoTF.2014.141
                         instructions.pop();
                         offset = 0;
@@ -213,7 +248,7 @@ impl Program {
         for redirect in redirects {
             instructions.push(Instruction {
             next_instruction: None,
-            right_char: self.boundary_char.unwrap_or(Char(0)),
+            right_char: self.right_boundary_char.unwrap_or(Char(0)),
             operation: Operation::EntrypointRedirect(
                 redirect.checked_add(offset as u16).expect("the inputted lig/kern instructions vector doesn't have enough space for new instructions"),
             true,
@@ -221,7 +256,7 @@ impl Program {
         });
         }
         instructions.rotate_right(offset as usize);
-        if let Some(boundary_char_entrypoint) = self.boundary_char_entrypoint {
+        if let Some(boundary_char_entrypoint) = self.left_boundary_char_entrypoint {
             instructions.push(Instruction {
                 next_instruction: None,
                 right_char: Char(0),
@@ -308,9 +343,9 @@ impl Program {
     {
         let mut warnings = vec![];
         // TFtoPL.2014.68
-        if let Some(entrypoint) = self.boundary_char_entrypoint {
+        if let Some(entrypoint) = self.left_boundary_char_entrypoint {
             if self.instructions.len() <= entrypoint as usize {
-                self.boundary_char_entrypoint = None;
+                self.left_boundary_char_entrypoint = None;
                 warnings.push(ValidationWarning::InvalidBoundaryCharEntrypoint);
             }
         }
@@ -363,7 +398,7 @@ impl Program {
                 }
             };
             if !char_exists(instruction.right_char)
-                && Some(instruction.right_char) != self.boundary_char
+                && Some(instruction.right_char) != self.right_boundary_char
             {
                 warnings.push(if is_kern_step {
                     ValidationWarning::KernStepForNonExistentCharacter(i, instruction.right_char)
@@ -427,7 +462,7 @@ impl Program {
             }
         }
         // TFtoPL.2014.69
-        if let Some(entrypoint) = self.boundary_char_entrypoint {
+        if let Some(entrypoint) = self.left_boundary_char_entrypoint {
             // There is a bug (?) in Knuth's TFtoPL when the entrypoint for the boundary char
             // points at the last instruction - i.e., the instruction containing the
             // boundary char entrypoint. In this case the last instruction is marked as passthrough
