@@ -29,7 +29,7 @@ pub use validate::ValidationWarning;
 /// In fact in TeX the font data for all fonts is stored in one contiguous piece of memory
 ///     (`font_info`, defined in TeX82.2021.549).
 /// This is a little too unsafe to pull off though.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct File {
     /// Header.
     pub header: Header,

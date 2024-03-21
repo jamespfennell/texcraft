@@ -442,10 +442,10 @@ impl Program {
         }
 
         let entrypoints: HashMap<Char, u16> = unpacked_entrypoints.into_iter().collect();
-        if let Some(err) = super::CompiledProgram::compile(&self.instructions, kerns, entrypoints).1
-        {
+        let (_, error_or) = super::CompiledProgram::compile(self, kerns, entrypoints);
+        if let Some(err) = error_or {
             warnings.push(ValidationWarning::InfiniteLoop(err));
-        }
+        };
         warnings
     }
 
@@ -530,13 +530,7 @@ impl ValidationWarning {
                 " \nLigature/kern starting index for boundarychar is too large;so I removed it."
                     .to_string()
             }
-            InfiniteLoop(err) => {
-                // TODO: the error can involve a boundary char
-                format![
-                    "Infinite ligature loop starting with '{:03o} and '{:03o}!",
-                    err.starting_pair.0 .0, err.starting_pair.1 .0
-                ]
-            }
+            InfiniteLoop(err) => err.pltotf_message(),
         }
     }
 

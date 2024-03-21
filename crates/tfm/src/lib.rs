@@ -66,7 +66,7 @@
 //! assert_eq![deserialization_warnings, vec![], "the data in cmr10.tfm is 100% valid, so there are no deserialization warnings"];
 //! // TODO assert_eq![tfm_file.header.design_size, tfm::Number::UNITY * 10]; make it 11 to be more interesting
 //! // TODO query some data
-//! 
+//!
 //! // Validate the .tfm file.
 //! let validation_warnings = tfm_file.validate_and_fix();
 //! assert_eq![validation_warnings, vec![], "the data in cmr10.tfm is 100% valid, so there are no validation warnings"];
@@ -75,11 +75,11 @@
 //! let pl_file: tfm::pl::File = tfm_file.clone().into();
 //! // TODO query some data
 //! println!["cmr10.pl:\n{}", pl_file.display(/*indent=*/2, tfm::pl::CharDisplayFormat::Default)];
-//! 
+//!
 //! // TODO Convert the .tfm file to the crate's Font type.
 //! ```
-//! 
-//! 
+//!
+//!
 //! ## Advanced functionality
 //!
 //! In addition to supporting the basic use cases of querying font metric data
@@ -87,7 +87,7 @@
 //!     this crate has advanced functionality for performing additional tasks on font metric data.
 //! The full functionality can be understood by navigating through the crate documentation.
 //! But here are 3 highlights we think are interesting:
-//! 
+//!
 //! - **Language analysis of .pl files**:
 //!     In `pltotf`, Knuth parses .pl files in a single pass.
 //!     This crate takes a common approach nowadays of parsing it in multiple passes:
@@ -97,12 +97,12 @@
 //!     and finally building the [`pl::File`] itself.
 //!     Each of the passes is exposed, so you can e.g. just build the AST for the .pl file and
 //!         do some analysis on it.
-//! 
+//!
 //! - **Debug output for .tfm files**:
 //!     
 //! - **Compilation of lig/kern programs**:
-//! 
-//! 
+//!
+//!
 //! ## Binaries
 //!
 //! The Texcraft project produces 3 binaries based on this crate:
@@ -116,7 +116,7 @@
 //!     these tools can be run with `cargo run --bin $NAME`
 //!     and built with `cargo build --bin $NAME`.
 //!
-//! 
+//!
 //! ## Correctness
 //!
 //! As part of the development of this crate significant effort has been spent
