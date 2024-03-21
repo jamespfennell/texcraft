@@ -107,8 +107,8 @@ enum Command {
     /// If you're modifying the debug output it may be useful to some of the parsing rules:
     ///
     /// 1.
-    ///     You can omit .tfm sections.
-    ///     In the outputted .tfm file, all unspecified sections will be output as empty
+    ///     Entire sections can be omitted.
+    ///     In the outputted .tfm file, all omitted sections will be output as empty
     ///     sections with the exception of the sub file sizes section, which is calculated
     ///     correctly.
     ///

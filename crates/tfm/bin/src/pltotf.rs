@@ -1,7 +1,5 @@
 use clap::Parser;
 
-mod common;
-
 fn main() {
     if let Err(err) = Cli::parse().run() {
         eprintln!("{err}");
