@@ -70,7 +70,7 @@ impl Cli {
         for warning in warnings {
             eprintln!("{}", warning.pltotf_message(&pl_data));
         }
-        let tfm_file = tfm::format::File::from_pl_file(&pl_file);
+        let tfm_file: tfm::format::File = pl_file.into();
         let tfm_output: Vec<u8> = tfm_file.serialize();
 
         // Output

@@ -1,4 +1,155 @@
-//! Parsers for the TeX font metric (.tfm) and property list (.pl) file formats
+//! # tfm: TeX font metric data
+//!
+//! This is a crate for working with TeX font metric data.
+//! It includes:
+//!
+//! - Functions to read and write TeX font metric (.tfm) files
+//!     to and from a value of type [`format::File`]
+//!     ([`deserialize`](format::File::deserialize), [`serialize`](format::File::serialize)).
+//!
+//! - Functions to read and write property list (.pl) files
+//!     to and from a value of type [`pl::File`]
+//!     ([`from_pl_source_code`](pl::File::from_pl_source_code), [`display`](pl::File::display)).
+//!
+//! - Converters from .tfm to .pl files and vice-versa
+//!     (using Rust's [`From`] trait to go between [`format::File`] and [`pl::File`]).
+//!
+//! - A type [`Font`] that represents a fully validated and compiled TeX font
+//!     and that can be used to efficiently query data about the font
+//!     (e.g., "what is the width of the character A?").
+//!     This type and its methods are performance optimized and
+//!     designed for use in the hot main loops
+//!     of typesetting software such as TeX.
+//!
+//! ## Background
+//!
+//! Probably the most famous part of the implementation of TeX is the Knuth-Plass line-breaking algorithm.
+//! This determines the "optimal" places to add line breaks when typesetting a paragraph of text.
+//! Path of the inputs to this algorithm, in addition to the characters being typeset,
+//!     are the dimensions of the characters in the current font.
+//! When running this algorithm, in TeX or elsewhere, this information needs to be provided somehow.
+//!
+//! In TeX, this is done using TeX font metric files.
+//! These are binary files.
+//! By convention they have a .tfm file extension.
+//! Unlike more modern file formats like TrueType, .tfm files only contain the font dimensions;
+//!     they don't contains the glyphs.
+//! In general .tfm files are produced by other software like Metafont,
+//!     placed in some well-known directory in the TeX distribution,
+//!     and then read into memory when TeX is running.
+//!
+//! Because .tfm files are binary files, it's hard to debug or tweak them.
+//! To remedy this, Knuth and his team developed another file format called a property list file
+//!     (extension .pl or .plst)
+//!     that contains the same information but in a modifiable text format.
+//! They then wrote two programs:
+//!     `tftopl` to convert a .tfm file to a .pl file,
+//!     and `pltotf` to convert a .pl file to a .tfm file.
+//!
+//! The general goal of this crate to fully re-implement all of the TeX font metric
+//!     code written by Knuth and others.
+//! This includes `tftopl`, `pltotf`, and also the parts of TeX itself that contain logic
+//!     for reading and interpreting .tfm files.
+//! However, unlike these monolithic software programs,
+//!     this re-implementation is in the form of a modular library in which
+//!     individual pieces of logic and be used and re-used.
+//!
+//! ## Basic example
+//!
+//! ```
+//! // Include the .tfm file for Computer Modern in size 10pt.
+//! let tfm_bytes = include_bytes!["cmr10.tfm"];
+//!
+//! // Deserialize the .tfm file.
+//! let (tfm_file_or_error, deserialization_warnings) = tfm::format::File::deserialize(tfm_bytes);
+//! let mut tfm_file = tfm_file_or_error.expect("cmr10.tfm is a valid .tfm file");
+//! assert_eq![deserialization_warnings, vec![], "the data in cmr10.tfm is 100% valid, so there are no deserialization warnings"];
+//! // TODO assert_eq![tfm_file.header.design_size, tfm::Number::UNITY * 10]; make it 11 to be more interesting
+//! // TODO query some data
+//! 
+//! // Validate the .tfm file.
+//! let validation_warnings = tfm_file.validate_and_fix();
+//! assert_eq![validation_warnings, vec![], "the data in cmr10.tfm is 100% valid, so there are no validation warnings"];
+//!
+//! // Convert the .tfm file to a .pl file and print it.
+//! let pl_file: tfm::pl::File = tfm_file.clone().into();
+//! // TODO query some data
+//! println!["cmr10.pl:\n{}", pl_file.display(/*indent=*/2, tfm::pl::CharDisplayFormat::Default)];
+//! 
+//! // TODO Convert the .tfm file to the crate's Font type.
+//! ```
+//! 
+//! 
+//! ## Advanced functionality
+//!
+//! In addition to supporting the basic use cases of querying font metric data
+//!     and converting between different formats,
+//!     this crate has advanced functionality for performing additional tasks on font metric data.
+//! The full functionality can be understood by navigating through the crate documentation.
+//! But here are 3 highlights we think are interesting:
+//! 
+//! - **Language analysis of .pl files**:
+//!     In `pltotf`, Knuth parses .pl files in a single pass.
+//!     This crate takes a common approach nowadays of parsing it in multiple passes:
+//!     first running a [lexer](pl::lexer::Lexer) to convert the file to tokens,
+//!     then constructing a [concrete syntax tree](pl::cst::Cst) (or parse tree),
+//!     next constructing a [fully typed and checked abstract syntax tree](pl::ast::Ast),
+//!     and finally building the [`pl::File`] itself.
+//!     Each of the passes is exposed, so you can e.g. just build the AST for the .pl file and
+//!         do some analysis on it.
+//! 
+//! - **Debug output for .tfm files**:
+//!     
+//! - **Compilation of lig/kern programs**:
+//! 
+//! 
+//! ## Binaries
+//!
+//! The Texcraft project produces 3 binaries based on this crate:
+//!
+//! - `tftopl` and `pltotf`: re-implementations of Knuth's programs.
+//! - `tfmtools`: a new binary that has a bunch of different tools
+//!         for working with TeX font metric data.
+//!         Run `tfmtools help` to list all of the available tools.
+//!
+//! In the root of [the Texcraft repository](https://github.com/jamespfennell/texcraft)
+//!     these tools can be run with `cargo run --bin $NAME`
+//!     and built with `cargo build --bin $NAME`.
+//!
+//! 
+//! ## Correctness
+//!
+//! As part of the development of this crate significant effort has been spent
+//!     ensuring it exactly replicates the work of Knuth.
+//! This correctness checking is largely based around diff testing the binaries
+//!     `tftopl` and `pltotf`.
+//! We verify that the Texcraft and Knuth implementations have the same output
+//!     and generate the same error messages.
+//!
+//! This diff testing has been performed in a few different ways:
+//!
+//! - We have run diff tests over all ~100,000 .tfm files in CTAN.
+//!     These tests verify that `tftopl` gives the correct result,
+//!     and that running `pltotf` on the output .pl file gives the correct result too.
+//!     Unfortunately running `pltotf` on the .pl files in CTAN is infeasible
+//!     because most of these files are Perl scripts, not property list files.
+//!
+//! - We have developed a fuzz testing harness (so far just for `tftopl`)
+//!     that generates highly heterogenous .tfm files and verifies that `tftopl` gives the correct result.
+//!     This fuzz testing has uncovered many issues in the Texcraft implementation,
+//!     and has even identified [a 30-year old bug](https://tug.org/pipermail/tex-k/2024-March/004031.html)
+//!     in Knuth's implementation of `tftopl`.
+//!
+//! Any .tfm or .pl file that exposes a bug in this library is added to
+//!     [our automated testing corpus](https://github.com/jamespfennell/texcraft/tree/main/crates/tfm/bin/tests/data).
+//! Running `cargo t` validates that Texcraft's binaries give the same result as Knuth's binaries
+//!     (the output of Knuth's binaries is in source control).
+//! This ensures there are no regressions.
+//!
+//! If you discover a .tfm or .pl file such that the Texcraft and Knuth implementations
+//!     diverge, this indicates there is a bug in this library.
+//! Please create an issue on the Texcraft GitHub repo.
+//! We will fix the bug and add your files to the testing corpus.
 
 pub mod algorithms;
 use std::{
@@ -34,6 +185,10 @@ pub struct Header {
     pub face: Option<Face>,
     /// The TFM format allows the header to contain arbitrary additional data.
     pub additional_data: Vec<u32>,
+}
+
+pub struct Font {
+    _todo: bool,
 }
 
 /// Design size of the font.

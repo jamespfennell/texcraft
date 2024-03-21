@@ -345,18 +345,16 @@ impl File {
 
         // Validate and fix the lig kern program.
         let lig_kern_seven_bit_safe = {
-            match crate::ligkern::CompiledProgram::compile(
+            if let Some(err) = crate::ligkern::CompiledProgram::compile(
                 &file.lig_kern_program.instructions,
                 &[],
                 file.lig_kern_entrypoints(true), // todo include orphans?
-            ) {
-                // TODO: warnings from the compilation?
-                Ok(_) => {}
-                Err(err) => {
-                    errors.push(ParseError::InfiniteLoopInLigKernProgram(err));
-                    file.clear_lig_kern_data();
-                }
-            };
+            )
+            .1
+            {
+                errors.push(ParseError::InfiniteLoopInLigKernProgram(err));
+                file.clear_lig_kern_data();
+            }
             file.lig_kern_program
                 .is_seven_bit_safe(file.lig_kern_entrypoints(false))
         };
@@ -417,9 +415,10 @@ impl File {
 
         file
     }
+}
 
-    /// Convert a TFM file into a PL file.
-    pub fn from_tfm_file(tfm_file: crate::format::File) -> File {
+impl From<crate::format::File> for File {
+    fn from(tfm_file: crate::format::File) -> Self {
         let char_dimens: BTreeMap<Char, CharDimensions> = tfm_file
             .char_dimens
             .iter()
@@ -495,7 +494,9 @@ impl File {
             params: tfm_file.params,
         }
     }
+}
 
+impl File {
     /// Lower a File to an AST.
     pub fn lower(&self, char_display_format: CharDisplayFormat) -> ast::Ast {
         let mut roots = vec![];
@@ -1226,7 +1227,7 @@ mod tests {
     );
 
     fn run_from_tfm_file_test(tfm_file: crate::format::File, want: File) {
-        let got = File::from_tfm_file(tfm_file);
+        let got: File = tfm_file.into();
         assert_eq!(got, want);
     }
 
@@ -1302,7 +1303,7 @@ mod tests {
                     }
                 ),
             ]),
-            ..File::from_tfm_file(Default::default())
+            ..<File as From<crate::format::File>>::from(Default::default())
         },
     ),);
 }

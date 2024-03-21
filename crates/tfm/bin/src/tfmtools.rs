@@ -187,8 +187,8 @@ impl Convert {
     fn run(&self) -> Result<(), String> {
         match &self.path {
             TfOrPlPath::Tf(tf_path) => {
-                let (_, tfm_file, warnings) = tf_path.read(false)?;
-                let pl_file = tfm::pl::File::from_tfm_file(tfm_file);
+                let (_, tfm_file, _, validation_warnings) = tf_path.read(false)?;
+                let pl_file: tfm::pl::File = tfm_file.into();
                 let pl_output = format![
                     "{}",
                     pl_file.display(
@@ -198,19 +198,17 @@ impl Convert {
                     )
                 ];
                 // TODO: deduplicate this code between here and algorithms
-                let infinite_loop = warnings.iter().any(|w| {
+                let infinite_loop = validation_warnings.iter().any(|w| {
                     matches!(
                         w,
-                        tfm::format::Warning::ValidationWarning(
-                            tfm::format::ValidationWarning::LigKernWarning(
-                                tfm::ligkern::lang::ValidationWarning::InfiniteLoop(_),
-                            )
+                        tfm::format::ValidationWarning::LigKernWarning(
+                            tfm::ligkern::lang::ValidationWarning::InfiniteLoop(_),
                         )
                     )
                 });
-                let tfm_modified = warnings
+                let tfm_modified = validation_warnings
                     .iter()
-                    .map(tfm::format::Warning::tfm_file_modified)
+                    .map(tfm::format::ValidationWarning::tfm_file_modified)
                     .any(|t| t);
                 let suffix = if infinite_loop {
                     "(INFINITE LIGATURE LOOP MUST BE BROKEN!)"
@@ -230,7 +228,7 @@ impl Convert {
             }
             TfOrPlPath::Pl(pl_path) => {
                 let pl_file = pl_path.read()?;
-                let tfm_file = tfm::format::File::from_pl_file(&pl_file);
+                let tfm_file: tfm::format::File = pl_file.into();
                 let tfm_bytes = tfm_file.serialize();
                 let tfm_path: TfPath = match &self.output {
                     Some(TfOrPlPath::Pl(_pl_path)) => todo!(),
@@ -365,7 +363,7 @@ impl clap::ValueEnum for Section {
 
 impl Debug {
     fn run(&self) -> Result<(), String> {
-        let (tfm_bytes, tfm_file, _) = self.path.read(self.skip_validation)?;
+        let (tfm_bytes, tfm_file, _, _) = self.path.read(self.skip_validation)?;
         let raw_file = tfm::format::RawFile::deserialize(&tfm_bytes).0.unwrap();
 
         let path = if self.omit_tfm_path {

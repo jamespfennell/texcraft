@@ -1,4 +1,4 @@
-//! Ligature and kern data
+//! Ligature and kern programming
 //!
 //! The TFM file format can provide information about ligatures and kerns.
 //! A [ligature](https://en.wikipedia.org/wiki/Ligature_(writing))
@@ -104,7 +104,7 @@ impl CompiledProgram {
         instructions: &[lang::Instruction],
         kerns: &[Number],
         entrypoints: HashMap<Char, u16>,
-    ) -> Result<CompiledProgram, InfiniteLoopError> {
+    ) -> (CompiledProgram, Option<InfiniteLoopError>) {
         compiler::compile(instructions, kerns, &entrypoints)
     }
 

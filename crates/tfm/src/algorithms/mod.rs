@@ -16,11 +16,11 @@ pub fn tfm_to_pl(
     display_format: &dyn Fn(&crate::pl::File) -> crate::pl::CharDisplayFormat,
 ) -> Result<TfmToPlOutput, std::fmt::Error> {
     let mut output: TfmToPlOutput = Default::default();
-    let (tfm_file_or, warnings) = crate::format::File::deserialize(tfm_data, false);
+    let (tfm_file_or, warnings) = crate::format::File::deserialize(tfm_data);
     for warning in &warnings {
         writeln!(&mut output.error_messages, "{}", warning.tftopl_message())?;
     }
-    let tfm_file = match tfm_file_or {
+    let mut tfm_file = match tfm_file_or {
         Ok(tfm_file) => tfm_file,
         Err(err) => {
             writeln!(
@@ -31,20 +31,22 @@ pub fn tfm_to_pl(
             return Ok(output);
         }
     };
-    let pl_file = crate::pl::File::from_tfm_file(tfm_file);
+    let warnings = tfm_file.validate_and_fix();
+    for warning in &warnings {
+        writeln!(&mut output.error_messages, "{}", warning.tftopl_message())?;
+    }
+    let pl_file: crate::pl::File = tfm_file.into();
     let infinite_loop = warnings.iter().any(|w| {
         matches!(
             w,
-            crate::format::Warning::ValidationWarning(
-                crate::format::ValidationWarning::LigKernWarning(
-                    crate::ligkern::lang::ValidationWarning::InfiniteLoop(_),
-                )
+            crate::format::ValidationWarning::LigKernWarning(
+                crate::ligkern::lang::ValidationWarning::InfiniteLoop(_),
             )
         )
     });
     let tfm_modified = warnings
         .iter()
-        .map(crate::format::Warning::tfm_file_modified)
+        .map(crate::format::ValidationWarning::tfm_file_modified)
         .any(|t| t);
     let suffix = if infinite_loop {
         "(INFINITE LIGATURE LOOP MUST BE BROKEN!)"

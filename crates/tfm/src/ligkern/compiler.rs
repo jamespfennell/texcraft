@@ -5,11 +5,12 @@ pub fn compile(
     instructions: &[lang::Instruction],
     kerns: &[Number],
     entry_points: &HashMap<Char, u16>,
-) -> Result<CompiledProgram, InfiniteLoopError> {
+) -> (CompiledProgram, Option<InfiniteLoopError>) {
     let pair_to_instruction = build_pair_to_instruction_map(instructions, entry_points);
-    let pair_to_replacement = calculate_replacements(instructions, kerns, pair_to_instruction)?;
+    let (pair_to_replacement, infinite_loop_error_or) =
+        calculate_replacements(instructions, kerns, pair_to_instruction);
     let program = lower_and_optimize(pair_to_replacement);
-    Ok(program)
+    (program, infinite_loop_error_or)
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
@@ -63,7 +64,10 @@ fn calculate_replacements(
     instructions: &[lang::Instruction],
     kerns: &[Number],
     pair_to_instruction: HashMap<(Char, Char), usize>,
-) -> Result<HashMap<(Char, Char), Replacement>, InfiniteLoopError> {
+) -> (
+    HashMap<(Char, Char), Replacement>,
+    Option<InfiniteLoopError>,
+) {
     let mut result: HashMap<(Char, Char), Replacement> = Default::default();
     let mut actionable: Vec<OngoingCalculation> = vec![];
     let mut node_to_parents: HashMap<Node, Vec<OngoingCalculation>> = Default::default();
@@ -188,6 +192,8 @@ fn calculate_replacements(
 
     // Next we check for infinite loops. If there is one, the node_to_parents
     // map will be non-empty and contain all the nodes that couldn't be calculated.
+    // TODO: return all infinite loops
+    let mut infinite_loop_error: Option<InfiniteLoopError> = None;
     let node_to_calc: HashMap<Node, OngoingCalculation> = node_to_parents
         .into_values()
         .flatten()
@@ -237,13 +243,13 @@ fn calculate_replacements(
                 instruction_index: pair_to_instruction[&(node.0, node.1)],
             });
         }
-        return Err(InfiniteLoopError {
+        infinite_loop_error = Some(InfiniteLoopError {
             starting_pair,
             infinite_loop: steps,
-        });
+        })
     }
 
-    Ok(result)
+    (result, infinite_loop_error)
 }
 
 enum TC {
@@ -388,7 +394,9 @@ mod tests {
                 )
             })
             .collect();
-        let compiled_program = compile(&instructions, &vec![], &entry_points).unwrap();
+        let (compiled_program, infinite_loop_error_or) =
+            compile(&instructions, &vec![], &entry_points);
+        assert!(infinite_loop_error_or.is_none(), "no infinite loop errors");
 
         let mut got: HashMap<(Char, Char), Vec<(Char, Number)>> = Default::default();
         for pair in compiled_program.all_pairs_having_replacement() {
@@ -754,7 +762,7 @@ mod tests {
             .into_iter()
             .map(|(c, u)| (c.try_into().unwrap(), u))
             .collect();
-        let got_err = compile(&instructions, &vec![], &entry_points).unwrap_err();
+        let got_err = compile(&instructions, &vec![], &entry_points).1.unwrap();
         assert_eq!(got_err, want_err);
     }
 

@@ -73,20 +73,36 @@ impl TfPath {
     pub fn read(
         &self,
         skip_validation: bool,
-    ) -> Result<(Vec<u8>, tfm::format::File, Vec<tfm::format::Warning>), String> {
+    ) -> Result<
+        (
+            Vec<u8>,
+            tfm::format::File,
+            Vec<tfm::format::DeserializationWarning>,
+            Vec<tfm::format::ValidationWarning>,
+        ),
+        String,
+    > {
         let data = match std::fs::read(&self.0) {
             Ok(data) => data,
             Err(err) => return Err(format!("Failed to read `{}`: {}", self.0.display(), err)),
         };
-        let (tfm_file_or, warnings) = tfm::format::File::deserialize(&data, skip_validation);
+        let (tfm_file_or, warnings) = tfm::format::File::deserialize(&data);
         for warning in &warnings {
             eprintln!("{}", warning.tftopl_message())
         }
-        let tfm_file = match tfm_file_or {
+        let mut tfm_file = match tfm_file_or {
             Ok(t) => t,
             Err(err) => return Err(err.tftopl_message()),
         };
-        Ok((data, tfm_file, warnings))
+        let validation_warnings = if skip_validation {
+            vec![]
+        } else {
+            tfm_file.validate_and_fix()
+        };
+        for warning in &validation_warnings {
+            eprintln!("{}", warning.tftopl_message())
+        }
+        Ok((data, tfm_file, warnings, validation_warnings))
     }
     fn parse(input: &str) -> Result<Self, InvalidExtension> {
         let path_buf: std::path::PathBuf = input.into();

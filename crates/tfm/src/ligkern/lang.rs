@@ -336,7 +336,7 @@ impl Program {
         entrypoints: I,
         char_exists: T,
         kerns: &[Number],
-    ) -> (Vec<ValidationWarning>, Option<super::CompiledProgram>)
+    ) -> Vec<ValidationWarning>
     where
         I: Iterator<Item = (Char, u8)>,
         T: Fn(Char) -> bool,
@@ -442,15 +442,11 @@ impl Program {
         }
 
         let entrypoints: HashMap<Char, u16> = unpacked_entrypoints.into_iter().collect();
-        let program_or =
-            match super::CompiledProgram::compile(&self.instructions, kerns, entrypoints) {
-                Ok(program) => Some(program),
-                Err(err) => {
-                    warnings.push(ValidationWarning::InfiniteLoop(err));
-                    None
-                }
-            };
-        (warnings, program_or)
+        if let Some(err) = super::CompiledProgram::compile(&self.instructions, kerns, entrypoints).1
+        {
+            warnings.push(ValidationWarning::InfiniteLoop(err));
+        }
+        warnings
     }
 
     fn reachable_array<I: Iterator<Item = (Char, u16)>>(&self, entrypoints: I) -> Vec<bool> {
@@ -488,7 +484,7 @@ impl Program {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ValidationWarning {
     SkipTooLarge(usize),
     LigatureStepForNonExistentCharacter(usize, Char, Char),

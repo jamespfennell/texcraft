@@ -1,6 +1,7 @@
 use super::*;
 use crate::ligkern::lang;
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum ValidationWarning {
     DesignSizeIsTooSmall,
     DesignSizeIsNegative,
@@ -264,7 +265,7 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
         .map(|w| (w.bad_char(), w))
         .collect();
 
-    let (lig_kern_warnings, compiled_program_or) = file.lig_kern_program.validate_and_fix(
+    let lig_kern_warnings = file.lig_kern_program.validate_and_fix(
         file.smallest_char,
         file.char_tags
             .iter()
@@ -330,15 +331,18 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
             .for_each(|(u, w)| m.entry(u).or_default().push(w));
         m
     };
+    let has_infinite_loop = lig_kern_warnings
+        .iter()
+        .any(|f| matches!(f, lang::ValidationWarning::InfiniteLoop(_)));
+    if has_infinite_loop {
+        file.char_dimens.clear();
+        file.extensible_chars.clear();
+    }
     warnings.extend(
         lig_kern_warnings
             .into_iter()
             .map(ValidationWarning::LigKernWarning),
     );
-    if compiled_program_or.is_none() {
-        file.char_dimens.clear();
-        file.extensible_chars.clear();
-    }
 
     file.extensible_chars.iter_mut().for_each(|e| {
         // TFtoPL.2014.87
