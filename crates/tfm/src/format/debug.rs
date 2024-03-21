@@ -3,9 +3,11 @@ use super::*;
 static SECTION_DIVIDER: &str = "============================[";
 static INDEX_DIVIDER: char = '|';
 
-pub fn parse(s: &str) -> Result<Vec<u8>, (String, usize)> {
+pub fn parse(s: &str, keep_sub_file_sizes: bool) -> Result<Vec<u8>, (String, usize)> {
     let mut section_to_bytes: HashMap<Section, (Vec<u8>, usize)> = Default::default();
     let mut current_buffer: Option<&mut Vec<u8>> = None;
+    let mut current_section: Option<Section> = None;
+    let mut bc_and_line_set: Option<(u8, usize)> = None;
     for (n, line) in s.lines().enumerate() {
         let line = line.trim();
 
@@ -15,10 +17,13 @@ pub fn parse(s: &str) -> Result<Vec<u8>, (String, usize)> {
                 if line.starts_with("//") || line.is_empty() {
                     continue;
                 }
-                let data = match line.rfind(INDEX_DIVIDER) {
-                    None => line,
-                    Some(i) => &line[i + INDEX_DIVIDER.len_utf8()..],
+                let (prefix, data) = match line.rfind(INDEX_DIVIDER) {
+                    None => ("", line),
+                    Some(i) => (&line[0..i], &line[i + INDEX_DIVIDER.len_utf8()..]),
                 };
+                if bc_and_line_set.is_none() && current_section == Some(Section::CharInfos) {
+                    bc_and_line_set = Some((parse_char(prefix), n))
+                }
 
                 let start = buffer.len();
                 for byte in data.split_whitespace() {
@@ -64,6 +69,7 @@ pub fn parse(s: &str) -> Result<Vec<u8>, (String, usize)> {
                         Some(&mut r.0)
                     }
                 };
+                current_section = Some(section);
             }
         }
     }
@@ -72,7 +78,7 @@ pub fn parse(s: &str) -> Result<Vec<u8>, (String, usize)> {
     // But we can't because calculating the value to insert requires accessing the map
     // and the entry API uses a mutable reference to the map.
     #[allow(clippy::map_entry)]
-    if !section_to_bytes.contains_key(&Section::SubFileSizes) {
+    if !keep_sub_file_sizes || !section_to_bytes.contains_key(&Section::SubFileSizes) {
         let num_words = |section| -> Result<i16, (String, usize)> {
             let (l, n) = section_to_bytes
                 .get(&section)
@@ -88,22 +94,28 @@ pub fn parse(s: &str) -> Result<Vec<u8>, (String, usize)> {
                 )
             })
         };
+        let num_chars = num_words(Section::CharInfos)?;
+        let (bc, ec): (u8, u8) = match (bc_and_line_set, num_chars.checked_sub(1)) {
+            (Some((bc, line_set)), Some(ec_pre_shift)) => {
+                let ec = ec_pre_shift.saturating_add(bc as i16);
+                let ec: u8 = match ec.try_into() {
+                    Ok(ec )=>ec,
+                    Err(_) => {
+                        return Err( (
+                            format!("char_infos array starts with char 0x{bc:02x} and has length {num_chars}, so ec is {ec} which is too big"),
+                            line_set,
+                        ))
+                    }
+                };
+                (bc, ec)
+            }
+            _ => (1, 0),
+        };
         let mut s = SubFileSizes {
             lf: 0,
             lh: num_words(Section::Header)?,
-            bc: if num_words(Section::CharInfos)? == 0 {
-                1
-            } else {
-                0
-            },
-            ec: {
-                let n = num_words(Section::CharInfos)?;
-                if n == 0 {
-                    0
-                } else {
-                    n - 1
-                }
-            },
+            bc: bc as i16,
+            ec: ec as i16,
             nw: num_words(Section::Widths)?,
             nh: num_words(Section::Heights)?,
             nd: num_words(Section::Depths)?,
@@ -250,5 +262,28 @@ fn format_char(c: Char) -> String {
         format!("   {}", ch)
     } else {
         format!("0x{:02x}", c.0)
+    }
+}
+
+/// Inverse of [format_char].
+fn parse_char(prefix: &str) -> u8 {
+    let first_word = match prefix.split_whitespace().next() {
+        None => "",
+        Some(w) => w,
+    };
+    if first_word.len() == 1 {
+        if let Some(ch) = first_word.chars().next() {
+            if ch.is_ascii_alphanumeric() || ch.is_ascii_graphic() {
+                ch.try_into().expect("ASCII char can be cast to u8")
+            } else {
+                0
+            }
+        } else {
+            0
+        }
+    } else if let Some(data) = first_word.strip_prefix("0x") {
+        u8::from_str_radix(data, 16).unwrap_or(0)
+    } else {
+        0
     }
 }

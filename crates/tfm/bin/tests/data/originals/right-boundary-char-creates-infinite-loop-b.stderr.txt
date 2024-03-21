@@ -1,0 +1,1 @@
+Bad TFM file: Ligature step for nonexistent character '102.

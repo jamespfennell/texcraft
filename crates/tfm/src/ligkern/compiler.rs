@@ -2,27 +2,28 @@ use super::*;
 use std::collections::HashSet;
 
 pub fn compile(
-    instructions: &[lang::Instruction],
+    program: &lang::Program,
     kerns: &[Number],
     entry_points: &HashMap<Char, u16>,
 ) -> Result<CompiledProgram, InfiniteLoopError> {
-    let pair_to_instruction = build_pair_to_instruction_map(instructions, entry_points);
-    let pair_to_replacement = calculate_replacements(instructions, kerns, pair_to_instruction)?;
+    let pair_to_instruction = build_pair_to_instruction_map(program, entry_points);
+    let pair_to_replacement =
+        calculate_replacements(&program.instructions, kerns, pair_to_instruction)?;
     let program = lower_and_optimize(pair_to_replacement);
     Ok(program)
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
-struct Node(Char, Char);
+struct Node(LeftChar, Char);
 
 struct OngoingCalculation {
     // Node this calculation is for.
     node: Node,
     // Part of the ligature result that has been finalized and won't change.
-    finalized: Vec<(Char, Number)>,
+    finalized: ReplacementBuilder,
     // Characters that are still pending replacement. The next step is to apply the ligature
     // rule for (pending[0], pending[1]).
-    pending: (Char, Char, Option<Char>),
+    pending: (LeftChar, Char, Option<Char>),
 }
 
 impl OngoingCalculation {
@@ -31,15 +32,56 @@ impl OngoingCalculation {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
+enum LeftChar {
+    Char(Char),
+    BoundaryChar,
+}
+
+impl LeftChar {
+    fn char_or(&self) -> Option<Char> {
+        match self {
+            LeftChar::Char(c) => Some(*c),
+            LeftChar::BoundaryChar => None,
+        }
+    }
+}
+
+impl From<Char> for LeftChar {
+    fn from(value: Char) -> Self {
+        LeftChar::Char(value)
+    }
+}
+
+impl TryFrom<LeftChar> for Char {
+    type Error = ();
+
+    fn try_from(value: LeftChar) -> Result<Self, Self::Error> {
+        match value {
+            LeftChar::Char(c) => Ok(c),
+            LeftChar::BoundaryChar => Err(()),
+        }
+    }
+}
+
 fn build_pair_to_instruction_map(
-    instructions: &[lang::Instruction],
+    program: &lang::Program,
     entry_points: &HashMap<Char, u16>,
-) -> HashMap<(Char, Char), usize> {
-    let mut result = HashMap::<(Char, Char), usize>::new();
-    for (&left, &entry_point) in entry_points {
+) -> HashMap<(LeftChar, Char), usize> {
+    let mut result = HashMap::<(LeftChar, Char), usize>::new();
+    let all_entry_points = entry_points
+        .iter()
+        .map(|(c, e)| (LeftChar::Char(*c), *e))
+        .chain(
+            program
+                .left_boundary_char_entrypoint
+                .iter()
+                .map(|e| (LeftChar::BoundaryChar, *e)),
+        );
+    for (left, entry_point) in all_entry_points {
         let mut next_instruction = Some(entry_point as usize);
         while let Some(next) = next_instruction {
-            let instruction = match instructions.get(next) {
+            let instruction = match program.instructions.get(next) {
                 None => {
                     // Invalid next instruction
                     break;
@@ -57,14 +99,96 @@ fn build_pair_to_instruction_map(
     result
 }
 
-struct Replacement(Vec<(Char, Number)>, Char);
+// TODO: replace the first LeftChar with a bool indicating whether the
+// first character is deleted. Anytime we need the first char, get it from
+// the context. I think in this way we can remove all of the expect() calls
+// on boundary chars.
+struct Replacement(LeftChar, Vec<(Number, Char)>);
+
+enum ReplacementBuilder {
+    Empty,
+    NonEmpty {
+        replacement: Replacement,
+        last_kern: Number,
+    },
+}
+
+impl ReplacementBuilder {
+    fn new_single_char(c1: LeftChar) -> Self {
+        ReplacementBuilder::NonEmpty {
+            replacement: Replacement(c1, vec![]),
+            last_kern: Number::ZERO,
+        }
+    }
+    fn new_double_char(c1: LeftChar, c2: Char) -> Self {
+        ReplacementBuilder::NonEmpty {
+            replacement: Replacement(c1, vec![(Number::ZERO, c2)]),
+            last_kern: Number::ZERO,
+        }
+    }
+    fn finish(self, last_char: Char) -> Replacement {
+        match self {
+            ReplacementBuilder::Empty => Replacement(last_char.into(), vec![]),
+            ReplacementBuilder::NonEmpty {
+                mut replacement,
+                last_kern,
+            } => {
+                replacement.1.push((last_kern, last_char));
+                replacement
+            }
+        }
+    }
+    fn push(&mut self, c: LeftChar, kern: Number) {
+        match self {
+            ReplacementBuilder::Empty => {
+                *self = ReplacementBuilder::NonEmpty {
+                    replacement: Replacement(c, vec![]),
+                    last_kern: kern,
+                }
+            }
+            ReplacementBuilder::NonEmpty {
+                replacement,
+                last_kern,
+            } => {
+                replacement.1.push((
+                    *last_kern,
+                    c.try_into()
+                        .expect("boundary char can't appear in the middle of a replacement"),
+                ));
+                *last_kern = kern;
+            }
+        }
+    }
+
+    fn extend(&mut self, replacement: &Replacement) -> LeftChar {
+        let mut c: LeftChar = replacement.0;
+        for (kern, next_c) in replacement.1.iter().copied() {
+            self.push(c, kern);
+            c = next_c.into();
+        }
+        c
+    }
+
+    fn chars(&self) -> Option<Chars> {
+        match self {
+            ReplacementBuilder::Empty => None,
+            ReplacementBuilder::NonEmpty {
+                replacement,
+                last_kern: _,
+            } => Some(Chars(
+                replacement.0,
+                replacement.1.iter().map(|(_, c)| *c).collect(),
+            )),
+        }
+    }
+}
 
 fn calculate_replacements(
     instructions: &[lang::Instruction],
     kerns: &[Number],
-    pair_to_instruction: HashMap<(Char, Char), usize>,
-) -> Result<HashMap<(Char, Char), Replacement>, InfiniteLoopError> {
-    let mut result: HashMap<(Char, Char), Replacement> = Default::default();
+    pair_to_instruction: HashMap<(LeftChar, Char), usize>,
+) -> Result<HashMap<(LeftChar, Char), Replacement>, InfiniteLoopError> {
+    let mut result: HashMap<(LeftChar, Char), Replacement> = Default::default();
     let mut actionable: Vec<OngoingCalculation> = vec![];
     let mut node_to_parents: HashMap<Node, Vec<OngoingCalculation>> = Default::default();
     for (&(left, right), &index) in &pair_to_instruction {
@@ -78,17 +202,21 @@ fn calculate_replacements(
             }
             operation => operation,
         };
-        let (pre_cursor, cursor, post_cursor): (TC, Char, TC) = match operation {
+        let (pre_cursor, cursor, post_cursor): (ReplacementBuilder, LeftChar, TC) = match operation
+        {
             lang::Operation::Kern(kern) => {
-                result.insert((left, right), Replacement(vec![(left, kern)], right));
+                result.insert((left, right), Replacement(left, vec![(kern, right)]));
                 continue;
             }
             lang::Operation::KernAtIndex(index) => {
                 result.insert(
                     (left, right),
                     Replacement(
-                        vec![(left, kerns.get(index as usize).copied().unwrap_or_default())],
-                        right,
+                        left,
+                        vec![(
+                            kerns.get(index as usize).copied().unwrap_or_default(),
+                            right,
+                        )],
                     ),
                 );
                 continue;
@@ -101,37 +229,54 @@ fn calculate_replacements(
                 post_lig_operation,
                 post_lig_tag_invalid: _,
             } => match post_lig_operation {
-                lang::PostLigOperation::RetainBothMoveNowhere => {
-                    (TC::None, left, TC::Two(char_to_insert, right))
-                }
-                lang::PostLigOperation::RetainBothMoveToInserted => {
-                    (TC::One(left), char_to_insert, TC::One(right))
-                }
-                lang::PostLigOperation::RetainBothMoveToRight => {
-                    (TC::Two(left, char_to_insert), right, TC::None)
-                }
-                lang::PostLigOperation::RetainRightMoveToInserted => {
-                    (TC::None, char_to_insert, TC::One(right))
-                }
-                lang::PostLigOperation::RetainRightMoveToRight => {
-                    (TC::One(char_to_insert), right, TC::None)
-                }
+                lang::PostLigOperation::RetainBothMoveNowhere => (
+                    ReplacementBuilder::Empty,
+                    left,
+                    TC::Two(char_to_insert, right),
+                ),
+                lang::PostLigOperation::RetainBothMoveToInserted => (
+                    ReplacementBuilder::new_single_char(left),
+                    char_to_insert.into(),
+                    TC::One(right),
+                ),
+                lang::PostLigOperation::RetainBothMoveToRight => (
+                    ReplacementBuilder::new_double_char(left, char_to_insert),
+                    right.into(),
+                    TC::None { cursor: right },
+                ),
+                lang::PostLigOperation::RetainRightMoveToInserted => (
+                    ReplacementBuilder::Empty,
+                    char_to_insert.into(),
+                    TC::One(right),
+                ),
+                lang::PostLigOperation::RetainRightMoveToRight => (
+                    ReplacementBuilder::new_single_char(char_to_insert.into()),
+                    right.into(),
+                    TC::None { cursor: right },
+                ),
                 lang::PostLigOperation::RetainLeftMoveNowhere => {
-                    (TC::None, left, TC::One(char_to_insert))
+                    (ReplacementBuilder::Empty, left, TC::One(char_to_insert))
                 }
-                lang::PostLigOperation::RetainLeftMoveToInserted => {
-                    (TC::One(left), char_to_insert, TC::None)
-                }
-                lang::PostLigOperation::RetainNeitherMoveToInserted => {
-                    (TC::None, char_to_insert, TC::None)
-                }
+                lang::PostLigOperation::RetainLeftMoveToInserted => (
+                    ReplacementBuilder::new_single_char(left),
+                    char_to_insert.into(),
+                    TC::None {
+                        cursor: char_to_insert,
+                    },
+                ),
+                lang::PostLigOperation::RetainNeitherMoveToInserted => (
+                    ReplacementBuilder::Empty,
+                    char_to_insert.into(),
+                    TC::None {
+                        cursor: char_to_insert,
+                    },
+                ),
             },
         };
         let node = Node(left, right);
-        let pre_cursor = pre_cursor.map(|c| (c, Number::ZERO)).collect();
         match post_cursor {
-            TC::None => {
-                result.insert((node.0, node.1), Replacement(pre_cursor, cursor));
+            TC::None { cursor } => {
+                result.insert((node.0, node.1), pre_cursor.finish(cursor));
             }
             TC::One(c2) => {
                 actionable.push(OngoingCalculation {
@@ -153,34 +298,31 @@ fn calculate_replacements(
     }
 
     while let Some(mut calc) = actionable.pop() {
-        let child = Node(calc.pending.0, calc.pending.1); // todo calc.child() ?
+        let child = Node(calc.pending.0, calc.pending.1);
         if let Some(blocking) = node_to_parents.get_mut(&child) {
             blocking.push(calc);
             continue;
         }
         let last = match result.get(&(child.0, child.1)) {
-            // todo node.tuple?
             None => {
-                calc.finalized.push((child.0, Number::ZERO));
+                calc.finalized.push(child.0, Number::ZERO);
                 child.1
             }
-            Some(Replacement(replacement, last)) => {
-                calc.finalized.extend(replacement);
-                *last
-            }
+            Some(replacement) => calc
+                .finalized
+                .extend(replacement)
+                .try_into()
+                .expect("boundary char can't be in the middle of a replacement"),
         };
         match calc.pending.2 {
             None => {
                 if let Some(blocking) = node_to_parents.remove(&calc.node) {
                     actionable.extend(blocking);
                 }
-                result.insert(
-                    (calc.node.0, calc.node.1),
-                    Replacement(calc.finalized, last),
-                );
+                result.insert((calc.node.0, calc.node.1), calc.finalized.finish(last));
             }
             Some(other) => {
-                calc.pending = (last, other, None);
+                calc.pending = (last.into(), other, None);
                 actionable.push(calc);
             }
         }
@@ -207,38 +349,78 @@ fn calculate_replacements(
             }
             infinite_loop
         };
-        let starting_pair = (infinite_loop[0].0, infinite_loop[0].1);
-        let mut starting_replacement = vec![starting_pair.0, starting_pair.1];
+        let starting_pair = infinite_loop[0];
+        let mut replacement: Option<Chars> = None;
         let mut cursor_position = 0_usize;
         let mut steps = Vec::<InfiniteLoopStep>::new();
         for node in infinite_loop {
             // TODO: the bug here for /LIG/ nodes is that the loop may caused by the second dep of /LIG/
             // and so we've lost information on how we got from the start to here.
             let calc = &node_to_calc[&node];
-            let mut new_starting_replacement: Vec<Char> =
-                starting_replacement[0..cursor_position].into();
-            for (finalized, _) in &calc.finalized {
-                new_starting_replacement.push(*finalized);
-            }
-            let new_cursor_position = new_starting_replacement.len();
-            new_starting_replacement.push(calc.pending.0);
-            new_starting_replacement.push(calc.pending.1);
-            if let Some(c) = calc.pending.2 {
-                new_starting_replacement.push(c);
-            }
-            new_starting_replacement.extend(&starting_replacement[cursor_position + 2..]);
 
-            starting_replacement = new_starting_replacement;
+            let (head, tail): (Option<Chars>, Vec<Char>) = match replacement.take() {
+                None => (None, vec![]),
+                Some(mut replacement) => {
+                    if cursor_position == 0 {
+                        (None, vec![])
+                    } else {
+                        let tail: Vec<Char> = replacement
+                            .1
+                            .get(cursor_position + 1..)
+                            .unwrap_or_default()
+                            .into();
+                        replacement.1.truncate(cursor_position - 1);
+                        (Some(replacement), tail)
+                    }
+                }
+            };
+            let head = match calc.finalized.chars() {
+                None => head,
+                Some(middle) => match head {
+                    None => Some(middle),
+                    Some(mut head) => {
+                        head.push(middle.0);
+                        head.1.extend(middle.1);
+                        Some(head)
+                    }
+                },
+            };
+            let new_cursor_position = match &head {
+                None => 0,
+                Some(head) => 1 + head.1.len(),
+            };
+            let mut head = match head {
+                None => Chars(calc.pending.0, vec![]),
+                Some(mut head) => {
+                    head.push(calc.pending.0);
+                    head
+                }
+            };
+            head.1.push(calc.pending.1);
+            if let Some(c) = calc.pending.2 {
+                head.1.push(c);
+            }
+            head.1.extend(tail);
+
+            let post_replacement = match head.0 {
+                LeftChar::Char(c) => {
+                    let mut v = vec![c];
+                    v.extend(&head.1);
+                    (false, v)
+                }
+                LeftChar::BoundaryChar => (true, head.1.clone()),
+            };
+            replacement = Some(head);
             cursor_position = new_cursor_position;
 
             steps.push(InfiniteLoopStep {
-                post_replacement: starting_replacement.clone(),
+                post_replacement,
                 post_cursor_position: cursor_position,
                 instruction_index: pair_to_instruction[&(node.0, node.1)],
             });
         }
         return Err(InfiniteLoopError {
-            starting_pair,
+            starting_pair: (starting_pair.0.char_or(), starting_pair.1),
             infinite_loop: steps,
         });
     }
@@ -246,66 +428,65 @@ fn calculate_replacements(
     Ok(result)
 }
 
+#[derive(Debug)]
+struct Chars(LeftChar, Vec<Char>);
+
+impl Chars {
+    fn push(&mut self, c: LeftChar) {
+        self.1.push(
+            c.try_into()
+                .expect("left boundary char cannot appear in the middle of a replacement"),
+        );
+    }
+}
+
 enum TC {
-    None,
+    None { cursor: Char },
     One(Char),
     Two(Char, Char),
 }
 
-impl Iterator for TC {
-    type Item = Char;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let a = match *self {
-            TC::None => (TC::None, None),
-            TC::One(a) => (TC::None, Some(a)),
-            TC::Two(a, b) => (TC::One(b), Some(a)),
-        };
-        *self = a.0;
-        a.1
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let n = match self {
-            TC::None => 0,
-            TC::One(_) => 1,
-            TC::Two(_, _) => 2,
-        };
-        (n, Some(n))
-    }
-}
-
-fn lower_and_optimize(pair_to_replacement: HashMap<(Char, Char), Replacement>) -> CompiledProgram {
-    let mut intermediate: HashMap<Char, Vec<(Char, RawReplacement)>> = Default::default();
+fn lower_and_optimize(
+    pair_to_replacement: HashMap<(LeftChar, Char), Replacement>,
+) -> CompiledProgram {
+    let mut intermediate: HashMap<LeftChar, Vec<(Char, RawReplacement)>> = Default::default();
     let mut middle_chars: Vec<(Char, Number)> = Default::default();
 
-    for (node, Replacement(middle, last)) in pair_to_replacement {
-        let (left_char_operation, middle_extension) = match middle.first().copied() {
-            None => (LeftCharOperation::Delete, &middle[..]),
-            Some((first, kern)) => {
-                if first == node.0 {
-                    (
-                        if kern == Number::ZERO {
-                            LeftCharOperation::Retain
-                        } else {
-                            LeftCharOperation::AppendKern(kern)
-                        },
-                        &middle[1..],
-                    )
+    for (node, Replacement(head, tail)) in pair_to_replacement {
+        let start: u16 = middle_chars.len().try_into().unwrap();
+
+        let (left_char_operation, last_char) = match tail.first().copied() {
+            None => {
+                let head: Char = head.try_into().expect("boundary chars cannot appear as replacements (in this case for the deleted left char");
+                (LeftCharOperation::Delete, head)
+            }
+            Some((first_kern, mut last_char)) => {
+                let left_char_operation = if node.0 == head {
+                    if first_kern == Number::ZERO {
+                        LeftCharOperation::Retain
+                    } else {
+                        LeftCharOperation::AppendKern(first_kern)
+                    }
                 } else {
-                    (LeftCharOperation::Delete, &middle[..])
+                    let head: Char = head.try_into().expect("boundary chars cannot appear as replacements (in this case for the deleted left char");
+                    middle_chars.push((head, first_kern));
+                    LeftCharOperation::Delete
+                };
+                for (kern, c) in tail[1..].iter().copied() {
+                    middle_chars.push((last_char, kern));
+                    last_char = c;
                 }
+                (left_char_operation, last_char)
             }
         };
-        let start: u16 = middle_chars.len().try_into().unwrap();
-        middle_chars.extend(middle_extension);
+
         let end: u16 = middle_chars.len().try_into().unwrap();
         intermediate.entry(node.0).or_default().push((
             node.1,
             RawReplacement {
                 left_char_operation,
                 middle_char_bounds: start..end,
-                last_char: last,
+                last_char,
             },
         ));
     }
@@ -317,7 +498,14 @@ fn lower_and_optimize(pair_to_replacement: HashMap<(Char, Char), Replacement>) -
         let start: u16 = pairs.len().try_into().unwrap();
         pairs.extend(replacements);
         let end: u16 = pairs.len().try_into().unwrap();
-        left_to_pairs.insert(left, (start, end));
+        match left {
+            LeftChar::Char(left) => {
+                left_to_pairs.insert(left, (start, end));
+            }
+            LeftChar::BoundaryChar => {
+                // TODO
+            }
+        }
     }
     CompiledProgram {
         left_to_pairs,
@@ -388,7 +576,11 @@ mod tests {
                 )
             })
             .collect();
-        let compiled_program = compile(&instructions, &vec![], &entry_points).unwrap();
+        let program = lang::Program {
+            instructions,
+            ..Default::default()
+        };
+        let compiled_program = compile(&program, &vec![], &entry_points).unwrap();
 
         let mut got: HashMap<(Char, Char), Vec<(Char, Number)>> = Default::default();
         for pair in compiled_program.all_pairs_having_replacement() {
@@ -750,11 +942,15 @@ mod tests {
         entry_points: Vec<(char, u16)>,
         want_err: InfiniteLoopError,
     ) {
+        let program = lang::Program {
+            instructions,
+            ..Default::default()
+        };
         let entry_points: HashMap<Char, u16> = entry_points
             .into_iter()
             .map(|(c, u)| (c.try_into().unwrap(), u))
             .collect();
-        let got_err = compile(&instructions, &vec![], &entry_points).unwrap_err();
+        let got_err = compile(&program, &vec![], &entry_points).unwrap_err();
         assert_eq!(got_err, want_err);
     }
 
@@ -897,11 +1093,11 @@ mod tests {
         ),
     );
 
-    fn starting_pair(l: char, r: char) -> (Char, Char) {
-        (l.try_into().unwrap(), r.try_into().unwrap())
+    fn starting_pair(l: char, r: char) -> (Option<Char>, Char) {
+        (Some(l.try_into().unwrap()), r.try_into().unwrap())
     }
 
-    fn post_replacement(s: &str) -> Vec<Char> {
-        s.chars().map(|c| c.try_into().unwrap()).collect()
+    fn post_replacement(s: &str) -> (bool, Vec<Char>) {
+        (false, s.chars().map(|c| c.try_into().unwrap()).collect())
     }
 }

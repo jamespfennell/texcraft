@@ -427,6 +427,12 @@ struct Undebug {
 
     /// Path to write the .tfm file.
     output: TfPath,
+
+    /// By default the sub-file sizes in the debug output are ignored and the
+    ///     correct sizes are calculated, based on the sizes of the data sections.
+    /// If true, the sizes in the debug output will be used instead.
+    #[arg(short, long)]
+    keep_sub_file_sizes: bool,
 }
 
 impl Undebug {
@@ -441,7 +447,7 @@ impl Undebug {
                 ))
             }
         };
-        match tfm::format::RawFile::from_debug_output(&data) {
+        match tfm::format::RawFile::from_debug_output(&data, self.keep_sub_file_sizes) {
             Ok(b) => {
                 self.output.write(&b)?;
                 Ok(())

@@ -1,0 +1,2 @@
+Bad TFM file: Ligature step for nonexistent character '102.
+Infinite ligature loop starting with '121 and '120!

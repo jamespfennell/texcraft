@@ -295,8 +295,11 @@ impl From<SubFileSizes> for [u8; 24] {
 }
 
 impl<'a> RawFile<'a> {
-    pub fn from_debug_output(s: &str) -> Result<Vec<u8>, (String, usize)> {
-        debug::parse(s)
+    pub fn from_debug_output(
+        s: &str,
+        keep_sub_file_sizes: bool,
+    ) -> Result<Vec<u8>, (String, usize)> {
+        debug::parse(s, keep_sub_file_sizes)
     }
 
     pub fn deserialize(

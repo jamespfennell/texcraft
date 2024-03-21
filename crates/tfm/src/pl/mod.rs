@@ -346,7 +346,7 @@ impl File {
         // Validate and fix the lig kern program.
         let lig_kern_seven_bit_safe = {
             match crate::ligkern::CompiledProgram::compile(
-                &file.lig_kern_program.instructions,
+                &file.lig_kern_program,
                 &[],
                 file.lig_kern_entrypoints(true), // todo include orphans?
             ) {

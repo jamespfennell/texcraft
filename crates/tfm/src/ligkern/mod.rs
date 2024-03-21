@@ -101,11 +101,11 @@ struct RawReplacement {
 impl CompiledProgram {
     /// Compile a lig/kern program.
     pub fn compile(
-        instructions: &[lang::Instruction],
+        program: &lang::Program,
         kerns: &[Number],
         entrypoints: HashMap<Char, u16>,
     ) -> Result<CompiledProgram, InfiniteLoopError> {
-        compiler::compile(instructions, kerns, &entrypoints)
+        compiler::compile(program, kerns, &entrypoints)
     }
 
     /// Get an iterator over the full lig/kern replacement for a pair of characters.
@@ -174,7 +174,7 @@ impl CompiledProgram {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InfiniteLoopError {
     /// The pair of characters the starts the infinite loop.
-    pub starting_pair: (Char, Char),
+    pub starting_pair: (Option<Char>, Char),
     /// A sequence of steps forming the infinite loop.
     ///
     /// At the end of these steps, the next pair to replace will be the `starting_pair` again.
@@ -183,9 +183,13 @@ pub struct InfiniteLoopError {
 
 impl InfiniteLoopError {
     pub fn pltotf_message(&self) -> String {
+        let left = match self.starting_pair.0 {
+            Some(c) => format!["'{:03o}", c.0],
+            None => "boundary".to_string(),
+        };
         format!(
-            "Infinite ligature loop starting with '{:o} and '{:o}!",
-            self.starting_pair.0 .0, self.starting_pair.1 .0
+            "Infinite ligature loop starting with {} and '{:03o}!",
+            left, self.starting_pair.1 .0
         )
     }
     pub fn pltotf_section(&self) -> u8 {
@@ -201,7 +205,10 @@ pub struct InfiniteLoopStep {
     /// The index of the instruction to apply in this step.
     pub instruction_index: usize,
     /// The replacement text after applying this step.
-    pub post_replacement: Vec<Char>,
+    ///
+    /// The boolean specifies whether the replacement begins with the
+    /// left boundary char.
+    pub post_replacement: (bool, Vec<Char>),
     /// The position of the cursor after applying this step.
     pub post_cursor_position: usize,
 }
