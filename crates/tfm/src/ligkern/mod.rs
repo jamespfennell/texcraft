@@ -80,13 +80,14 @@
 mod compiler;
 use crate::Char;
 use crate::Number;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 pub mod lang;
 
 /// A compiled lig/kern program.
 #[derive(Debug)]
 pub struct CompiledProgram {
-    left_to_pairs: HashMap<Char, (u16, u16)>,
+    left_to_pairs: BTreeMap<Char, (u16, u16)>,
     pairs: Vec<(Char, RawReplacement)>,
     middle_chars: Vec<(Char, Number)>,
 }

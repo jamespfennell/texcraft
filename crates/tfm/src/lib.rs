@@ -104,6 +104,16 @@ impl From<Number> for DesignSize {
 #[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
 pub struct Char(pub u8);
 
+impl std::fmt::Display for Char {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if (self.0 as char).is_ascii_graphic() {
+            write!(f, "{}", self.0 as char)
+        } else {
+            write!(f, "0x{:02x}", self.0)
+        }
+    }
+}
+
 impl From<u8> for Char {
     fn from(value: u8) -> Self {
         Char(value)

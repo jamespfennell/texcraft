@@ -120,7 +120,7 @@ pub struct PlPath(pub std::path::PathBuf);
 
 impl PlPath {
     #[allow(dead_code)]
-    pub fn read(&self) -> Result<tfm::pl::File, String> {
+    pub fn read(&self) -> Result<(tfm::pl::File, Vec<tfm::pl::ParseError>), String> {
         let data = match std::fs::read_to_string(&self.0) {
             Ok(data) => data,
             Err(err) => return Err(format!("Failed to read `{}`: {}", self.0.display(), err)),
@@ -133,7 +133,7 @@ impl PlPath {
         for warning in &warnings {
             warning.ariadne_report().eprint(&source).unwrap();
         }
-        Ok(pl_file)
+        Ok((pl_file, warnings))
     }
     #[allow(dead_code)]
     pub fn write(&self, content: &str) -> Result<(), String> {

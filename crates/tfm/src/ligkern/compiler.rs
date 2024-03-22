@@ -491,7 +491,7 @@ fn lower_and_optimize(
         ));
     }
 
-    let mut left_to_pairs: HashMap<Char, (u16, u16)> = Default::default();
+    let mut left_to_pairs: BTreeMap<Char, (u16, u16)> = Default::default();
     let mut pairs: Vec<(Char, RawReplacement)> = Default::default();
 
     for (left, replacements) in intermediate {

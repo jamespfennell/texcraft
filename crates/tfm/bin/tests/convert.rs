@@ -95,7 +95,7 @@ fn debug_tfm(tfm_file_path: &std::path::PathBuf) -> String {
 }
 
 macro_rules! convert_tests {
-    ( $( ($name: ident, $tfm_path: expr, $pl_path: expr $(, $tftopl_args: expr )? $(,)? ), )+ ) => {
+    ( $( ($name: ident, $tfm_path: expr, $pl_path: expr $(, $charcode_format: expr, )? $(,)? ), )+ ) => {
         $(
             mod $name {
                 use super::*;
@@ -106,10 +106,10 @@ macro_rules! convert_tests {
                 fn tfmtools_convert_tfm_to_pl() {
                     run_tfm_to_pl_test(TFM, PL, "tfmtools", |tfm_file_path| {
                         let mut v: Vec<&str> = vec![];
-                        v.extend(["convert", tfm_file_path]);
                         $(
-                            v.extend( $tftopl_args );
+                            v.extend(["--pl-charcode-format", $charcode_format]);
                         )?
+                        v.extend(["convert", tfm_file_path]);
                         v
                     }, Some(""), true);
                 }
@@ -120,7 +120,7 @@ macro_rules! convert_tests {
                         let mut v: Vec<&str> = vec![];
                         v.extend([tfm_file_path]);
                         $(
-                            v.extend( $tftopl_args );
+                            v.extend(["--charcode-format", $charcode_format]);
                         )?
                         v
                     }, Some(""), true);
@@ -209,13 +209,13 @@ convert_tests!(
         cmr10_ascii,
         "data/computer-modern/cmr10.tfm",
         "data/computer-modern/cmr10_ascii.plst",
-        vec!["--charcode-format", "ascii"]
+        "ascii",
     ),
     (
         cmr10_octal,
         "data/computer-modern/cmr10.tfm",
         "data/computer-modern/cmr10_octal.plst",
-        vec!["--charcode-format", "octal"]
+        "octal",
     ),
     (
         cmss8,

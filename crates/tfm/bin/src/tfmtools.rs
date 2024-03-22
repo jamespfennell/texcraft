@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use clap::Parser;
 
@@ -28,23 +28,27 @@ struct Cli {
     #[command(subcommand)]
     command: Command,
 
-    /// Indent to use when outputting .pl files.
-    #[arg(long, default_value_t = 3)]
+    /// Indent to use when outputting property list files.
+    #[arg(short = 'i', long, default_value_t = 3)]
     pl_indent: usize,
 
-    /// Specification for how to output characters in .pl files.
-    #[arg(short, long, default_value = "default")]
+    /// Specification for how to output characters in property list files.
+    #[arg(short = 'c', long, default_value = "default")]
     pl_charcode_format: CharcodeFormat,
+
+    /// Default extension to use when writing property list files.
+    #[arg(short = 'e', long, default_value = "plst")]
+    pl_extension: PlExtension,
 }
 
 impl Cli {
     fn run(self) -> Result<(), String> {
         match self.command {
             Command::Check(check) => check.run(),
-            Command::Convert(convert) => convert.run(),
-            Command::ConvertBatch(convert_batch) => convert_batch.run(),
+            Command::Convert(convert) => convert.run(self.pl_indent, self.pl_charcode_format),
             Command::Debug(debug) => debug.run(),
             Command::Fmt(format) => format.run(),
+            Command::Ligkern(lig_kern) => lig_kern.run(),
             Command::Undebug(undebug) => undebug.run(),
         }
     }
@@ -52,16 +56,16 @@ impl Cli {
 
 #[derive(Clone, Debug, clap::Subcommand)]
 enum Command {
-    /// Check that a .tfm or .pl file is valid.
+    /// Check that a .tfm or property list file is valid.
     Check(Check),
-    /// Convert a single .tfm or .pl file.
+
+    /// Convert a single .tfm or property list file.
     Convert(Convert),
-    /// Convert a batch of .tfm and .pl files.
-    ConvertBatch(ConvertBatch),
+
     /// Print debugging information about a .tfm file.
     ///
     /// This subcommand is used to debug the contents of a .tfm file.
-    /// Unlike .pl files - which are regular ASCII, human-readable,
+    /// Unlike property list files - which are regular ASCII, human-readable,
     ///   and can thus be debugged by opening them in a text editor -
     ///   .tfm are binary files and can't be easily debugged.
     ///
@@ -83,13 +87,18 @@ enum Command {
     ///
     ///     $ tfmtools debug path/to/file.tfm --section widths --section heights
     Debug(Debug),
-    /// Format a .pl file.
+
+    /// Format a property list file.
     Fmt(Format),
+
+    /// Compile and describe the lig/kern program in a .tfm or property list file.
+    Ligkern(LigKern),
+
     /// Create a .tfm file from the (potentially modified) output of `tfmtools debug`
     ///
     /// The `tfmtools debug` command outputs a plain text representation of the binary
-    ///     data in a .tfm file.
-    /// This command reconstructs .tfm binary files from this plain text output.
+    ///     and parsed data in a .tfm file.
+    /// This command reconstructs .tfm binary files from the raw data in this plain text output.
     ///
     /// There are at least two use cases for this command:
     ///
@@ -104,11 +113,11 @@ enum Command {
     ///     you can use this command to create invalid or otherwise unusual .tfm files
     ///     for testing.
     ///
-    /// If you're modifying the debug output it may be useful to some of the parsing rules:
+    /// When modifying the debug output it may be useful to some of the parsing rules:
     ///
     /// 1.
-    ///     You can omit .tfm sections.
-    ///     In the outputted .tfm file, all unspecified sections will be output as empty
+    ///     Any of the .tfm sections can be omitted.
+    ///     In the .tfm file, all omitted sections will be output as empty
     ///     sections with the exception of the sub file sizes section, which is calculated
     ///     correctly.
     ///
@@ -120,54 +129,46 @@ enum Command {
     ///     Within binary data sections, all lines beginning with // are ignored.
     ///
     /// 4.
-    ///     Within binary data sections, all data before the first | character is ignored.
+    ///     Within binary data sections, all data before the first | character is generally ignored.
+    ///     There is a single exception: in the first line of the character data section,
+    ///     any text before the first | is parsed as the first character in the file.
     Undebug(Undebug),
 }
 
 #[derive(Clone, Debug, Parser)]
 struct Check {
-    /// Path to the .tf or .pl file to validate.
+    /// Path to the .tf or property list file to validate.
     path: TfOrPlPath,
 }
 
 impl Check {
     fn run(&self) -> Result<(), String> {
-        todo!()
-        /*
-        let source = match std::fs::read_to_string(&args.path) {
-            Ok(source) => source,
-            Err(err) => {
-                println!["Failed to open file {:?}: {err}", &args.path];
-                std::process::exit(1);
-            }
+        let num_warnings = match &self.path {
+            TfOrPlPath::Tf(tfm_path) => tfm_path.read(false)?.2.len(),
+            TfOrPlPath::Pl(pl_path) => pl_path.read()?.1.len(),
         };
-        let (ast, errors) = tfm::pl::ast::Ast::build(&source);
-        for error in errors {
-            let s = Source {
-                path: args.path.clone(),
-                source: ariadne::Source::from(source.clone()),
-            };
-            error.ariadne_report().eprint(s).unwrap();
+        if num_warnings > 0 {
+            Err(format!("Check failure: {} warnings", num_warnings))
+        } else {
+            Ok(())
         }
-        let _ = ast;
-         */
     }
 }
 
 #[derive(Clone, Debug, Parser)]
 struct Convert {
-    /// Path to the .tfm or .pl file to convert.
+    /// Path to the .tfm or property list file to convert.
     path: TfOrPlPath,
 
     /// Output path for the converted file.
     ///
     /// This must have the correct file extension.
-    /// If the input file is a .pl file, this must be a .tfm path,
-    ///     and vice-versa.
+    /// If the input file is a property list file, this must be a .tfm path.
+    /// If the input file is a .tfm file, this must be a .pl or .plst path.
     ///
     /// If not provided, and the input file is a .tfm file,
-    ///     the converted .pl file will be printed to standard out.
-    /// If the input file is a .pl file,
+    ///     the converted property list file will be printed to standard out.
+    /// If the input file is a property list file,
     ///     the converted TFM file will be written to the same path
     ///     as the input file but with a .tfm file extension.
     /// Thus
@@ -177,14 +178,10 @@ struct Convert {
     /// writes the output to path/to/file.tfm.
     #[arg(short, long)]
     output: Option<TfOrPlPath>,
-
-    /// Specification for how to output characters.
-    #[arg(short, long, default_value = "default")]
-    charcode_format: common::CharcodeFormat,
 }
 
 impl Convert {
-    fn run(&self) -> Result<(), String> {
+    fn run(&self, indent: usize, charcode_format: CharcodeFormat) -> Result<(), String> {
         match &self.path {
             TfOrPlPath::Tf(tf_path) => {
                 let (_, tfm_file, warnings) = tf_path.read(false)?;
@@ -192,9 +189,8 @@ impl Convert {
                 let pl_output = format![
                     "{}",
                     pl_file.display(
-                        3,
-                        self.charcode_format
-                            .to_display_format(&pl_file.header.character_coding_scheme)
+                        indent,
+                        charcode_format.to_display_format(&pl_file.header.character_coding_scheme)
                     )
                 ];
                 // TODO: deduplicate this code between here and algorithms
@@ -229,7 +225,7 @@ impl Convert {
                 Ok(())
             }
             TfOrPlPath::Pl(pl_path) => {
-                let pl_file = pl_path.read()?;
+                let (pl_file, _) = pl_path.read()?;
                 let tfm_file = tfm::format::File::from_pl_file(&pl_file);
                 let tfm_bytes = tfm_file.serialize();
                 let tfm_path: TfPath = match &self.output {
@@ -245,60 +241,6 @@ impl Convert {
                 Ok(())
             }
         }
-    }
-}
-
-#[derive(Clone, Debug, Parser)]
-struct ConvertBatch {
-    /// Paths of the files to convert.
-    ///
-    /// Each path must have either a .tfm or a .pl file extension.
-    paths: Vec<TfOrPlPath>,
-    /* TODO
-    /// Output directory for the converted files.
-    ///
-    /// (At least) three ways to do it:
-    ///
-    /// - Relative to each original file. Defaults to being next to each file but can be customized
-    /// - Relative to the current working directory, with the directory structure preserved
-    /// - Relative to the current working directory, but all flattened (--flatten)
-    ///
-    /// By default, all of the converted files are written to this directory.
-    /// The name of the converted file is the name of the original file with the extension changed accordingly.
-    /// Thus
-    ///
-    ///     $ tfmtools convert-batch -o output file1.pl dir/file2.tfm
-    ///
-    /// will create two files, `output/file1.tfm` and `output/file2.pl`.
-    ///
-    /// Alternatively, the `--preserve-paths` option can be used to preserve directory structure.
-    #[arg(short, long)]
-    output_directory: std::path::PathBuf,
-
-    /// Preserve the relative paths of input files.
-    ///
-    /// With this option, the output path for a converted file is the
-    ///     output directory specified in `--output-directory` followed by the path to the original file.
-    /// Thus
-    ///
-    ///     $ tfmtools convert-batch --preserve-paths -o output file1.pl dir/file2.tfm
-    ///
-    /// will create two files, `output/file1.tfm` and `output/dir/file2.pl`.
-    ///
-    /// Using this option it is possible to write the converted files to the same directory
-    ///     as the original files even if the files are in multiple directories.
-    /// This can be down with:
-    ///
-    ///     $ tfmtools convert-batch --preserve-paths -o output . [PATHS]...
-    #[arg(short, long)]
-    preserve_paths: bool,
-    // TODO: allow collisions
-     */
-}
-
-impl ConvertBatch {
-    fn run(&self) -> Result<(), String> {
-        todo!()
     }
 }
 
@@ -323,11 +265,12 @@ struct Debug {
 
     /// Omit the .tfm path in the output.
     ///
-    /// This is useful if you're using the output to diff two .tfm files.
+    /// This is useful if the tool is being used to diff two .tfm files.
+    /// In this case the .tfm file paths being different would return a false positive.
     #[arg(long)]
     omit_tfm_path: bool,
 
-    /// Don't validate and fix the .tfm file.
+    /// Skip validating and fixing the .tfm file.
     #[arg(long)]
     skip_validation: bool,
 }
@@ -401,15 +344,15 @@ impl Debug {
 
 #[derive(Clone, Debug, Parser)]
 struct Format {
-    /// Instead of overwriting the .pl file, write the result to the provided path.
+    /// Instead of overwriting the property list file, write the result to the provided path.
     #[arg(short, long)]
     output: Option<std::path::PathBuf>,
 
-    /// Instead of overwriting the .pl file, print the result to standard out.
+    /// Instead of overwriting the property list file, print the result to standard out.
     #[arg(short, long)]
     print: bool,
 
-    /// Just check that the .pl file is already formatted correctly, and don't output anything.
+    /// Just check that the property list file is already formatted correctly, and don't output anything.
     #[arg(short, long)]
     check: bool,
 }
@@ -417,6 +360,61 @@ struct Format {
 impl Format {
     fn run(&self) -> Result<(), String> {
         todo!()
+    }
+}
+
+#[derive(Clone, Debug, Parser)]
+struct LigKern {
+    /// Path to the .tfm or property list file.
+    path: TfOrPlPath,
+}
+
+impl LigKern {
+    fn run(&self) -> Result<(), String> {
+        let lig_kern_program = match &self.path {
+            TfOrPlPath::Tf(tfm_path) => {
+                let (_, mut tfm_file, _) = tfm_path.read(false)?;
+                let entrypoints: HashMap<tfm::Char, u16> = tfm_file
+                    .lig_kern_entrypoints()
+                    .into_iter()
+                    .filter_map(|(c, e)| {
+                        tfm_file
+                            .lig_kern_program
+                            .unpack_entrypoint(e)
+                            .ok()
+                            .map(|e| (c, e))
+                    })
+                    .collect();
+                tfm::ligkern::CompiledProgram::compile(
+                    &tfm_file.lig_kern_program,
+                    &tfm_file.kerns,
+                    entrypoints,
+                )
+                .unwrap()
+            }
+            TfOrPlPath::Pl(pl_path) => {
+                let (pl_file, _) = pl_path.read()?;
+                let entrypoints = pl_file.lig_kern_entrypoints(true);
+                tfm::ligkern::CompiledProgram::compile(&pl_file.lig_kern_program, &[], entrypoints)
+                    .unwrap()
+            }
+        };
+        let mut last_l: Option<tfm::Char> = None;
+        for (l, r) in lig_kern_program.all_pairs_having_replacement() {
+            if Some(l) != last_l {
+                println!("{}", l);
+                last_l = Some(l);
+            }
+            print!("    {} {} ->", l, r);
+            for (c, k) in lig_kern_program.get_replacement_iter(l, r) {
+                print!(" {}", c);
+                if k != tfm::Number::ZERO {
+                    print!(" k({k})");
+                }
+            }
+            println!();
+        }
+        Ok(())
     }
 }
 
@@ -484,4 +482,15 @@ fn line_range(s: &str, n: usize) -> std::ops::Range<usize> {
         consumed += 1 + line.len();
     }
     panic!("s contains a line with index n");
+}
+
+#[derive(Debug, Clone, clap::ValueEnum)]
+pub enum PlExtension {
+    /// The .pl file extension is used in Knuth's implementation of tftopl and pltotf.
+    /// The problem with this extension is that it collides with Perl scripts,
+    ///     which are very common in the CTAN repository,
+    ///     and this makes it hard to find real property list files.
+    Pl,
+    /// The .plst file extension is the default in tfmtools.
+    Plst,
 }
