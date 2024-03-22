@@ -90,10 +90,10 @@ macro_rules! debug_undebug_roundtrip_tests {
 }
 
 debug_undebug_roundtrip_tests!(
-    (cmr10, "data/computer-modern/cmr10.tfm", vec![]),
+    (cmr10, "../../corpus/computer-modern/cmr10.tfm", vec![]),
     (
         cmr10_calculate_sub_file_sizes,
-        "data/computer-modern/cmr10.tfm",
+        "../../corpus/computer-modern/cmr10.tfm",
         vec![
             "-s",
             "header",
@@ -118,7 +118,7 @@ debug_undebug_roundtrip_tests!(
         ],
     ),
     // cmex10 contains extensible recipes
-    (cmex10, "data/computer-modern/cmex10.tfm", vec![]),
+    (cmex10, "../../corpus/computer-modern/cmex10.tfm", vec![]),
     // rashii2 has bc=16
-    (rashii2, "data/ctan/rashii2-1.tfm", vec![]),
+    (rashii2, "../../corpus/ctan/rashii2-1.tfm", vec![]),
 );
