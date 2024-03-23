@@ -57,7 +57,7 @@ fn write_input_and_correct_output(
     knuth_stderr: &str,
 ) {
     let base_path = format![
-        "crates/tfm/bin/tests/data/fuzz/fuzz_tftopl_{:x}",
+        "crates/tfm/corpus/fuzz/fuzz_tftopl_{:x}",
         input.calculate_hash()
     ];
     std::fs::copy(tfm_file_path, format!["{base_path}.tfm"]).unwrap();

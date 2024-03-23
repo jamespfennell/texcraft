@@ -243,6 +243,9 @@ macro_rules! convert_tests {
 }
 
 convert_tests!(
+    // TODO: make sure all of the files in the corpus are here
+    // Maybe order them alphabetically
+    // E.g. lig-kern-redirect-254.plst is not here
     (cmr10, roundtrip("computer-modern/cmr10")),
     (
         cmr10_ascii,
@@ -544,5 +547,41 @@ convert_tests!(
     (
         unusual_num_params,
         tftopl_with_stderr("originals/unusual-num-params"),
+    ),
+    (
+        infinite_loop_error_ordering_a,
+        tftopl_with_stderr("originals/infinite-loop-error-ordering-a")
+    ),
+    (
+        infinite_loop_error_ordering_b,
+        tftopl_with_stderr("originals/infinite-loop-error-ordering-b")
+    ),
+    (
+        infinite_loop_error_ordering_c,
+        tftopl_with_stderr("originals/infinite-loop-error-ordering-c")
+    ),
+    (
+        infinite_loop_error_ordering_d,
+        tftopl_with_stderr("originals/infinite-loop-error-ordering-d")
+    ),
+    (
+        infinite_loop_error_ordering_e,
+        tftopl_with_stderr("originals/infinite-loop-error-ordering-e")
+    ),
+    (
+        infinite_loop_error_ordering_f,
+        tftopl_with_stderr("originals/infinite-loop-error-ordering-f")
+    ),
+    (
+        infinite_loop_error_ordering_g,
+        tftopl_with_stderr("originals/infinite-loop-error-ordering-g")
+    ),
+    (
+        infinite_loop_error_ordering_fuzz_1,
+        tftopl_fuzz("43c85ba5be9a35ef")
+    ),
+    (
+        infinite_loop_error_ordering_fuzz_2,
+        tftopl_fuzz("6915a258ab846ae4")
     ),
 );
