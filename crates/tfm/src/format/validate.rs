@@ -290,38 +290,70 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
         let mut m: HashMap<usize, Vec<lang::ValidationWarning>> = Default::default();
         lig_kern_warnings
             .iter()
+            .cloned()
             .filter_map(|warning| match warning {
                 // When this warning is raised in the lig/kern validator, the buggy index is never fixed. When the
                 // instruction is seen again the warning is raised again.
-                lang::ValidationWarning::KernIndexTooBig(u) => Some((*u, warning.clone())),
+                lang::ValidationWarning::KernIndexTooBig(u) => Some((u, warning.clone())),
                 // As with KernIndexTooBig, the buggy data is never fixed.
-                lang::ValidationWarning::EntrypointRedirectTooBig(u) => Some((*u, warning.clone())),
+                lang::ValidationWarning::EntrypointRedirectTooBig(u) => Some((u, warning.clone())),
                 // When this warning is raised the non-existent character is replaced by bc; i.e., the smallest
                 // character in the .tfm file. However that character may also not exist! When the instruction
                 // is seen again it will be raised again, except the character being warned about is the smallest
                 // character.
-                lang::ValidationWarning::LigatureStepForNonExistentCharacter(u, _, c) => {
-                    if file.char_dimens.contains_key(c) {
+                lang::ValidationWarning::LigatureStepForNonExistentCharacter {
+                    instruction_index,
+                    right_char: _,
+                    new_right_char,
+                } => {
+                    if file.char_dimens.contains_key(&new_right_char) {
                         None
                     } else {
                         Some((
-                            *u,
-                            lang::ValidationWarning::LigatureStepForNonExistentCharacter(
-                                *u, *c, *c,
-                            ),
+                            instruction_index,
+                            lang::ValidationWarning::LigatureStepForNonExistentCharacter {
+                                instruction_index,
+                                right_char: new_right_char,
+                                new_right_char,
+                            },
                         ))
                     }
                 }
                 // Same as LigatureStepForNonExistentCharacter.
-                lang::ValidationWarning::LigatureStepProducesNonExistentCharacter(u, _, c) => {
-                    if file.char_dimens.contains_key(c) {
+                lang::ValidationWarning::LigatureStepProducesNonExistentCharacter {
+                    instruction_index,
+                    replacement_char: _,
+                    new_replacement_char,
+                } => {
+                    if file.char_dimens.contains_key(&new_replacement_char) {
                         None
                     } else {
                         Some((
-                            *u,
-                            lang::ValidationWarning::LigatureStepProducesNonExistentCharacter(
-                                *u, *c, *c,
-                            ),
+                            instruction_index,
+                            lang::ValidationWarning::LigatureStepProducesNonExistentCharacter {
+                                instruction_index,
+                                replacement_char: new_replacement_char,
+                                new_replacement_char,
+                            },
+                        ))
+                    }
+                }
+                // Same as LigatureStepForNonExistentCharacter.
+                lang::ValidationWarning::KernStepForNonExistentCharacter {
+                    instruction_index,
+                    right_char: _,
+                    new_right_char,
+                } => {
+                    if file.char_dimens.contains_key(&new_right_char) {
+                        None
+                    } else {
+                        Some((
+                            instruction_index,
+                            lang::ValidationWarning::KernStepForNonExistentCharacter {
+                                instruction_index,
+                                right_char: new_right_char,
+                                new_right_char,
+                            },
                         ))
                     }
                 }

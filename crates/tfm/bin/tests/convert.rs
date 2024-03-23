@@ -584,4 +584,5 @@ convert_tests!(
         infinite_loop_error_ordering_fuzz_2,
         tftopl_fuzz("6915a258ab846ae4")
     ),
+    (todo, tftopl_fuzz("d1cf983ef16e54f3")),
 );

@@ -401,13 +401,17 @@ impl Program {
                 && Some(instruction.right_char) != self.right_boundary_char
             {
                 warnings.push(if is_kern_step {
-                    ValidationWarning::KernStepForNonExistentCharacter(i, instruction.right_char)
+                    ValidationWarning::KernStepForNonExistentCharacter {
+                        instruction_index: i,
+                        right_char: instruction.right_char,
+                        new_right_char: smallest_char,
+                    }
                 } else {
-                    ValidationWarning::LigatureStepForNonExistentCharacter(
-                        i,
-                        instruction.right_char,
-                        smallest_char,
-                    )
+                    ValidationWarning::LigatureStepForNonExistentCharacter {
+                        instruction_index: i,
+                        right_char: instruction.right_char,
+                        new_right_char: smallest_char,
+                    }
                 });
                 instruction.right_char = smallest_char;
             }
@@ -425,11 +429,13 @@ impl Program {
                     ..
                 } => {
                     if !char_exists(*char_to_insert) {
-                        warnings.push(ValidationWarning::LigatureStepProducesNonExistentCharacter(
-                            i,
-                            *char_to_insert,
-                            smallest_char,
-                        ));
+                        warnings.push(
+                            ValidationWarning::LigatureStepProducesNonExistentCharacter {
+                                instruction_index: i,
+                                replacement_char: *char_to_insert,
+                                new_replacement_char: smallest_char,
+                            },
+                        );
                         *char_to_insert = smallest_char;
                     }
                     if *post_lig_tag_invalid {
@@ -490,9 +496,39 @@ impl Program {
 #[derive(Clone, Debug)]
 pub enum ValidationWarning {
     SkipTooLarge(usize),
-    LigatureStepForNonExistentCharacter(usize, Char, Char),
-    KernStepForNonExistentCharacter(usize, Char),
-    LigatureStepProducesNonExistentCharacter(usize, Char, Char),
+    LigatureStepForNonExistentCharacter {
+        // Index of the buggy lig instruction in the program.
+        instruction_index: usize,
+        // Right character that is non existent.
+        right_char: Char,
+        // New right character after the buggy instruction is fixed.
+        //
+        // This is set to bc by tftopl. Note there is no guarantee that bc
+        // itself exists, so the instruction may still be buggy.
+        new_right_char: Char,
+    },
+    KernStepForNonExistentCharacter {
+        // Index of the buggy kern instruction in the program.
+        instruction_index: usize,
+        // Right character that is non existent.
+        right_char: Char,
+        // New right character after the buggy instruction is fixed.
+        //
+        // This is set to bc by tftopl. Note there is no guarantee that bc
+        // itself exists, so the instruction may still be buggy.
+        new_right_char: Char,
+    },
+    LigatureStepProducesNonExistentCharacter {
+        // Index of the buggy kern instruction in the program.
+        instruction_index: usize,
+        // Replacement character that is non existent.
+        replacement_char: Char,
+        // New replacement character after the buggy instruction is fixed.
+        //
+        // This is set to bc by tftopl. Note there is no guarantee that bc
+        // itself exists, so the instruction may not be fully fixed.
+        new_replacement_char: Char,
+    },
     KernIndexTooBig(usize),
     InvalidLigTag(usize),
     EntrypointRedirectTooBig(usize),
@@ -509,17 +545,19 @@ impl ValidationWarning {
             SkipTooLarge(i) => {
                 format!["Bad TFM file: Ligature/kern step {i} skips too far;\nI made it stop."]
             }
-            LigatureStepForNonExistentCharacter(_, c, _) => format![
+            LigatureStepForNonExistentCharacter { right_char, .. } => format![
                 "Bad TFM file: Ligature step for nonexistent character '{:03o}.",
-                c.0
+                right_char.0
             ],
-            KernStepForNonExistentCharacter(_, c) => format![
+            KernStepForNonExistentCharacter { right_char, .. } => format![
                 "Bad TFM file: Kern step for nonexistent character '{:03o}.",
-                c.0
+                right_char.0
             ],
-            LigatureStepProducesNonExistentCharacter(_, c, _) => format![
+            LigatureStepProducesNonExistentCharacter {
+                replacement_char, ..
+            } => format![
                 "Bad TFM file: Ligature step produces the nonexistent character '{:03o}.",
-                c.0
+                replacement_char.0
             ],
             KernIndexTooBig(_) => "Bad TFM file: Kern index too large.".to_string(),
             InvalidLigTag(_) => "Ligature step with nonstandard code changed to LIG".to_string(),
@@ -542,10 +580,10 @@ impl ValidationWarning {
         use ValidationWarning::*;
         match self {
             SkipTooLarge(_) => 70,
-            LigatureStepForNonExistentCharacter(_, _, _)
-            | LigatureStepProducesNonExistentCharacter(_, _, _)
+            LigatureStepForNonExistentCharacter { .. }
+            | LigatureStepProducesNonExistentCharacter { .. }
             | InvalidLigTag(_) => 77,
-            KernStepForNonExistentCharacter(_, _) | KernIndexTooBig(_) => 76,
+            KernStepForNonExistentCharacter { .. } | KernIndexTooBig(_) => 76,
             EntrypointRedirectTooBig(_) => 74,
             InvalidEntrypoint(_) => 67,
             InvalidBoundaryCharEntrypoint => 69,

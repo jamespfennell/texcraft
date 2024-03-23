@@ -70,6 +70,7 @@ fn write_input_and_correct_output(
 #[derive(Clone, Debug, arbitrary::Arbitrary)]
 pub struct Input {
     pub header: Vec<u32>,
+    pub bc: u8,
     pub char_infos: Vec<u32>,
     pub widths: Vec<u32>,
     pub heights: Vec<u32>,
@@ -87,12 +88,18 @@ impl Input {
         let mut sub_file_sizes = SubFileSizes {
             lf: 0, // the correct value is calculated later
             lh: append_bytes(&mut b, &self.header, 2, i16::MAX),
-            // TODO: we should also fuzz the value of bc
-            bc: if self.char_infos.is_empty() { 1 } else { 0 },
+            bc: if self.char_infos.is_empty() {
+                1
+            } else {
+                self.bc.into()
+            },
             ec: if self.char_infos.is_empty() {
                 0
             } else {
-                append_bytes(&mut b, &self.char_infos, 0, 256) - 1
+                let bc: i16 = self.bc.into();
+                let max_chars = 256_i16 - bc;
+                let num_chars = append_bytes(&mut b, &self.char_infos, 0, max_chars);
+                bc + num_chars - 1
             },
             nw: append_bytes(&mut b, &self.widths, 1, i16::MAX),
             nh: append_bytes(&mut b, &self.heights, 1, i16::MAX),
