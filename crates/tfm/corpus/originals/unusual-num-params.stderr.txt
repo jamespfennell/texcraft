@@ -1,0 +1,1 @@
+Unusual number of fontdimen parameters for a math symbols font (0 not 22).
