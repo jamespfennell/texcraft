@@ -2,34 +2,70 @@ use assert_cmd::prelude::*;
 use std::io::Write;
 use std::process::Command;
 
-type TfmToPlArgsFn = for<'a> fn(tfm_file_path: &'a str) -> Vec<&'a str>;
+macro_rules! include_str_from_corpus {
+    ( $p: expr ) => {
+        include_str![concat!["../../corpus/", $p]]
+    };
+}
+
+macro_rules! include_bytes_from_corpus {
+    ( $p: expr ) => {
+        include_bytes![concat!["../../corpus/", $p]]
+    };
+}
+
+#[derive(Default)]
+struct Options {
+    charcode_format: Option<&'static str>,
+}
+
+enum Binary {
+    KnuthReImplementation,
+    Tfmtools,
+}
 
 fn run_tfm_to_pl_test(
     tfm: &[u8],
     pl: &str,
-    command: &str,
-    args_fn: TfmToPlArgsFn,
+    binary: Binary,
+    options: Options,
     want_stderr: Option<&str>,
-    want_success: bool,
 ) {
     let dir = tempfile::TempDir::new().unwrap();
     let tfm_file_path = dir.path().join("input.tfm");
     let mut tfm_file = std::fs::File::create(&tfm_file_path).unwrap();
     tfm_file.write_all(tfm).unwrap();
 
+    let (command, args) = match binary {
+        Binary::KnuthReImplementation => {
+            let mut v = vec![tfm_file_path.to_str().unwrap()];
+            if let Some(charcode_format) = options.charcode_format {
+                v.extend(["--charcode-format", charcode_format]);
+            }
+            ("tftopl", v)
+        }
+        Binary::Tfmtools => {
+            let mut v = vec![];
+            if let Some(charcode_format) = options.charcode_format {
+                v.extend(["--pl-charcode-format", charcode_format]);
+            }
+            v.extend(["convert", tfm_file_path.to_str().unwrap()]);
+            ("tfmtools", v)
+        }
+    };
     let mut cmd = Command::cargo_bin(command).unwrap();
-    let args = args_fn(tfm_file_path.to_str().unwrap());
     cmd.args(args);
 
     let output = cmd.output().unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
-    if want_success {
-        assert!(
-            output.status.success(),
-            "failed to run Texcraft command: {}",
-            stderr
-        );
-    }
+    let want_success = !pl.is_empty();
+    assert_eq!(
+        want_success,
+        output.status.success(),
+        "want_success={want_success}, got_success={}, stderr={}",
+        output.status.success(),
+        stderr
+    );
     if let Some(want_stderr) = want_stderr {
         similar_asserts::assert_eq!(texcraft: stderr, knuth: want_stderr.replace("\r\n", "\n"));
     }
@@ -95,35 +131,26 @@ fn debug_tfm(tfm_file_path: &std::path::PathBuf) -> String {
 }
 
 macro_rules! convert_tests {
-    ( $( ($name: ident, $tfm_path: expr, $pl_path: expr $(, $charcode_format: expr, )? $(,)? ), )+ ) => {
-        $(
+    ( ($name: ident, roundtrip($base_path: expr) $(,)? ) ) => {
+        convert_tests![($name, roundtrip($base_path, ".tfm", ".plst"))];
+    };
+    ( ($name: ident, roundtrip($base_path: expr, $tfm_path: expr, $pl_path: expr $(,)? ) $(,)? ) ) => {
+        convert_tests![($name, roundtrip($base_path, $tfm_path, $pl_path, Default::default()))];
+    };
+    ( ($name: ident, roundtrip($base_path: expr, $tfm_path: expr, $pl_path: expr, $options: expr $(,)? ) $(,)? ) ) => {
             mod $name {
                 use super::*;
-                const TFM: &'static [u8] = include_bytes!($tfm_path);
-                const PL: &'static str = include_str!($pl_path);
+                const TFM: &'static [u8] = include_bytes_from_corpus!(concat![$base_path, $tfm_path]);
+                const PL: &'static str = include_str_from_corpus!(concat![$base_path, $pl_path]);
 
                 #[test]
                 fn tfmtools_convert_tfm_to_pl() {
-                    run_tfm_to_pl_test(TFM, PL, "tfmtools", |tfm_file_path| {
-                        let mut v: Vec<&str> = vec![];
-                        $(
-                            v.extend(["--pl-charcode-format", $charcode_format]);
-                        )?
-                        v.extend(["convert", tfm_file_path]);
-                        v
-                    }, Some(""), true);
+                    run_tfm_to_pl_test(TFM, PL, Binary::Tfmtools, $options, Some(""));
                 }
 
                 #[test]
                 fn tftopl() {
-                    run_tfm_to_pl_test(TFM, PL, "tftopl", |tfm_file_path|{
-                        let mut v: Vec<&str> = vec![];
-                        v.extend([tfm_file_path]);
-                        $(
-                            v.extend(["--charcode-format", $charcode_format]);
-                        )?
-                        v
-                    }, Some(""), true);
+                    run_tfm_to_pl_test(TFM, PL, Binary::KnuthReImplementation, $options, Some(""));
                 }
 
                 #[test]
@@ -140,17 +167,24 @@ macro_rules! convert_tests {
                     }, Some(""));
                 }
             }
-        )+
     };
-}
-
-macro_rules! convert_pltotf_tests {
-    ( $( ($name: ident, $tfm_path: expr, $pl_path: expr, $stderr: expr $(,)? ), )+ ) => {
-        $(
+    ( ($name: ident, pltotf($base_path: expr ) $(,)? ) ) => {
+        convert_tests![($name, pltotf($base_path, ".plst", ".tfm"))];
+    };
+    ( ($name: ident, pltotf($base_path: expr, $pl_path: expr, $tfm_path: expr $(,)? ) $(,)? ) ) => {
+        convert_tests![($name, __pltotf_internal($base_path, $pl_path, $tfm_path, ""))];
+    };
+    ( ($name: ident, pltotf_with_stderr($base_path: expr) $(,)? ) ) => {
+        convert_tests![($name, pltotf_with_stderr($base_path, ".plst", ".tfm", ".stderr.txt"))];
+    };
+    ( ($name: ident, pltotf_with_stderr($base_path: expr, $pl_path: expr, $tfm_path: expr, $stderr_path: expr $(,)? ) $(,)? ) ) => {
+        convert_tests![($name, __pltotf_internal($base_path, $pl_path, $tfm_path, include_str_from_corpus!(concat![$base_path, $stderr_path])))];
+    };
+    ( ($name: ident, __pltotf_internal($base_path: expr, $pl_path: expr, $tfm_path: expr, $stderr: expr ) ) ) => {
             mod $name {
                 use super::*;
-                const TFM: &'static [u8] = include_bytes!($tfm_path);
-                const PL: &'static str = include_str!($pl_path);
+                const TFM: &'static [u8] = include_bytes_from_corpus!(concat![$base_path, $tfm_path]);
+                const PL: &'static str = include_str_from_corpus!(concat![$base_path, $pl_path]);
                 const STDERR: &'static str = $stderr;
 
                 #[test]
@@ -167,214 +201,172 @@ macro_rules! convert_pltotf_tests {
                     }, Some(STDERR));
                 }
             }
-        )+
     };
-}
+    ( ($name: ident, tftopl($base_path: expr ) $(,)? ) ) => {
+        convert_tests![($name, tftopl($base_path, ".tfm", ".plst"))];
+    };
+    ( ($name: ident, tftopl($base_path: expr, $tfm_path: expr, $pl_path: expr $(,)? ) $(,)? ) ) => {
+        convert_tests![($name, __tftopl_internal($base_path, $tfm_path, $pl_path, ""))];
+    };
+    ( ($name: ident, tftopl_with_stderr($base_path: expr) $(,)? ) ) => {
+        convert_tests![($name, tftopl_with_stderr($base_path, ".tfm", ".plst", ".stderr.txt"))];
+    };
+    ( ($name: ident, tftopl_with_stderr($base_path: expr, $tfm_path: expr, $pl_path: expr, $stderr_path: expr $(,)? ) $(,)? ) ) => {
+        convert_tests![($name, __tftopl_internal($base_path, $tfm_path, $pl_path, include_str_from_corpus!(concat![$base_path, $stderr_path])))];
+    };
+    ( ($name: ident, tftopl_fuzz($hash: expr) $(,)? ) ) => {
+        convert_tests![($name, tftopl_with_stderr(concat!["fuzz/fuzz_tftopl_", $hash]))];
+    };
+    ( ($name: ident, __tftopl_internal($base_path: expr, $tfm_path: expr, $pl_path: expr, $stderr: expr ) ) ) => {
+        mod $name {
+            use super::*;
+            const TFM: &'static [u8] = include_bytes_from_corpus!(concat![$base_path, $tfm_path]);
+            const PL: &'static str = include_str_from_corpus!(concat![$base_path, $pl_path]);
+            const WANT_STDERR: &'static str = $stderr;
 
-macro_rules! convert_tftopl_tests {
-    ( $( ($name: ident, $tfm_path: expr, $pl: expr, $stderr: expr, $want_success: expr $(,)? ), )+ ) => {
-        $(
-            mod $name {
-                use super::*;
-                const TFM: &'static [u8] = include_bytes!($tfm_path);
-                const PL: &'static str = $pl;
-                const WANT_STDERR: &'static str = $stderr;
-                const WANT_SUCCESS: bool = $want_success;
-
-                #[test]
-                fn tfmtools_convert_tfm_to_pl() {
-                    run_tfm_to_pl_test(TFM, PL, "tfmtools", |tfm_file_path| {
-                            vec!["convert", tfm_file_path]
-                    }, None, WANT_SUCCESS);
-                }
-
-                #[test]
-                fn tftopl() {
-                    run_tfm_to_pl_test(TFM, PL, "tftopl", |tfm_file_path|{
-                            vec![tfm_file_path]
-                    },Some(WANT_STDERR), WANT_SUCCESS);
-                }
+            #[test]
+            fn tfmtools_convert_tfm_to_pl() {
+                run_tfm_to_pl_test(TFM, PL, Binary::Tfmtools, Default::default(), None);
             }
+
+            #[test]
+            fn tftopl() {
+                run_tfm_to_pl_test(TFM, PL, Binary::KnuthReImplementation, Default::default(), Some(WANT_STDERR));
+            }
+        }
+};
+    ( $( $piece: tt , )+ ) => {
+        $(
+            convert_tests!($piece);
         )+
     };
 }
 
 convert_tests!(
-    (
-        cmr10,
-        "data/computer-modern/cmr10.tfm",
-        "data/computer-modern/cmr10.plst"
-    ),
+    (cmr10, roundtrip("computer-modern/cmr10")),
     (
         cmr10_ascii,
-        "data/computer-modern/cmr10.tfm",
-        "data/computer-modern/cmr10_ascii.plst",
-        "ascii",
+        roundtrip(
+            "computer-modern/cmr10",
+            ".tfm",
+            "_ascii.plst",
+            Options {
+                charcode_format: Some("ascii")
+            },
+        ),
     ),
     (
         cmr10_octal,
-        "data/computer-modern/cmr10.tfm",
-        "data/computer-modern/cmr10_octal.plst",
-        "octal",
+        roundtrip(
+            "computer-modern/cmr10",
+            ".tfm",
+            "_octal.plst",
+            Options {
+                charcode_format: Some("octal")
+            },
+        ),
     ),
-    (
-        cmss8,
-        "data/computer-modern/cmss8.tfm",
-        "data/computer-modern/cmss8.plst"
-    ),
-    (
-        cmex10,
-        "data/computer-modern/cmex10.tfm",
-        "data/computer-modern/cmex10.plst"
-    ),
-    (
-        cminch,
-        "data/computer-modern/cminch.tfm",
-        "data/computer-modern/cminch.plst"
-    ),
-    (
-        cmsy7,
-        "data/computer-modern/cmsy7.tfm",
-        "data/computer-modern/cmsy7.plst"
-    ),
-    (
-        many_ligatures,
-        "data/originals/many-ligatures.tfm",
-        "data/originals/many-ligatures.plst",
-    ),
-    (
-        params,
-        "data/originals/font-dimen.tfm",
-        "data/originals/font-dimen.plst",
-    ),
-    (
-        boundary_char,
-        "data/originals/boundarychar.tfm",
-        "data/originals/boundarychar.plst",
-    ),
+    (cmss8, roundtrip("computer-modern/cmss8")),
+    (cmex10, roundtrip("computer-modern/cmex10")),
+    (cminch, roundtrip("computer-modern/cminch")),
+    (cmsy7, roundtrip("computer-modern/cmsy7")),
+    (many_ligatures, roundtrip("originals/many-ligatures")),
+    (params, roundtrip("originals/font-dimen")),
+    (boundary_char, roundtrip("originals/boundarychar")),
     (
         boundary_char_unspecified,
-        "data/originals/boundarychar-unspecified.tfm",
-        "data/originals/boundarychar-unspecified.plst",
+        roundtrip("originals/boundarychar-unspecified"),
     ),
     (
         boundary_char_no_entrypoint,
-        "data/originals/boundarychar-noentrypoint.tfm",
-        "data/originals/boundarychar-noentrypoint.plst",
+        roundtrip("originals/boundarychar-noentrypoint"),
     ),
-    (
-        many_entrypoints,
-        "data/originals/many-entrypoints.tfm",
-        "data/originals/many-entrypoints.plst",
-    ),
+    (many_entrypoints, roundtrip("originals/many-entrypoints")),
     (
         theano_old_style,
-        "data/ctan/TheanoOldStyle-Bold-tlf-t1--base.tfm",
-        "data/ctan/TheanoOldStyle-Bold-tlf-t1--base.plst",
-    ),
-    (
-        orphan_lig_kerns_4_5,
-        "data/originals/orphan-lig-kerns-4.tfm",
-        "data/originals/orphan-lig-kerns-5.plst",
-    ),
-    (
-        arev_sans_3_4,
-        "data/ctan/ArevSans-BoldOblique-3.tfm",
-        "data/ctan/ArevSans-BoldOblique-4.plst",
-    ),
-    (
-        dimen_index_out_of_bounds_3_4,
-        "data/originals/dimen-index-out-of-bounds-3.tfm",
-        "data/originals/dimen-index-out-of-bounds-4.plst",
-    ),
-    (
-        smfebsl10_3_4,
-        "data/ctan/smfebsl10-3.tfm",
-        "data/ctan/smfebsl10-4.plst",
-    ),
-    (cprbn8t, "data/ctan/cprbn8t.tfm", "data/ctan/cprbn8t.plst",),
-    (
-        rashii2_3_4,
-        "data/ctan/rashii2-3.tfm",
-        "data/ctan/rashii2-4.plst",
-    ),
-    (
-        veracruz_6vcr8r,
-        "data/ctan/6vcr8r.tfm",
-        "data/ctan/6vcr8r.plst",
-    ),
-);
-
-convert_pltotf_tests!(
-    (
-        rashii2_2_3,
-        "data/ctan/rashii2-3.tfm",
-        "data/ctan/rashii2-2.plst",
-        ""
-    ),
-    (
-        empty,
-        "data/originals/empty.tfm",
-        "data/originals/empty.plst",
-        "",
-    ),
-    (
-        empty_varchar,
-        "data/originals/empty-varchar.tfm",
-        "data/originals/empty-varchar.plst",
-        "",
-    ),
-    (
-        zero_width_chars,
-        "data/originals/zero-width-char.tfm",
-        "data/originals/zero-width-char.plst",
-        "",
-    ),
-    (
-        ligature_loop,
-        "data/originals/ligature-loop.tfm",
-        "data/originals/ligature-loop.plst",
-        include_str!["data/originals/ligature-loop.stderr.txt"],
-    ),
-    (
-        next_larger_loop_pl,
-        "data/originals/next-larger-loop-pl.tfm",
-        "data/originals/next-larger-loop-pl.plst",
-        include_str!["data/originals/next-larger-loop-pl.stderr.txt"],
+        roundtrip("ctan/TheanoOldStyle-Bold-tlf-t1--base"),
     ),
     (
         orphan_lig_kerns_1_2,
-        "data/originals/orphan-lig-kerns-2.tfm",
-        "data/originals/orphan-lig-kerns-1.plst",
-        "",
+        pltotf("originals/orphan-lig-kerns-", "1.plst", "2.tfm"),
+    ),
+    (
+        orphan_lig_kerns_2_3,
+        tftopl("originals/orphan-lig-kerns-", "2.tfm", "3.plst"),
     ),
     (
         orphan_lig_kerns_3_4,
-        "data/originals/orphan-lig-kerns-4.tfm",
-        "data/originals/orphan-lig-kerns-3.plst",
-        "",
+        pltotf("originals/orphan-lig-kerns-", "3.plst", "4.tfm"),
+    ),
+    (
+        orphan_lig_kerns_4_5,
+        roundtrip("originals/orphan-lig-kerns-", "4.tfm", "5.plst"),
+    ),
+    (
+        arev_sans_1_2,
+        tftopl_with_stderr(
+            "ctan/ArevSans-BoldOblique-",
+            "1.tfm",
+            "2.plst",
+            "2.stderr.txt"
+        ),
     ),
     (
         arev_sans_2_3,
-        "data/ctan/ArevSans-BoldOblique-3.tfm",
-        "data/ctan/ArevSans-BoldOblique-2.plst",
-        "",
+        pltotf("ctan/ArevSans-BoldOblique-", "2.plst", "3.tfm")
+    ),
+    (
+        arev_sans_3_4,
+        roundtrip("ctan/ArevSans-BoldOblique-", "3.tfm", "4.plst"),
+    ),
+    (
+        dimen_index_out_of_bounds_1_2,
+        tftopl_with_stderr(
+            "originals/dimen-index-out-of-bounds-",
+            "1.tfm",
+            "2.plst",
+            "2.stderr.txt"
+        ),
+    ),
+    (
+        dimen_index_out_of_bounds_3_4,
+        roundtrip("originals/dimen-index-out-of-bounds-", "3.tfm", "4.plst"),
+    ),
+    (smfebsl10_1_2, tftopl("ctan/smfebsl10-", "1.tfm", "2.plst")),
+    (smfebsl10_2_3, pltotf("ctan/smfebsl10-", "2.plst", "3.tfm")),
+    (
+        smfebsl10_3_4,
+        roundtrip("ctan/smfebsl10-", "3.tfm", "4.plst"),
+    ),
+    (cprbn8t, roundtrip("ctan/cprbn8t")),
+    (rashii2_1_2, tftopl("ctan/rashii2-", "1.tfm", "2.plst")),
+    (rashii2_2_3, pltotf("ctan/rashii2-", "2.plst", "3.tfm")),
+    (rashii2_3_4, roundtrip("ctan/rashii2-", "3.tfm", "4.plst")),
+    (veracruz_6vcr8r, roundtrip("ctan/6vcr8r")),
+    (empty_plst_file, pltotf("originals/empty", ".plst", ".tfm")),
+    (empty_varchar, pltotf("originals/empty-varchar")),
+    (zero_width_chars, pltotf("originals/zero-width-char")),
+    (ligature_loop, pltotf_with_stderr("originals/ligature-loop")),
+    (
+        next_larger_loop_pl,
+        pltotf_with_stderr("originals/next-larger-loop-pl"),
     ),
     (
         theano_old_style_bold_tlf_lgr,
-        "data/ctan/TheanoOldStyle-Bold-tlf-lgr.tfm",
-        "data/ctan/TheanoOldStyle-Bold-tlf-lgr.plst",
-        "",
+        pltotf("ctan/TheanoOldStyle-Bold-tlf-lgr"),
     ),
     /* TODO: fix the bug and enable
     (
         dimen_index_out_of_bounds_2_3,
-        "data/originals/dimen-index-out-of-bounds-3.tfm",
-        "data/originals/dimen-index-out-of-bounds-2.plst",
-        include_str!["data/originals/dimen-index-out-of-bounds-3.stderr.txt"],
+        "originals/dimen-index-out-of-bounds-3.tfm",
+        "originals/dimen-index-out-of-bounds-2.plst",
+        include_str_from_corpus!["originals/dimen-index-out-of-bounds-3.stderr.txt"],
     ),
      */
-
+    (
+        bxjatoucs_jis,
+        tftopl("ctan/bxjatoucs-jis-", "1.tfm", "2.plst"),
+    ),
     /*
     The problem in this one is that pltotf imposes max params of 254.
     (It's not 255 because in the CST -> AST step, number bigger than this become 255
@@ -382,368 +374,175 @@ convert_pltotf_tests!(
     Do we want to support that?
         (
         bxjatoucs_jis_roundtrip,
-        "data/ctan/bxjatoucs-jis-3.tfm",
-        "data/ctan/bxjatoucs-jis-2.plst",
+        "ctan/bxjatoucs-jis-3.tfm",
+        "ctan/bxjatoucs-jis-2.plst",
     ),
      */
-    (
-        smfebsl10_2_3,
-        "data/ctan/smfebsl10-3.tfm",
-        "data/ctan/smfebsl10-2.plst",
-        "",
-    ),
-    (aebkri, "data/ctan/aebkri.tfm", "data/ctan/aebkri.plst", "",),
-    (mt2exa, "data/ctan/mt2exa.tfm", "data/ctan/mt2exa.plst", "",),
-    (copti, "data/ctan/copti.tfm", "data/ctan/copti.plst", "",),
-    (
-        bxjatoucs_cid,
-        "data/ctan/bxjatoucs-cid.tfm",
-        "data/ctan/bxjatoucs-cid.plst",
-        include_str!["data/ctan/bxjatoucs-cid.stderr.txt"],
-    ),
+    (aebkri, pltotf("ctan/aebkri")),
+    (mt2exa, pltotf("ctan/mt2exa")),
+    (copti, pltotf("ctan/copti")),
+    (bxjatoucs_cid, pltotf_with_stderr("ctan/bxjatoucs-cid")),
     (
         xcharter_bolditalic_tlf_ot1g,
-        "data/ctan/XCharter-BoldItalic-tlf-ot1G.tfm",
-        "data/ctan/XCharter-BoldItalic-tlf-ot1G.plst",
-        "",
+        pltotf("ctan/XCharter-BoldItalic-tlf-ot1G"),
     ),
-);
-
-convert_tftopl_tests!(
-    (
-        rashii2_1_2,
-        "data/ctan/rashii2-1.tfm",
-        include_str!("data/ctan/rashii2-2.plst"),
-        "",
-        true,
-    ),
-    (
-        gk256g,
-        "data/ctan/gk256g.tfm",
-        "",
-        include_str!["data/ctan/gk256g.stderr.txt"],
-        false,
-    ),
-    (
-        orphan_lig_kerns_2_3,
-        "data/originals/orphan-lig-kerns-2.tfm",
-        include_str!("data/originals/orphan-lig-kerns-3.plst"),
-        "",
-        true,
-    ),
-    (
-        txbmi,
-        "data/ctan/txbmi.tfm",
-        include_str!("data/ctan/txbmi.plst"),
-        "",
-        true,
-    ),
-    (
-        unusual_num_params,
-        "data/originals/unusual-num-params.tfm",
-        include_str!("data/originals/unusual-num-params.plst"),
-        "Unusual number of fontdimen parameters for a math symbols font (0 not 22).\n",
-        true,
-    ),
-    (
-        empty_coding_scheme,
-        "data/ctan/md-utree.tfm",
-        include_str!("data/ctan/md-utree.plst"),
-        "",
-        true,
-    ),
-    (
-        md_grbr7m,
-        "data/ctan/md-grbr7m.tfm",
-        include_str!("data/ctan/md-grbr7m.plst"),
-        "",
-        true,
-    ),
-    (
-        xcyeuat12,
-        "data/ctan/xyeuat12.tfm",
-        include_str!("data/ctan/xyeuat12.plst"),
-        "",
-        true,
-    ),
-    (
-        arev_sans_1_2,
-        "data/ctan/ArevSans-BoldOblique-1.tfm",
-        include_str!("data/ctan/ArevSans-BoldOblique-2.plst"),
-        include_str!("data/ctan/ArevSans-BoldOblique-2.stderr.txt"),
-        true,
-    ),
+    (empty_coding_scheme, tftopl("ctan/md-utree")),
+    (txbmi, tftopl("ctan/txbmi")),
+    (md_grbr7m, tftopl("ctan/md-grbr7m")),
+    (xcyeuat12, tftopl("ctan/xyeuat12")),
     (
         non_zero_first_dimens,
-        "data/originals/non-zero-first-dimens.tfm",
-        include_str!("data/originals/non-zero-first-dimens.plst"),
-        include_str!("data/originals/non-zero-first-dimens.stderr.txt"),
-        true,
-    ),
-    (
-        dimen_index_out_of_bounds_1_2,
-        "data/originals/dimen-index-out-of-bounds-1.tfm",
-        include_str!("data/originals/dimen-index-out-of-bounds-2.plst"),
-        include_str!("data/originals/dimen-index-out-of-bounds-2.stderr.txt"),
-        true,
+        tftopl_with_stderr("originals/non-zero-first-dimens"),
     ),
     (
         duplicate_lig_stop_warning,
-        "data/originals/duplicate-lig-stop-warnings.tfm",
-        include_str!("data/originals/duplicate-lig-stop-warnings.plst"),
-        include_str!("data/originals/duplicate-lig-stop-warnings.stderr.txt"),
-        true,
+        tftopl_with_stderr("originals/duplicate-lig-stop-warnings"),
     ),
     (
         duplicate_lig_kern_warning,
-        "data/originals/duplicate-lig-kern-warnings-1.tfm",
-        include_str!("data/originals/duplicate-lig-kern-warnings-2.plst"),
-        include_str!("data/originals/duplicate-lig-kern-warnings-2.stderr.txt"),
-        true,
-    ),
-    (
-        smfebsl10_1_2,
-        "data/ctan/smfebsl10-1.tfm",
-        include_str!("data/ctan/smfebsl10-2.plst"),
-        "",
-        true,
-    ),
-    (
-        bxjatoucs_jis,
-        "data/ctan/bxjatoucs-jis-1.tfm",
-        include_str!("data/ctan/bxjatoucs-jis-2.plst"),
-        "",
-        true,
+        tftopl_with_stderr(
+            "originals/duplicate-lig-kern-warnings-",
+            "1.tfm",
+            "2.plst",
+            "2.stderr.txt"
+        ),
     ),
     (
         quicspool_wwfonts_i_1_2,
-        "data/ctan/quicspool_wwfonts_i-1.tfm",
-        include_str!("data/ctan/quicspool_wwfonts_i-2.plst"),
-        include_str!("data/ctan/quicspool_wwfonts_i-2.stderr.txt"),
-        true,
+        tftopl_with_stderr(
+            "ctan/quicspool_wwfonts_i-",
+            "1.tfm",
+            "2.plst",
+            "2.stderr.txt"
+        ),
     ),
     (
         quicspool_wwfonts_b_1_2,
-        "data/ctan/quicspool_wwfonts_b-1.tfm",
-        include_str!("data/ctan/quicspool_wwfonts_b-2.plst"),
-        include_str!("data/ctan/quicspool_wwfonts_b-2.stderr.txt"),
-        true,
+        tftopl_with_stderr(
+            "ctan/quicspool_wwfonts_b-",
+            "1.tfm",
+            "2.plst",
+            "2.stderr.txt"
+        ),
     ),
     (
         quicspool_wwfonts_cw_1_2,
-        "data/ctan/quicspool_wwfonts_cw-1.tfm",
-        include_str!("data/ctan/quicspool_wwfonts_cw-2.plst"),
-        include_str!("data/ctan/quicspool_wwfonts_cw-2.stderr.txt"),
-        true,
+        tftopl_with_stderr(
+            "ctan/quicspool_wwfonts_cw-",
+            "1.tfm",
+            "2.plst",
+            "2.stderr.txt"
+        ),
     ),
     (
         quicspool_wwfonts_r_1_2,
-        "data/ctan/quicspool_wwfonts_r-1.tfm",
-        include_str!("data/ctan/quicspool_wwfonts_r-2.plst"),
-        include_str!("data/ctan/quicspool_wwfonts_r-2.stderr.txt"),
-        true,
+        tftopl_with_stderr(
+            "ctan/quicspool_wwfonts_r-",
+            "1.tfm",
+            "2.plst",
+            "2.stderr.txt"
+        ),
     ),
     (
         number_limit_16,
-        "data/originals/number-limit-16-1.tfm",
-        include_str!("data/originals/number-limit-16-2.plst"),
-        include_str!("data/originals/number-limit-16-2.stderr.txt"),
-        true,
+        tftopl_with_stderr(
+            "originals/number-limit-16-",
+            "1.tfm",
+            "2.plst",
+            "2.stderr.txt"
+        ),
     ),
     (
         next_larger_loop_tfm,
-        "data/originals/next-larger-loop-tfm.tfm",
-        include_str!("data/originals/next-larger-loop-tfm.plst"),
-        include_str!["data/originals/next-larger-loop-tfm.stderr.txt"],
-        true,
+        tftopl_with_stderr("originals/next-larger-loop-tfm"),
     ),
-    (
-        zero_design_size,
-        "data/fuzz/fuzz_tftopl_8512ff447bf762fe.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_8512ff447bf762fe.plst"),
-        include_str!["data/fuzz/fuzz_tftopl_8512ff447bf762fe.stderr.txt"],
-        true,
-    ),
-    (
-        lig_kern_out_of_bounds,
-        "data/fuzz/fuzz_tftopl_794bb506a827c3f.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_794bb506a827c3f.plst"),
-        include_str!["data/fuzz/fuzz_tftopl_794bb506a827c3f.stderr.txt"],
-        true,
-    ),
-    (
-        truncated_string_in_header,
-        "data/fuzz/fuzz_tftopl_f89546ae5b0f1d5d.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_f89546ae5b0f1d5d.plst"),
-        "",
-        true,
-    ),
+    (zero_design_size, tftopl_fuzz("8512ff447bf762fe")),
+    (lig_kern_out_of_bounds, tftopl_fuzz("794bb506a827c3f")),
+    (truncated_string_in_header, tftopl_fuzz("f89546ae5b0f1d5d")),
     (
         header_size_too_big_a,
-        "data/originals/large-string-length-a.tfm",
-        include_str!("data/originals/large-string-length-a.plst"),
-        "",
-        true,
+        tftopl("originals/large-string-length-a"),
     ),
     (
         header_size_too_big_b,
-        "data/originals/large-string-length-b.tfm",
-        include_str!("data/originals/large-string-length-b.plst"),
-        include_str!("data/originals/large-string-length-b.stderr.txt"),
-        true,
+        tftopl_with_stderr("originals/large-string-length-b"),
     ),
     (
         bad_chars_in_string,
-        "data/originals/bad-chars-in-string.tfm",
-        include_str!("data/originals/bad-chars-in-string.plst"),
-        include_str!("data/originals/bad-chars-in-string.stderr.txt"),
-        true,
+        tftopl_with_stderr("originals/bad-chars-in-string"),
     ),
     (
         lig_kern_instruction_references_non_existent_character,
-        "data/fuzz/fuzz_tftopl_10e324e0595b2934.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_10e324e0595b2934.plst"),
-        include_str!("data/fuzz/fuzz_tftopl_10e324e0595b2934.stderr.txt"),
-        true,
+        tftopl_fuzz("10e324e0595b2934"),
     ),
     (
         extensible_character_references_non_existent_character,
-        "data/fuzz/fuzz_tftopl_e1f1c0de87caa4a0.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_e1f1c0de87caa4a0.plst"),
-        include_str!("data/fuzz/fuzz_tftopl_e1f1c0de87caa4a0.stderr.txt"),
-        true,
+        tftopl_fuzz("e1f1c0de87caa4a0"),
     ),
     (
         lig_kern_empty_invisible_section,
-        "data/fuzz/fuzz_tftopl_764173f545c18b72.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_764173f545c18b72.plst"),
-        include_str!("data/fuzz/fuzz_tftopl_764173f545c18b72.stderr.txt"),
-        true,
+        tftopl_fuzz("764173f545c18b72"),
     ),
     (
         lig_kern_stop_address_too_big,
-        "data/fuzz/fuzz_tftopl_8ab6f071335a4abc.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_8ab6f071335a4abc.plst"),
-        include_str!("data/fuzz/fuzz_tftopl_8ab6f071335a4abc.stderr.txt"),
-        true,
+        tftopl_fuzz("8ab6f071335a4abc"),
     ),
-    (
-        infinite_ligature_loop,
-        "data/fuzz/fuzz_tftopl_273fbef691836675.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_273fbef691836675.plst"),
-        include_str!("data/fuzz/fuzz_tftopl_273fbef691836675.stderr.txt"),
-        true,
-    ),
+    (infinite_ligature_loop, tftopl_fuzz("273fbef691836675")),
     (
         invalid_boundary_char_entrypoint,
-        "data/fuzz/fuzz_tftopl_f49074da35aa2807.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_f49074da35aa2807.plst"),
-        include_str!("data/fuzz/fuzz_tftopl_f49074da35aa2807.stderr.txt"),
-        true,
+        tftopl_fuzz("f49074da35aa2807"),
     ),
     (
         invalid_rep_in_extensible_recipe,
-        "data/fuzz/fuzz_tftopl_1c72e451cd0e25e7.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_1c72e451cd0e25e7.plst"),
-        include_str!("data/fuzz/fuzz_tftopl_1c72e451cd0e25e7.stderr.txt"),
-        true,
+        tftopl_fuzz("1c72e451cd0e25e7"),
     ),
     (
         non_existent_lig_kern_duplicate_warning,
-        "data/fuzz/fuzz_tftopl_e87827104f9cc5c4.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_e87827104f9cc5c4.plst"),
-        include_str!("data/fuzz/fuzz_tftopl_e87827104f9cc5c4.stderr.txt"),
-        true,
+        tftopl_fuzz("e87827104f9cc5c4"),
     ),
     (
         lig_kern_unused_part_of_program_edge_case,
-        "data/fuzz/fuzz_tftopl_622eb29085ef8389.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_622eb29085ef8389.plst"),
-        include_str!("data/fuzz/fuzz_tftopl_622eb29085ef8389.stderr.txt"),
-        true,
+        tftopl_fuzz("622eb29085ef8389"),
     ),
-    (
-        header_warnings_ordering,
-        "data/fuzz/fuzz_tftopl_b38d3def70d7a026.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_b38d3def70d7a026.plst"),
-        include_str!("data/fuzz/fuzz_tftopl_b38d3def70d7a026.stderr.txt"),
-        true,
-    ),
-    (
-        string_with_non_ascii_chars,
-        "data/fuzz/fuzz_tftopl_d35c51fe3046ea8f.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_d35c51fe3046ea8f.plst"),
-        include_str!("data/fuzz/fuzz_tftopl_d35c51fe3046ea8f.stderr.txt"),
-        true,
-    ),
+    (header_warnings_ordering, tftopl_fuzz("b38d3def70d7a026")),
+    (string_with_non_ascii_chars, tftopl_fuzz("d35c51fe3046ea8f")),
     (
         lig_kern_label_boundary_char,
-        "data/fuzz/fuzz_tftopl_e604027d3275b06e.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_e604027d3275b06e.plst"),
-        include_str!("data/fuzz/fuzz_tftopl_e604027d3275b06e.stderr.txt"),
-        true,
+        tftopl_fuzz("e604027d3275b06e"),
     ),
-    (
-        slant_param_is_i32_min,
-        "data/fuzz/fuzz_tftopl_ef0432d46c78f8a.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_ef0432d46c78f8a.plst"),
-        include_str!("data/fuzz/fuzz_tftopl_ef0432d46c78f8a.stderr.txt"),
-        true,
-    ),
-    (
-        phantom_ligature_bug,
-        "data/fuzz/fuzz_tftopl_90cbce0c1d734f4e.tfm",
-        include_str!("data/fuzz/fuzz_tftopl_90cbce0c1d734f4e.plst"),
-        include_str!("data/fuzz/fuzz_tftopl_90cbce0c1d734f4e.stderr.txt"),
-        true,
-    ),
+    (slant_param_is_i32_min, tftopl_fuzz("ef0432d46c78f8a")),
+    (phantom_ligature_bug, tftopl_fuzz("90cbce0c1d734f4e")),
     (
         phantom_ligature_bug_minimal_repro_1,
-        "data/originals/phantom-ligature-bug-minimal-repro-1.tfm",
-        include_str!("data/originals/phantom-ligature-bug-minimal-repro-1.plst"),
-        include_str!("data/originals/phantom-ligature-bug-minimal-repro-1.stderr.txt"),
-        true,
+        tftopl_with_stderr("originals/phantom-ligature-bug-minimal-repro-1"),
     ),
     (
         phantom_ligature_bug_minimal_repro_2,
-        "data/originals/phantom-ligature-bug-minimal-repro-2.tfm",
-        include_str!("data/originals/phantom-ligature-bug-minimal-repro-2.plst"),
-        include_str!("data/originals/phantom-ligature-bug-minimal-repro-2.stderr.txt"),
-        true,
+        tftopl_with_stderr("originals/phantom-ligature-bug-minimal-repro-2"),
     ),
     (
         left_boundary_char_infinite_loop,
-        "data/originals/left-boundary-char-infinite-loop.tfm",
-        include_str!("data/originals/left-boundary-char-infinite-loop.plst"),
-        include_str!("data/originals/left-boundary-char-infinite-loop.stderr.txt"),
-        true,
+        tftopl_with_stderr("originals/left-boundary-char-infinite-loop"),
     ),
     (
         right_boundary_char_creates_infinite_loop_a,
-        "data/originals/right-boundary-char-creates-infinite-loop-a.tfm",
-        include_str!("data/originals/right-boundary-char-creates-infinite-loop-a.plst"),
-        include_str!("data/originals/right-boundary-char-creates-infinite-loop-a.stderr.txt"),
-        true,
+        tftopl_with_stderr("originals/right-boundary-char-creates-infinite-loop-a"),
     ),
     (
         right_boundary_char_creates_infinite_loop_b,
-        "data/originals/right-boundary-char-creates-infinite-loop-b.tfm",
-        include_str!("data/originals/right-boundary-char-creates-infinite-loop-b.plst"),
-        include_str!("data/originals/right-boundary-char-creates-infinite-loop-b.stderr.txt"),
-        true,
+        tftopl_with_stderr("originals/right-boundary-char-creates-infinite-loop-b"),
     ),
     (
         right_boundary_char_breaks_infinite_loop_a,
-        "data/originals/right-boundary-char-breaks-infinite-loop-a.tfm",
-        include_str!("data/originals/right-boundary-char-breaks-infinite-loop-a.plst"),
-        include_str!("data/originals/right-boundary-char-breaks-infinite-loop-a.stderr.txt"),
-        true,
+        tftopl("originals/right-boundary-char-breaks-infinite-loop-a"),
     ),
     (
         right_boundary_char_breaks_infinite_loop_b,
-        "data/originals/right-boundary-char-breaks-infinite-loop-b.tfm",
-        include_str!("data/originals/right-boundary-char-breaks-infinite-loop-b.plst"),
-        include_str!("data/originals/right-boundary-char-breaks-infinite-loop-b.stderr.txt"),
-        true,
+        tftopl_with_stderr("originals/right-boundary-char-breaks-infinite-loop-b"),
+    ),
+    (gk256g, tftopl_with_stderr("ctan/gk256g")),
+    (
+        unusual_num_params,
+        tftopl_with_stderr("originals/unusual-num-params"),
     ),
 );

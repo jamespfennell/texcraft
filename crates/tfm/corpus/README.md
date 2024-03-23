@@ -1,19 +1,19 @@
-# .tfm and .pl data for testing
+# .tfm and .plst corpus
 
-This directory tree hosts .tfm and .pl files for testing.
-For a pair `(file.tfm, file.pl)`, 
-    either `file.tfm` is the result of Knuth's `pltotf file.pl`,
-    or `file.pl` is the result of Knuth's `tftopl file.tfm`.
+This directory tree host a diverse corpus of .tfm and .plst files for testing.
+For a pair `(file.tfm, file.plst)`, 
+    either `file.tfm` is the result of Knuth's `pltotf file.plst`,
+    or `file.plst` is the result of Knuth's `tftopl file.tfm`.
 The CLI E2E tests then verify that Texcraft's version of these command gives the identical result.
 
 In some cases the roundtrip conversion works - i.e., 
-    `file.tfm` is the result of Knuth's `pltotf file.pl`
-    _and_ `file.pl` is the result of Knuth's `tftopl file.tfm`.
-This happens when both the .tfm and .pl file are in their respective canoncial forms.
+    `file.tfm` is the result of Knuth's `pltotf file.plst`
+    _and_ `file.plst` is the result of Knuth's `tftopl file.tfm`.
+This happens when both the .tfm and .pl file are in their respective canonical forms.
 In this case the E2E tests verify that both conversion directions works.
 While this is in some sense the ideal case, we can't have this for
   every test because we sometimes want to test non-canonical input files
-  (like an empty .pl file, which is valid, but not in canonical form).
+  (like an empty .plst file, which is valid, but not in canonical form).
 
 The input files are sourced online or written by hand.
 For files sourced online it is important to attribute the file correctly.
