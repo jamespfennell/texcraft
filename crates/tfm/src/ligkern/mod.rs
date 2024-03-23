@@ -176,10 +176,6 @@ impl CompiledProgram {
 pub struct InfiniteLoopError {
     /// The pair of characters the starts the infinite loop.
     pub starting_pair: (Option<Char>, Char),
-    /// A sequence of steps forming the infinite loop.
-    ///
-    /// At the end of these steps, the next pair to replace will be the `starting_pair` again.
-    pub infinite_loop: Vec<InfiniteLoopStep>,
 }
 
 impl InfiniteLoopError {

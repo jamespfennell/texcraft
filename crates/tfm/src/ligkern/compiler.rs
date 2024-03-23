@@ -7,8 +7,7 @@ pub fn compile(
     entry_points: &HashMap<Char, u16>,
 ) -> Result<CompiledProgram, InfiniteLoopError> {
     let pair_to_instruction = build_pair_to_instruction_map(program, entry_points);
-    let pair_to_replacement =
-        calculate_replacements(&program.instructions, kerns, pair_to_instruction)?;
+    let pair_to_replacement = calculate_replacements(program, kerns, pair_to_instruction)?;
     let program = lower_and_optimize(pair_to_replacement);
     Ok(program)
 }
@@ -20,15 +19,16 @@ struct OngoingCalculation {
     // Node this calculation is for.
     node: Node,
     // Part of the ligature result that has been finalized and won't change.
-    finalized: ReplacementBuilder,
+    finalized: Finalized,
     // Characters that are still pending replacement. The next step is to apply the ligature
-    // rule for (pending[0], pending[1]).
-    pending: (LeftChar, Char, Option<Char>),
+    // rule for the node. After that, if the second element is not empty, the next step
+    // is to apply the ligature rule for (tuple.0.1, tuple.1).
+    pending: (Node, Option<Char>),
 }
 
 impl OngoingCalculation {
     fn child(&self) -> Node {
-        Node(self.pending.0, self.pending.1)
+        self.pending.0
     }
 }
 
@@ -67,8 +67,8 @@ impl TryFrom<LeftChar> for Char {
 fn build_pair_to_instruction_map(
     program: &lang::Program,
     entry_points: &HashMap<Char, u16>,
-) -> HashMap<(LeftChar, Char), usize> {
-    let mut result = HashMap::<(LeftChar, Char), usize>::new();
+) -> HashMap<Node, usize> {
+    let mut result = HashMap::<Node, usize>::new();
     let all_entry_points = entry_points
         .iter()
         .map(|(c, e)| (LeftChar::Char(*c), *e))
@@ -93,7 +93,9 @@ fn build_pair_to_instruction_map(
                 .map(|increment| next + 1 + (increment as usize));
 
             // We only insert the element if it doesn't already exist.
-            result.entry((left, instruction.right_char)).or_insert(next);
+            result
+                .entry(Node(left, instruction.right_char))
+                .or_insert(next);
         }
     }
     result
@@ -105,7 +107,7 @@ fn build_pair_to_instruction_map(
 // on boundary chars.
 struct Replacement(LeftChar, Vec<(Number, Char)>);
 
-enum ReplacementBuilder {
+enum Finalized {
     Empty,
     NonEmpty {
         replacement: Replacement,
@@ -113,23 +115,23 @@ enum ReplacementBuilder {
     },
 }
 
-impl ReplacementBuilder {
+impl Finalized {
     fn new_single_char(c1: LeftChar) -> Self {
-        ReplacementBuilder::NonEmpty {
+        Finalized::NonEmpty {
             replacement: Replacement(c1, vec![]),
             last_kern: Number::ZERO,
         }
     }
     fn new_double_char(c1: LeftChar, c2: Char) -> Self {
-        ReplacementBuilder::NonEmpty {
+        Finalized::NonEmpty {
             replacement: Replacement(c1, vec![(Number::ZERO, c2)]),
             last_kern: Number::ZERO,
         }
     }
     fn finish(self, last_char: Char) -> Replacement {
         match self {
-            ReplacementBuilder::Empty => Replacement(last_char.into(), vec![]),
-            ReplacementBuilder::NonEmpty {
+            Finalized::Empty => Replacement(last_char.into(), vec![]),
+            Finalized::NonEmpty {
                 mut replacement,
                 last_kern,
             } => {
@@ -140,13 +142,13 @@ impl ReplacementBuilder {
     }
     fn push(&mut self, c: LeftChar, kern: Number) {
         match self {
-            ReplacementBuilder::Empty => {
-                *self = ReplacementBuilder::NonEmpty {
+            Finalized::Empty => {
+                *self = Finalized::NonEmpty {
                     replacement: Replacement(c, vec![]),
                     last_kern: kern,
                 }
             }
-            ReplacementBuilder::NonEmpty {
+            Finalized::NonEmpty {
                 replacement,
                 last_kern,
             } => {
@@ -168,31 +170,19 @@ impl ReplacementBuilder {
         }
         c
     }
-
-    fn chars(&self) -> Option<Chars> {
-        match self {
-            ReplacementBuilder::Empty => None,
-            ReplacementBuilder::NonEmpty {
-                replacement,
-                last_kern: _,
-            } => Some(Chars(
-                replacement.0,
-                replacement.1.iter().map(|(_, c)| *c).collect(),
-            )),
-        }
-    }
 }
 
 fn calculate_replacements(
-    instructions: &[lang::Instruction],
+    program: &lang::Program,
     kerns: &[Number],
-    pair_to_instruction: HashMap<(LeftChar, Char), usize>,
-) -> Result<HashMap<(LeftChar, Char), Replacement>, InfiniteLoopError> {
-    let mut result: HashMap<(LeftChar, Char), Replacement> = Default::default();
+    pair_to_instruction: HashMap<Node, usize>,
+) -> Result<HashMap<Node, Replacement>, InfiniteLoopError> {
+    let mut result: HashMap<Node, Replacement> = Default::default();
     let mut actionable: Vec<OngoingCalculation> = vec![];
     let mut node_to_parents: HashMap<Node, Vec<OngoingCalculation>> = Default::default();
-    for (&(left, right), &index) in &pair_to_instruction {
-        let operation = instructions[index].operation;
+    for (&pair, &index) in &pair_to_instruction {
+        let Node(left, right) = pair;
+        let operation = program.instructions[index].operation;
         let operation = match operation {
             lang::Operation::EntrypointRedirect(u, _) => {
                 // This reimplements the phantom ligature bug in tftopl.
@@ -202,15 +192,19 @@ fn calculate_replacements(
             }
             operation => operation,
         };
-        let (pre_cursor, cursor, post_cursor): (ReplacementBuilder, LeftChar, TC) = match operation
-        {
+        enum Pending {
+            None(Char),
+            One(Node),
+            Two(Node, Char),
+        }
+        let (finalized, pending): (Finalized, Pending) = match operation {
             lang::Operation::Kern(kern) => {
-                result.insert((left, right), Replacement(left, vec![(kern, right)]));
+                result.insert(pair, Replacement(left, vec![(kern, right)]));
                 continue;
             }
             lang::Operation::KernAtIndex(index) => {
                 result.insert(
-                    (left, right),
+                    pair,
                     Replacement(
                         left,
                         vec![(
@@ -230,80 +224,67 @@ fn calculate_replacements(
                 post_lig_tag_invalid: _,
             } => match post_lig_operation {
                 lang::PostLigOperation::RetainBothMoveNowhere => (
-                    ReplacementBuilder::Empty,
-                    left,
-                    TC::Two(char_to_insert, right),
+                    Finalized::Empty,
+                    Pending::Two(Node(left, char_to_insert), right),
                 ),
                 lang::PostLigOperation::RetainBothMoveToInserted => (
-                    ReplacementBuilder::new_single_char(left),
-                    char_to_insert.into(),
-                    TC::One(right),
+                    Finalized::new_single_char(left),
+                    Pending::One(Node(char_to_insert.into(), right)),
                 ),
                 lang::PostLigOperation::RetainBothMoveToRight => (
-                    ReplacementBuilder::new_double_char(left, char_to_insert),
-                    right.into(),
-                    TC::None { cursor: right },
+                    Finalized::new_double_char(left, char_to_insert),
+                    Pending::None(right),
                 ),
                 lang::PostLigOperation::RetainRightMoveToInserted => (
-                    ReplacementBuilder::Empty,
-                    char_to_insert.into(),
-                    TC::One(right),
+                    Finalized::Empty,
+                    Pending::One(Node(char_to_insert.into(), right)),
                 ),
                 lang::PostLigOperation::RetainRightMoveToRight => (
-                    ReplacementBuilder::new_single_char(char_to_insert.into()),
-                    right.into(),
-                    TC::None { cursor: right },
+                    Finalized::new_single_char(char_to_insert.into()),
+                    Pending::None(right),
                 ),
                 lang::PostLigOperation::RetainLeftMoveNowhere => {
-                    (ReplacementBuilder::Empty, left, TC::One(char_to_insert))
+                    (Finalized::Empty, Pending::One(Node(left, char_to_insert)))
                 }
                 lang::PostLigOperation::RetainLeftMoveToInserted => (
-                    ReplacementBuilder::new_single_char(left),
-                    char_to_insert.into(),
-                    TC::None {
-                        cursor: char_to_insert,
-                    },
+                    Finalized::new_single_char(left),
+                    Pending::None(char_to_insert),
                 ),
-                lang::PostLigOperation::RetainNeitherMoveToInserted => (
-                    ReplacementBuilder::Empty,
-                    char_to_insert.into(),
-                    TC::None {
-                        cursor: char_to_insert,
-                    },
-                ),
+                lang::PostLigOperation::RetainNeitherMoveToInserted => {
+                    (Finalized::Empty, Pending::None(char_to_insert))
+                }
             },
         };
-        let node = Node(left, right);
-        match post_cursor {
-            TC::None { cursor } => {
-                result.insert((node.0, node.1), pre_cursor.finish(cursor));
+        match pending {
+            Pending::None(cursor) => {
+                result.insert(pair, finalized.finish(cursor));
             }
-            TC::One(c2) => {
+            Pending::One(node) => {
                 actionable.push(OngoingCalculation {
-                    node,
-                    finalized: pre_cursor,
-                    pending: (cursor, c2, None),
+                    node: pair,
+                    finalized,
+                    pending: (node, None),
                 });
-                node_to_parents.insert(node, vec![]);
+                node_to_parents.insert(pair, vec![]);
             }
-            TC::Two(c2, c3) => {
+            Pending::Two(node, c3) => {
                 actionable.push(OngoingCalculation {
-                    node,
-                    finalized: pre_cursor,
-                    pending: (cursor, c2, Some(c3)),
+                    node: pair,
+                    finalized,
+                    pending: (node, Some(c3)),
                 });
-                node_to_parents.insert(node, vec![]);
+                node_to_parents.insert(pair, vec![]);
             }
         };
     }
 
     while let Some(mut calc) = actionable.pop() {
-        let child = Node(calc.pending.0, calc.pending.1);
+        let child = calc.child();
         if let Some(blocking) = node_to_parents.get_mut(&child) {
             blocking.push(calc);
             continue;
         }
-        let last = match result.get(&(child.0, child.1)) {
+        let last = match result.get(&child) {
             None => {
                 calc.finalized.push(child.0, Number::ZERO);
                 child.1
@@ -314,15 +295,15 @@ fn calculate_replacements(
                 .try_into()
                 .expect("boundary char can't be in the middle of a replacement"),
         };
-        match calc.pending.2 {
+        match calc.pending.1 {
             None => {
                 if let Some(blocking) = node_to_parents.remove(&calc.node) {
                     actionable.extend(blocking);
                 }
-                result.insert((calc.node.0, calc.node.1), calc.finalized.finish(last));
+                result.insert(calc.node, calc.finalized.finish(last));
             }
             Some(other) => {
-                calc.pending = (last.into(), other, None);
+                calc.pending = (Node(last.into(), other), None);
                 actionable.push(calc);
             }
         }
@@ -330,125 +311,73 @@ fn calculate_replacements(
 
     // Next we check for infinite loops. If there is one, the node_to_parents
     // map will be non-empty and contain all the nodes that couldn't be calculated.
-    let node_to_calc: HashMap<Node, OngoingCalculation> = node_to_parents
+    //
+    // The main complication here is that there are multiple nodes we can report
+    // as being the cause of the infinite loop. E.g., the loop could be
+    // (A,R) -> (B,R) -> (C,R) -> (A,R), and we could report any of these 3 nodes.
+    // What we want to do, though, is report the same node that Knuth does in tftopl
+    // and pltotf. Thus the algorithm here replicates what Knuth does.
+    //
+    // Knuth iterates over all nodes in the following order: in lexigraphical order
+    // for the left pair (with the boundary char last), and in the instruction order
+    // for the right pair. I.e, if we have pairs (A,R) and (B,R) the pair whose
+    // instruction comes first in the lig/kern program will come first.
+    //
+    // Then, given such a node, Knuth performs a path traversal following each
+    // node's dependencies. The first node that is seen twice in the traversal is the
+    // node that is considered to break the infinite loop. Knuth then essentially breaks
+    // the loop and moves on. Note that Knuth's algorithm correctly handles cases
+    // like (A,R) -> (B,R) -> (C,R) -> (B,R) - in such a case, the first node we see (A,R)
+    // isn't actually what causes the loop.
+    //
+    // The process described in the last paragraph can happen multiple times if there
+    // are multiple infinite loops. Knuth reports the node from the last infinite loop.
+    // Note that we have E2E tests that cover these kinds of cases.
+    let mut node_to_child: HashMap<Node, Node> = node_to_parents
         .into_values()
         .flatten()
-        .map(|calc| (calc.node, calc))
+        .map(|calc| (calc.node, calc.child()))
         .collect();
-    if let Some(&smallest_node) = node_to_calc.keys().min() {
-        let infinite_loop = {
-            let mut seen = HashSet::<Node>::new();
-            let mut next_node = smallest_node;
-            while seen.insert(next_node) {
-                next_node = node_to_calc[&next_node].child();
-            }
-            let mut infinite_loop: Vec<Node> = vec![];
-            while Some(next_node) != infinite_loop.first().copied() {
-                infinite_loop.push(next_node);
-                next_node = node_to_calc[&next_node].child();
-            }
-            infinite_loop
-        };
-        let starting_pair = infinite_loop[0];
-        let mut replacement: Option<Chars> = None;
-        let mut cursor_position = 0_usize;
-        let mut steps = Vec::<InfiniteLoopStep>::new();
-        for node in infinite_loop {
-            // TODO: the bug here for /LIG/ nodes is that the loop may caused by the second dep of /LIG/
-            // and so we've lost information on how we got from the start to here.
-            let calc = &node_to_calc[&node];
+    let mut knuth_ordered_nodes: Vec<Node> = node_to_child.keys().copied().collect();
+    knuth_ordered_nodes.sort_by(|lhs, rhs| {
+        lhs.0
+            .cmp(&rhs.0)
+            .then(pair_to_instruction[lhs].cmp(&pair_to_instruction[rhs]))
+    });
 
-            let (head, tail): (Option<Chars>, Vec<Char>) = match replacement.take() {
-                None => (None, vec![]),
-                Some(mut replacement) => {
-                    if cursor_position == 0 {
-                        (None, vec![])
-                    } else {
-                        let tail: Vec<Char> = replacement
-                            .1
-                            .get(cursor_position + 1..)
-                            .unwrap_or_default()
-                            .into();
-                        replacement.1.truncate(cursor_position - 1);
-                        (Some(replacement), tail)
-                    }
-                }
-            };
-            let head = match calc.finalized.chars() {
-                None => head,
-                Some(middle) => match head {
-                    None => Some(middle),
-                    Some(mut head) => {
-                        head.push(middle.0);
-                        head.1.extend(middle.1);
-                        Some(head)
-                    }
-                },
-            };
-            let new_cursor_position = match &head {
-                None => 0,
-                Some(head) => 1 + head.1.len(),
-            };
-            let mut head = match head {
-                None => Chars(calc.pending.0, vec![]),
-                Some(mut head) => {
-                    head.push(calc.pending.0);
-                    head
-                }
-            };
-            head.1.push(calc.pending.1);
-            if let Some(c) = calc.pending.2 {
-                head.1.push(c);
-            }
-            head.1.extend(tail);
-
-            let post_replacement = match head.0 {
-                LeftChar::Char(c) => {
-                    let mut v = vec![c];
-                    v.extend(&head.1);
-                    (false, v)
-                }
-                LeftChar::BoundaryChar => (true, head.1.clone()),
-            };
-            replacement = Some(head);
-            cursor_position = new_cursor_position;
-
-            steps.push(InfiniteLoopStep {
-                post_replacement,
-                post_cursor_position: cursor_position,
-                instruction_index: pair_to_instruction[&(node.0, node.1)],
-            });
+    let mut inf_nodes: Vec<Node> = vec![];
+    for mut node in knuth_ordered_nodes {
+        let mut seen = HashSet::<Node>::new();
+        while let Some(child) = node_to_child.remove(&node) {
+            seen.insert(node);
+            node = child;
         }
-        return Err(InfiniteLoopError {
-            starting_pair: (starting_pair.0.char_or(), starting_pair.1),
-            infinite_loop: steps,
-        });
+        // As mentioned above, when Knuth finds an infinite loop he breaks it.
+        // It's possible that the node that started this iteration is part of an infinite
+        // loop that has already been broken. For example the lig/kern program could be:
+        // - (A,R) -> (C,R) -> (C,R)
+        // - (B,R) -> (C,R) -> (C,R)
+        // In this case when considering (B,R) there is nothing to do because the (C,R)
+        // loop has already been broken.
+        //
+        // We detect this case by keeping track of which nodes we've seen for the first
+        // time in this traversal.
+        // If we haven't seen it, the loop has already been broken. There is an E2E test
+        // for this case.
+        if seen.contains(&node) {
+            inf_nodes.push(node);
+        }
     }
 
+    if let Some(l) = inf_nodes.pop() {
+        return Err(InfiniteLoopError {
+            starting_pair: (l.0.char_or(), l.1),
+        });
+    }
     Ok(result)
 }
 
-#[derive(Debug)]
-struct Chars(LeftChar, Vec<Char>);
-
-impl Chars {
-    fn push(&mut self, c: LeftChar) {
-        self.1.push(
-            c.try_into()
-                .expect("left boundary char cannot appear in the middle of a replacement"),
-        );
-    }
-}
-
-enum TC {
-    None { cursor: Char },
-    One(Char),
-    Two(Char, Char),
-}
-
-fn lower_and_optimize(
-    pair_to_replacement: HashMap<(LeftChar, Char), Replacement>,
-) -> CompiledProgram {
+fn lower_and_optimize(pair_to_replacement: HashMap<Node, Replacement>) -> CompiledProgram {
     let mut intermediate: HashMap<LeftChar, Vec<(Char, RawReplacement)>> = Default::default();
     let mut middle_chars: Vec<(Char, Number)> = Default::default();
 
@@ -541,18 +470,6 @@ mod tests {
                 post_lig_operation,
                 post_lig_tag_invalid: false,
             },
-        }
-    }
-
-    pub fn new_stop(
-        next_instruction: Option<u8>,
-        right_char: char,
-        entrypoint_redirect: u16,
-    ) -> lang::Instruction {
-        lang::Instruction {
-            next_instruction,
-            right_char: right_char.try_into().unwrap(),
-            operation: lang::Operation::EntrypointRedirect(entrypoint_redirect, true),
         }
     }
 
@@ -936,168 +853,4 @@ mod tests {
             ],
         ),
     );
-
-    fn run_infinite_loop_test(
-        instructions: Vec<lang::Instruction>,
-        entry_points: Vec<(char, u16)>,
-        want_err: InfiniteLoopError,
-    ) {
-        let program = lang::Program {
-            instructions,
-            ..Default::default()
-        };
-        let entry_points: HashMap<Char, u16> = entry_points
-            .into_iter()
-            .map(|(c, u)| (c.try_into().unwrap(), u))
-            .collect();
-        let got_err = compile(&program, &vec![], &entry_points).unwrap_err();
-        assert_eq!(got_err, want_err);
-    }
-
-    macro_rules! infinite_loop_tests {
-        ( $( ($name: ident, $instructions: expr, $entry_points: expr, $want_err: expr, ), )+ ) => {
-            $(
-                #[test]
-                fn $name() {
-                    let instructions = $instructions;
-                    let entry_points = $entry_points;
-                    let want_err = $want_err;
-                    run_infinite_loop_test(instructions, entry_points, want_err);
-                }
-            )+
-        };
-    }
-
-    infinite_loop_tests!(
-        (
-            single_command,
-            vec![new_lig(None, 'B', 'A', RetainBothMoveToInserted)],
-            vec![('A', 0)],
-            InfiniteLoopError {
-                starting_pair: starting_pair('A', 'B'),
-                infinite_loop: vec![InfiniteLoopStep {
-                    instruction_index: 0,
-                    post_replacement: post_replacement("AAB"),
-                    post_cursor_position: 1,
-                }]
-            },
-        ),
-        (
-            duplicate_command_single_char,
-            vec![
-                new_lig(Some(0), 'A', 'A', RetainLeftMoveNowhere),
-                new_stop(None, 'A', 225),
-            ],
-            vec![('A', 0)],
-            InfiniteLoopError {
-                starting_pair: starting_pair('A', 'A'),
-                infinite_loop: vec![InfiniteLoopStep {
-                    instruction_index: 0,
-                    post_replacement: post_replacement("AA"),
-                    post_cursor_position: 0,
-                }]
-            },
-        ),
-        (
-            two_commands,
-            vec![
-                new_lig(None, 'B', 'C', RetainRightMoveToInserted),
-                new_lig(None, 'B', 'A', RetainRightMoveToInserted),
-            ],
-            vec![('A', 0), ('C', 1)],
-            InfiniteLoopError {
-                starting_pair: starting_pair('A', 'B'),
-                infinite_loop: vec![
-                    InfiniteLoopStep {
-                        instruction_index: 0,
-                        post_replacement: post_replacement("CB"),
-                        post_cursor_position: 0,
-                    },
-                    InfiniteLoopStep {
-                        instruction_index: 1,
-                        post_replacement: post_replacement("AB"),
-                        post_cursor_position: 0,
-                    }
-                ]
-            },
-        ),
-        /* TODO: fix the bug and enable this test
-        (
-            three_commands,
-            vec![
-                new_lig(Some(1), 'B', 'C', RetainBothMoveNowhere), // AB -> ACB
-                new_lig(None, 'C', 'D', RetainRightMoveToInserted), // ACB -> DCB
-                new_lig(None, 'C', 'A', RetainLeftMoveToInserted), // DCB -> DAB
-            ],
-            vec![('A', 0), ('D', 2)],
-            CompilationError {
-                starting_pair: starting_pair('A', 'B'),
-                infinite_loop: vec![
-                    InfiniteLoopStep {
-                        instruction_index: 0,
-                        post_replacement: post_replacement("ACB"),
-                        post_cursor_position: 0,
-                    },
-                    InfiniteLoopStep {
-                        instruction_index: 1,
-                        post_replacement: post_replacement("DCB"),
-                        post_cursor_position: 0,
-                    },
-                    InfiniteLoopStep {
-                        instruction_index: 2,
-                        post_replacement: post_replacement("DAB"),
-                        post_cursor_position: 1,
-                    }
-                ]
-            },
-        ),
-        */
-        (
-            infinite_append,
-            vec![
-                new_lig(None, 'B', 'C', RetainBothMoveToInserted),
-                new_lig(None, 'B', 'A', RetainBothMoveToInserted),
-            ],
-            vec![('A', 0), ('C', 1)],
-            InfiniteLoopError {
-                starting_pair: starting_pair('A', 'B'),
-                infinite_loop: vec![
-                    InfiniteLoopStep {
-                        instruction_index: 0,
-                        post_replacement: post_replacement("ACB"),
-                        post_cursor_position: 1,
-                    },
-                    InfiniteLoopStep {
-                        instruction_index: 1,
-                        post_replacement: post_replacement("ACAB"),
-                        post_cursor_position: 2,
-                    }
-                ]
-            },
-        ),
-        (
-            path_leading_to_loop,
-            vec![
-                new_lig(None, 'B', 'C', RetainBothMoveToInserted),
-                new_lig(None, 'B', 'C', RetainBothMoveToInserted),
-            ],
-            vec![('A', 0), ('C', 1)],
-            InfiniteLoopError {
-                starting_pair: starting_pair('C', 'B'),
-                infinite_loop: vec![InfiniteLoopStep {
-                    instruction_index: 1,
-                    post_replacement: post_replacement("CCB"),
-                    post_cursor_position: 1,
-                }]
-            },
-        ),
-    );
-
-    fn starting_pair(l: char, r: char) -> (Option<Char>, Char) {
-        (Some(l.try_into().unwrap()), r.try_into().unwrap())
-    }
-
-    fn post_replacement(s: &str) -> (bool, Vec<Char>) {
-        (false, s.chars().map(|c| c.try_into().unwrap()).collect())
-    }
 }

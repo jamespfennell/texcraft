@@ -1,0 +1,8 @@
+Bad TFM file: Design size too small!
+I've set it to 10 points.
+Bad TFM file: Ligature/kern step 1 skips too far;
+I made it stop.
+Bad TFM file: Ligature step produces the nonexistent character '152.
+Bad TFM file: Ligature unconditional stop command address is too big.
+Bad TFM file: Ligature unconditional stop command address is too big.
+Infinite ligature loop starting with '001 and '001!

@@ -1,0 +1,9 @@
+Bad TFM file: Design size too small!
+I've set it to 10 points.
+Bad TFM file: Ligature step for nonexistent character '151.
+Ligature step with nonstandard code changed to LIG
+Bad TFM file: Ligature unconditional stop command address is too big.
+Bad TFM file: Kern step for nonexistent character '012.
+Bad TFM file: Kern index too large.
+Bad TFM file: Ligature step produces the nonexistent character '244.
+Infinite ligature loop starting with '011 and '001!
