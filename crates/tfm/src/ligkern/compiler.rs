@@ -5,11 +5,12 @@ pub fn compile(
     program: &lang::Program,
     kerns: &[Number],
     entry_points: &HashMap<Char, u16>,
-) -> Result<CompiledProgram, InfiniteLoopError> {
+) -> (CompiledProgram, Option<InfiniteLoopError>) {
     let pair_to_instruction = build_pair_to_instruction_map(program, entry_points);
-    let pair_to_replacement = calculate_replacements(program, kerns, pair_to_instruction)?;
+    let (pair_to_replacement, infinite_loop_error_or) =
+        calculate_replacements(program, kerns, pair_to_instruction);
     let program = lower_and_optimize(pair_to_replacement);
-    Ok(program)
+    (program, infinite_loop_error_or)
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
@@ -176,7 +177,7 @@ fn calculate_replacements(
     program: &lang::Program,
     kerns: &[Number],
     pair_to_instruction: HashMap<Node, usize>,
-) -> Result<HashMap<Node, Replacement>, InfiniteLoopError> {
+) -> (HashMap<Node, Replacement>, Option<InfiniteLoopError>) {
     let mut result: HashMap<Node, Replacement> = Default::default();
     let mut actionable: Vec<OngoingCalculation> = vec![];
     let mut node_to_parents: HashMap<Node, Vec<OngoingCalculation>> = Default::default();
@@ -345,7 +346,7 @@ fn calculate_replacements(
             .then(pair_to_instruction[lhs].cmp(&pair_to_instruction[rhs]))
     });
 
-    let mut inf_nodes: Vec<Node> = vec![];
+    let mut infinite_loop_errors: Vec<InfiniteLoopError> = vec![];
     for mut node in knuth_ordered_nodes {
         let mut seen = HashSet::<Node>::new();
         while let Some(child) = node_to_child.remove(&node) {
@@ -365,16 +366,14 @@ fn calculate_replacements(
         // If we haven't seen it, the loop has already been broken. There is an E2E test
         // for this case.
         if seen.contains(&node) {
-            inf_nodes.push(node);
+            infinite_loop_errors.push(InfiniteLoopError {
+                starting_pair: (node.0.char_or(), node.1),
+            });
         }
     }
 
-    if let Some(l) = inf_nodes.pop() {
-        return Err(InfiniteLoopError {
-            starting_pair: (l.0.char_or(), l.1),
-        });
-    }
-    Ok(result)
+    // TODO: return all infinite loops
+    (result, infinite_loop_errors.pop())
 }
 
 fn lower_and_optimize(pair_to_replacement: HashMap<Node, Replacement>) -> CompiledProgram {
@@ -497,7 +496,8 @@ mod tests {
             instructions,
             ..Default::default()
         };
-        let compiled_program = compile(&program, &vec![], &entry_points).unwrap();
+        let (compiled_program, infinite_loop_error_or) = compile(&program, &vec![], &entry_points);
+        assert!(infinite_loop_error_or.is_none(), "no infinite loop errors");
 
         let mut got: HashMap<(Char, Char), Vec<(Char, Number)>> = Default::default();
         for pair in compiled_program.all_pairs_having_replacement() {

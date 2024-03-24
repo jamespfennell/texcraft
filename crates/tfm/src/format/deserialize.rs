@@ -60,7 +60,7 @@ impl DeserializationError {
     /// Returns the error message the TFtoPL program prints for this kind of error.
     pub fn tftopl_message(&self) -> String {
         use DeserializationError::*;
-        match self {
+        let first_line = match self {
             FileHasOneByte(0..=127) => "The input file is only one byte long!".into(),
             InternalFileLengthIsZero => {
                 "The file claims to have length zero, but that's impossible!".into()
@@ -82,7 +82,11 @@ impl DeserializationError {
             IncompleteSubFiles(_) => "Incomplete subfiles for character dimensions!".into(),
             TooManyExtensibleCharacters(n) => format!["There are {n} extensible recipes!"],
             InconsistentSubFileSizes(_) => "Subfile sizes don't add up to the stated total!".into(),
-        }
+        };
+        format!(
+            "{}\nSorry, but I can't go on; are you sure this is a TFM?",
+            first_line
+        )
     }
 
     /// Returns the section in Knuth's TFtoPL (version 2014) in which this error occurs.
@@ -182,7 +186,7 @@ pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
         lig_kern_program: deserialize_lig_kern_program(raw_file.lig_kern_instructions),
         kerns: deserialize_array(raw_file.kerns),
         extensible_chars: deserialize_array(raw_file.extensible_recipes),
-        params: Params(deserialize_array(raw_file.params)),
+        params: deserialize_array(raw_file.params),
     }
 }
 
@@ -489,7 +493,7 @@ impl Header {
     fn deserialize(mut b: &[u8]) -> Self {
         let checksum = Some(u32::deserialize(b));
         b = &b[4..];
-        let design_size = Number::deserialize(b).into();
+        let design_size = Number::deserialize(b);
         b = b.get(4..).unwrap_or(&[0; 0]);
         let character_coding_scheme = deserialize_string(b.get(0..40).unwrap_or(&[0; 0]));
         b = b.get(40..).unwrap_or(&[0; 0]);
@@ -501,6 +505,7 @@ impl Header {
         Self {
             checksum,
             design_size,
+            design_size_valid: true,
             character_coding_scheme,
             font_family,
             seven_bit_safe,
@@ -827,7 +832,8 @@ mod tests {
             Ok(File {
                 header: Header {
                     checksum: Some(7),
-                    design_size: Number(11).into(),
+                    design_size: Number(11),
+                    design_size_valid: true,
                     character_coding_scheme: Some(format!["A{}", " ".repeat(238)]),
                     font_family: Some(format!["B{}", " ".repeat(98)]),
                     seven_bit_safe: Some(false),
@@ -880,7 +886,8 @@ mod tests {
             File {
                 header: Header {
                     checksum: Some(7),
-                    design_size: Number(11).into(),
+                    design_size: Number(11),
+                    design_size_valid: true,
                     character_coding_scheme: None,
                     font_family: None,
                     seven_bit_safe: None,
@@ -903,7 +910,8 @@ mod tests {
             File {
                 header: Header {
                     checksum: Some(7),
-                    design_size: Number(11).into(),
+                    design_size: Number(11),
+                    design_size_valid: true,
                     character_coding_scheme: Some("ABC".into()),
                     font_family: Some("DEF".into()),
                     seven_bit_safe: Some(true),
@@ -1202,7 +1210,7 @@ mod tests {
             ],
             File {
                 header: Header::tfm_default(),
-                params: Params(vec![
+                params: vec![
                     Number(11),
                     Number(13),
                     Number(17),
@@ -1213,7 +1221,7 @@ mod tests {
                     Number(37),
                     Number(41),
                     Number(43),
-                ]),
+                ],
                 ..Default::default()
             },
         ),

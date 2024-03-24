@@ -1,4 +1,4 @@
-//! The TeX font metric (.tfm) file format
+//! The TeX font metric (.tfm) file format.
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -29,7 +29,7 @@ pub use validate::ValidationWarning;
 /// In fact in TeX the font data for all fonts is stored in one contiguous piece of memory
 ///     (`font_info`, defined in TeX82.2021.549).
 /// This is a little too unsafe to pull off though.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct File {
     /// Header.
     pub header: Header,
@@ -73,7 +73,7 @@ pub struct File {
     pub extensible_chars: Vec<ExtensibleRecipe>,
 
     /// Font parameters.
-    pub params: Params,
+    pub params: Vec<Number>,
 }
 
 /// Data about one character in a .tfm file.
@@ -198,28 +198,6 @@ pub fn debug<'a>(
     }
 }
 
-pub enum Warning {
-    DeserializationWarning(DeserializationWarning),
-    ValidationWarning(ValidationWarning),
-}
-
-impl Warning {
-    /// Returns the warning message the TFtoPL program prints for this kind of warning.
-    pub fn tftopl_message(&self) -> String {
-        match self {
-            Warning::DeserializationWarning(warning) => warning.tftopl_message(),
-            Warning::ValidationWarning(warning) => warning.tftopl_message(),
-        }
-    }
-    /// Returns true if this warning means the .tfm file was modified.
-    pub fn tfm_file_modified(&self) -> bool {
-        match self {
-            Warning::DeserializationWarning(warning) => warning.tfm_file_modified(),
-            Warning::ValidationWarning(warning) => warning.tfm_file_modified(),
-        }
-    }
-}
-
 impl File {
     pub fn from_raw_file(raw_file: &RawFile) -> Self {
         deserialize::from_raw_file(raw_file)
@@ -231,23 +209,11 @@ impl File {
 
     pub fn deserialize(
         b: &[u8],
-        skip_validation: bool,
-    ) -> (Result<File, DeserializationError>, Vec<Warning>) {
-        let (mut result, warnings) = deserialize::deserialize(b);
-        let mut warnings: Vec<Warning> = warnings
-            .into_iter()
-            .map(Warning::DeserializationWarning)
-            .collect();
-        if let Ok(file) = &mut result {
-            if !skip_validation {
-                warnings.extend(
-                    file.validate_and_fix()
-                        .into_iter()
-                        .map(Warning::ValidationWarning),
-                )
-            }
-        }
-        (result, warnings)
+    ) -> (
+        Result<File, DeserializationError>,
+        Vec<DeserializationWarning>,
+    ) {
+        deserialize::deserialize(b)
     }
 
     pub fn serialize(&self) -> Vec<u8> {
@@ -307,14 +273,16 @@ impl File {
         }
         u32::from_be_bytes(b)
     }
+}
 
-    pub fn from_pl_file(pl_file: &crate::pl::File) -> Self {
+impl From<crate::pl::File> for File {
+    fn from(pl_file: crate::pl::File) -> Self {
         let mut char_bounds: Option<(Char, Char)> = None;
 
-        let mut lig_kern_program = pl_file.lig_kern_program.clone();
+        let lig_kern_entrypoints = pl_file.lig_kern_entrypoints(true);
+        let mut lig_kern_program = pl_file.lig_kern_program;
         let kerns = lig_kern_program.unpack_kerns();
-        let lig_kern_entrypoints =
-            lig_kern_program.pack_entrypoints(pl_file.lig_kern_entrypoints(true));
+        let lig_kern_entrypoints = lig_kern_program.pack_entrypoints(lig_kern_entrypoints);
 
         let mut widths = vec![];
         let mut heights = vec![];
@@ -421,7 +389,7 @@ impl File {
         }).collect();
 
         let mut file = Self {
-            header: pl_file.header.clone(),
+            header: pl_file.header,
             smallest_char: char_bounds.map(|t| t.0).unwrap_or(Char(1)),
             char_dimens,
             char_tags,
@@ -433,7 +401,7 @@ impl File {
             lig_kern_program,
             kerns,
             extensible_chars,
-            params: pl_file.params.clone(),
+            params: pl_file.params,
         };
         if file.header.checksum.is_none() {
             file.header.checksum = Some(file.checksum());

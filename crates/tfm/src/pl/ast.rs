@@ -4,9 +4,7 @@
 
 use super::cst;
 use super::error::ParseError;
-use crate::{
-    ligkern::lang::PostLigOperation, Char, DesignSize, Face, NamedParam, Number, ParameterNumber,
-};
+use crate::{ligkern::lang::PostLigOperation, Char, Face, NamedParameter, Number};
 use std::ops::Range;
 
 /// Abstract syntax tree for property list files
@@ -398,7 +396,7 @@ node_impl!(
 #[derive(PartialEq, Eq, Debug)]
 pub enum FontDimension {
     /// A named parameters like `(SLANT R -.25)`.
-    NamedParam(NamedParam, SingleValue<Number>),
+    NamedParam(NamedParameter, SingleValue<Number>),
 
     /// The notation `PARAMETER n` provides another way to specify the nth parameter;
     ///     for example, `(PARAMETER D 1 R −.25)` is another way to specify that the `SLANT` is −0.25.
@@ -424,97 +422,99 @@ impl Parse for DecimalU8 {
     }
 }
 
+#[derive(PartialEq, Eq, Debug)]
+pub struct ParameterNumber(pub u16);
+
 impl TryParse for ParameterNumber {
     fn try_parse(input: &mut Input) -> Option<(Self, Range<usize>)> {
         let (a, b) = u8::parse(input);
-        if a == u8::MAX {
-            input.skip_error(ParseError::ParameterNumberTooBig { span: b });
-            None
-        } else {
-            match crate::ParameterNumber::new(a as i16) {
-                None => {
-                    input.skip_error(ParseError::ParameterNumberIsZero { span: b });
-                    None
-                }
-                Some(n) => Some((n, b)),
+        match a {
+            0 => {
+                input.skip_error(ParseError::ParameterNumberIsZero { span: b });
+                None
             }
+            u8::MAX => {
+                input.skip_error(ParseError::ParameterNumberTooBig { span: b });
+                None
+            }
+            n => Some((ParameterNumber(n as u16), b)),
         }
     }
 
     fn to_string(self, _: &LowerOpts) -> Option<String> {
-        Some(format!["D {}", self.get()])
+        Some(format!["D {}", self.0])
     }
 }
 
 node_impl!(
     FontDimension,
-    (SLANT, "SLANT", NamedParam, NamedParam::Slant),
-    (SPACE, "SPACE", NamedParam, NamedParam::Space),
-    (STRETCH, "STRETCH", NamedParam, NamedParam::Stretch),
-    (SHRINK, "SHRINK", NamedParam, NamedParam::Shrink),
-    (X_HEIGHT, "XHEIGHT", NamedParam, NamedParam::XHeight),
-    (QUAD, "QUAD", NamedParam, NamedParam::Quad),
+    (SLANT, "SLANT", NamedParam, NamedParameter::Slant),
+    (SPACE, "SPACE", NamedParam, NamedParameter::Space),
+    (STRETCH, "STRETCH", NamedParam, NamedParameter::Stretch),
+    (SHRINK, "SHRINK", NamedParam, NamedParameter::Shrink),
+    (X_HEIGHT, "XHEIGHT", NamedParam, NamedParameter::XHeight),
+    (QUAD, "QUAD", NamedParam, NamedParameter::Quad),
     (
         EXTRA_SPACE,
         "EXTRASPACE",
         NamedParam,
-        NamedParam::ExtraSpace
+        NamedParameter::ExtraSpace
     ),
-    (NUM_1, "NUM1", NamedParam, NamedParam::Num1),
-    (NUM_2, "NUM2", NamedParam, NamedParam::Num2),
-    (NUM_3, "NUM3", NamedParam, NamedParam::Num3),
-    (DENOM_1, "DENOM1", NamedParam, NamedParam::Denom1),
-    (DENOM_2, "DENOM2", NamedParam, NamedParam::Denom2),
-    (SUP_1, "SUP1", NamedParam, NamedParam::Sup1),
-    (SUP_2, "SUP2", NamedParam, NamedParam::Sup2),
-    (SUP_3, "SUP3", NamedParam, NamedParam::Sup3),
-    (SUB_1, "SUB1", NamedParam, NamedParam::Sub1),
-    (SUB_2, "SUB2", NamedParam, NamedParam::Sub2),
-    (SUP_DROP, "SUPDROP", NamedParam, NamedParam::SupDrop),
-    (SUB_DROP, "SUBDROP", NamedParam, NamedParam::SubDrop),
-    (DELIM_1, "DELIM1", NamedParam, NamedParam::Delim1),
-    (DELIM_2, "DELIM2", NamedParam, NamedParam::Delim2),
+    (NUM_1, "NUM1", NamedParam, NamedParameter::Num1),
+    (NUM_2, "NUM2", NamedParam, NamedParameter::Num2),
+    (NUM_3, "NUM3", NamedParam, NamedParameter::Num3),
+    (DENOM_1, "DENOM1", NamedParam, NamedParameter::Denom1),
+    (DENOM_2, "DENOM2", NamedParam, NamedParameter::Denom2),
+    (SUP_1, "SUP1", NamedParam, NamedParameter::Sup1),
+    (SUP_2, "SUP2", NamedParam, NamedParameter::Sup2),
+    (SUP_3, "SUP3", NamedParam, NamedParameter::Sup3),
+    (SUB_1, "SUB1", NamedParam, NamedParameter::Sub1),
+    (SUB_2, "SUB2", NamedParam, NamedParameter::Sub2),
+    (SUP_DROP, "SUPDROP", NamedParam, NamedParameter::SupDrop),
+    (SUB_DROP, "SUBDROP", NamedParam, NamedParameter::SubDrop),
+    (DELIM_1, "DELIM1", NamedParam, NamedParameter::Delim1),
+    (DELIM_2, "DELIM2", NamedParam, NamedParameter::Delim2),
     (
         AXIS_HEIGHT,
         "AXISHEIGHT",
         NamedParam,
-        NamedParam::AxisHeight
+        NamedParameter::AxisHeight
     ),
     (
         DEFAULT_RULE_THICKNESS,
         "DEFAULTRULETHICKNESS",
         NamedParam,
-        NamedParam::DefaultRuleThickness
+        NamedParameter::DefaultRuleThickness
     ),
     (
         BIG_OP_SPACING_1,
         "BIGOPSPACING1",
         NamedParam,
-        NamedParam::BigOpSpacing1
+        NamedParameter::BigOpSpacing1
     ),
     (
         BIG_OP_SPACING_2,
         "BIGOPSPACING2",
         NamedParam,
-        NamedParam::BigOpSpacing2
+        NamedParameter::BigOpSpacing2
     ),
     (
         BIG_OP_SPACING_3,
         "BIGOPSPACING3",
         NamedParam,
-        NamedParam::BigOpSpacing3
+        NamedParameter::BigOpSpacing3
     ),
     (
         BIG_OP_SPACING_4,
         "BIGOPSPACING4",
         NamedParam,
-        NamedParam::BigOpSpacing4
+        NamedParameter::BigOpSpacing4
     ),
     (
         BIG_OP_SPACING_5,
         "BIGOPSPACING5",
         NamedParam,
-        NamedParam::BigOpSpacing5
+        NamedParameter::BigOpSpacing5
     ),
     (PARAMETER, "PARAMETER", IndexedParam),
 );
@@ -1169,6 +1169,34 @@ impl Parse for Number {
     }
 }
 
+/// Design size of the font.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DesignSize {
+    Valid(Number),
+    Invalid,
+}
+
+impl Default for DesignSize {
+    fn default() -> Self {
+        DesignSize::Valid(Number::UNITY * 10)
+    }
+}
+
+impl DesignSize {
+    pub fn get(&self) -> Number {
+        match self {
+            DesignSize::Valid(v) => *v,
+            DesignSize::Invalid => Number::UNITY * 10,
+        }
+    }
+}
+
+impl From<Number> for DesignSize {
+    fn from(value: Number) -> Self {
+        Self::Valid(value)
+    }
+}
+
 impl Parse for DesignSize {
     fn parse(input: &mut Input) -> (Self, Range<usize>) {
         let (n, r) = Number::parse(input);
@@ -1574,42 +1602,42 @@ mod tests {
                     data_span: 362..362,
                     children: vec![
                         FontDimension::NamedParam(
-                            NamedParam::Slant,
+                            NamedParameter::Slant,
                             SingleValue {
                                 data: Number::UNITY * -1 / 4,
                                 data_span: 369..375,
                             }
                         ),
                         FontDimension::NamedParam(
-                            NamedParam::Space,
+                            NamedParameter::Space,
                             SingleValue {
                                 data: Number::UNITY * 6,
                                 data_span: 399..402,
                             }
                         ),
                         FontDimension::NamedParam(
-                            NamedParam::Shrink,
+                            NamedParameter::Shrink,
                             SingleValue {
                                 data: Number::UNITY * 2,
                                 data_span: 427..430,
                             }
                         ),
                         FontDimension::NamedParam(
-                            NamedParam::Stretch,
+                            NamedParameter::Stretch,
                             SingleValue {
                                 data: Number::UNITY * 3,
                                 data_span: 456..459,
                             }
                         ),
                         FontDimension::NamedParam(
-                            NamedParam::XHeight,
+                            NamedParameter::XHeight,
                             SingleValue {
                                 data: Number(1055 * Number::UNITY.0 / 100 + 1),
                                 data_span: 485..492,
                             }
                         ),
                         FontDimension::NamedParam(
-                            NamedParam::Quad,
+                            NamedParameter::Quad,
                             SingleValue {
                                 data: Number::UNITY * 18,
                                 data_span: 515..519,

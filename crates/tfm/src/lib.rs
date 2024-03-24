@@ -1,9 +1,160 @@
-//! Parsers for the TeX font metric (.tfm) and property list (.pl) file formats
+//! # tfm: TeX font metric data
+//!
+//! This is a crate for working with TeX font metric data.
+//! It includes:
+//!
+//! - Functions to read and write TeX font metric (.tfm) files
+//!     to and from a value of type [`format::File`]
+//!     ([`deserialize`](format::File::deserialize), [`serialize`](format::File::serialize)).
+//!
+//! - Functions to read and write property list (.pl) files
+//!     to and from a value of type [`pl::File`]
+//!     ([`from_pl_source_code`](pl::File::from_pl_source_code), [`display`](pl::File::display)).
+//!
+//! - Converters from .tfm to .pl files and vice-versa
+//!     (using Rust's [`From`] trait to go between [`format::File`] and [`pl::File`]).
+//!
+//! - A type [`Font`] that represents a fully validated and compiled TeX font
+//!     and that can be used to efficiently query data about the font
+//!     (e.g., "what is the width of the character A?").
+//!     This type and its methods are performance optimized and
+//!     designed for use in the hot main loops
+//!     of typesetting software such as TeX.
+//!
+//! ## Background
+//!
+//! Probably the most famous part of the implementation of TeX is the Knuth-Plass line breaking algorithm.
+//! This algorithm determines the "optimal" places to add line breaks when typesetting a paragraph of text.
+//! In order to run the algorithm one needs to provide the dimensions of all characters in the current font.
+//! These dimensions are used to size the boxes in the Knuth-Plass box and glue model.
+//!
+//! In TeX, character dimensions are provided using TeX font metric files.
+//! These are binary files.
+//! By convention they have a .tfm file extension.
+//! Unlike more modern file formats like TrueType, .tfm files only contain the font dimensions;
+//!     they don't contains the glyphs.
+//! In general,
+//!     .tfm files are produced by other software like Metafont,
+//!     placed in some well-known directory in the TeX distribution,
+//!     and then read into memory when TeX is running.
+//!
+//! Because .tfm files are binary files, it's hard to debug or tweak them.
+//! To remedy this, Knuth and his team developed another file format called a property list file
+//!     (extension .pl or .plst)
+//!     that contains the same information but in a modifiable text format.
+//! They then wrote two programs:
+//!     `tftopl` to convert a .tfm file to a .pl file,
+//!     and `pltotf` to convert a .pl file to a .tfm file.
+//!
+//! The general goal of this crate to fully re-implement all of the TeX font metric
+//!     code written by Knuth and others.
+//! This includes `tftopl`, `pltotf`, and also the parts of TeX itself that contain logic
+//!     for reading and interpreting .tfm files.
+//! However, unlike these monolithic software programs,
+//!     this re-implementation is in the form of a modular library in which
+//!     individual pieces of logic and be used and re-used.
+//!
+//! ## Basic example
+//!
+//! ```
+//! // Include the .tfm file for Computer Modern in size 10pt.
+//! let tfm_bytes = include_bytes!["../corpus/computer-modern/cmr10.tfm"];
+//!
+//! // Deserialize the .tfm file.
+//! let (tfm_file_or_error, deserialization_warnings) = tfm::format::File::deserialize(tfm_bytes);
+//! let mut tfm_file = tfm_file_or_error.expect("cmr10.tfm is a valid .tfm file");
+//! assert_eq![deserialization_warnings, vec![], "the data in cmr10.tfm is 100% valid, so there are no deserialization warnings"];
+//! // TODO assert_eq![tfm_file.header.design_size, tfm::Number::UNITY * 10]; make it 11 to be more interesting
+//! // TODO query some data
+//!
+//! // Validate the .tfm file.
+//! let validation_warnings = tfm_file.validate_and_fix();
+//! assert_eq![validation_warnings, vec![], "the data in cmr10.tfm is 100% valid, so there are no validation warnings"];
+//!
+//! // Convert the .tfm file to a .pl file and print it.
+//! let pl_file: tfm::pl::File = tfm_file.clone().into();
+//! // TODO query some data
+//! println!["cmr10.pl:\n{}", pl_file.display(/*indent=*/2, tfm::pl::CharDisplayFormat::Default)];
+//!
+//! // TODO Convert the .tfm file to the crate's Font type.
+//! ```
+//!
+//!
+//! ## Advanced functionality
+//!
+//! In addition to supporting the basic use cases of querying font metric data
+//!     and converting between different formats,
+//!     this crate has advanced functionality for performing additional tasks on font metric data.
+//! The full set of functionality can be understood by navigating through the crate documentation.
+//! But here are 3 highlights we think are interesting:
+//!
+//! - **Language analysis of .pl files**:
+//!     In `pltotf`, Knuth parses .pl files in a single pass.
+//!     This crate takes a common approach nowadays of parsing in multiple passes:
+//!     first running a [lexer](pl::lexer::Lexer) to convert the file to tokens,
+//!     then constructing a [concrete syntax tree](pl::cst::Cst) (or parse tree),
+//!     next constructing a [fully typed and checked abstract syntax tree](pl::ast::Ast),
+//!     and finally building the [`pl::File`] itself.
+//!     Each of the passes is exposed, so you can e.g. just build the AST for the .pl file and
+//!         do some analysis on it.
+//!
+//! - **Debug output for .tfm files**:
+//!     
+//! - **Compilation of lig/kern programs**:
+//!
+//!
+//! ## Binaries
+//!
+//! The Texcraft project produces 3 binaries based on this crate:
+//!
+//! - `tftopl` and `pltotf`: re-implementations of Knuth's programs.
+//! - `tfmtools`: a new binary that has a bunch of different tools
+//!         for working with TeX font metric data.
+//!         Run `tfmtools help` to list all of the available tools.
+//!
+//! In the root of [the Texcraft repository](https://github.com/jamespfennell/texcraft)
+//!     these tools can be run with `cargo run --bin $NAME`
+//!     and built with `cargo build --bin $NAME`.
+//!
+//!
+//! ## Correctness
+//!
+//! As part of the development of this crate significant effort has been spent
+//!     ensuring it exactly replicates the work of Knuth.
+//! This correctness checking is largely based around diff testing the binaries
+//!     `tftopl` and `pltotf`.
+//! We verify that the Texcraft and Knuth implementations have the same output
+//!     and generate the same error messages.
+//!
+//! This diff testing has been performed in a few different ways:
+//!
+//! - We have run diff tests over all ~100,000 .tfm files in CTAN.
+//!     These tests verify that `tftopl` gives the correct result,
+//!     and that running `pltotf` on the output .pl file gives the correct result too.
+//!     Unfortunately running `pltotf` on the .pl files in CTAN is infeasible
+//!     because most of these files are Perl scripts, not property list files.
+//!
+//! - We have developed a fuzz testing harness (so far just for `tftopl`)
+//!     that generates highly heterogenous .tfm files and verifies that `tftopl` gives the correct result.
+//!     This fuzz testing has uncovered many issues in the Texcraft implementation,
+//!     and has even identified [a 30-year old bug](https://tug.org/pipermail/tex-k/2024-March/004031.html)
+//!     in Knuth's implementation of `tftopl`.
+//!
+//! Any .tfm or .pl file that exposes a bug in this library is added to
+//!     [our automated testing corpus](https://github.com/jamespfennell/texcraft/tree/main/crates/tfm/bin/tests/data).
+//! Running `cargo t` validates that Texcraft's binaries give the same result as Knuth's binaries
+//!     (the output of Knuth's binaries is in source control).
+//! This ensures there are no regressions.
+//!
+//! If you discover a .tfm or .pl file such that the Texcraft and Knuth implementations
+//!     diverge, this indicates there is a bug in this library.
+//! Please create an issue on the Texcraft GitHub repo.
+//! We will fix the bug and add your files to the testing corpus.
 
 pub mod algorithms;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
-    num::{NonZeroI16, NonZeroU8},
+    num::NonZeroU8,
 };
 
 pub mod format;
@@ -27,7 +178,8 @@ pub struct Header {
     /// In TeX82, this is stored in the `font_check` array (TeX82.2021.549).
     pub checksum: Option<u32>,
     /// In TeX82, this is stored in the `font_dsize` array (TeX82.2021.549).
-    pub design_size: DesignSize,
+    pub design_size: Number,
+    pub design_size_valid: bool,
     pub character_coding_scheme: Option<String>,
     pub font_family: Option<String>,
     pub seven_bit_safe: Option<bool>,
@@ -36,28 +188,8 @@ pub struct Header {
     pub additional_data: Vec<u32>,
 }
 
-/// Design size of the font.
-// TODO: instead of having a specific type, consider adding another boolean field to the header
-// that specifies how the design size should be serialized.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DesignSize {
-    Valid(Number),
-    Invalid,
-}
-
-impl Default for DesignSize {
-    fn default() -> Self {
-        DesignSize::Valid(Number::UNITY * 10)
-    }
-}
-
-impl DesignSize {
-    pub fn get(&self) -> Number {
-        match self {
-            DesignSize::Valid(v) => *v,
-            DesignSize::Invalid => Number::UNITY * 10,
-        }
-    }
+pub struct Font {
+    _todo: bool,
 }
 
 impl Header {
@@ -67,7 +199,8 @@ impl Header {
     pub fn pl_default() -> Header {
         Header {
             checksum: None,
-            design_size: Default::default(),
+            design_size: Number::UNITY * 10,
+            design_size_valid: true,
             character_coding_scheme: Some("UNSPECIFIED".into()),
             font_family: Some("UNSPECIFIED".into()),
             seven_bit_safe: None,
@@ -82,19 +215,14 @@ impl Header {
     pub fn tfm_default() -> Header {
         Header {
             checksum: Some(0),
-            design_size: DesignSize::Valid(Number::ZERO),
+            design_size: Number::ZERO,
+            design_size_valid: true,
             character_coding_scheme: None,
             font_family: None,
             seven_bit_safe: None,
             face: None,
             additional_data: vec![],
         }
-    }
-}
-
-impl From<Number> for DesignSize {
-    fn from(value: Number) -> Self {
-        Self::Valid(value)
     }
 }
 
@@ -315,55 +443,9 @@ impl From<Face> for u8 {
     }
 }
 
-/// TeX font metric parameters
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Params(pub Vec<Number>);
-
-impl Params {
-    pub fn set(&mut self, number: ParameterNumber, value: Number) {
-        let i = number.index();
-        let min_len = number.get() as usize;
-        if self.0.len() <= min_len {
-            self.0.resize(min_len, Default::default());
-        }
-        self.0[i] = value;
-    }
-
-    pub fn set_named(&mut self, named_param: NamedParam, value: Number) {
-        self.set(named_param.number(), value)
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct ParameterNumber(NonZeroI16);
-
-impl ParameterNumber {
-    pub fn new(u: i16) -> Option<Self> {
-        if u < 0 {
-            None
-        } else {
-            match u.try_into() {
-                Ok(u) => Some(Self(u)),
-                Err(_) => None,
-            }
-        }
-    }
-    fn get(&self) -> i16 {
-        self.0.get()
-    }
-    fn index(&self) -> usize {
-        self.0
-            .get()
-            .checked_sub(1)
-            .expect("payload is non-zero")
-            .try_into()
-            .expect("payload is non-negative")
-    }
-}
-
 /// A named TeX font metric parameter.
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
-pub enum NamedParam {
+pub enum NamedParameter {
     Slant,
     Space,
     Stretch,
@@ -394,42 +476,42 @@ pub enum NamedParam {
     BigOpSpacing5,
 }
 
-impl NamedParam {
-    pub fn number(&self) -> ParameterNumber {
-        let i = match self {
-            NamedParam::Slant => 1,
-            NamedParam::Space => 2,
-            NamedParam::Stretch => 3,
-            NamedParam::Shrink => 4,
-            NamedParam::XHeight => 5,
-            NamedParam::Quad => 6,
-            NamedParam::ExtraSpace => 7,
-            NamedParam::Num1 => 8,
-            NamedParam::Num2 => 9,
-            NamedParam::Num3 => 10,
-            NamedParam::Denom1 => 11,
-            NamedParam::Denom2 => 12,
-            NamedParam::Sup1 => 13,
-            NamedParam::Sup2 => 14,
-            NamedParam::Sup3 => 15,
-            NamedParam::Sub1 => 16,
-            NamedParam::Sub2 => 17,
-            NamedParam::SupDrop => 18,
-            NamedParam::SubDrop => 19,
-            NamedParam::Delim1 => 20,
-            NamedParam::Delim2 => 21,
-            NamedParam::AxisHeight => 22,
-            NamedParam::DefaultRuleThickness => 8,
-            NamedParam::BigOpSpacing1 => 9,
-            NamedParam::BigOpSpacing2 => 10,
-            NamedParam::BigOpSpacing3 => 11,
-            NamedParam::BigOpSpacing4 => 12,
-            NamedParam::BigOpSpacing5 => 13,
-        };
-        ParameterNumber(i.try_into().expect("all numbers are in range"))
+impl NamedParameter {
+    pub fn number(&self) -> u8 {
+        match self {
+            NamedParameter::Slant => 1,
+            NamedParameter::Space => 2,
+            NamedParameter::Stretch => 3,
+            NamedParameter::Shrink => 4,
+            NamedParameter::XHeight => 5,
+            NamedParameter::Quad => 6,
+            NamedParameter::ExtraSpace => 7,
+            NamedParameter::Num1 => 8,
+            NamedParameter::Num2 => 9,
+            NamedParameter::Num3 => 10,
+            NamedParameter::Denom1 => 11,
+            NamedParameter::Denom2 => 12,
+            NamedParameter::Sup1 => 13,
+            NamedParameter::Sup2 => 14,
+            NamedParameter::Sup3 => 15,
+            NamedParameter::Sub1 => 16,
+            NamedParameter::Sub2 => 17,
+            NamedParameter::SupDrop => 18,
+            NamedParameter::SubDrop => 19,
+            NamedParameter::Delim1 => 20,
+            NamedParameter::Delim2 => 21,
+            NamedParameter::AxisHeight => 22,
+            NamedParameter::DefaultRuleThickness => 8,
+            NamedParameter::BigOpSpacing1 => 9,
+            NamedParameter::BigOpSpacing2 => 10,
+            NamedParameter::BigOpSpacing3 => 11,
+            NamedParameter::BigOpSpacing4 => 12,
+            NamedParameter::BigOpSpacing5 => 13,
+        }
     }
 }
 
+/// Warning from the compilation of "next larger character" instructions.
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum NextLargerProgramWarning {
     NonExistentCharacter { original: Char, next_larger: Char },
@@ -499,7 +581,7 @@ impl NextLargerProgramWarning {
         }
     }
 }
-/// Next larger characters
+/// Compiled program of "next larger character" instructions
 ///
 /// The .tfm file format can associate a "next larger" character to any character in a font.
 /// Next larger characters form sequences: i.e. B can be the next larger character for A,

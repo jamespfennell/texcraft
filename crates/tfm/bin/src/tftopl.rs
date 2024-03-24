@@ -72,22 +72,25 @@ impl Cli {
         };
 
         // Conversion
-        let output = tfm::algorithms::tfm_to_pl(&tfm_data, &|pl_file| {
+        let output = tfm::algorithms::tfm_to_pl(&tfm_data, 3, &|pl_file| {
             self.charcode_format
                 .to_display_format(&pl_file.header.character_coding_scheme)
         })
         .unwrap();
-        eprint!("{}", output.error_messages);
-        if !output.success {
-            return Err("".to_string());
+        for error_message in output.error_messages {
+            eprintln!("{}", error_message.tftopl_message());
         }
+        let pl_data = match output.pl_data {
+            Ok(pl_data) => pl_data,
+            Err(err) => return Err(err.tftopl_message()),
+        };
 
         // Output
         match self.pl_file_path {
-            None => print!("{}", output.pl_data),
+            None => print!("{}", pl_data),
             Some(pl_file_path) => {
                 let pl_file_path = with_default_file_extension(pl_file_path, "pl");
-                if let Err(err) = std::fs::write(&pl_file_path, output.pl_data) {
+                if let Err(err) = std::fs::write(&pl_file_path, pl_data) {
                     return Err(format!(
                         "Failed to write file `{}`: {}",
                         pl_file_path.display(),

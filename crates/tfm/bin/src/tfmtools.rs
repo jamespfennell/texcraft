@@ -117,7 +117,7 @@ enum Command {
     ///
     /// 1.
     ///     Any of the .tfm sections can be omitted.
-    ///     In the .tfm file, all omitted sections will be output as empty
+    ///     All omitted sections are output as empty
     ///     sections with the exception of the sub file sizes section, which is calculated
     ///     correctly.
     ///
@@ -144,7 +144,14 @@ struct Check {
 impl Check {
     fn run(&self) -> Result<(), String> {
         let num_warnings = match &self.path {
-            TfOrPlPath::Tf(tfm_path) => tfm_path.read(false)?.2.len(),
+            TfOrPlPath::Tf(tfm_path) => {
+                let Tfm {
+                    deserialization_warnings,
+                    validation_warnings,
+                    ..
+                } = tfm_path.read(false)?;
+                deserialization_warnings.len() + validation_warnings.len()
+            }
             TfOrPlPath::Pl(pl_path) => pl_path.read()?.1.len(),
         };
         if num_warnings > 0 {
@@ -184,41 +191,22 @@ impl Convert {
     fn run(&self, indent: usize, charcode_format: CharcodeFormat) -> Result<(), String> {
         match &self.path {
             TfOrPlPath::Tf(tf_path) => {
-                let (_, tfm_file, warnings) = tf_path.read(false)?;
-                let pl_file = tfm::pl::File::from_tfm_file(tfm_file);
-                let pl_output = format![
-                    "{}",
-                    pl_file.display(
-                        indent,
-                        charcode_format.to_display_format(&pl_file.header.character_coding_scheme)
-                    )
-                ];
-                // TODO: deduplicate this code between here and algorithms
-                let infinite_loop = warnings.iter().any(|w| {
-                    matches!(
-                        w,
-                        tfm::format::Warning::ValidationWarning(
-                            tfm::format::ValidationWarning::LigKernWarning(
-                                tfm::ligkern::lang::ValidationWarning::InfiniteLoop(_),
-                            )
-                        )
-                    )
-                });
-                let tfm_modified = warnings
-                    .iter()
-                    .map(tfm::format::Warning::tfm_file_modified)
-                    .any(|t| t);
-                let suffix = if infinite_loop {
-                    "(INFINITE LIGATURE LOOP MUST BE BROKEN!)"
-                } else if tfm_modified {
-                    "(COMMENT THE TFM FILE WAS BAD, SO THE DATA HAS BEEN CHANGED!)\n"
-                } else {
-                    ""
+                let bytes = tf_path.read_bytes()?;
+                let output = tfm::algorithms::tfm_to_pl(&bytes, indent, &|pl_file| {
+                    charcode_format.to_display_format(&pl_file.header.character_coding_scheme)
+                })
+                .unwrap();
+                for error_message in output.error_messages {
+                    eprintln!("{}", error_message.tftopl_message());
+                }
+                let pl_data = match output.pl_data {
+                    Ok(pl_data) => pl_data,
+                    Err(err) => return Err(err.tftopl_message()),
                 };
                 match &self.output {
-                    None => print!("{pl_output}{suffix}"),
+                    None => print!("{pl_data}"),
                     Some(TfOrPlPath::Pl(pl_path)) => {
-                        pl_path.write(&pl_output)?;
+                        pl_path.write(&pl_data)?;
                     }
                     Some(TfOrPlPath::Tf(_tfm_path)) => todo!(),
                 }
@@ -226,7 +214,7 @@ impl Convert {
             }
             TfOrPlPath::Pl(pl_path) => {
                 let (pl_file, _) = pl_path.read()?;
-                let tfm_file = tfm::format::File::from_pl_file(&pl_file);
+                let tfm_file: tfm::format::File = pl_file.into();
                 let tfm_bytes = tfm_file.serialize();
                 let tfm_path: TfPath = match &self.output {
                     Some(TfOrPlPath::Pl(_pl_path)) => todo!(),
@@ -308,7 +296,11 @@ impl clap::ValueEnum for Section {
 
 impl Debug {
     fn run(&self) -> Result<(), String> {
-        let (tfm_bytes, tfm_file, _) = self.path.read(self.skip_validation)?;
+        let Tfm {
+            bytes: tfm_bytes,
+            file: tfm_file,
+            ..
+        } = self.path.read(self.skip_validation)?;
         let raw_file = tfm::format::RawFile::deserialize(&tfm_bytes).0.unwrap();
 
         let path = if self.omit_tfm_path {
@@ -373,7 +365,7 @@ impl LigKern {
     fn run(&self) -> Result<(), String> {
         let lig_kern_program = match &self.path {
             TfOrPlPath::Tf(tfm_path) => {
-                let (_, mut tfm_file, _) = tfm_path.read(false)?;
+                let mut tfm_file = tfm_path.read(false)?.file;
                 let entrypoints: HashMap<tfm::Char, u16> = tfm_file
                     .lig_kern_entrypoints()
                     .into_iter()
@@ -390,13 +382,13 @@ impl LigKern {
                     &tfm_file.kerns,
                     entrypoints,
                 )
-                .unwrap()
+                .0
             }
             TfOrPlPath::Pl(pl_path) => {
                 let (pl_file, _) = pl_path.read()?;
                 let entrypoints = pl_file.lig_kern_entrypoints(true);
                 tfm::ligkern::CompiledProgram::compile(&pl_file.lig_kern_program, &[], entrypoints)
-                    .unwrap()
+                    .0
             }
         };
         let mut last_l: Option<tfm::Char> = None;
@@ -452,14 +444,13 @@ impl Undebug {
             }
             Err((err, n)) => {
                 // TODO: this logic should be behind an arg type like TfmFile?
-                let source = common::AriadneSource {
+                let source = AriadneSource {
                     path: self.input.clone(),
                     source: data.clone().into(),
                 };
-
                 let range = line_range(&data, n);
                 let builder = ariadne::Report::build(ariadne::ReportKind::Error, (), range.start)
-                    .with_message("failed to parse `tfmtool debug` output");
+                    .with_message("failed to parse `tfmtools debug` output");
                 let builder = builder.with_label(
                     ariadne::Label::new(range)
                         .with_message(err)
@@ -493,4 +484,174 @@ pub enum PlExtension {
     Pl,
     /// The .plst file extension is the default in tfmtools.
     Plst,
+}
+
+#[derive(Clone, Debug)]
+pub struct TfPath(pub std::path::PathBuf);
+
+pub struct Tfm {
+    pub bytes: Vec<u8>,
+    pub file: tfm::format::File,
+    pub deserialization_warnings: Vec<tfm::format::DeserializationWarning>,
+    pub validation_warnings: Vec<tfm::format::ValidationWarning>,
+}
+
+impl TfPath {
+    pub fn read_bytes(&self) -> Result<Vec<u8>, String> {
+        match std::fs::read(&self.0) {
+            Ok(data) => Ok(data),
+            Err(err) => Err(format!("Failed to read `{}`: {}", self.0.display(), err)),
+        }
+    }
+    pub fn read(&self, skip_validation: bool) -> Result<Tfm, String> {
+        let bytes = self.read_bytes()?;
+        let (tfm_file_or, deserialization_warnings) = tfm::format::File::deserialize(&bytes);
+        for warning in &deserialization_warnings {
+            eprintln!("{}", warning.tftopl_message())
+        }
+        let mut tfm_file = match tfm_file_or {
+            Ok(t) => t,
+            Err(err) => return Err(err.tftopl_message()),
+        };
+        let validation_warnings = if skip_validation {
+            vec![]
+        } else {
+            tfm_file.validate_and_fix()
+        };
+        for warning in &validation_warnings {
+            eprintln!("{}", warning.tftopl_message())
+        }
+        Ok(Tfm {
+            bytes,
+            file: tfm_file,
+            deserialization_warnings,
+            validation_warnings,
+        })
+    }
+    fn parse(input: &str) -> Result<Self, InvalidExtension> {
+        let path_buf: std::path::PathBuf = input.into();
+        match path_buf.extension().and_then(std::ffi::OsStr::to_str) {
+            Some("tfm") => Ok(TfPath(path_buf)),
+            extension => Err(InvalidExtension {
+                provided: extension.map(str::to_string),
+                allowed: vec!["tfm"],
+            }),
+        }
+    }
+
+    pub fn write(&self, content: &[u8]) -> Result<(), String> {
+        match std::fs::write(&self.0, content) {
+            Ok(_) => Ok(()),
+            Err(err) => Err(format!("Failed to write `{}`: {}", self.0.display(), err)),
+        }
+    }
+}
+
+impl clap::builder::ValueParserFactory for TfPath {
+    type Parser = clap::builder::ValueParser;
+
+    fn value_parser() -> Self::Parser {
+        clap::builder::ValueParser::new(TfPath::parse)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct PlPath(pub std::path::PathBuf);
+
+impl PlPath {
+    pub fn read(&self) -> Result<(tfm::pl::File, Vec<tfm::pl::ParseError>), String> {
+        let data = match std::fs::read_to_string(&self.0) {
+            Ok(data) => data,
+            Err(err) => return Err(format!("Failed to read `{}`: {}", self.0.display(), err)),
+        };
+        let (pl_file, warnings) = tfm::pl::File::from_pl_source_code(&data);
+        let source = AriadneSource {
+            path: self.0.clone(),
+            source: data.into(),
+        };
+        for warning in &warnings {
+            warning.ariadne_report().eprint(&source).unwrap();
+        }
+        Ok((pl_file, warnings))
+    }
+    pub fn write(&self, content: &str) -> Result<(), String> {
+        match std::fs::write(&self.0, content) {
+            Ok(_) => Ok(()),
+            Err(err) => Err(format!("Failed to write `{}`: {}", self.0.display(), err)),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct InvalidExtension {
+    pub provided: Option<String>,
+    pub allowed: Vec<&'static str>,
+}
+
+impl std::fmt::Display for InvalidExtension {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let allowed = self
+            .allowed
+            .iter()
+            .map(|s| format![".{s}"])
+            .collect::<Vec<String>>()
+            .join(" or ");
+        match &self.provided {
+            None => write!(
+                f,
+                "the file extension must be {} but it is missing",
+                allowed
+            ),
+            Some(extension) => write!(
+                f,
+                "the file extension must be {} but it is .{}",
+                allowed, extension
+            ),
+        }
+    }
+}
+
+impl std::error::Error for InvalidExtension {}
+
+#[derive(Clone, Debug)]
+pub enum TfOrPlPath {
+    Tf(TfPath),
+    Pl(PlPath),
+}
+
+impl TfOrPlPath {
+    pub fn parse(input: &str) -> Result<Self, InvalidExtension> {
+        let path_buf: std::path::PathBuf = input.into();
+        match path_buf.extension().and_then(std::ffi::OsStr::to_str) {
+            Some("pl") | Some("plst") => Ok(TfOrPlPath::Pl(PlPath(path_buf))),
+            Some("tfm") => Ok(TfOrPlPath::Tf(TfPath(path_buf))),
+            extension => Err(InvalidExtension {
+                provided: extension.map(str::to_string),
+                allowed: vec!["pl", "plst", "tfm"],
+            }),
+        }
+    }
+}
+
+impl clap::builder::ValueParserFactory for TfOrPlPath {
+    type Parser = clap::builder::ValueParser;
+
+    fn value_parser() -> Self::Parser {
+        clap::builder::ValueParser::new(TfOrPlPath::parse)
+    }
+}
+
+pub struct AriadneSource {
+    pub path: std::path::PathBuf,
+    pub source: ariadne::Source,
+}
+
+impl ariadne::Cache<()> for &AriadneSource {
+    fn fetch(&mut self, _: &()) -> Result<&ariadne::Source, Box<dyn std::fmt::Debug + '_>> {
+        Ok(&self.source)
+    }
+
+    fn display<'a>(&self, _: &'a ()) -> Option<Box<dyn std::fmt::Display + 'a>> {
+        Some(Box::new(format!["{}", self.path.display()]))
+    }
 }

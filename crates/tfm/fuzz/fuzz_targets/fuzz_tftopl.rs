@@ -26,24 +26,34 @@ fuzz_target!(|input: Input| {
         write_input_and_correct_output(&input, &tfm_file_path, knuth_stdout, knuth_stderr);
     }
 
-    let texcraft_output = tfm::algorithms::tfm_to_pl(&tfm_bytes, &|_| Default::default()).unwrap();
-
-    if texcraft_output.success
-        && knuth_stdout == texcraft_output.pl_data
-        && knuth_stderr == texcraft_output.error_messages
-    {
-        return;
+    let texcraft_output =
+        tfm::algorithms::tfm_to_pl(&tfm_bytes, 3, &|_| Default::default()).unwrap();
+    let texcraft_stderr = {
+        use std::fmt::Write;
+        let mut s = String::new();
+        for error_message in texcraft_output.error_messages {
+            writeln!(&mut s, "{}", error_message.tftopl_message()).unwrap();
+        }
+        if let Err(err) = &texcraft_output.pl_data {
+            writeln!(&mut s, "{}", err.tftopl_message()).unwrap();
+        }
+        s
+    };
+    if let Ok(pl_data) = &texcraft_output.pl_data {
+        if knuth_stdout == pl_data && knuth_stderr == texcraft_stderr {
+            return;
+        }
     }
 
     write_input_and_correct_output(&input, &tfm_file_path, knuth_stdout, knuth_stderr);
 
     assert!(
-        texcraft_output.success,
+        texcraft_output.pl_data.is_ok(),
         "failed to run Texcraft tftopl: {}",
-        texcraft_output.error_messages
+        texcraft_stderr,
     );
-    similar_asserts::assert_eq!(texcraft: texcraft_output.pl_data, knuth: knuth_stdout);
-    similar_asserts::assert_eq!(texcraft: texcraft_output.error_messages, knuth: knuth_stderr);
+    similar_asserts::assert_eq!(texcraft: texcraft_output.pl_data.unwrap(), knuth: knuth_stdout);
+    similar_asserts::assert_eq!(texcraft: texcraft_stderr, knuth: knuth_stderr);
 });
 
 fn output_always() -> bool {

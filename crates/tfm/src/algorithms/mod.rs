@@ -1,51 +1,67 @@
-//! Algorithms like tftopl and pltotf.
+//! The tftopl and pltotf algorithms.
 
 use std::fmt::Write;
 
-/// Output of the TFM to PL algorithm.
-#[derive(Default)]
+/// Output of the tftopl algorithm.
 pub struct TfmToPlOutput {
-    pub success: bool,
-    pub pl_data: String,
-    pub error_messages: String,
+    pub pl_data: Result<String, crate::format::DeserializationError>,
+    pub error_messages: Vec<TfmToPlErrorMessage>,
 }
 
-/// Convert .tfm bytes to a .pl string.
+/// An error message written by the tftopl algorithm.
+pub enum TfmToPlErrorMessage {
+    DeserializationWarning(crate::format::DeserializationWarning),
+    ValidationWarning(crate::format::ValidationWarning),
+}
+
+impl TfmToPlErrorMessage {
+    pub fn tftopl_message(&self) -> String {
+        match self {
+            TfmToPlErrorMessage::DeserializationWarning(warning) => warning.tftopl_message(),
+            TfmToPlErrorMessage::ValidationWarning(warning) => warning.tftopl_message(),
+        }
+    }
+}
+
+/// The tftopl algorithm.
+///
+/// This algorithm converts .tfm bytes to a .pl string.
 pub fn tfm_to_pl(
     tfm_data: &[u8],
+    indent: usize,
     display_format: &dyn Fn(&crate::pl::File) -> crate::pl::CharDisplayFormat,
 ) -> Result<TfmToPlOutput, std::fmt::Error> {
-    let mut output: TfmToPlOutput = Default::default();
-    let (tfm_file_or, warnings) = crate::format::File::deserialize(tfm_data, false);
-    for warning in &warnings {
-        writeln!(&mut output.error_messages, "{}", warning.tftopl_message())?;
+    let mut error_messages = Vec::<TfmToPlErrorMessage>::new();
+    let (tfm_file_or, warnings) = crate::format::File::deserialize(tfm_data);
+    for warning in warnings {
+        error_messages.push(TfmToPlErrorMessage::DeserializationWarning(warning));
     }
-    let tfm_file = match tfm_file_or {
+    let mut tfm_file = match tfm_file_or {
         Ok(tfm_file) => tfm_file,
         Err(err) => {
-            writeln!(
-                &mut output.error_messages,
-                "{}\nSorry, but I can't go on; are you sure this is a TFM?",
-                err.tftopl_message()
-            )?;
-            return Ok(output);
+            return Ok(TfmToPlOutput {
+                pl_data: Err(err),
+                error_messages,
+            });
         }
     };
-    let pl_file = crate::pl::File::from_tfm_file(tfm_file);
+    let warnings = tfm_file.validate_and_fix();
     let infinite_loop = warnings.iter().any(|w| {
         matches!(
             w,
-            crate::format::Warning::ValidationWarning(
-                crate::format::ValidationWarning::LigKernWarning(
-                    crate::ligkern::lang::ValidationWarning::InfiniteLoop(_),
-                )
+            crate::format::ValidationWarning::LigKernWarning(
+                crate::ligkern::lang::ValidationWarning::InfiniteLoop(_),
             )
         )
     });
     let tfm_modified = warnings
         .iter()
-        .map(crate::format::Warning::tfm_file_modified)
+        .map(crate::format::ValidationWarning::tfm_file_modified)
         .any(|t| t);
+    for warning in warnings {
+        error_messages.push(TfmToPlErrorMessage::ValidationWarning(warning));
+    }
+    let pl_file: crate::pl::File = tfm_file.into();
     let suffix = if infinite_loop {
         "(INFINITE LIGATURE LOOP MUST BE BROKEN!)"
     } else if tfm_modified {
@@ -53,12 +69,15 @@ pub fn tfm_to_pl(
     } else {
         ""
     };
+    let mut s = String::new();
     write![
-        &mut output.pl_data,
+        &mut s,
         "{}{}",
-        pl_file.display(3, display_format(&pl_file),),
+        pl_file.display(indent, display_format(&pl_file),),
         suffix
     ]?;
-    output.success = true;
-    Ok(output)
+    Ok(TfmToPlOutput {
+        pl_data: Ok(s),
+        error_messages,
+    })
 }

@@ -1,5 +1,5 @@
 /*!
-The property list (.pl) file format
+The property list (.pl) file format.
 
 |                                     | from .pl source code              | to .pl source code    | from lower level         | to lower level
 |-------------------------------------|-----------------------------------|-----------------------|--------------------------|----
@@ -14,8 +14,9 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::{
     format::{self, ExtensibleRecipe},
-    ligkern, Char, Header, NamedParam, NextLargerProgram, NextLargerProgramWarning, Number,
-    ParameterNumber, Params,
+    ligkern,
+    pl::ast::{DesignSize, ParameterNumber},
+    Char, Header, NamedParameter, NextLargerProgram, NextLargerProgramWarning, Number,
 };
 
 pub mod ast;
@@ -96,7 +97,7 @@ pub struct File {
     /// Tags that have been unset, but whose discriminant is still written to a .tfm file by PLtoTF.
     pub unset_char_tags: BTreeMap<Char, u8>,
     pub lig_kern_program: ligkern::lang::Program,
-    pub params: Params,
+    pub params: Vec<Number>,
 }
 
 impl Default for File {
@@ -159,7 +160,9 @@ impl File {
                     file.header.checksum = Some(v.data);
                 }
                 ast::Root::DesignSize(v) => {
-                    file.header.design_size = v.data;
+                    if let DesignSize::Valid(design_size) = v.data {
+                        file.header.design_size = design_size;
+                    }
                 }
                 ast::Root::DesignUnits(v) => {
                     file.design_units = v.data;
@@ -188,15 +191,18 @@ impl File {
                 },
                 ast::Root::FontDimension(b) => {
                     for node in b.children {
-                        match node {
+                        let (number, value) = match node {
                             ast::FontDimension::NamedParam(named_param, v) => {
-                                file.params.set_named(named_param, v.data);
+                                (named_param.number() as usize, v.data)
                             }
-                            ast::FontDimension::IndexedParam(v) => {
-                                file.params.set(v.left, v.right);
-                            }
-                            ast::FontDimension::Comment(_) => {}
+                            ast::FontDimension::IndexedParam(v) => (v.left.0 as usize, v.right),
+                            ast::FontDimension::Comment(_) => continue,
+                        };
+                        let index = number - 1;
+                        if file.params.len() < number {
+                            file.params.resize(number, Default::default());
                         }
+                        file.params[index] = value;
                     }
                 }
                 ast::Root::LigTable(b) => {
@@ -345,18 +351,16 @@ impl File {
 
         // Validate and fix the lig kern program.
         let lig_kern_seven_bit_safe = {
-            match crate::ligkern::CompiledProgram::compile(
+            if let Some(err) = crate::ligkern::CompiledProgram::compile(
                 &file.lig_kern_program,
                 &[],
                 file.lig_kern_entrypoints(true), // todo include orphans?
-            ) {
-                // TODO: warnings from the compilation?
-                Ok(_) => {}
-                Err(err) => {
-                    errors.push(ParseError::InfiniteLoopInLigKernProgram(err));
-                    file.clear_lig_kern_data();
-                }
-            };
+            )
+            .1
+            {
+                errors.push(ParseError::InfiniteLoopInLigKernProgram(err));
+                file.clear_lig_kern_data();
+            }
             file.lig_kern_program
                 .is_seven_bit_safe(file.lig_kern_entrypoints(false))
         };
@@ -417,9 +421,10 @@ impl File {
 
         file
     }
+}
 
-    /// Convert a TFM file into a PL file.
-    pub fn from_tfm_file(tfm_file: crate::format::File) -> File {
+impl From<crate::format::File> for File {
+    fn from(tfm_file: crate::format::File) -> Self {
         let char_dimens: BTreeMap<Char, CharDimensions> = tfm_file
             .char_dimens
             .iter()
@@ -495,7 +500,9 @@ impl File {
             params: tfm_file.params,
         }
     }
+}
 
+impl File {
     /// Lower a File to an AST.
     pub fn lower(&self, char_display_format: CharDisplayFormat) -> ast::Ast {
         let mut roots = vec![];
@@ -535,7 +542,14 @@ impl File {
             roots.push(ast::Root::CodingScheme(scheme.clone().into()));
         }
         roots.extend([
-            ast::Root::DesignSize(self.header.design_size.into()),
+            ast::Root::DesignSize(
+                if self.header.design_size_valid {
+                    DesignSize::Valid(self.header.design_size)
+                } else {
+                    DesignSize::Invalid
+                }
+                .into(),
+            ),
             ast::Root::Comment(vec!["DESIGNSIZE IS IN POINTS".into()]),
             ast::Root::Comment(vec!["OTHER SIZES ARE MULTIPLES OF DESIGNSIZE".into()]),
             ast::Root::Checksum(self.header.checksum.unwrap_or_default().into()),
@@ -546,47 +560,45 @@ impl File {
         // Next the parameters. This is TFtoPL.2014.58-61
         let params: Vec<ast::FontDimension> = self
             .params
-            .0
             .iter()
             .enumerate()
             .map(|(i, &param)| {
-                let i: i16 = (i + 1)
+                let i: u16 = (i + 1)
                     .try_into()
-                    .expect("cannot be more than i16::MAX parameters");
+                    .expect("cannot be more than u16::MAX-1 parameters");
                 // TODO: should just drop bigger parameters? Or encode this invariant in the params type
                 // TFtoPL.2014.61
-                // TODO: check that each parameter *except* SLANT is in the range [-16.0, 16.0] per TFtoPL.2014.60
                 let named_param = match (i, font_type) {
-                    (1, _) => NamedParam::Slant,
-                    (2, _) => NamedParam::Space,
-                    (3, _) => NamedParam::Stretch,
-                    (4, _) => NamedParam::Shrink,
-                    (5, _) => NamedParam::XHeight,
-                    (6, _) => NamedParam::Quad,
-                    (7, _) => NamedParam::ExtraSpace,
-                    (8, FontType::TexMathSy) => NamedParam::Num1,
-                    (9, FontType::TexMathSy) => NamedParam::Num2,
-                    (10, FontType::TexMathSy) => NamedParam::Num3,
-                    (11, FontType::TexMathSy) => NamedParam::Denom1,
-                    (12, FontType::TexMathSy) => NamedParam::Denom2,
-                    (13, FontType::TexMathSy) => NamedParam::Sup1,
-                    (14, FontType::TexMathSy) => NamedParam::Sup2,
-                    (15, FontType::TexMathSy) => NamedParam::Sup3,
-                    (16, FontType::TexMathSy) => NamedParam::Sub1,
-                    (17, FontType::TexMathSy) => NamedParam::Sub2,
-                    (18, FontType::TexMathSy) => NamedParam::SupDrop,
-                    (19, FontType::TexMathSy) => NamedParam::SubDrop,
-                    (20, FontType::TexMathSy) => NamedParam::Delim1,
-                    (21, FontType::TexMathSy) => NamedParam::Delim2,
-                    (22, FontType::TexMathSy) => NamedParam::AxisHeight,
-                    (8, FontType::TexMathEx) => NamedParam::DefaultRuleThickness,
-                    (9, FontType::TexMathEx) => NamedParam::BigOpSpacing1,
-                    (10, FontType::TexMathEx) => NamedParam::BigOpSpacing2,
-                    (11, FontType::TexMathEx) => NamedParam::BigOpSpacing3,
-                    (12, FontType::TexMathEx) => NamedParam::BigOpSpacing4,
-                    (13, FontType::TexMathEx) => NamedParam::BigOpSpacing5,
+                    (1, _) => NamedParameter::Slant,
+                    (2, _) => NamedParameter::Space,
+                    (3, _) => NamedParameter::Stretch,
+                    (4, _) => NamedParameter::Shrink,
+                    (5, _) => NamedParameter::XHeight,
+                    (6, _) => NamedParameter::Quad,
+                    (7, _) => NamedParameter::ExtraSpace,
+                    (8, FontType::TexMathSy) => NamedParameter::Num1,
+                    (9, FontType::TexMathSy) => NamedParameter::Num2,
+                    (10, FontType::TexMathSy) => NamedParameter::Num3,
+                    (11, FontType::TexMathSy) => NamedParameter::Denom1,
+                    (12, FontType::TexMathSy) => NamedParameter::Denom2,
+                    (13, FontType::TexMathSy) => NamedParameter::Sup1,
+                    (14, FontType::TexMathSy) => NamedParameter::Sup2,
+                    (15, FontType::TexMathSy) => NamedParameter::Sup3,
+                    (16, FontType::TexMathSy) => NamedParameter::Sub1,
+                    (17, FontType::TexMathSy) => NamedParameter::Sub2,
+                    (18, FontType::TexMathSy) => NamedParameter::SupDrop,
+                    (19, FontType::TexMathSy) => NamedParameter::SubDrop,
+                    (20, FontType::TexMathSy) => NamedParameter::Delim1,
+                    (21, FontType::TexMathSy) => NamedParameter::Delim2,
+                    (22, FontType::TexMathSy) => NamedParameter::AxisHeight,
+                    (8, FontType::TexMathEx) => NamedParameter::DefaultRuleThickness,
+                    (9, FontType::TexMathEx) => NamedParameter::BigOpSpacing1,
+                    (10, FontType::TexMathEx) => NamedParameter::BigOpSpacing2,
+                    (11, FontType::TexMathEx) => NamedParameter::BigOpSpacing3,
+                    (12, FontType::TexMathEx) => NamedParameter::BigOpSpacing4,
+                    (13, FontType::TexMathEx) => NamedParameter::BigOpSpacing5,
                     _ => {
-                        let parameter_number = ParameterNumber::new(i).expect("i is non-negative");
+                        let parameter_number = ParameterNumber(i);
                         return ast::FontDimension::IndexedParam((parameter_number, param).into());
                     }
                 };
@@ -973,7 +985,7 @@ mod tests {
             named_param,
             "(FONTDIMEN (STRETCH D 13.0))",
             File {
-                params: Params(vec![Number::ZERO, Number::ZERO, Number::UNITY * 13]),
+                params: vec![Number::ZERO, Number::ZERO, Number::UNITY * 13],
                 ..Default::default()
             },
         ),
@@ -981,7 +993,7 @@ mod tests {
             indexed_param,
             "(FONTDIMEN (PARAMETER D 2 D 15.0))",
             File {
-                params: Params(vec![Number::ZERO, Number::UNITY * 15]),
+                params: vec![Number::ZERO, Number::UNITY * 15],
                 ..Default::default()
             },
         ),
@@ -1226,7 +1238,7 @@ mod tests {
     );
 
     fn run_from_tfm_file_test(tfm_file: crate::format::File, want: File) {
-        let got = File::from_tfm_file(tfm_file);
+        let got: File = tfm_file.into();
         assert_eq!(got, want);
     }
 
@@ -1302,7 +1314,7 @@ mod tests {
                     }
                 ),
             ]),
-            ..File::from_tfm_file(Default::default())
+            ..<File as From<crate::format::File>>::from(Default::default())
         },
     ),);
 }
