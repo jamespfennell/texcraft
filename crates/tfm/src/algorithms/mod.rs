@@ -30,6 +30,7 @@ impl TfmToPlErrorMessage {
         }
     }
 }
+
 /// The tftopl algorithm.
 ///
 /// This algorithm converts .tfm bytes to a .pl string.
