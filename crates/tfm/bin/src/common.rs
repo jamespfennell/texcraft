@@ -68,26 +68,26 @@ impl clap::builder::ValueParserFactory for TfOrPlPath {
 #[derive(Clone, Debug)]
 pub struct TfPath(pub std::path::PathBuf);
 
+pub struct Tfm {
+    pub bytes: Vec<u8>,
+    pub file: tfm::format::File,
+    pub deserialization_warnings: Vec<tfm::format::DeserializationWarning>,
+    pub validation_warnings: Vec<tfm::format::ValidationWarning>,
+}
+
 impl TfPath {
     #[allow(dead_code)]
-    pub fn read(
-        &self,
-        skip_validation: bool,
-    ) -> Result<
-        (
-            Vec<u8>,
-            tfm::format::File,
-            Vec<tfm::format::DeserializationWarning>,
-            Vec<tfm::format::ValidationWarning>,
-        ),
-        String,
-    > {
-        let data = match std::fs::read(&self.0) {
-            Ok(data) => data,
-            Err(err) => return Err(format!("Failed to read `{}`: {}", self.0.display(), err)),
-        };
-        let (tfm_file_or, warnings) = tfm::format::File::deserialize(&data);
-        for warning in &warnings {
+    pub fn read_bytes(&self) -> Result<Vec<u8>, String> {
+        match std::fs::read(&self.0) {
+            Ok(data) => Ok(data),
+            Err(err) => Err(format!("Failed to read `{}`: {}", self.0.display(), err)),
+        }
+    }
+    #[allow(dead_code)]
+    pub fn read(&self, skip_validation: bool) -> Result<Tfm, String> {
+        let bytes = self.read_bytes()?;
+        let (tfm_file_or, deserialization_warnings) = tfm::format::File::deserialize(&bytes);
+        for warning in &deserialization_warnings {
             eprintln!("{}", warning.tftopl_message())
         }
         let mut tfm_file = match tfm_file_or {
@@ -102,7 +102,12 @@ impl TfPath {
         for warning in &validation_warnings {
             eprintln!("{}", warning.tftopl_message())
         }
-        Ok((data, tfm_file, warnings, validation_warnings))
+        Ok(Tfm {
+            bytes,
+            file: tfm_file,
+            deserialization_warnings,
+            validation_warnings,
+        })
     }
     fn parse(input: &str) -> Result<Self, InvalidExtension> {
         let path_buf: std::path::PathBuf = input.into();

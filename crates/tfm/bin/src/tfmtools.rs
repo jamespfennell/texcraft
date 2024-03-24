@@ -144,7 +144,7 @@ struct Check {
 impl Check {
     fn run(&self) -> Result<(), String> {
         let num_warnings = match &self.path {
-            TfOrPlPath::Tf(tfm_path) => tfm_path.read(false)?.2.len(),
+            TfOrPlPath::Tf(tfm_path) => tfm_path.read(false)?.deserialization_warnings.len(),
             TfOrPlPath::Pl(pl_path) => pl_path.read()?.1.len(),
         };
         if num_warnings > 0 {
@@ -184,39 +184,22 @@ impl Convert {
     fn run(&self, indent: usize, charcode_format: CharcodeFormat) -> Result<(), String> {
         match &self.path {
             TfOrPlPath::Tf(tf_path) => {
-                let (_, tfm_file, _, validation_warnings) = tf_path.read(false)?;
-                let pl_file: tfm::pl::File = tfm_file.into();
-                let pl_output = format![
-                    "{}",
-                    pl_file.display(
-                        indent,
-                        charcode_format.to_display_format(&pl_file.header.character_coding_scheme)
-                    )
-                ];
-                // TODO: deduplicate this code between here and algorithms
-                let infinite_loop = validation_warnings.iter().any(|w| {
-                    matches!(
-                        w,
-                        tfm::format::ValidationWarning::LigKernWarning(
-                            tfm::ligkern::lang::ValidationWarning::InfiniteLoop(_),
-                        )
-                    )
-                });
-                let tfm_modified = validation_warnings
-                    .iter()
-                    .map(tfm::format::ValidationWarning::tfm_file_modified)
-                    .any(|t| t);
-                let suffix = if infinite_loop {
-                    "(INFINITE LIGATURE LOOP MUST BE BROKEN!)"
-                } else if tfm_modified {
-                    "(COMMENT THE TFM FILE WAS BAD, SO THE DATA HAS BEEN CHANGED!)\n"
-                } else {
-                    ""
+                let bytes = tf_path.read_bytes()?;
+                let output = tfm::algorithms::tfm_to_pl(&bytes, indent, &|pl_file| {
+                    charcode_format.to_display_format(&pl_file.header.character_coding_scheme)
+                })
+                .unwrap();
+                for error_message in output.error_messages {
+                    eprintln!("{}", error_message.tftopl_message());
+                }
+                let pl_data = match output.pl_data {
+                    Ok(pl_data) => pl_data,
+                    Err(err) => return Err(err.tftopl_message()),
                 };
                 match &self.output {
-                    None => print!("{pl_output}{suffix}"),
+                    None => print!("{pl_data}"),
                     Some(TfOrPlPath::Pl(pl_path)) => {
-                        pl_path.write(&pl_output)?;
+                        pl_path.write(&pl_data)?;
                     }
                     Some(TfOrPlPath::Tf(_tfm_path)) => todo!(),
                 }
@@ -306,7 +289,11 @@ impl clap::ValueEnum for Section {
 
 impl Debug {
     fn run(&self) -> Result<(), String> {
-        let (tfm_bytes, tfm_file, _, _) = self.path.read(self.skip_validation)?;
+        let Tfm {
+            bytes: tfm_bytes,
+            file: tfm_file,
+            ..
+        } = self.path.read(self.skip_validation)?;
         let raw_file = tfm::format::RawFile::deserialize(&tfm_bytes).0.unwrap();
 
         let path = if self.omit_tfm_path {
@@ -371,7 +358,7 @@ impl LigKern {
     fn run(&self) -> Result<(), String> {
         let lig_kern_program = match &self.path {
             TfOrPlPath::Tf(tfm_path) => {
-                let (_, mut tfm_file, _, _) = tfm_path.read(false)?;
+                let mut tfm_file = tfm_path.read(false)?.file;
                 let entrypoints: HashMap<tfm::Char, u16> = tfm_file
                     .lig_kern_entrypoints()
                     .into_iter()

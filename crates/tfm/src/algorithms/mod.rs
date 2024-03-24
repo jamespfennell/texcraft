@@ -28,6 +28,7 @@ impl TfmToPlErrorMessage {
 /// This algorithm converts .tfm bytes to a .pl string.
 pub fn tfm_to_pl(
     tfm_data: &[u8],
+    indent: usize,
     display_format: &dyn Fn(&crate::pl::File) -> crate::pl::CharDisplayFormat,
 ) -> Result<TfmToPlOutput, std::fmt::Error> {
     let mut error_messages = Vec::<TfmToPlErrorMessage>::new();
@@ -72,7 +73,7 @@ pub fn tfm_to_pl(
     write![
         &mut s,
         "{}{}",
-        pl_file.display(3, display_format(&pl_file),),
+        pl_file.display(indent, display_format(&pl_file),),
         suffix
     ]?;
     Ok(TfmToPlOutput {

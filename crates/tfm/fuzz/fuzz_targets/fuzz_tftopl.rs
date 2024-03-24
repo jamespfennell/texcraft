@@ -26,7 +26,8 @@ fuzz_target!(|input: Input| {
         write_input_and_correct_output(&input, &tfm_file_path, knuth_stdout, knuth_stderr);
     }
 
-    let texcraft_output = tfm::algorithms::tfm_to_pl(&tfm_bytes, &|_| Default::default()).unwrap();
+    let texcraft_output =
+        tfm::algorithms::tfm_to_pl(&tfm_bytes, 3, &|_| Default::default()).unwrap();
     let texcraft_stderr = {
         use std::fmt::Write;
         let mut s = String::new();

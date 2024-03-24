@@ -72,7 +72,7 @@ impl Cli {
         };
 
         // Conversion
-        let output = tfm::algorithms::tfm_to_pl(&tfm_data, &|pl_file| {
+        let output = tfm::algorithms::tfm_to_pl(&tfm_data, 3, &|pl_file| {
             self.charcode_format
                 .to_display_format(&pl_file.header.character_coding_scheme)
         })
