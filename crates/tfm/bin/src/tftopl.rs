@@ -81,8 +81,8 @@ impl Cli {
             eprintln!("{}", error_message.tftopl_message());
         }
         let pl_data = match output.pl_data {
-            None => return Err("".to_string()),
-            Some(pl_data) => pl_data,
+            Ok(pl_data) => pl_data,
+            Err(err) => return Err(err.tftopl_message()),
         };
 
         // Output

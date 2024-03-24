@@ -33,9 +33,12 @@ fuzz_target!(|input: Input| {
         for error_message in texcraft_output.error_messages {
             writeln!(&mut s, "{}", error_message.tftopl_message()).unwrap();
         }
+        if let Err(err) = &texcraft_output.pl_data {
+            writeln!(&mut s, "{}", err.tftopl_message()).unwrap();
+        }
         s
     };
-    if let Some(pl_data) = &texcraft_output.pl_data {
+    if let Ok(pl_data) = &texcraft_output.pl_data {
         if knuth_stdout == pl_data && knuth_stderr == texcraft_stderr {
             return;
         }
@@ -44,7 +47,7 @@ fuzz_target!(|input: Input| {
     write_input_and_correct_output(&input, &tfm_file_path, knuth_stdout, knuth_stderr);
 
     assert!(
-        texcraft_output.pl_data.is_some(),
+        texcraft_output.pl_data.is_ok(),
         "failed to run Texcraft tftopl: {}",
         texcraft_stderr,
     );

@@ -60,7 +60,7 @@ impl DeserializationError {
     /// Returns the error message the TFtoPL program prints for this kind of error.
     pub fn tftopl_message(&self) -> String {
         use DeserializationError::*;
-        match self {
+        let first_line = match self {
             FileHasOneByte(0..=127) => "The input file is only one byte long!".into(),
             InternalFileLengthIsZero => {
                 "The file claims to have length zero, but that's impossible!".into()
@@ -82,7 +82,11 @@ impl DeserializationError {
             IncompleteSubFiles(_) => "Incomplete subfiles for character dimensions!".into(),
             TooManyExtensibleCharacters(n) => format!["There are {n} extensible recipes!"],
             InconsistentSubFileSizes(_) => "Subfile sizes don't add up to the stated total!".into(),
-        }
+        };
+        format!(
+            "{}\nSorry, but I can't go on; are you sure this is a TFM?",
+            first_line
+        )
     }
 
     /// Returns the section in Knuth's TFtoPL (version 2014) in which this error occurs.
