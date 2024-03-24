@@ -1,4 +1,4 @@
-//! The TeX font metric (.tfm) file format
+//! The TeX font metric (.tfm) file format.
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;

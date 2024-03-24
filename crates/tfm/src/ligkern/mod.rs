@@ -1,6 +1,6 @@
-//! Ligature and kern programming
+//! Lig/kern programming.
 //!
-//! The TFM file format can provide information about ligatures and kerns.
+//! TFM files can include information about ligatures and kerns.
 //! A [ligature](https://en.wikipedia.org/wiki/Ligature_(writing))
 //!     is a special character that can replace two or more adjacent characters.
 //! For example, the pair of characters ae can be replaced by the æ ligature which is a single character.

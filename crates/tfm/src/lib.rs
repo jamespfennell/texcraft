@@ -511,7 +511,7 @@ impl NamedParameter {
     }
 }
 
-/// Warning from the compilation of the "next larger character" instructions
+/// Warning from the compilation of "next larger character" instructions.
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum NextLargerProgramWarning {
     NonExistentCharacter { original: Char, next_larger: Char },
@@ -581,7 +581,7 @@ impl NextLargerProgramWarning {
         }
     }
 }
-/// Compiled version of the "next larger character" instructions
+/// Compiled program of "next larger character" instructions
 ///
 /// The .tfm file format can associate a "next larger" character to any character in a font.
 /// Next larger characters form sequences: i.e. B can be the next larger character for A,

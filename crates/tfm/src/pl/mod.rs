@@ -1,5 +1,5 @@
 /*!
-The property list (.pl) file format
+The property list (.pl) file format.
 
 |                                     | from .pl source code              | to .pl source code    | from lower level         | to lower level
 |-------------------------------------|-----------------------------------|-----------------------|--------------------------|----
