@@ -77,7 +77,9 @@ impl Cli {
                 .to_display_format(&pl_file.header.character_coding_scheme)
         })
         .unwrap();
-        eprint!("{}", output.error_messages);
+        for error_message in output.error_messages {
+            eprintln!("{}", error_message.tftopl_message());
+        }
         if !output.success {
             return Err("".to_string());
         }

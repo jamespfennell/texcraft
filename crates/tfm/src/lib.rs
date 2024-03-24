@@ -23,18 +23,18 @@
 //!
 //! ## Background
 //!
-//! Probably the most famous part of the implementation of TeX is the Knuth-Plass line-breaking algorithm.
-//! This determines the "optimal" places to add line breaks when typesetting a paragraph of text.
-//! Path of the inputs to this algorithm, in addition to the characters being typeset,
-//!     are the dimensions of the characters in the current font.
-//! When running this algorithm, in TeX or elsewhere, this information needs to be provided somehow.
+//! Probably the most famous part of the implementation of TeX is the Knuth-Plass line breaking algorithm.
+//! This algorithm determines the "optimal" places to add line breaks when typesetting a paragraph of text.
+//! In order to run the algorithm one needs to provide the dimensions of all characters in the current font.
+//! These dimensions are used to size the boxes in the Knuth-Plass box and glue model.
 //!
-//! In TeX, this is done using TeX font metric files.
+//! In TeX, character dimensions are provided using TeX font metric files.
 //! These are binary files.
 //! By convention they have a .tfm file extension.
 //! Unlike more modern file formats like TrueType, .tfm files only contain the font dimensions;
 //!     they don't contains the glyphs.
-//! In general .tfm files are produced by other software like Metafont,
+//! In general,
+//!     .tfm files are produced by other software like Metafont,
 //!     placed in some well-known directory in the TeX distribution,
 //!     and then read into memory when TeX is running.
 //!
@@ -58,7 +58,7 @@
 //!
 //! ```
 //! // Include the .tfm file for Computer Modern in size 10pt.
-//! let tfm_bytes = include_bytes!["cmr10.tfm"];
+//! let tfm_bytes = include_bytes!["../corpus/computer-modern/cmr10.tfm"];
 //!
 //! // Deserialize the .tfm file.
 //! let (tfm_file_or_error, deserialization_warnings) = tfm::format::File::deserialize(tfm_bytes);
@@ -85,12 +85,12 @@
 //! In addition to supporting the basic use cases of querying font metric data
 //!     and converting between different formats,
 //!     this crate has advanced functionality for performing additional tasks on font metric data.
-//! The full functionality can be understood by navigating through the crate documentation.
+//! The full set of functionality can be understood by navigating through the crate documentation.
 //! But here are 3 highlights we think are interesting:
 //!
 //! - **Language analysis of .pl files**:
 //!     In `pltotf`, Knuth parses .pl files in a single pass.
-//!     This crate takes a common approach nowadays of parsing it in multiple passes:
+//!     This crate takes a common approach nowadays of parsing in multiple passes:
 //!     first running a [lexer](pl::lexer::Lexer) to convert the file to tokens,
 //!     then constructing a [concrete syntax tree](pl::cst::Cst) (or parse tree),
 //!     next constructing a [fully typed and checked abstract syntax tree](pl::ast::Ast),
