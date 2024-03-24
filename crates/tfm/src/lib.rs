@@ -445,7 +445,7 @@ impl From<Face> for u8 {
 
 /// A named TeX font metric parameter.
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
-pub enum NamedParam {
+pub enum NamedParameter {
     Slant,
     Space,
     Stretch,
@@ -476,37 +476,37 @@ pub enum NamedParam {
     BigOpSpacing5,
 }
 
-impl NamedParam {
+impl NamedParameter {
     pub fn number(&self) -> u8 {
         match self {
-            NamedParam::Slant => 1,
-            NamedParam::Space => 2,
-            NamedParam::Stretch => 3,
-            NamedParam::Shrink => 4,
-            NamedParam::XHeight => 5,
-            NamedParam::Quad => 6,
-            NamedParam::ExtraSpace => 7,
-            NamedParam::Num1 => 8,
-            NamedParam::Num2 => 9,
-            NamedParam::Num3 => 10,
-            NamedParam::Denom1 => 11,
-            NamedParam::Denom2 => 12,
-            NamedParam::Sup1 => 13,
-            NamedParam::Sup2 => 14,
-            NamedParam::Sup3 => 15,
-            NamedParam::Sub1 => 16,
-            NamedParam::Sub2 => 17,
-            NamedParam::SupDrop => 18,
-            NamedParam::SubDrop => 19,
-            NamedParam::Delim1 => 20,
-            NamedParam::Delim2 => 21,
-            NamedParam::AxisHeight => 22,
-            NamedParam::DefaultRuleThickness => 8,
-            NamedParam::BigOpSpacing1 => 9,
-            NamedParam::BigOpSpacing2 => 10,
-            NamedParam::BigOpSpacing3 => 11,
-            NamedParam::BigOpSpacing4 => 12,
-            NamedParam::BigOpSpacing5 => 13,
+            NamedParameter::Slant => 1,
+            NamedParameter::Space => 2,
+            NamedParameter::Stretch => 3,
+            NamedParameter::Shrink => 4,
+            NamedParameter::XHeight => 5,
+            NamedParameter::Quad => 6,
+            NamedParameter::ExtraSpace => 7,
+            NamedParameter::Num1 => 8,
+            NamedParameter::Num2 => 9,
+            NamedParameter::Num3 => 10,
+            NamedParameter::Denom1 => 11,
+            NamedParameter::Denom2 => 12,
+            NamedParameter::Sup1 => 13,
+            NamedParameter::Sup2 => 14,
+            NamedParameter::Sup3 => 15,
+            NamedParameter::Sub1 => 16,
+            NamedParameter::Sub2 => 17,
+            NamedParameter::SupDrop => 18,
+            NamedParameter::SubDrop => 19,
+            NamedParameter::Delim1 => 20,
+            NamedParameter::Delim2 => 21,
+            NamedParameter::AxisHeight => 22,
+            NamedParameter::DefaultRuleThickness => 8,
+            NamedParameter::BigOpSpacing1 => 9,
+            NamedParameter::BigOpSpacing2 => 10,
+            NamedParameter::BigOpSpacing3 => 11,
+            NamedParameter::BigOpSpacing4 => 12,
+            NamedParameter::BigOpSpacing5 => 13,
         }
     }
 }
