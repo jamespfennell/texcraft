@@ -5,8 +5,7 @@ use std::fmt::Write;
 /// Output of the tftopl algorithm.
 #[derive(Default)]
 pub struct TfmToPlOutput {
-    pub success: bool,
-    pub pl_data: String,
+    pub pl_data: Option<String>,
     pub error_messages: Vec<TfmToPlErrorMessage>,
 }
 
@@ -80,12 +79,13 @@ pub fn tfm_to_pl(
     } else {
         ""
     };
+    let mut s = String::new();
     write![
-        &mut output.pl_data,
+        &mut s,
         "{}{}",
         pl_file.display(3, display_format(&pl_file),),
         suffix
     ]?;
-    output.success = true;
+    output.pl_data = Some(s);
     Ok(output)
 }

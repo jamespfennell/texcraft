@@ -35,21 +35,20 @@ fuzz_target!(|input: Input| {
         }
         s
     };
-    if texcraft_output.success
-        && knuth_stdout == texcraft_output.pl_data
-        && knuth_stderr == texcraft_stderr
-    {
-        return;
+    if let Some(pl_data) = &texcraft_output.pl_data {
+        if knuth_stdout == pl_data && knuth_stderr == texcraft_stderr {
+            return;
+        }
     }
 
     write_input_and_correct_output(&input, &tfm_file_path, knuth_stdout, knuth_stderr);
 
     assert!(
-        texcraft_output.success,
+        texcraft_output.pl_data.is_some(),
         "failed to run Texcraft tftopl: {}",
         texcraft_stderr,
     );
-    similar_asserts::assert_eq!(texcraft: texcraft_output.pl_data, knuth: knuth_stdout);
+    similar_asserts::assert_eq!(texcraft: texcraft_output.pl_data.unwrap(), knuth: knuth_stdout);
     similar_asserts::assert_eq!(texcraft: texcraft_stderr, knuth: knuth_stderr);
 });
 

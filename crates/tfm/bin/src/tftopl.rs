@@ -80,16 +80,17 @@ impl Cli {
         for error_message in output.error_messages {
             eprintln!("{}", error_message.tftopl_message());
         }
-        if !output.success {
-            return Err("".to_string());
-        }
+        let pl_data = match output.pl_data {
+            None => return Err("".to_string()),
+            Some(pl_data) => pl_data,
+        };
 
         // Output
         match self.pl_file_path {
-            None => print!("{}", output.pl_data),
+            None => print!("{}", pl_data),
             Some(pl_file_path) => {
                 let pl_file_path = with_default_file_extension(pl_file_path, "pl");
-                if let Err(err) = std::fs::write(&pl_file_path, output.pl_data) {
+                if let Err(err) = std::fs::write(&pl_file_path, pl_data) {
                     return Err(format!(
                         "Failed to write file `{}`: {}",
                         pl_file_path.display(),
