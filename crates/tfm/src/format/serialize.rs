@@ -29,7 +29,7 @@ pub fn serialize(file: &File) -> Vec<u8> {
         ),
         nk: serialize_section(&file.kerns, &mut b, None),
         ne: serialize_section(&file.extensible_chars, &mut b, None),
-        np: serialize_section(&file.params.0, &mut b, None),
+        np: serialize_section(&file.params, &mut b, None),
     };
     sub_file_sizes.lf = sub_file_sizes.valid_lf();
     let sfs_b: [u8; 24] = sub_file_sizes.into();

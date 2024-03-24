@@ -4,7 +4,7 @@
 
 use super::cst;
 use super::error::ParseError;
-use crate::{ligkern::lang::PostLigOperation, Char, Face, NamedParam, Number, ParameterNumber};
+use crate::{ligkern::lang::PostLigOperation, Char, Face, NamedParam, Number};
 use std::ops::Range;
 
 /// Abstract syntax tree for property list files
@@ -422,25 +422,27 @@ impl Parse for DecimalU8 {
     }
 }
 
+#[derive(PartialEq, Eq, Debug)]
+pub struct ParameterNumber(pub u16);
+
 impl TryParse for ParameterNumber {
     fn try_parse(input: &mut Input) -> Option<(Self, Range<usize>)> {
         let (a, b) = u8::parse(input);
-        if a == u8::MAX {
-            input.skip_error(ParseError::ParameterNumberTooBig { span: b });
-            None
-        } else {
-            match crate::ParameterNumber::new(a as i16) {
-                None => {
-                    input.skip_error(ParseError::ParameterNumberIsZero { span: b });
-                    None
-                }
-                Some(n) => Some((n, b)),
+        match a {
+            0 => {
+                input.skip_error(ParseError::ParameterNumberIsZero { span: b });
+                None
             }
+            u8::MAX => {
+                input.skip_error(ParseError::ParameterNumberTooBig { span: b });
+                None
+            }
+            n => Some((ParameterNumber(n as u16), b)),
         }
     }
 
     fn to_string(self, _: &LowerOpts) -> Option<String> {
-        Some(format!["D {}", self.get()])
+        Some(format!["D {}", self.0])
     }
 }
 

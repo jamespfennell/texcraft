@@ -182,7 +182,7 @@ pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
         lig_kern_program: deserialize_lig_kern_program(raw_file.lig_kern_instructions),
         kerns: deserialize_array(raw_file.kerns),
         extensible_chars: deserialize_array(raw_file.extensible_recipes),
-        params: Params(deserialize_array(raw_file.params)),
+        params: deserialize_array(raw_file.params),
     }
 }
 
@@ -1206,7 +1206,7 @@ mod tests {
             ],
             File {
                 header: Header::tfm_default(),
-                params: Params(vec![
+                params: vec![
                     Number(11),
                     Number(13),
                     Number(17),
@@ -1217,7 +1217,7 @@ mod tests {
                     Number(37),
                     Number(41),
                     Number(43),
-                ]),
+                ],
                 ..Default::default()
             },
         ),

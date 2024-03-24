@@ -73,7 +73,7 @@ pub struct File {
     pub extensible_chars: Vec<ExtensibleRecipe>,
 
     /// Font parameters.
-    pub params: Params,
+    pub params: Vec<Number>,
 }
 
 /// Data about one character in a .tfm file.

@@ -15,9 +15,8 @@ use std::collections::{BTreeMap, HashMap};
 use crate::{
     format::{self, ExtensibleRecipe},
     ligkern,
-    pl::ast::DesignSize,
-    Char, Header, NamedParam, NextLargerProgram, NextLargerProgramWarning, Number, ParameterNumber,
-    Params,
+    pl::ast::{DesignSize, ParameterNumber},
+    Char, Header, NamedParam, NextLargerProgram, NextLargerProgramWarning, Number,
 };
 
 pub mod ast;
@@ -98,7 +97,7 @@ pub struct File {
     /// Tags that have been unset, but whose discriminant is still written to a .tfm file by PLtoTF.
     pub unset_char_tags: BTreeMap<Char, u8>,
     pub lig_kern_program: ligkern::lang::Program,
-    pub params: Params,
+    pub params: Vec<Number>,
 }
 
 impl Default for File {
@@ -192,15 +191,18 @@ impl File {
                 },
                 ast::Root::FontDimension(b) => {
                     for node in b.children {
-                        match node {
+                        let (number, value) = match node {
                             ast::FontDimension::NamedParam(named_param, v) => {
-                                file.params.set_named(named_param, v.data);
+                                (named_param.number() as usize, v.data)
                             }
-                            ast::FontDimension::IndexedParam(v) => {
-                                file.params.set(v.left, v.right);
-                            }
-                            ast::FontDimension::Comment(_) => {}
+                            ast::FontDimension::IndexedParam(v) => (v.left.0 as usize, v.right),
+                            ast::FontDimension::Comment(_) => continue,
+                        };
+                        let index = number - 1;
+                        if file.params.len() < number {
+                            file.params.resize(number, Default::default());
                         }
+                        file.params[index] = value;
                     }
                 }
                 ast::Root::LigTable(b) => {
@@ -558,16 +560,14 @@ impl File {
         // Next the parameters. This is TFtoPL.2014.58-61
         let params: Vec<ast::FontDimension> = self
             .params
-            .0
             .iter()
             .enumerate()
             .map(|(i, &param)| {
-                let i: i16 = (i + 1)
+                let i: u16 = (i + 1)
                     .try_into()
-                    .expect("cannot be more than i16::MAX parameters");
+                    .expect("cannot be more than u16::MAX-1 parameters");
                 // TODO: should just drop bigger parameters? Or encode this invariant in the params type
                 // TFtoPL.2014.61
-                // TODO: check that each parameter *except* SLANT is in the range [-16.0, 16.0] per TFtoPL.2014.60
                 let named_param = match (i, font_type) {
                     (1, _) => NamedParam::Slant,
                     (2, _) => NamedParam::Space,
@@ -598,7 +598,7 @@ impl File {
                     (12, FontType::TexMathEx) => NamedParam::BigOpSpacing4,
                     (13, FontType::TexMathEx) => NamedParam::BigOpSpacing5,
                     _ => {
-                        let parameter_number = ParameterNumber::new(i).expect("i is non-negative");
+                        let parameter_number = ParameterNumber(i);
                         return ast::FontDimension::IndexedParam((parameter_number, param).into());
                     }
                 };
@@ -985,7 +985,7 @@ mod tests {
             named_param,
             "(FONTDIMEN (STRETCH D 13.0))",
             File {
-                params: Params(vec![Number::ZERO, Number::ZERO, Number::UNITY * 13]),
+                params: vec![Number::ZERO, Number::ZERO, Number::UNITY * 13],
                 ..Default::default()
             },
         ),
@@ -993,7 +993,7 @@ mod tests {
             indexed_param,
             "(FONTDIMEN (PARAMETER D 2 D 15.0))",
             File {
-                params: Params(vec![Number::ZERO, Number::UNITY * 15]),
+                params: vec![Number::ZERO, Number::UNITY * 15],
                 ..Default::default()
             },
         ),

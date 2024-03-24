@@ -181,7 +181,7 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
         file.header.design_size_valid = false;
     }
 
-    for (i, elem) in file.params.0.iter_mut().enumerate() {
+    for (i, elem) in file.params.iter_mut().enumerate() {
         if i == 0 {
             continue;
         }
@@ -196,7 +196,7 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
             None => "".to_string(),
             Some(scheme) => scheme.to_uppercase(),
         };
-        let num_params = file.params.0.len();
+        let num_params = file.params.len();
         if scheme.starts_with("TEX MATH SY") && num_params != 22 {
             warnings.push(ValidationWarning::UnusualNumberOfParameters {
                 is_math_symbols_font: true,
