@@ -2,7 +2,9 @@
 Python script to check that Texcraft's implementation of tftopl gives the same
 result as Knuth's original version. Run from the root of the Texcraft repo.
 
-rsync -zarvm --include="*/" --include="*.tfm" --exclude="*" rsync://mirrors.mit.edu/CTAN/ .
+To download all .tfm files from CTAN:
+
+    rsync -zarvm --include="*/" --include="*.tfm" --exclude="*" rsync://mirrors.mit.edu/CTAN/ 
 """
 import pathlib
 import os
@@ -23,11 +25,18 @@ parser = argparse.ArgumentParser(
 parser.add_argument('path', default='./')
 parser.add_argument('--fail-fast', action='store_true') 
 parser.add_argument('--delete', action='store_true')
+parser.add_argument('--save-pl', action='store_true')
 args = parser.parse_args()
 
 for tfm_path in pathlib.Path(args.path).rglob("*.tfm"):
     knuth_pl, knuth_stderr = run(["tftopl", tfm_path])
     texcraft_pl, texcraft_stderr = run(["cargo", "run", "--quiet", "--bin", "tftopl", "--", tfm_path])
+    if args.save_pl:
+        pl_path = str(tfm_path)[:-len(".tfm")] + ".pl"
+        pl_file = open(pl_path, "w")
+        pl_file.write(knuth_pl)
+        pl_file.close()
+        pass
     if knuth_pl == texcraft_pl and knuth_stderr == texcraft_stderr:
         print(f"{tfm_path} OK")
         if args.delete:
@@ -45,4 +54,3 @@ for tfm_path in pathlib.Path(args.path).rglob("*.tfm"):
             break
     if args.fail_fast:
         break
-

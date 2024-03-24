@@ -104,9 +104,6 @@ fn run_pl_to_tfm_test(
     );
     let stdout = String::from_utf8(output.stdout).unwrap();
     similar_asserts::assert_eq!(texcraft: stdout, knuth: "");
-    if let Some(want_stderr) = want_stderr {
-        similar_asserts::assert_eq!(texcraft: stderr, knuth: want_stderr.replace("\r\n", "\n"));
-    }
 
     let got = std::fs::read(&tfm_file_path).unwrap();
     if got == tfm {
@@ -120,13 +117,22 @@ fn run_pl_to_tfm_test(
     // It's possible that there is a bug in `tfmtools debug` such that different files have
     // the same debug output. For this case, we assert the bytes are equal too.
     assert_eq!(got, tfm);
+
+    if let Some(want_stderr) = want_stderr {
+        similar_asserts::assert_eq!(texcraft: stderr, knuth: want_stderr.replace("\r\n", "\n"));
+    }
 }
 
 fn debug_tfm(tfm_file_path: &std::path::PathBuf) -> String {
     let mut cmd = Command::cargo_bin("tfmtools").unwrap();
     cmd.args(vec!["debug", tfm_file_path.to_str().unwrap()]);
     let output = cmd.output().unwrap();
-    assert!(output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        output.status.success(),
+        "failed to run Texcraft debug command: {}",
+        stderr
+    );
     String::from_utf8(output.stdout).unwrap()
 }
 
@@ -332,6 +338,15 @@ convert_tests!(
         ),
     ),
     (
+        dimen_index_out_of_bounds_2_3,
+        pltotf_with_stderr(
+            "originals/dimen-index-out-of-bounds-",
+            "2.plst",
+            "3.tfm",
+            "3.stderr.txt",
+        )
+    ),
+    (
         dimen_index_out_of_bounds_3_4,
         roundtrip("originals/dimen-index-out-of-bounds-", "3.tfm", "4.plst"),
     ),
@@ -355,32 +370,30 @@ convert_tests!(
         pltotf_with_stderr("originals/next-larger-loop-pl"),
     ),
     (
+        parameter_index_zero_1_2,
+        pltotf_with_stderr(
+            "originals/param-index-zero-",
+            "1.plst",
+            "2.tfm",
+            "2.stderr.txt"
+        ),
+    ),
+    (
         theano_old_style_bold_tlf_lgr,
         pltotf("ctan/TheanoOldStyle-Bold-tlf-lgr"),
     ),
-    /* TODO: fix the bug and enable
     (
-        dimen_index_out_of_bounds_2_3,
-        "originals/dimen-index-out-of-bounds-3.tfm",
-        "originals/dimen-index-out-of-bounds-2.plst",
-        include_str_from_corpus!["originals/dimen-index-out-of-bounds-3.stderr.txt"],
-    ),
-     */
-    (
-        bxjatoucs_jis,
+        bxjatoucs_jis_1_2,
         tftopl("ctan/bxjatoucs-jis-", "1.tfm", "2.plst"),
     ),
-    /*
-    The problem in this one is that pltotf imposes max params of 254.
-    (It's not 255 because in the CST -> AST step, number bigger than this become 255
-    due to how Knuth does the get_byte method. So with 254 we can still check for this condition)
-    Do we want to support that?
-        (
-        bxjatoucs_jis_roundtrip,
-        "ctan/bxjatoucs-jis-3.tfm",
-        "ctan/bxjatoucs-jis-2.plst",
+    (
+        bxjatoucs_jis_2_3,
+        pltotf("ctan/bxjatoucs-jis-", "2.plst", "3.tfm"),
     ),
-     */
+    (
+        bxjatoucs_jis_3_4,
+        roundtrip("ctan/bxjatoucs-jis-", "3.tfm", "4.plst"),
+    ),
     (aebkri, pltotf("ctan/aebkri")),
     (mt2exa, pltotf("ctan/mt2exa")),
     (copti, pltotf("ctan/copti")),

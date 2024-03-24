@@ -562,11 +562,11 @@ impl File {
             .params
             .iter()
             .enumerate()
-            .map(|(i, &param)| {
-                let i: u16 = (i + 1)
-                    .try_into()
-                    .expect("cannot be more than u16::MAX-1 parameters");
-                // TODO: should just drop bigger parameters? Or encode this invariant in the params type
+            .filter_map(|(i, &param)| {
+                let i: u16 = match (i + 1).try_into() {
+                    Ok(i) => i,
+                    Err(_) => return None,
+                };
                 // TFtoPL.2014.61
                 let named_param = match (i, font_type) {
                     (1, _) => NamedParameter::Slant,
@@ -599,10 +599,12 @@ impl File {
                     (13, FontType::TexMathEx) => NamedParameter::BigOpSpacing5,
                     _ => {
                         let parameter_number = ParameterNumber(i);
-                        return ast::FontDimension::IndexedParam((parameter_number, param).into());
+                        return Some(ast::FontDimension::IndexedParam(
+                            (parameter_number, param).into(),
+                        ));
                     }
                 };
-                ast::FontDimension::NamedParam(named_param, param.into())
+                Some(ast::FontDimension::NamedParam(named_param, param.into()))
             })
             .collect();
         if !params.is_empty() {
