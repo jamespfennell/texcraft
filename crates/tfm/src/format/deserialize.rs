@@ -489,7 +489,7 @@ impl Header {
     fn deserialize(mut b: &[u8]) -> Self {
         let checksum = Some(u32::deserialize(b));
         b = &b[4..];
-        let design_size = Number::deserialize(b).into();
+        let design_size = Number::deserialize(b);
         b = b.get(4..).unwrap_or(&[0; 0]);
         let character_coding_scheme = deserialize_string(b.get(0..40).unwrap_or(&[0; 0]));
         b = b.get(40..).unwrap_or(&[0; 0]);
@@ -501,6 +501,7 @@ impl Header {
         Self {
             checksum,
             design_size,
+            design_size_valid: true,
             character_coding_scheme,
             font_family,
             seven_bit_safe,
@@ -827,7 +828,8 @@ mod tests {
             Ok(File {
                 header: Header {
                     checksum: Some(7),
-                    design_size: Number(11).into(),
+                    design_size: Number(11),
+                    design_size_valid: true,
                     character_coding_scheme: Some(format!["A{}", " ".repeat(238)]),
                     font_family: Some(format!["B{}", " ".repeat(98)]),
                     seven_bit_safe: Some(false),
@@ -880,7 +882,8 @@ mod tests {
             File {
                 header: Header {
                     checksum: Some(7),
-                    design_size: Number(11).into(),
+                    design_size: Number(11),
+                    design_size_valid: true,
                     character_coding_scheme: None,
                     font_family: None,
                     seven_bit_safe: None,
@@ -903,7 +906,8 @@ mod tests {
             File {
                 header: Header {
                     checksum: Some(7),
-                    design_size: Number(11).into(),
+                    design_size: Number(11),
+                    design_size_valid: true,
                     character_coding_scheme: Some("ABC".into()),
                     font_family: Some("DEF".into()),
                     seven_bit_safe: Some(true),

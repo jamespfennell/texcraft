@@ -14,8 +14,10 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::{
     format::{self, ExtensibleRecipe},
-    ligkern, Char, Header, NamedParam, NextLargerProgram, NextLargerProgramWarning, Number,
-    ParameterNumber, Params,
+    ligkern,
+    pl::ast::DesignSize,
+    Char, Header, NamedParam, NextLargerProgram, NextLargerProgramWarning, Number, ParameterNumber,
+    Params,
 };
 
 pub mod ast;
@@ -159,7 +161,9 @@ impl File {
                     file.header.checksum = Some(v.data);
                 }
                 ast::Root::DesignSize(v) => {
-                    file.header.design_size = v.data;
+                    if let DesignSize::Valid(design_size) = v.data {
+                        file.header.design_size = design_size;
+                    }
                 }
                 ast::Root::DesignUnits(v) => {
                     file.design_units = v.data;
@@ -536,7 +540,14 @@ impl File {
             roots.push(ast::Root::CodingScheme(scheme.clone().into()));
         }
         roots.extend([
-            ast::Root::DesignSize(self.header.design_size.into()),
+            ast::Root::DesignSize(
+                if self.header.design_size_valid {
+                    DesignSize::Valid(self.header.design_size)
+                } else {
+                    DesignSize::Invalid
+                }
+                .into(),
+            ),
             ast::Root::Comment(vec!["DESIGNSIZE IS IN POINTS".into()]),
             ast::Root::Comment(vec!["OTHER SIZES ARE MULTIPLES OF DESIGNSIZE".into()]),
             ast::Root::Checksum(self.header.checksum.unwrap_or_default().into()),

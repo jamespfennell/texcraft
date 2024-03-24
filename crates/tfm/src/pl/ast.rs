@@ -4,9 +4,7 @@
 
 use super::cst;
 use super::error::ParseError;
-use crate::{
-    ligkern::lang::PostLigOperation, Char, DesignSize, Face, NamedParam, Number, ParameterNumber,
-};
+use crate::{ligkern::lang::PostLigOperation, Char, Face, NamedParam, Number, ParameterNumber};
 use std::ops::Range;
 
 /// Abstract syntax tree for property list files
@@ -1166,6 +1164,34 @@ impl Parse for Number {
     }
     fn to_string(self, _: &LowerOpts) -> Option<String> {
         Some(format!["R {self}"])
+    }
+}
+
+/// Design size of the font.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DesignSize {
+    Valid(Number),
+    Invalid,
+}
+
+impl Default for DesignSize {
+    fn default() -> Self {
+        DesignSize::Valid(Number::UNITY * 10)
+    }
+}
+
+impl DesignSize {
+    pub fn get(&self) -> Number {
+        match self {
+            DesignSize::Valid(v) => *v,
+            DesignSize::Invalid => Number::UNITY * 10,
+        }
+    }
+}
+
+impl From<Number> for DesignSize {
+    fn from(value: Number) -> Self {
+        Self::Valid(value)
     }
 }
 

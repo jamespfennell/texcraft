@@ -170,13 +170,15 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
     if let Some(family) = &mut file.header.font_family {
         validate_string(family, 19, &mut warnings);
     }
-    if file.header.design_size.get() < Number::ZERO {
+    if file.header.design_size < Number::ZERO {
         warnings.push(ValidationWarning::DesignSizeIsNegative);
-        file.header.design_size = DesignSize::Invalid;
+        file.header.design_size = Number::UNITY * 10;
+        file.header.design_size_valid = false;
     }
-    if file.header.design_size.get() < Number::UNITY {
+    if file.header.design_size < Number::UNITY {
         warnings.push(ValidationWarning::DesignSizeIsTooSmall);
-        file.header.design_size = DesignSize::Invalid;
+        file.header.design_size = Number::UNITY * 10;
+        file.header.design_size_valid = false;
     }
 
     for (i, elem) in file.params.0.iter_mut().enumerate() {

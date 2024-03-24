@@ -178,7 +178,8 @@ pub struct Header {
     /// In TeX82, this is stored in the `font_check` array (TeX82.2021.549).
     pub checksum: Option<u32>,
     /// In TeX82, this is stored in the `font_dsize` array (TeX82.2021.549).
-    pub design_size: DesignSize,
+    pub design_size: Number,
+    pub design_size_valid: bool,
     pub character_coding_scheme: Option<String>,
     pub font_family: Option<String>,
     pub seven_bit_safe: Option<bool>,
@@ -191,30 +192,6 @@ pub struct Font {
     _todo: bool,
 }
 
-/// Design size of the font.
-// TODO: instead of having a specific type, consider adding another boolean field to the header
-// that specifies how the design size should be serialized.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DesignSize {
-    Valid(Number),
-    Invalid,
-}
-
-impl Default for DesignSize {
-    fn default() -> Self {
-        DesignSize::Valid(Number::UNITY * 10)
-    }
-}
-
-impl DesignSize {
-    pub fn get(&self) -> Number {
-        match self {
-            DesignSize::Valid(v) => *v,
-            DesignSize::Invalid => Number::UNITY * 10,
-        }
-    }
-}
-
 impl Header {
     /// Returns the default header when parsing property list files.
     ///
@@ -222,7 +199,8 @@ impl Header {
     pub fn pl_default() -> Header {
         Header {
             checksum: None,
-            design_size: Default::default(),
+            design_size: Number::UNITY * 10,
+            design_size_valid: true,
             character_coding_scheme: Some("UNSPECIFIED".into()),
             font_family: Some("UNSPECIFIED".into()),
             seven_bit_safe: None,
@@ -237,19 +215,14 @@ impl Header {
     pub fn tfm_default() -> Header {
         Header {
             checksum: Some(0),
-            design_size: DesignSize::Valid(Number::ZERO),
+            design_size: Number::ZERO,
+            design_size_valid: true,
             character_coding_scheme: None,
             font_family: None,
             seven_bit_safe: None,
             face: None,
             additional_data: vec![],
         }
-    }
-}
-
-impl From<Number> for DesignSize {
-    fn from(value: Number) -> Self {
-        Self::Valid(value)
     }
 }
 
