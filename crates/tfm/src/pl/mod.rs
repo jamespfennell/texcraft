@@ -23,7 +23,7 @@ pub mod ast;
 pub mod cst;
 mod error;
 pub mod lexer;
-pub use error::ParseError;
+pub use error::*;
 
 /// Maximum number of lig/kern instructions in a property list file.
 ///
@@ -98,6 +98,24 @@ pub struct File {
     pub unset_char_tags: BTreeMap<Char, u8>,
     pub lig_kern_program: ligkern::lang::Program,
     pub params: Vec<Number>,
+
+    /// Additional widths that appear in the plst file but not appear in the fully parsed file.
+    ///
+    /// This can happen due to the following plst listing:
+    /// ```txt
+    /// (CHARACTER C X (CHARWD D 8.0))
+    /// (CHARACTER C X (CHARWD D 9.0))
+    /// ```
+    /// In this case the width `8.0` is not in the fully parsed file because it is overwritten
+    ///     by `9.0`.
+    /// However pltotf still writes the `8.0` width to the .tfm file.
+    pub additional_widths: Vec<Number>,
+    /// Additional heights; similar to additional widths.
+    pub additional_heights: Vec<Number>,
+    /// Additional depths; similar to additional widths.
+    pub additional_depths: Vec<Number>,
+    /// Additional italic corrections; similar to additional widths.
+    pub additional_italics: Vec<Number>,
 }
 
 impl Default for File {
@@ -110,13 +128,17 @@ impl Default for File {
             unset_char_tags: Default::default(),
             lig_kern_program: Default::default(),
             params: Default::default(),
+            additional_widths: vec![],
+            additional_heights: vec![],
+            additional_depths: vec![],
+            additional_italics: vec![],
         }
     }
 }
 
 impl File {
     /// Build a File from PL source code.
-    pub fn from_pl_source_code(source: &str) -> (File, Vec<ParseError>) {
+    pub fn from_pl_source_code(source: &str) -> (File, Vec<ParseWarning>) {
         let (ast, mut errors) = ast::Ast::from_pl_source_code(source);
         let file = File::from_ast(ast, &mut errors);
         (file, errors)
@@ -136,6 +158,7 @@ impl File {
 
     /// Clear all lig/kern data from the file.
     pub fn clear_lig_kern_data(&mut self) {
+        // PLtoTF.2014.125
         self.char_tags = self
             .char_tags
             .iter()
@@ -144,11 +167,11 @@ impl File {
                 _ => Some((*c, tag.clone())),
             })
             .collect();
-        self.lig_kern_program.instructions = vec![];
+        self.lig_kern_program = Default::default();
     }
 
     /// Build a File from an AST.
-    pub fn from_ast(ast: ast::Ast, errors: &mut Vec<error::ParseError>) -> File {
+    pub fn from_ast(ast: ast::Ast, errors: &mut Vec<error::ParseWarning>) -> File {
         let mut file: File = Default::default();
         let mut lig_kern_precedes = false;
 
@@ -180,7 +203,11 @@ impl File {
                     file.header.seven_bit_safe = Some(v.data);
                 }
                 ast::Root::Header(v) => match v.left.0.checked_sub(18) {
-                    None => errors.push(ParseError::InvalidHeaderIndex { span: v.left_span }),
+                    None => errors.push(ParseWarning {
+                        span: v.left_span.clone(),
+                        knuth_pltotf_offset: Some(v.left_span.end),
+                        kind: ParseWarningKind::HeaderIndexIsTooSmall,
+                    }),
                     Some(i) => {
                         let i = i as usize;
                         if file.header.additional_data.len() <= i {
@@ -214,7 +241,11 @@ impl File {
                                 file.lig_kern_program.instructions.push(instruction);
                             } else {
                                 // TODO: add a test for this case
-                                errors.push(error::ParseError::LigTableTooLong { span });
+                                errors.push(error::ParseWarning {
+                                    span,
+                                    knuth_pltotf_offset: None,
+                                    kind: ParseWarningKind::LigTableIsTooBig,
+                                });
                             }
                         };
                         match node {
@@ -296,16 +327,29 @@ impl File {
                     for node in b.children {
                         match node {
                             ast::Character::Width(v) => {
-                                char_dimens.width = v.data;
+                                if let Some(additional_width) =
+                                    char_dimens.width.replace(v.data.unwrap_or(Number::ZERO))
+                                {
+                                    file.additional_widths.push(additional_width);
+                                }
                             }
                             ast::Character::Height(v) => {
-                                char_dimens.height = Some(v.data);
+                                if let Some(additional_height) = char_dimens.height.replace(v.data)
+                                {
+                                    file.additional_heights.push(additional_height);
+                                }
                             }
                             ast::Character::Depth(v) => {
-                                char_dimens.depth = Some(v.data);
+                                if let Some(additional_depth) = char_dimens.depth.replace(v.data) {
+                                    file.additional_depths.push(additional_depth);
+                                }
                             }
                             ast::Character::ItalicCorrection(v) => {
-                                char_dimens.italic_correction = Some(v.data);
+                                if let Some(additional_italic) =
+                                    char_dimens.italic_correction.replace(v.data)
+                                {
+                                    file.additional_italics.push(additional_italic);
+                                }
                             }
                             ast::Character::NextLarger(c) => {
                                 // TODO: warning if tag != CharTag::None
@@ -342,6 +386,15 @@ impl File {
             }
         }
 
+        // In pltotf the file is parsed in a single pass, whereas here we parse it in at least 2
+        // passes (CST, then AST). As a result some of the warnings will be out of order versus
+        // pltotf - e.g., all CST level warnings will come first, whereas in pltotf the warnings are
+        // interleaved depending on where they appear in the file. This is easy to fix.
+        errors.sort_by_key(|w| {
+            w.knuth_pltotf_offset
+                .expect("all warnings generated so far have an offset populated")
+        });
+
         // PLtoTF.2014.116
         if let Some(final_instruction) = file.lig_kern_program.instructions.last_mut() {
             if final_instruction.next_instruction == Some(0) {
@@ -358,7 +411,11 @@ impl File {
             )
             .1
             {
-                errors.push(ParseError::InfiniteLoopInLigKernProgram(err));
+                errors.push(ParseWarning {
+                    span: 0..0, // todo
+                    knuth_pltotf_offset: None,
+                    kind: ParseWarningKind::CycleInLigKernProgram(err),
+                });
                 file.clear_lig_kern_data();
             }
             file.lig_kern_program
@@ -388,34 +445,54 @@ impl File {
                             },
                         );
                     }
-                    NextLargerProgramWarning::InfiniteLoop(c) => {
+                    NextLargerProgramWarning::InfiniteLoop { original, .. } => {
                         let discriminant = file
                             .char_tags
-                            .remove(c)
+                            .remove(original)
                             .and_then(|t| t.list())
                             .expect("this char has a NEXTLARGER SPEC");
-                        file.unset_char_tags.insert(*c, discriminant.0);
+                        file.unset_char_tags.insert(*original, discriminant.0);
                     }
                 }
                 let span = next_larger_span
                     .get(&warning.bad_char())
                     .cloned()
                     .expect("every char with a next larger tag had a NEXTLARGER AST node");
-                errors.push(ParseError::NextLargerWarning { warning, span });
+                errors.push(ParseWarning {
+                    span,
+                    knuth_pltotf_offset: None,
+                    kind: ParseWarningKind::CycleInNextLargerProgram(warning),
+                });
             }
             program.is_seven_bit_safe()
         };
 
-        let extensible_seven_bit_safe = file
-            .char_tags
+        // PLtoTF.2014.112
+        let mut extensible_seven_bit_safe = true;
+        file.char_tags
             .iter()
-            .filter(|(c, _)| c.is_seven_bit())
-            .filter_map(|(_, t)| t.extension())
-            .all(|e| e.is_seven_bit());
+            .filter_map(|(c, t)| t.extension().map(|t| (c, t)))
+            .for_each(|(c, e)| {
+                if c.is_seven_bit() && !e.is_seven_bit() {
+                    extensible_seven_bit_safe = false;
+                }
+                for c in e.chars() {
+                    if let std::collections::btree_map::Entry::Vacant(v) = file.char_dimens.entry(c)
+                    {
+                        v.insert(Default::default());
+                        // todo warning
+                    };
+                }
+            });
+
         let seven_bit_safe =
             lig_kern_seven_bit_safe && next_larger_seven_bit_safe && extensible_seven_bit_safe;
         if file.header.seven_bit_safe == Some(true) && !seven_bit_safe {
-            errors.push(ParseError::NotReallySevenBitSafe);
+            errors.push(ParseWarning {
+                span: 0..0, //todo,
+                knuth_pltotf_offset: None,
+                kind: ParseWarningKind::NotReallySevenBitSafe,
+            });
         }
         file.header.seven_bit_safe = Some(seven_bit_safe);
 
@@ -498,6 +575,10 @@ impl From<crate::format::File> for File {
             unset_char_tags: Default::default(),
             lig_kern_program,
             params: tfm_file.params,
+            additional_widths: vec![],
+            additional_heights: vec![],
+            additional_depths: vec![],
+            additional_italics: vec![],
         }
     }
 }
@@ -1202,12 +1283,10 @@ mod tests {
             char_extensible_recipe_empty,
             "(CHARACTER C r (VARCHAR))",
             File {
-                char_dimens: BTreeMap::from([(
-                    'r'.try_into().unwrap(),
-                    CharDimensions {
-                        ..Default::default()
-                    }
-                )]),
+                char_dimens: BTreeMap::from([
+                    (Char(0), Default::default(),),
+                    ('r'.try_into().unwrap(), Default::default(),),
+                ]),
                 char_tags: BTreeMap::from([(
                     'r'.try_into().unwrap(),
                     CharTag::Extension(Default::default()),
@@ -1219,12 +1298,13 @@ mod tests {
             char_extensible_recipe_data,
             "(CHARACTER C r (VARCHAR (TOP O 1) (MID O 2) (BOT O 3) (REP O 4)))",
             File {
-                char_dimens: BTreeMap::from([(
-                    'r'.try_into().unwrap(),
-                    CharDimensions {
-                        ..Default::default()
-                    }
-                )]),
+                char_dimens: BTreeMap::from([
+                    (Char(1), Default::default(),),
+                    (Char(2), Default::default(),),
+                    (Char(3), Default::default(),),
+                    (Char(4), Default::default(),),
+                    ('r'.try_into().unwrap(), Default::default(),),
+                ]),
                 char_tags: BTreeMap::from([(
                     'r'.try_into().unwrap(),
                     CharTag::Extension(ExtensibleRecipe {

@@ -172,6 +172,8 @@ impl CompiledProgram {
 }
 
 /// An error returned from lig/kern compilation.
+///
+/// TODO: rename Cycle everywhere including the docs
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InfiniteLoopError {
     /// The pair of characters the starts the infinite loop.

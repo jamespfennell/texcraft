@@ -1,0 +1,151 @@
+(COMMENT this is a property list file that contains almost all errors raised in pltotf)
+
+(COMMENT NonAsciiCharacter Ë)
+(COMMENT NonAsciiCharacter (tab)		)
+
+(COMMENT errors related to 8-bit integers and parameter indices)
+(FONTDIMEN
+    (COMMENT ParameterNumberIsZero)
+    (PARAMETER D 0 D 5)
+    (COMMENT ParameterNumberTooBig)
+    (PARAMETER D 255 D 5)
+    (COMMENT SmallIntegerTooBig (decimal))
+    (PARAMETER D 256 D 5)
+    (COMMENT SmallIntegerTooBig (decimal))
+    (PARAMETER D 2566666666 D 5)
+    (COMMENT SmallIntegerTooBig (octal))
+    (PARAMETER O 456 D 5)
+    (PARAMETER O 456 D 5     )
+    (COMMENT InvalidFaceCode 1)
+    (PARAMETER F XXX D 5)
+    (COMMENT InvalidFaceCode 2)
+    (PARAMETER F BXX D 5)
+    (COMMENT InvalidFaceCode 1)
+    (PARAMETER F BIX D 5)
+    (COMMENT SmallIntegerTooBig (hexadecimal))
+    (PARAMETER H 256 D 5)
+    (COMMENT InvalidPrefixForSmallInteger)
+    (PARAMETER prefix 0 D 5)
+    (COMMENT InvalidOctalDigit - no specific error)
+    (PARAMETER O Z D 5)
+    (PARAMETER O 0Z D 5)
+    (PARAMETER O A D 5)
+    (COMMENT InvalidOctalDigit - no specific error)
+    (PARAMETER H Z D 5)
+    (PARAMETER H 0Z D 5)
+    (COMMENT JunkAfterPropertyValue)
+    (PARAMETER O 1 D 1junk)
+    (PARAMETER O 1 D 1j)
+    (PARAMETER O 1 D 1   junk)
+    (PARAMETER O 1 D 1   junk    )
+    )
+
+(COMMENT InvalidPrefixForDecimalNumber)
+(DESIGNSIZE W 2047.9999999)
+(DESIGNSIZE    W 2047.9999999)
+(DESIGNSIZE)
+(DESIGNSIZE    )
+
+(COMMENT errors related to 32-bit integers)
+(COMMENT InvalidPrefixForInteger)
+(CHECKSUM prefix 0)
+(COMMENT IntegerTooBig (octal))
+(CHECKSUM H 5555555555555555555)
+(COMMENT IntegerTooBig (hexadecimal))
+(CHECKSUM O 5555555555555555555)
+(COMMENT InvalidOctalDigit - no specific error)
+(CHECKSUM H Z)
+(CHECKSUM H 0Z)
+(COMMENT InvalidOctalDigit - no specific error)
+(CHECKSUM O Z)
+(CHECKSUM O 0Z)
+(CHECKSUM O A)
+(CHECKSUM O 1A)
+(CHECKSUM O 1A1)
+(COMMENT JunkAfterPropertyValue)
+(CHECKSUM O 111a)
+(CHECKSUM O 111aaaa)
+(CHECKSUM O 111j)
+(CHECKSUM O 111junk)
+(CHECKSUM O 111    junk)
+(CHECKSUM O 111    junk    )
+
+(COMMENT InvalidBoolean)
+(SEVENBITSAFEFLAG MAYBE)
+
+(COMMENT EmptyCharacterValue and NonAsciiCharacter)
+(CHARACTER C)
+(CHARACTER C  (CHARWD D 6))
+(CHARACTER C 	(CHARWD D 7)) (COMMENT <- there is 1 tab here)
+(CHARACTER C 		 (CHARWD D 8)) (COMMENT <- there are 2 tabs here)
+
+(COMMENT JunkAfterPropertyValue)
+(CHARACTER C O junk (CHARWD D 6.1))
+
+(COMMENT not a reported error, but overwriting char data.
+    The main symptom of this is additional dimensions in the width/height/etc arrays)
+(CHARACTER C O
+    (CHARWD D 6.1)
+    (CHARHT D 6.2)
+    (CHARDP D 6.3)
+    (CHARIC D 6.4)
+    )
+(CHARACTER C O
+    (CHARWD D 6.5)
+    (CHARHT D 6.6)
+    (CHARDP D 6.7)
+    (CHARIC D 6.8)
+    )
+
+(COMMENT NextLargerWarning for a cycle: A>B and B>A)
+(CHARACTER C A
+    (NEXTLARGER C B)
+    (COMMENT JunkInPropertyList)
+    some trash here
+    )
+(CHARACTER C B
+    (NEXTLARGER C A))
+
+(COMMENT UnexpectedRightParenthesis)
+)
+
+(COMMENT NextLargerWarning for an undefined character TODO reenable
+    (CHARACTER C X
+        (NEXTLARGER C U)
+        )
+    )
+
+(COMMENT InvalidPropertyName at every level)
+(COMMENT InvalidPropertyName at the root level)
+(UNDEFINED D 0 D 5)
+(CHARACTER C Y
+    (COMMENT InvalidPropertyName in a CHARACTER list)
+    (UNDEFINED D 0 D 5)
+    (VARCHAR
+        (COMMENT InvalidPropertyName in a VARCHAR list)
+        (UNDEFINED D 0 D 5)
+        )
+    )
+(FONTDIMEN
+    (COMMENT InvalidPropertyName in a FONTDIMEN list)
+    (UNDEFINED D 0 D 5)
+    )
+(LIGTABLE
+    (COMMENT InvalidPropertyName in a LIGTABLE list)
+    (UNDEFINED D 0 D 5)
+    )
+
+(COMMENT InfiniteLoopInLigKernProgram)
+(LIGTABLE
+    (LABEL BOUNDARYCHAR)
+    (/LIG C A C A)
+    )
+
+(COMMENT HeaderIndexIsTooSmall)
+(HEADER O 1 O 17)
+
+(COMMENT UnbalancedOpeningParenthesis
+    this needs to be at the end of the file so as not to affect other errors)
+(unbalanced
+    opening
+    parenthesis

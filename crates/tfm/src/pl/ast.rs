@@ -3,7 +3,7 @@
 //! The property list [AST](Ast) is a fully typed representation of a property list file.
 
 use super::cst;
-use super::error::ParseError;
+use super::error::*;
 use crate::{ligkern::lang::PostLigOperation, Char, Face, NamedParameter, Number};
 use std::ops::Range;
 
@@ -11,11 +11,12 @@ use std::ops::Range;
 ///
 /// This is simply a list of [`Root`] nodes.
 #[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Ast(pub Vec<Root>);
 
 impl Ast {
     /// Build an AST directly from source code.
-    pub fn from_pl_source_code(source: &str) -> (Ast, Vec<ParseError>) {
+    pub fn from_pl_source_code(source: &str) -> (Ast, Vec<ParseWarning>) {
         let lexer = super::lexer::Lexer::new(source);
         let mut errors = vec![];
         let cst = cst::Cst::from_lexer(lexer, &mut errors);
@@ -24,7 +25,7 @@ impl Ast {
     }
 
     /// Build an AST from a CST.
-    pub fn from_cst(cst: cst::Cst, errors: &mut Vec<ParseError>) -> Vec<Root> {
+    pub fn from_cst(cst: cst::Cst, errors: &mut Vec<ParseWarning>) -> Vec<Root> {
         cst.0
             .into_iter()
             .filter_map(|c| Root::build(c, errors))
@@ -60,6 +61,16 @@ impl<D> From<D> for SingleValue<D> {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+impl<'a, D> arbitrary::Arbitrary<'a> for SingleValue<D>
+where
+    D: arbitrary::Arbitrary<'a>,
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(D::arbitrary(u)?.into())
+    }
+}
+
 /// Value of a leaf node in the AST that contains two pieces of data.
 ///
 /// An example of this node is the `HEADER` entry, which contains a 8-bit header index
@@ -84,6 +95,17 @@ impl<D, E> From<(D, E)> for TupleValue<D, E> {
             right: value.1,
             right_span: 0..0,
         }
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+impl<'a, D, E> arbitrary::Arbitrary<'a> for TupleValue<D, E>
+where
+    D: arbitrary::Arbitrary<'a>,
+    E: arbitrary::Arbitrary<'a>,
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(<(D, E)>::arbitrary(u)?.into())
     }
 }
 
@@ -113,6 +135,17 @@ impl<D, E> From<(D, Vec<E>)> for Branch<D, E> {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+impl<'a, D, E> arbitrary::Arbitrary<'a> for Branch<D, E>
+where
+    D: arbitrary::Arbitrary<'a>,
+    E: arbitrary::Arbitrary<'a>,
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(<(D, Vec<E>)>::arbitrary(u)?.into())
+    }
+}
+
 /// The first reason we have this trait is to make it possible to invoke the `from`
 /// associated function of a type without specifying the type itself.
 /// I.e., instead of writing `LeafValue::from` we can write `FromCstNode::from`.
@@ -120,11 +153,12 @@ impl<D, E> From<(D, Vec<E>)> for Branch<D, E> {
 /// the type name to the macro.
 ///
 /// Second, the implementations impose trait bounds on `D` and `E` in terms of private traits.
-/// Doing this kinds of bounds on a regular impl block (private trait in public interface (error E0445)).
+/// Doing this kinds of bounds on a regular impl block is not allowed by the Rust compiler
+///     (it raises the private trait in public interface error (error E0445)).
 /// But with a trait impl we get away with it.
 trait ToFromCstNode: Sized {
-    fn from(p: cst::RegularNodeValue, errors: &mut Vec<ParseError>) -> Option<Self>;
-    fn to(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue;
+    fn from_cst_node(p: cst::RegularNodeValue, errors: &mut Vec<ParseWarning>) -> Option<Self>;
+    fn to_cst_node(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue;
 }
 
 struct LowerOpts {
@@ -132,14 +166,16 @@ struct LowerOpts {
 }
 
 impl<D: TryParse> ToFromCstNode for SingleValue<D> {
-    fn from(p: cst::RegularNodeValue, errors: &mut Vec<ParseError>) -> Option<Self> {
+    fn from_cst_node(p: cst::RegularNodeValue, errors: &mut Vec<ParseWarning>) -> Option<Self> {
         let (mut input, _) = Input::new(p, errors);
-        D::try_parse(&mut input).map(|data| Self {
+        let result = D::try_parse(&mut input).map(|data| Self {
             data: data.0,
             data_span: data.1,
-        })
+        });
+        input.find_junk(false);
+        result
     }
-    fn to(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue {
+    fn to_cst_node(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue {
         cst::RegularNodeValue {
             key: key.into(),
             key_span: 0..0,
@@ -151,13 +187,14 @@ impl<D: TryParse> ToFromCstNode for SingleValue<D> {
 }
 
 impl<D: TryParse, E: Parse> ToFromCstNode for TupleValue<D, E> {
-    fn from(p: cst::RegularNodeValue, errors: &mut Vec<ParseError>) -> Option<Self> {
+    fn from_cst_node(p: cst::RegularNodeValue, errors: &mut Vec<ParseWarning>) -> Option<Self> {
         let (mut input, _) = Input::new(p, errors);
         let (left, left_span) = match D::try_parse(&mut input) {
             None => return None,
             Some(first) => first,
         };
         let (right, right_span) = E::parse(&mut input);
+        input.find_junk(false);
         Some(Self {
             left,
             left_span,
@@ -165,7 +202,7 @@ impl<D: TryParse, E: Parse> ToFromCstNode for TupleValue<D, E> {
             right_span,
         })
     }
-    fn to(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue {
+    fn to_cst_node(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue {
         cst::RegularNodeValue {
             key: key.into(),
             key_span: 0..0,
@@ -181,10 +218,11 @@ impl<D: TryParse, E: Parse> ToFromCstNode for TupleValue<D, E> {
 }
 
 impl<D: Parse, E: Node> ToFromCstNode for Branch<D, E> {
-    fn from(p: cst::RegularNodeValue, errors: &mut Vec<ParseError>) -> Option<Self> {
+    fn from_cst_node(p: cst::RegularNodeValue, errors: &mut Vec<ParseWarning>) -> Option<Self> {
         {
             let (mut input, children) = Input::new(p, errors);
             let (data, data_span) = D::parse(&mut input);
+            input.find_junk(true);
             Some(Branch::<D, E> {
                 data,
                 data_span,
@@ -195,7 +233,7 @@ impl<D: Parse, E: Node> ToFromCstNode for Branch<D, E> {
             })
         }
     }
-    fn to(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue {
+    fn to_cst_node(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue {
         cst::RegularNodeValue {
             key: key.into(),
             key_span: 0..0,
@@ -212,9 +250,9 @@ impl<D: Parse, E: Node> ToFromCstNode for Branch<D, E> {
 }
 
 trait Node: Sized {
-    fn build_regular(p: cst::RegularNodeValue, errors: &mut Vec<ParseError>) -> Option<Self>;
+    fn build_regular(p: cst::RegularNodeValue, errors: &mut Vec<ParseWarning>) -> Option<Self>;
     fn build_comment(_: Vec<cst::BalancedElem>) -> Self;
-    fn build(n: cst::Node, errors: &mut Vec<ParseError>) -> Option<Self> {
+    fn build(n: cst::Node, errors: &mut Vec<ParseWarning>) -> Option<Self> {
         match n.value {
             cst::NodeValue::Comment(c) => Some(Node::build_comment(c)),
             cst::NodeValue::Regular(r) => Node::build_regular(r, errors),
@@ -235,22 +273,25 @@ macro_rules! node_impl {
         }
 
         impl Node for $type {
-            fn build_regular(mut r: cst::RegularNodeValue, errors: &mut Vec<ParseError>) -> Option<Self> {
+            fn build_regular(mut r: cst::RegularNodeValue, errors: &mut Vec<ParseWarning>) -> Option<Self> {
                 r.key.make_ascii_uppercase();
                 match r.key.as_str() {
                     $(
                         $type::$key => {
-                            match ToFromCstNode::from(r, errors) {
+                            match ToFromCstNode::from_cst_node(r, errors) {
                                 None => None,
                                 Some(v) => Some($type::$variant( $( $prefix, )? v )),
                             }
                         },
                     )+
                     _ => {
-                        errors.push(ParseError::InvalidPropertyName {
-                            name: r.key.into(),
-                            name_span: r.key_span.clone(),
-                            allowed_property_names: $type::ALL_PROPERTY_NAMES,
+                        errors.push(ParseWarning{
+                            span: r.key_span.clone(),
+                            knuth_pltotf_offset: Some(r.key_span.end),
+                            kind: ParseWarningKind::InvalidPropertyName {
+                                provided_name: r.key.into(),
+                                allowed_property_names: $type::ALL_PROPERTY_NAMES,
+                            }
                         });
                         None
                     },
@@ -263,7 +304,7 @@ macro_rules! node_impl {
                 let value = match self {
                     $(
                         $type::$variant($( $prefix, )? v) => {
-                            cst::NodeValue::Regular(v.to($str, opts))
+                            cst::NodeValue::Regular(v.to_cst_node($str, opts))
                         }
                     )+
                     $type::Comment(balanced_elements) => {
@@ -290,6 +331,7 @@ macro_rules! node_impl {
 ///
 /// The documentation on each variant is based on the documentation in PFtoTF.2014.9.
 #[derive(PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum Root {
     /// The checksum value is used to identify a particular version of a font;
     ///     it should match the check sum value stored with the font itself.
@@ -394,6 +436,7 @@ node_impl!(
 ///
 /// The documentation on each variant is based on the documentation in PFtoTF.2014.11.
 #[derive(PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum FontDimension {
     /// A named parameters like `(SLANT R -.25)`.
     NamedParam(NamedParameter, SingleValue<Number>),
@@ -409,6 +452,7 @@ pub enum FontDimension {
 
 /// A [`u8`] that is output in decimal when lowering the AST to a CST.
 #[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct DecimalU8(pub u8);
 
 impl Parse for DecimalU8 {
@@ -423,18 +467,41 @@ impl Parse for DecimalU8 {
 }
 
 #[derive(PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct ParameterNumber(pub u16);
 
 impl TryParse for ParameterNumber {
     fn try_parse(input: &mut Input) -> Option<(Self, Range<usize>)> {
-        let (a, b) = u8::parse(input);
+        input.consume_spaces();
+        let span_start = input.raw_data_span.start;
+        let (a, err_or) = match parse_u8(input) {
+            Ok(u) => (u, None),
+            Err(err) => {
+                input.skip_error(err.clone().into());
+                (0, Some(err))
+            }
+        };
+        let b = span_start..input.raw_data_span.start;
         match a {
             0 => {
-                input.skip_error(ParseError::ParameterNumberIsZero { span: b });
+                input.skip_error(ParseWarning {
+                    span: b.clone(),
+                    knuth_pltotf_offset: Some(match err_or {
+                        // After this error occurs pltotf calls `backup` which shifts
+                        // the scanner back 1 character.
+                        Some(ParseU8Error::SmallIntegerIsTooBig { .. }) => b.end - 1,
+                        _ => b.end,
+                    }),
+                    kind: ParseWarningKind::ParameterNumberIsZero,
+                });
                 None
             }
             u8::MAX => {
-                input.skip_error(ParseError::ParameterNumberTooBig { span: b });
+                input.skip_error(ParseWarning {
+                    span: b.clone(),
+                    knuth_pltotf_offset: Some(b.end),
+                    kind: ParseWarningKind::ParameterNumberIsTooBig,
+                });
                 None
             }
             n => Some((ParameterNumber(n as u16), b)),
@@ -523,6 +590,7 @@ node_impl!(
 ///
 /// The documentation on each variant is based on the documentation in PFtoTF.2014.12.
 #[derive(PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum Character {
     /// The character's width in design units.
     Width(SingleValue<Option<Number>>),
@@ -564,6 +632,7 @@ node_impl!(
 ///
 /// The documentation on each variant is based on the documentation in PFtoTF.2014.12.
 #[derive(PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum ExtensibleCharacter {
     /// The top piece of an extensible character, or 0 if the top piece is absent.
     Top(SingleValue<Char>),
@@ -597,6 +666,7 @@ node_impl!(
 ///
 /// The documentation here and on each variant is based on the documentation in PFtoTF.2014.13.
 #[derive(PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum LigTable {
     /// A label specifies that the program for the stated character value starts here.
     /// The integer must be the number of a character in the font;
@@ -653,6 +723,7 @@ pub enum LigTable {
 
 /// Value of a label in a lig table.
 #[derive(PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum LigTableLabel {
     /// A specific character.
     Char(Char),
@@ -665,7 +736,7 @@ impl Parse for LigTableLabel {
         match input.peek() {
             Some('B' | 'b') => {
                 let span_start = input.raw_data_offset;
-                input.next();
+                input.skip_to_end();
                 (LigTableLabel::BoundaryChar, span_start..span_start + 1)
             }
             _ => {
@@ -747,15 +818,16 @@ impl<T: Parse> TryParse for T {
     }
 }
 
+#[derive(Debug)]
 struct Input<'a> {
     raw_data: String,
     raw_data_offset: usize,
     raw_data_span: Range<usize>,
-    errors: &'a mut Vec<ParseError>,
+    errors: &'a mut Vec<ParseWarning>,
 }
 
 impl<'a> Input<'a> {
-    fn new(p: cst::RegularNodeValue, errors: &'a mut Vec<ParseError>) -> (Self, Vec<cst::Node>) {
+    fn new(p: cst::RegularNodeValue, errors: &'a mut Vec<ParseWarning>) -> (Self, Vec<cst::Node>) {
         (
             Input {
                 raw_data: p.data.unwrap_or_default(),
@@ -766,13 +838,12 @@ impl<'a> Input<'a> {
             p.children.unwrap_or_default(),
         )
     }
-    fn skip_error(&mut self, error: ParseError) {
+    fn skip_error(&mut self, error: ParseWarning) {
         self.errors.push(error);
         self.skip_to_end();
     }
     fn skip_to_end(&mut self) {
-        self.raw_data_offset = self.raw_data.len();
-        self.raw_data_span.start = self.raw_data_span.end;
+        while self.next().is_some() {}
     }
     fn peek(&self) -> Option<char> {
         self.raw_data[self.raw_data_offset..].chars().next()
@@ -794,8 +865,25 @@ impl<'a> Input<'a> {
         assert_eq!(self.raw_data_offset, 0);
         let mut res = String::new();
         std::mem::swap(&mut res, &mut self.raw_data);
-        self.skip_to_end();
+        self.raw_data_span.start = self.raw_data_span.end;
         res
+    }
+    fn find_junk(&mut self, is_branch: bool) {
+        self.consume_spaces();
+        if !self.raw_data_span.is_empty() {
+            let span = self.raw_data_span.clone();
+            let knuth_pltotf_offset = Some(self.raw_data_span.start + 1);
+            let junk: String = self.collect();
+            self.errors.push(ParseWarning {
+                span,
+                knuth_pltotf_offset,
+                kind: if is_branch {
+                    ParseWarningKind::JunkInsidePropertyList { junk }
+                } else {
+                    ParseWarningKind::JunkAfterPropertyValue { junk }
+                },
+            })
+        }
     }
 }
 
@@ -804,8 +892,15 @@ impl<'a> Iterator for Input<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let res = self.raw_data[self.raw_data_offset..].chars().next();
         if let Some(c) = res {
+            if !c.is_ascii_graphic() && c != ' ' {
+                self.errors.push(ParseWarning {
+                    span: self.raw_data_span.start..self.raw_data_span.start + 1,
+                    knuth_pltotf_offset: Some(self.raw_data_span.start + 1),
+                    kind: ParseWarningKind::NonVisibleAsciiCharacter { character: c },
+                });
+            }
             self.raw_data_offset += c.len_utf8();
-            self.raw_data_span.start += c.len_utf8();
+            self.raw_data_span.start += 1;
         }
         res
     }
@@ -823,45 +918,59 @@ impl Parse for () {
 impl Parse for u32 {
     // PLtoTF.2014.59-60
     fn parse(input: &mut Input) -> (Self, Range<usize>) {
+        input.consume_spaces();
         let start_span = input.raw_data_span.start;
         let radix = match input.next() {
-            Some('O' | 'o') => 8,
+            Some('O' | 'o') => 8_u8,
             Some('H' | 'h') => 16,
             c => {
                 let span = input.last_span(c);
-                input.skip_error(ParseError::InvalidPrefixForInteger { span: span.clone() });
+                input.skip_error(ParseWarning {
+                    span: span.clone(),
+                    knuth_pltotf_offset: Some(span.end),
+                    kind: ParseWarningKind::InvalidPrefixForInteger { prefix: c },
+                });
                 return (0, span);
             }
         };
         input.consume_spaces();
         let number_start_span = input.raw_data_span.start;
         let mut acc: u32 = 0;
-        while let Some(c) = input.next() {
+        while let Some(c) = input.peek() {
             let n: u32 = match c.to_digit(16) {
                 None => break,
                 Some(d) => d,
             };
-            if n >= radix {
-                input.skip_error(ParseError::InvalidOctalDigit {
-                    c,
-                    span: input.raw_data_span.start - 1,
+            input.next();
+            if n >= radix as u32 {
+                let span_start = input.raw_data_span.start - 1;
+                input.skip_error(ParseWarning {
+                    span: span_start..span_start + 1,
+                    knuth_pltotf_offset: Some(span_start + 1),
+                    kind: ParseWarningKind::InvalidOctalDigit { invalid_digit: c },
                 });
                 break;
             }
-            match acc.checked_mul(radix).and_then(|acc| acc.checked_add(n)) {
+            match acc
+                .checked_mul(radix as u32)
+                .and_then(|acc| acc.checked_add(n))
+            {
                 None => {
                     // Overflow has occurred.
                     // We advance to the end of the integer constant so that the span in the error is
                     // most accurate.
+                    let knuth_pltotf_offset = input.raw_data_span.start;
                     while let Some(c) = input.peek() {
-                        match c.to_digit(radix) {
+                        match c.to_digit(radix as u32) {
                             None => break,
                             Some(_) => input.next(),
                         };
                     }
                     let end_span = input.raw_data_span.start;
-                    input.skip_error(ParseError::IntegerTooBig {
+                    input.skip_error(ParseWarning {
                         span: number_start_span..end_span,
+                        knuth_pltotf_offset: Some(knuth_pltotf_offset),
+                        kind: ParseWarningKind::IntegerIsTooBig { radix },
                     });
                     break;
                 }
@@ -876,102 +985,17 @@ impl Parse for u32 {
 }
 
 impl Parse for u8 {
-    // PLtoTF.2014.51
     fn parse(input: &mut Input) -> (Self, Range<usize>) {
-        let parse_number = |input: &mut Input, radix: u8| {
-            input.consume_spaces();
-            let start_span = input.raw_data_span.start;
-            let mut acc: u8 = 0;
-            while let Some(c) = input.peek() {
-                let n: u8 = match c.to_digit(radix as u32) {
-                    None => break,
-                    Some(d) => d.try_into().unwrap(),
-                };
-                input.next();
-                match acc.checked_mul(radix).and_then(|l| l.checked_add(n)) {
-                    None => {
-                        // Overflow has occurred.
-                        // We advance to the end of the integer constant so that the span in the error is
-                        // most accurate.
-                        while let Some(c) = input.peek() {
-                            match c.to_digit(radix as u32) {
-                                None => break,
-                                Some(_) => input.next(),
-                            };
-                        }
-                        let end_span = input.raw_data_span.start;
-                        input.skip_error(ParseError::SmallIntegerTooBig {
-                            span: start_span..end_span,
-                            radix,
-                        });
-                        acc = 0;
-                        break;
-                    }
-                    Some(new_acc) => acc = new_acc,
-                }
-            }
-            acc
-        };
+        input.consume_spaces();
         let span_start = input.raw_data_span.start;
-        let u = match input.next() {
-            // PLtoTF.2014.52
-            Some('C' | 'c') => {
-                input.consume_spaces();
-                match input.next() {
-                    Some(c @ ' '..='~') => (c as usize).try_into().unwrap(),
-                    c => {
-                        input.skip_error(ParseError::InvalidCharacterForSmallInteger {
-                            span: input.last_span(c),
-                        });
-                        0
-                    }
-                }
-            }
-            // PLtoTF.2014.52
-            Some('D' | 'd') => parse_number(input, 10),
-            // PLtoTF.2014.53
-            Some('O' | 'o') => parse_number(input, 8),
-            // PLtoTF.2014.54
-            Some('H' | 'h') => parse_number(input, 16),
-            // PLtoTF.2014.55
-            Some('F' | 'f') => {
-                input.consume_spaces();
-                let span_start = input.raw_data_span.start;
-                let mut acc: u8 = match input.next() {
-                    Some('M' | 'm') => 0,
-                    Some('B' | 'b') => 2,
-                    Some('L' | 'l') => 4,
-                    _ => 18,
-                };
-                acc += match input.next() {
-                    Some('R' | 'r') => 0,
-                    Some('I' | 'i') => 1,
-                    _ => 18,
-                };
-                acc += match input.next() {
-                    Some('R' | 'r') => 0,
-                    Some('C' | 'c') => 6,
-                    Some('E' | 'e') => 12,
-                    _ => 18,
-                };
-                if acc >= 18 {
-                    let span_end = input.raw_data_span.start;
-                    input.skip_error(ParseError::InvalidFaceCode {
-                        span: span_start..span_end,
-                    });
-                    acc = 0;
-                }
-                acc
-            }
-            c => {
-                input.skip_error(ParseError::InvalidPrefixForSmallInteger {
-                    span: input.last_span(c),
-                });
+        let u = match parse_u8(input) {
+            Ok(u) => u,
+            Err(err) => {
+                input.skip_error(err.into());
                 0
             }
         };
         let span_end = input.raw_data_span.start;
-        input.consume_spaces();
         (u, span_start..span_end)
     }
     fn to_string(self, _: &LowerOpts) -> Option<String> {
@@ -1055,8 +1079,10 @@ impl TryParse for bool {
             _ => {
                 input.skip_to_end();
                 let span_end = input.raw_data_span.start;
-                input.skip_error(ParseError::InvalidBoolean {
+                input.skip_error(ParseWarning {
                     span: span_start..span_end,
+                    knuth_pltotf_offset: Some(span_start + 1),
+                    kind: ParseWarningKind::InvalidBoolean,
                 });
                 return None;
             }
@@ -1073,12 +1099,17 @@ impl TryParse for bool {
 impl Parse for Number {
     // PLtoTF.2014.62
     fn parse(input: &mut Input) -> (Self, Range<usize>) {
+        input.consume_spaces();
         let span_start = input.raw_data_span.start;
         match input.next() {
             Some('D' | 'd') | Some('R' | 'r') => (),
             c => {
                 let span = input.last_span(c);
-                input.skip_error(ParseError::InvalidPrefixForDecimal { span: span.clone() });
+                input.skip_error(ParseWarning {
+                    span: span.clone(),
+                    knuth_pltotf_offset: Some(span.end),
+                    kind: ParseWarningKind::InvalidPrefixForDecimalNumber,
+                });
                 return (Number::ZERO, span);
             }
         }
@@ -1142,8 +1173,10 @@ impl Parse for Number {
 
         if integer_part >= 2048 || (fractional_part >= Number::UNITY.0 && integer_part == 2047) {
             let span_end = input.raw_data_span.start;
-            input.skip_error(ParseError::DecimalTooLarge {
+            input.skip_error(ParseWarning {
                 span: number_span_start..span_end,
+                knuth_pltotf_offset: Some(number_span_start),
+                kind: ParseWarningKind::DecimalNumberIsTooBig,
             });
             return if integer_part == 2047 {
                 (Number::UNITY, span_start..span_end)
@@ -1171,6 +1204,7 @@ impl Parse for Number {
 
 /// Design size of the font.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum DesignSize {
     Valid(Number),
     Invalid,
@@ -1200,7 +1234,17 @@ impl From<Number> for DesignSize {
 impl Parse for DesignSize {
     fn parse(input: &mut Input) -> (Self, Range<usize>) {
         let (n, r) = Number::parse(input);
-        (n.into(), r)
+        let d = if n < Number::UNITY {
+            input.errors.push(ParseWarning {
+                span: r.start..input.raw_data_span.end,
+                knuth_pltotf_offset: Some(input.raw_data_span.end),
+                kind: ParseWarningKind::DesignSizeIsTooSmall,
+            });
+            DesignSize::Invalid
+        } else {
+            DesignSize::Valid(n)
+        };
+        (d, r)
     }
     fn to_string(self, opts: &LowerOpts) -> Option<String> {
         match self {
@@ -1224,13 +1268,155 @@ impl Parse for Option<Number> {
     }
 }
 
+#[derive(Clone)]
+enum ParseU8Error {
+    SmallIntegerIsTooBig {
+        span: std::ops::Range<usize>,
+        knuth_pltotf_offset: usize,
+        radix: u8,
+    },
+    EmptyCharacterValue {
+        span: std::ops::Range<usize>,
+    },
+    InvalidFaceCode {
+        span: std::ops::Range<usize>,
+    },
+    InvalidPrefixForSmallInteger {
+        span: std::ops::Range<usize>,
+    },
+}
+
+impl From<ParseU8Error> for ParseWarning {
+    fn from(value: ParseU8Error) -> Self {
+        match value {
+            ParseU8Error::SmallIntegerIsTooBig {
+                span,
+                knuth_pltotf_offset,
+                radix,
+            } => ParseWarning {
+                span,
+                knuth_pltotf_offset: Some(knuth_pltotf_offset),
+                kind: ParseWarningKind::SmallIntegerIsTooBig { radix },
+            },
+            ParseU8Error::EmptyCharacterValue { span } => ParseWarning {
+                span: span.clone(),
+                knuth_pltotf_offset: Some(span.end),
+                kind: ParseWarningKind::EmptyCharacterValue,
+            },
+            ParseU8Error::InvalidFaceCode { span } => ParseWarning {
+                span: span.clone(),
+                knuth_pltotf_offset: Some(span.end),
+                kind: ParseWarningKind::InvalidFaceCode,
+            },
+            ParseU8Error::InvalidPrefixForSmallInteger { span } => ParseWarning {
+                span: span.clone(),
+                knuth_pltotf_offset: Some(span.end + 1),
+                kind: ParseWarningKind::InvalidPrefixForSmallInteger,
+            },
+        }
+    }
+}
+
+fn parse_u8(input: &mut Input) -> Result<u8, ParseU8Error> {
+    // PLtoTF.2014.51
+    let parse_number = |input: &mut Input, radix: u8| {
+        input.consume_spaces();
+        let start_span = input.raw_data_span.start;
+        let mut acc: u8 = 0;
+        while let Some(c) = input.peek() {
+            let n: u8 = match c.to_digit(radix as u32) {
+                None => break,
+                Some(d) => d.try_into().unwrap(),
+            };
+            input.next();
+            match acc.checked_mul(radix).and_then(|l| l.checked_add(n)) {
+                None => {
+                    // Overflow has occurred.
+                    // We advance to the end of the integer constant so that the span in the error is
+                    // most accurate.
+                    let knuth_pltotf_offset = input.raw_data_span.start;
+                    while let Some(c) = input.peek() {
+                        match c.to_digit(radix as u32) {
+                            None => break,
+                            Some(_) => input.next(),
+                        };
+                    }
+                    let end_span = input.raw_data_span.start;
+                    return Err(ParseU8Error::SmallIntegerIsTooBig {
+                        span: start_span..end_span,
+                        knuth_pltotf_offset,
+                        radix,
+                    });
+                }
+                Some(new_acc) => acc = new_acc,
+            }
+        }
+        Ok(acc)
+    };
+    let u = match input.next() {
+        // PLtoTF.2014.52
+        Some('C' | 'c') => {
+            input.consume_spaces();
+            match input.next() {
+                None => {
+                    let span = input.last_span(None);
+                    return Err(ParseU8Error::EmptyCharacterValue { span });
+                }
+                Some(c @ ' '..='~') => (c as usize).try_into().unwrap(),
+                // if the character is not a visible ASCII char it is set to invalid=127.
+                _ => 127,
+            }
+        }
+        // PLtoTF.2014.52
+        Some('D' | 'd') => parse_number(input, 10)?,
+        // PLtoTF.2014.53
+        Some('O' | 'o') => parse_number(input, 8)?,
+        // PLtoTF.2014.54
+        Some('H' | 'h') => parse_number(input, 16)?,
+        // PLtoTF.2014.55
+        Some('F' | 'f') => {
+            input.consume_spaces();
+            let span_start = input.raw_data_span.start;
+            let mut acc: u8 = match input.next() {
+                Some('M' | 'm') => 0,
+                Some('B' | 'b') => 2,
+                Some('L' | 'l') => 4,
+                _ => 18,
+            };
+            acc += match input.next() {
+                Some('R' | 'r') => 0,
+                Some('I' | 'i') => 1,
+                _ => 18,
+            };
+            acc += match input.next() {
+                Some('R' | 'r') => 0,
+                Some('C' | 'c') => 6,
+                Some('E' | 'e') => 12,
+                _ => 18,
+            };
+            if acc >= 18 {
+                let span_end = input.raw_data_span.start;
+                return Err(ParseU8Error::InvalidFaceCode {
+                    span: span_start..span_end,
+                });
+            }
+            acc
+        }
+        c => {
+            let span = input.last_span(c);
+            return Err(ParseU8Error::InvalidPrefixForSmallInteger { span });
+        }
+    };
+    Ok(u)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::pl::cst::BalancedElem;
 
     use super::*;
 
-    fn run(source: &str, want: Vec<Root>, want_errs: Vec<ParseError>) {
+    fn run(source: &str, want: Vec<Root>, want_errs: Vec<ParseWarning>) {
         let (got, got_errors) = Ast::from_pl_source_code(source);
         assert_eq!(got_errors, want_errs);
         assert_eq!(got, Ast(want));
@@ -1291,7 +1477,11 @@ mod tests {
             boolean_invalid,
             r"(SEVENBITSAFEFLAG INVALID)",
             vec![],
-            vec![ParseError::InvalidBoolean { span: 18..25 }],
+            vec![ParseWarning {
+                span: 18..25,
+                knuth_pltotf_offset: Some(19),
+                kind: ParseWarningKind::InvalidBoolean,
+            }],
         ),
         (
             one_byte_char_invalid_prefix,
@@ -1300,7 +1490,11 @@ mod tests {
                 data: Char(0),
                 data_span: 14..17
             })],
-            vec![ParseError::InvalidPrefixForSmallInteger { span: 14..15 }],
+            vec![ParseWarning {
+                span: 14..15,
+                knuth_pltotf_offset: Some(16),
+                kind: ParseWarningKind::InvalidPrefixForSmallInteger,
+            }],
         ),
         (
             one_byte_char_no_prefix,
@@ -1309,7 +1503,11 @@ mod tests {
                 data: Char(0),
                 data_span: 13..13,
             })],
-            vec![ParseError::InvalidPrefixForSmallInteger { span: 13..13 }],
+            vec![ParseWarning {
+                span: 13..13,
+                knuth_pltotf_offset: Some(14),
+                kind: ParseWarningKind::InvalidPrefixForSmallInteger,
+            }],
         ),
         (
             one_byte_char,
@@ -1327,8 +1525,27 @@ mod tests {
                 data: Char(0),
                 data_span: 14..15
             })],
-            vec![ParseError::InvalidCharacterForSmallInteger { span: 15..15 }],
+            vec![ParseWarning {
+                span: 15..15,
+                knuth_pltotf_offset: Some(15),
+                kind: ParseWarningKind::EmptyCharacterValue,
+            }],
         ),
+        /*
+        TODO: re-enable when the bug is fixed
+        (
+            invalid_character_value_tab,
+            "(BOUNDARYCHAR C \t)",
+            vec![Root::BoundaryChar(SingleValue {
+                data: Char(0), // probably Char(127)
+                data_span: 14..16
+            })],
+            vec![
+                ParseWarning::NonVisibleAsciiCharacter('\t', 16),
+                ParseWarning::EmptyCharacterValue { span: 16..16 }
+            ],
+        ),
+         */
         (
             one_byte_octal,
             r"(BOUNDARYCHAR O 77)",
@@ -1345,9 +1562,10 @@ mod tests {
                 data: Char(0o0),
                 data_span: 14..20
             })],
-            vec![ParseError::SmallIntegerTooBig {
+            vec![ParseWarning {
                 span: 16..20,
-                radix: 8
+                knuth_pltotf_offset: Some(19),
+                kind: ParseWarningKind::SmallIntegerIsTooBig { radix: 8 }
             }],
         ),
         (
@@ -1366,9 +1584,10 @@ mod tests {
                 data: Char(0),
                 data_span: 14..20
             })],
-            vec![ParseError::SmallIntegerTooBig {
+            vec![ParseWarning {
                 span: 16..20,
-                radix: 10
+                knuth_pltotf_offset: Some(19),
+                kind: ParseWarningKind::SmallIntegerIsTooBig { radix: 10 }
             }],
         ),
         (
@@ -1387,9 +1606,10 @@ mod tests {
                 data: Char(0x0),
                 data_span: 14..20
             })],
-            vec![ParseError::SmallIntegerTooBig {
+            vec![ParseWarning {
                 span: 16..20,
-                radix: 16
+                knuth_pltotf_offset: Some(19),
+                kind: ParseWarningKind::SmallIntegerIsTooBig { radix: 16 }
             }],
         ),
         (
@@ -1408,7 +1628,11 @@ mod tests {
                 data: Char(0),
                 data_span: 14..19
             })],
-            vec![ParseError::InvalidFaceCode { span: 16..19 }],
+            vec![ParseWarning {
+                span: 16..19,
+                knuth_pltotf_offset: Some(19),
+                kind: ParseWarningKind::InvalidFaceCode,
+            }],
         ),
         (
             one_byte_four_byte,
@@ -1446,7 +1670,11 @@ mod tests {
                 data: 0,
                 data_span: 9..9
             })],
-            vec![ParseError::InvalidPrefixForInteger { span: 9..9 }],
+            vec![ParseWarning {
+                span: 9..9,
+                knuth_pltotf_offset: Some(9),
+                kind: ParseWarningKind::InvalidPrefixForInteger { prefix: None },
+            }],
         ),
         (
             four_bytes_invalid_prefix,
@@ -1455,7 +1683,11 @@ mod tests {
                 data: 0,
                 data_span: 10..11
             })],
-            vec![ParseError::InvalidPrefixForInteger { span: 10..11 }],
+            vec![ParseWarning {
+                span: 10..11,
+                knuth_pltotf_offset: Some(11),
+                kind: ParseWarningKind::InvalidPrefixForInteger { prefix: Some('W') },
+            }],
         ),
         (
             four_bytes_too_big,
@@ -1464,7 +1696,11 @@ mod tests {
                 data: 0o6666666666,
                 data_span: 10..30
             })],
-            vec![ParseError::IntegerTooBig { span: 12..30 }],
+            vec![ParseWarning {
+                span: 12..30,
+                knuth_pltotf_offset: Some(23),
+                kind: ParseWarningKind::IntegerIsTooBig { radix: 8 }
+            }],
         ),
         (
             four_bytes_invalid_octal_digit,
@@ -1473,7 +1709,11 @@ mod tests {
                 data: 0o6666,
                 data_span: 10..30
             })],
-            vec![ParseError::InvalidOctalDigit { c: '8', span: 16 }],
+            vec![ParseWarning {
+                span: 16..17,
+                knuth_pltotf_offset: Some(17),
+                kind: ParseWarningKind::InvalidOctalDigit { invalid_digit: '8' }
+            }],
         ),
         (
             fix_word_integer,
@@ -1495,39 +1735,29 @@ mod tests {
         ),
         (
             fix_word_negative,
-            r"(DESIGNSIZE D -11.5)",
-            vec![Root::DesignSize(SingleValue {
-                data: (Number::UNITY * -23 / 2).into(),
-                data_span: 12..19,
-            })],
+            r"(CHARACTER C X (CHARWD D -11.5))",
+            vec![Root::Character(Branch {
+                data: Char::X,
+                data_span: 11..14,
+                children: vec![Character::Width(SingleValue {
+                    data: Some(Number::UNITY * -23 / 2),
+                    data_span: 23..30,
+                })]
+            }),],
             vec![],
         ),
         (
-            fix_word_too_big_1,
-            r"(DESIGNSIZE D 2049.1)",
-            vec![Root::DesignSize(SingleValue {
-                data: Number::ZERO.into(),
-                data_span: 12..20
-            })],
-            vec![ParseError::DecimalTooLarge { span: 14..20 }],
-        ),
-        (
-            fix_word_too_big_2,
+            fix_word_too_big,
             r"(DESIGNSIZE D 2047.9999999)",
             vec![Root::DesignSize(SingleValue {
                 data: Number::UNITY.into(),
                 data_span: 12..26,
             })],
-            vec![ParseError::DecimalTooLarge { span: 14..26 }],
-        ),
-        (
-            fix_word_invalid_prefix,
-            r"(DESIGNSIZE W 2047.9999999)",
-            vec![Root::DesignSize(SingleValue {
-                data: Number::ZERO.into(),
-                data_span: 12..13
-            })],
-            vec![ParseError::InvalidPrefixForDecimal { span: 12..13 }],
+            vec![ParseWarning {
+                span: 14..26,
+                knuth_pltotf_offset: Some(14),
+                kind: ParseWarningKind::DecimalNumberIsTooBig,
+            }],
         ),
         (
             pl_to_tf_section_7_example,

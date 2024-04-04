@@ -152,6 +152,7 @@ impl Operation {
 /// In general all of the post-lig operations are of the form `RetainXMoveY` where `X`
 ///     specifies the characters to retain and `Y` specifies where the cursor should move.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum PostLigOperation {
     /// Corresponds to the `/LIG/` property list element.
     RetainBothMoveNowhere,

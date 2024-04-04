@@ -1,0 +1,216 @@
+PARAMETER index must not be zero (line 9).
+    (PARAMETER D 0 
+                   D 5)  
+This PARAMETER index is too big for my present table size (line 11).
+    (PARAMETER D 255 
+                     D 5)  
+This value shouldn't exceed 255 (line 13).
+    (PARAMETER D 256 
+                     D 5)  
+PARAMETER index must not be zero (line 13).
+    (PARAMETER D 256 D  
+                       5)  
+This value shouldn't exceed 255 (line 15).
+    (PARAMETER D 256 
+                    6666666 D 5)  
+PARAMETER index must not be zero (line 15).
+    (PARAMETER D 2566666666 D  
+                              5)  
+This value shouldn't exceed '377 (line 17).
+    (PARAMETER O 456 
+                     D 5)  
+PARAMETER index must not be zero (line 17).
+    (PARAMETER O 456 D  
+                       5)  
+This value shouldn't exceed '377 (line 18).
+    (PARAMETER O 456 
+                     D 5     )  
+PARAMETER index must not be zero (line 18).
+    (PARAMETER O 456 D 5     
+                             )  
+Illegal face code, I changed it to MRR (line 20).
+    (PARAMETER F XXX 
+                     D 5)  
+PARAMETER index must not be zero (line 20).
+    (PARAMETER F XXX D 5 
+                        )  
+Illegal face code, I changed it to MRR (line 22).
+    (PARAMETER F BXX 
+                     D 5)  
+PARAMETER index must not be zero (line 22).
+    (PARAMETER F BXX D 5 
+                        )  
+Illegal face code, I changed it to MRR (line 24).
+    (PARAMETER F BIX 
+                     D 5)  
+PARAMETER index must not be zero (line 24).
+    (PARAMETER F BIX D 5 
+                        )  
+This value shouldn't exceed "FF (line 26).
+    (PARAMETER H 256 
+                     D 5)  
+PARAMETER index must not be zero (line 26).
+    (PARAMETER H 256 D  
+                       5)  
+You need "C" or "D" or "O" or "H" or "F" here (line 28).
+    (PARAMETER pr 
+                 efix 0 D 5)  
+PARAMETER index must not be zero (line 28).
+    (PARAMETER prefix 0 D 5 
+                           )  
+PARAMETER index must not be zero (line 30).
+    (PARAMETER O  
+                 Z D 5)  
+PARAMETER index must not be zero (line 31).
+    (PARAMETER O 0 
+                  Z D 5)  
+PARAMETER index must not be zero (line 32).
+    (PARAMETER O  
+                 A D 5)  
+PARAMETER index must not be zero (line 34).
+    (PARAMETER H  
+                 Z D 5)  
+PARAMETER index must not be zero (line 35).
+    (PARAMETER H 0 
+                  Z D 5)  
+Junk after property value will be ignored (line 37).
+    (PARAMETER O 1 D 1j 
+                       unk)  
+Junk after property value will be ignored (line 38).
+    (PARAMETER O 1 D 1j 
+                       )  
+Junk after property value will be ignored (line 39).
+    (PARAMETER O 1 D 1   j 
+                          unk)  
+Junk after property value will be ignored (line 40).
+    (PARAMETER O 1 D 1   j 
+                          unk    )  
+An "R" or "D" value is needed here (line 44).
+(DESIGNSIZE W 
+              2047.9999999)  
+The design size must be at least 1 (line 44).
+(DESIGNSIZE W 2047.9999999 
+                          )  
+An "R" or "D" value is needed here (line 45).
+(DESIGNSIZE    W 
+                 2047.9999999)  
+The design size must be at least 1 (line 45).
+(DESIGNSIZE    W 2047.9999999 
+                             )  
+An "R" or "D" value is needed here (line 46).
+(DESIGNSIZE 
+           )  
+The design size must be at least 1 (line 46).
+(DESIGNSIZE 
+           )  
+An "R" or "D" value is needed here (line 47).
+(DESIGNSIZE     
+               )  
+The design size must be at least 1 (line 47).
+(DESIGNSIZE     
+               )  
+An octal ("O") or hex ("H") value is needed here (line 51).
+(CHECKSUM p 
+           refix 0)  
+Sorry, the maximum hex value is H FFFFFFFF (line 53).
+(CHECKSUM H 555555555 
+                     5555555555)  
+Sorry, the maximum octal value is O 37777777777 (line 55).
+(CHECKSUM O 55555555555 
+                       55555555)  
+Junk after property value will be ignored (line 57).
+(CHECKSUM H Z 
+             )  
+Junk after property value will be ignored (line 58).
+(CHECKSUM H 0Z 
+              )  
+Junk after property value will be ignored (line 60).
+(CHECKSUM O Z 
+             )  
+Junk after property value will be ignored (line 61).
+(CHECKSUM O 0Z 
+              )  
+Illegal digit (line 62).
+(CHECKSUM O A 
+             )  
+Illegal digit (line 63).
+(CHECKSUM O 1A 
+              )  
+Illegal digit (line 64).
+(CHECKSUM O 1A 
+              1)  
+Illegal digit (line 66).
+(CHECKSUM O 111a 
+                )  
+Illegal digit (line 67).
+(CHECKSUM O 111a 
+                aaa)  
+Junk after property value will be ignored (line 68).
+(CHECKSUM O 111j 
+                )  
+Junk after property value will be ignored (line 69).
+(CHECKSUM O 111j 
+                unk)  
+Junk after property value will be ignored (line 70).
+(CHECKSUM O 111    j 
+                    unk)  
+Junk after property value will be ignored (line 71).
+(CHECKSUM O 111    j 
+                    unk    )  
+The flag value should be "TRUE" or "FALSE" (line 74).
+(SEVENBITSAFEFLAG M 
+                   AYBE)  
+"C" value must be standard ASCII and not a paren (line 77).
+(CHARACTER C 
+            )  
+"C" value must be standard ASCII and not a paren (line 78).
+(CHARACTER C   
+              (CHARWD D 6))  
+Illegal character in the file (line 79).
+(CHARACTER C 	 
+              (CHARWD D 7)) (COMMENT <- there is 1 tab here)  
+Illegal character in the file (line 80).
+(CHARACTER C 	 
+              	 (CHARWD D 8)) (COMMENT <- there are 2 tabs here)  
+Illegal character in the file (line 80).
+(CHARACTER C 		 
+                (CHARWD D 8)) (COMMENT <- there are 2 tabs here)  
+There's junk here that is not in parentheses (line 80).
+(CHARACTER C 		 
+                (CHARWD D 8)) (COMMENT <- there are 2 tabs here)  
+There's junk here that is not in parentheses (line 83).
+(CHARACTER C O j 
+                unk (CHARWD D 6.1))  
+There's junk here that is not in parentheses (line 104).
+    s 
+     ome trash here  
+Extra right parenthesis (line 110).
+ 
+)  
+Sorry, I don't know that property name (line 120).
+(UNDEFINED 
+           D 0 D 5)  
+Sorry, I don't know that property name (line 123).
+    (UNDEFINED 
+               D 0 D 5)  
+Sorry, I don't know that property name (line 126).
+        (UNDEFINED 
+                   D 0 D 5)  
+Sorry, I don't know that property name (line 131).
+    (UNDEFINED 
+               D 0 D 5)  
+Sorry, I don't know that property name (line 135).
+    (UNDEFINED 
+               D 0 D 5)  
+HEADER indices should be 18 or more (line 145).
+(HEADER O 1 
+            O 17)  
+Sorry, I don't know that property name (line 149).
+(unbalanced 
+             
+File ended unexpectedly: No closing ")" (line 152).
+) 
+ ...
+Infinite ligature loop starting with boundary and '101!
+All ligatures will be cleared.
+A cycle of NEXTLARGER characters has been broken at '102.

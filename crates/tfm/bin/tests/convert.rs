@@ -76,11 +76,11 @@ fn run_tfm_to_pl_test(
 type PlToTfmArgsFn = for<'a> fn(pl_file_path: &'a str, tfm_file_path: &'a str) -> Vec<&'a str>;
 
 fn run_pl_to_tfm_test(
-    tfm: &[u8],
+    knuth_tfm: &[u8],
     pl: &str,
     command: &str,
     args_fn: PlToTfmArgsFn,
-    want_stderr: Option<&str>,
+    knuth_stderr: Option<&str>,
 ) {
     let dir = tempfile::TempDir::new().unwrap();
     let pl_file_path = dir.path().join("input.plst");
@@ -96,36 +96,47 @@ fn run_pl_to_tfm_test(
     cmd.args(args);
 
     let output = cmd.output().unwrap();
-    let stderr = String::from_utf8(output.stderr).unwrap();
+    let texcraft_stderr = String::from_utf8(output.stderr).unwrap();
     assert!(
         output.status.success(),
         "failed to run Texcraft command: {}",
-        stderr
+        texcraft_stderr
     );
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    similar_asserts::assert_eq!(texcraft: stdout, knuth: "");
+    let texcraft_stdout = String::from_utf8(output.stdout).unwrap();
+    similar_asserts::assert_eq!(texcraft: texcraft_stdout, knuth: "");
 
-    let got = std::fs::read(&tfm_file_path).unwrap();
-    if got == tfm {
-        return;
+    let texcraft_tfm = std::fs::read(&tfm_file_path).unwrap();
+    if texcraft_tfm == knuth_tfm {
+        match knuth_stderr {
+            None => return,
+            Some(knuth_stderr) => {
+                if knuth_stderr == texcraft_stderr {
+                    return;
+                }
+            }
+        }
     }
     let want_tfm_file_path = dir.path().join("want.tfm");
     let mut want_tfm_file = std::fs::File::create(&want_tfm_file_path).unwrap();
-    want_tfm_file.write_all(tfm).unwrap();
+    want_tfm_file.write_all(knuth_tfm).unwrap();
+
+    if let Some(want_stderr) = knuth_stderr {
+        similar_asserts::assert_eq!(texcraft: texcraft_stderr, knuth: want_stderr.replace("\r\n", "\n"));
+    }
 
     similar_asserts::assert_eq!(texcraft: debug_tfm(&tfm_file_path), knuth: debug_tfm(&want_tfm_file_path));
     // It's possible that there is a bug in `tfmtools debug` such that different files have
     // the same debug output. For this case, we assert the bytes are equal too.
-    assert_eq!(got, tfm);
-
-    if let Some(want_stderr) = want_stderr {
-        similar_asserts::assert_eq!(texcraft: stderr, knuth: want_stderr.replace("\r\n", "\n"));
-    }
+    assert_eq!(texcraft_tfm, knuth_tfm);
 }
 
 fn debug_tfm(tfm_file_path: &std::path::PathBuf) -> String {
     let mut cmd = Command::cargo_bin("tfmtools").unwrap();
-    cmd.args(vec!["debug", tfm_file_path.to_str().unwrap()]);
+    cmd.args(vec![
+        "debug",
+        "--omit-tfm-path",
+        tfm_file_path.to_str().unwrap(),
+    ]);
     let output = cmd.output().unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(
@@ -185,6 +196,9 @@ macro_rules! convert_tests {
     };
     ( ($name: ident, pltotf_with_stderr($base_path: expr, $pl_path: expr, $tfm_path: expr, $stderr_path: expr $(,)? ) $(,)? ) ) => {
         convert_tests![($name, __pltotf_internal($base_path, $pl_path, $tfm_path, include_str_from_corpus!(concat![$base_path, $stderr_path])))];
+    };
+    ( ($name: ident, pltotf_fuzz($hash: expr) $(,)? ) ) => {
+        convert_tests![($name, pltotf_with_stderr(concat!["fuzz/fuzz_pltotf_", $hash]))];
     };
     ( ($name: ident, __pltotf_internal($base_path: expr, $pl_path: expr, $tfm_path: expr, $stderr: expr ) ) ) => {
             mod $name {
@@ -388,14 +402,14 @@ convert_tests!(
     ),
     (
         bxjatoucs_jis_2_3,
-        pltotf("ctan/bxjatoucs-jis-", "2.plst", "3.tfm"),
+        pltotf_with_stderr("ctan/bxjatoucs-jis-", "2.plst", "3.tfm", "3.stderr.txt"),
     ),
     (
         bxjatoucs_jis_3_4,
         roundtrip("ctan/bxjatoucs-jis-", "3.tfm", "4.plst"),
     ),
-    (aebkri, pltotf("ctan/aebkri")),
-    (mt2exa, pltotf("ctan/mt2exa")),
+    (aebkri, roundtrip("ctan/aebkri")),
+    (mt2exa, roundtrip("ctan/mt2exa")),
     (copti, pltotf("ctan/copti")),
     (bxjatoucs_cid, pltotf_with_stderr("ctan/bxjatoucs-cid")),
     (
@@ -598,4 +612,9 @@ convert_tests!(
         tftopl_fuzz("6915a258ab846ae4")
     ),
     (duplicate_kern_warning, tftopl_fuzz("d1cf983ef16e54f3")),
+    (
+        header_indices_must_be_18_or_larger,
+        pltotf_fuzz("b834b9111328cf0c")
+    ),
+    (all_plst_errors, pltotf_with_stderr("originals/all-errors"),),
 );

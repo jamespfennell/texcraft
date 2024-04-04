@@ -559,7 +559,7 @@ impl clap::builder::ValueParserFactory for TfPath {
 pub struct PlPath(pub std::path::PathBuf);
 
 impl PlPath {
-    pub fn read(&self) -> Result<(tfm::pl::File, Vec<tfm::pl::ParseError>), String> {
+    pub fn read(&self) -> Result<(tfm::pl::File, Vec<tfm::pl::ParseWarning>), String> {
         let data = match std::fs::read_to_string(&self.0) {
             Ok(data) => data,
             Err(err) => return Err(format!("Failed to read `{}`: {}", self.0.display(), err)),

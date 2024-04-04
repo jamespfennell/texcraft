@@ -18,7 +18,7 @@ fuzz_target!(|input: Input| {
     let knuth_output = Command::new("tftopl")
         .arg(&tfm_file_path)
         .output()
-        .expect("failed to execute pltotf");
+        .expect("failed to execute tftopl");
     let knuth_stdout = std::str::from_utf8(&knuth_output.stdout).unwrap();
     let knuth_stderr = std::str::from_utf8(&knuth_output.stderr).unwrap();
 

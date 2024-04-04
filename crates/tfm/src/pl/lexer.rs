@@ -1,6 +1,6 @@
 //! Lexer for property list files.
-
-use super::error::ParseError;
+//!
+//! TODO: this lexer is pretty pointless. We should just parse straight to a CST.
 
 /// Type of a token.
 #[derive(PartialEq, Eq, Debug)]
@@ -11,11 +11,9 @@ pub enum TokenKind {
     ClosedParenthesis,
     /// An single word.
     /// This is string consisting of visible ASCII symbols without whitespace or open or closed parenthesis.
-    Word(String),
+    Word { value: String },
     /// Potentially significant whitespace.
-    /// The first element is the number of characters of significant whitespace,
-    /// and the second element specifies whether the whitespace contains a newline character.
-    Whitespace(usize, bool),
+    Whitespace { len: usize, contains_newlines: bool },
 }
 
 /// Token in a property list file.
@@ -28,8 +26,10 @@ pub struct Token(pub TokenKind, pub usize);
 /// Lexer for property list files.
 pub struct Lexer {
     source: String,
-    /// The current position within the source string.
+    /// The current bytes position within the source string.
     current: usize,
+    current_char: usize,
+    /// The current char position within the source string.
     start_of_line: bool,
 }
 
@@ -39,24 +39,32 @@ impl Lexer {
         Lexer {
             source: source.into(),
             current: 0,
+            current_char: 0,
             start_of_line: true,
         }
     }
     /// Return the length of the source code.
     pub fn source_length(&self) -> usize {
-        self.source.len()
+        self.source.chars().map(|_| 1).sum()
     }
-    fn accumulate_string(&mut self) -> String {
-        let mut s: String = Default::default();
+    fn accumulate_string(&mut self) -> TokenKind {
+        let mut value: String = Default::default();
         for c in self.source[self.current..].chars() {
-            match c {
-                '(' | ')' => break,
-                '!'..='~' => s.push(c),
-                _ => break,
-            }
+            let c = match c {
+                '(' | ')' | '\n' | ' ' => break,
+                '\r' => {
+                    if self.source[self.current + 1..].starts_with('\n') {
+                        break;
+                    }
+                    '\r'
+                }
+                _ => c,
+            };
+            value.push(c);
         }
-        self.current += s.len();
-        s
+        self.current += value.len();
+        self.current_char += value.chars().map(|_| 1).sum::<usize>();
+        TokenKind::Word { value }
     }
 
     fn accumulate_whitespace(&mut self) -> Option<TokenKind> {
@@ -72,9 +80,6 @@ impl Lexer {
                 '\n' => (1, true),
                 '\r' => {
                     if !self.source[self.current + 1..].starts_with('\n') {
-                        // An error for this case is created in the main iterator loop.
-                        // We don't create one here because we may need to return whitespace
-                        // that has already been accumulated.
                         break;
                     }
                     (2, true)
@@ -82,6 +87,7 @@ impl Lexer {
                 _ => break,
             };
             self.current += len;
+            self.current_char += len;
             if self.start_of_line {
                 continue;
             }
@@ -94,17 +100,20 @@ impl Lexer {
         if l == 0 {
             None
         } else {
-            Some(TokenKind::Whitespace(l, contains_newlines))
+            Some(TokenKind::Whitespace {
+                len: l,
+                contains_newlines,
+            })
         }
     }
 }
 
 impl Iterator for Lexer {
-    type Item = Result<Token, ParseError>;
+    type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let start_of_token = self.current;
+            let start_of_token = self.current_char;
             let c = match self.source[self.current..].chars().next() {
                 None => return None,
                 Some(c) => c,
@@ -115,35 +124,33 @@ impl Iterator for Lexer {
                     Some(kind) => kind,
                 },
                 '\r' => {
-                    if !self.source[self.current + 1..].starts_with('\n') {
-                        self.current += 1;
-                        return Some(Err(ParseError::InvalidCharacter('\r', start_of_token)));
-                    }
-                    match self.accumulate_whitespace() {
-                        None => continue,
-                        Some(kind) => kind,
+                    if self.source[self.current + 1..].starts_with('\n') {
+                        match self.accumulate_whitespace() {
+                            None => continue,
+                            Some(kind) => kind,
+                        }
+                    } else {
+                        self.accumulate_string()
                     }
                 }
                 '(' => {
                     self.start_of_line = false;
                     self.current += 1;
+                    self.current_char += 1;
                     TokenKind::OpenParenthesis
                 }
                 ')' => {
                     self.start_of_line = false;
                     self.current += 1;
+                    self.current_char += 1;
                     TokenKind::ClosedParenthesis
                 }
-                '!'..='~' => {
+                _ => {
                     self.start_of_line = false;
-                    TokenKind::Word(self.accumulate_string())
-                }
-                c => {
-                    self.current += c.len_utf8();
-                    return Some(Err(ParseError::InvalidCharacter(c, start_of_token)));
+                    self.accumulate_string()
                 }
             };
-            return Some(Ok(Token(kind, start_of_token)));
+            return Some(Token(kind, start_of_token));
         }
     }
 }
@@ -159,17 +166,14 @@ mod test {
                 #[test]
                 fn $name() {
                     let input = $input;
-                    let want: Vec<Result<Token, ParseError>> = $want;
+                    let want: Vec<(TokenKind, usize)> = $want;
+                    let want: Vec<Token> = want.into_iter().map(|(a,b)| Token(a,b)).collect();
                     let lexer = Lexer::new(&input);
-                    let got: Vec<Result<Token, ParseError>> = lexer.collect();
+                    let got: Vec<Token> = lexer.collect();
                     assert_eq!(got, want);
                 }
             )+
         };
-    }
-
-    fn token(kind: TokenKind, span: usize) -> Result<Token, ParseError> {
-        Ok(Token(kind, span))
     }
 
     lexer_tests!(
@@ -177,113 +181,244 @@ mod test {
             basic_1,
             " (HELLO WORLD) ",
             vec![
-                token(OpenParenthesis, 1),
-                token(Word("HELLO".into()), 2),
-                token(Whitespace(1, false), 7),
-                token(Word("WORLD".into()), 8),
-                token(ClosedParenthesis, 13),
-                token(Whitespace(1, false), 14),
+                (OpenParenthesis, 1),
+                (
+                    Word {
+                        value: "HELLO".into(),
+                    },
+                    2
+                ),
+                (
+                    Whitespace {
+                        len: 1,
+                        contains_newlines: false
+                    },
+                    7
+                ),
+                (
+                    Word {
+                        value: "WORLD".into(),
+                    },
+                    8
+                ),
+                (ClosedParenthesis, 13),
+                (
+                    Whitespace {
+                        len: 1,
+                        contains_newlines: false
+                    },
+                    14
+                ),
             ],
         ),
         (
             basic_2,
             "(HELLO   WORLD   )",
             vec![
-                token(OpenParenthesis, 0),
-                token(Word("HELLO".into()), 1),
-                token(Whitespace(3, false), 6),
-                token(Word("WORLD".into()), 9),
-                token(Whitespace(3, false), 14),
-                token(ClosedParenthesis, 17),
+                (OpenParenthesis, 0),
+                (
+                    Word {
+                        value: "HELLO".into(),
+                    },
+                    1
+                ),
+                (
+                    Whitespace {
+                        len: 3,
+                        contains_newlines: false
+                    },
+                    6
+                ),
+                (
+                    Word {
+                        value: "WORLD".into(),
+                    },
+                    9
+                ),
+                (
+                    Whitespace {
+                        len: 3,
+                        contains_newlines: false
+                    },
+                    14
+                ),
+                (ClosedParenthesis, 17),
             ],
         ),
         (
             nested,
             "(HELLO WORLD (MUNDO))",
             vec![
-                token(OpenParenthesis, 0),
-                token(Word("HELLO".into()), 1),
-                token(Whitespace(1, false), 6),
-                token(Word("WORLD".into()), 7),
-                token(Whitespace(1, false), 12),
-                token(OpenParenthesis, 13),
-                token(Word("MUNDO".into()), 14),
-                token(ClosedParenthesis, 19),
-                token(ClosedParenthesis, 20),
+                (OpenParenthesis, 0),
+                (
+                    Word {
+                        value: "HELLO".into(),
+                    },
+                    1
+                ),
+                (
+                    Whitespace {
+                        len: 1,
+                        contains_newlines: false
+                    },
+                    6
+                ),
+                (
+                    Word {
+                        value: "WORLD".into(),
+                    },
+                    7
+                ),
+                (
+                    Whitespace {
+                        len: 1,
+                        contains_newlines: false
+                    },
+                    12
+                ),
+                (OpenParenthesis, 13),
+                (
+                    Word {
+                        value: "MUNDO".into(),
+                    },
+                    14
+                ),
+                (ClosedParenthesis, 19),
+                (ClosedParenthesis, 20),
             ],
         ),
         (
             newline_1,
             "(HELLO \n)",
             vec![
-                token(OpenParenthesis, 0),
-                token(Word("HELLO".into()), 1),
-                token(Whitespace(2, true), 6),
-                token(ClosedParenthesis, 8),
+                (OpenParenthesis, 0),
+                (
+                    Word {
+                        value: "HELLO".into(),
+                    },
+                    1
+                ),
+                (
+                    Whitespace {
+                        len: 2,
+                        contains_newlines: true
+                    },
+                    6
+                ),
+                (ClosedParenthesis, 8),
             ],
         ),
         (
             newline_2,
             "(HELLO \n  )",
             vec![
-                token(OpenParenthesis, 0),
-                token(Word("HELLO".into()), 1),
-                token(Whitespace(2, true), 6),
-                token(ClosedParenthesis, 10),
+                (OpenParenthesis, 0),
+                (
+                    Word {
+                        value: "HELLO".into(),
+                    },
+                    1
+                ),
+                (
+                    Whitespace {
+                        len: 2,
+                        contains_newlines: true
+                    },
+                    6
+                ),
+                (ClosedParenthesis, 10),
             ],
         ),
         (
             newline_3,
             "(HELLO \r\n)",
             vec![
-                token(OpenParenthesis, 0),
-                token(Word("HELLO".into()), 1),
-                token(Whitespace(2, true), 6),
-                token(ClosedParenthesis, 9),
+                (OpenParenthesis, 0),
+                (
+                    Word {
+                        value: "HELLO".into(),
+                    },
+                    1
+                ),
+                (
+                    Whitespace {
+                        len: 2,
+                        contains_newlines: true
+                    },
+                    6
+                ),
+                (ClosedParenthesis, 9),
             ],
         ),
         (
             newline_4,
             "(HELLO\n\n\n\n)",
             vec![
-                token(OpenParenthesis, 0),
-                token(Word("HELLO".into()), 1),
-                token(Whitespace(1, true), 6),
-                token(ClosedParenthesis, 10),
+                (OpenParenthesis, 0),
+                (
+                    Word {
+                        value: "HELLO".into(),
+                    },
+                    1
+                ),
+                (
+                    Whitespace {
+                        len: 1,
+                        contains_newlines: true
+                    },
+                    6
+                ),
+                (ClosedParenthesis, 10),
             ],
         ),
         (
             invalid_char_1,
             "(HËLLO)",
             vec![
-                token(OpenParenthesis, 0),
-                token(Word("H".into()), 1),
-                Err(ParseError::InvalidCharacter('Ë', 2)),
-                token(Word("LLO".into()), 4),
-                token(ClosedParenthesis, 7),
+                (OpenParenthesis, 0),
+                (
+                    Word {
+                        value: "HËLLO".into(),
+                    },
+                    1
+                ),
+                (ClosedParenthesis, 6),
             ],
         ),
         (
             invalid_char_2,
             "(H\rLLO)",
             vec![
-                token(OpenParenthesis, 0),
-                token(Word("H".into()), 1),
-                Err(ParseError::InvalidCharacter('\r', 2)),
-                token(Word("LLO".into()), 3),
-                token(ClosedParenthesis, 6),
+                (OpenParenthesis, 0),
+                (
+                    Word {
+                        value: "H\rLLO".into(),
+                    },
+                    1
+                ),
+                (ClosedParenthesis, 6),
             ],
         ),
         (
             invalid_char_3,
             "(H \rLLO)",
             vec![
-                token(OpenParenthesis, 0),
-                token(Word("H".into()), 1),
-                token(Whitespace(1, false), 2),
-                Err(ParseError::InvalidCharacter('\r', 3)),
-                token(Word("LLO".into()), 4),
-                token(ClosedParenthesis, 7),
+                (OpenParenthesis, 0),
+                (Word { value: "H".into() }, 1),
+                (
+                    Whitespace {
+                        len: 1,
+                        contains_newlines: false
+                    },
+                    2
+                ),
+                (
+                    Word {
+                        value: "\rLLO".into(),
+                    },
+                    3
+                ),
+                (ClosedParenthesis, 7),
             ],
         ),
     );

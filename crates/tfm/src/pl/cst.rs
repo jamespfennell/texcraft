@@ -11,7 +11,7 @@
 //! - `<whitespace> -> <space><whitespace>? | <newline><whitespace>?`
 //! - `<open parenthesis> -> '('<whitespace>?`
 //! - `<closed parenthesis> -> ')'<whitespace>?`
-use super::error::ParseError;
+use super::error::{ParseWarning, ParseWarningKind};
 use super::lexer::*;
 
 /// Concrete syntax tree for property list files
@@ -20,7 +20,7 @@ pub struct Cst(pub Vec<Node>);
 
 impl Cst {
     /// Build an CST directly from source code.
-    pub fn from_pl_source_code(source: &str) -> (Cst, Vec<ParseError>) {
+    pub fn from_pl_source_code(source: &str) -> (Cst, Vec<ParseWarning>) {
         let lexer = Lexer::new(source);
         let mut errors = vec![];
         let cst = Cst::from_lexer(lexer, &mut errors);
@@ -28,7 +28,7 @@ impl Cst {
     }
 
     /// Build an AST from an instance of the lexer.
-    pub fn from_lexer(lexer: Lexer, errors: &mut Vec<ParseError>) -> Cst {
+    pub fn from_lexer(lexer: Lexer, errors: &mut Vec<ParseWarning>) -> Cst {
         let mut input = Input {
             lexer,
             next: None,
@@ -143,7 +143,7 @@ pub struct RegularNodeValue {
     pub key: String,
     /// Span of the key in the source file
     pub key_span: std::ops::Range<usize>,
-    /// Raw data of the node.
+    /// Data of the node.
     ///
     /// The values `None` and `Some("".to_string())` are semantically the same.
     /// However they are displayed differently.
@@ -163,6 +163,7 @@ pub struct RegularNodeValue {
 
 /// Element of a comment node.
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum BalancedElem {
     String(String),
     Vec(Vec<BalancedElem>),
@@ -226,7 +227,7 @@ struct Input<'a> {
     next: Option<Token>,
     // Used for building error messages when opening spans are not matched.
     opening_parenthesis_spans: Vec<usize>,
-    errors: &'a mut Vec<ParseError>,
+    errors: &'a mut Vec<ParseWarning>,
 }
 
 impl<'a> Input<'a> {
@@ -243,10 +244,16 @@ impl<'a> Input<'a> {
     fn next_or_closing(&mut self) -> Token {
         match self.next() {
             None => {
-                self.errors.push(ParseError::UnbalancedOpeningParenthesis {
-                    // We pop the last opening brace span because it's being matched by the closing brace we return here.
-                    opening_parenthesis_span: self.opening_parenthesis_spans.pop().unwrap(),
-                    end_span: self.lexer.source_length(),
+                // We pop the last opening brace span because it's being matched by the closing brace we return here.
+                let opening_parenthesis_span_start = self.opening_parenthesis_spans.pop().unwrap();
+                let span_start = self.lexer.source_length();
+                self.errors.push(ParseWarning {
+                    span: span_start..span_start,
+                    knuth_pltotf_offset: Some(span_start),
+                    kind: ParseWarningKind::UnbalancedOpeningParenthesis {
+                        opening_parenthesis_span: opening_parenthesis_span_start
+                            ..opening_parenthesis_span_start + 1,
+                    },
                 });
                 Token(TokenKind::ClosedParenthesis, self.lexer.source_length())
             }
@@ -254,10 +261,10 @@ impl<'a> Input<'a> {
         }
     }
 
-    fn read_word(&mut self) -> (String, std::ops::Range<usize>) {
+    fn read_word(&mut self) -> AccumulatedString {
         remove_whitespace(self);
-        let (string, span_start) = match self.next.take() {
-            Some(Token(TokenKind::Word(string), span_start)) => (string, span_start),
+        let (value, span_start) = match self.next.take() {
+            Some(Token(TokenKind::Word { value }, span_start)) => (value, span_start),
             Some(token) => {
                 let span_start = token.1;
                 self.next = Some(token);
@@ -265,15 +272,15 @@ impl<'a> Input<'a> {
             }
             _ => ("".to_string(), self.lexer.source_length()),
         };
-        let span = span_start..span_start + string.len();
-        (string, span)
+        let span = span_start..span_start + value.chars().map(|_| 1).sum::<usize>();
+        AccumulatedString { value, span }
     }
 
     fn refill_next(&mut self) {
         while self.next.is_none() {
             match self.lexer.next() {
                 None => return,
-                Some(Ok(token)) => {
+                Some(token) => {
                     match token.0 {
                         TokenKind::OpenParenthesis => self.opening_parenthesis_spans.push(token.1),
                         TokenKind::ClosedParenthesis => {
@@ -283,75 +290,90 @@ impl<'a> Input<'a> {
                     }
                     self.next = Some(token)
                 }
-                Some(Err(error)) => self.errors.push(error),
             }
         }
     }
 }
 
 fn remove_whitespace(input: &mut Input) {
-    while let Some(Token(TokenKind::Whitespace(..), _)) = input.peek() {
+    while let Some(Token(TokenKind::Whitespace { .. }, _)) = input.peek() {
         input.next();
     }
 }
 
+struct AccumulatedString {
+    value: String,
+    span: std::ops::Range<usize>,
+}
+
 fn finish_accumulating_string(
     input: &mut Input,
-    mut data: String,
-    span_start: usize,
+    // TODO: make this a method on AccumulatedString
+    mut data: AccumulatedString,
     allow_newlines: bool,
-) -> (String, std::ops::Range<usize>) {
+) -> AccumulatedString {
     let mut whitespace_to_flush = 0_usize;
     loop {
         match input.peek() {
-            Some(Token(TokenKind::Word(s), _)) => {
+            Some(Token(TokenKind::Word { value }, _)) => {
                 for _ in 0..whitespace_to_flush {
-                    data.push(' ');
+                    data.value.push(' ');
                 }
                 whitespace_to_flush = 0;
-                data.push_str(s);
+                data.value.push_str(value);
             }
-            Some(Token(TokenKind::Whitespace(n, contains_newlines), _)) => {
+            Some(Token(
+                TokenKind::Whitespace {
+                    len: n,
+                    contains_newlines,
+                },
+                _,
+            )) => {
                 if *contains_newlines && !allow_newlines {
                     break;
                 }
                 whitespace_to_flush += *n;
             }
-            Some(Token(TokenKind::ClosedParenthesis, _)) => {
+            Some(Token(TokenKind::OpenParenthesis, _))
+            | Some(Token(TokenKind::ClosedParenthesis, _)) => {
                 for _ in 0..whitespace_to_flush {
-                    data.push(' ');
+                    data.value.push(' ');
                 }
                 break;
             }
-            _ => {
+            None => {
                 break;
             }
         }
         input.next();
     }
-    let final_span = span_start..span_start + data.len();
-    (data, final_span)
+    let final_span =
+        data.span.start..data.span.start + data.value.chars().map(|_| 1).sum::<usize>();
+    data.span = final_span;
+    data
 }
 
 fn parse_node(input: &mut Input, opening_parenthesis_span: usize) -> Node {
     // Parse the key
-    let (key, key_span) = input.read_word();
+    let AccumulatedString {
+        value: key,
+        span: key_span,
+    } = input.read_word();
 
     // Parse the content of the node, which is either a comment or regular node.
     let (value, closing_token) = if key == "COMMENT" {
         let (balanced_elements, closing_token) = parse_balanced_elements(input);
         (NodeValue::Comment(balanced_elements), closing_token)
     } else {
-        let (first_word, initial_span) = input.read_word();
-        let (data, data_span) =
-            finish_accumulating_string(input, first_word, initial_span.start, true);
+        let string = input.read_word();
+        let string = finish_accumulating_string(input, string, true);
         let (children, closing_token) = parse_inner_nodes(input);
         (
             NodeValue::Regular(RegularNodeValue {
                 key,
                 key_span,
-                data: Some(data),
-                data_span,
+                data: Some(string.value),
+                data_span: string.span,
                 children: Some(children),
             }),
             closing_token,
@@ -373,19 +395,20 @@ fn parse_root_nodes(input: &mut Input) -> Vec<Node> {
             Some(token) => token,
         };
         match token.0 {
-            TokenKind::Word(s) => {
-                let span = token.1..token.1 + s.len();
-                input
-                    .errors
-                    .push(ParseError::JunkInPropertyList { value: s, span })
+            TokenKind::Word { value } => {
+                let span = token.1..token.1 + value.len();
+                let s = AccumulatedString { value, span };
+                add_junk_string_error(input, s);
             }
             TokenKind::OpenParenthesis => {
                 r.push(parse_node(input, token.1));
             }
-            TokenKind::ClosedParenthesis => input
-                .errors
-                .push(ParseError::UnexpectedRightParenthesis { span: token.1 }),
-            TokenKind::Whitespace(..) => {}
+            TokenKind::ClosedParenthesis => input.errors.push(ParseWarning {
+                span: token.1..token.1 + 1,
+                knuth_pltotf_offset: Some(token.1),
+                kind: ParseWarningKind::UnexpectedClosingParenthesis,
+            }),
+            TokenKind::Whitespace { .. } => {}
         }
     }
 }
@@ -396,19 +419,27 @@ fn parse_inner_nodes(input: &mut Input) -> (Vec<Node>, Token) {
     loop {
         let token = input.next_or_closing();
         match token.0 {
-            TokenKind::Word(s) => {
-                let span = token.1..token.1 + s.len();
-                input
-                    .errors
-                    .push(ParseError::JunkInPropertyList { value: s, span })
+            TokenKind::Word { value } => {
+                let span = token.1..token.1 + value.len();
+                let s = AccumulatedString { value, span };
+                add_junk_string_error(input, s);
             }
             TokenKind::OpenParenthesis => {
                 r.push(parse_node(input, token.1));
             }
             TokenKind::ClosedParenthesis => return (r, token),
-            TokenKind::Whitespace(..) => {}
+            TokenKind::Whitespace { .. } => {}
         }
     }
+}
+
+fn add_junk_string_error(input: &mut Input, data: AccumulatedString) {
+    let AccumulatedString { value, span } = finish_accumulating_string(input, data, true);
+    input.errors.push(ParseWarning {
+        span: span.clone(),
+        knuth_pltotf_offset: Some(span.start + 1),
+        kind: ParseWarningKind::JunkInsidePropertyList { junk: value },
+    });
 }
 
 fn parse_balanced_elements(input: &mut Input) -> (Vec<BalancedElem>, Token) {
@@ -416,16 +447,17 @@ fn parse_balanced_elements(input: &mut Input) -> (Vec<BalancedElem>, Token) {
     loop {
         let token = input.next_or_closing();
         match token.0 {
-            TokenKind::Word(word) => {
-                let (s, _) = finish_accumulating_string(input, word, token.1, false);
-                r.push(BalancedElem::String(s));
+            TokenKind::Word { value } => {
+                let s = AccumulatedString { value, span: 0..0 };
+                let s = finish_accumulating_string(input, s, false);
+                r.push(BalancedElem::String(s.value));
             }
             TokenKind::OpenParenthesis => {
                 let (inner, _) = parse_balanced_elements(input);
                 r.push(BalancedElem::Vec(inner));
             }
             TokenKind::ClosedParenthesis => return (r, token),
-            TokenKind::Whitespace(..) => {}
+            TokenKind::Whitespace { .. } => {}
         }
     }
 }
@@ -434,7 +466,7 @@ fn parse_balanced_elements(input: &mut Input) -> (Vec<BalancedElem>, Token) {
 mod tests {
     use super::*;
 
-    fn run(source: &str, want: Vec<Node>, want_errors: Vec<ParseError>) {
+    fn run(source: &str, want: Vec<Node>, want_errors: Vec<ParseWarning>) {
         let (got, got_errors) = Cst::from_pl_source_code(source);
         assert_eq!(got, Cst(want));
         assert_eq!(got_errors, want_errors);
@@ -463,8 +495,8 @@ mod tests {
                 value: NodeValue::Regular(RegularNodeValue {
                     key: "Hello".into(),
                     key_span: 2..7,
-                    data: Some("World".into()),
-                    data_span: 8..13,
+                    data: Some("World ".into()),
+                    data_span: 8..14,
                     children: vec![
                         Node {
                             opening_parenthesis_span: 14,
@@ -520,9 +552,12 @@ mod tests {
                 }),
                 closing_parenthesis_span: 6,
             }],
-            vec![ParseError::UnbalancedOpeningParenthesis {
-                opening_parenthesis_span: 0,
-                end_span: 6
+            vec![ParseWarning {
+                span: 6..6,
+                knuth_pltotf_offset: Some(6),
+                kind: ParseWarningKind::UnbalancedOpeningParenthesis {
+                    opening_parenthesis_span: 0..1,
+                },
             }],
         ),
         (
@@ -539,9 +574,12 @@ mod tests {
                 }),
                 closing_parenthesis_span: 1,
             }],
-            vec![ParseError::UnbalancedOpeningParenthesis {
-                opening_parenthesis_span: 0,
-                end_span: 1
+            vec![ParseWarning {
+                span: 1..1,
+                knuth_pltotf_offset: Some(1),
+                kind: ParseWarningKind::UnbalancedOpeningParenthesis {
+                    opening_parenthesis_span: 0..1,
+                },
             }],
         ),
         (
@@ -562,7 +600,7 @@ mod tests {
         ),
         (
             garbage_string_in_list,
-            "(Hello World) Garbage (Hola Mundo)",
+            "(Hello World) Garbage String (Hola Mundo)",
             vec![
                 Node {
                     opening_parenthesis_span: 0,
@@ -576,20 +614,23 @@ mod tests {
                     closing_parenthesis_span: 12,
                 },
                 Node {
-                    opening_parenthesis_span: 22,
+                    opening_parenthesis_span: 29,
                     value: NodeValue::Regular(RegularNodeValue {
                         key: "Hola".into(),
-                        key_span: 23..27,
+                        key_span: 30..34,
                         data: Some("Mundo".into()),
-                        data_span: 28..33,
+                        data_span: 35..40,
                         children: vec![].into(),
                     }),
-                    closing_parenthesis_span: 33,
+                    closing_parenthesis_span: 40,
                 },
             ],
-            vec![ParseError::JunkInPropertyList {
-                value: "Garbage".into(),
-                span: 14..21,
+            vec![ParseWarning {
+                span: 14..29,
+                knuth_pltotf_offset: Some(15),
+                kind: ParseWarningKind::JunkInsidePropertyList {
+                    junk: "Garbage String ".into(),
+                },
             }],
         ),
         (
@@ -619,7 +660,11 @@ mod tests {
                     closing_parenthesis_span: 27,
                 },
             ],
-            vec![ParseError::UnexpectedRightParenthesis { span: 14 },],
+            vec![ParseWarning {
+                span: 14..15,
+                knuth_pltotf_offset: Some(14),
+                kind: ParseWarningKind::UnexpectedClosingParenthesis,
+            }],
         ),
         (
             comment,
@@ -627,9 +672,9 @@ mod tests {
             vec![Node {
                 opening_parenthesis_span: 0,
                 value: NodeValue::Comment(vec![
-                    BalancedElem::String("World".into()),
+                    BalancedElem::String("World ".into()),
                     BalancedElem::Vec(vec![BalancedElem::String("Nested One".into()),]),
-                    BalancedElem::String("Hello".into()),
+                    BalancedElem::String("Hello ".into()),
                     BalancedElem::Vec(vec![BalancedElem::String("Nested Two".into()),]),
                 ]),
                 closing_parenthesis_span: 46,
@@ -642,12 +687,12 @@ mod tests {
             vec![Node {
                 opening_parenthesis_span: 0,
                 value: NodeValue::Comment(vec![
-                    BalancedElem::String("World".into()),
+                    BalancedElem::String("World ".into()),
                     BalancedElem::Vec(vec![
                         BalancedElem::String("Nested".into()),
                         BalancedElem::String("One".into()),
                     ]),
-                    BalancedElem::String("Hello".into()),
+                    BalancedElem::String("Hello ".into()),
                     BalancedElem::Vec(vec![
                         BalancedElem::String("Nested".into()),
                         BalancedElem::String("Two".into()),
@@ -663,37 +708,43 @@ mod tests {
             vec![Node {
                 opening_parenthesis_span: 0,
                 value: NodeValue::Comment(vec![
-                    BalancedElem::String("World".into()),
+                    BalancedElem::String("World ".into()),
                     BalancedElem::Vec(vec![]),
                 ]),
                 closing_parenthesis_span: 16,
             }],
             vec![
-                ParseError::UnbalancedOpeningParenthesis {
-                    opening_parenthesis_span: 15,
-                    end_span: 16
+                ParseWarning {
+                    span: 16..16,
+                    knuth_pltotf_offset: Some(16),
+                    kind: ParseWarningKind::UnbalancedOpeningParenthesis {
+                        opening_parenthesis_span: 15..16,
+                    }
                 },
-                ParseError::UnbalancedOpeningParenthesis {
-                    opening_parenthesis_span: 0,
-                    end_span: 16
+                ParseWarning {
+                    span: 16..16,
+                    knuth_pltotf_offset: Some(16),
+                    kind: ParseWarningKind::UnbalancedOpeningParenthesis {
+                        opening_parenthesis_span: 0..1,
+                    }
                 },
             ],
         ),
         (
-            lexer_error_propagated,
+            non_visible_ascii_char,
             "(Hello Worldä)",
             vec![Node {
                 opening_parenthesis_span: 0,
                 value: NodeValue::Regular(RegularNodeValue {
                     key: "Hello".into(),
                     key_span: 1..6,
-                    data: Some("World".into()),
-                    data_span: 7..12,
+                    data: Some("Worldä".into()),
+                    data_span: 7..13,
                     children: vec![].into(),
                 }),
-                closing_parenthesis_span: 14,
+                closing_parenthesis_span: 13,
             }],
-            vec![ParseError::InvalidCharacter('ä', 12)],
+            vec![],
         ),
         (
             trailing_space,

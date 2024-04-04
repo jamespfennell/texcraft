@@ -154,10 +154,13 @@ pub struct ExtensibleRecipe {
 
 impl ExtensibleRecipe {
     pub fn is_seven_bit(&self) -> bool {
+        self.chars().all(|c| c.is_seven_bit())
+    }
+
+    pub fn chars(&self) -> impl Iterator<Item = Char> {
         [self.top, self.middle, self.bottom, Some(self.rep)]
             .into_iter()
             .flatten()
-            .all(|c| c.is_seven_bit())
     }
 }
 
@@ -284,10 +287,10 @@ impl From<crate::pl::File> for File {
         let kerns = lig_kern_program.unpack_kerns();
         let lig_kern_entrypoints = lig_kern_program.pack_entrypoints(lig_kern_entrypoints);
 
-        let mut widths = vec![];
-        let mut heights = vec![];
-        let mut depths = vec![];
-        let mut italic_corrections = vec![];
+        let mut widths = pl_file.additional_widths;
+        let mut heights = pl_file.additional_heights;
+        let mut depths = pl_file.additional_depths;
+        let mut italic_corrections = pl_file.additional_italics;
         for (char, char_dimens) in &pl_file.char_dimens {
             widths.push(char_dimens.width.unwrap_or_default());
             match char_dimens.height {

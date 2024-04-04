@@ -230,6 +230,7 @@ impl Header {
 ///
 /// TFM and PL files only support 1-byte characters.
 #[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Char(pub u8);
 
 impl std::fmt::Display for Char {
@@ -273,6 +274,7 @@ impl Char {
         (D, b'D'),
         (X, b'X'),
         (Y, b'Y'),
+        (Z, b'Z'),
     ];
 
     pub fn is_seven_bit(&self) -> bool {
@@ -292,6 +294,7 @@ impl Char {
 /// This is a non-lossy representation
 ///   because 10^(-6) is larger than 2^(-20).
 #[derive(Default, PartialEq, Eq, Debug, Copy, Clone, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Number(pub i32);
 
 impl Number {
@@ -367,6 +370,7 @@ impl std::fmt::Display for Number {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum FaceWeight {
     Light,
     Medium,
@@ -374,12 +378,14 @@ pub enum FaceWeight {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum FaceSlope {
     Roman,
     Italic,
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum FaceExpansion {
     Regular,
     Condensed,
@@ -387,6 +393,7 @@ pub enum FaceExpansion {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum Face {
     Valid(FaceWeight, FaceSlope, FaceExpansion),
     Other(u8),
@@ -445,6 +452,7 @@ impl From<Face> for u8 {
 
 /// A named TeX font metric parameter.
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum NamedParameter {
     Slant,
     Space,
@@ -515,7 +523,7 @@ impl NamedParameter {
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum NextLargerProgramWarning {
     NonExistentCharacter { original: Char, next_larger: Char },
-    InfiniteLoop(Char),
+    InfiniteLoop { original: Char, next_larger: Char },
 }
 
 impl NextLargerProgramWarning {
@@ -525,7 +533,7 @@ impl NextLargerProgramWarning {
                 original,
                 next_larger: _,
             } => *original,
-            NextLargerProgramWarning::InfiniteLoop(c) => *c,
+            NextLargerProgramWarning::InfiniteLoop { original, .. } => *original,
         }
     }
 
@@ -541,8 +549,8 @@ impl NextLargerProgramWarning {
                     next_larger.0
                 ]
             }
-            NextLargerProgramWarning::InfiniteLoop(c) => {
-                format!["Bad TFM file: Cycle in a character list!\nCharacter '{:03o} now ends the list.", c.0]
+            NextLargerProgramWarning::InfiniteLoop { original, .. } => {
+                format!["Bad TFM file: Cycle in a character list!\nCharacter '{:03o} now ends the list.", original.0]
             }
         }
     }
@@ -556,7 +564,7 @@ impl NextLargerProgramWarning {
     pub fn pltotf_section(&self) -> u8 {
         match self {
             NextLargerProgramWarning::NonExistentCharacter { .. } => 111,
-            NextLargerProgramWarning::InfiniteLoop(_) => 113,
+            NextLargerProgramWarning::InfiniteLoop { .. } => 113,
         }
     }
 
@@ -572,10 +580,10 @@ impl NextLargerProgramWarning {
                     original.0
                 ]
             }
-            NextLargerProgramWarning::InfiniteLoop(c) => {
+            NextLargerProgramWarning::InfiniteLoop { original, .. } => {
                 format![
                     "A cycle of NEXTLARGER characters has been broken at '{:03o}.",
-                    c.0
+                    original.0
                 ]
             }
         }
@@ -650,7 +658,10 @@ impl NextLargerProgramWarning {
 /// ];
 /// let (next_larger_program, warnings) = NextLargerProgram::new(edges.into_iter(), |_| true, true);
 ///
-/// assert_eq!(warnings, vec![NextLargerProgramWarning::InfiniteLoop(Char::Y)]);
+/// assert_eq!(warnings, vec![NextLargerProgramWarning::InfiniteLoop{
+///     original: Char::Y,
+///     next_larger: Char::X,
+/// }]);
 ///
 /// let sequence_X: Vec<Char> = next_larger_program.get(Char::X).collect();
 /// assert_eq!(sequence_X, vec![Char::Y]);
@@ -742,27 +753,27 @@ impl NextLargerProgram {
         // This function implements functionality in TFtoPL.2014.84 and PLtoTF.2014.{110,111,113}.
         let mut warnings: Vec<NextLargerProgramWarning> = vec![];
 
-        let mut node_to_parent = HashMap::<Char, Char>::new();
-        let mut node_to_num_children = HashMap::<Char, usize>::new();
-        for (child, parent) in edges {
-            if !character_exists(parent) {
+        let mut node_to_larger = HashMap::<Char, Char>::new();
+        let mut node_to_num_smaller = HashMap::<Char, usize>::new();
+        for (smaller, larger) in edges {
+            if !character_exists(larger) {
                 warnings.push(NextLargerProgramWarning::NonExistentCharacter {
-                    original: child,
-                    next_larger: parent,
+                    original: smaller,
+                    next_larger: larger,
                 });
                 if drop_non_existent_characters {
                     continue;
                 }
             }
-            node_to_parent.insert(child, parent);
-            node_to_num_children.entry(child).or_default();
-            *node_to_num_children.entry(parent).or_default() += 1;
+            node_to_larger.insert(smaller, larger);
+            node_to_num_smaller.entry(smaller).or_default();
+            *node_to_num_smaller.entry(larger).or_default() += 1;
         }
 
         let mut leaves: Vec<Char> = vec![];
         let mut non_leaves: BTreeSet<Char> = Default::default();
-        for (node, num_children) in &node_to_num_children {
-            if *num_children == 0 {
+        for (node, num_smaller) in &node_to_num_smaller {
+            if *num_smaller == 0 {
                 leaves.push(*node);
             } else {
                 non_leaves.insert(*node);
@@ -772,43 +783,46 @@ impl NextLargerProgram {
         let mut sorted_chars = vec![];
         let mut infinite_loop_warnings = vec![];
         loop {
-            while let Some(leaf) = leaves.pop() {
-                if let Some(parent) = node_to_parent.get(&leaf).copied() {
-                    let n = node_to_num_children
-                        .get_mut(&parent)
-                        .expect("`node_to_num_children` contains all nodes");
-                    *n = n
+            while let Some(smaller) = leaves.pop() {
+                if let Some(larger) = node_to_larger.get(&smaller).copied() {
+                    let num_smaller = node_to_num_smaller
+                        .get_mut(&larger)
+                        .expect("`node_to_num_smaller` contains all nodes");
+                    *num_smaller = num_smaller
                         .checked_sub(1)
-                        .expect("the parent of a child must have at least one child");
-                    if *n == 0 {
-                        leaves.push(parent);
-                        non_leaves.remove(&parent);
+                        .expect("the larger of a smaller must have at least one smaller");
+                    if *num_smaller == 0 {
+                        leaves.push(larger);
+                        non_leaves.remove(&larger);
                     }
                 }
-                sorted_chars.push(leaf);
+                sorted_chars.push(smaller);
             }
 
             // There could be pending nodes left because of a cycle.
             // We break the cycle at the largest node.
-            let child = match non_leaves.last() {
+            let smaller = match non_leaves.last() {
                 None => break,
                 Some(child) => *child,
             };
-            infinite_loop_warnings.push(NextLargerProgramWarning::InfiniteLoop(child));
-            let parent = node_to_parent.remove(&child).expect(
+            let larger = node_to_larger.remove(&smaller).expect(
                 "General graph fact: sum_(node)#in_edges(node)=sum_(node)#out_edges(node).
                 Fact about the next larger graph: #out_edges(node)<=1, because each char has at most one next larger char.
                 If #out_edge(child)=0 then sum_(node)#in_edges(node)=sum_(node)#out_edges(node) < #nodes.
                 Thus there exists another node with #in_edges(node)=0 and that node is a leaf.
                 But `leaves.len()=0` at this line of code",
             );
-            leaves.push(parent);
-            non_leaves.remove(&parent);
+            infinite_loop_warnings.push(NextLargerProgramWarning::InfiniteLoop {
+                original: smaller,
+                next_larger: larger,
+            });
+            leaves.push(larger);
+            non_leaves.remove(&larger);
         }
         warnings.extend(infinite_loop_warnings.into_iter().rev());
 
         let next_larger = {
-            let parents: HashSet<Char> = node_to_parent.values().copied().collect();
+            let parents: HashSet<Char> = node_to_larger.values().copied().collect();
             let mut node_to_position = HashMap::<Char, u8>::new();
             let mut next_larger: Vec<(Char, NonZeroU8)> = vec![];
 
@@ -822,7 +836,7 @@ impl NextLargerProgram {
                     .len()
                     .try_into()
                     .expect("there are at most u8::MAX chars in the `next_larger` array");
-                let offset = match node_to_parent.get(c) {
+                let offset = match node_to_larger.get(c) {
                     // The next_larger array contains at most 256 elements: one for each char.
                     // (Actually it contains at most 255 because one character necessarily does not
                     // have a child node and this character does not appear in the array.)
@@ -860,7 +874,7 @@ impl NextLargerProgram {
                 .collect();
             let mut entrypoints = HashMap::<Char, u8>::new();
             for c in sorted_chars.iter().rev() {
-                if let Some(parent) = node_to_parent.get(c) {
+                if let Some(parent) = node_to_larger.get(c) {
                     entrypoints.insert(
                         *c,
                         *node_to_position
@@ -1017,13 +1031,61 @@ mod tests {
                 same_node_loop,
                 vec![(Char::A, Char::A)],
                 HashMap::from([(Char::A, vec![])]),
-                vec![NextLargerProgramWarning::InfiniteLoop(Char::A)],
+                vec![NextLargerProgramWarning::InfiniteLoop {
+                    original: Char::A,
+                    next_larger: Char::A,
+                }],
+            ),
+            (
+                two_loops,
+                vec![
+                    (Char::A, Char::B),
+                    (Char::B, Char::C),
+                    (Char::C, Char::B),
+                    (Char::X, Char::Y),
+                    (Char::Y, Char::Z),
+                    (Char::Z, Char::X),
+                ],
+                HashMap::from([
+                    (Char::A, vec![Char::B, Char::C]),
+                    (Char::B, vec![Char::C]),
+                    (Char::C, vec![]),
+                    (Char::X, vec![Char::Y, Char::Z]),
+                    (Char::Y, vec![Char::Z]),
+                    (Char::Z, vec![]),
+                ]),
+                vec![
+                    NextLargerProgramWarning::InfiniteLoop {
+                        original: Char::C,
+                        next_larger: Char::B,
+                    },
+                    NextLargerProgramWarning::InfiniteLoop {
+                        original: Char::Z,
+                        next_larger: Char::X,
+                    },
+                ],
+            ),
+            (
+                path_leading_to_loop,
+                vec![(Char::A, Char::B), (Char::B, Char::C), (Char::C, Char::B),],
+                HashMap::from([
+                    (Char::A, vec![Char::B, Char::C]),
+                    (Char::B, vec![Char::C]),
+                    (Char::C, vec![]),
+                ]),
+                vec![NextLargerProgramWarning::InfiniteLoop {
+                    original: Char::C,
+                    next_larger: Char::B,
+                }],
             ),
             (
                 big_infinite_loop,
                 big_infinite_loop_edges(),
                 big_infinite_loop_sequences(),
-                vec![NextLargerProgramWarning::InfiniteLoop(Char(u8::MAX))],
+                vec![NextLargerProgramWarning::InfiniteLoop {
+                    original: Char(u8::MAX),
+                    next_larger: Char(0),
+                }],
             ),
         );
     }
