@@ -5,8 +5,7 @@ The property list (.pl) file format.
 |-------------------------------------|-----------------------------------|-----------------------|--------------------------|----
 | fully parsed .pl file ([`File`])    | [`File::from_pl_source_code`]     | [`File::display`]     | [`File::from_ast`]       | [`File::lower`]
 | abstract syntax tree ([`ast::Ast`]) | [`ast::Ast::from_pl_source_code`] | `ast::Ast::display` (TODO) | [`ast::Ast::from_cst`]   | [`ast::Ast::lower`]
-| concrete syntax tree ([`cst::Cst`]) | [`cst::Cst::from_pl_source_code`] | [`cst::Cst::display`] | [`cst::Cst::from_lexer`] | N/A
-| tokens (vector of [`lexer::Token`]) | [`lexer::Lexer::new`] and [`lexer::Lexer::next`] | N/A    | N/A                      | N/A
+| concrete syntax tree ([`cst::Cst`]) | [`cst::Cst::from_pl_source_code`] | [`cst::Cst::display`] | N/A | N/A
 
 */
 
@@ -22,7 +21,6 @@ use crate::{
 pub mod ast;
 pub mod cst;
 mod error;
-pub mod lexer;
 pub use error::*;
 
 /// Maximum number of lig/kern instructions in a property list file.
@@ -631,8 +629,8 @@ impl File {
                 }
                 .into(),
             ),
-            ast::Root::Comment(vec!["DESIGNSIZE IS IN POINTS".into()]),
-            ast::Root::Comment(vec!["OTHER SIZES ARE MULTIPLES OF DESIGNSIZE".into()]),
+            ast::Root::Comment("DESIGNSIZE IS IN POINTS".into()),
+            ast::Root::Comment("OTHER SIZES ARE MULTIPLES OF DESIGNSIZE".into()),
             ast::Root::Checksum(self.header.checksum.unwrap_or_default().into()),
         ]);
         if self.header.seven_bit_safe == Some(true) {
@@ -728,16 +726,12 @@ impl File {
         };
 
         // When we fixed the (LIGTABLE (LABEL BOUNDARYCHAR) bug, number of failures went from 26652 -> 12004
-        let mut unreachable_elems: Option<Vec<cst::BalancedElem>> = None;
-        let flush_unreachable_elems =
-            |elems: &mut Option<Vec<cst::BalancedElem>>, l: &mut Vec<ast::LigTable>| {
-                if let Some(mut elems) = elems.take() {
-                    if elems.len() == 1 {
-                        elems.push(cst::BalancedElem::String("".to_string()));
-                    }
-                    l.push(ast::LigTable::Comment(elems))
-                }
-            };
+        let mut unreachable_elems: Option<String> = None;
+        let flush_unreachable_elems = |elems: &mut Option<String>, l: &mut Vec<ast::LigTable>| {
+            if let Some(elems) = elems.take() {
+                l.push(ast::LigTable::Comment(elems))
+            }
+        };
         for (index, (reachable, instruction)) in self
             .lig_kern_program
             .reachable_iter(
@@ -781,26 +775,19 @@ impl File {
                 }
                 ligkern::lang::ReachableIterItem::Unreachable => {
                     let unreachable_elems = unreachable_elems.get_or_insert_with(|| {
-                        vec![cst::BalancedElem::String(
-                            "THIS PART OF THE PROGRAM IS NEVER USED!".to_string(),
-                        )]
+                        // TODO: shouldn't have to add a starting space here!
+                        // Need to fix Node::write in the CST code
+                        " THIS PART OF THE PROGRAM IS NEVER USED!\n".to_string()
                     });
                     if let Some(op) = build_lig_kern_op(instruction) {
-                        unreachable_elems.push(cst::BalancedElem::Vec(
-                            op.into_balanced_elements(char_display_format),
-                        ));
+                        unreachable_elems
+                            .push_str(&format!["{}", op.lower(char_display_format).display(6, 3)]);
                     }
                 }
                 ligkern::lang::ReachableIterItem::Passthrough => {}
             }
         }
         flush_unreachable_elems(&mut unreachable_elems, &mut l);
-        if let Some(mut unreachable_elems) = unreachable_elems.take() {
-            if unreachable_elems.len() == 1 {
-                unreachable_elems.push(cst::BalancedElem::String("".to_string()));
-            }
-            l.push(ast::LigTable::Comment(unreachable_elems))
-        }
         if !self.lig_kern_program.instructions.is_empty() {
             roots.push(ast::Root::LigTable(((), l).into()))
         }
@@ -838,22 +825,20 @@ impl File {
             match self.char_tags.get(c) {
                 None => {}
                 Some(CharTag::Ligature(entrypoint)) => {
-                    let l: Vec<cst::BalancedElem> = self
+                    let l: Vec<cst::Node> = self
                         .lig_kern_program
                         .instructions_for_entrypoint(*entrypoint)
                         .map(|(_, b)| b)
                         .filter_map(build_lig_kern_op)
-                        .map(|n| {
-                            cst::BalancedElem::Vec(n.into_balanced_elements(char_display_format))
-                        })
+                        .map(|n| n.lower(char_display_format))
                         .collect();
                     if l.is_empty() {
-                        v.push(ast::Character::Comment(vec![
-                            cst::BalancedElem::String("".to_string()),
-                            cst::BalancedElem::String("".to_string()),
-                        ]));
+                        v.push(ast::Character::Comment("\n".into()));
                     } else {
-                        v.push(ast::Character::Comment(l));
+                        v.push(ast::Character::Comment(format![
+                            "\n{}",
+                            cst::Cst(l).display(6, 3)
+                        ]));
                     }
                 }
                 Some(CharTag::List(c)) => v.push(ast::Character::NextLarger((*c).into())),
@@ -910,7 +895,8 @@ impl<'a> std::fmt::Display for Display<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let ast = self.pl_file.lower(self.char_display_format);
         let cst = ast.lower(self.char_display_format);
-        cst.display(self.indent).fmt(f)
+        let d = cst.display(0, self.indent);
+        d.fmt(f)
     }
 }
 
@@ -927,6 +913,51 @@ pub enum CharDisplayFormat {
     Ascii,
     /// All characters are output in octal (e.g. `O 14`)
     Octal,
+}
+
+/// Iterator over the characters in the strings but with canonical Unix line endings.
+struct Chars<'a> {
+    s: &'a str,
+}
+
+impl<'a> Chars<'a> {
+    fn new(s: &'a str) -> Self {
+        Self { s }
+    }
+}
+
+impl<'a> Iterator for Chars<'a> {
+    type Item = char;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut iter = self.s.chars();
+        match iter.next() {
+            Some(mut c) => {
+                if c == '\r' {
+                    let mut skipped = 1;
+                    loop {
+                        match iter.next() {
+                            Some('\r') => {
+                                skipped += 1;
+                                continue;
+                            }
+                            Some('\n') => {
+                                c = '\n';
+                                self.s = &self.s[skipped..];
+                                break;
+                            }
+                            _ => break,
+                        }
+                    }
+                }
+                self.s = &self.s[c.len_utf8()..];
+                Some(c)
+            }
+            None => None,
+        }
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.s.len()))
+    }
 }
 
 #[cfg(test)]

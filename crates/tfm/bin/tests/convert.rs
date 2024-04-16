@@ -289,6 +289,10 @@ convert_tests!(
             },
         ),
     ),
+    (
+        cmr10_windows_newlines,
+        pltotf("computer-modern/cmr10", "_windows_newlines.plst", ".tfm")
+    ),
     (cmss8, roundtrip("computer-modern/cmss8")),
     (cmex10, roundtrip("computer-modern/cmex10")),
     (cminch, roundtrip("computer-modern/cminch")),
@@ -617,4 +621,13 @@ convert_tests!(
         pltotf_fuzz("b834b9111328cf0c")
     ),
     (all_plst_errors, pltotf_with_stderr("originals/all-errors"),),
+    (
+        all_plst_errors_windows_newlines,
+        pltotf_with_stderr(
+            "originals/all-errors",
+            "_windows_newlines.plst",
+            ".tfm",
+            ".stderr.txt"
+        ),
+    ),
 );

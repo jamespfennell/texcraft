@@ -8,7 +8,7 @@ use std::process::Command;
 
 fuzz_target!(|ast: tfm::pl::ast::Ast| {
     let cst = ast.lower(Default::default());
-    let pl_input = format!["{}", cst.display(3)];
+    let pl_input = format!["{}", cst.display(0, 3)];
 
     let dir = tempfile::TempDir::new().unwrap();
     let pl_file_path = dir.path().join("input.pl");

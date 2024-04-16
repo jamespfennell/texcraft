@@ -91,8 +91,7 @@
 //! - **Language analysis of .pl files**:
 //!     In `pltotf`, Knuth parses .pl files in a single pass.
 //!     This crate takes a common approach nowadays of parsing in multiple passes:
-//!     first running a [lexer](pl::lexer::Lexer) to convert the file to tokens,
-//!     then constructing a [concrete syntax tree](pl::cst::Cst) (or parse tree),
+//!     first constructing a [concrete syntax tree](pl::cst::Cst) (or parse tree),
 //!     next constructing a [fully typed and checked abstract syntax tree](pl::ast::Ast),
 //!     and finally building the [`pl::File`] itself.
 //!     Each of the passes is exposed, so you can e.g. just build the AST for the .pl file and

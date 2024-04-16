@@ -17,9 +17,7 @@ pub struct Ast(pub Vec<Root>);
 impl Ast {
     /// Build an AST directly from source code.
     pub fn from_pl_source_code(source: &str) -> (Ast, Vec<ParseWarning>) {
-        let lexer = super::lexer::Lexer::new(source);
-        let mut errors = vec![];
-        let cst = cst::Cst::from_lexer(lexer, &mut errors);
+        let (cst, mut errors) = cst::Cst::from_pl_source_code(source);
         let ast = Ast::from_cst(cst, &mut errors);
         (Ast(ast), errors)
     }
@@ -33,10 +31,12 @@ impl Ast {
     }
     /// Lower an AST to a CST.
     pub fn lower(self, char_display_format: super::CharDisplayFormat) -> cst::Cst {
-        let opts = LowerOpts {
-            char_display_format,
-        };
-        cst::Cst(self.0.into_iter().map(|c| Root::lower(c, &opts)).collect())
+        cst::Cst(
+            self.0
+                .into_iter()
+                .map(|c| Root::lower(c, char_display_format))
+                .collect(),
+        )
     }
 }
 
@@ -157,8 +157,8 @@ where
 ///     (it raises the private trait in public interface error (error E0445)).
 /// But with a trait impl we get away with it.
 trait ToFromCstNode: Sized {
-    fn from_cst_node(p: cst::RegularNodeValue, errors: &mut Vec<ParseWarning>) -> Option<Self>;
-    fn to_cst_node(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue;
+    fn from_cst_node(p: cst::RegularNode, errors: &mut Vec<ParseWarning>) -> Option<Self>;
+    fn to_cst_node(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNode;
 }
 
 struct LowerOpts {
@@ -166,7 +166,7 @@ struct LowerOpts {
 }
 
 impl<D: TryParse> ToFromCstNode for SingleValue<D> {
-    fn from_cst_node(p: cst::RegularNodeValue, errors: &mut Vec<ParseWarning>) -> Option<Self> {
+    fn from_cst_node(p: cst::RegularNode, errors: &mut Vec<ParseWarning>) -> Option<Self> {
         let (mut input, _) = Input::new(p, errors);
         let result = D::try_parse(&mut input).map(|data| Self {
             data: data.0,
@@ -175,19 +175,21 @@ impl<D: TryParse> ToFromCstNode for SingleValue<D> {
         input.find_junk(false);
         result
     }
-    fn to_cst_node(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue {
-        cst::RegularNodeValue {
+    fn to_cst_node(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNode {
+        cst::RegularNode {
+            opening_parenthesis_span: 0..0,
             key: key.into(),
             key_span: 0..0,
             data: TryParse::to_string(self.data, opts),
             data_span: self.data_span,
             children: None,
+            closing_parenthesis_span: 0..0,
         }
     }
 }
 
 impl<D: TryParse, E: Parse> ToFromCstNode for TupleValue<D, E> {
-    fn from_cst_node(p: cst::RegularNodeValue, errors: &mut Vec<ParseWarning>) -> Option<Self> {
+    fn from_cst_node(p: cst::RegularNode, errors: &mut Vec<ParseWarning>) -> Option<Self> {
         let (mut input, _) = Input::new(p, errors);
         let (left, left_span) = match D::try_parse(&mut input) {
             None => return None,
@@ -202,8 +204,9 @@ impl<D: TryParse, E: Parse> ToFromCstNode for TupleValue<D, E> {
             right_span,
         })
     }
-    fn to_cst_node(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue {
-        cst::RegularNodeValue {
+    fn to_cst_node(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNode {
+        cst::RegularNode {
+            opening_parenthesis_span: 0..0,
             key: key.into(),
             key_span: 0..0,
             data: Some(format![
@@ -213,12 +216,13 @@ impl<D: TryParse, E: Parse> ToFromCstNode for TupleValue<D, E> {
             ]),
             data_span: self.left_span.start..self.right_span.end,
             children: None,
+            closing_parenthesis_span: 0..0,
         }
     }
 }
 
 impl<D: Parse, E: Node> ToFromCstNode for Branch<D, E> {
-    fn from_cst_node(p: cst::RegularNodeValue, errors: &mut Vec<ParseWarning>) -> Option<Self> {
+    fn from_cst_node(p: cst::RegularNode, errors: &mut Vec<ParseWarning>) -> Option<Self> {
         {
             let (mut input, children) = Input::new(p, errors);
             let (data, data_span) = D::parse(&mut input);
@@ -233,8 +237,9 @@ impl<D: Parse, E: Node> ToFromCstNode for Branch<D, E> {
             })
         }
     }
-    fn to_cst_node(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNodeValue {
-        cst::RegularNodeValue {
+    fn to_cst_node(self, key: &'static str, opts: &LowerOpts) -> cst::RegularNode {
+        cst::RegularNode {
+            opening_parenthesis_span: 0..0,
             key: key.into(),
             key_span: 0..0,
             data: TryParse::to_string(self.data, opts),
@@ -245,17 +250,18 @@ impl<D: Parse, E: Node> ToFromCstNode for Branch<D, E> {
                     .map(|c| E::lower(c, opts))
                     .collect(),
             ),
+            closing_parenthesis_span: 0..0,
         }
     }
 }
 
 trait Node: Sized {
-    fn build_regular(p: cst::RegularNodeValue, errors: &mut Vec<ParseWarning>) -> Option<Self>;
-    fn build_comment(_: Vec<cst::BalancedElem>) -> Self;
+    fn build_regular(p: cst::RegularNode, errors: &mut Vec<ParseWarning>) -> Option<Self>;
+    fn build_comment(s: String) -> Self;
     fn build(n: cst::Node, errors: &mut Vec<ParseWarning>) -> Option<Self> {
-        match n.value {
-            cst::NodeValue::Comment(c) => Some(Node::build_comment(c)),
-            cst::NodeValue::Regular(r) => Node::build_regular(r, errors),
+        match n {
+            cst::Node::Comment(c) => Some(Node::build_comment(c)),
+            cst::Node::Regular(r) => Node::build_regular(r, errors),
         }
     }
     fn lower(self, opts: &LowerOpts) -> cst::Node;
@@ -273,7 +279,7 @@ macro_rules! node_impl {
         }
 
         impl Node for $type {
-            fn build_regular(mut r: cst::RegularNodeValue, errors: &mut Vec<ParseWarning>) -> Option<Self> {
+            fn build_regular(mut r: cst::RegularNode, errors: &mut Vec<ParseWarning>) -> Option<Self> {
                 r.key.make_ascii_uppercase();
                 match r.key.as_str() {
                     $(
@@ -297,32 +303,29 @@ macro_rules! node_impl {
                     },
                 }
             }
-            fn build_comment(v: Vec<cst::BalancedElem>) -> Self {
-                $type::Comment(v)
+            fn build_comment(s: String) -> Self {
+                $type::Comment(s)
             }
             fn lower(self, opts: &LowerOpts) -> cst::Node {
-                let value = match self {
+                match self {
                     $(
                         $type::$variant($( $prefix, )? v) => {
-                            cst::NodeValue::Regular(v.to_cst_node($str, opts))
+                            cst::Node::Regular(v.to_cst_node($str, opts))
                         }
                     )+
                     $type::Comment(balanced_elements) => {
-                            cst::NodeValue::Comment(balanced_elements)
+                            cst::Node::Comment(balanced_elements)
                     }
-                };
-                cst::Node {
-                    opening_parenthesis_span:0,
-                    value,
-                    closing_parenthesis_span: 0,
                 }
             }
         }
         impl $type {
-            pub fn into_balanced_elements(self, char_display_format: super::CharDisplayFormat) -> Vec<cst::BalancedElem> {
-                let opts =  LowerOpts{char_display_format};
-                self.lower(&opts).into_balanced_elements()
-            }
+          pub fn lower(self, char_display_format: super::CharDisplayFormat) -> cst::Node {
+            let opts = LowerOpts {
+              char_display_format,
+            };
+            Node::lower(self, &opts)
+          }
         }
     };
 }
@@ -409,7 +412,7 @@ pub enum Root {
     Character(Branch<Char, Character>),
 
     /// A comment that is ignored.
-    Comment(Vec<cst::BalancedElem>),
+    Comment(String),
 }
 
 node_impl!(
@@ -447,7 +450,7 @@ pub enum FontDimension {
     IndexedParam(TupleValue<ParameterNumber, Number>),
 
     /// A comment that is ignored.
-    Comment(Vec<cst::BalancedElem>),
+    Comment(String),
 }
 
 /// A [`u8`] that is output in decimal when lowering the AST to a CST.
@@ -615,7 +618,7 @@ pub enum Character {
     ExtensibleCharacter(Branch<(), ExtensibleCharacter>),
 
     /// A comment that is ignored.
-    Comment(Vec<cst::BalancedElem>),
+    Comment(String),
 }
 
 node_impl!(
@@ -647,7 +650,7 @@ pub enum ExtensibleCharacter {
     Replicated(SingleValue<Char>),
 
     /// A comment that is ignored.
-    Comment(Vec<cst::BalancedElem>),
+    Comment(String),
 }
 
 node_impl!(
@@ -718,7 +721,7 @@ pub enum LigTable {
     Skip(SingleValue<DecimalU8>),
 
     /// A comment that is ignored.
-    Comment(Vec<cst::BalancedElem>),
+    Comment(String),
 }
 
 /// Value of a label in a lig table.
@@ -827,7 +830,7 @@ struct Input<'a> {
 }
 
 impl<'a> Input<'a> {
-    fn new(p: cst::RegularNodeValue, errors: &'a mut Vec<ParseWarning>) -> (Self, Vec<cst::Node>) {
+    fn new(p: cst::RegularNode, errors: &'a mut Vec<ParseWarning>) -> (Self, Vec<cst::Node>) {
         (
             Input {
                 raw_data: p.data.unwrap_or_default(),
@@ -849,7 +852,7 @@ impl<'a> Input<'a> {
         self.raw_data[self.raw_data_offset..].chars().next()
     }
     fn consume_spaces(&mut self) {
-        while self.raw_data[self.raw_data_offset..].starts_with(' ') {
+        while self.raw_data[self.raw_data_offset..].starts_with([' ', '\n']) {
             self.raw_data_offset += 1;
             self.raw_data_span.start += 1;
         }
@@ -1412,8 +1415,6 @@ fn parse_u8(input: &mut Input) -> Result<u8, ParseU8Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::pl::cst::BalancedElem;
-
     use super::*;
 
     fn run(source: &str, want: Vec<Root>, want_errs: Vec<ParseWarning>) {
@@ -1819,14 +1820,12 @@ mod tests {
                     data: Number::UNITY * 18,
                     data_span: 140..144,
                 }),
-                Root::Comment(vec![BalancedElem::String("A COMMENT IS IGNORED".into())]),
-                Root::Comment(vec![BalancedElem::Vec(vec![BalancedElem::String(
-                    "EXCEPT THIS ONE ISN'T".into()
-                ),])]),
-                Root::Comment(vec![BalancedElem::Vec(vec![
-                    BalancedElem::String("ACTUALLY IT IS, EVEN THOUGH".into()),
-                    BalancedElem::String("IT SAYS IT ISN'T".into()),
-                ])]),
+                Root::Comment(" A COMMENT IS IGNORED".into()),
+                Root::Comment(" (EXCEPT THIS ONE ISN'T)".into()),
+                Root::Comment(format![
+                    " (ACTUALLY IT IS, EVEN THOUGH\n{}IT SAYS IT ISN'T)",
+                    " ".repeat(20)
+                ]),
                 Root::FontDimension(Branch {
                     data: (),
                     data_span: 362..362,

@@ -443,11 +443,7 @@ impl Undebug {
                 Ok(())
             }
             Err((err, n)) => {
-                // TODO: this logic should be behind an arg type like TfmFile?
-                let source = AriadneSource {
-                    path: self.input.clone(),
-                    source: data.clone().into(),
-                };
+                let source = tfm::pl::AriadneSource::new(self.input.as_path(), &data);
                 let range = line_range(&data, n);
                 let builder = ariadne::Report::build(ariadne::ReportKind::Error, (), range.start)
                     .with_message("failed to parse `tfmtools debug` output");
@@ -565,10 +561,7 @@ impl PlPath {
             Err(err) => return Err(format!("Failed to read `{}`: {}", self.0.display(), err)),
         };
         let (pl_file, warnings) = tfm::pl::File::from_pl_source_code(&data);
-        let source = AriadneSource {
-            path: self.0.clone(),
-            source: data.into(),
-        };
+        let source = tfm::pl::AriadneSource::new(self.0.as_path(), &data);
         for warning in &warnings {
             warning.ariadne_report().eprint(&source).unwrap();
         }
@@ -638,20 +631,5 @@ impl clap::builder::ValueParserFactory for TfOrPlPath {
 
     fn value_parser() -> Self::Parser {
         clap::builder::ValueParser::new(TfOrPlPath::parse)
-    }
-}
-
-pub struct AriadneSource {
-    pub path: std::path::PathBuf,
-    pub source: ariadne::Source,
-}
-
-impl ariadne::Cache<()> for &AriadneSource {
-    fn fetch(&mut self, _: &()) -> Result<&ariadne::Source, Box<dyn std::fmt::Debug + '_>> {
-        Ok(&self.source)
-    }
-
-    fn display<'a>(&self, _: &'a ()) -> Option<Box<dyn std::fmt::Display + 'a>> {
-        Some(Box::new(format!["{}", self.path.display()]))
     }
 }

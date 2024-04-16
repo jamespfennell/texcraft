@@ -372,11 +372,37 @@ impl ParseWarning {
     }
 }
 
+pub struct AriadneSource {
+    source: ariadne::Source,
+    path: std::path::PathBuf,
+}
+
+impl AriadneSource {
+    pub fn new(pl_path: &std::path::Path, pl_source: &str) -> Self {
+        let s: String = super::Chars::new(pl_source).collect();
+        Self {
+            source: s.into(),
+            path: pl_path.into(),
+        }
+    }
+}
+
+#[cfg(feature = "ariadne")]
+impl ariadne::Cache<()> for &AriadneSource {
+    fn fetch(&mut self, _: &()) -> Result<&ariadne::Source, Box<dyn std::fmt::Debug + '_>> {
+        Ok(&self.source)
+    }
+
+    fn display<'a>(&self, _: &'a ()) -> Option<Box<dyn std::fmt::Display + 'a>> {
+        Some(Box::new(format!["{}", self.path.display()]))
+    }
+}
+
 fn add_pltotf_error_context(pl_source: &str, error_message: String, error_point: usize) -> String {
     let mut line_index = 0;
     let mut line_offset = 0;
     let mut total_chars = 0;
-    for (i, c) in pl_source.chars().enumerate() {
+    for (i, c) in super::Chars::new(pl_source).enumerate() {
         total_chars += 1;
         if error_point == i {
             break;
