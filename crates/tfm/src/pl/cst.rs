@@ -165,9 +165,13 @@ fn parse(s: &str) -> (Cst, Vec<ParseWarning>) {
     let mut warnings = vec![];
     let mut cst = Cst(vec![]);
     let mut stack: Vec<RegularNode> = vec![];
+    let push = |cst: &mut Cst, stack: &mut Vec<RegularNode>, node: Node| match stack.last_mut() {
+        None => cst.0.push(node),
+        Some(tail) => tail.children.get_or_insert(vec![]).push(node),
+    };
 
     let mut iter = ParseIter::new(s);
-    while let Some((pos, c, is_added_closing_paren)) = iter.peek() {
+    while let Some((pos, c)) = iter.peek() {
         match c {
             '(' => {
                 iter.next();
@@ -175,11 +179,45 @@ fn parse(s: &str) -> (Cst, Vec<ParseWarning>) {
 
                 if key == "COMMENT" {
                     // todo: trim whitespace from the front of the comment?
-                    let node = Node::Comment(iter.accumulate_comment());
-                    match stack.last_mut() {
-                        None => cst.0.push(node),
-                        Some(tail) => tail.children.get_or_insert(vec![]).push(node),
+                    let mut comment = String::new();
+                    let mut comment_stack: Vec<usize> = vec![pos];
+                    for (u, c) in iter.by_ref() {
+                        match c {
+                            '(' => {
+                                comment_stack.push(u);
+                            }
+                            ')' => {
+                                comment_stack.pop();
+                                if comment_stack.is_empty() {
+                                    break;
+                                }
+                            }
+                            _ => {}
+                        }
+                        comment.push(c);
                     }
+                    // If there are unbalanced opening parentheses in a comment, only 2 warnings
+                    // are printed irrespective of the depth. The first warning is for the opening
+                    // parenthesis starting the comment, and the second warning is for the opening
+                    // parenthesis that increases the level to 1.
+                    while comment_stack.len() > 2 {
+                        comment.push(')');
+                        comment_stack.pop();
+                    }
+                    if comment_stack.len() == 2 {
+                        comment.push(')');
+                    }
+                    while let Some(u) = comment_stack.pop() {
+                        let pos = iter.next_pos;
+                        warnings.push(ParseWarning {
+                            span: pos..pos,
+                            knuth_pltotf_offset: Some(pos),
+                            kind: ParseWarningKind::UnbalancedOpeningParenthesis {
+                                opening_parenthesis_span: u..u + 1,
+                            },
+                        });
+                    }
+                    push(&mut cst, &mut stack, Node::Comment(comment));
                 } else {
                     iter.trim_whitespace();
                     let (data, data_span) = iter.accumulate_string();
@@ -205,16 +243,8 @@ fn parse(s: &str) -> (Cst, Vec<ParseWarning>) {
                         kind: ParseWarningKind::UnexpectedClosingParenthesis,
                     }),
                     Some(mut finished) => {
-                        finished.closing_parenthesis_span = if is_added_closing_paren {
-                            pos..pos
-                        } else {
-                            pos..pos + 1
-                        };
-                        let node = Node::Regular(finished);
-                        match stack.last_mut() {
-                            None => cst.0.push(node),
-                            Some(tail) => tail.children.get_or_insert(vec![]).push(node),
-                        }
+                        finished.closing_parenthesis_span = pos..pos + 1;
+                        push(&mut cst, &mut stack, Node::Regular(finished));
                     }
                 }
             }
@@ -232,60 +262,53 @@ fn parse(s: &str) -> (Cst, Vec<ParseWarning>) {
             }
         }
     }
+    while let Some(mut finished) = stack.pop() {
+        let pos = iter.next_pos;
+        warnings.push(ParseWarning {
+            span: pos..pos,
+            knuth_pltotf_offset: Some(pos),
+            kind: ParseWarningKind::UnbalancedOpeningParenthesis {
+                opening_parenthesis_span: finished.opening_parenthesis_span.clone(),
+            },
+        });
+        finished.closing_parenthesis_span = pos..pos;
+        push(&mut cst, &mut stack, Node::Regular(finished));
+    }
     warnings.extend(iter.warnings);
     (cst, warnings)
 }
 
 struct ParseIter<'a> {
-    iter: std::iter::Peekable<BalancedIter<super::Chars<'a>>>,
+    iter: std::iter::Peekable<super::Chars<'a>>,
     warnings: Vec<ParseWarning>,
-    last_observed_pos: usize,
+    next_pos: usize,
 }
 
 impl<'a> Iterator for ParseIter<'a> {
-    type Item = (usize, char, bool);
+    type Item = (usize, char);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let i = self.iter.next();
-        if let Some((pos, BalancedChar::Closing(opening_pos))) = i {
-            self.warnings.push(ParseWarning {
-                span: pos..pos,
-                knuth_pltotf_offset: Some(pos),
-                kind: ParseWarningKind::UnbalancedOpeningParenthesis {
-                    opening_parenthesis_span: opening_pos..opening_pos + 1,
-                },
-            });
-        }
-        self.convert(i)
+        self.iter.next().map(|c| {
+            let pos = self.next_pos;
+            self.next_pos += 1;
+            (pos, c)
+        })
     }
 }
 
 impl<'a> ParseIter<'a> {
     fn peek(&mut self) -> Option<<Self as Iterator>::Item> {
-        let i = self.iter.peek().copied();
-        self.convert(i)
-    }
-    fn convert(&mut self, i: Option<(usize, BalancedChar)>) -> Option<<Self as Iterator>::Item> {
-        match i {
-            Some((pos, balanced_char)) => {
-                self.last_observed_pos = pos;
-                Some(match balanced_char {
-                    BalancedChar::Regular(c) => (pos, c, false),
-                    BalancedChar::Closing(_) => (pos, ')', true),
-                })
-            }
-            None => None,
-        }
+        self.iter.peek().copied().map(|c| (self.next_pos, c))
     }
     fn new(s: &'a str) -> Self {
         Self {
-            iter: BalancedIter::new(super::Chars::new(s)).peekable(),
+            iter: super::Chars::new(s).peekable(),
             warnings: vec![],
-            last_observed_pos: 0,
+            next_pos: 0,
         }
     }
     fn trim_whitespace(&mut self) {
-        while let Some((_, c, _)) = self.peek() {
+        while let Some((_, c)) = self.peek() {
             match c {
                 ' ' | '\n' => {
                     self.next();
@@ -306,7 +329,7 @@ impl<'a> ParseIter<'a> {
     ) -> (String, std::ops::Range<usize>) {
         let mut s = String::new();
         let mut start: Option<usize> = None;
-        while let Some((pos, c, _)) = self.peek() {
+        while let Some((pos, c)) = self.peek() {
             if is_allowed_char(c) {
                 self.next();
                 s.push(c);
@@ -315,74 +338,8 @@ impl<'a> ParseIter<'a> {
                 break;
             }
         }
-        let start = start.unwrap_or(self.last_observed_pos);
-        (s, start..self.last_observed_pos)
-    }
-    fn accumulate_comment(&mut self) -> String {
-        let mut comment = String::new();
-        let mut level = 0_usize;
-        for (_, c, _) in self.by_ref() {
-            match c {
-                '(' => level += 1,
-                ')' => {
-                    level = match level.checked_sub(1) {
-                        None => break,
-                        Some(level) => level,
-                    }
-                }
-                _ => {}
-            }
-            comment.push(c);
-        }
-        comment
-    }
-}
-
-struct BalancedIter<T> {
-    iter: T,
-    pos: usize,
-    opening_parens: Vec<usize>,
-}
-
-#[derive(Clone, Copy)]
-enum BalancedChar {
-    Regular(char),
-    Closing(usize),
-}
-
-impl<T> BalancedIter<T> {
-    fn new(iter: T) -> Self {
-        Self {
-            iter,
-            pos: 0,
-            opening_parens: vec![],
-        }
-    }
-}
-
-impl<T: Iterator<Item = char>> Iterator for BalancedIter<T> {
-    type Item = (usize, BalancedChar);
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.iter.next() {
-            None => match self.opening_parens.pop() {
-                None => None,
-                Some(opening) => Some((self.pos, BalancedChar::Closing(opening))),
-            },
-            Some(c) => {
-                let pos = self.pos;
-                match c {
-                    '(' => {
-                        self.opening_parens.push(pos);
-                    }
-                    ')' => {
-                        self.opening_parens.pop();
-                    }
-                    _ => {}
-                }
-                self.pos += 1;
-                Some((pos, BalancedChar::Regular(c)))
-            }
-        }
+        let start = start.unwrap_or(self.next_pos);
+        (s, start..self.next_pos)
     }
 }
 

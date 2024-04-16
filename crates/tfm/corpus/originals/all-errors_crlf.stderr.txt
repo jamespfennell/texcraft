@@ -205,15 +205,6 @@ Sorry, I don't know that property name (line 135).
 HEADER indices should be 18 or more (line 145).
 (HEADER O 1 
             O 17)  
-File ended unexpectedly: No closing ")" (line 154).
-...) 
-    ...
-File ended unexpectedly: No closing ")" (line 154).
-...) 
-    ...
-File ended unexpectedly: No closing ")" (line 154).
-...) 
-    ...
 Infinite ligature loop starting with boundary and '101!
 All ligatures will be cleared.
 A cycle of NEXTLARGER characters has been broken at '102.

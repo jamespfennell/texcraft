@@ -146,6 +146,8 @@
 
 (COMMENT UnbalancedOpeningParenthesis
     this needs to be at the end of the file so as not to affect other errors)
-(unbalanced
-    opening
-    parenthesis
+(LIGTABLE
+    (COMMENT
+        (unbalanced opening parenthesis
+            (nested 
+                unbalanced

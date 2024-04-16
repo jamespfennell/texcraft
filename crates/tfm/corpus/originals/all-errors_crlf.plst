@@ -143,9 +143,3 @@
 
 (COMMENT HeaderIndexIsTooSmall)
 (HEADER O 1 O 17)
-
-(COMMENT UnbalancedOpeningParenthesis
-    this needs to be at the end of the file so as not to affect other errors)
-(unbalanced
-    opening
-    parenthesis

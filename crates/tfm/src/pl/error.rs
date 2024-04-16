@@ -416,7 +416,7 @@ fn add_pltotf_error_context(pl_source: &str, error_message: String, error_point:
     if error_point == total_chars {
         // This handles the unbalanced open parenthesis error.
         let num_lines = line_index + 1;
-        return format!("{error_message} (line {num_lines}).\n) \n ...",);
+        return format!("{error_message} (line {num_lines}).\n...) \n    ...",);
     }
     let line = pl_source
         .lines()

@@ -623,11 +623,6 @@ convert_tests!(
     (all_plst_errors, pltotf_with_stderr("originals/all-errors"),),
     (
         all_plst_errors_windows_newlines,
-        pltotf_with_stderr(
-            "originals/all-errors",
-            "_windows_newlines.plst",
-            ".tfm",
-            ".stderr.txt"
-        ),
+        pltotf_with_stderr("originals/all-errors_crlf"),
     ),
 );
