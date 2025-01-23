@@ -372,11 +372,13 @@ impl ParseWarning {
     }
 }
 
+#[cfg(feature = "ariadne")]
 pub struct AriadneSource {
     source: ariadne::Source,
     path: std::path::PathBuf,
 }
 
+#[cfg(feature = "ariadne")]
 impl AriadneSource {
     pub fn new(pl_path: &std::path::Path, pl_source: &str) -> Self {
         let s: String = super::Chars::new(pl_source).collect();

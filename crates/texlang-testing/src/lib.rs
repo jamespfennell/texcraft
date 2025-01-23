@@ -95,7 +95,8 @@ use texlang::vm::VM;
 use texlang::*;
 
 /// Texlang component that every unit testing state needs to have.
-#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TestingComponent {
     allow_undefined_command: bool,
     recover_from_errors: bool,
@@ -143,7 +144,8 @@ impl TestingComponent {
 ///
 /// If the primitives under test don't require custom components or
 /// other pieces in the state, it is easier to use this type rather than defining a custom one.
-#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct State {
     testing: TestingComponent,
 }
@@ -338,6 +340,17 @@ pub enum SerdeFormat {
     BinCode,
 }
 
+#[cfg(not(feature = "serde"))]
+/// Run a serialization/deserialization test
+pub fn run_serde_test<S>(
+    input_1: &str,
+    input_2: &str,
+    options: &[TestOption<S>],
+    format: SerdeFormat,
+) {
+}
+
+#[cfg(feature = "serde")]
 /// Run a serialization/deserialization test
 pub fn run_serde_test<S>(
     input_1: &str,

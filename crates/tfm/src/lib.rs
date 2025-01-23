@@ -188,7 +188,7 @@ pub struct Header {
 }
 
 pub struct Font {
-    _todo: bool,
+    pub lig_kern_program: ligkern::CompiledProgram,
 }
 
 impl Header {
@@ -254,6 +254,12 @@ impl TryFrom<char> for Char {
     fn try_from(value: char) -> Result<Self, Self::Error> {
         let u: u8 = value.try_into()?;
         Ok(Char(u))
+    }
+}
+
+impl Into<char> for Char {
+    fn into(self) -> char {
+        self.0 as char
     }
 }
 
