@@ -381,11 +381,8 @@ mod test {
     }
 
     texlang_testing::test_suite![
-        state(State),
-        options(
-            texlang_testing::TestOption::BuiltInCommands(built_in_commands),
-            texlang_testing::TestOption::AllowUndefinedCommands(true),
-        ),
+        @option(texlang_testing::TestOption::BuiltInCommands(built_in_commands)),
+        @option(texlang_testing::TestOption::AllowUndefinedCommands(true)),
         expansion_equality_tests(
             (def_parsed_successfully, r"\def\A{abc}", ""),
             (output_is_correct, r"\def\A{abc}\A", "abc"),

@@ -202,18 +202,19 @@ pub enum TestOption<'a, S> {
 /// Run an expansion equality test.
 ///
 /// The test passes if the two provided input strings expand to the same tokens.
-pub fn run_expansion_equality_test<S>(
+pub fn run_expansion_equality_test<S, H>(
     lhs: &str,
     rhs: &str,
     expect_recoverable_errors: bool,
     options: &[TestOption<S>],
 ) where
     S: Default + HasComponent<TestingComponent>,
+    H: texlang::vm::Handlers<S>,
 {
     let options = ResolvedOptions::new(options);
 
     let mut vm_1 = initialize_vm(&options);
-    let (output_1, _) = execute_source_code(&mut vm_1, lhs, &options)
+    let (output_1, _) = execute_source_code::<S, H>(&mut vm_1, lhs, &options)
         .map_err(|err| {
             println!("{err}");
             err
@@ -221,7 +222,7 @@ pub fn run_expansion_equality_test<S>(
         .unwrap();
 
     let mut vm_2 = initialize_vm(&options);
-    let (output_2, _) = execute_source_code(&mut vm_2, rhs, &options)
+    let (output_2, _) = execute_source_code::<S, H>(&mut vm_2, rhs, &options)
         .map_err(|err| {
             println!("{err}");
             err
@@ -322,7 +323,7 @@ where
     let options = ResolvedOptions::new(options);
 
     let mut vm = initialize_vm(&options);
-    let result = execute_source_code(&mut vm, input, &options);
+    let result = execute_source_code::<S, texlang::vm::DefaultHandlers>(&mut vm, input, &options);
     if let Ok((output, _)) = result {
         println!("Expansion succeeded:");
         println!(
@@ -331,6 +332,29 @@ where
         );
         panic!("Expansion failure test did not pass: expansion successful");
     }
+}
+
+/// Run a state verification test.
+///
+/// The test passes if after running the input TeX snippet,
+/// the state verifier function runs succesfully.
+pub fn run_state_test<S, H>(
+    input: &str,
+    options: &[TestOption<S>],
+    state_verifier: impl Fn(&S),
+) where
+    S: Default + HasComponent<TestingComponent>,
+    H: texlang::vm::Handlers<S>,
+{
+    let options = ResolvedOptions::new(options);
+    let mut vm = initialize_vm(&options);
+    execute_source_code::<S, H>(&mut vm, input, &options)
+        .map_err(|err| {
+            println!("{err}");
+            err
+        })
+        .unwrap();
+    state_verifier(&vm.state);
 }
 
 /// Format to use in a serde test.
@@ -363,7 +387,9 @@ pub fn run_serde_test<S>(
     let options = ResolvedOptions::new(options);
 
     let mut vm_1 = initialize_vm(&options);
-    let (mut output_1_1, _) = execute_source_code(&mut vm_1, input_1, &options).unwrap();
+    let (mut output_1_1, _) =
+        execute_source_code::<S, texlang::vm::DefaultHandlers>(&mut vm_1, input_1, &options)
+            .unwrap();
 
     let mut vm_1 = match format {
         SerdeFormat::Json => {
@@ -396,12 +422,19 @@ pub fn run_serde_test<S>(
         }
     };
 
-    let (mut output_1_2, _) = execute_source_code(&mut vm_1, input_2, &options).unwrap();
+    let (mut output_1_2, _) =
+        execute_source_code::<S, texlang::vm::DefaultHandlers>(&mut vm_1, input_2, &options)
+            .unwrap();
     output_1_1.append(&mut output_1_2);
 
     let mut vm_2 = initialize_vm(&options);
     let combined_input = format!["{input_1}{input_2}"];
-    let (output_2, _) = execute_source_code(&mut vm_2, &combined_input, &options).unwrap();
+    let (output_2, _) = execute_source_code::<S, texlang::vm::DefaultHandlers>(
+        &mut vm_2,
+        &combined_input,
+        &options,
+    )
+    .unwrap();
 
     compare_output(output_1_1, &vm_1, output_2, &vm_2)
 }
@@ -444,13 +477,14 @@ fn initialize_vm<S: Default>(options: &ResolvedOptions<S>) -> Box<vm::VM<S>> {
 }
 
 /// Execute source code in a VM with the provided options.
-fn execute_source_code<S>(
+fn execute_source_code<S, H>(
     vm: &mut vm::VM<S>,
     source: &str,
     options: &ResolvedOptions<S>,
 ) -> Result<(Vec<token::Token>, usize), Box<error::Error>>
 where
     S: Default + HasComponent<TestingComponent>,
+    H: texlang::vm::Handlers<S>,
 {
     vm.push_source("testing.tex", source).unwrap();
     {
@@ -459,7 +493,7 @@ where
         component.recover_from_errors = options.recover_from_errors;
         *component.num_recovered_errors.borrow_mut() = 0;
     }
-    vm.run::<Handlers>()?;
+    vm.run::<Handlers<H>>()?;
     Ok({
         let component = vm.state.component_mut();
         let tokens = component.take_tokens();
@@ -468,16 +502,16 @@ where
     })
 }
 
-struct Handlers;
+struct Handlers<H>(std::marker::PhantomData<H>);
 
-impl<S: HasComponent<TestingComponent>> vm::Handlers<S> for Handlers {
+impl<S: HasComponent<TestingComponent>, H: vm::Handlers<S>> vm::Handlers<S> for Handlers<H> {
     fn character_handler(
         input: &mut vm::ExecutionInput<S>,
         token: token::Token,
-        _: char,
+        c: char,
     ) -> command::Result<()> {
         input.state_mut().component_mut().tokens.push(token);
-        Ok(())
+        H::character_handler(input, token, c)
     }
 
     fn math_character_handler(
@@ -524,8 +558,8 @@ impl<S: HasComponent<TestingComponent>> vm::Handlers<S> for Handlers {
 /// ```
 /// # use texlang_testing::*;
 /// test_suite![
-///     state(State),
-///     options(TestOptions::InitialCommands(built_in_commands)),
+///     @state(State),
+///     @options(TestOptions::InitialCommands(built_in_commands)),
 ///     expansion_equality_tests(
 ///         (case_1, "lhs_1", "rhs_1"),
 ///         (case_2, "lhs_2", "rhs_2"),
@@ -562,21 +596,44 @@ impl<S: HasComponent<TestingComponent>> vm::Handlers<S> for Handlers {
 /// Zero or more of the other arguments may be provided, and in any order.
 #[macro_export]
 macro_rules! test_suite {
-    ( state($state: ty), options $options: tt, expansion_equality_tests ( $( ($name: ident, $lhs: expr, $rhs: expr $(,)? ) ),* $(,)? ) $(,)? ) => (
+    // expansion_equality_tests
+    (
+        @state($state: ty),
+        @handlers($handlers: ty),
+        @options $options: tt,
+        expansion_equality_tests(
+            $( ($name: ident, $lhs: expr, $rhs: expr $(,)? ), )*
+        ),
+    ) => (
         $(
             #[test]
             fn $name() {
                 let lhs = $lhs;
                 let rhs = $rhs;
                 let options = vec! $options;
-                texlang_testing::run_expansion_equality_test::<$state>(&lhs, &rhs, false, &options);
+                texlang_testing::run_expansion_equality_test::<$state, $handlers>(&lhs, &rhs, false, &options);
             }
         )*
     );
-    ( state($state: ty), options $options: tt, expansion_equality_tests $test_body: tt $(,)? ) => (
+    // expansion_equality_tests: fail with a helpful error message if the inner test cases are malformed
+    // (It would be nice to do this for other tests, too.)
+    (
+        @state($state: ty),
+        @handlers($handlers: ty),
+        @options $options: tt,
+        expansion_equality_tests $test_body: tt $(,)?
+    ) => (
         compile_error!("Invalid test cases for expansion_equality_tests: must be a list of tuples (name, lhs, rhs)");
     );
-    ( state($state: ty), options $options: tt, serde_tests ( $( ($name: ident, $lhs: expr, $rhs: expr $(,)? ) ),* $(,)? ) $(,)? ) => (
+    // serde_tests
+    (
+        @state($state: ty),
+        @handlers($handlers: ty),
+        @options $options: tt,
+        serde_tests(
+            $( ($name: ident, $lhs: expr, $rhs: expr $(,)? ), )*
+        ),
+    ) => (
         $(
             mod $name {
                 use super::*;
@@ -607,8 +664,16 @@ macro_rules! test_suite {
             }
         )*
     );
-    // TODO: rename unrecoverable_error_test
-    ( state($state: ty), options $options: tt, failure_tests ( $( ($name: ident, $input: expr $(,)? ) ),* $(,)? ) $(,)? ) => (
+    // failure_tests
+    // TODO: rename unrecoverable_error_tests
+    (
+        @state($state: ty),
+        @handlers($handlers: ty),
+        @options $options: tt,
+        failure_tests(
+            $( ($name: ident, $input: expr $(,)? ), )*
+        ),
+    ) => (
         $(
             #[test]
             fn $name() {
@@ -618,7 +683,15 @@ macro_rules! test_suite {
             }
         )*
     );
-    ( state($state: ty), options $options: tt, recoverable_failure_tests ( $( ($name: ident, $lhs: expr, $rhs: expr $(,)? ) ),* $(,)? ) $(,)? ) => (
+    // recoverable_failure_tests
+    (
+        @state($state: ty),
+        @handlers($handlers: ty),
+        @options $options: tt,
+        recoverable_failure_tests(
+            $( ($name: ident, $lhs: expr, $rhs: expr $(,)? ), )*
+        ),
+    ) => (
         $(
             mod $name {
                 use super::*;
@@ -629,7 +702,7 @@ macro_rules! test_suite {
                     let mut options = vec! $options;
                     options.push(TestOption::RecoverFromErrors(true));
                     // TODO: verify a recoverable error was thrown?
-                    texlang_testing::run_expansion_equality_test::<$state>(&lhs, &rhs, true, &options);
+                    texlang_testing::run_expansion_equality_test::<$state, $handlers>(&lhs, &rhs, true, &options);
                 }
                 #[test]
                 fn error_recovery_disabled() {
@@ -641,18 +714,106 @@ macro_rules! test_suite {
             }
         )*
     );
-    ( state($state: ty), options $options: tt, $test_kind: ident $test_cases: tt $(,)? ) => (
-        compile_error!("Invalid keyword: test_suite! only accepts the following keywords: `state, `options`, `expansion_equality_tests`, `failure_tests`, `serde_tests`");
-    );
-    ( state($state: ty), options $options: tt, $( $test_kind: ident $test_cases: tt ),+ $(,)? ) => (
+    // state_tests
+    (
+        @state($state: ty),
+        @handlers($handlers: ty),
+        @options $options: tt,
+        state_tests(
+            $( ($name: ident, $input: expr, $state_verifier: expr $(,)? ), )*
+        ),
+    ) => (
         $(
-            texlang_testing::test_suite![state($state), options $options, $test_kind $test_cases,];
+            #[test]
+            fn $name() {
+                let input = $input;
+                let options = vec! $options;
+                let state_verifier = $state_verifier;
+                texlang_testing::run_state_test::<$state, $handlers>(&input, &options, state_verifier);
+            }
+        )*
+    );
+    // Errors out if the test type (e.g. expansion_equality_tests) is invalid.
+    (
+        @state($state: ty),
+        @handlers($handlers: ty),
+        @options $options: tt,
+        $test_kind: ident $test_cases: tt,
+    ) => (
+        compile_error!("Invalid keyword: test_suite! only accepts the following keywords: `@state, `@handlerss`, `@options`, `expansion_equality_tests`, `failure_tests`, `serde_tests`");
+    );
+    // Creates one test suite for every test type.
+    (
+        @state($state: ty),
+        @handlers($handlers: ty),
+        @options $options: tt,
+        $( $test_kind: ident $test_cases: tt, )+
+    ) => (
+        $(
+            texlang_testing::test_suite![
+                @state($state),
+                @handlers($handlers),
+                @options $options,
+                $test_kind $test_cases,
+            ];
         )+
     );
-    ( options $options: tt, $( $test_kind: ident $test_cases: tt ),+ $(,)? ) => (
-        texlang_testing::test_suite![state(State), options $options, $( $test_kind $test_cases, )+ ];
+    // Sets the default state.
+    (
+        /* missing state */
+        $( @handlers($handlers: ty), )?
+        $( @options $options: tt, )?
+        $( $test_kind: ident $test_cases: tt, )+
+    ) => (
+        texlang_testing::test_suite![
+            @state(State),
+            $( @handlers($handlers), )?
+            $( @options $options, )?
+            $( $test_kind $test_cases, )+
+        ];
     );
-    ( $( $test_kind: ident $test_cases: tt ),+ $(,)? ) => (
-        texlang_testing::test_suite![options (texlang_testing::TestOption::BuiltInCommands(built_in_commands)), $( $test_kind $test_cases, )+ ];
+    // Sets the default handlers.
+    (
+        $( @state($state: ty), )?
+        /* missing handlers */
+        $( @options $options: tt, )?
+        $( $test_kind: ident $test_cases: tt, )+
+    ) => (
+        texlang_testing::test_suite![
+            $( @state($state), )?
+            @handlers(texlang::vm::DefaultHandlers),
+            $( @options $options, )?
+            $( $test_kind $test_cases, )+
+        ];
+    );
+    // Sets the default options.
+    (
+        $( @state($state: ty), )?
+        $( @handlers($handlers: ty), )?
+        /* missing options */
+        $( $test_kind: ident $test_cases: tt, )+
+    ) => (
+        texlang_testing::test_suite![
+            $( @state($state), )?
+            $( @handlers($handlers), )?
+            @options (texlang_testing::TestOption::BuiltInCommands(built_in_commands)),
+            $( $test_kind $test_cases, )+
+        ];
+    );
+    // Convert from @option() form to @options form.
+    (
+        $( @state($state: ty), )?
+        $( @handlers($handlers: ty), )?
+        $( @option($option: expr), )+
+        $( $test_kind: ident $test_cases: tt, )+
+    ) => (
+        texlang_testing::test_suite![
+            $( @state($state), )?
+            $( @handlers($handlers), )?
+            @options(
+                $( $option, )*
+            ),
+            $( $test_kind $test_cases, )+
+        ];
     );
 }

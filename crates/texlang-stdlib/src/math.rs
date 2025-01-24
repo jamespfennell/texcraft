@@ -252,7 +252,7 @@ mod tests {
                             $expected
                         ),
                     )*
-                )
+                ),
             ];
         };
     }

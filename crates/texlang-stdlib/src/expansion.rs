@@ -310,10 +310,8 @@ mod test {
     }
 
     test_suite![
-        options(
-            TestOption::BuiltInCommandsDyn(Box::new(|| { built_in_commands(true) })),
-            TestOption::AllowUndefinedCommands(true),
-        ),
+        @option(TestOption::BuiltInCommandsDyn(Box::new(|| { built_in_commands(true) }))),
+        @option(TestOption::AllowUndefinedCommands(true)),
         expansion_equality_tests(
             (simple_case, r"\def\a{Hello}\noexpand\a", r"\a"),
             (
@@ -365,7 +363,7 @@ mod test {
             mod expandafter_simple {
                 use super::*;
                 test_suite![
-                    options(TestOption::BuiltInCommandsDyn(Box::new(|| { built_in_commands(false) }))),
+                    @option(TestOption::BuiltInCommandsDyn(Box::new(|| { built_in_commands(false) }))),
                     expansion_equality_tests(
                         $(
                             ( $name, format!("{}{}{}", PREFIX, $lhs, POSTFIX), $rhs ),
@@ -376,7 +374,7 @@ mod test {
             mod expandafter_optimized {
                 use super::*;
                 test_suite![
-                    options(TestOption::BuiltInCommandsDyn(Box::new(|| { built_in_commands(true) }))),
+                    @option(TestOption::BuiltInCommandsDyn(Box::new(|| { built_in_commands(true) }))),
                     expansion_equality_tests(
                         $(
                             ( $name, format!("{}{}{}", PREFIX, $lhs, POSTFIX), $rhs ),

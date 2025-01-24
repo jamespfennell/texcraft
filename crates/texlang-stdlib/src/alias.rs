@@ -127,6 +127,6 @@ mod test {
             (serde_macro, r"\def\A{Hello World}\let\B=\A ", r"\A \B",),
             (serde_character, r"\let\A=B ", r"\A",),
         ),
-        failure_tests((let_unknown_cs_name, r"\let \B=\A")),
+        failure_tests((let_unknown_cs_name, r"\let \B=\A"),),
     ];
 }

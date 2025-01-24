@@ -647,7 +647,7 @@ mod tests {
                 serde_ifcase,
                 r"\ifcase 2 a\or b\or executed ",
                 r"case \or d \fi"
-            )
+            ),
         ),
         failure_tests(
             (iftrue_end_of_input, r"\iftrue a\else b"),

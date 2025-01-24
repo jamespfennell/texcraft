@@ -443,7 +443,7 @@ mod tests {
     }
 
     test_suite!(
-        options(
+        @options(
             TestOption::BuiltInCommands(built_in_commands),
             TestOption::CustomVMInitialization(custom_vm_initialization),
         ),
@@ -470,10 +470,8 @@ mod tests {
     }
 
     test_suite!(
-        options(
-            TestOption::BuiltInCommands(built_in_commands),
-            TestOption::CustomVMInitialization(end_input_vm_initialization),
-        ),
+        @option(TestOption::BuiltInCommands(built_in_commands)),
+        @option(TestOption::CustomVMInitialization(end_input_vm_initialization)),
         expansion_equality_tests(
             (end_input_simple, r"Hello\endinput World", "Hello",),
             (
@@ -502,7 +500,7 @@ mod tests {
     }
 
     test_suite!(
-        options(
+        @options(
             TestOption::BuiltInCommands(built_in_commands),
             TestOption::CustomVMInitialization(read_vm_initialization),
         ),
@@ -556,7 +554,7 @@ mod tests {
                 read_from_terminal,
                 r"\read 0 to \line line1='\line'\read 0 to \line line2='\line'\read 0 to \line line3='\line'",
                 "line1='first-line 'line2='second-line { third-line } 'line3='fourth'",
-            )
+            ),
         ),
         serde_tests((
             ifeof_file_exists_serde,
@@ -572,6 +570,6 @@ mod tests {
                 failed_to_read_from_terminal,
                 r"\read 0 to \X \read 0 to \X \read 0 to \X \read 0 to \X",
             ),
-        )
+        ),
     );
 }
