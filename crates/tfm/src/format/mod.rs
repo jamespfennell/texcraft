@@ -459,7 +459,7 @@ impl From<crate::pl::File> for File {
 ///
 /// Checking a particular delta is `O(n)`.
 /// The worst-case running time of Knuth's algorithm is then `O(n^3)` because the interval
-///     `[2^{k-1}, 2^k]` can contain `O(n^2)` distinct deltas to check in the worst-case.*
+///     `[2^{k-1}, 2^k]` can contain `O(n^2)` distinct deltas to check in the worst-case [Note 1].
 ///
 /// In the re-implementation here we realize that the problem of finding the smallest possible delta
 ///     is a classic binary search problem.
@@ -468,7 +468,7 @@ impl From<crate::pl::File> for File {
 /// The re-implementation using binary search is `O(n log n)`.
 /// Moreover, the constant factors are about the same.
 ///
-/// * In the worst-case there are O(n^2) distinct deltas because each pair of elements yields a delta.
+/// [Note 1] In the worst-case there are O(n^2) distinct deltas because each pair of elements yields a delta.
 /// Let m be the smallest delta and M the largest delta.
 /// In the initial `2^k`-based ranging scheme, the largest `K` satisfies `m 2^{K-1} < M <= m 2^K`,
 /// or `K-1 <= log_2(M/m)`. Thus there are `K=O(1)` ranges in this initial scheme.

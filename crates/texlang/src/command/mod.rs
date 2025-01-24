@@ -310,6 +310,12 @@ impl Tag {
 /// ```
 pub struct StaticTag(OnceCell<Tag>);
 
+impl Default for StaticTag {
+    fn default() -> Self {
+        StaticTag::new()
+    }
+}
+
 impl StaticTag {
     /// Create a new static tag.
     pub const fn new() -> StaticTag {

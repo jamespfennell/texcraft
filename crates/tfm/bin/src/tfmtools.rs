@@ -103,35 +103,35 @@ enum Command {
     /// There are at least two use cases for this command:
     ///
     /// 1.
-    ///     If you have a corrupted .tfm file and know enough about the format to fix it,
-    ///     you can run `tfmtools debug`,
-    ///     manually fix the bytes in the text output,
-    ///     and then create a hopefully valid .tfm from the modified output using `tfmtools undebug`.
+    ///        If you have a corrupted .tfm file and know enough about the format to fix it,
+    ///        you can run `tfmtools debug`,
+    ///        manually fix the bytes in the text output,
+    ///        and then create a hopefully valid .tfm from the modified output using `tfmtools undebug`.
     ///
     /// 2.
-    ///     If you're writing code that reads .tfm files (potentially using Texcraft's tfm crate)
-    ///     you can use this command to create invalid or otherwise unusual .tfm files
-    ///     for testing.
+    ///        If you're writing code that reads .tfm files (potentially using Texcraft's tfm crate)
+    ///        you can use this command to create invalid or otherwise unusual .tfm files
+    ///        for testing.
     ///
     /// When modifying the debug output it may be useful to some of the parsing rules:
     ///
     /// 1.
-    ///     Any of the .tfm sections can be omitted.
-    ///     All omitted sections are output as empty
-    ///     sections with the exception of the sub file sizes section, which is calculated
-    ///     correctly.
+    ///        Any of the .tfm sections can be omitted.
+    ///        All omitted sections are output as empty
+    ///        sections with the exception of the sub file sizes section, which is calculated
+    ///        correctly.
     ///
     /// 2.
-    ///     Only data within binary data sections is parsed.
-    ///     Text in other sections is completely ignored.
+    ///        Only data within binary data sections is parsed.
+    ///        Text in other sections is completely ignored.
     ///
     /// 3.
-    ///     Within binary data sections, all lines beginning with // are ignored.
+    ///        Within binary data sections, all lines beginning with // are ignored.
     ///
     /// 4.
-    ///     Within binary data sections, all data before the first | character is generally ignored.
-    ///     There is a single exception: in the first line of the character data section,
-    ///     any text before the first | is parsed as the first character in the file.
+    ///        Within binary data sections, all data before the first | character is generally ignored.
+    ///        There is a single exception: in the first line of the character data section,
+    ///        any text before the first | is parsed as the first character in the file.
     Undebug(Undebug),
 }
 

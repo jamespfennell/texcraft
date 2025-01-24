@@ -338,11 +338,8 @@ where
 ///
 /// The test passes if after running the input TeX snippet,
 /// the state verifier function runs succesfully.
-pub fn run_state_test<S, H>(
-    input: &str,
-    options: &[TestOption<S>],
-    state_verifier: impl Fn(&S),
-) where
+pub fn run_state_test<S, H>(input: &str, options: &[TestOption<S>], state_verifier: impl Fn(&S))
+where
     S: Default + HasComponent<TestingComponent>,
     H: texlang::vm::Handlers<S>,
 {

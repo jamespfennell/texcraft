@@ -267,10 +267,7 @@ fn format_char(c: Char) -> String {
 
 /// Inverse of [format_char].
 fn parse_char(prefix: &str) -> u8 {
-    let first_word = match prefix.split_whitespace().next() {
-        None => "",
-        Some(w) => w,
-    };
+    let first_word = prefix.split_whitespace().next().unwrap_or_default();
     if first_word.len() == 1 {
         if let Some(ch) = first_word.chars().next() {
             if ch.is_ascii_alphanumeric() || ch.is_ascii_graphic() {

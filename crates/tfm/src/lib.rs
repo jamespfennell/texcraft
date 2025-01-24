@@ -257,9 +257,9 @@ impl TryFrom<char> for Char {
     }
 }
 
-impl Into<char> for Char {
-    fn into(self) -> char {
-        self.0 as char
+impl From<Char> for char {
+    fn from(value: Char) -> Self {
+        value.0 as char
     }
 }
 
