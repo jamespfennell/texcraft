@@ -28,27 +28,25 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
     let alias = token::CommandRef::parse(input)?;
     OptionalEqualsUnexpanded::parse(input)?;
     match input.unexpanded().next()? {
-        None => Err(error::SimpleEndOfInputError::new(
-            input.vm(),
-            "unexpected end of input while reading the right hand side of a \\let assignment",
-        )
-        .into()),
+        None => {
+            return Err(error::SimpleEndOfInputError::new(
+                input.vm(),
+                "unexpected end of input while reading the right hand side of a \\let assignment",
+            )
+            .into())
+        }
         Some(token) => match token.value() {
             token::Value::CommandRef(command_ref) => {
-                match input
+                input
                     .commands_map_mut()
-                    .alias_control_sequence(alias, &command_ref, scope)
-                {
-                    Ok(()) => Ok(()),
-                    Err(_) => Err(error::UndefinedCommandError::new(input.vm(), token).into()),
-                }
+                    .alias_control_sequence(alias, &command_ref, scope);
             }
             _ => {
                 input.commands_map_mut().alias_token(alias, token, scope);
-                Ok(())
             }
         },
-    }
+    };
+    Ok(())
 }
 
 #[cfg(test)]
@@ -107,6 +105,7 @@ mod test {
             ),
             (let_for_macro_equals, r"\def\A{abc}\let\B=\A\B", "abc"),
             (let_character, r"\let\A=B\A", "B"),
+            (let_unknown_cs_name, r"\let \B=\undefined", ""),
         ),
         serde_tests(
             (
@@ -127,6 +126,5 @@ mod test {
             (serde_macro, r"\def\A{Hello World}\let\B=\A ", r"\A \B",),
             (serde_character, r"\let\A=B ", r"\A",),
         ),
-        failure_tests((let_unknown_cs_name, r"\let \B=\A"),),
     ];
 }

@@ -122,13 +122,10 @@ impl<S> Map<S> {
         alias: token::CommandRef,
         command: &token::CommandRef,
         scope: groupingmap::Scope,
-    ) -> std::result::Result<(), InvalidAlias> {
-        let command = match self.get_command(command) {
-            None => return Err(InvalidAlias {}),
-            Some(t) => t,
+    ) {
+        if let Some(command) = self.get_command(command) {
+            self.insert(alias, command.clone(), scope);
         };
-        self.insert(alias, command.clone(), scope);
-        Ok(())
     }
 
     pub fn alias_token(
