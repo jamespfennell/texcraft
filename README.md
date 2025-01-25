@@ -13,7 +13,7 @@ The same code can be shared between engines - for example,
     primitive](https://github.com/jamespfennell/texcraft/blob/main/crates/texlang-stdlib/src/registers.rs)
     can be used both for TeX '82 (which has 256 memory registers) and pdfTeX (which has over 32,000 registers).
 
-Initial work has focused on building a [fast](https://github.com/jamespfennell/texcraft/tree/main/performance)
+The first part of the projec that was built is a [fast](https://github.com/jamespfennell/texcraft/tree/main/performance)
   TeX language interpreter called Texlang,
   and a standard library of primitives such as `\def` that work with this interpreter.
 No typesetting work has been done yet.

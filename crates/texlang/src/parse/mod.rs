@@ -263,3 +263,31 @@ impl<S: TexlangState> Parsable<S> for SpacesUnexpanded {
         Ok(SpacesUnexpanded {})
     }
 }
+
+impl<S: TexlangState> Parsable<S> for Option<char> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+        let Some(token) = input.peek()? else {
+            return Ok(None);
+        };
+        let c = match token.value() {
+            token::Value::BeginGroup(_)
+            | token::Value::EndGroup(_)
+            | token::Value::MathShift(_)
+            | token::Value::AlignmentTab(_)
+            | token::Value::Parameter(_)
+            | token::Value::Superscript(_)
+            | token::Value::Subscript(_)
+            | token::Value::Space(_) => return Ok(None),
+            token::Value::Letter(c) => c,
+            token::Value::Other(c) => c,
+            token::Value::CommandRef(command_ref) => {
+                match input.commands_map().get_command(&command_ref) {
+                    Some(command::Command::Character(c)) => *c,
+                    _ => return Ok(None),
+                }
+            }
+        };
+        input.consume()?;
+        Ok(Some(c))
+    }
+}

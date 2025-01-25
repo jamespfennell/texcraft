@@ -1,0 +1,18 @@
+[package]
+name = "typesetting-texcraft"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Texcraft bindings for the typesetting crate"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+
+[dependencies]
+
+texlang = { path = "../texlang", version="0.1.0" }
+typesetting = { path = "../typesetting", version="0.1.0" }
+
+[dev-dependencies]
+texlang-testing = { path = "../texlang-testing", version = "0.1.0", default-features = false }
+texlang-stdlib = { path = "../texlang-stdlib", version = "0.1.0" }
