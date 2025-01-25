@@ -299,6 +299,10 @@ impl ErrorCase {
                 "\\count \"AAAAAAAAAAAAAAAAAAAAAA",
             ),
             ("number with letter catcode", r"\catcode `1 = 11 \count 1"),
+            (
+                "non-arithmetic argument to math command",
+                r"\advance \catcode 1 by 3",
+            ),
             /*
             ("", r""),
             ("", r""),

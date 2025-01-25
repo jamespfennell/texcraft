@@ -162,7 +162,7 @@ fn parse_number_internal<S: TexlangState>(
                     | command::Command::Macro(..)
                     | command::Command::CharacterTokenAlias(..),
                 ) => {
-                    return Err(parse::Error::new(
+                    let err = parse::Error::new(
                         stream.vm(),
                         "the beginning of a number",
                         Some(first_token),
@@ -171,12 +171,14 @@ fn parse_number_internal<S: TexlangState>(
                     .with_annotation_override(match cmd {
                         None => "undefined control sequence".to_string(),
                         Some(cmd) => format!["control sequence referencing {cmd}"],
-                    })
-                    .into());
+                    });
+                    stream.expansions_mut().push(first_token);
+                    return Err(err.into());
                 }
             }
         }
         _ => {
+            stream.expansions_mut().push(first_token);
             return Err(parse::Error::new(
                 stream.vm(),
                 "the beginning of a number",
@@ -260,6 +262,7 @@ fn parse_character<S: TexlangState>(
     }
 }
 
+// TODO: why is the radix a const parameter?
 fn parse_constant<S: TexlangState, const RADIX: i32>(
     stream: &mut vm::ExpandedStream<S>,
     mut result: i32,

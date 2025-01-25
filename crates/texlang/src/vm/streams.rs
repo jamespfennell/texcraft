@@ -135,6 +135,14 @@ impl<S: TexlangState> ExpandedStream<S> {
             .token_buffers
             .push(super::TokenBuffer(token_buffer))
     }
+
+    /// Returns a mutable reference to the expanded tokens stack for the current input source.
+    ///
+    /// The tokens are a stack, so the next token is the last token in the vector.
+    #[inline]
+    pub fn expansions_mut(&mut self) -> &mut Vec<Token> {
+        self.0 .0.internal.expansions_mut()
+    }
 }
 
 impl<S: TexlangState> TokenStream for ExpandedStream<S> {

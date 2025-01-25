@@ -144,6 +144,16 @@ impl<S> Command<S> {
             index_resolver: Some(IndexResolver::Static(index)),
         }
     }
+
+    /// Returns true if the variable command corresponds to arithmetic variable(s) (e.g. integer or glue).
+    ///
+    /// TODO: we should just expose the type.
+    pub fn is_arithmetic(&self) -> bool {
+        match self.getters {
+            Getters::Int(_, _) => true,
+            Getters::CatCode(_, _) | Getters::MathCode(_, _) | Getters::TokenList(_, _) => false,
+        }
+    }
 }
 
 impl<S: TexlangState> Command<S> {

@@ -51,7 +51,7 @@ struct AddOp;
 impl Op for AddOp {
     const DOC: &'static str = "Add an integer to a variable";
     fn perform(lhs: i32, rhs: i32) -> Result<i32, Box<error::Error>> {
-        // Note: TeX explicitly permits overflow in \advance
+        // Note: TeX silently overflows in \advance
         Ok(lhs.wrapping_add(rhs))
     }
 }
@@ -159,35 +159,37 @@ impl error::TexError for DivisionByZeroError {
 }
 
 fn math_primitive_fn<S: TexlangState, O: Op>(
-    token: token::Token,
+    _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<error::Error>> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
-    let variable = variable::Variable::parse(input)?;
+    let variable = match texlang::parse::ArithmeticVariable::parse(input) {
+        Ok(variable) => variable.0,
+        Err(err) => {
+            return S::recoverable_error_hook(input.vm(), err);
+        }
+    };
     OptionalBy::parse(input)?;
     match variable {
         variable::Variable::Int(variable) => {
             let lhs = *variable.get(input.state());
-            let rhs = i32::parse(input)?;
-            let result = O::perform(lhs, rhs)?;
+            let rhs = match i32::parse(input) {
+                Ok(rhs) => rhs,
+                Err(err) => return S::recoverable_error_hook(input.vm(), err),
+            };
+            let result = match O::perform(lhs, rhs) {
+                Ok(result) => result,
+                Err(err) => return S::recoverable_error_hook(input.vm(), err),
+            };
             variable.set(input, scope, result);
             Ok(())
         }
         variable::Variable::CatCode(_)
         | variable::Variable::TokenList(_)
-        | variable::Variable::MathCode(_) => invalid_variable_error(input.vm(), token),
+        | variable::Variable::MathCode(_) => {
+            unreachable!("only arithmetic commands are considered");
+        }
     }
-}
-
-fn invalid_variable_error<S>(vm: &vm::VM<S>, token: token::Token) -> Result<(), Box<error::Error>> {
-    Err(error::SimpleTokenError::new(
-        vm,
-        token,
-        "arithmetic commands cannot be applied to variables of type X",
-    )
-    .into())
-    // TODO .add_note(
-    //       "arithmetic commands (\\advance, \\multiply, \\divide) can be applied to integer, dimension, glue and muglue variables",
 }
 
 #[cfg(test)]
@@ -216,6 +218,12 @@ mod tests {
             state: &mut Self,
         ) -> texcraft_stdext::collections::groupingmap::Scope {
             prefix::variable_assignment_scope_hook(state)
+        }
+        fn recoverable_error_hook(
+            vm: &vm::VM<Self>,
+            recoverable_error: Box<error::Error>,
+        ) -> Result<(), Box<error::Error>> {
+            texlang_testing::TestingComponent::recoverable_error_hook(vm, recoverable_error)
         }
     }
 
@@ -321,25 +329,37 @@ mod tests {
                 "5"
             ),
         ),
-        failure_tests(
+        recoverable_failure_tests(
             (
                 advance_incorrect_keyword_1,
-                r"\count 1 1\advance\count 1 fy 2 \the \count 1"
+                r"\count 1 1\advance\count 1 fy 2 \the \count 1",
+                "fy 2 1",
             ),
             (
                 advance_incorrect_keyword_2,
-                r"\count 1 1\advance\count 1 be 2 \the \count 1"
+                r"\count 1 1\advance\count 1 be 2 \the \count 1",
+                "be 2 1",
             ),
-            (advance_catcode_not_supported, r"\advance\catcode 100 by 2"),
+            (
+                advance_catcode_not_supported,
+                r"\advance\catcode 100 by 2",
+                "100 by 2",
+            ),
             (
                 advance_checked_overflow,
-                r"\count 1 2147483647 \advanceChecked\count 1 by 1"
+                r"\count 1 2147483647 \advanceChecked\count 1 by 1",
+                "",
             ),
             (
                 multiply_overflow,
-                r"\count 1 100000 \multiply\count 1 by 100000"
+                r"\count 1 100000 \multiply\count 1 by 100000 \the \count 1",
+                "100000"
             ),
-            (divide_by_zero, r"\divide\count 1 by 0"),
+            (
+                divide_by_zero,
+                r"\count 1 20 \divide\count 1 by 0 \the\count 1",
+                "20"
+            ),
         ),
     ];
 }

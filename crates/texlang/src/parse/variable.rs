@@ -1,7 +1,10 @@
 use crate::traits::*;
 use crate::*;
 
-impl<S: TexlangState> Parsable<S> for variable::Variable<S> {
+/// Parses an arithmetic variable (integer, glue, dimension, etc).
+pub struct ArithmeticVariable<S>(pub variable::Variable<S>);
+
+impl<S: TexlangState> Parsable<S> for ArithmeticVariable<S> {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
         match input.next()? {
             None => Err(parse::Error::new(input.vm(), "a variable", None, "").into()),
@@ -13,7 +16,18 @@ impl<S: TexlangState> Parsable<S> for variable::Variable<S> {
                             .with_annotation_override("undefined control sequence")
                             .into()),
                         Some(command::Command::Variable(cmd)) => {
-                            Ok(cmd.clone().resolve(token, input)?)
+                            if !cmd.is_arithmetic() {
+                                Err(parse::Error::new(
+                                    input.vm(),
+                                    "an arithmetic variable",
+                                    Some(token),
+                                    "",
+                                )
+                                .with_got_override("got a non-arithmetic variable")
+                                .into())
+                            } else {
+                                Ok(ArithmeticVariable(cmd.clone().resolve(token, input)?))
+                            }
                         }
                         Some(cmd) => {
                             Err(parse::Error::new(input.vm(), "a variable", Some(token), "")
