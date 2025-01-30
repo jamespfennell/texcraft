@@ -87,20 +87,20 @@ pub fn get_batchmode<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 }
 
 pub fn recoverable_error_hook<S: HasComponent<Component> + common::HasLogging>(
-    vm: &vm::VM<S>,
+    state: &S,
     recoverable_error: Box<error::Error>,
 ) -> txl::Result<()> {
-    match &vm.state.component().mode {
+    match &state.component().mode {
         Mode::ErrorStop => {
             return Err(recoverable_error);
         }
         Mode::Scroll | Mode::NonStop => {
-            writeln!(vm.state.terminal_out().borrow_mut(), "{recoverable_error}").unwrap();
+            writeln!(state.terminal_out().borrow_mut(), "{recoverable_error}").unwrap();
         }
         Mode::Batch => {}
     }
-    writeln!(vm.state.log_file().borrow_mut(), "{recoverable_error}").unwrap();
-    vm.state
+    writeln!(state.log_file().borrow_mut(), "{recoverable_error}").unwrap();
+    state
         .component()
         .errors
         .borrow_mut()

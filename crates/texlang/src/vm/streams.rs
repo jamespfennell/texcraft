@@ -515,9 +515,7 @@ mod stream {
     }
 
     #[inline]
-    pub fn next_unexpanded<S: TexlangState>(
-        vm: &mut vm::VM<S>,
-    ) -> txl::Result<Option<Token>> {
+    pub fn next_unexpanded<S: TexlangState>(vm: &mut vm::VM<S>) -> txl::Result<Option<Token>> {
         if let Some(token) = vm.internal.current_source.expansions.pop() {
             return Ok(Some(token));
         }
@@ -538,9 +536,7 @@ mod stream {
         next_unexpanded_recurse(vm)
     }
 
-    fn next_unexpanded_recurse<S: TexlangState>(
-        vm: &mut vm::VM<S>,
-    ) -> txl::Result<Option<Token>> {
+    fn next_unexpanded_recurse<S: TexlangState>(vm: &mut vm::VM<S>) -> txl::Result<Option<Token>> {
         if vm.internal.pop_source() {
             next_unexpanded(vm)
         } else {
@@ -549,9 +545,7 @@ mod stream {
     }
 
     #[inline]
-    pub fn peek_unexpanded<S: TexlangState>(
-        vm: &mut vm::VM<S>,
-    ) -> txl::Result<Option<&Token>> {
+    pub fn peek_unexpanded<S: TexlangState>(vm: &mut vm::VM<S>) -> txl::Result<Option<&Token>> {
         if let Some(token) = vm.internal.current_source.expansions.last() {
             return Ok(Some(unsafe { launder(token) }));
         }
@@ -573,9 +567,7 @@ mod stream {
         peek_unexpanded_recurse(vm)
     }
 
-    fn peek_unexpanded_recurse<S: TexlangState>(
-        vm: &mut vm::VM<S>,
-    ) -> txl::Result<Option<&Token>> {
+    fn peek_unexpanded_recurse<S: TexlangState>(vm: &mut vm::VM<S>) -> txl::Result<Option<&Token>> {
         if vm.internal.pop_source() {
             peek_unexpanded(vm)
         } else {
@@ -591,9 +583,7 @@ mod stream {
         lexer::InvalidCharacterError::new(vm, c, trace_key).into()
     }
 
-    pub fn next_expanded<S: TexlangState>(
-        vm: &mut vm::VM<S>,
-    ) -> txl::Result<Option<Token>> {
+    pub fn next_expanded<S: TexlangState>(vm: &mut vm::VM<S>) -> txl::Result<Option<Token>> {
         let (token, command) = match next_unexpanded(vm)? {
             None => return Ok(None),
             Some(token) => match token.value() {
@@ -630,9 +620,7 @@ mod stream {
         }
     }
 
-    pub fn peek_expanded<S: TexlangState>(
-        vm: &mut vm::VM<S>,
-    ) -> txl::Result<Option<&Token>> {
+    pub fn peek_expanded<S: TexlangState>(vm: &mut vm::VM<S>) -> txl::Result<Option<&Token>> {
         let (token, command) = match peek_unexpanded(vm)? {
             None => return Ok(None),
             Some(token) => match token.value() {

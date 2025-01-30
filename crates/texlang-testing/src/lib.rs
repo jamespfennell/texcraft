@@ -116,10 +116,10 @@ impl TestingComponent {
     ///
     /// States used in unit testing must be configured to use this hook.
     pub fn recoverable_error_hook<S: HasComponent<Self>>(
-        vm: &VM<S>,
+        state: &S,
         recoverable_error: Box<error::Error>,
     ) -> txl::Result<()> {
-        let component = vm.state.component();
+        let component = state.component();
         if component.recover_from_errors {
             let mut num_recovered_errors = component.num_recovered_errors.borrow_mut();
             *num_recovered_errors += 1;
@@ -152,11 +152,8 @@ pub struct State {
 }
 
 impl TexlangState for State {
-    fn recoverable_error_hook(
-        vm: &VM<Self>,
-        recoverable_error: Box<error::Error>,
-    ) -> txl::Result<()> {
-        TestingComponent::recoverable_error_hook(vm, recoverable_error)
+    fn recoverable_error_hook(&self, recoverable_error: Box<error::Error>) -> txl::Result<()> {
+        TestingComponent::recoverable_error_hook(self, recoverable_error)
     }
 }
 

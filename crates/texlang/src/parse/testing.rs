@@ -67,12 +67,12 @@ impl<S: TexlangState> TexlangState for WrappedState<S> {
         self.inner.end_line_char()
     }
     fn recoverable_error_hook(
-        vm: &vm::VM<Self>,
+        &self,
         recoverable_error: Box<crate::error::Error>,
     ) -> Result<(), Box<crate::error::Error>> {
-        let mut num_errors = vm.state.num_errors.borrow_mut();
+        let mut num_errors = self.num_errors.borrow_mut();
         *num_errors = *num_errors + 1;
-        if vm.state.recover_from_errors {
+        if self.recover_from_errors {
             Ok(())
         } else {
             Err(recoverable_error)

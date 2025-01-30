@@ -167,7 +167,7 @@ fn math_primitive_fn<S: TexlangState, O: Op>(
     let variable = match texlang::parse::ArithmeticVariable::parse(input) {
         Ok(variable) => variable.0,
         Err(err) => {
-            return S::recoverable_error_hook(input.vm(), err);
+            return input.state().recoverable_error_hook(err);
         }
     };
     OptionalBy::parse(input)?;
@@ -176,11 +176,11 @@ fn math_primitive_fn<S: TexlangState, O: Op>(
             let lhs = *variable.get(input.state());
             let rhs = match i32::parse(input) {
                 Ok(rhs) => rhs,
-                Err(err) => return S::recoverable_error_hook(input.vm(), err),
+                Err(err) => return input.state().recoverable_error_hook(err),
             };
             let result = match O::perform(lhs, rhs) {
                 Ok(result) => result,
-                Err(err) => return S::recoverable_error_hook(input.vm(), err),
+                Err(err) => return input.state().recoverable_error_hook(err),
             };
             variable.set(input, scope, result);
             Ok(())
@@ -220,11 +220,8 @@ mod tests {
         ) -> texcraft_stdext::collections::groupingmap::Scope {
             prefix::variable_assignment_scope_hook(state)
         }
-        fn recoverable_error_hook(
-            vm: &vm::VM<Self>,
-            recoverable_error: Box<error::Error>,
-        ) -> txl::Result<()> {
-            texlang_testing::TestingComponent::recoverable_error_hook(vm, recoverable_error)
+        fn recoverable_error_hook(&self, recoverable_error: Box<error::Error>) -> txl::Result<()> {
+            texlang_testing::TestingComponent::recoverable_error_hook(self, recoverable_error)
         }
     }
 

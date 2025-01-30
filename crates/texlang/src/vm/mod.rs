@@ -313,11 +313,8 @@ pub trait TexlangState: Sized {
     ///     for the first 99 errors,
     ///     but after the 100th error a "too many errors" error would be returned from the hook.
     /// Note that the returned error in this case is not the 100th error itself.
-    fn recoverable_error_hook(
-        vm: &VM<Self>,
-        recoverable_error: Box<error::Error>,
-    ) -> txl::Result<()> {
-        _ = vm;
+    fn recoverable_error_hook(&self, recoverable_error: Box<error::Error>) -> txl::Result<()> {
+        _ = self;
         Err(recoverable_error)
     }
 }

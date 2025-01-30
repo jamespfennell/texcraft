@@ -28,8 +28,7 @@ impl<S: TexlangState, const N: usize> Parsable<S> for Uint<N> {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let (first_token, i): (token::Token, i32) = parse_number_internal(input)?;
         if i < 0 || i as usize >= N {
-            S::recoverable_error_hook(
-                input.vm(),
+            input.state().recoverable_error_hook(
                 OutOfBoundsError::<N> {
                     first_token: input.trace(first_token),
                     got: i,
@@ -79,8 +78,7 @@ impl<S: TexlangState> Parsable<S> for types::CatCode {
                 return Ok(cat_code);
             }
         }
-        S::recoverable_error_hook(
-            input.vm(),
+        input.state().recoverable_error_hook(
             parse::Error {
                 expected: "a category code number (an integer in the range [0, 15])".into(),
                 got: input.vm().trace(token),
