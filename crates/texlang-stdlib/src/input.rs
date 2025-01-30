@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::path;
 use std::rc::Rc;
 use texlang::parse::{FileLocation, OptionalEquals};
+use texlang::prelude as txl;
 use texlang::token::lexer;
 use texlang::token::trace;
 use texlang::traits::*;
@@ -273,7 +274,7 @@ fn read_from_terminal(
     terminal_in: &Rc<RefCell<dyn common::TerminalIn>>,
     tracer: &mut trace::Tracer,
     prompt: &Option<String>,
-) -> command::Result<Box<lexer::Lexer>> {
+) -> txl::Result<Box<lexer::Lexer>> {
     let mut buffer = String::new();
     if let Err(err) = terminal_in
         .borrow_mut()
@@ -303,7 +304,7 @@ impl<const N: usize, S> conditional::Condition<S> for IsEof<N>
 where
     S: HasComponent<Component<N>> + HasComponent<conditional::Component>,
 {
-    fn evaluate(input: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
+    fn evaluate(input: &mut vm::ExpansionInput<S>) -> txl::Result<bool> {
         let u = parse::Uint::<N>::parse(input)?;
         Ok(HasComponent::<Component<N>>::component(input.state())
             .files
@@ -317,7 +318,7 @@ fn read_file<S: common::HasFileSystem>(
     vm: &vm::VM<S>,
     file_location: parse::FileLocation,
     default_extension: &str,
-) -> command::Result<(path::PathBuf, String)> {
+) -> txl::Result<(path::PathBuf, String)> {
     let file_path = file_location.determine_full_path(
         vm.working_directory.as_ref().map(path::PathBuf::as_ref),
         default_extension,

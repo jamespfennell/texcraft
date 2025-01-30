@@ -4,13 +4,14 @@
 //! from an internal registers. The full definition of a number in the TeX grammar
 //! is given on page X of the TeXBook.
 
+use crate::prelude as txl;
 use crate::token::trace;
 use crate::token::Value;
 use crate::traits::*;
 use crate::*;
 
 impl<S: TexlangState> Parsable<S> for i32 {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let (_, i): (token::Token, i32) = parse_number_internal(input)?;
         Ok(i)
     }
@@ -24,7 +25,7 @@ impl Uint<0> {
 }
 
 impl<S: TexlangState, const N: usize> Parsable<S> for Uint<N> {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let (first_token, i): (token::Token, i32) = parse_number_internal(input)?;
         if i < 0 || i as usize >= N {
             S::recoverable_error_hook(
@@ -62,7 +63,7 @@ impl<const N: usize> error::TexError for OutOfBoundsError<N> {
 }
 
 impl<S: TexlangState> Parsable<S> for char {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let u1 = Uint::<{ char::MAX as usize }>::parse(input)?;
         let u2: u32 = u1.0.try_into().unwrap();
         Ok(char::from_u32(u2).unwrap())
@@ -71,7 +72,7 @@ impl<S: TexlangState> Parsable<S> for char {
 
 // TODO: move to types/catcode.rs
 impl<S: TexlangState> Parsable<S> for types::CatCode {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let (token, i): (token::Token, i32) = parse_number_internal(input)?;
         if let Ok(val_u8) = u8::try_from(i) {
             if let Ok(cat_code) = types::CatCode::try_from(val_u8) {
@@ -105,7 +106,7 @@ const GUIDANCE_BEGINNING: &str =
 
 fn parse_number_internal<S: TexlangState>(
     stream: &mut vm::ExpandedStream<S>,
-) -> Result<(token::Token, i32), Box<error::Error>> {
+) -> txl::Result<(token::Token, i32)> {
     let sign = parse_optional_signs(stream)?;
     let first_token = match stream.next()? {
         None => {
@@ -205,7 +206,7 @@ fn parse_number_internal<S: TexlangState>(
 /// Otherwise, the Token corresponding to the last negative sign is returned.
 fn parse_optional_signs<S: TexlangState>(
     stream: &mut vm::ExpandedStream<S>,
-) -> Result<Option<token::Token>, Box<error::Error>> {
+) -> txl::Result<Option<token::Token>> {
     let mut result = None;
     while let Some((sign, token)) = get_optional_element_with_token![
         stream,
@@ -222,9 +223,7 @@ fn parse_optional_signs<S: TexlangState>(
     Ok(result)
 }
 
-fn parse_character<S: TexlangState>(
-    input: &mut vm::ExpandedStream<S>,
-) -> Result<i32, Box<error::Error>> {
+fn parse_character<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<i32> {
     let c_or: Result<char, Option<token::Token>> = match input.next()? {
         None => Err(None),
         Some(token) => match token.value() {
@@ -266,7 +265,7 @@ fn parse_character<S: TexlangState>(
 fn parse_constant<S: TexlangState, const RADIX: i32>(
     stream: &mut vm::ExpandedStream<S>,
     mut result: i32,
-) -> Result<i32, Box<error::Error>> {
+) -> txl::Result<i32> {
     let mut started = RADIX == 10;
     loop {
         let next = match stream.peek()? {

@@ -2,6 +2,7 @@
 
 use crate::prefix;
 use texlang::parse::OptionalEqualsUnexpanded;
+use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
 
@@ -23,7 +24,7 @@ pub fn let_tag() -> command::Tag {
 fn let_primitive_fn<S: HasComponent<prefix::Component>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> Result<(), Box<error::Error>> {
+) -> txl::Result<()> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
     let alias = token::CommandRef::parse(input)?;
     OptionalEqualsUnexpanded::parse(input)?;
@@ -78,7 +79,7 @@ mod test {
         fn recoverable_error_hook(
             vm: &vm::VM<Self>,
             recoverable_error: Box<error::Error>,
-        ) -> Result<(), Box<error::Error>> {
+        ) -> txl::Result<()> {
             TestingComponent::recoverable_error_hook(vm, recoverable_error)
         }
     }

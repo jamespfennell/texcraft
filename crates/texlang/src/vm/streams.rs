@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use super::TexlangState;
+use crate::prelude as txl;
 use crate::token::trace;
 use crate::token::Token;
 use crate::*;
@@ -39,7 +40,7 @@ pub trait TokenStream {
     /// as the `next` method in Rust's iterator trait, except a stream can return an error.
     ///
     /// As with iterators, a result of `Ok(None)` indicates that the stream is exhausted.
-    fn next(&mut self) -> Result<Option<Token>, Box<error::Error>>;
+    fn next(&mut self) -> txl::Result<Option<Token>>;
 
     /// Peeks at the next token in the stream without removing it.
     ///
@@ -61,13 +62,13 @@ pub trait TokenStream {
     ///     rather than returned. The next token will be the first token in the expansion in this case,
     ///     or the following token in the remaining stream if the expansion returns no tokens.
     ///     This mutation is generally irreversible.
-    fn peek(&mut self) -> Result<Option<&Token>, Box<error::Error>>;
+    fn peek(&mut self) -> txl::Result<Option<&Token>>;
 
     /// Consumes the next token in the stream without returning it.
     ///
     /// This method is mostly to make code self-documenting. It is typically used in
     /// situations where a peek has already occurred, and the token itself is not needed.
-    fn consume(&mut self) -> Result<(), Box<error::Error>> {
+    fn consume(&mut self) -> txl::Result<()> {
         self.next().map(|_| ())
     }
 
@@ -118,7 +119,7 @@ impl<S: TexlangState> ExpandedStream<S> {
     ///
     /// This method only expands a single token. If, after the expansion, the next token
     /// is expandable it will not be expanded.
-    pub fn expand_once(&mut self) -> Result<bool, Box<error::Error>> {
+    pub fn expand_once(&mut self) -> txl::Result<bool> {
         stream::expand_once(&mut self.unexpanded().0)
     }
 
@@ -149,12 +150,12 @@ impl<S: TexlangState> TokenStream for ExpandedStream<S> {
     type S = S;
 
     #[inline]
-    fn next(&mut self) -> Result<Option<Token>, Box<error::Error>> {
+    fn next(&mut self) -> txl::Result<Option<Token>> {
         stream::next_expanded(&mut self.unexpanded().0)
     }
 
     #[inline]
-    fn peek(&mut self) -> Result<Option<&Token>, Box<error::Error>> {
+    fn peek(&mut self) -> txl::Result<Option<&Token>> {
         stream::peek_expanded(&mut self.unexpanded().0)
     }
 
@@ -178,12 +179,12 @@ impl<S: TexlangState> TokenStream for UnexpandedStream<S> {
     type S = S;
 
     #[inline]
-    fn next(&mut self) -> Result<Option<Token>, Box<error::Error>> {
+    fn next(&mut self) -> txl::Result<Option<Token>> {
         stream::next_unexpanded(&mut self.0)
     }
 
     #[inline]
-    fn peek(&mut self) -> Result<Option<&Token>, Box<error::Error>> {
+    fn peek(&mut self) -> txl::Result<Option<&Token>> {
         stream::peek_unexpanded(&mut self.0)
     }
 
@@ -227,11 +228,11 @@ impl<S> std::convert::AsMut<ExpandedStream<S>> for ExpansionInput<S> {
 impl<S: TexlangState> TokenStream for ExpansionInput<S> {
     type S = S;
 
-    fn next(&mut self) -> Result<Option<Token>, Box<error::Error>> {
+    fn next(&mut self) -> txl::Result<Option<Token>> {
         self.0.next()
     }
 
-    fn peek(&mut self) -> Result<Option<&Token>, Box<error::Error>> {
+    fn peek(&mut self) -> txl::Result<Option<&Token>> {
         self.0.peek()
     }
 
@@ -256,7 +257,7 @@ impl<S: TexlangState> ExpansionInput<S> {
         token: Token,
         file_name: PathBuf,
         source_code: String,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> txl::Result<()> {
         self.0
              .0
              .0
@@ -392,11 +393,11 @@ impl<S> std::convert::AsMut<ExpandedStream<S>> for ExecutionInput<S> {
 impl<S: TexlangState> TokenStream for ExecutionInput<S> {
     type S = S;
 
-    fn next(&mut self) -> Result<Option<Token>, Box<error::Error>> {
+    fn next(&mut self) -> txl::Result<Option<Token>> {
         self.0.next()
     }
 
-    fn peek(&mut self) -> Result<Option<&Token>, Box<error::Error>> {
+    fn peek(&mut self) -> txl::Result<Option<&Token>> {
         self.0.peek()
     }
 
@@ -447,7 +448,7 @@ impl<S> ExecutionInput<S> {
         self.0 .0 .0.begin_group()
     }
 
-    pub fn end_group(&mut self, token: Token) -> Result<(), Box<error::Error>> {
+    pub fn end_group(&mut self, token: Token) -> txl::Result<()> {
         self.0 .0 .0.end_group(token)
     }
     #[inline]
@@ -516,7 +517,7 @@ mod stream {
     #[inline]
     pub fn next_unexpanded<S: TexlangState>(
         vm: &mut vm::VM<S>,
-    ) -> Result<Option<Token>, Box<error::Error>> {
+    ) -> txl::Result<Option<Token>> {
         if let Some(token) = vm.internal.current_source.expansions.pop() {
             return Ok(Some(token));
         }
@@ -539,7 +540,7 @@ mod stream {
 
     fn next_unexpanded_recurse<S: TexlangState>(
         vm: &mut vm::VM<S>,
-    ) -> Result<Option<Token>, Box<error::Error>> {
+    ) -> txl::Result<Option<Token>> {
         if vm.internal.pop_source() {
             next_unexpanded(vm)
         } else {
@@ -550,7 +551,7 @@ mod stream {
     #[inline]
     pub fn peek_unexpanded<S: TexlangState>(
         vm: &mut vm::VM<S>,
-    ) -> Result<Option<&Token>, Box<error::Error>> {
+    ) -> txl::Result<Option<&Token>> {
         if let Some(token) = vm.internal.current_source.expansions.last() {
             return Ok(Some(unsafe { launder(token) }));
         }
@@ -574,7 +575,7 @@ mod stream {
 
     fn peek_unexpanded_recurse<S: TexlangState>(
         vm: &mut vm::VM<S>,
-    ) -> Result<Option<&Token>, Box<error::Error>> {
+    ) -> txl::Result<Option<&Token>> {
         if vm.internal.pop_source() {
             peek_unexpanded(vm)
         } else {
@@ -592,7 +593,7 @@ mod stream {
 
     pub fn next_expanded<S: TexlangState>(
         vm: &mut vm::VM<S>,
-    ) -> Result<Option<Token>, Box<error::Error>> {
+    ) -> txl::Result<Option<Token>> {
         let (token, command) = match next_unexpanded(vm)? {
             None => return Ok(None),
             Some(token) => match token.value() {
@@ -631,7 +632,7 @@ mod stream {
 
     pub fn peek_expanded<S: TexlangState>(
         vm: &mut vm::VM<S>,
-    ) -> Result<Option<&Token>, Box<error::Error>> {
+    ) -> txl::Result<Option<&Token>> {
         let (token, command) = match peek_unexpanded(vm)? {
             None => return Ok(None),
             Some(token) => match token.value() {
@@ -674,7 +675,7 @@ mod stream {
         }
     }
 
-    pub fn expand_once<S: TexlangState>(vm: &mut vm::VM<S>) -> Result<bool, Box<error::Error>> {
+    pub fn expand_once<S: TexlangState>(vm: &mut vm::VM<S>) -> txl::Result<bool> {
         let (token, command) = match peek_unexpanded(vm)? {
             None => return Ok(false),
             Some(token) => match token.value() {

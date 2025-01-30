@@ -2,6 +2,7 @@
 
 use super::script;
 use std::sync::Arc;
+use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
 use texlang_common as common;
@@ -102,7 +103,7 @@ pub mod run {
 /// This exits the REPL.
 pub fn get_exit<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
-        |_: token::Token, input: &mut vm::ExecutionInput<S>| -> command::Result<()> {
+        |_: token::Token, input: &mut vm::ExecutionInput<S>| -> txl::Result<()> {
             HasComponent::<Component>::component_mut(input.state_mut()).quit_requested = true;
             Err(error::SimpleEndOfInputError::new(
                 input.vm(),
@@ -118,7 +119,7 @@ pub fn get_exit<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 /// This prints help text for the REPL.
 pub fn get_help<S: HasComponent<Component> + common::HasLogging>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
-        |token: token::Token, input: &mut vm::ExecutionInput<S>| -> command::Result<()> {
+        |token: token::Token, input: &mut vm::ExecutionInput<S>| -> txl::Result<()> {
             let help = HasComponent::<Component>::component(input.state())
                 .help
                 .clone();
@@ -140,7 +141,7 @@ pub fn get_help<S: HasComponent<Component> + common::HasLogging>() -> command::B
 /// This prints the documentation for a TeX command.
 pub fn get_doc<S: TexlangState + common::HasLogging>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
-        |token: token::Token, input: &mut vm::ExecutionInput<S>| -> command::Result<()> {
+        |token: token::Token, input: &mut vm::ExecutionInput<S>| -> txl::Result<()> {
             let target = token::CommandRef::parse(input)?;
             let name = target.to_string(input.vm().cs_name_interner());
             let doc = match input.commands_map().get_command_slow(&target) {

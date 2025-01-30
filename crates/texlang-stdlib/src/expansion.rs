@@ -1,5 +1,6 @@
 //! Commands that alter the expansion process
 
+use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
 
@@ -10,7 +11,7 @@ pub fn get_noexpand<S>() -> command::BuiltIn<S> {
 
 static NO_EXPAND_TAG: command::StaticTag = command::StaticTag::new();
 
-fn noexpand_fn<S>(_: token::Token, _: &mut vm::ExpansionInput<S>) -> command::Result<()> {
+fn noexpand_fn<S>(_: token::Token, _: &mut vm::ExpansionInput<S>) -> txl::Result<()> {
     panic!(
         "The \\noexpand expansion function is never invoked directly. \
          Instead, the primitive operates through the \\noexpand hook, \
@@ -24,7 +25,7 @@ pub fn noexpand_hook<S: TexlangState>(
     token: token::Token,
     input: &mut vm::ExpansionInput<S>,
     tag: Option<command::Tag>,
-) -> command::Result<Option<token::Token>> {
+) -> txl::Result<Option<token::Token>> {
     // Fast path: this is not the \noexpand command.
     // We want this check to be inlined into the VM functions that perform
     if tag != Some(NO_EXPAND_TAG.get()) {
@@ -38,7 +39,7 @@ pub fn noexpand_hook<S: TexlangState>(
 fn noexpand_hook_finish<S: TexlangState>(
     token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> command::Result<Option<token::Token>> {
+) -> txl::Result<Option<token::Token>> {
     match input.unexpanded().next()? {
         None => Err(error::SimpleTokenError::new(
             input.vm(),
@@ -110,7 +111,7 @@ pub fn get_expandafter_optimized<S: TexlangState>() -> command::BuiltIn<S> {
 fn expandafter_simple_fn<S: TexlangState>(
     expandafter_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     let next = match input.unexpanded().next()? {
         None => {
             return Err(expandafter_missing_first_token_error(
@@ -135,7 +136,7 @@ fn expandafter_simple_fn<S: TexlangState>(
 fn expandafter_optimized_fn<S: TexlangState>(
     expandafter_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     let mut buffer: Vec<token::Token> = input.checkout_token_buffer();
     let unexpanded_input = input.unexpanded();
     loop {
@@ -284,7 +285,7 @@ mod test {
             token: token::Token,
             input: &mut vm::ExpansionInput<Self>,
             tag: Option<command::Tag>,
-        ) -> command::Result<Option<token::Token>> {
+        ) -> txl::Result<Option<token::Token>> {
             noexpand_hook(token, input, tag)
         }
     }

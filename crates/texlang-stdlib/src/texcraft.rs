@@ -3,6 +3,7 @@
 //! This primitive is essentially equivalent to `\def\Texcraft{Texcraft}`.
 //! It was implemented to serve as a simple example of a custom expansion primitive.
 
+use texlang::prelude as txl;
 use texlang::*;
 
 /// Get the `\texcraft` expansion primitive.
@@ -13,7 +14,7 @@ pub fn get_texcraft<S>() -> command::BuiltIn<S> {
 pub fn texcraft_primitive_fn<S>(
     token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     let expansions = input.expansions_mut();
     for c in "Texcraft".chars().rev() {
         expansions.push(token::Token::new_letter(c, token.trace_key()))

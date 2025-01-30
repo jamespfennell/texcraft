@@ -37,6 +37,7 @@ use crate::def;
 use crate::math;
 use std::collections::HashSet;
 use texcraft_stdext::collections::groupingmap;
+use texlang::prelude as txl;
 use texlang::token::trace;
 use texlang::traits::*;
 use texlang::*;
@@ -167,7 +168,7 @@ static OUTER_TAG: command::StaticTag = command::StaticTag::new();
 fn global_primitive_fn<S: HasComponent<Component>>(
     global_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     process_prefixes(
         Prefix {
             global: Some(global_token),
@@ -181,7 +182,7 @@ fn global_primitive_fn<S: HasComponent<Component>>(
 fn long_primitive_fn<S: HasComponent<Component>>(
     long_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     process_prefixes(
         Prefix {
             global: None,
@@ -195,7 +196,7 @@ fn long_primitive_fn<S: HasComponent<Component>>(
 fn outer_primitive_fn<S: HasComponent<Component>>(
     outer_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     process_prefixes(
         Prefix {
             global: None,
@@ -209,7 +210,7 @@ fn outer_primitive_fn<S: HasComponent<Component>>(
 fn process_prefixes<S: HasComponent<Component>>(
     mut prefix: Prefix,
     input: &mut vm::ExecutionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     complete_prefix(&mut prefix, input)?;
     match input.peek()? {
         None => Err(error::SimpleEndOfInputError::new(
@@ -286,7 +287,7 @@ fn process_prefixes<S: HasComponent<Component>>(
 fn complete_prefix<S: HasComponent<Component>>(
     prefix: &mut Prefix,
     input: &mut vm::ExecutionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     // BUG: spaces and \relax are allowed after prefixes per TeX source sections 1211 and 404.
     let found_prefix = match input.peek()? {
         None => false,
@@ -320,7 +321,7 @@ fn assert_only_global_prefix<S: TexlangState>(
     token: token::Token,
     prefix: Prefix,
     input: &vm::ExecutionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     if let Some(outer_token) = prefix.outer {
         Err(Error {
             kind: Kind::Outer,
@@ -407,7 +408,7 @@ pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::Buil
     fn noop_execution_cmd_fn<S: HasComponent<Component>>(
         token: token::Token,
         input: &mut vm::ExecutionInput<S>,
-    ) -> command::Result<()> {
+    ) -> txl::Result<()> {
         match input.state_mut().component_mut().read_and_reset_global() {
             groupingmap::Scope::Global => Err(error::SimpleTokenError::new(
                 input.vm(),

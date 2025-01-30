@@ -6,6 +6,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use texcraft_stdext::collections::groupingmap;
+use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
 use texlang_stdlib::*;
@@ -59,7 +60,7 @@ impl TexlangState for PlaygroundState {
         token: texlang::token::Token,
         input: &mut vm::ExpansionInput<Self>,
         tag: Option<texlang::command::Tag>,
-    ) -> command::Result<Option<texlang::token::Token>> {
+    ) -> txl::Result<Option<texlang::token::Token>> {
         expansion::noexpand_hook(token, input, tag)
     }
 

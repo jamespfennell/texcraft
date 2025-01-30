@@ -3,6 +3,7 @@ use std::{
     ffi::OsString,
     path::{Path, PathBuf},
 };
+use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
 use texlang_common as common;
@@ -83,7 +84,7 @@ fn dump_primitive_fn<
 >(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     let component = input.state().component();
     let mut job_name: OsString = component.job_name().into();
     let num_dumps = component.num_dumps;

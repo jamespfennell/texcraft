@@ -7,6 +7,7 @@
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
+use texlang::prelude as txl;
 use texlang::token::trace;
 use texlang::traits::*;
 use texlang::*;
@@ -123,7 +124,7 @@ static FI_TAG: command::StaticTag = command::StaticTag::new();
 fn true_case<S: HasComponent<Component>>(
     token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<(), Box<error::Error>> {
+) -> txl::Result<()> {
     push_branch(
         input,
         Branch {
@@ -141,7 +142,7 @@ fn true_case<S: HasComponent<Component>>(
 fn false_case<S: HasComponent<Component>>(
     original_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<(), Box<error::Error>> {
+) -> txl::Result<()> {
     let mut depth = 0;
     while let Some(token) = input.unexpanded().next()? {
         if let token::Value::CommandRef(command_ref) = &token.value() {
@@ -215,18 +216,17 @@ pub trait Condition<S: HasComponent<Component>> {
     ///
     /// Returns `true` if the condition is true, `false` if it is false,
     ///   and an error otherwise.
-    fn evaluate(input: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>>;
+    fn evaluate(input: &mut vm::ExpansionInput<S>) -> txl::Result<bool>;
 
     /// Build an `if` conditional command that uses this condition.
     fn build_if_command() -> command::BuiltIn<S> {
-        let primitive_fn = |token: token::Token,
-                            input: &mut vm::ExpansionInput<S>|
-         -> Result<(), Box<error::Error>> {
-            match Self::evaluate(input)? {
-                true => true_case(token, input),
-                false => false_case(token, input),
-            }
-        };
+        let primitive_fn =
+            |token: token::Token, input: &mut vm::ExpansionInput<S>| -> txl::Result<()> {
+                match Self::evaluate(input)? {
+                    true => true_case(token, input),
+                    false => false_case(token, input),
+                }
+            };
         let mut cmd = command::BuiltIn::new_expansion(primitive_fn).with_tag(IF_TAG.get());
         if let Some(doc) = Self::DOC {
             cmd = cmd.with_doc(doc)
@@ -240,7 +240,7 @@ struct IfTrue;
 impl<S: HasComponent<Component>> Condition<S> for IfTrue {
     const DOC: Option<&'static str> = Some(IFTRUE_DOC);
 
-    fn evaluate(_: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
+    fn evaluate(_: &mut vm::ExpansionInput<S>) -> txl::Result<bool> {
         Ok(true)
     }
 }
@@ -255,7 +255,7 @@ struct IfFalse;
 impl<S: HasComponent<Component>> Condition<S> for IfFalse {
     const DOC: Option<&'static str> = Some(IFFALSE_DOC);
 
-    fn evaluate(_: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
+    fn evaluate(_: &mut vm::ExpansionInput<S>) -> txl::Result<bool> {
         Ok(false)
     }
 }
@@ -270,7 +270,7 @@ struct IfNum;
 impl<S: HasComponent<Component>> Condition<S> for IfNum {
     const DOC: Option<&'static str> = Some(IFNUM_DOC);
 
-    fn evaluate(input: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
+    fn evaluate(input: &mut vm::ExpansionInput<S>) -> txl::Result<bool> {
         let (a, o, b) = <(i32, Ordering, i32)>::parse(input)?;
         Ok(a.cmp(&b) == o)
     }
@@ -286,7 +286,7 @@ struct IfOdd;
 impl<S: HasComponent<Component>> Condition<S> for IfOdd {
     const DOC: Option<&'static str> = Some(IFODD_DOC);
 
-    fn evaluate(input: &mut vm::ExpansionInput<S>) -> Result<bool, Box<error::Error>> {
+    fn evaluate(input: &mut vm::ExpansionInput<S>) -> txl::Result<bool> {
         let n = i32::parse(input)?;
         Ok((n % 2) == 1)
     }
@@ -300,7 +300,7 @@ pub fn get_ifodd<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn if_case_primitive_fn<S: HasComponent<Component>>(
     ifcase_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<(), Box<error::Error>> {
+) -> txl::Result<()> {
     // TODO: should we reading the number from the unexpanded stream? Probably!
     let mut cases_to_skip = i32::parse(input)?;
     if cases_to_skip == 0 {
@@ -391,7 +391,7 @@ pub fn get_ifcase<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn or_primitive_fn<S: HasComponent<Component>>(
     ifcase_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<(), Box<error::Error>> {
+) -> txl::Result<()> {
     let branch = pop_branch(input);
     // For an or command to be valid, we must be in a switch statement
     let is_valid = match branch {
@@ -462,7 +462,7 @@ pub fn get_or<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn else_primitive_fn<S: HasComponent<Component>>(
     else_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<(), Box<error::Error>> {
+) -> txl::Result<()> {
     let branch = pop_branch(input);
     // For else token to be valid, we must be in the true branch of a conditional
     let is_valid = match branch {
@@ -535,7 +535,7 @@ pub fn get_else<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn fi_primitive_fn<S: HasComponent<Component>>(
     token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<(), Box<error::Error>> {
+) -> txl::Result<()> {
     let branch = pop_branch(input);
     // For a \fi primitive to be valid, we must be in a conditional.
     // Note that we could be in the false branch: \iftrue\else\fi

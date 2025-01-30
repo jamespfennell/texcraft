@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 use texcraft_stdext::collections::groupingmap;
+use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
 
@@ -77,7 +78,7 @@ pub fn get_newint<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn newint_primitive_fn<S: HasComponent<Component>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     let command_ref = token::CommandRef::parse(input)?;
     let component = input.state_mut().component_mut();
     let index = component.singletons.len();
@@ -121,7 +122,7 @@ pub fn get_newintarray<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn newintarray_primitive_fn<S: HasComponent<Component>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     let command_ref = token::CommandRef::parse(input)?;
     let len = parse::Uint::<{ parse::Uint::MAX }>::parse(input)?.0;
     let component = input.state_mut().component_mut();
@@ -144,7 +145,7 @@ fn newintarray_primitive_fn<S: HasComponent<Component>>(
 fn resolve<S: HasComponent<Component>>(
     token: token::Token,
     input: &mut vm::ExpandedStream<S>,
-) -> command::Result<variable::Index> {
+) -> txl::Result<variable::Index> {
     let command_ref = match token.value() {
         token::Value::CommandRef(command_ref) => command_ref,
         _ => unreachable!(),

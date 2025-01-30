@@ -3,12 +3,13 @@
 //! A relation is defined on p209 of the TeXBook to be a character token with
 //! catcode 12 (other) and value <, = or >.
 
+use crate::prelude as txl;
 use crate::traits::*;
 use crate::{error, token, types, vm};
 use std::cmp::Ordering;
 
 impl<S: TexlangState> Parsable<S> for Ordering {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         get_required_element![
             input,
             "a relation",

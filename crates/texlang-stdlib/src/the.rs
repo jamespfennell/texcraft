@@ -1,6 +1,7 @@
 //! The `\the` primitive
 
 use std::char;
+use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
 
@@ -14,7 +15,7 @@ pub fn get_the<S: TexlangState>() -> command::BuiltIn<S> {
 fn the_primitive_fn<S: TexlangState>(
     the_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     let token = match input.next()? {
         None => return Err(error::SimpleEndOfInputError::new(input.vm(), "TODO").into()),
         Some(token) => token,

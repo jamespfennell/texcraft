@@ -10,6 +10,7 @@ use crate::command;
 use crate::command::BuiltIn;
 use crate::command::Command;
 use crate::error;
+use crate::prelude as txl;
 use crate::texmacro;
 use crate::token;
 use crate::token::lexer;
@@ -67,7 +68,7 @@ pub trait Handlers<S: TexlangState> {
         input: &mut ExecutionInput<S>,
         token: token::Token,
         character: char,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> txl::Result<()> {
         _ = (input, token, character);
         Ok(())
     }
@@ -80,7 +81,7 @@ pub trait Handlers<S: TexlangState> {
         input: &mut ExecutionInput<S>,
         token: token::Token,
         math_character: types::MathCode,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> txl::Result<()> {
         _ = math_character;
         Err(error::SimpleTokenError::new(
             input.vm(),
@@ -96,7 +97,7 @@ pub trait Handlers<S: TexlangState> {
     fn undefined_command_handler(
         input: &mut ExecutionInput<S>,
         token: token::Token,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> txl::Result<()> {
         Err(error::UndefinedCommandError::new(input.vm(), token).into())
     }
 
@@ -109,7 +110,7 @@ pub trait Handlers<S: TexlangState> {
     fn unexpanded_expansion_command(
         input: &mut ExecutionInput<S>,
         token: token::Token,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> txl::Result<()> {
         _ = (token, input);
         Ok(())
     }
@@ -125,7 +126,7 @@ impl<S: TexlangState> VM<S> {
     ///
     /// It is assumed that the VM has been preloaded with TeX source code using the
     /// [VM::push_source] method.
-    pub fn run<H: Handlers<S>>(&mut self) -> Result<(), Box<error::Error>> {
+    pub fn run<H: Handlers<S>>(&mut self) -> txl::Result<()> {
         let input = ExecutionInput::new(self);
         loop {
             let token = match input.next()? {
@@ -315,7 +316,7 @@ pub trait TexlangState: Sized {
     fn recoverable_error_hook(
         vm: &VM<Self>,
         recoverable_error: Box<error::Error>,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> txl::Result<()> {
         _ = vm;
         Err(recoverable_error)
     }
@@ -419,7 +420,7 @@ impl<S: TexlangState> VM<S> {
         &mut self,
         file_name: T1,
         source_code: T2,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> txl::Result<()> {
         self.internal
             .push_source(None, file_name.into(), source_code.into())
     }
@@ -460,7 +461,7 @@ impl<S> VM<S> {
         self.internal.save_stack.push(Default::default());
     }
 
-    fn end_group(&mut self, token: token::Token) -> Result<(), Box<error::Error>> {
+    fn end_group(&mut self, token: token::Token) -> txl::Result<()> {
         match self.commands_map.end_group() {
             Ok(()) => (),
             Err(_) => {
@@ -536,7 +537,7 @@ impl<S: TexlangState> Internal<S> {
         token: Option<Token>,
         file_name: PathBuf,
         source_code: String,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> txl::Result<()> {
         let trace_key_range =
             self.tracer
                 .register_source_code(token, trace::Origin::File(file_name), &source_code);

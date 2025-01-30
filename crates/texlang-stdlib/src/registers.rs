@@ -2,6 +2,7 @@
 
 use texcraft_stdext::collections::groupingmap;
 use texlang::parse::OptionalEquals;
+use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
 
@@ -70,7 +71,7 @@ pub fn get_toks<S: HasComponent<Component<Vec<token::Token>, N>>, const N: usize
 fn count_fn<T, S: HasComponent<Component<T, N>>, const N: usize>(
     _: token::Token,
     input: &mut vm::ExpandedStream<S>,
-) -> command::Result<variable::Index> {
+) -> txl::Result<variable::Index> {
     let index = parse::Uint::<N>::parse(input)?;
     Ok(index.0.into())
 }
@@ -89,7 +90,7 @@ pub fn get_toksdef<S: HasComponent<Component<Vec<token::Token>, N>>, const N: us
 fn countdef_fn<T: variable::SupportedType, S: HasComponent<Component<T, N>>, const N: usize>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     let (target, _, index) = <(token::CommandRef, OptionalEquals, parse::Uint<N>)>::parse(input)?;
     // TODO: I suspect \countdef should honor \global, but haven't checked pdfTeX.
     input.commands_map_mut().insert_variable_command(
@@ -138,7 +139,7 @@ mod tests {
         fn recoverable_error_hook(
             vm: &vm::VM<Self>,
             recoverable_error: Box<error::Error>,
-        ) -> Result<(), Box<error::Error>> {
+        ) -> txl::Result<()> {
             TestingComponent::recoverable_error_hook(vm, recoverable_error)
         }
     }

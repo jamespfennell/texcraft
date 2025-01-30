@@ -32,6 +32,7 @@ pub use variable::ArithmeticVariable;
 pub use variable::OptionalEquals;
 pub use variable::OptionalEqualsUnexpanded;
 
+use crate::prelude as txl;
 use crate::token::trace;
 use crate::traits::*;
 use crate::*;
@@ -42,7 +43,7 @@ pub trait Parsable<S: TexlangState>: Sized {
     ///
     /// This method just delegates to [Parsable::parse_impl].
     #[inline]
-    fn parse<I>(input: &mut I) -> Result<Self, Box<error::Error>>
+    fn parse<I>(input: &mut I) -> txl::Result<Self>
     where
         I: AsMut<vm::ExpandedStream<S>>,
     {
@@ -50,7 +51,7 @@ pub trait Parsable<S: TexlangState>: Sized {
     }
 
     /// Parses a value from the [vm::ExpandedStream].
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>>;
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self>;
 }
 
 #[derive(Debug)]
@@ -142,7 +143,7 @@ macro_rules! generate_tuple_impls {
         generate_tuple_impls![ $( $name ),+];
 
         impl<S: TexlangState, $first : Parsable<S>, $( $name : Parsable<S> ),+> Parsable<S> for ($first, $( $name ),+) {
-            fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+            fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
                 Ok(($first::parse(input)?, $( $name::parse(input)? ),+))
             }
         }
@@ -152,7 +153,7 @@ macro_rules! generate_tuple_impls {
 generate_tuple_impls![T1, T2, T3, T4, T5];
 
 impl<S: TexlangState> Parsable<S> for token::CommandRef {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         while let Some(found_equals) = get_optional_element![
             input.unexpanded(),
             token::Value::Space(_) => true,
@@ -171,7 +172,7 @@ impl<S: TexlangState> Parsable<S> for token::CommandRef {
 }
 
 impl<S: TexlangState> Parsable<S> for Vec<token::Token> {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let mut result = input.checkout_token_buffer();
         let first_token_or = input.next()?;
         let got = match first_token_or {
@@ -225,7 +226,7 @@ impl<S: TexlangState> Parsable<S> for Vec<token::Token> {
 pub fn finish_parsing_balanced_tokens<S: vm::TokenStream>(
     stream: &mut S,
     result: &mut Vec<token::Token>,
-) -> Result<bool, Box<error::Error>> {
+) -> txl::Result<bool> {
     let mut scope_depth = 0;
     while let Some(token) = stream.next()? {
         match token.value() {
@@ -249,7 +250,7 @@ pub fn finish_parsing_balanced_tokens<S: vm::TokenStream>(
 pub struct SpacesUnexpanded;
 
 impl<S: TexlangState> Parsable<S> for SpacesUnexpanded {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let input = input.unexpanded();
         while let Some(token) = input.peek()? {
             match token.value() {
@@ -265,7 +266,7 @@ impl<S: TexlangState> Parsable<S> for SpacesUnexpanded {
 }
 
 impl<S: TexlangState> Parsable<S> for Option<char> {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let Some(token) = input.peek()? else {
             return Ok(None);
         };

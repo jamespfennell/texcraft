@@ -1,6 +1,7 @@
 //! Operations on variables (add, multiply, divide)
 
 use texlang::parse::OptionalBy;
+use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
 
@@ -43,14 +44,14 @@ pub fn get_variable_op_tag() -> command::Tag {
 
 trait Op {
     const DOC: &'static str = "";
-    fn perform(lhs: i32, rhs: i32) -> Result<i32, Box<error::Error>>;
+    fn perform(lhs: i32, rhs: i32) -> txl::Result<i32>;
 }
 
 struct AddOp;
 
 impl Op for AddOp {
     const DOC: &'static str = "Add an integer to a variable";
-    fn perform(lhs: i32, rhs: i32) -> Result<i32, Box<error::Error>> {
+    fn perform(lhs: i32, rhs: i32) -> txl::Result<i32> {
         // Note: TeX silently overflows in \advance
         Ok(lhs.wrapping_add(rhs))
     }
@@ -60,7 +61,7 @@ struct AddCheckedOp;
 
 impl Op for AddCheckedOp {
     const DOC: &'static str = "Add an integer to a variable and error on overflow";
-    fn perform(lhs: i32, rhs: i32) -> Result<i32, Box<error::Error>> {
+    fn perform(lhs: i32, rhs: i32) -> txl::Result<i32> {
         match lhs.checked_add(rhs) {
             Some(result) => Ok(result),
             None => Err(OverflowError {
@@ -78,7 +79,7 @@ struct MultiplyOp;
 
 impl Op for MultiplyOp {
     const DOC: &'static str = "Multiply a variable by an integer";
-    fn perform(lhs: i32, rhs: i32) -> Result<i32, Box<error::Error>> {
+    fn perform(lhs: i32, rhs: i32) -> txl::Result<i32> {
         match lhs.checked_mul(rhs) {
             Some(result) => Ok(result),
             None => Err(OverflowError {
@@ -96,7 +97,7 @@ struct MultiplyWrappedOp;
 
 impl Op for MultiplyWrappedOp {
     const DOC: &'static str = "Multiply a variable by an integer and wrap on overflow";
-    fn perform(lhs: i32, rhs: i32) -> Result<i32, Box<error::Error>> {
+    fn perform(lhs: i32, rhs: i32) -> txl::Result<i32> {
         Ok(lhs.wrapping_mul(rhs))
     }
 }
@@ -105,7 +106,7 @@ struct DivideOp;
 
 impl Op for DivideOp {
     const DOC: &'static str = "Divide a variable by an integer";
-    fn perform(lhs: i32, rhs: i32) -> Result<i32, Box<error::Error>> {
+    fn perform(lhs: i32, rhs: i32) -> txl::Result<i32> {
         if rhs == 0 {
             return Err(DivisionByZeroError { numerator: lhs }.into());
         }
@@ -161,7 +162,7 @@ impl error::TexError for DivisionByZeroError {
 fn math_primitive_fn<S: TexlangState, O: Op>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> Result<(), Box<error::Error>> {
+) -> txl::Result<()> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
     let variable = match texlang::parse::ArithmeticVariable::parse(input) {
         Ok(variable) => variable.0,
@@ -222,7 +223,7 @@ mod tests {
         fn recoverable_error_hook(
             vm: &vm::VM<Self>,
             recoverable_error: Box<error::Error>,
-        ) -> Result<(), Box<error::Error>> {
+        ) -> txl::Result<()> {
             texlang_testing::TestingComponent::recoverable_error_hook(vm, recoverable_error)
         }
     }

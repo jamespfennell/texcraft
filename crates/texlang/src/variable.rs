@@ -8,6 +8,7 @@
 use crate::command;
 use crate::error;
 use crate::parse::OptionalEquals;
+use crate::prelude as txl;
 use crate::token;
 use crate::traits::*;
 use crate::types;
@@ -59,7 +60,7 @@ pub enum IndexResolver<S> {
     ///
     /// For example, in `\count 4` the index of `4` is determined by parsing a number
     /// from the input token stream.
-    Dynamic(fn(token::Token, &mut vm::ExpandedStream<S>) -> Result<Index, Box<error::Error>>),
+    Dynamic(fn(token::Token, &mut vm::ExpandedStream<S>) -> txl::Result<Index>),
 }
 
 impl<S> IndexResolver<S> {
@@ -68,7 +69,7 @@ impl<S> IndexResolver<S> {
         &self,
         token: token::Token,
         input: &mut vm::ExpandedStream<S>,
-    ) -> Result<Index, Box<error::Error>> {
+    ) -> txl::Result<Index> {
         match self {
             IndexResolver::Static(addr) => Ok(*addr),
             IndexResolver::Dynamic(f) => f(token, input),
@@ -162,7 +163,7 @@ impl<S: TexlangState> Command<S> {
         &self,
         token: token::Token,
         input: &mut vm::ExpandedStream<S>,
-    ) -> Result<Variable<S>, Box<error::Error>> {
+    ) -> txl::Result<Variable<S>> {
         let index = match &self.index_resolver {
             None => Index(0),
             Some(index_resolver) => match index_resolver.resolve(token, input) {
@@ -200,7 +201,7 @@ impl<S: TexlangState> Command<S> {
         &self,
         token: token::Token,
         input: &'a mut vm::ExpandedStream<S>,
-    ) -> Result<ValueRef<'a>, Box<error::Error>> {
+    ) -> txl::Result<ValueRef<'a>> {
         Ok(self.resolve(token, input)?.value(input.state()))
     }
 
@@ -214,7 +215,7 @@ impl<S: TexlangState> Command<S> {
         token: token::Token,
         input: &mut vm::ExecutionInput<S>,
         scope: groupingmap::Scope,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> txl::Result<()> {
         match self
             .resolve(token, input.as_mut())?
             .set_value_using_input(input, scope)
@@ -343,7 +344,7 @@ where
         &self,
         input: &mut vm::ExecutionInput<S>,
         scope: groupingmap::Scope,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> txl::Result<()> {
         let (_, value) = <(OptionalEquals, T)>::parse(input)?;
         self.set(input, scope, value);
         Ok(())
@@ -464,7 +465,7 @@ macro_rules! supported_type_impl {
                 &self,
                 input: &mut vm::ExecutionInput<S>,
                 scope: groupingmap::Scope,
-            ) -> Result<(), Box<error::Error>> {
+            ) -> txl::Result<()> {
                 match self {
                     $(
                         Variable::$enum_variant(variable) => variable.set_using_input(input, scope),

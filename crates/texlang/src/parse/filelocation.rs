@@ -4,6 +4,7 @@
 
 use std::path;
 
+use crate::prelude as txl;
 use crate::traits::*;
 use crate::*;
 
@@ -16,7 +17,7 @@ pub struct FileLocation {
 }
 
 impl<S: TexlangState> Parsable<S> for FileLocation {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let mut raw_string = String::new();
         let mut area_delimiter = None;
         let mut ext_delimiter = None;

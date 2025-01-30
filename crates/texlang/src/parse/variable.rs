@@ -1,3 +1,4 @@
+use crate::prelude as txl;
 use crate::traits::*;
 use crate::*;
 
@@ -5,7 +6,7 @@ use crate::*;
 pub struct ArithmeticVariable<S>(pub variable::Variable<S>);
 
 impl<S: TexlangState> Parsable<S> for ArithmeticVariable<S> {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         match input.next()? {
             None => Err(parse::Error::new(input.vm(), "a variable", None, "").into()),
             Some(token) => match token.value() {
@@ -51,7 +52,7 @@ impl<S: TexlangState> Parsable<S> for ArithmeticVariable<S> {
 pub struct OptionalEquals;
 
 impl<S: TexlangState> Parsable<S> for OptionalEquals {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         parse_optional_equals(input)?;
         Ok(OptionalEquals {})
     }
@@ -61,16 +62,14 @@ impl<S: TexlangState> Parsable<S> for OptionalEquals {
 pub struct OptionalEqualsUnexpanded;
 
 impl<S: TexlangState> Parsable<S> for OptionalEqualsUnexpanded {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         parse_optional_equals(input.unexpanded())?;
         Ok(OptionalEqualsUnexpanded {})
     }
 }
 
 // Corresponds to the `scan_optional_equals` procedure in Knuth's TeX (405)
-fn parse_optional_equals<S: TexlangState, I: TokenStream<S = S>>(
-    input: &mut I,
-) -> Result<(), Box<error::Error>> {
+fn parse_optional_equals<S: TexlangState, I: TokenStream<S = S>>(input: &mut I) -> txl::Result<()> {
     while let Some(found_equals) = get_optional_element![
         input,
         token::Value::Other('=') => true,

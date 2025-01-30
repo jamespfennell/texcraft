@@ -1,7 +1,7 @@
 //! # Texcraft bindings for the typesetting crate
 
+use texlang::prelude as txl;
 use texlang::{
-    error,
     parse::Parsable,
     token,
     vm::{ExecutionInput, TexlangState},
@@ -38,7 +38,7 @@ pub fn character_handler<S: HasEngine>(
     input: &mut ExecutionInput<S>,
     _: token::Token,
     starting_character: char,
-) -> Result<(), Box<error::Error>>
+) -> txl::Result<()>
 where
     <S as HasEngine>::Engine: CharacterHandlerCompatible,
 {
@@ -147,7 +147,7 @@ mod tests {
             input: &mut ExecutionInput<State>,
             token: token::Token,
             character: char,
-        ) -> Result<(), Box<error::Error>> {
+        ) -> txl::Result<()> {
             super::character_handler(input, token, character)
         }
     }

@@ -89,6 +89,7 @@ Also the Texlang standard library uses this macro extensively.
 
 use std::collections::HashMap;
 
+use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::vm::implement_has_component;
 use texlang::vm::VM;
@@ -117,7 +118,7 @@ impl TestingComponent {
     pub fn recoverable_error_hook<S: HasComponent<Self>>(
         vm: &VM<S>,
         recoverable_error: Box<error::Error>,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> txl::Result<()> {
         let component = vm.state.component();
         if component.recover_from_errors {
             let mut num_recovered_errors = component.num_recovered_errors.borrow_mut();
@@ -154,7 +155,7 @@ impl TexlangState for State {
     fn recoverable_error_hook(
         vm: &VM<Self>,
         recoverable_error: Box<error::Error>,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> txl::Result<()> {
         TestingComponent::recoverable_error_hook(vm, recoverable_error)
     }
 }
@@ -506,7 +507,7 @@ impl<S: HasComponent<TestingComponent>, H: vm::Handlers<S>> vm::Handlers<S> for 
         input: &mut vm::ExecutionInput<S>,
         token: token::Token,
         c: char,
-    ) -> command::Result<()> {
+    ) -> txl::Result<()> {
         input.state_mut().component_mut().tokens.push(token);
         H::character_handler(input, token, c)
     }
@@ -515,7 +516,7 @@ impl<S: HasComponent<TestingComponent>, H: vm::Handlers<S>> vm::Handlers<S> for 
         input: &mut vm::ExecutionInput<S>,
         token: token::Token,
         math_character: types::MathCode,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> txl::Result<()> {
         let s = format!("{math_character:?}");
         for c in s.chars() {
             let token = if c.is_ascii_alphabetic() {
@@ -531,7 +532,7 @@ impl<S: HasComponent<TestingComponent>, H: vm::Handlers<S>> vm::Handlers<S> for 
     fn undefined_command_handler(
         input: &mut vm::ExecutionInput<S>,
         token: token::Token,
-    ) -> command::Result<()> {
+    ) -> txl::Result<()> {
         if input.state().component().allow_undefined_command {
             input.state_mut().component_mut().tokens.push(token);
             Ok(())
@@ -543,7 +544,7 @@ impl<S: HasComponent<TestingComponent>, H: vm::Handlers<S>> vm::Handlers<S> for 
     fn unexpanded_expansion_command(
         input: &mut vm::ExecutionInput<S>,
         token: token::Token,
-    ) -> command::Result<()> {
+    ) -> txl::Result<()> {
         input.state_mut().component_mut().tokens.push(token);
         Ok(())
     }

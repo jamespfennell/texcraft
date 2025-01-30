@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::fmt::Debug;
+use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::types::CatCode;
 use texlang::*;
@@ -98,9 +99,7 @@ fn get_command<T: Code, S: HasComponent<Component<T>>>() -> command::BuiltIn<S> 
             state.component_mut().get_mut(index.0)
         },
         variable::IndexResolver::Dynamic(
-            |_: token::Token,
-             input: &mut vm::ExpandedStream<S>|
-             -> command::Result<variable::Index> {
+            |_: token::Token, input: &mut vm::ExpandedStream<S>| -> txl::Result<variable::Index> {
                 let c = char::parse(input)?;
                 let u = c as usize;
                 Ok(u.into())
@@ -128,7 +127,7 @@ mod tests {
         fn recoverable_error_hook(
             vm: &vm::VM<Self>,
             recoverable_error: Box<error::Error>,
-        ) -> Result<(), Box<error::Error>> {
+        ) -> txl::Result<()> {
             TestingComponent::recoverable_error_hook(vm, recoverable_error)
         }
     }

@@ -1,4 +1,5 @@
 use crate::error;
+use crate::prelude as txl;
 use crate::token;
 use crate::traits::*;
 use crate::vm;
@@ -7,7 +8,7 @@ use crate::vm;
 pub struct OptionalBy;
 
 impl<S: TexlangState> Parsable<S> for OptionalBy {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let Some(first) = input.peek()?.copied() else {
             return Ok(OptionalBy {});
         };
@@ -36,7 +37,7 @@ impl<S: TexlangState> Parsable<S> for OptionalBy {
 pub struct To;
 
 impl<S: TexlangState> Parsable<S> for To {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> Result<Self, Box<error::Error>> {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         get_required_element![
             input,
                 "the first of letter of the `to` keyword",

@@ -1,4 +1,5 @@
 //! The `\mathchardef` primitive.
+use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
 
@@ -10,7 +11,7 @@ pub fn get_mathchardef<S: TexlangState>() -> command::BuiltIn<S> {
 fn mathchardef_primitive_fn<S: TexlangState>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> Result<(), Box<error::Error>> {
+) -> txl::Result<()> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
     let (target, _, c) =
         <(token::CommandRef, parse::OptionalEquals, types::MathCode)>::parse(input)?;

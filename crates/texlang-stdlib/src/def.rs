@@ -4,6 +4,7 @@ use texcraft_stdext::algorithms::substringsearch::Matcher;
 use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
 use texcraft_stdext::nevec;
+use texlang::prelude as txl;
 use texlang::token::trace;
 use texlang::traits::*;
 use texlang::*;
@@ -29,14 +30,14 @@ pub fn def_tag() -> command::Tag {
 fn def_primitive_fn<S: TexlangState>(
     def_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> Result<(), Box<error::Error>> {
+) -> txl::Result<()> {
     parse_and_set_macro(def_token, input, false)
 }
 
 fn gdef_primitive_fn<S: TexlangState>(
     def_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> Result<(), Box<error::Error>> {
+) -> txl::Result<()> {
     parse_and_set_macro(def_token, input, true)
 }
 
@@ -44,7 +45,7 @@ fn parse_and_set_macro<S: TexlangState>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
     set_globally_override: bool,
-) -> Result<(), Box<error::Error>> {
+) -> txl::Result<()> {
     let mut scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
     if set_globally_override {
         scope = groupingmap::Scope::Global;
@@ -108,7 +109,7 @@ fn char_to_parameter_index(c: char) -> Option<usize> {
 
 fn parse_prefix_and_parameters<S: TexlangState>(
     input: &mut vm::UnexpandedStream<S>,
-) -> command::Result<(Vec<token::Token>, Vec<RawParameter>, Option<token::Token>)> {
+) -> txl::Result<(Vec<token::Token>, Vec<RawParameter>, Option<token::Token>)> {
     let mut prefix = Vec::new();
     let mut parameters = Vec::new();
     let mut replacement_end_token = None;
@@ -207,7 +208,7 @@ fn parse_replacement_text<S: TexlangState>(
     input: &mut vm::UnexpandedStream<S>,
     opt_final_token: Option<token::Token>,
     num_parameters: usize,
-) -> command::Result<Vec<texmacro::Replacement>> {
+) -> txl::Result<Vec<texmacro::Replacement>> {
     // TODO: could we use a pool of vectors to avoid some of the allocations here?
     let mut result = vec![];
     let mut scope_depth = 0;
@@ -366,7 +367,7 @@ mod test {
         fn recoverable_error_hook(
             vm: &vm::VM<Self>,
             recoverable_error: Box<error::Error>,
-        ) -> Result<(), Box<error::Error>> {
+        ) -> txl::Result<()> {
             texlang_testing::TestingComponent::recoverable_error_hook(vm, recoverable_error)
         }
     }

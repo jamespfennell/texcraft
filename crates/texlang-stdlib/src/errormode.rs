@@ -5,6 +5,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
 use texlang_common as common;
@@ -88,7 +89,7 @@ pub fn get_batchmode<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 pub fn recoverable_error_hook<S: HasComponent<Component> + common::HasLogging>(
     vm: &vm::VM<S>,
     recoverable_error: Box<error::Error>,
-) -> Result<(), Box<error::Error>> {
+) -> txl::Result<()> {
     match &vm.state.component().mode {
         Mode::ErrorStop => {
             return Err(recoverable_error);

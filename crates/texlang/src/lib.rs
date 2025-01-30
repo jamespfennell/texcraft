@@ -11,6 +11,7 @@ extern crate texcraft_stdext;
 pub mod command;
 pub mod error;
 pub mod parse;
+pub mod prelude;
 pub mod texmacro;
 pub mod token;
 pub mod types;

@@ -7,6 +7,7 @@
 use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
+use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
 
@@ -73,7 +74,7 @@ pub fn get_newline<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn newline_primitive_fn<S: HasComponent<Component>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     input.state_mut().component_mut().writer.add_newline();
     Ok(())
 }
@@ -89,7 +90,7 @@ pub fn get_par<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 fn par_primitive_fn<S: HasComponent<Component>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> command::Result<()> {
+) -> txl::Result<()> {
     input.state_mut().component_mut().writer.start_paragraph();
     Ok(())
 }
@@ -106,7 +107,7 @@ pub fn run_to_string<S: HasComponent<Component>>(
 }
 
 /// Run the Texlang interpreter for the provided VM and return the result as list of tokens.
-pub fn run<S: HasComponent<Component>>(vm: &mut vm::VM<S>) -> Result<(), Box<error::Error>> {
+pub fn run<S: HasComponent<Component>>(vm: &mut vm::VM<S>) -> txl::Result<()> {
     vm.run::<Handlers>()
 }
 
@@ -125,7 +126,7 @@ impl<S: HasComponent<Component>> vm::Handlers<S> for Handlers {
         input: &mut vm::ExecutionInput<S>,
         token: token::Token,
         _: char,
-    ) -> command::Result<()> {
+    ) -> txl::Result<()> {
         // TODO: it's really not great that the character is ignored.
         Component::write_token(input, token);
         Ok(())
@@ -134,7 +135,7 @@ impl<S: HasComponent<Component>> vm::Handlers<S> for Handlers {
     fn unexpanded_expansion_command(
         input: &mut vm::ExecutionInput<S>,
         token: token::Token,
-    ) -> command::Result<()> {
+    ) -> txl::Result<()> {
         Component::write_token(input, token);
         Ok(())
     }

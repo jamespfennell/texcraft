@@ -8,6 +8,7 @@ extern crate texlang;
 use std::collections::HashMap;
 
 use texlang::command;
+use texlang::prelude as txl;
 use texlang::token;
 use texlang::traits::*;
 use texlang::types;
@@ -88,7 +89,7 @@ impl TexlangState for StdLibState {
         token: texlang::token::Token,
         input: &mut vm::ExpansionInput<Self>,
         tag: Option<texlang::command::Tag>,
-    ) -> command::Result<Option<texlang::token::Token>> {
+    ) -> txl::Result<Option<texlang::token::Token>> {
         expansion::noexpand_hook(token, input, tag)
     }
 
