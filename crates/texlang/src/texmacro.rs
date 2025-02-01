@@ -5,6 +5,7 @@ use crate::error;
 use crate::parse;
 use crate::token;
 use crate::token::Token;
+use crate::token::Value;
 use crate::traits::*;
 use crate::vm;
 use colored::*;
@@ -43,7 +44,7 @@ pub enum Replacement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Parameter {
     Undelimited,
-    Delimited(Matcher<Token>),
+    Delimited(Matcher<Value>),
 }
 
 // Input type for macro hooks
@@ -182,7 +183,7 @@ impl Parameter {
     fn parse_delimited_argument<T: vm::TokenStream>(
         macro_token: &Token,
         stream: &mut T,
-        matcher_factory: &Matcher<Token>,
+        matcher_factory: &Matcher<Value>,
         param_num: usize,
         result: &mut Vec<Token>,
     ) -> Result<bool, Box<command::Error>> {
@@ -192,7 +193,7 @@ impl Parameter {
         // This handles the case of a macro whose argument ends with the special #{ tokens. In this special case the parsing
         // will end with a scope depth of 1, because the last token parsed will be the { and all braces before that will
         // be balanced.
-        let closing_scope_depth = match matcher_factory.substring().last().value() {
+        let closing_scope_depth = match matcher_factory.substring().last() {
             token::Value::BeginGroup(_) => 1,
             _ => 0,
         };
@@ -207,7 +208,7 @@ impl Parameter {
                 }
                 _ => (),
             };
-            let matches_delimiter = matcher.next(&token);
+            let matches_delimiter = matcher.next(&token.value());
             result.push(token);
             if scope_depth == closing_scope_depth && matches_delimiter {
                 // Remove the suffix.
@@ -342,7 +343,7 @@ pub fn pretty_print_prefix_and_parameters(
                 d.push_str(&format![
                     "    {}: delimited by `{}`\n",
                     colored_parameter_number(parameter_number),
-                    token::write_tokens(factory.substring(), interner)
+                    token::write_token_values(factory.substring(), interner)
                 ]);
             }
         }
@@ -355,7 +356,7 @@ pub fn pretty_print_prefix_and_parameters(
     for parameter in parameters {
         d.push_str(&colored_parameter_number(parameter_number));
         if let Parameter::Delimited(factory) = parameter {
-            d.push_str(token::write_tokens(factory.substring(), interner).as_str());
+            d.push_str(token::write_token_values(factory.substring(), interner).as_str());
         }
         parameter_number += 1;
     }
@@ -396,7 +397,7 @@ pub fn remove_tokens_from_stream<T: vm::TokenStream>(
                 .into()),
                 Some(token) => token,
             };
-        if &stream_token != prefix_token {
+        if stream_token.value() != prefix_token.value() {
             /*
             let note = match &prefix_token.value {
                 ControlSequence(_) => {

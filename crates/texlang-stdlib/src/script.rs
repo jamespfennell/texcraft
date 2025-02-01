@@ -58,7 +58,7 @@ impl Component {
             .write(
                 c.io_writer.borrow_mut().deref_mut(),
                 cs_name_interner,
-                token,
+                token.value(),
             )
             .unwrap()
     }

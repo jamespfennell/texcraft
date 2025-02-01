@@ -201,9 +201,10 @@ In the variables API, we implement this by providing the following type of funct
 ```rust
 # extern crate texlang;
 use texlang::*;
+use texlang::prelude as txl;
 use texlang::traits::*;
 
-fn index<S: TexlangState>(token: token::Token, input: &mut vm::ExpandedStream<S>) -> command::Result<variable::Index> {
+fn index<S: TexlangState>(token: token::Token, input: &mut vm::ExpandedStream<S>) -> txl::Result<variable::Index> {
     let index = parse::Uint::<10>::parse(input)?;
     return Ok(index.0.into())
 }
@@ -216,13 +217,14 @@ with the `Dynamic` variant:
 ```rust
 # extern crate texlang;
 # use texlang::*;
+# use texlang::prelude as txl;
 # fn getter<S: HasComponent<MyComponent>>(state: &S, index: variable::Index) -> &i32 {
 #   panic![""]
 # }
 # fn mut_getter<S: HasComponent<MyComponent>>(state: &mut S, index: variable::Index) -> &mut i32 {
 #   panic![""]
 # }
-# fn index_resolver<S>(token: token::Token, input: &mut vm::ExpandedStream<S>) -> command::Result<variable::Index> {
+# fn index_resolver<S>(token: token::Token, input: &mut vm::ExpandedStream<S>) -> txl::Result<variable::Index> {
 #   panic![""]
 # }
 # pub struct MyComponent {

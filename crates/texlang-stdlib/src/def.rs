@@ -76,17 +76,17 @@ fn parse_and_set_macro<S: TexlangState>(
 
 enum RawParameter {
     Undelimited,
-    Delimited(Nevec<token::Token>),
+    Delimited(Nevec<token::Value>),
 }
 
 impl RawParameter {
     fn push(&mut self, t: token::Token) {
         match self {
             RawParameter::Undelimited => {
-                *self = RawParameter::Delimited(nevec![t]);
+                *self = RawParameter::Delimited(nevec![t.value()]);
             }
             RawParameter::Delimited(vec) => {
-                vec.push(t);
+                vec.push(t.value());
             }
         }
     }

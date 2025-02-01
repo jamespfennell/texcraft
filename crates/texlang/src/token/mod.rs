@@ -95,10 +95,49 @@ impl Value {
             _ => panic!("raw cat code not allowed"),
         }
     }
+
+    /// TODO: should have a char_and_catcode function
+    pub fn char(&self) -> Option<char> {
+        match *self {
+            Value::BeginGroup(c) => Some(c),
+            Value::EndGroup(c) => Some(c),
+            Value::MathShift(c) => Some(c),
+            Value::AlignmentTab(c) => Some(c),
+            Value::Parameter(c) => Some(c),
+            Value::Superscript(c) => Some(c),
+            Value::Subscript(c) => Some(c),
+            Value::Space(c) => Some(c),
+            Value::Letter(c) => Some(c),
+            Value::Other(c) => Some(c),
+            Value::CommandRef(command_ref) => match command_ref {
+                CommandRef::ControlSequence(_) => None,
+                CommandRef::ActiveCharacter(c) => Some(c),
+            },
+        }
+    }
+
+    pub fn cat_code(&self) -> Option<CatCode> {
+        match self {
+            Value::BeginGroup(_) => Some(CatCode::BeginGroup),
+            Value::EndGroup(_) => Some(CatCode::EndGroup),
+            Value::MathShift(_) => Some(CatCode::MathShift),
+            Value::AlignmentTab(_) => Some(CatCode::AlignmentTab),
+            Value::Parameter(_) => Some(CatCode::Parameter),
+            Value::Superscript(_) => Some(CatCode::Superscript),
+            Value::Subscript(_) => Some(CatCode::Subscript),
+            Value::Space(_) => Some(CatCode::Space),
+            Value::Letter(_) => Some(CatCode::Letter),
+            Value::Other(_) => Some(CatCode::Other),
+            Value::CommandRef(command_ref) => match command_ref {
+                CommandRef::ControlSequence(_) => None,
+                CommandRef::ActiveCharacter(_) => Some(CatCode::Active),
+            },
+        }
+    }
 }
 
 /// A TeX token.
-#[derive(Debug, Eq, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Token {
     value: Value,
@@ -115,11 +154,6 @@ impl std::fmt::Display for Token {
                 write![f, "{}", self.char().unwrap()]
             }
         }
-    }
-}
-impl PartialEq for Token {
-    fn eq(&self, other: &Self) -> bool {
-        self.value == other.value
     }
 }
 
@@ -176,41 +210,11 @@ impl Token {
 
     /// TODO: should have a char_and_catcode function
     pub fn char(&self) -> Option<char> {
-        match self.value {
-            Value::BeginGroup(c) => Some(c),
-            Value::EndGroup(c) => Some(c),
-            Value::MathShift(c) => Some(c),
-            Value::AlignmentTab(c) => Some(c),
-            Value::Parameter(c) => Some(c),
-            Value::Superscript(c) => Some(c),
-            Value::Subscript(c) => Some(c),
-            Value::Space(c) => Some(c),
-            Value::Letter(c) => Some(c),
-            Value::Other(c) => Some(c),
-            Value::CommandRef(command_ref) => match command_ref {
-                CommandRef::ControlSequence(_) => None,
-                CommandRef::ActiveCharacter(c) => Some(c),
-            },
-        }
+        self.value.char()
     }
 
     pub fn cat_code(&self) -> Option<CatCode> {
-        match self.value {
-            Value::BeginGroup(_) => Some(CatCode::BeginGroup),
-            Value::EndGroup(_) => Some(CatCode::EndGroup),
-            Value::MathShift(_) => Some(CatCode::MathShift),
-            Value::AlignmentTab(_) => Some(CatCode::AlignmentTab),
-            Value::Parameter(_) => Some(CatCode::Parameter),
-            Value::Superscript(_) => Some(CatCode::Superscript),
-            Value::Subscript(_) => Some(CatCode::Subscript),
-            Value::Space(_) => Some(CatCode::Space),
-            Value::Letter(_) => Some(CatCode::Letter),
-            Value::Other(_) => Some(CatCode::Other),
-            Value::CommandRef(command_ref) => match command_ref {
-                CommandRef::ControlSequence(_) => None,
-                CommandRef::ActiveCharacter(_) => Some(CatCode::Active),
-            },
-        }
+        self.value.cat_code()
     }
 }
 
@@ -286,9 +290,9 @@ impl Writer {
         &mut self,
         io_writer: &mut dyn std::io::Write,
         interner: &CsNameInterner,
-        token: Token,
+        value: Value,
     ) -> Result<(), std::io::Error> {
-        match &token.value {
+        match &value {
             Value::CommandRef(CommandRef::ControlSequence(s)) => {
                 write!(
                     io_writer,
@@ -304,7 +308,7 @@ impl Writer {
                     io_writer,
                     "{}{}",
                     self.pending_whitespace,
-                    token.char().unwrap()
+                    value.char().unwrap()
                 )?;
                 self.pending_whitespace.reset();
             }
@@ -329,7 +333,20 @@ where
     let mut buffer: Vec<u8> = Default::default();
     let mut writer: Writer = Default::default();
     for token in tokens.into_iter() {
-        writer.write(&mut buffer, interner, *token).unwrap();
+        writer.write(&mut buffer, interner, token.value()).unwrap();
+    }
+    std::str::from_utf8(&buffer).unwrap().into()
+}
+
+/// Write a collection of token values to a string.
+pub fn write_token_values<'a, T>(values: T, interner: &CsNameInterner) -> String
+where
+    T: IntoIterator<Item = &'a Value>,
+{
+    let mut buffer: Vec<u8> = Default::default();
+    let mut writer: Writer = Default::default();
+    for value in values.into_iter() {
+        writer.write(&mut buffer, interner, *value).unwrap();
     }
     std::str::from_utf8(&buffer).unwrap().into()
 }
@@ -355,11 +372,11 @@ mod tests {
                 Instruction::ControlSequence(name) => {
                     let cs_name = interner.get_or_intern(name);
                     let token = Token::new_control_sequence(cs_name, trace::Key::dummy());
-                    writer.write(&mut buffer, &interner, token).unwrap();
+                    writer.write(&mut buffer, &interner, token.value()).unwrap();
                 }
                 Instruction::Character(c, code) => {
                     let token = Token::new_from_value(Value::new(c, code), trace::Key::dummy());
-                    writer.write(&mut buffer, &interner, token).unwrap();
+                    writer.write(&mut buffer, &interner, token.value()).unwrap();
                 }
                 Instruction::Newline => {
                     writer.add_newline();

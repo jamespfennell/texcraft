@@ -283,7 +283,7 @@ fn compare_output<S>(
                         let name_2 = vm_2.cs_name_interner().resolve(*cs_name_2).unwrap();
                         name_1 == name_2
                     }
-                    _ => token_1 == token_2,
+                    _ => token_1.value() == token_2.value(),
                 };
                 if !token_equal {
                     equal = false;
