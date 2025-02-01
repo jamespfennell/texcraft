@@ -1,13 +1,26 @@
-use crate::error;
+use std::collections::HashMap;
+
 use crate::token::trace::{self, SourceCodeTrace};
+use crate::{error, token};
 use colored::*;
 
 pub fn format_error(f: &mut std::fmt::Formatter<'_>, err: &error::Error) -> std::fmt::Result {
-    let (stack, root) = err.stack_view();
+    let root = err.traced.error.as_ref();
+    let stack = &err.traced.stack_trace;
+
     let (error_line, immediate_command) = match root.kind() {
-        error::Kind::Token(s) => (s, stack.last()),
-        error::Kind::EndOfInput(s) => (s, stack.last()),
-        error::Kind::FailedPrecondition => (&stack.last().unwrap().trace, None),
+        error::Kind::Token(s) => (err.traced.token_traces.get(&s).unwrap(), stack.last()),
+        error::Kind::EndOfInput => (
+            err.traced.end_of_input_trace.as_ref().unwrap(),
+            stack.last(),
+        ),
+        error::Kind::FailedPrecondition => (
+            match err.traced.error.source_code_trace_override() {
+                None => &stack.last().unwrap().trace,
+                Some(trace) => trace,
+            },
+            None,
+        ),
     };
 
     let line = PrimaryLine {
@@ -15,7 +28,12 @@ pub fn format_error(f: &mut std::fmt::Formatter<'_>, err: &error::Error) -> std:
         source: error_line,
         title: root.title(),
         token_annotation: root.source_annotation(),
-        notes: root.notes().iter().map(|n| format!["{n}"]).collect(),
+        notes: root
+            .notes()
+            .iter()
+            .map(|n| n.trace(&err.traced.token_traces))
+            .map(|n| format!("{n}"))
+            .collect(),
     };
     write!(f, "{line}")?;
 
@@ -115,7 +133,7 @@ impl<'a> std::fmt::Display for PrimaryLine<'a> {
     }
 }
 
-struct ErrorStack<'a>(Vec<&'a error::PropagatedError>);
+struct ErrorStack<'a>(&'a Vec<error::StackTraceElement>);
 
 impl<'a> std::fmt::Display for ErrorStack<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -282,23 +300,43 @@ fn fmt_source_code_trace_light(
     Ok(())
 }
 
-#[derive(Debug)]
-pub enum Note<'a> {
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum Note {
     Text(String),
-    SourceCodeTrace(String, &'a trace::SourceCodeTrace),
+    SourceCodeTrace(String, token::Token),
 }
 
-impl<'a, T: Into<String>> From<T> for Note<'a> {
+impl Note {
+    fn trace<'a>(&'a self, m: &'a HashMap<token::Token, trace::SourceCodeTrace>) -> TracedNote<'a> {
+        match self {
+            Note::Text(t) => TracedNote::Text(t),
+            Note::SourceCodeTrace(s, token) => TracedNote::SourceCodeTrace(
+                s,
+                m.get(token)
+                    .expect("all tokens in the error have been traced"),
+            ),
+        }
+    }
+}
+
+impl<T: Into<String>> From<T> for Note {
     fn from(value: T) -> Self {
         Note::Text(value.into())
     }
 }
 
-impl<'a> std::fmt::Display for Note<'a> {
+#[derive(Debug)]
+enum TracedNote<'a> {
+    Text(&'a str),
+    SourceCodeTrace(&'a str, &'a trace::SourceCodeTrace),
+}
+
+impl<'a> std::fmt::Display for TracedNote<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Note::Text(s) => write!(f, "{s}"),
-            Note::SourceCodeTrace(s, trace) => {
+            TracedNote::Text(s) => write!(f, "{s}"),
+            TracedNote::SourceCodeTrace(s, trace) => {
                 write!(f, "{s}\n\n")?;
                 fmt_source_code_trace_light(f, trace, 2, PrimaryLineKind::Error.color(), "")
             }

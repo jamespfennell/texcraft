@@ -8,41 +8,40 @@ pub struct ArithmeticVariable<S>(pub variable::Variable<S>);
 impl<S: TexlangState> Parsable<S> for ArithmeticVariable<S> {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         match input.next()? {
-            None => Err(parse::Error::new(input.vm(), "a variable", None, "").into()),
+            None => Err(input
+                .vm()
+                .fatal_error(parse::Error::new("a variable", None, ""))),
             Some(token) => match token.value() {
                 token::Value::CommandRef(command_ref) => {
                     match input.commands_map().get_command(&command_ref) {
-                        None => Err(parse::Error::new(input.vm(), "a variable", Some(token), "")
-                            .with_got_override("got an undefined control sequence")
-                            .with_annotation_override("undefined control sequence")
-                            .into()),
+                        None => Err(input.vm().fatal_error(
+                            parse::Error::new("a variable", Some(token), "")
+                                .with_got_override("got an undefined control sequence")
+                                .with_annotation_override("undefined control sequence"),
+                        )),
                         Some(command::Command::Variable(cmd)) => {
                             if !cmd.is_arithmetic() {
-                                Err(parse::Error::new(
-                                    input.vm(),
-                                    "an arithmetic variable",
-                                    Some(token),
-                                    "",
-                                )
-                                .with_got_override("got a non-arithmetic variable")
-                                .into())
+                                Err(input.vm().fatal_error(
+                                    parse::Error::new("an arithmetic variable", Some(token), "")
+                                        .with_got_override("got a non-arithmetic variable"),
+                                ))
                             } else {
                                 Ok(ArithmeticVariable(cmd.clone().resolve(token, input)?))
                             }
                         }
-                        Some(cmd) => {
-                            Err(parse::Error::new(input.vm(), "a variable", Some(token), "")
+                        Some(cmd) => Err(input.vm().fatal_error(
+                            parse::Error::new("a variable", Some(token), "")
                                 .with_got_override("got a non-variable command")
                                 .with_annotation_override(format![
                                     "control sequence referencing {cmd}"
-                                ])
-                                .into())
-                        }
+                                ]),
+                        )),
                     }
                 }
-                _ => Err(parse::Error::new(input.vm(), "a variable", Some(token), "")
-                    .with_got_override("got a character token")
-                    .into()),
+                _ => Err(input.vm().fatal_error(
+                    parse::Error::new("a variable", Some(token), "")
+                        .with_got_override("got a character token"),
+                )),
             },
         }
     }

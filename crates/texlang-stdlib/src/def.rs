@@ -5,7 +5,6 @@ use texcraft_stdext::collections::groupingmap;
 use texcraft_stdext::collections::nevec::Nevec;
 use texcraft_stdext::nevec;
 use texlang::prelude as txl;
-use texlang::token::trace;
 use texlang::traits::*;
 use texlang::*;
 
@@ -120,18 +119,16 @@ fn parse_prefix_and_parameters<S: TexlangState>(
                 return Ok((prefix, parameters, replacement_end_token));
             }
             token::Value::EndGroup(_) => {
-                return Err(error::SimpleTokenError::new(
-                    input.vm(),
+                return Err(input.vm().fatal_error(error::SimpleTokenError::new(
                     token,
                     "unexpected end group token while parsing the parameter of a macro definition",
-                )
-                .into());
+                )));
             }
             token::Value::Parameter(_) => {
                 let parameter_token = match input.next()? {
                     None => {
-                        return Err(error::SimpleEndOfInputError::new(input.vm(),
-                "unexpected end of input while reading the token after a parameter token").into());
+                        return Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
+                "unexpected end of input while reading the token after a parameter token")));
                         // TODO .add_note("a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
                     }
                     Some(token) => token,
@@ -151,12 +148,10 @@ fn parse_prefix_and_parameters<S: TexlangState>(
                         return Ok((prefix, parameters, replacement_end_token));
                     }
                     token::Value::CommandRef(..) => {
-                        return Err(error::SimpleTokenError::new(
-                            input.vm(),
+                        return Err(input.vm().fatal_error(error::SimpleTokenError::new(
                             parameter_token,
                             "unexpected control sequence after a parameter token",
-                        )
-                        .into());
+                        )));
                         // TODO: are we sure we really know what's going on here?
                         // TODO "a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
                     }
@@ -164,23 +159,20 @@ fn parse_prefix_and_parameters<S: TexlangState>(
                         let c = parameter_token.char().unwrap();
                         let parameter_index = match char_to_parameter_index(c) {
                             None => {
-                                return Err(error::SimpleTokenError::new(
-                                    input.vm(),
+                                return Err(input.vm().fatal_error(error::SimpleTokenError::new(
                                     parameter_token,
                                     "unexpected character after a parameter token",
-                                )
-                                .into());
+                                )));
                                 // TODO .add_note("a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
                             }
                             Some(n) => n,
                         };
                         if parameter_index != parameters.len() {
-                            return Err(InvalidParameterNumberError {
-                                parameter_number_token: input.trace(parameter_token),
+                            return Err(input.vm().fatal_error(InvalidParameterNumberError {
+                                parameter_number_token: parameter_token,
                                 parameter_index,
                                 parameters_so_far: parameters.len(),
-                            }
-                            .into());
+                            }));
                         }
                         parameters.push(RawParameter::Undelimited);
                     }
@@ -196,11 +188,9 @@ fn parse_prefix_and_parameters<S: TexlangState>(
             },
         }
     }
-    Err(error::SimpleEndOfInputError::new(
-        input.vm(),
+    Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
         "unexpected end of input while reading the parameter text of a macro",
-    )
-    .into())
+    )))
     // TODO .add_note("the parameter text of a macro must end with a closing brace { or another token with catcode 1 (begin group)")
 }
 
@@ -238,22 +228,18 @@ fn parse_replacement_text<S: TexlangState>(
             token::Value::Parameter(_) => {
                 let parameter_token = match input.next()? {
                     None => {
-                        return Err(error::SimpleEndOfInputError::new(
-                            input.vm(),
+                        return Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
                             "unexpected end of input while reading a parameter number",
-                        )
-                        .into())
+                        )))
                     }
                     Some(token) => token,
                 };
                 let c = match parameter_token.value() {
                     token::Value::CommandRef(..) => {
-                        return Err(error::SimpleTokenError::new(
-                            input.vm(),
+                        return Err(input.vm().fatal_error(error::SimpleTokenError::new(
                             parameter_token,
                             "unexpected character while reading a parameter number",
-                        )
-                        .into());
+                        )));
                         // TODO .add_note("expected a number between 1 and 9 inclusive")
                     }
                     token::Value::Parameter(_) => {
@@ -265,23 +251,19 @@ fn parse_replacement_text<S: TexlangState>(
 
                 let parameter_index = match char_to_parameter_index(c) {
                     None => {
-                        return Err(error::SimpleTokenError::new(
-                            input.vm(),
+                        return Err(input.vm().fatal_error(error::SimpleTokenError::new(
                             parameter_token,
                             "unexpected character while reading a parameter number",
-                        )
-                        .into());
+                        )));
                         // TODO .add_note("expected a number between 1 and 9 inclusive")
                     }
                     Some(n) => n,
                 };
                 if parameter_index >= num_parameters {
-                    return Err(error::SimpleTokenError::new(
-                        input.vm(),
+                    return Err(input.vm().fatal_error(error::SimpleTokenError::new(
                         parameter_token,
                         "unexpected character while reading a parameter number",
-                    )
-                    .into());
+                    )));
 
                     /* TODO
                             var msg string
@@ -307,23 +289,21 @@ fn parse_replacement_text<S: TexlangState>(
         push(&mut result, token);
     }
 
-    Err(error::SimpleEndOfInputError::new(
-        input.vm(),
+    Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
         "unexpected end of input while reading a parameter number",
-    )
-    .into())
+    )))
 }
 
 #[derive(Debug)]
 struct InvalidParameterNumberError {
-    parameter_number_token: trace::SourceCodeTrace,
+    parameter_number_token: token::Token,
     parameter_index: usize,
     parameters_so_far: usize,
 }
 
 impl error::TexError for InvalidParameterNumberError {
     fn kind(&self) -> error::Kind {
-        error::Kind::Token(&self.parameter_number_token)
+        error::Kind::Token(self.parameter_number_token)
     }
 
     fn title(&self) -> String {

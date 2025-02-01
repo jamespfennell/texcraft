@@ -44,14 +44,16 @@ pub fn get_variable_op_tag() -> command::Tag {
 
 trait Op {
     const DOC: &'static str = "";
-    fn perform(lhs: i32, rhs: i32) -> txl::Result<i32>;
+    type Error: error::TexError;
+    fn perform(lhs: i32, rhs: i32) -> Result<i32, Self::Error>;
 }
 
 struct AddOp;
 
 impl Op for AddOp {
     const DOC: &'static str = "Add an integer to a variable";
-    fn perform(lhs: i32, rhs: i32) -> txl::Result<i32> {
+    type Error = OverflowError;
+    fn perform(lhs: i32, rhs: i32) -> Result<i32, Self::Error> {
         // Note: TeX silently overflows in \advance
         Ok(lhs.wrapping_add(rhs))
     }
@@ -61,7 +63,8 @@ struct AddCheckedOp;
 
 impl Op for AddCheckedOp {
     const DOC: &'static str = "Add an integer to a variable and error on overflow";
-    fn perform(lhs: i32, rhs: i32) -> txl::Result<i32> {
+    type Error = OverflowError;
+    fn perform(lhs: i32, rhs: i32) -> Result<i32, Self::Error> {
         match lhs.checked_add(rhs) {
             Some(result) => Ok(result),
             None => Err(OverflowError {
@@ -69,8 +72,7 @@ impl Op for AddCheckedOp {
                 lhs,
                 rhs,
                 wrapped_result: lhs.wrapping_add(rhs),
-            }
-            .into()),
+            }),
         }
     }
 }
@@ -79,7 +81,8 @@ struct MultiplyOp;
 
 impl Op for MultiplyOp {
     const DOC: &'static str = "Multiply a variable by an integer";
-    fn perform(lhs: i32, rhs: i32) -> txl::Result<i32> {
+    type Error = OverflowError;
+    fn perform(lhs: i32, rhs: i32) -> Result<i32, Self::Error> {
         match lhs.checked_mul(rhs) {
             Some(result) => Ok(result),
             None => Err(OverflowError {
@@ -87,8 +90,7 @@ impl Op for MultiplyOp {
                 lhs,
                 rhs,
                 wrapped_result: lhs.wrapping_mul(rhs),
-            }
-            .into()),
+            }),
         }
     }
 }
@@ -97,7 +99,8 @@ struct MultiplyWrappedOp;
 
 impl Op for MultiplyWrappedOp {
     const DOC: &'static str = "Multiply a variable by an integer and wrap on overflow";
-    fn perform(lhs: i32, rhs: i32) -> txl::Result<i32> {
+    type Error = OverflowError;
+    fn perform(lhs: i32, rhs: i32) -> Result<i32, Self::Error> {
         Ok(lhs.wrapping_mul(rhs))
     }
 }
@@ -106,9 +109,10 @@ struct DivideOp;
 
 impl Op for DivideOp {
     const DOC: &'static str = "Divide a variable by an integer";
-    fn perform(lhs: i32, rhs: i32) -> txl::Result<i32> {
+    type Error = DivisionByZeroError;
+    fn perform(lhs: i32, rhs: i32) -> Result<i32, Self::Error> {
         if rhs == 0 {
-            return Err(DivisionByZeroError { numerator: lhs }.into());
+            return Err(DivisionByZeroError { numerator: lhs });
         }
         Ok(lhs.wrapping_div(rhs))
     }
@@ -180,7 +184,9 @@ fn math_primitive_fn<S: TexlangState, O: Op>(
             };
             let result = match O::perform(lhs, rhs) {
                 Ok(result) => result,
-                Err(err) => return input.state().recoverable_error_hook(err),
+                Err(err) => {
+                    return input.vm().error(err);
+                }
             };
             variable.set(input, scope, result);
             Ok(())

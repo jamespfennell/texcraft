@@ -158,13 +158,13 @@ fn resolve<S: HasComponent<Component>>(
         .unwrap();
     let inner_index = parse::Uint::<{ parse::Uint::MAX }>::parse(input)?.0;
     if inner_index >= array_len {
-        return Err(error::SimpleTokenError::new(input.vm(),
+        return Err(input.vm().fatal_error(error::SimpleTokenError::new(
             token,
             format![
                 "Array out of bounds: cannot access index {inner_index} of array with length {array_len}"
             ],
         )
-        .into());
+        ));
     }
     Ok(variable::Index(array_index + inner_index))
 }

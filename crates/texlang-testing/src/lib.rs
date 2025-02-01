@@ -534,7 +534,9 @@ impl<S: HasComponent<TestingComponent>, H: vm::Handlers<S>> vm::Handlers<S> for 
             input.state_mut().component_mut().tokens.push(token);
             Ok(())
         } else {
-            Err(error::UndefinedCommandError::new(input.vm(), token).into())
+            Err(input
+                .vm()
+                .fatal_error(error::UndefinedCommandError::new(input.vm(), token)))
         }
     }
 

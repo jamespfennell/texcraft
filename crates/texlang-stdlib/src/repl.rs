@@ -105,11 +105,9 @@ pub fn get_exit<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
         |_: token::Token, input: &mut vm::ExecutionInput<S>| -> txl::Result<()> {
             HasComponent::<Component>::component_mut(input.state_mut()).quit_requested = true;
-            Err(error::SimpleEndOfInputError::new(
-                input.vm(),
+            Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
                 "quitting Texcraft REPL. This error should never be seen!",
-            )
-            .into())
+            )))
         },
     )
 }
@@ -125,12 +123,10 @@ pub fn get_help<S: HasComponent<Component> + common::HasLogging>() -> command::B
                 .clone();
             match writeln![input.state().terminal_out().borrow_mut(), "{help}"] {
                 Ok(_) => Ok(()),
-                Err(err) => Err(error::SimpleTokenError::new(
-                    input.vm(),
+                Err(err) => Err(input.vm().fatal_error(error::SimpleTokenError::new(
                     token,
                     format!["failed to write help text: {err}"],
-                )
-                .into()),
+                ))),
             }
         },
     )
@@ -153,12 +149,10 @@ pub fn get_doc<S: TexlangState + common::HasLogging>() -> command::BuiltIn<S> {
             };
             match writeln![input.state().terminal_out().borrow_mut(), "{doc}"] {
                 Ok(_) => Ok(()),
-                Err(err) => Err(error::SimpleTokenError::new(
-                    input.vm(),
+                Err(err) => Err(input.vm().fatal_error(error::SimpleTokenError::new(
                     token,
                     format!["failed to write doc text: {err}"],
-                )
-                .into()),
+                ))),
             }
         },
     )

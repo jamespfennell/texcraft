@@ -17,7 +17,11 @@ fn the_primitive_fn<S: TexlangState>(
     input: &mut vm::ExpansionInput<S>,
 ) -> txl::Result<()> {
     let token = match input.next()? {
-        None => return Err(error::SimpleEndOfInputError::new(input.vm(), "TODO").into()),
+        None => {
+            return Err(input
+                .vm()
+                .fatal_error(error::SimpleEndOfInputError::new("TODO")))
+        }
         Some(token) => token,
     };
     match &token.value() {

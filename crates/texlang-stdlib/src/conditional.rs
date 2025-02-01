@@ -8,7 +8,6 @@
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use texlang::prelude as txl;
-use texlang::token::trace;
 use texlang::traits::*;
 use texlang::*;
 
@@ -169,22 +168,19 @@ fn false_case<S: HasComponent<Component>>(
         }
     }
     let branch = pop_branch(input);
-    Err(FalseBranchEndOfInputError {
-        trace: input.vm().trace_end_of_input(),
-        branch,
-    }
-    .into())
+    Err(input
+        .vm()
+        .fatal_error(FalseBranchEndOfInputError { branch }))
 }
 
 #[derive(Debug)]
 struct FalseBranchEndOfInputError {
-    trace: trace::SourceCodeTrace,
     branch: Option<Branch>,
 }
 
 impl error::TexError for FalseBranchEndOfInputError {
     fn kind(&self) -> error::Kind {
-        error::Kind::EndOfInput(&self.trace)
+        error::Kind::EndOfInput
     }
 
     fn title(&self) -> String {
@@ -351,20 +347,15 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
             }
         }
     }
-    Err(IfCaseEndOfInputError {
-        trace: input.trace_end_of_input(),
-    }
-    .into())
+    Err(input.vm().fatal_error(IfCaseEndOfInputError {}))
 }
 
 #[derive(Debug)]
-struct IfCaseEndOfInputError {
-    trace: trace::SourceCodeTrace,
-}
+struct IfCaseEndOfInputError;
 
 impl error::TexError for IfCaseEndOfInputError {
     fn kind(&self) -> error::Kind {
-        error::Kind::EndOfInput(&self.trace)
+        error::Kind::EndOfInput
     }
 
     fn title(&self) -> String {
@@ -399,12 +390,10 @@ fn or_primitive_fn<S: HasComponent<Component>>(
         Some(branch) => matches!(branch.kind, BranchKind::Switch),
     };
     if !is_valid {
-        return Err(error::SimpleTokenError::new(
-            input.vm(),
+        return Err(input.vm().fatal_error(error::SimpleTokenError::new(
             ifcase_token,
             "unexpected `or` command",
-        )
-        .into());
+        )));
     }
 
     let mut depth = 0;
@@ -422,20 +411,15 @@ fn or_primitive_fn<S: HasComponent<Component>>(
             }
         }
     }
-    Err(OrEndOfInputError {
-        trace: input.vm().trace_end_of_input(),
-    }
-    .into())
+    Err(input.vm().fatal_error(OrEndOfInputError {}))
 }
 
 #[derive(Debug)]
-struct OrEndOfInputError {
-    trace: trace::SourceCodeTrace,
-}
+struct OrEndOfInputError;
 
 impl error::TexError for OrEndOfInputError {
     fn kind(&self) -> error::Kind {
-        error::Kind::EndOfInput(&self.trace)
+        error::Kind::EndOfInput
     }
 
     fn title(&self) -> String {
@@ -470,12 +454,10 @@ fn else_primitive_fn<S: HasComponent<Component>>(
         Some(branch) => matches!(branch.kind, BranchKind::True | BranchKind::Switch),
     };
     if !is_valid {
-        return Err(error::SimpleTokenError::new(
-            input.vm(),
+        return Err(input.vm().fatal_error(error::SimpleTokenError::new(
             else_token,
             "unexpected `else` command",
-        )
-        .into());
+        )));
     }
 
     // Now consume all of the tokens until the next \fi
@@ -494,20 +476,15 @@ fn else_primitive_fn<S: HasComponent<Component>>(
             }
         }
     }
-    Err(ElseEndOfInputError {
-        trace: input.vm().trace_end_of_input(),
-    }
-    .into())
+    Err(input.vm().fatal_error(ElseEndOfInputError {}))
 }
 
 #[derive(Debug)]
-struct ElseEndOfInputError {
-    trace: trace::SourceCodeTrace,
-}
+struct ElseEndOfInputError;
 
 impl error::TexError for ElseEndOfInputError {
     fn kind(&self) -> error::Kind {
-        error::Kind::EndOfInput(&self.trace)
+        error::Kind::EndOfInput
     }
 
     fn title(&self) -> String {
@@ -542,9 +519,10 @@ fn fi_primitive_fn<S: HasComponent<Component>>(
     // Or in the true branch: \iftrue\fi
     // Or in a switch statement.
     if branch.is_none() {
-        return Err(
-            error::SimpleTokenError::new(input.vm(), token, "unexpected `fi` command").into(),
-        );
+        return Err(input.vm().fatal_error(error::SimpleTokenError::new(
+            token,
+            "unexpected `fi` command",
+        )));
     }
     Ok(())
 }

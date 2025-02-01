@@ -5,7 +5,6 @@
 //! is given on page X of the TeXBook.
 
 use crate::prelude as txl;
-use crate::token::trace;
 use crate::token::Value;
 use crate::traits::*;
 use crate::*;
@@ -28,13 +27,10 @@ impl<S: TexlangState, const N: usize> Parsable<S> for Uint<N> {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let (first_token, i): (token::Token, i32) = parse_number_internal(input)?;
         if i < 0 || i as usize >= N {
-            input.state().recoverable_error_hook(
-                OutOfBoundsError::<N> {
-                    first_token: input.trace(first_token),
-                    got: i,
-                }
-                .into(),
-            )?;
+            input.vm().error(OutOfBoundsError::<N> {
+                first_token,
+                got: i,
+            })?;
             Ok(Uint(0))
         } else {
             Ok(Uint(i as usize))
@@ -44,13 +40,13 @@ impl<S: TexlangState, const N: usize> Parsable<S> for Uint<N> {
 
 #[derive(Debug)]
 struct OutOfBoundsError<const N: usize> {
-    first_token: trace::SourceCodeTrace,
+    first_token: token::Token,
     got: i32,
 }
 
 impl<const N: usize> error::TexError for OutOfBoundsError<N> {
     fn kind(&self) -> error::Kind {
-        error::Kind::Token(&self.first_token)
+        error::Kind::Token(self.first_token)
     }
 
     fn title(&self) -> String {
@@ -78,17 +74,14 @@ impl<S: TexlangState> Parsable<S> for types::CatCode {
                 return Ok(cat_code);
             }
         }
-        input.state().recoverable_error_hook(
-            parse::Error {
-                expected: "a category code number (an integer in the range [0, 15])".into(),
-                got: input.vm().trace(token),
-                got_override: format!["got the integer {i}"],
-                annotation_override: "this is where the number started".into(),
-                guidance: "".into(),
-                additional_notes: vec![],
-            }
-            .into(),
-        )?;
+        input.vm().error(parse::Error {
+            expected: "a category code number (an integer in the range [0, 15])".into(),
+            got: Some(token),
+            got_override: format!["got the integer {i}"],
+            annotation_override: "this is where the number started".into(),
+            guidance: "".into(),
+            additional_notes: vec![],
+        })?;
         Ok(types::CatCode::try_from(0).unwrap())
     }
 }
@@ -108,13 +101,11 @@ fn parse_number_internal<S: TexlangState>(
     let sign = parse_optional_signs(stream)?;
     let first_token = match stream.next()? {
         None => {
-            return Err(parse::Error::new(
-                stream.vm(),
+            return Err(stream.vm().fatal_error(parse::Error::new(
                 "the beginning of a number",
                 None,
                 GUIDANCE_BEGINNING,
-            )
-            .into())
+            )))
         }
         Some(token) => token,
     };
@@ -141,14 +132,14 @@ fn parse_number_internal<S: TexlangState>(
                         variable::ValueRef::CatCode(c) => *c as i32,
                         variable::ValueRef::MathCode(c) => c.0 as i32,
                         variable::ValueRef::TokenList(_) => {
-                            return Err(parse::Error::new(
-                                stream.vm(),
-                                "the beginning of a number",
-                                Some(first_token),
-                                GUIDANCE_BEGINNING,
-                            )
-                            .with_annotation_override("token list variable")
-                            .into());
+                            return Err(stream.vm().fatal_error(
+                                parse::Error::new(
+                                    "the beginning of a number",
+                                    Some(first_token),
+                                    GUIDANCE_BEGINNING,
+                                )
+                                .with_annotation_override("token list variable"),
+                            ));
                         }
                     }
                 }
@@ -162,7 +153,6 @@ fn parse_number_internal<S: TexlangState>(
                     | command::Command::CharacterTokenAlias(..),
                 ) => {
                     let err = parse::Error::new(
-                        stream.vm(),
                         "the beginning of a number",
                         Some(first_token),
                         GUIDANCE_BEGINNING,
@@ -172,19 +162,17 @@ fn parse_number_internal<S: TexlangState>(
                         Some(cmd) => format!["control sequence referencing {cmd}"],
                     });
                     stream.expansions_mut().push(first_token);
-                    return Err(err.into());
+                    return Err(stream.vm().fatal_error(err));
                 }
             }
         }
         _ => {
             stream.expansions_mut().push(first_token);
-            return Err(parse::Error::new(
-                stream.vm(),
+            return Err(stream.vm().fatal_error(parse::Error::new(
                 "the beginning of a number",
                 Some(first_token),
                 GUIDANCE_BEGINNING,
-            )
-            .into());
+            )));
         }
     };
     get_optional_element![stream, Value::Space(_) => (),];
@@ -239,13 +227,11 @@ fn parse_character<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::R
     let c =
         match c_or {
             Ok(c) => c,
-            Err(optional_token) => return Err(parse::Error::new(
-                input.vm(),
+            Err(optional_token) => return Err(input.vm().fatal_error(parse::Error::new(
                 "a character",
                 optional_token,
                 "a character is a character token or single-character control sequence like \\a",
-            )
-            .into()),
+            ))),
         };
     // This cast always succeeds at the time of writing.
     // This is because `c as u32` returns c's Unicode code point, which
@@ -304,7 +290,11 @@ fn parse_constant<S: TexlangState, const RADIX: i32>(
         stream.consume()?;
         result = match add_lsd::<RADIX>(result, lsd) {
             Some(n) => n,
-            None => return Err(add_lsd_error::<S, RADIX>(next, stream, result, lsd)),
+            None => {
+                return Err(stream
+                    .vm()
+                    .fatal_error(add_lsd_error::<RADIX>(next, result, lsd)))
+            }
         }
     }
     if !started {
@@ -320,7 +310,9 @@ fn parse_constant<S: TexlangState, const RADIX: i32>(
             _ => unreachable!(),
         };
         let got = stream.peek()?.copied();
-        return Err(parse::Error::new(stream.vm(), expected, got, guidance).into());
+        return Err(stream
+            .vm()
+            .fatal_error(parse::Error::new(expected, got, guidance)));
     }
     Ok(result)
 }
@@ -332,12 +324,7 @@ fn add_lsd<const RADIX: i32>(n: i32, lsd: i32) -> Option<i32> {
     }
 }
 
-fn add_lsd_error<S: TexlangState, const RADIX: i32>(
-    token: token::Token,
-    input: &mut vm::ExpandedStream<S>,
-    n: i32,
-    lsd: i32,
-) -> Box<error::Error> {
+fn add_lsd_error<const RADIX: i32>(token: token::Token, n: i32, lsd: i32) -> parse::Error {
     let (got, range) = match RADIX {
         8 => (
             format!["got '{n:o}{lsd:o}"],
@@ -355,13 +342,12 @@ fn add_lsd_error<S: TexlangState, const RADIX: i32>(
     };
     parse::Error {
         expected: format!["a number in the range [{range}]"],
-        got: input.vm().trace(token),
+        got: Some(token),
         got_override: got,
         annotation_override: "this digit makes the number too big".into(),
         guidance: "".into(),
         additional_notes: vec![],
     }
-    .into()
 }
 
 #[cfg(test)]

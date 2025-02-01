@@ -406,6 +406,12 @@ impl<S: TexlangState> TokenStream for ExecutionInput<S> {
     }
 }
 
+impl<S: TexlangState> ExecutionInput<S> {
+    pub fn end_group(&mut self, token: Token) -> txl::Result<()> {
+        self.0 .0 .0.end_group(token)
+    }
+}
+
 impl<S> ExecutionInput<S> {
     /// Creates a mutable reference to this type from the [VM](vm::VM) type.
     #[inline]
@@ -448,9 +454,6 @@ impl<S> ExecutionInput<S> {
         self.0 .0 .0.begin_group()
     }
 
-    pub fn end_group(&mut self, token: Token) -> txl::Result<()> {
-        self.0 .0 .0.end_group(token)
-    }
     #[inline]
     pub(crate) fn groups(&mut self) -> &mut [variable::SaveStackElement<S>] {
         &mut self.0 .0 .0.internal.save_stack
@@ -580,7 +583,7 @@ mod stream {
         c: char,
         trace_key: trace::Key,
     ) -> Box<error::Error> {
-        lexer::InvalidCharacterError::new(vm, c, trace_key).into()
+        vm.fatal_error(lexer::InvalidCharacterError::new(vm, c, trace_key))
     }
 
     pub fn next_expanded<S: TexlangState>(vm: &mut vm::VM<S>) -> txl::Result<Option<Token>> {

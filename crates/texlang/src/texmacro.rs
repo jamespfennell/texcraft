@@ -180,9 +180,9 @@ impl Parameter {
         }
     }
 
-    fn parse_delimited_argument<T: vm::TokenStream>(
+    fn parse_delimited_argument<S: TexlangState>(
         macro_token: &Token,
-        stream: &mut T,
+        stream: &mut vm::UnexpandedStream<S>,
         matcher_factory: &Matcher<Value>,
         param_num: usize,
         result: &mut Vec<Token>,
@@ -220,9 +220,9 @@ impl Parameter {
                 ));
             }
         }
-        return Err(error::SimpleEndOfInputError::new(stream.vm(),format![
+        return Err(stream.vm().fatal_error(error::SimpleEndOfInputError::new(format![
             "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
-        ]).into());
+        ])));
         /*
         TODO
         .add_note(format![
@@ -273,9 +273,9 @@ impl Parameter {
         let input = input.unexpanded();
         let _opening_brace = match input.next()? {
             None => {
-                return Err(error::SimpleEndOfInputError::new(input.vm(), format![
+                return Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(format![
                     "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
-                ]).into())
+                ])))
             }
             Some(token) => match token.value() {
                 token::Value::BeginGroup(_) => token,
@@ -287,9 +287,9 @@ impl Parameter {
         };
         match parse::finish_parsing_balanced_tokens(input, result)? {
             true => Ok(()),
-            false => Err(error::SimpleEndOfInputError::new(input.vm(), format![
+            false => Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(format![
                 "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
-            ]).into()),
+            ]))),
             /* TODO
             .add_note(format![
             "this argument started with a `{opening_brace}` and must be finished with a matching closing brace"
@@ -382,19 +382,17 @@ pub fn pretty_print_replacement_text(replacements: &[Replacement]) -> String {
 /// Removes the provided vector of tokens from the front of the stream.
 ///
 /// Returns an error if the stream does not start with the tokens.
-pub fn remove_tokens_from_stream<T: vm::TokenStream>(
+pub fn remove_tokens_from_stream<S: TexlangState>(
     tokens: &[Token],
-    stream: &mut T,
+    stream: &mut vm::UnexpandedStream<S>,
 ) -> Result<(), Box<command::Error>> {
     for prefix_token in tokens.iter() {
         let stream_token =
             match stream.next()? {
-                None => return Err(error::SimpleEndOfInputError::new(
-                    stream.vm(),
+                None => return Err(stream.vm().fatal_error(error::SimpleEndOfInputError::new(
                     "unexpected end of input while matching the prefix for a user-defined macro",
                     // TODO: add everything we've matched so far, and what we were expecting
-                )
-                .into()),
+                ))),
                 Some(token) => token,
             };
         if stream_token.value() != prefix_token.value() {
@@ -409,12 +407,10 @@ pub fn remove_tokens_from_stream<T: vm::TokenStream>(
                 ],
             };
              */
-            return Err(error::SimpleTokenError::new(
-                stream.vm(),
+            return Err(stream.vm().fatal_error(error::SimpleTokenError::new(
                 stream_token,
                 "unexpected token while matching the prefix for a user-defined macro",
-            )
-            .into());
+            )));
         }
     }
     Ok(())

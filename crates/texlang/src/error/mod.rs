@@ -1,4 +1,6 @@
-//! Error types and error display logic.
+//! Error handling
+
+use std::collections::HashMap;
 
 use crate::token;
 use crate::token::trace;
@@ -6,8 +8,115 @@ use crate::vm;
 use texcraft_stdext::algorithms::spellcheck::{self, WordDiff};
 
 pub mod display;
+
+/// A fully traced error
+///
+/// Note that serializing and deserializing this type results in type erasure.
+/// Also the serialization format is private.
+/// This is not by design: the minimal amount of work was done to make the type
+///     serializable, and future work to make this better is welcome!
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TracedError {
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            serialize_with = "serialize_error",
+            deserialize_with = "deserialize_error"
+        )
+    )]
+    pub error: Box<dyn TexError>,
+    pub stack_trace: Vec<StackTraceElement>,
+    pub token_traces: HashMap<token::Token, trace::SourceCodeTrace>,
+    pub end_of_input_trace: Option<trace::SourceCodeTrace>,
+}
+
 #[cfg(feature = "serde")]
-mod serde;
+#[allow(clippy::borrowed_box)] // we need this exact function signature for serde.
+fn serialize_error<S>(value: &Box<dyn TexError>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use serde::Serialize;
+    let serializable_error = SerializableError {
+        kind: value.kind().clone(),
+        title: value.title(),
+        notes: value.notes(),
+        source_annotation: value.source_annotation(),
+    };
+    serializable_error.serialize(serializer)
+}
+
+#[cfg(feature = "serde")]
+fn deserialize_error<'de, D>(deserializer: D) -> Result<Box<dyn TexError>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let serializable_error = SerializableError::deserialize(deserializer)?;
+    Ok(Box::new(serializable_error))
+}
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+struct SerializableError {
+    kind: Kind,
+    title: String,
+    notes: Vec<display::Note>,
+    source_annotation: String,
+}
+
+impl TexError for SerializableError {
+    fn kind(&self) -> Kind {
+        self.kind.clone()
+    }
+    fn title(&self) -> String {
+        self.title.clone()
+    }
+    fn notes(&self) -> Vec<display::Note> {
+        self.notes.clone()
+    }
+    fn source_annotation(&self) -> String {
+        self.source_annotation.clone()
+    }
+}
+
+impl TracedError {
+    pub(crate) fn new(
+        error: Box<dyn TexError>,
+        tracer: &trace::Tracer,
+        cs_name_interner: &token::CsNameInterner,
+    ) -> Self {
+        let (end_of_input_trace, mut tokens) = match error.kind() {
+            Kind::Token(token) => (None, vec![token]),
+            Kind::EndOfInput => (Some(tracer.trace_end_of_input()), vec![]),
+            Kind::FailedPrecondition => (None, vec![]),
+        };
+        for note in error.notes() {
+            if let display::Note::SourceCodeTrace(_, token) = note {
+                tokens.push(token);
+            }
+        }
+        let token_traces: HashMap<token::Token, trace::SourceCodeTrace> = tokens
+            .into_iter()
+            .map(|token| (token, tracer.trace(token, cs_name_interner)))
+            .collect();
+        TracedError {
+            error,
+            stack_trace: vec![],
+            token_traces,
+            end_of_input_trace,
+        }
+    }
+}
+
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct StackTraceElement {
+    pub context: PropagationContext,
+    pub token: token::Token,
+    pub trace: trace::SourceCodeTrace,
+}
 
 /// Texlang error type
 ///
@@ -16,9 +125,9 @@ mod serde;
 /// This is not by design: the minimal amount of work was done to make the type
 ///     serializable, and future work to make this better is welcome!
 #[derive(Debug)]
-pub enum Error {
-    Tex(Box<dyn TexError + 'static>),
-    Propagated(PropagatedError),
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Error {
+    traced: TracedError,
 }
 
 impl std::fmt::Display for Error {
@@ -27,82 +136,34 @@ impl std::fmt::Display for Error {
     }
 }
 
-#[cfg(feature = "serde")]
-impl ::serde::Serialize for Error {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: ::serde::Serializer,
-    {
-        let serializable_error: serde::Error = self.into();
-        serializable_error.serialize(serializer)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> ::serde::Deserialize<'de> for Error {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: ::serde::Deserializer<'de>,
-    {
-        let serializable_error = serde::Error::deserialize(deserializer)?;
-        Ok(serializable_error.into())
-    }
-}
-
 impl Error {
+    pub fn new(traced: TracedError) -> Self {
+        Self { traced }
+    }
     pub fn new_propagated<S>(
         vm: &vm::VM<S>,
         context: PropagationContext,
         token: token::Token,
-        error: Box<Error>,
+        mut error: Box<Error>,
     ) -> Box<Error> {
-        Box::new(Error::Propagated(PropagatedError {
+        error.traced.stack_trace.push(StackTraceElement {
             context,
             token,
             trace: vm.trace(token),
-            error,
-        }))
-    }
-
-    pub fn stack_view(&self) -> (Vec<&PropagatedError>, &dyn TexError) {
-        let mut stack: Vec<&PropagatedError> = vec![];
-        let mut last = self;
-        loop {
-            match last {
-                Error::Tex(error) => {
-                    return (stack, error.as_ref());
-                }
-                Error::Propagated(propagated) => {
-                    stack.push(propagated);
-                    last = &propagated.error;
-                }
-            }
-        }
+        });
+        error
     }
 }
 
-impl<T: TexError + 'static> From<T> for Box<Error> {
-    fn from(err: T) -> Self {
-        Box::new(Error::Tex(Box::new(err)))
-    }
-}
-
-#[derive(Debug)]
-pub struct PropagatedError {
-    pub context: PropagationContext,
-    pub token: token::Token,
-    pub trace: trace::SourceCodeTrace,
-    pub error: Box<Error>,
-}
-
-#[derive(Debug)]
-pub enum Kind<'a> {
-    Token(&'a trace::SourceCodeTrace),
-    EndOfInput(&'a trace::SourceCodeTrace),
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum Kind {
+    Token(token::Token),
+    EndOfInput,
     FailedPrecondition,
 }
 
-pub trait TexError: std::fmt::Debug {
+pub trait TexError: std::fmt::Debug + 'static {
     fn kind(&self) -> Kind;
 
     fn title(&self) -> String;
@@ -117,20 +178,20 @@ pub trait TexError: std::fmt::Debug {
 
     fn default_source_annotation(&self) -> String {
         match TexError::kind(self) {
-            Kind::Token(s) => {
-                let t = s.token.unwrap();
-                match (t.char(), t.cat_code()) {
-                    (Some(c), Some(code)) => {
-                        format!["character token with value {c} and category code {code}",]
-                    }
-                    _ => "control sequence".to_string(),
+            Kind::Token(t) => match (t.char(), t.cat_code()) {
+                (Some(c), Some(code)) => {
+                    format!["character token with value {c} and category code {code}",]
                 }
-            }
-            Kind::EndOfInput(_) => "input ended here".into(),
+                _ => "control sequence".to_string(),
+            },
+            Kind::EndOfInput => "input ended here".into(),
             Kind::FailedPrecondition => "error occurred while running this command".into(),
         }
     }
 
+    fn source_code_trace_override(&self) -> Option<&trace::SourceCodeTrace> {
+        None
+    }
     // TODO: have a method that returns the exact error messages as Knuth's TeX
     // The method will return a vector of static strings
 }
@@ -160,22 +221,14 @@ impl PropagationContext {
 #[derive(Debug)]
 pub struct SimpleTokenError {
     pub token: token::Token,
-    pub trace: trace::SourceCodeTrace,
     pub title: String,
 }
 
 impl SimpleTokenError {
     /// Create a new simple token error.
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new<S, T: AsRef<str>>(
-        vm: &vm::VM<S>,
-        token: token::Token,
-        title: T,
-    ) -> SimpleTokenError {
-        let trace = vm.trace(token);
+    pub fn new<T: AsRef<str>>(token: token::Token, title: T) -> SimpleTokenError {
         SimpleTokenError {
             token,
-            trace,
             title: title.as_ref().into(),
         }
     }
@@ -183,7 +236,7 @@ impl SimpleTokenError {
 
 impl TexError for SimpleTokenError {
     fn kind(&self) -> Kind {
-        Kind::Token(&self.trace)
+        Kind::Token(self.token)
     }
 
     fn title(&self) -> String {
@@ -191,18 +244,17 @@ impl TexError for SimpleTokenError {
     }
 }
 
+// After the errors work creating custom errors will be easy.
 #[derive(Debug)]
 pub struct SimpleEndOfInputError {
-    pub trace: trace::SourceCodeTrace,
     pub title: String,
     pub text_notes: Vec<String>,
 }
 
 impl SimpleEndOfInputError {
     /// Create a new simple end of input error.
-    pub fn new<S, T: AsRef<str>>(vm: &vm::VM<S>, title: T) -> Self {
+    pub fn new<T: AsRef<str>>(title: T) -> Self {
         Self {
-            trace: vm.trace_end_of_input(),
             title: title.as_ref().into(),
             text_notes: vec![],
         }
@@ -216,7 +268,7 @@ impl SimpleEndOfInputError {
 
 impl TexError for SimpleEndOfInputError {
     fn kind(&self) -> Kind {
-        Kind::EndOfInput(&self.trace)
+        Kind::EndOfInput
     }
 
     fn title(&self) -> String {
@@ -273,7 +325,7 @@ impl TexError for SimpleFailedPreconditionError {
 
 #[derive(Debug)]
 pub struct UndefinedCommandError {
-    pub trace: trace::SourceCodeTrace,
+    pub token: token::Token,
     pub close_names: Vec<WordDiff>,
 }
 
@@ -289,20 +341,17 @@ impl UndefinedCommandError {
         }
         let close_names = spellcheck::find_close_words(all_names, &name);
 
-        UndefinedCommandError {
-            trace: vm.trace(token),
-            close_names,
-        }
+        UndefinedCommandError { token, close_names }
     }
 }
 
 impl TexError for UndefinedCommandError {
     fn kind(&self) -> Kind {
-        Kind::Token(&self.trace)
+        Kind::Token(self.token)
     }
 
     fn title(&self) -> String {
-        format!["undefined control sequence {}", &self.trace.value]
+        "undefined control sequence".into()
     }
 
     fn notes(&self) -> Vec<display::Note> {

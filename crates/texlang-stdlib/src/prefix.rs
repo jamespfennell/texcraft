@@ -38,7 +38,6 @@ use crate::math;
 use std::collections::HashSet;
 use texcraft_stdext::collections::groupingmap;
 use texlang::prelude as txl;
-use texlang::token::trace;
 use texlang::traits::*;
 use texlang::*;
 
@@ -213,21 +212,20 @@ fn process_prefixes<S: HasComponent<Component>>(
 ) -> txl::Result<()> {
     complete_prefix(&mut prefix, input)?;
     match input.peek()? {
-        None => Err(error::SimpleEndOfInputError::new(
-            input.vm(),
+        None => Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
             "end of input while looking for a command to prefix",
         )
         .with_note(
             r"prefix commands (\global, \long, \outer) must be followed by a command to prefix",
         )
-        .into()),
+        )),
         Some(&t) => match t.value() {
             token::Value::CommandRef(command_ref) => {
                 // First check if it's a variable command.
                 if let Some(command::Command::Variable(_)) =
                     input.commands_map_mut().get_command(&command_ref)
                 {
-                    assert_only_global_prefix(t, prefix, input)?;
+                    assert_only_global_prefix(input, t, prefix)?;
                     if prefix.global.is_some() {
                         input
                             .state_mut()
@@ -252,7 +250,7 @@ fn process_prefixes<S: HasComponent<Component>>(
                     // Next check if it's a command that can be prefixed by global only. In this case we check
                     // that no other prefixes are present.
                     if component.tags.can_be_prefixed_with_global.contains(&tag) {
-                        assert_only_global_prefix(t, prefix, input)?;
+                        assert_only_global_prefix(input, t, prefix)?;
                         if prefix.global.is_some() {
                             input
                                 .state_mut()
@@ -264,21 +262,23 @@ fn process_prefixes<S: HasComponent<Component>>(
                 }
                 // If we make it to here, this is not a valid target for the prefix command.
                 let (prefix_token, kind) = prefix.get_one();
-                Err(Error {
+                Err(input.vm().fatal_error(Error {
                     kind,
-                    got: input.vm().trace(t),
-                    prefix: input.vm().trace(prefix_token),
+                    got: t,
+                    prefix: prefix_token,
+                    prefix_kind: kind,
                 }
-                .into())
+                ))
             }
             _ => {
                 let (prefix_token, kind) = prefix.get_one();
-                Err(Error {
+                Err(input.vm().fatal_error(Error {
                     kind,
-                    got: input.vm().trace(t),
-                    prefix: input.vm().trace(prefix_token),
+                    got: t,
+                    prefix: prefix_token,
+                    prefix_kind: kind,
                 }
-                .into())
+                ))
             }
         },
     }
@@ -318,24 +318,24 @@ fn complete_prefix<S: HasComponent<Component>>(
 }
 
 fn assert_only_global_prefix<S: TexlangState>(
+    input: &mut vm::ExecutionInput<S>,
     token: token::Token,
     prefix: Prefix,
-    input: &vm::ExecutionInput<S>,
 ) -> txl::Result<()> {
     if let Some(outer_token) = prefix.outer {
-        Err(Error {
+        Err(input.vm().fatal_error(Error {
             kind: Kind::Outer,
-            got: input.vm().trace(token),
-            prefix: input.vm().trace(outer_token),
-        }
-        .into())
+            got: token,
+            prefix: outer_token,
+            prefix_kind: Kind::Outer,
+        }))
     } else if let Some(long_token) = prefix.long {
-        Err(Error {
+        Err(input.vm().fatal_error(Error {
             kind: Kind::Long,
-            got: input.vm().trace(token),
-            prefix: input.vm().trace(long_token),
-        }
-        .into())
+            got: token,
+            prefix: long_token,
+            prefix_kind: Kind::Long,
+        }))
     } else {
         Ok(())
     }
@@ -348,32 +348,49 @@ enum Kind {
     Outer,
 }
 
+impl Kind {
+    fn control_sequence(&self) -> &'static str {
+        match self {
+            Kind::Global => r"\global",
+            Kind::Long => r"\long",
+            Kind::Outer => r"\outer",
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Error {
     kind: Kind,
-    got: trace::SourceCodeTrace,
-    prefix: trace::SourceCodeTrace,
+    got: token::Token,
+    prefix: token::Token,
+    prefix_kind: Kind,
 }
 
 impl error::TexError for Error {
     fn kind(&self) -> error::Kind {
-        error::Kind::Token(&self.got)
+        error::Kind::Token(self.got)
     }
 
     fn title(&self) -> String {
-        match self.got.token.unwrap().value() {
+        match self.got.value() {
             token::Value::CommandRef(_) => {
-                format!["this command cannot be prefixed by {}", self.prefix.value]
+                format![
+                    "this command cannot be prefixed by {}",
+                    self.prefix_kind.control_sequence()
+                ]
             }
             _ => format![
                 "character tokens cannot be prefixed by {}",
-                self.prefix.value
+                self.prefix_kind.control_sequence()
             ],
         }
     }
 
     fn source_annotation(&self) -> String {
-        format!["cannot by prefixed by {}", self.prefix.value]
+        format![
+            "cannot by prefixed by {}",
+            self.prefix_kind.control_sequence()
+        ]
     }
 
     fn notes(&self) -> Vec<error::display::Note> {
@@ -390,7 +407,7 @@ impl error::TexError for Error {
         };
         vec![
             guidance.into(),
-            error::display::Note::SourceCodeTrace("the prefix appeared here:".into(), &self.prefix),
+            error::display::Note::SourceCodeTrace("the prefix appeared here:".into(), self.prefix),
         ]
     }
 }
@@ -410,12 +427,9 @@ pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::Buil
         input: &mut vm::ExecutionInput<S>,
     ) -> txl::Result<()> {
         match input.state_mut().component_mut().read_and_reset_global() {
-            groupingmap::Scope::Global => Err(error::SimpleTokenError::new(
-                input.vm(),
-                token,
-                "assertion failed: global is true",
-            )
-            .into()),
+            groupingmap::Scope::Global => Err(input.vm().fatal_error(
+                error::SimpleTokenError::new(token, "assertion failed: global is true"),
+            )),
             groupingmap::Scope::Local => Ok(()),
         }
     }

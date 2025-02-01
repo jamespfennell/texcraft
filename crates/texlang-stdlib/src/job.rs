@@ -104,11 +104,12 @@ fn dump_primitive_fn<
         1 => serde_json::to_vec_pretty(input.vm()).unwrap(),
         2 => bincode::serde::encode_to_vec(input.vm(), bincode::config::standard()).unwrap(),
         i => {
-            return Err(error::SimpleFailedPreconditionError::new(format![
-                r"\dumpFormat has invalid value {i}",
-            ])
-            .with_note(r"\dumpFormat must be either 0 (message pack), 1 (json) or 2 (bincode)")
-            .into())
+            return Err(input.vm().fatal_error(
+                error::SimpleFailedPreconditionError::new(format![
+                    r"\dumpFormat has invalid value {i}",
+                ])
+                .with_note(r"\dumpFormat must be either 0 (message pack), 1 (json) or 2 (bincode)"),
+            ))
         }
     };
 

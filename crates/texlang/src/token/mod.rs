@@ -43,7 +43,7 @@ impl interner::Key for CsName {
 }
 
 /// The value of a token.
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Value {
     BeginGroup(char),
@@ -137,7 +137,7 @@ impl Value {
 }
 
 /// A TeX token.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Token {
     value: Value,

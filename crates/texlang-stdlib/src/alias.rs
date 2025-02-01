@@ -30,11 +30,9 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
     OptionalEqualsUnexpanded::parse(input)?;
     match input.unexpanded().next()? {
         None => {
-            return Err(error::SimpleEndOfInputError::new(
-                input.vm(),
+            return Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
                 "unexpected end of input while reading the right hand side of a \\let assignment",
-            )
-            .into())
+            )))
         }
         Some(token) => match token.value() {
             token::Value::CommandRef(command_ref) => {

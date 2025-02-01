@@ -41,12 +41,10 @@ fn noexpand_hook_finish<S: TexlangState>(
     input: &mut vm::ExpansionInput<S>,
 ) -> txl::Result<Option<token::Token>> {
     match input.unexpanded().next()? {
-        None => Err(error::SimpleTokenError::new(
-            input.vm(),
+        None => Err(input.vm().fatal_error(error::SimpleTokenError::new(
             token,
             "unexpected end of input while expanding a `\\noexpand` command",
-        )
-        .into()),
+        ))),
         // TODO .add_note("the `\\noexpand` command must be followed by 1 token")
         Some(token) => Ok(Some(token)),
     }
@@ -115,7 +113,7 @@ fn expandafter_simple_fn<S: TexlangState>(
     let next = match input.unexpanded().next()? {
         None => {
             return Err(expandafter_missing_first_token_error(
-                input.vm(),
+                input,
                 expandafter_token,
             ));
         }
@@ -123,7 +121,7 @@ fn expandafter_simple_fn<S: TexlangState>(
     };
     if input.unexpanded().peek()?.is_none() {
         return Err(expandafter_missing_second_token_error(
-            input.vm(),
+            input,
             expandafter_token,
             next,
         ));
@@ -143,7 +141,7 @@ fn expandafter_optimized_fn<S: TexlangState>(
         match unexpanded_input.next()? {
             None => {
                 return Err(expandafter_missing_first_token_error(
-                    input.vm(),
+                    input,
                     expandafter_token,
                 ))
             }
@@ -152,7 +150,7 @@ fn expandafter_optimized_fn<S: TexlangState>(
         let token = match unexpanded_input.peek()? {
             None => {
                 return Err(expandafter_missing_second_token_error(
-                    input.vm(),
+                    input,
                     expandafter_token,
                     *buffer.last().unwrap(),
                 ))
@@ -189,7 +187,7 @@ fn expandafter_optimized_fn<S: TexlangState>(
             // Under-full
             0 => {
                 let next = match input.unexpanded().next()? {
-                    None => return Err(expandafter_missing_first_token_error(input.vm(), root)),
+                    None => return Err(expandafter_missing_first_token_error(input, root)),
                     Some(next) => next,
                 };
                 buffer.push(next);
@@ -208,7 +206,7 @@ fn expandafter_optimized_fn<S: TexlangState>(
         // exactly right cases, but it's easier to put it here.
         if input.unexpanded().peek()?.is_none() {
             return Err(expandafter_missing_second_token_error(
-                input.vm(),
+                input,
                 root,
                 *buffer.last().unwrap(),
             ));
@@ -231,33 +229,29 @@ fn remove_even_indices(v: &mut Vec<token::Token>) {
     v.truncate(dest);
 }
 
-fn expandafter_missing_first_token_error<S>(
-    vm: &vm::VM<S>,
+fn expandafter_missing_first_token_error<S: TexlangState>(
+    input: &mut vm::ExpansionInput<S>,
     expandafter_token: token::Token,
 ) -> Box<error::Error> {
-    error::SimpleTokenError::new(
-        vm,
+    input.vm().fatal_error(error::SimpleTokenError::new(
         expandafter_token,
         "unexpected end of input while expanding an `\\expandafter` command",
-    )
-    .into()
+    ))
     // TODO
     // .add_note("the `\\expandafter` command must be followed by 2 tokens")
     // .add_note("no more tokens were found")
 }
 
-fn expandafter_missing_second_token_error<S>(
-    vm: &vm::VM<S>,
+fn expandafter_missing_second_token_error<S: TexlangState>(
+    input: &mut vm::ExpansionInput<S>,
     expandafter_token: token::Token,
     first_token: token::Token,
 ) -> Box<error::Error> {
     _ = first_token;
-    error::SimpleTokenError::new(
-        vm,
+    input.vm().fatal_error(error::SimpleTokenError::new(
         expandafter_token,
         "unexpected end of input while expanding an `\\expandafter` command",
-    )
-    .into()
+    ))
     // TODO .add_note("the `\\expandafter` command must be followed by 2 tokens")
     //.add_note("only 1 more tokens was found")
 }

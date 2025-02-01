@@ -1,12 +1,12 @@
 macro_rules! get_required_element {
     ($stream :expr, $expected: expr, $guidance: expr, $($pat:pat => $result:expr,)+) => {
        match ($stream).next()? {
-            None => Err::<_, Box<error::Error>>(crate::parse::Error::new($stream.vm(), $expected, None, $guidance).into()),
+            None => Err::<_, Box<error::Error>>($stream.vm().fatal_error(crate::parse::Error::new($expected, None, $guidance))),
             Some(token) => match token.value() {
                  $(
                      $pat => Ok($result),
                  )+
-                 _ => Err(crate::parse::Error::new($stream.vm(), $expected, Some(token), $guidance).into()),
+                 _ => Err($stream.vm().fatal_error(crate::parse::Error::new($expected, Some(token), $guidance))),
             }
         }
     };

@@ -1,8 +1,8 @@
-//! Tracing system for determining the origin of a token.
+//! Token tracing system
 //!
-//! This module implements a [Tracer] for tokens.
-//! When building helpful error messages we need to know the origin of tokens -
-//!     e.g., the file and line they came from.
+//! This module implements a [Tracer] that determines the origins of tokens.
+//! When building helpful error messages we need to know the token came from -
+//!     e.g., the file and line number.
 //! The tracing functionality here enables obtaining this information in the form of a [SourceCodeTrace].
 //!
 //! Rather than the custom system here,
@@ -43,7 +43,7 @@ use super::CommandRef;
 /// Key attached to tokens to enable tracing them.
 ///
 /// This type is 32 bits.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Key(u32);
 

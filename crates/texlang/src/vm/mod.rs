@@ -83,12 +83,10 @@ pub trait Handlers<S: TexlangState> {
         math_character: types::MathCode,
     ) -> txl::Result<()> {
         _ = math_character;
-        Err(error::SimpleTokenError::new(
-            input.vm(),
+        Err(input.vm().fatal_error(error::SimpleTokenError::new(
             token,
             "math characters can only appear in math mode",
-        )
-        .into())
+        )))
     }
 
     /// Handler to invoke for a control sequence or active character for which no command is defined.
@@ -98,7 +96,9 @@ pub trait Handlers<S: TexlangState> {
         input: &mut ExecutionInput<S>,
         token: token::Token,
     ) -> txl::Result<()> {
-        Err(error::UndefinedCommandError::new(input.vm(), token).into())
+        Err(input
+            .vm()
+            .fatal_error(error::UndefinedCommandError::new(input.vm(), token)))
     }
 
     /// Handler to invoke for expansion commands that were not expanded.
@@ -188,16 +188,31 @@ impl<S: TexlangState> VM<S> {
         }
         Ok(())
     }
+
+    // TODO: expose via the input instead types
+    pub fn fatal_error<E: error::TexError>(&self, err: E) -> Box<error::Error> {
+        let err: Box<dyn error::TexError> = Box::new(err);
+        let traced =
+            error::TracedError::new(err, &self.internal.tracer, &self.internal.cs_name_interner);
+        Box::new(error::Error::new(traced))
+    }
+    pub fn error<E: error::TexError>(&self, err: E) -> Result<(), Box<error::Error>> {
+        let err: Box<dyn error::TexError> = Box::new(err);
+        let traced =
+            error::TracedError::new(err, &self.internal.tracer, &self.internal.cs_name_interner);
+        let traced = Box::new(error::Error::new(traced));
+        self.state.recoverable_error_hook(traced)
+    }
 }
 
 #[derive(Debug)]
 struct EndOfGroupError {
-    trace: trace::SourceCodeTrace,
+    trace: token::Token,
 }
 
 impl error::TexError for EndOfGroupError {
     fn kind(&self) -> error::Kind {
-        error::Kind::Token(&self.trace)
+        error::Kind::Token(self.trace)
     }
 
     fn title(&self) -> String {
@@ -458,21 +473,6 @@ impl<S> VM<S> {
         self.internal.save_stack.push(Default::default());
     }
 
-    fn end_group(&mut self, token: token::Token) -> txl::Result<()> {
-        match self.commands_map.end_group() {
-            Ok(()) => (),
-            Err(_) => {
-                return Err(EndOfGroupError {
-                    trace: self.trace(token),
-                }
-                .into())
-            }
-        }
-        let group = self.internal.save_stack.pop().unwrap();
-        group.restore(ExecutionInput::new(self));
-        Ok(())
-    }
-
     pub fn trace(&self, token: Token) -> trace::SourceCodeTrace {
         self.internal
             .tracer
@@ -486,6 +486,18 @@ impl<S> VM<S> {
     /// Returns the number of current sources on the source stack
     pub fn num_current_sources(&self) -> usize {
         self.internal.sources.len() + 1
+    }
+}
+
+impl<S: TexlangState> VM<S> {
+    fn end_group(&mut self, token: token::Token) -> txl::Result<()> {
+        match self.commands_map.end_group() {
+            Ok(()) => (),
+            Err(_) => return Err(self.fatal_error(EndOfGroupError { trace: token })),
+        }
+        let group = self.internal.save_stack.pop().unwrap();
+        group.restore(ExecutionInput::new(self));
+        Ok(())
     }
 }
 

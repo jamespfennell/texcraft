@@ -118,7 +118,9 @@ impl InvalidCharacterError {
 
 impl error::TexError for InvalidCharacterError {
     fn kind(&self) -> error::Kind {
-        error::Kind::Token(&self.trace)
+        error::Kind::FailedPrecondition
+        // TODO
+        // error::Kind::Token(&self.trace)
     }
 
     fn title(&self) -> String {
@@ -140,6 +142,9 @@ impl error::TexError for InvalidCharacterError {
             CatCode::Invalid
         ]
         .into()]
+    }
+    fn source_code_trace_override(&self) -> Option<&trace::SourceCodeTrace> {
+        Some(&self.trace)
     }
 }
 

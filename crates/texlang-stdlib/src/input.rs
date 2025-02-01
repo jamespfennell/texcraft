@@ -25,7 +25,7 @@ fn input_fn<S: TexlangState + common::HasFileSystem>(
     let file_location = FileLocation::parse(input)?;
     let (file_path, source_code) = read_file(input.vm(), file_location, "tex")?;
     if input.vm().num_current_sources() > 100 {
-        return Err(TooManyInputs {}.into());
+        return Err(input.vm().fatal_error(TooManyInputs {}));
     }
     input.push_source(input_token, file_path, source_code)?;
     Ok(())
@@ -166,37 +166,42 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn
 ) -> Result<(), Box<command::Error>> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
     let (index, _, target) = <(i32, parse::To, token::CommandRef)>::parse(input)?;
-    let vm::Parts {
-        state,
-        cs_name_interner,
-        tracer,
-        ..
-    } = input.vm_parts();
+
     #[derive(Copy, Clone, PartialEq, Eq)]
     enum Mode {
         File,
         Terminal,
     }
 
-    let (mut lexer, mode, prompt) = match state.component_mut().take_file(index) {
+    let terminal_in = input.state().terminal_in().clone();
+    let (mut lexer, mode, prompt) = match input.state_mut().component_mut().take_file(index) {
         Some(file) => (file, Mode::File, None),
         None => {
             let prompt = if index < 0 {
                 None
             } else {
-                Some(format!(r"{}=", target.to_string(cs_name_interner)))
+                Some(format!(
+                    r"{}=",
+                    target.to_string(input.vm().cs_name_interner())
+                ))
             };
             (
-                read_from_terminal(&state.terminal_in(), tracer, &prompt)?,
+                read_from_terminal(&terminal_in, input, &prompt)?,
                 Mode::Terminal,
                 prompt,
             )
         }
     };
+
     let mut tokens = vec![];
     let mut more_lines_exist = true;
     let mut braces: Vec<token::Token> = vec![];
     loop {
+        let vm::Parts {
+            state,
+            cs_name_interner,
+            ..
+        } = input.vm_parts();
         match (lexer.next(state, cs_name_interner, true), mode) {
             (lexer::Result::Token(token), _) => {
                 match token.cat_code() {
@@ -214,7 +219,11 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn
                 tokens.push(token);
             }
             (lexer::Result::InvalidCharacter(c, trace_key), _) => {
-                return Err(lexer::InvalidCharacterError::new(input.vm(), c, trace_key).into())
+                return Err(input.vm().fatal_error(lexer::InvalidCharacterError::new(
+                    input.vm(),
+                    c,
+                    trace_key,
+                )))
             }
             (lexer::Result::EndOfLine, Mode::File) => {
                 if braces.is_empty() {
@@ -223,17 +232,16 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn
             }
             (lexer::Result::EndOfInput, Mode::File) => {
                 if let Some(unmatched_brace) = braces.pop() {
-                    return Err(UnmatchedBracesError {
-                        unmatched_brace: input.trace(unmatched_brace),
-                    }
-                    .into());
+                    return Err(input
+                        .vm()
+                        .fatal_error(UnmatchedBracesError { unmatched_brace }));
                 }
                 more_lines_exist = false;
                 break;
             }
             (lexer::Result::EndOfLine | lexer::Result::EndOfInput, Mode::Terminal) => {
                 if !braces.is_empty() {
-                    lexer = read_from_terminal(&state.terminal_in(), tracer, &prompt)?;
+                    lexer = read_from_terminal(&terminal_in, input, &prompt)?;
                     continue;
                 }
                 break;
@@ -241,7 +249,7 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn
         }
     }
     if mode == Mode::File && more_lines_exist {
-        state.component_mut().return_file(index, lexer);
+        input.state_mut().component_mut().return_file(index, lexer);
     }
     tokens.reverse();
     let user_defined_macro =
@@ -270,9 +278,9 @@ fn drain_line<S: TexlangState>(
     }
 }
 
-fn read_from_terminal(
+fn read_from_terminal<S: TexlangState>(
     terminal_in: &Rc<RefCell<dyn common::TerminalIn>>,
-    tracer: &mut trace::Tracer,
+    input: &mut vm::ExecutionInput<S>,
     prompt: &Option<String>,
 ) -> txl::Result<Box<lexer::Lexer>> {
     let mut buffer = String::new();
@@ -280,13 +288,15 @@ fn read_from_terminal(
         .borrow_mut()
         .read_line(prompt.as_deref(), &mut buffer)
     {
-        return Err(IoError {
+        return Err(input.vm().fatal_error(IoError {
             title: "failed to read from the terminal".into(),
             underlying_error: err,
-        }
-        .into());
+        }));
     }
-    let trace_key_range = tracer.register_source_code(None, trace::Origin::Terminal, &buffer);
+    let trace_key_range =
+        input
+            .tracer_mut()
+            .register_source_code(None, trace::Origin::Terminal, &buffer);
     Ok(Box::new(lexer::Lexer::new(buffer, trace_key_range)))
 }
 
@@ -314,7 +324,7 @@ where
     }
 }
 
-fn read_file<S: common::HasFileSystem>(
+fn read_file<S: common::HasFileSystem + TexlangState>(
     vm: &vm::VM<S>,
     file_location: parse::FileLocation,
     default_extension: &str,
@@ -330,11 +340,10 @@ fn read_file<S: common::HasFileSystem>(
         .read_to_string(&file_path)
     {
         Ok(source_code) => Ok((file_path, source_code)),
-        Err(err) => Err(IoError {
+        Err(err) => Err(vm.fatal_error(IoError {
             title: format!("could not read from `{}`", file_path.display()),
             underlying_error: err,
-        }
-        .into()),
+        })),
     }
 }
 
@@ -360,12 +369,12 @@ impl error::TexError for IoError {
 
 #[derive(Debug)]
 struct UnmatchedBracesError {
-    unmatched_brace: trace::SourceCodeTrace,
+    unmatched_brace: token::Token,
 }
 
 impl error::TexError for UnmatchedBracesError {
     fn kind(&self) -> error::Kind {
-        error::Kind::Token(&self.unmatched_brace)
+        error::Kind::Token(self.unmatched_brace)
     }
 
     fn title(&self) -> String {

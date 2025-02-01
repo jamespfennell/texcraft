@@ -33,7 +33,6 @@ pub use variable::OptionalEquals;
 pub use variable::OptionalEqualsUnexpanded;
 
 use crate::prelude as txl;
-use crate::token::trace;
 use crate::traits::*;
 use crate::*;
 
@@ -57,7 +56,7 @@ pub trait Parsable<S: TexlangState>: Sized {
 #[derive(Debug)]
 pub struct Error {
     pub expected: String,
-    pub got: trace::SourceCodeTrace,
+    pub got: Option<token::Token>,
     pub got_override: String,
     pub annotation_override: String,
     pub guidance: String,
@@ -66,15 +65,15 @@ pub struct Error {
 
 impl error::TexError for Error {
     fn kind(&self) -> error::Kind {
-        match self.got.token {
-            None => error::Kind::EndOfInput(&self.got),
-            Some(_) => error::Kind::Token(&self.got),
+        match self.got {
+            None => error::Kind::EndOfInput,
+            Some(token) => error::Kind::Token(token),
         }
     }
 
     fn title(&self) -> String {
         let got = if self.got_override.is_empty() {
-            match self.got.token {
+            match self.got {
                 None => "the input ended".to_string(),
                 Some(token) => match token.value() {
                     token::Value::Letter(c) => format!["found the letter {c}"],
@@ -83,7 +82,7 @@ impl error::TexError for Error {
                         (Some(c), Some(code)) => {
                             format!["found a token with value {c} and category code {code}"]
                         }
-                        _ => format!("found the control sequence {}", self.got.value),
+                        _ => "found a control sequence".to_string(),
                     },
                 },
             }
@@ -106,16 +105,11 @@ impl error::TexError for Error {
 }
 
 impl Error {
-    pub fn new<S, T: Into<String>, R: Into<String>>(
-        vm: &vm::VM<S>,
+    pub fn new<T: Into<String>, R: Into<String>>(
         expected: T,
         got: Option<token::Token>,
         guidance: R,
     ) -> Self {
-        let got = match got {
-            None => vm.trace_end_of_input(),
-            Some(token) => vm.trace(token),
-        };
         Error {
             expected: expected.into(),
             got,
@@ -199,21 +193,25 @@ impl<S: TexlangState> Parsable<S> for Vec<token::Token> {
                         return Ok(result);
                     }
                     input.return_token_buffer(result);
-                    return Err(parse::Error::new(input.vm(), "balanced braces", None, "").into());
+                    return Err(input.vm().fatal_error(parse::Error::new(
+                        "balanced braces",
+                        None,
+                        "",
+                    )));
                 }
                 _ => "a non-command, non-opening brace token",
             },
         };
         input.return_token_buffer(result);
-        Err(parse::Error::new(
-            input.vm(),
-            "an opening brace or a variable of type token list",
-            first_token_or,
-            "",
-        )
-        .with_got_override(format!("got {got}"))
-        .with_annotation_override(got)
-        .into())
+        Err(input.vm().fatal_error(
+            parse::Error::new(
+                "an opening brace or a variable of type token list",
+                first_token_or,
+                "",
+            )
+            .with_got_override(format!("got {got}"))
+            .with_annotation_override(got),
+        ))
     }
 }
 
