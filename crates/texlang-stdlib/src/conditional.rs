@@ -6,7 +6,7 @@
 //! See the [Condition] trait for information on adding new commands.
 
 use std::cell::RefCell;
-use std::cmp::Ordering;
+use texlang::parse::Ordering;
 use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
@@ -268,7 +268,7 @@ impl<S: HasComponent<Component>> Condition<S> for IfNum {
 
     fn evaluate(input: &mut vm::ExpansionInput<S>) -> txl::Result<bool> {
         let (a, o, b) = <(i32, Ordering, i32)>::parse(input)?;
-        Ok(a.cmp(&b) == o)
+        Ok(a.cmp(&b) == o.0)
     }
 }
 
@@ -390,10 +390,11 @@ fn or_primitive_fn<S: HasComponent<Component>>(
         Some(branch) => matches!(branch.kind, BranchKind::Switch),
     };
     if !is_valid {
-        return Err(input.vm().fatal_error(error::SimpleTokenError::new(
+        input.vm().error(error::SimpleTokenError::new(
             ifcase_token,
             "unexpected `or` command",
-        )));
+        ))?;
+        return Ok(());
     }
 
     let mut depth = 0;
@@ -454,10 +455,11 @@ fn else_primitive_fn<S: HasComponent<Component>>(
         Some(branch) => matches!(branch.kind, BranchKind::True | BranchKind::Switch),
     };
     if !is_valid {
-        return Err(input.vm().fatal_error(error::SimpleTokenError::new(
+        input.vm().error(error::SimpleTokenError::new(
             else_token,
             "unexpected `else` command",
-        )));
+        ))?;
+        return Ok(());
     }
 
     // Now consume all of the tokens until the next \fi
@@ -519,10 +521,10 @@ fn fi_primitive_fn<S: HasComponent<Component>>(
     // Or in the true branch: \iftrue\fi
     // Or in a switch statement.
     if branch.is_none() {
-        return Err(input.vm().fatal_error(error::SimpleTokenError::new(
+        input.vm().error(error::SimpleTokenError::new(
             token,
             "unexpected `fi` command",
-        )));
+        ))?;
     }
     Ok(())
 }
@@ -548,7 +550,14 @@ mod tests {
         testing: TestingComponent,
     }
 
-    impl TexlangState for State {}
+    impl TexlangState for State {
+        fn recoverable_error_hook(
+            &self,
+            error: error::TracedError,
+        ) -> Result<(), Box<dyn error::TexError>> {
+            TestingComponent::recoverable_error_hook(self, error)
+        }
+    }
 
     implement_has_component![State {
         conditional: Component,
@@ -627,12 +636,24 @@ mod tests {
                 r"case \or d \fi"
             ),
         ),
+        recoverable_failure_tests(
+            (
+                missing_op_1,
+                r"\ifnum 3 3 equal \else not equal \fi",
+                "equal",
+            ),
+            (
+                missing_op_2,
+                r"\ifnum 3 4 equal \else not equal \fi",
+                "not equal",
+            ),
+            (else_not_expected, r"a\else b", "ab"),
+            (fi_not_expected, r"a\fi b", "ab"),
+            (or_not_expected, r"a\or b", "ab"),
+        ),
         failure_tests(
             (iftrue_end_of_input, r"\iftrue a\else b"),
             (iffalse_end_of_input, r"\iffalse a"),
-            (else_not_expected, r"a\else"),
-            (fi_not_expected, r"a\fi"),
-            (or_not_expected, r"a\or"),
         ),
     ];
 }

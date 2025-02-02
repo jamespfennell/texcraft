@@ -5,19 +5,28 @@
 
 use crate::prelude as txl;
 use crate::traits::*;
-use crate::{error, token, types, vm};
-use std::cmp::Ordering;
+use crate::{token, types, vm};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Ordering(pub std::cmp::Ordering);
+
+impl Default for Ordering {
+    fn default() -> Self {
+        Ordering(std::cmp::Ordering::Equal)
+    }
+}
 
 impl<S: TexlangState> Parsable<S> for Ordering {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
-        get_required_element![
+        let ordering_or = get_required_element![
             input,
             "a relation",
             format!["a relation is a token with character code {} and one of the following values: <, =, >", types::CatCode::Other],
-            token::Value::Other('<') => Ordering::Less,
-            token::Value::Other('=') => Ordering::Equal,
-            token::Value::Other('>') => Ordering::Greater,
-        ]
+            token::Value::Other('<') => Ordering(std::cmp::Ordering::Less),
+            token::Value::Other('=') => Ordering(std::cmp::Ordering::Equal),
+            token::Value::Other('>') => Ordering(std::cmp::Ordering::Greater),
+        ];
+        Ok(ordering_or.unwrap_or_default())
     }
 }
 
@@ -27,9 +36,9 @@ mod tests {
     use crate::parse::testing::*;
 
     parse_success_tests![
-        (less_than, r"<a", Ordering::Less),
-        (equals, r"=a", Ordering::Equal),
-        (greater_than, r">a", Ordering::Greater),
+        (less_than, r"<a", Ordering(std::cmp::Ordering::Less)),
+        (equals, r"=a", Ordering(std::cmp::Ordering::Equal)),
+        (greater_than, r">a", Ordering(std::cmp::Ordering::Greater)),
     ];
 
     #[derive(Default)]

@@ -4,18 +4,15 @@ use crate::token::trace::{self, SourceCodeTrace};
 use crate::{error, token};
 use colored::*;
 
-pub fn format_error(f: &mut std::fmt::Formatter<'_>, err: &error::Error) -> std::fmt::Result {
-    let root = err.traced.error.as_ref();
-    let stack = &err.traced.stack_trace;
+pub fn format_error(f: &mut std::fmt::Formatter<'_>, err: &error::TracedError) -> std::fmt::Result {
+    let root = err.error.as_ref();
+    let stack = &err.stack_trace;
 
     let (error_line, immediate_command) = match root.kind() {
-        error::Kind::Token(s) => (err.traced.token_traces.get(&s).unwrap(), stack.last()),
-        error::Kind::EndOfInput => (
-            err.traced.end_of_input_trace.as_ref().unwrap(),
-            stack.last(),
-        ),
+        error::Kind::Token(s) => (err.token_traces.get(&s).unwrap(), stack.last()),
+        error::Kind::EndOfInput => (err.end_of_input_trace.as_ref().unwrap(), stack.last()),
         error::Kind::FailedPrecondition => (
-            match err.traced.error.source_code_trace_override() {
+            match err.error.source_code_trace_override() {
                 None => &stack.last().unwrap().trace,
                 Some(trace) => trace,
             },
@@ -31,7 +28,7 @@ pub fn format_error(f: &mut std::fmt::Formatter<'_>, err: &error::Error) -> std:
         notes: root
             .notes()
             .iter()
-            .map(|n| n.trace(&err.traced.token_traces))
+            .map(|n| n.trace(&err.token_traces))
             .map(|n| format!("{n}"))
             .collect(),
     };

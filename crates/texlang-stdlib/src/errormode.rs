@@ -5,7 +5,6 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
 use texlang_common as common;
@@ -16,7 +15,7 @@ pub struct Component {
     mode: Mode,
     #[cfg_attr(feature = "serde", serde(skip))]
     default_terminal: DefaultTerminal,
-    errors: RefCell<Vec<error::Error>>,
+    errors: RefCell<Vec<error::TracedError>>,
 }
 
 impl Component {
@@ -88,11 +87,11 @@ pub fn get_batchmode<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 
 pub fn recoverable_error_hook<S: HasComponent<Component> + common::HasLogging>(
     state: &S,
-    recoverable_error: Box<error::Error>,
-) -> txl::Result<()> {
+    recoverable_error: error::TracedError,
+) -> Result<(), Box<dyn error::TexError>> {
     match &state.component().mode {
         Mode::ErrorStop => {
-            return Err(recoverable_error);
+            return Err(recoverable_error.error);
         }
         Mode::Scroll | Mode::NonStop => {
             writeln!(state.terminal_out().borrow_mut(), "{recoverable_error}").unwrap();
@@ -104,7 +103,7 @@ pub fn recoverable_error_hook<S: HasComponent<Component> + common::HasLogging>(
         .component()
         .errors
         .borrow_mut()
-        .push(*recoverable_error);
+        .push(recoverable_error);
     Ok(())
 }
 

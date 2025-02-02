@@ -126,7 +126,13 @@ impl<S: TexlangState> VM<S> {
     ///
     /// It is assumed that the VM has been preloaded with TeX source code using the
     /// [VM::push_source] method.
-    pub fn run<H: Handlers<S>>(&mut self) -> txl::Result<()> {
+    pub fn run<H: Handlers<S>>(&mut self) -> Result<(), Box<error::TracedError>> {
+        match self.run_impl::<H>() {
+            Ok(_) => Ok(()),
+            Err(err) => Err(Box::new(err.traced)),
+        }
+    }
+    pub fn run_impl<H: Handlers<S>>(&mut self) -> txl::Result<()> {
         let input = ExecutionInput::new(self);
         loop {
             let token = match input.next()? {
@@ -200,8 +206,17 @@ impl<S: TexlangState> VM<S> {
         let err: Box<dyn error::TexError> = Box::new(err);
         let traced =
             error::TracedError::new(err, &self.internal.tracer, &self.internal.cs_name_interner);
-        let traced = Box::new(error::Error::new(traced));
-        self.state.recoverable_error_hook(traced)
+        match self.state.recoverable_error_hook(traced) {
+            Ok(_) => Ok(()),
+            Err(err) => {
+                let traced = error::TracedError::new(
+                    err,
+                    &self.internal.tracer,
+                    &self.internal.cs_name_interner,
+                );
+                Err(Box::new(error::Error::new(traced)))
+            }
+        }
     }
 }
 
@@ -328,9 +343,12 @@ pub trait TexlangState: Sized {
     ///     for the first 99 errors,
     ///     but after the 100th error a "too many errors" error would be returned from the hook.
     /// Note that the returned error in this case is not the 100th error itself.
-    fn recoverable_error_hook(&self, recoverable_error: Box<error::Error>) -> txl::Result<()> {
+    fn recoverable_error_hook(
+        &self,
+        error: error::TracedError,
+    ) -> Result<(), Box<dyn error::TexError>> {
         _ = self;
-        Err(recoverable_error)
+        Err(error.error)
     }
 }
 

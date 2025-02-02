@@ -117,15 +117,15 @@ impl TestingComponent {
     /// States used in unit testing must be configured to use this hook.
     pub fn recoverable_error_hook<S: HasComponent<Self>>(
         state: &S,
-        recoverable_error: Box<error::Error>,
-    ) -> txl::Result<()> {
+        recoverable_error: error::TracedError,
+    ) -> Result<(), Box<dyn error::TexError>> {
         let component = state.component();
         if component.recover_from_errors {
             let mut num_recovered_errors = component.num_recovered_errors.borrow_mut();
             *num_recovered_errors += 1;
             Ok(())
         } else {
-            Err(recoverable_error)
+            Err(recoverable_error.error)
         }
     }
     /// Returns an integer variable command that references an integer stored in the testing component.
@@ -152,7 +152,10 @@ pub struct State {
 }
 
 impl TexlangState for State {
-    fn recoverable_error_hook(&self, recoverable_error: Box<error::Error>) -> txl::Result<()> {
+    fn recoverable_error_hook(
+        &self,
+        recoverable_error: error::TracedError,
+    ) -> Result<(), Box<dyn error::TexError>> {
         TestingComponent::recoverable_error_hook(self, recoverable_error)
     }
 }
@@ -476,7 +479,7 @@ fn execute_source_code<S, H>(
     vm: &mut vm::VM<S>,
     source: &str,
     options: &ResolvedOptions<S>,
-) -> Result<(Vec<token::Token>, usize), Box<error::Error>>
+) -> Result<(Vec<token::Token>, usize), Box<error::TracedError>>
 where
     S: Default + HasComponent<TestingComponent>,
     H: texlang::vm::Handlers<S>,

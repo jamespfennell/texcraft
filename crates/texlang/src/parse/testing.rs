@@ -68,14 +68,14 @@ impl<S: TexlangState> TexlangState for WrappedState<S> {
     }
     fn recoverable_error_hook(
         &self,
-        recoverable_error: Box<crate::error::Error>,
-    ) -> Result<(), Box<crate::error::Error>> {
+        recoverable_error: crate::error::TracedError,
+    ) -> Result<(), Box<dyn crate::error::TexError>> {
         let mut num_errors = self.num_errors.borrow_mut();
         *num_errors = *num_errors + 1;
         if self.recover_from_errors {
             Ok(())
         } else {
-            Err(recoverable_error)
+            Err(recoverable_error.error)
         }
     }
 }
@@ -96,30 +96,28 @@ macro_rules! parse_success_tests {
 pub(crate) use parse_success_tests;
 
 macro_rules! parse_failure_tests {
-    ( $parsable_type: ty, $state: ty, $( ($name: ident, $input: expr), )+) => {
+    ( $parsable_type: ty, $state: ty, $( ($name: ident, $input: expr $( , $want: expr )? ), )+) => {
         $(
-        #[test]
-        fn $name() {
-            let input = $input;
-            run_parse_failure_test::<$state, $parsable_type>(&input);
+        mod $name {
+            use super::*;
+            #[test]
+            fn recovery_disabled() {
+                let input = $input;
+                run_parse_failure_test::<$state, $parsable_type>(&input);
+            }
+            #[test]
+            fn recovery_enabled() {
+                let source = $input;
+                #[allow(unused_mut,unused_assignments)]
+                let mut want: $parsable_type = Default::default();
+                $(
+                    want = $want;
+                )?
+                run_parse_failure_recovery_test::<$state, $parsable_type>(&source, want);
+            }
         }
         )+
     };
 }
 
 pub(crate) use parse_failure_tests;
-
-macro_rules! parse_failure_recovery_tests {
-    ($( ($name: ident, $input: expr, $expected: expr $(,)? ) ),+ $(,)? ) => {
-        $(
-        #[test]
-        fn $name() {
-            let source = $input;
-            let want = $expected;
-            run_parse_failure_recovery_test::<(), _>(&source, want);
-        }
-        )+
-    };
-}
-
-pub(crate) use parse_failure_recovery_tests;

@@ -74,7 +74,10 @@ mod test {
         ) -> texcraft_stdext::collections::groupingmap::Scope {
             prefix::variable_assignment_scope_hook(state)
         }
-        fn recoverable_error_hook(&self, recoverable_error: Box<error::Error>) -> txl::Result<()> {
+        fn recoverable_error_hook(
+            &self,
+            recoverable_error: error::TracedError,
+        ) -> Result<(), Box<dyn error::TexError>> {
             TestingComponent::recoverable_error_hook(self, recoverable_error)
         }
     }

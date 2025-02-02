@@ -16,7 +16,7 @@ impl<S: TexlangState> Parsable<S> for i32 {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub struct Uint<const N: usize>(pub usize);
 
 impl Uint<0> {
@@ -168,11 +168,12 @@ fn parse_number_internal<S: TexlangState>(
         }
         _ => {
             stream.expansions_mut().push(first_token);
-            return Err(stream.vm().fatal_error(parse::Error::new(
+            stream.vm().error(parse::Error::new(
                 "the beginning of a number",
                 Some(first_token),
                 GUIDANCE_BEGINNING,
-            )));
+            ))?;
+            0
         }
     };
     get_optional_element![stream, Value::Space(_) => (),];
@@ -209,40 +210,41 @@ fn parse_optional_signs<S: TexlangState>(
     Ok(result)
 }
 
+// TeX.2021.442
 fn parse_character<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<i32> {
-    let c_or: Result<char, Option<token::Token>> = match input.next()? {
-        None => Err(None),
+    // BUG: should be from the unexpanded stream
+    let c = match input.next()? {
+        None => {
+            input.vm().error(parse::Error::new(
+                "a character",
+                None,
+                "a character is a character token or single-character control sequence like \\a",
+            ))?;
+            '0'
+        }
         Some(token) => match token.value() {
             Value::CommandRef(token::CommandRef::ControlSequence(cs_name)) => {
                 let name = input.vm().cs_name_interner().resolve(cs_name).unwrap();
                 let mut iter = name.chars();
                 match (iter.next(), iter.count()) {
-                    (Some(c), 0) => Ok(c),
-                    _ => Err(Some(token)),
+                    // (None, 0) => ?! TODO: add a test for this.
+                    // Should be something like:
+                    // \expandafter \i \expandafter ` \csname\endcsname
+                    (Some(c), 0) => c,
+                    _ => {
+                        input.vm().error(parse::Error::new(
+                            "a character",
+                            Some(token),
+                            "a character is a character token or single-character control sequence like \\a",
+                        ))?;
+                        '0'
+                    }
                 }
             }
-            _ => Ok(token.char().unwrap()),
+            _ => token.char().unwrap(),
         },
     };
-    let c =
-        match c_or {
-            Ok(c) => c,
-            Err(optional_token) => return Err(input.vm().fatal_error(parse::Error::new(
-                "a character",
-                optional_token,
-                "a character is a character token or single-character control sequence like \\a",
-            ))),
-        };
-    // This cast always succeeds at the time of writing.
-    // This is because `c as u32` returns c's Unicode code point, which
-    // is in the range [0, 2^21] and fits in an i32.
-    match TryInto::<i32>::try_into(c as i32) {
-        Ok(t) => Ok(t),
-        Err(_) => panic!(
-            "can't cast unicode character {} ({}) to 32-bit signed integer",
-            c, c as u32
-        ),
-    }
+    Ok(c as i32)
 }
 
 // TODO: why is the radix a const parameter?
@@ -251,6 +253,7 @@ fn parse_constant<S: TexlangState, const RADIX: i32>(
     mut result: i32,
 ) -> txl::Result<i32> {
     let mut started = RADIX == 10;
+    let mut too_big = false;
     loop {
         let next = match stream.peek()? {
             None => break,
@@ -291,9 +294,13 @@ fn parse_constant<S: TexlangState, const RADIX: i32>(
         result = match add_lsd::<RADIX>(result, lsd) {
             Some(n) => n,
             None => {
-                return Err(stream
-                    .vm()
-                    .fatal_error(add_lsd_error::<RADIX>(next, result, lsd)))
+                if !too_big {
+                    stream
+                        .vm()
+                        .error(add_lsd_error::<RADIX>(next, result, lsd))?;
+                    too_big = true;
+                }
+                i32::MAX
             }
         }
     }
@@ -310,9 +317,9 @@ fn parse_constant<S: TexlangState, const RADIX: i32>(
             _ => unreachable!(),
         };
         let got = stream.peek()?.copied();
-        return Err(stream
+        stream
             .vm()
-            .fatal_error(parse::Error::new(expected, got, guidance)));
+            .error(parse::Error::new(expected, got, guidance))?;
     }
     Ok(result)
 }
@@ -468,16 +475,24 @@ mod tests {
         i32,
         State,
         (number_with_letter_catcode, "9"),
-        (octal_too_big, "'177777777770"),
+        (octal_too_big, "'177777777770", i32::MAX),
         (octal_empty, "'"),
-        (decimal_too_big, "2147483648"),
-        (decimal_too_negative, "-2147483648"),
-        (hexadecimal_too_big, "\"7FFFFFFF0"),
+        (decimal_too_big_1, "2147483648", i32::MAX),
+        (decimal_too_big_2, "500000000000000", i32::MAX),
+        (decimal_too_negative_1, "-2147483648", -1 * i32::MAX),
+        (decimal_too_negative_2, "-5000000000000", -1 * i32::MAX),
+        (hexadecimal_too_big, "\"7FFFFFFF0", i32::MAX),
         (hexadecimal_empty, "\""),
+        (character, "A"),
+        // TODO: the test is messed up because a space gets appended to the input
+        // (character_missing, r"`", '0' as i32),
+        (control_sequence_too_big, r"`\BC", '0' as i32),
     ];
 
-    parse_failure_recovery_tests![
-        (number_too_big, "16", Uint::<16>(0)),
-        (number_is_negative, "-1", Uint::<16>(0)),
+    parse_failure_tests![
+        Uint::<16>,
+        State,
+        (number_too_big, "16"),
+        (number_is_negative, "-1"),
     ];
 }

@@ -102,8 +102,8 @@ impl TexlangState for StdLibState {
 
     fn recoverable_error_hook(
         &self,
-        recoverable_error: Box<texlang::error::Error>,
-    ) -> Result<(), Box<texlang::error::Error>> {
+        recoverable_error: texlang::error::TracedError,
+    ) -> Result<(), Box<dyn texlang::error::TexError>> {
         errormode::recoverable_error_hook(self, recoverable_error)
     }
 }

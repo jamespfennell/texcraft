@@ -124,7 +124,10 @@ mod tests {
     }
 
     impl TexlangState for State {
-        fn recoverable_error_hook(&self, recoverable_error: Box<error::Error>) -> txl::Result<()> {
+        fn recoverable_error_hook(
+            &self,
+            recoverable_error: error::TracedError,
+        ) -> Result<(), Box<dyn error::TexError>> {
             TestingComponent::recoverable_error_hook(self, recoverable_error)
         }
     }

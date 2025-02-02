@@ -3,7 +3,6 @@ use colored::Colorize;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::PathBuf;
-use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
 use texlang_stdlib::job;
@@ -74,7 +73,7 @@ fn main() {
     }
 }
 
-fn run(vm: &mut vm::VM<StdLibState>, mut path: PathBuf) -> txl::Result<()> {
+fn run(vm: &mut vm::VM<StdLibState>, mut path: PathBuf) -> Result<(), Box<error::TracedError>> {
     if path.extension().is_none() {
         path.set_extension("tex");
     }

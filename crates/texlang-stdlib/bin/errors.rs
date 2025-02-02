@@ -14,7 +14,7 @@ fn main() {
 
 struct RunResult {
     case: ErrorCase,
-    err: Box<error::Error>,
+    err: Box<error::TracedError>,
 }
 
 fn run(case: ErrorCase) -> RunResult {

@@ -1,20 +1,30 @@
 macro_rules! get_required_element {
     ($stream :expr, $expected: expr, $guidance: expr, $($pat:pat => $result:expr,)+) => {
-       match ($stream).next()? {
-            None => Err::<_, Box<error::Error>>($stream.vm().fatal_error(crate::parse::Error::new($expected, None, $guidance))),
+        // TODO: probably should call get_optional_element_with_token
+        match ($stream).peek()?.copied() {
             Some(token) => match token.value() {
                  $(
-                     $pat => Ok($result),
+                     $pat => {
+                        ($stream).consume()?;
+                        Some($result)
+                     },
                  )+
-                 _ => Err($stream.vm().fatal_error(crate::parse::Error::new($expected, Some(token), $guidance))),
+                 _ => {
+                    $stream.vm().error(crate::parse::Error::new($expected, Some(token), $guidance))?;
+                    None
+                 },
             }
+            None => {
+                $stream.vm().error(crate::parse::Error::new($expected, None, $guidance))?;
+                None
+            },
         }
     };
 }
 
 macro_rules! get_optional_element {
     ($stream :expr, $($pat:pat => $result:expr,)+) => {
-       match match ($stream).peek()? {
+        match match ($stream).peek()? {
             None => None,
             Some(token) => match token.value() {
                  $(

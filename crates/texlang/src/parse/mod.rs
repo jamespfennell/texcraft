@@ -28,6 +28,7 @@ pub use filelocation::FileLocation;
 pub use keyword::OptionalBy;
 pub use keyword::To;
 pub use number::Uint;
+pub use relation::Ordering;
 pub use variable::ArithmeticVariable;
 pub use variable::OptionalEquals;
 pub use variable::OptionalEqualsUnexpanded;
@@ -156,12 +157,14 @@ impl<S: TexlangState> Parsable<S> for token::CommandRef {
                 break;
             }
         }
-        get_required_element![
+        let ref_or = get_required_element![
             input.unexpanded(),
             "a control sequence or active character",
             "a command must be a control sequence or an active character",
             token::Value::CommandRef(command_ref) => command_ref,
-        ]
+        ];
+        // TODO: in this case return the empty control sequence
+        Ok(ref_or.unwrap())
     }
 }
 
