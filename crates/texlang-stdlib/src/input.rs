@@ -165,7 +165,7 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<command::Error>> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
-    let (index, _, target) = <(i32, parse::To, token::CommandRef)>::parse(input)?;
+    let (index, _, target) = <(i32, To, token::CommandRef)>::parse(input)?;
 
     #[derive(Copy, Clone, PartialEq, Eq)]
     enum Mode {
@@ -383,6 +383,16 @@ impl error::TexError for UnmatchedBracesError {
 
     fn notes(&self) -> Vec<error::display::Note> {
         vec![r"files being read with the \read primitive must match all opening braces with closing braces".into()]
+    }
+}
+
+/// When parsed, this type consumes a required `to` keyword from the input stream.
+struct To;
+
+impl<S: TexlangState> Parsable<S> for To {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+        texlang::parse::parse_keyword(input, "to")?;
+        Ok(To {})
     }
 }
 

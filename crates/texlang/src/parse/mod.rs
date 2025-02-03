@@ -25,8 +25,7 @@ mod testing;
 mod variable;
 
 pub use filelocation::FileLocation;
-pub use keyword::OptionalBy;
-pub use keyword::To;
+pub use keyword::parse_keyword;
 pub use number::Uint;
 pub use relation::Ordering;
 pub use variable::ArithmeticVariable;

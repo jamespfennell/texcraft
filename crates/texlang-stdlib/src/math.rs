@@ -1,6 +1,5 @@
 //! Operations on variables (add, multiply, divide)
 
-use texlang::parse::OptionalBy;
 use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
@@ -190,6 +189,16 @@ fn math_primitive_fn<S: TexlangState, O: Op>(
         | variable::Variable::MathCode(_) => {
             unreachable!("only arithmetic commands are considered");
         }
+    }
+}
+
+/// When parsed, this type consumes an optional `by` keyword from the input stream.
+struct OptionalBy;
+
+impl<S: TexlangState> Parsable<S> for OptionalBy {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+        texlang::parse::parse_keyword(input, "by")?;
+        Ok(OptionalBy)
     }
 }
 
