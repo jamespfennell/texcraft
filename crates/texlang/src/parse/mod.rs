@@ -8,7 +8,7 @@
 //! This allows expressions like `<integer><relation><integer>` to be parsed by one invocation
 //!     of [Parsable::parse], in this case on the type `(i32, std::cmp::Ordering, i32)`.
 //!
-//! The second most important thing is the collection of custom Rust types like [OptionalBy] and
+//! The second most important thing is the collection of custom Rust types like [OptionalEquals] and
 //!     [FileLocation] which correspond to Rust grammar elements.
 //!
 //! Finally this module contains some functions for special situation like parsing lists of tokens.

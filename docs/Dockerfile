@@ -20,7 +20,13 @@ RUN mdbook build
 RUN mdbook test -L target/debug/deps
 
 # Built the Rust reference
-RUN RUSTDOCFLAGS="-D warnings" cargo doc --all-features --lib --no-deps -p texlang -p texlang-stdlib -p texcraft-stdext -p texlang-common -p texlang-testing -p tfm
+RUN RUSTDOCFLAGS="-D warnings" cargo doc --all-features --lib --no-deps \
+  -p texcraft-stdext \
+  -p texlang \
+  -p texlang-common \
+  -p texlang-stdlib \
+  -p texlang-testing \
+  -p tfm
 
 # Serve the static files using Caddy
 FROM caddy
