@@ -85,7 +85,8 @@ use std::collections::HashMap;
 pub mod lang;
 
 /// A compiled lig/kern program.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CompiledProgram {
     left_to_pairs: BTreeMap<Char, (u16, u16)>,
     pairs: Vec<(Char, RawReplacement)>,
@@ -93,6 +94,7 @@ pub struct CompiledProgram {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 struct RawReplacement {
     left_char_operation: LeftCharOperation,
     middle_char_bounds: std::ops::Range<u16>,
@@ -105,7 +107,7 @@ impl CompiledProgram {
         program: &lang::Program,
         kerns: &[Number],
         entrypoints: HashMap<Char, u16>,
-    ) -> (CompiledProgram, Option<InfiniteLoopError>) {
+    ) -> (CompiledProgram, Vec<InfiniteLoopError>) {
         compiler::compile(program, kerns, &entrypoints)
     }
 
@@ -244,6 +246,7 @@ impl<'a> Replacement<'a> {
 
 /// Operation to perform on the left character of a lig/kern pair.
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum LeftCharOperation {
     /// Retain the left character and do not add a kern.
     Retain,

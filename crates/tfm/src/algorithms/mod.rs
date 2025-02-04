@@ -1,5 +1,6 @@
 //! The tftopl and pltotf algorithms.
 
+use crate::format::ValidationWarning;
 use std::fmt::Write;
 
 /// Output of the tftopl algorithm.
@@ -54,6 +55,7 @@ pub fn tfm_to_pl(
             )
         )
     });
+    let warnings = filter_lig_kern_warnings(warnings);
     let tfm_modified = warnings
         .iter()
         .map(crate::format::ValidationWarning::tfm_file_modified)
@@ -80,4 +82,25 @@ pub fn tfm_to_pl(
         pl_data: Ok(s),
         error_messages,
     })
+}
+
+fn filter_lig_kern_warnings(mut warnings: Vec<ValidationWarning>) -> Vec<ValidationWarning> {
+    let mut out = Vec::with_capacity(warnings.len());
+    let mut seen_lig_kern = false;
+    while let Some(warning) = warnings.pop() {
+        if matches!(
+            warning,
+            crate::format::ValidationWarning::LigKernWarning(
+                crate::ligkern::lang::ValidationWarning::InfiniteLoop(_),
+            )
+        ) {
+            if seen_lig_kern {
+                continue;
+            }
+            seen_lig_kern = true;
+        }
+        out.push(warning);
+    }
+    out.reverse();
+    out
 }

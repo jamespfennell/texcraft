@@ -5,12 +5,12 @@ pub fn compile(
     program: &lang::Program,
     kerns: &[Number],
     entry_points: &HashMap<Char, u16>,
-) -> (CompiledProgram, Option<InfiniteLoopError>) {
+) -> (CompiledProgram, Vec<InfiniteLoopError>) {
     let pair_to_instruction = build_pair_to_instruction_map(program, entry_points);
-    let (pair_to_replacement, infinite_loop_error_or) =
+    let (pair_to_replacement, infinite_loop_errors) =
         calculate_replacements(program, kerns, pair_to_instruction);
     let program = lower_and_optimize(pair_to_replacement);
-    (program, infinite_loop_error_or)
+    (program, infinite_loop_errors)
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
@@ -177,7 +177,7 @@ fn calculate_replacements(
     program: &lang::Program,
     kerns: &[Number],
     pair_to_instruction: HashMap<Node, usize>,
-) -> (HashMap<Node, Replacement>, Option<InfiniteLoopError>) {
+) -> (HashMap<Node, Replacement>, Vec<InfiniteLoopError>) {
     let mut result: HashMap<Node, Replacement> = Default::default();
     let mut actionable: Vec<OngoingCalculation> = vec![];
     let mut node_to_parents: HashMap<Node, Vec<OngoingCalculation>> = Default::default();
@@ -372,8 +372,7 @@ fn calculate_replacements(
         }
     }
 
-    // TODO: return all infinite loops
-    (result, infinite_loop_errors.pop())
+    (result, infinite_loop_errors)
 }
 
 fn lower_and_optimize(pair_to_replacement: HashMap<Node, Replacement>) -> CompiledProgram {
@@ -497,7 +496,7 @@ mod tests {
             ..Default::default()
         };
         let (compiled_program, infinite_loop_error_or) = compile(&program, &vec![], &entry_points);
-        assert!(infinite_loop_error_or.is_none(), "no infinite loop errors");
+        assert!(infinite_loop_error_or.is_empty(), "no infinite loop errors");
 
         let mut got: HashMap<(Char, Char), Vec<(Char, Number)>> = Default::default();
         for pair in compiled_program.all_pairs_having_replacement() {

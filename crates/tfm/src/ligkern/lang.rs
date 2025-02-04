@@ -449,10 +449,10 @@ impl Program {
         }
 
         let entrypoints: HashMap<Char, u16> = unpacked_entrypoints.into_iter().collect();
-        let (_, error_or) = super::CompiledProgram::compile(self, kerns, entrypoints);
-        if let Some(err) = error_or {
+        let (_, errors) = super::CompiledProgram::compile(self, kerns, entrypoints);
+        for err in errors {
             warnings.push(ValidationWarning::InfiniteLoop(err));
-        };
+        }
         warnings
     }
 

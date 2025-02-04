@@ -160,10 +160,91 @@ pub mod format;
 pub mod ligkern;
 pub mod pl;
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Font {
+    /// Header.
+    pub header: Header,
+
+    /// Character dimensions.
+    pub char_dimens: HashMap<Char, CharDimensions>,
+
+    /// Lig kern program.
+    pub lig_kern_program: ligkern::CompiledProgram,
+
+    /// Next larger program
+    pub next_larger_program: NextLargerProgram,
+
+    /// Font parameters.
+    pub params: Vec<Number>,
+}
+
+impl Font {
+    pub fn deserialize_from_tfm(b: &[u8]) -> Result<Font, format::DeserializationError> {
+        let (file_or, _) = format::File::deserialize(b);
+        // TODO: maybe the following logic should live in the validate_and_fix function.
+        // And that function should return the fully valid programs.
+        let file = file_or?;
+        let entrypoints: HashMap<Char, u16> = file
+            .char_tags
+            .iter()
+            .filter_map(|(c, t)| t.ligature().map(|l| (*c, l as u16)))
+            .collect();
+        let (lig_kern_program, _) =
+            ligkern::CompiledProgram::compile(&file.lig_kern_program, &file.kerns, entrypoints);
+        let (next_larger_program, _) = NextLargerProgram::new(
+            file.char_tags
+                .iter()
+                .filter_map(|(c, t)| t.list().map(|l| (*c, l))),
+            |c| file.char_dimens.contains_key(&c),
+            true,
+        );
+        let char_dimens = file
+            .char_dimens
+            .into_iter()
+            .map(|(char, d)| {
+                (
+                    char,
+                    CharDimensions {
+                        width: file
+                            .widths
+                            .get(d.width_index.get() as usize)
+                            .copied()
+                            .unwrap_or_default(),
+                        height: file
+                            .heights
+                            .get(d.height_index as usize)
+                            .copied()
+                            .unwrap_or_default(),
+                        depth: file
+                            .depths
+                            .get(d.depth_index as usize)
+                            .copied()
+                            .unwrap_or_default(),
+                        italic_correction: file
+                            .italic_corrections
+                            .get(d.italic_index as usize)
+                            .copied()
+                            .unwrap_or_default(),
+                    },
+                )
+            })
+            .collect();
+        Ok(Font {
+            header: file.header,
+            char_dimens,
+            lig_kern_program,
+            next_larger_program,
+            params: file.params,
+        })
+    }
+}
+
 /// The TFM header, which contains metadata about the file.
 ///
 /// This is defined in TFtoPL.2014.10.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Header {
     /// The font checksum, if specified.
     ///
@@ -185,10 +266,6 @@ pub struct Header {
     pub face: Option<Face>,
     /// The TFM format allows the header to contain arbitrary additional data.
     pub additional_data: Vec<u32>,
-}
-
-pub struct Font {
-    pub lig_kern_program: ligkern::CompiledProgram,
 }
 
 impl Header {
@@ -230,6 +307,7 @@ impl Header {
 /// TFM and PL files only support 1-byte characters.
 #[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Char(pub u8);
 
 impl std::fmt::Display for Char {
@@ -300,6 +378,7 @@ impl Char {
 ///   because 10^(-6) is larger than 2^(-20).
 #[derive(Default, PartialEq, Eq, Debug, Copy, Clone, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Number(pub i32);
 
 impl Number {
@@ -374,8 +453,18 @@ impl std::fmt::Display for Number {
     }
 }
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CharDimensions {
+    pub width: Number,
+    pub height: Number,
+    pub depth: Number,
+    pub italic_correction: Number,
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FaceWeight {
     Light,
     Medium,
@@ -384,6 +473,7 @@ pub enum FaceWeight {
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FaceSlope {
     Roman,
     Italic,
@@ -391,6 +481,7 @@ pub enum FaceSlope {
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FaceExpansion {
     Regular,
     Condensed,
@@ -399,6 +490,7 @@ pub enum FaceExpansion {
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Face {
     Valid(FaceWeight, FaceSlope, FaceExpansion),
     Other(u8),
@@ -743,6 +835,7 @@ impl NextLargerProgramWarning {
 /// ```
 ///
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NextLargerProgram {
     entrypoints: HashMap<Char, u8>,
     next_larger: Vec<(Char, NonZeroU8)>,
