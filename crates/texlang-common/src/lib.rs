@@ -2,11 +2,18 @@
 
 use std::collections::HashMap;
 use std::{cell::RefCell, rc::Rc};
+use texlang::prelude as txl;
+use texlang::vm::TexlangState;
 
 /// Implementations of this trait can provide access to the file system.
 ///
 /// This trait is intended to be implemented by the state and used as a trait
 /// bound in Texlang primitives like `\input` that require a file system.
+///
+/// The filesystem is returned in a dynamic pointer to avoid complicating
+/// the trait with a generic parameter.
+/// File system operations are rate in TeX documents so the overhead
+/// of a vtable lookup is negligable.
 pub trait HasFileSystem {
     fn file_system(&self) -> Rc<RefCell<dyn FileSystem>> {
         Rc::new(RefCell::new(RealFileSystem {}))
@@ -23,10 +30,85 @@ pub trait FileSystem {
     /// This is implemented by [std::fs::read_to_string].
     fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String>;
 
+    /// Read the entire contents of a file into a bytes buffer.
+    ///
+    /// This is implemented by [std::fs::read].
+    fn read_to_bytes(&self, path: &std::path::Path) -> std::io::Result<Vec<u8>>;
+
     /// Write a slice of bytes to a file.
     ///
     /// This is implemented by [std::fs::write].
     fn write_bytes(&self, path: &std::path::Path, contents: &[u8]) -> std::io::Result<()>;
+}
+
+pub fn read_file_to_string<S: HasFileSystem + TexlangState>(
+    vm: &texlang::vm::VM<S>,
+    file_location: texlang::parse::FileLocation,
+    default_extension: &str,
+) -> txl::Result<(std::path::PathBuf, String)> {
+    let file_path = file_location.determine_full_path(
+        vm.working_directory
+            .as_ref()
+            .map(std::path::PathBuf::as_ref),
+        default_extension,
+    );
+    match vm
+        .state
+        .file_system()
+        .borrow_mut()
+        .read_to_string(&file_path)
+    {
+        Ok(source_code) => Ok((file_path, source_code)),
+        Err(err) => Err(vm.fatal_error(IoError {
+            title: format!("could not read from `{}`", file_path.display()),
+            underlying_error: err,
+        })),
+    }
+}
+
+pub fn read_file_to_bytes<S: HasFileSystem + TexlangState>(
+    vm: &texlang::vm::VM<S>,
+    file_location: texlang::parse::FileLocation,
+    default_extension: &str,
+) -> txl::Result<(std::path::PathBuf, Vec<u8>)> {
+    let file_path = file_location.determine_full_path(
+        vm.working_directory
+            .as_ref()
+            .map(std::path::PathBuf::as_ref),
+        default_extension,
+    );
+    match vm
+        .state
+        .file_system()
+        .borrow_mut()
+        .read_to_bytes(&file_path)
+    {
+        Ok(source_code) => Ok((file_path, source_code)),
+        Err(err) => Err(vm.fatal_error(IoError {
+            title: format!("could not read from `{}`", file_path.display()),
+            underlying_error: err,
+        })),
+    }
+}
+
+#[derive(Debug)]
+pub struct IoError {
+    pub title: String,
+    pub underlying_error: std::io::Error,
+}
+
+impl texlang::error::TexError for IoError {
+    fn kind(&self) -> texlang::error::Kind {
+        texlang::error::Kind::FailedPrecondition
+    }
+
+    fn title(&self) -> String {
+        self.title.clone()
+    }
+
+    fn notes(&self) -> Vec<texlang::error::display::Note> {
+        vec![format!("underlying filesystem error: {}", self.underlying_error).into()]
+    }
 }
 
 /// Implementation of the file system trait the uses the real file system.
@@ -35,6 +117,9 @@ pub struct RealFileSystem;
 impl FileSystem for RealFileSystem {
     fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String> {
         std::fs::read_to_string(path)
+    }
+    fn read_to_bytes(&self, path: &std::path::Path) -> std::io::Result<Vec<u8>> {
+        std::fs::read(path)
     }
     fn write_bytes(&self, path: &std::path::Path, contents: &[u8]) -> std::io::Result<()> {
         std::fs::write(path, contents)
@@ -62,13 +147,14 @@ impl FileSystem for RealFileSystem {
 ///     HashMap::new(),  // empty set of built-in commands
 /// );
 /// let mut mock_file_system = InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
-/// mock_file_system.add("file/path.tex", "file content");
+/// mock_file_system.add_string_file("file/path.tex", "file content");
 /// vm.state.file_system = Rc::new(RefCell::new(mock_file_system));
 /// ```
 #[derive(Default)]
 pub struct InMemoryFileSystem {
     working_directory: std::path::PathBuf,
-    files: HashMap<std::path::PathBuf, String>,
+    string_files: HashMap<std::path::PathBuf, String>,
+    bytes_files: HashMap<std::path::PathBuf, Vec<u8>>,
 }
 
 impl InMemoryFileSystem {
@@ -78,22 +164,40 @@ impl InMemoryFileSystem {
     pub fn new(working_directory: &std::path::Path) -> Self {
         Self {
             working_directory: working_directory.into(),
-            files: Default::default(),
+            string_files: Default::default(),
+            bytes_files: Default::default(),
         }
     }
-    /// Add a file to the in-memory file system.
+    /// Add a string file to the in-memory file system.
     ///
     /// The provided path is relative to the working directory
-    pub fn add(&mut self, relative_path: &str, content: &str) {
+    pub fn add_string_file(&mut self, relative_path: &str, content: &str) {
         let mut path = self.working_directory.clone();
         path.push(relative_path);
-        self.files.insert(path, content.to_string());
+        self.string_files.insert(path, content.to_string());
+    }
+    /// Add a bytes file to the in-memory file system.
+    ///
+    /// The provided path is relative to the working directory
+    pub fn add_bytes_file(&mut self, relative_path: &str, content: &[u8]) {
+        let mut path = self.working_directory.clone();
+        path.push(relative_path);
+        self.bytes_files.insert(path, content.into());
     }
 }
 
 impl FileSystem for InMemoryFileSystem {
     fn read_to_string(&self, path: &std::path::Path) -> std::io::Result<String> {
-        match self.files.get(path) {
+        match self.string_files.get(path) {
+            None => Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "not found",
+            )),
+            Some(content) => Ok(content.clone()),
+        }
+    }
+    fn read_to_bytes(&self, path: &std::path::Path) -> std::io::Result<Vec<u8>> {
+        match self.bytes_files.get(path) {
             None => Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "not found",

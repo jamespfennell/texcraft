@@ -1,7 +1,6 @@
 //! Primitives for inputting source code from files and the terminal
 
 use std::cell::RefCell;
-use std::path;
 use std::rc::Rc;
 use texlang::parse::{FileLocation, OptionalEquals};
 use texlang::prelude as txl;
@@ -23,7 +22,8 @@ fn input_fn<S: TexlangState + common::HasFileSystem>(
     input: &mut vm::ExpansionInput<S>,
 ) -> Result<(), Box<command::Error>> {
     let file_location = FileLocation::parse(input)?;
-    let (file_path, source_code) = read_file(input.vm(), file_location, "tex")?;
+    let (file_path, source_code) =
+        texlang_common::read_file_to_string(input.vm(), file_location, "tex")?;
     if input.vm().num_current_sources() > 100 {
         return Err(input.vm().fatal_error(TooManyInputs {}));
     }
@@ -105,7 +105,7 @@ fn openin_fn<const N: usize, S: HasComponent<Component<N>> + common::HasFileSyst
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<command::Error>> {
     let (u, _, file_location) = <(parse::Uint<N>, OptionalEquals, FileLocation)>::parse(input)?;
-    let lexer_or = match read_file(input.vm(), file_location, "tex") {
+    let lexer_or = match texlang_common::read_file_to_string(input.vm(), file_location, "tex") {
         // If the file fails to open TeX does not error out.
         // Instead, TeX users are expected to test the result with \ifeof.
         Err(_) => None,
@@ -324,29 +324,6 @@ where
     }
 }
 
-fn read_file<S: common::HasFileSystem + TexlangState>(
-    vm: &vm::VM<S>,
-    file_location: parse::FileLocation,
-    default_extension: &str,
-) -> txl::Result<(path::PathBuf, String)> {
-    let file_path = file_location.determine_full_path(
-        vm.working_directory.as_ref().map(path::PathBuf::as_ref),
-        default_extension,
-    );
-    match vm
-        .state
-        .file_system()
-        .borrow_mut()
-        .read_to_string(&file_path)
-    {
-        Ok(source_code) => Ok((file_path, source_code)),
-        Err(err) => Err(vm.fatal_error(IoError {
-            title: format!("could not read from `{}`", file_path.display()),
-            underlying_error: err,
-        })),
-    }
-}
-
 #[derive(Debug)]
 struct IoError {
     title: String,
@@ -453,12 +430,12 @@ mod tests {
 
     fn custom_vm_initialization(vm: &mut vm::VM<State>) {
         let mut fs = common::InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
-        fs.add("file1.tex", "content1\n");
-        fs.add("file2.tex", "content2%\n");
-        fs.add("file3.tex", r"\input nested/file4");
-        fs.add("nested/file4.tex", "content4");
-        fs.add("file5.tex", "file1.tex");
-        fs.add("recursive.tex", r"\input recursive.tex content");
+        fs.add_string_file("file1.tex", "content1\n");
+        fs.add_string_file("file2.tex", "content2%\n");
+        fs.add_string_file("file3.tex", r"\input nested/file4");
+        fs.add_string_file("nested/file4.tex", "content4");
+        fs.add_string_file("file5.tex", "file1.tex");
+        fs.add_string_file("recursive.tex", r"\input recursive.tex content");
         vm.state.file_system = Rc::new(RefCell::new(fs));
     }
 
@@ -482,7 +459,7 @@ mod tests {
 
     fn end_input_vm_initialization(vm: &mut vm::VM<State>) {
         let mut fs = common::InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
-        fs.add(
+        fs.add_string_file(
             "file1.tex",
             "Hello\\def\\Macro{Hola\\endinput Mundo}\\Macro World\n",
         );
@@ -504,11 +481,11 @@ mod tests {
 
     fn read_vm_initialization(vm: &mut vm::VM<State>) {
         let mut fs = common::InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
-        fs.add("file1.tex", "1\n2%\n3");
-        fs.add("file2.tex", "1{\n2\n3}");
-        fs.add("file3.tex", "1}1\n2");
-        fs.add("file4.tex", "");
-        fs.add("file5.tex", "hello { world");
+        fs.add_string_file("file1.tex", "1\n2%\n3");
+        fs.add_string_file("file2.tex", "1{\n2\n3}");
+        fs.add_string_file("file3.tex", "1}1\n2");
+        fs.add_string_file("file4.tex", "");
+        fs.add_string_file("file5.tex", "hello { world");
         vm.state.file_system = Rc::new(RefCell::new(fs));
 
         let mut terminal_in: common::MockTerminalIn = Default::default();
