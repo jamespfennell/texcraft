@@ -137,6 +137,10 @@ impl<S: TexlangState> ExpandedStream<S> {
             .push(super::TokenBuffer(token_buffer))
     }
 
+    pub(crate) fn vm_mut(&mut self) -> &mut vm::VM<S> {
+        &mut self.0 .0
+    }
+
     /// Returns a mutable reference to the expanded tokens stack for the current input source.
     ///
     /// The tokens are a stack, so the next token is the last token in the vector.
@@ -485,6 +489,10 @@ impl<S> ExecutionInput<S> {
             .token_buffers
             .push(super::TokenBuffer(token_buffer))
     }
+
+    pub(crate) fn vm_mut(&mut self) -> &mut vm::VM<S> {
+        &mut self.0 .0 .0
+    }
 }
 
 /// Strips the lifetime from the token.
@@ -605,18 +613,17 @@ mod stream {
                     Ok(Some(override_expansion)) => {
                         return Ok(Some(override_expansion));
                     }
-                    Err(err) => return Err(convert_command_error(vm, token, err)),
+                    Err(err) => return Err(err),
                 };
-                if let Err(err) = command(token, ExpansionInput::new(vm)) {
-                    return Err(convert_command_error(vm, token, err));
-                };
+                vm.stack_push(token, error::OperationKind::Expansion);
+                let err_or = command(token, ExpansionInput::new(vm));
+                vm.stack_pop();
+                err_or?;
                 next_expanded(vm)
             }
             Some(command::Command::Macro(command)) => {
                 let command = command.clone();
-                if let Err(err) = command.call(token, ExpansionInput::new(vm)) {
-                    return Err(convert_command_error(vm, token, err));
-                }
+                command.call(token, ExpansionInput::new(vm))?;
                 next_expanded(vm)
             }
             _ => Ok(Some(token)),
@@ -646,20 +653,19 @@ mod stream {
                         vm.internal.expansions_mut().push(override_expansion);
                         return Ok(vm.internal.expansions().last());
                     }
-                    Err(err) => return Err(convert_command_error(vm, token, err)),
+                    Err(err) => return Err(err),
                 };
-                if let Err(err) = command(token, ExpansionInput::new(vm)) {
-                    return Err(convert_command_error(vm, token, err));
-                };
+                vm.stack_push(token, error::OperationKind::Expansion);
+                let err_or = command(token, ExpansionInput::new(vm));
+                vm.stack_pop();
+                err_or?;
                 peek_expanded(vm)
             }
             Some(command::Command::Macro(command)) => {
                 let command = command.clone();
                 let token = *token;
                 consume_peek(vm);
-                if let Err(err) = command.call(token, ExpansionInput::new(vm)) {
-                    return Err(convert_command_error(vm, token, err));
-                }
+                command.call(token, ExpansionInput::new(vm))?;
                 peek_expanded(vm)
             }
             _ => Ok(Some(unsafe { launder(token) })),
@@ -689,20 +695,19 @@ mod stream {
                         vm.internal.expansions_mut().push(override_expansion);
                         return Ok(true);
                     }
-                    Err(err) => return Err(convert_command_error(vm, token, err)),
+                    Err(err) => return Err(err),
                 };
-                if let Err(err) = command(token, ExpansionInput::new(vm)) {
-                    return Err(convert_command_error(vm, token, err));
-                };
+                vm.stack_push(token, error::OperationKind::Expansion);
+                let err_or = command(token, ExpansionInput::new(vm));
+                vm.stack_pop();
+                err_or?;
                 Ok(true)
             }
             Some(command::Command::Macro(command)) => {
                 let command = command.clone();
                 let token = *token;
                 consume_peek(vm);
-                if let Err(err) = command.call(token, ExpansionInput::new(vm)) {
-                    return Err(convert_command_error(vm, token, err));
-                }
+                command.call(token, ExpansionInput::new(vm))?;
                 Ok(true)
             }
             _ => Ok(false),
@@ -714,15 +719,5 @@ mod stream {
         // When we peek at a token, it is placed on top of the expansions stack.
         // So to consume the token, we just need to remove it from the stack.
         vm.internal.current_source.expansions.pop();
-    }
-
-    use crate::error::Error;
-
-    fn convert_command_error<S: TexlangState>(
-        vm: &mut vm::VM<S>,
-        token: Token,
-        err: Box<error::Error>,
-    ) -> Box<Error> {
-        Error::new_propagated(vm, error::PropagationContext::Expansion, token, err)
     }
 }

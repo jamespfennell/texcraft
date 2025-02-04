@@ -86,6 +86,7 @@ impl TracedError {
         error: Box<dyn TexError>,
         tracer: &trace::Tracer,
         cs_name_interner: &token::CsNameInterner,
+        stack_trace: Vec<StackTraceElement>,
     ) -> Self {
         let (end_of_input_trace, mut tokens) = match error.kind() {
             Kind::Token(token) => (None, vec![token]),
@@ -103,17 +104,17 @@ impl TracedError {
             .collect();
         TracedError {
             error,
-            stack_trace: vec![],
+            stack_trace,
             token_traces,
             end_of_input_trace,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StackTraceElement {
-    pub context: PropagationContext,
+    pub context: OperationKind,
     pub token: token::Token,
     pub trace: trace::SourceCodeTrace,
 }
@@ -142,7 +143,7 @@ impl Error {
     }
     pub fn new_propagated<S>(
         vm: &vm::VM<S>,
-        context: PropagationContext,
+        context: OperationKind,
         token: token::Token,
         mut error: Box<Error>,
     ) -> Box<Error> {
@@ -196,24 +197,22 @@ pub trait TexError: std::fmt::Debug + 'static {
     // The method will return a vector of static strings
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
-pub enum PropagationContext {
+pub enum OperationKind {
     Expansion,
     Execution,
     VariableIndex,
     VariableAssignment,
 }
 
-impl PropagationContext {
+impl OperationKind {
     fn action(&self) -> &'static str {
         match self {
-            PropagationContext::Expansion => "expanding this command",
-            PropagationContext::Execution => "executing this command",
-            PropagationContext::VariableIndex => "determining the index of this variable",
-            PropagationContext::VariableAssignment => {
-                "determining the value to assign to this variable"
-            }
+            OperationKind::Expansion => "expanding this command",
+            OperationKind::Execution => "executing this command",
+            OperationKind::VariableIndex => "determining the index of this variable",
+            OperationKind::VariableAssignment => "determining the value to assign to this variable",
         }
     }
 }

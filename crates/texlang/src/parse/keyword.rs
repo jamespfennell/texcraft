@@ -4,7 +4,7 @@ use crate::traits::*;
 use crate::vm;
 
 /// Parses a keyword from the input stream.
-/// 
+///
 /// scan_keyword
 pub fn parse_keyword<S: TexlangState>(
     input: &mut vm::ExpandedStream<S>,

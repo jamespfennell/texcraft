@@ -144,14 +144,13 @@ impl<S: TexlangState> VM<S> {
                 Value::CommandRef(command_ref) => {
                     match input.commands_map().get_command(&command_ref) {
                         Some(Command::Execution(cmd, _)) => {
-                            if let Err(err) = cmd(token, input) {
-                                return Err(error::Error::new_propagated(
-                                    input.vm(),
-                                    error::PropagationContext::Execution,
-                                    token,
-                                    err,
-                                ));
-                            }
+                            let cmd = *cmd;
+                            input
+                                .vm_mut()
+                                .stack_push(token, error::OperationKind::Execution);
+                            let err_or = cmd(token, input);
+                            input.vm_mut().stack_pop();
+                            err_or?;
                         }
                         Some(Command::Variable(cmd)) => {
                             let cmd = cmd.clone();
@@ -198,14 +197,22 @@ impl<S: TexlangState> VM<S> {
     // TODO: expose via the input instead types
     pub fn fatal_error<E: error::TexError>(&self, err: E) -> Box<error::Error> {
         let err: Box<dyn error::TexError> = Box::new(err);
-        let traced =
-            error::TracedError::new(err, &self.internal.tracer, &self.internal.cs_name_interner);
+        let traced = error::TracedError::new(
+            err,
+            &self.internal.tracer,
+            &self.internal.cs_name_interner,
+            self.generate_stack_trace(),
+        );
         Box::new(error::Error::new(traced))
     }
     pub fn error<E: error::TexError>(&self, err: E) -> Result<(), Box<error::Error>> {
         let err: Box<dyn error::TexError> = Box::new(err);
-        let traced =
-            error::TracedError::new(err, &self.internal.tracer, &self.internal.cs_name_interner);
+        let traced = error::TracedError::new(
+            err,
+            &self.internal.tracer,
+            &self.internal.cs_name_interner,
+            self.generate_stack_trace(),
+        );
         match self.state.recoverable_error_hook(traced) {
             Ok(_) => Ok(()),
             Err(err) => {
@@ -213,6 +220,7 @@ impl<S: TexlangState> VM<S> {
                     err,
                     &self.internal.tracer,
                     &self.internal.cs_name_interner,
+                    self.generate_stack_trace(),
                 );
                 Err(Box::new(error::Error::new(traced)))
             }
@@ -505,6 +513,27 @@ impl<S> VM<S> {
     pub fn num_current_sources(&self) -> usize {
         self.internal.sources.len() + 1
     }
+
+    pub fn generate_stack_trace(&self) -> Vec<error::StackTraceElement> {
+        self.internal
+            .execution_stack
+            .iter()
+            .map(|(op_kind, token)| error::StackTraceElement {
+                context: *op_kind,
+                token: *token,
+                trace: self
+                    .internal
+                    .tracer
+                    .trace(*token, &self.internal.cs_name_interner),
+            })
+            .collect()
+    }
+    pub(crate) fn stack_push(&mut self, token: Token, op_kind: error::OperationKind) {
+        self.internal.execution_stack.push((op_kind, token));
+    }
+    pub(crate) fn stack_pop(&mut self) {
+        self.internal.execution_stack.pop();
+    }
 }
 
 impl<S: TexlangState> VM<S> {
@@ -544,6 +573,8 @@ struct Internal<S> {
     // variable pointers that are in the stack.
     #[cfg_attr(feature = "serde", serde(skip))]
     save_stack: Vec<variable::SaveStackElement<S>>,
+
+    execution_stack: Vec<(error::OperationKind, Token)>,
 }
 
 impl<S> Internal<S> {
@@ -555,6 +586,7 @@ impl<S> Internal<S> {
             tracer: Default::default(),
             token_buffers: Default::default(),
             save_stack: Default::default(),
+            execution_stack: Default::default(),
         }
     }
 }

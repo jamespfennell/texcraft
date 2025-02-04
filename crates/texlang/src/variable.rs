@@ -166,17 +166,14 @@ impl<S: TexlangState> Command<S> {
     ) -> txl::Result<Variable<S>> {
         let index = match &self.index_resolver {
             None => Index(0),
-            Some(index_resolver) => match index_resolver.resolve(token, input) {
-                Ok(index) => index,
-                Err(err) => {
-                    return Err(error::Error::new_propagated(
-                        input.vm(),
-                        error::PropagationContext::VariableIndex,
-                        token,
-                        err,
-                    ))
-                }
-            },
+            Some(index_resolver) => {
+                input
+                    .vm_mut()
+                    .stack_push(token, error::OperationKind::VariableIndex);
+                let err_or = index_resolver.resolve(token, input);
+                input.vm_mut().stack_pop();
+                err_or?
+            }
         };
         Ok(new_variable(&self.getters, index))
     }
@@ -216,18 +213,13 @@ impl<S: TexlangState> Command<S> {
         input: &mut vm::ExecutionInput<S>,
         scope: groupingmap::Scope,
     ) -> txl::Result<()> {
-        match self
-            .resolve(token, input.as_mut())?
-            .set_value_using_input(input, scope)
-        {
-            Ok(()) => Ok(()),
-            Err(err) => Err(error::Error::new_propagated(
-                input.vm(),
-                error::PropagationContext::VariableAssignment,
-                token,
-                err,
-            )),
-        }
+        let variable = self.resolve(token, input.as_mut())?;
+        input
+            .vm_mut()
+            .stack_push(token, error::OperationKind::VariableAssignment);
+        let err_or = variable.set_value_using_input(input, scope);
+        input.vm_mut().stack_pop();
+        err_or
     }
 }
 
