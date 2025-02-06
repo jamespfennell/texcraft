@@ -700,7 +700,7 @@ macro_rules! test_suite {
                     let lhs = $lhs;
                     let rhs = $rhs;
                     let mut options = vec! $options;
-                    options.push(TestOption::RecoverFromErrors(true));
+                    options.push(texlang_testing::TestOption::RecoverFromErrors(true));
                     // TODO: verify a recoverable error was thrown?
                     texlang_testing::run_expansion_equality_test::<$state, $handlers>(&lhs, &rhs, true, &options);
                 }
@@ -708,7 +708,7 @@ macro_rules! test_suite {
                 fn error_recovery_disabled() {
                     let input = $lhs;
                     let mut options = vec! $options;
-                    options.push(TestOption::RecoverFromErrors(false));
+                    options.push(texlang_testing::TestOption::RecoverFromErrors(false));
                     texlang_testing::run_failure_test::<$state>(&input, &options);
                 }
             }

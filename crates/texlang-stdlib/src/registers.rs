@@ -1,6 +1,5 @@
 //! Register variables (`\count`, `\countdef`)
 
-use texcraft_stdext::collections::groupingmap;
 use texlang::parse::OptionalEquals;
 use texlang::prelude as txl;
 use texlang::traits::*;
@@ -15,6 +14,12 @@ pub struct Component<T, const N: usize>(
     // cost due to this, and it would be nice to fix the issue another way.
     Box<[T; N]>,
 );
+
+static COUNTDEF_TAG: command::StaticTag = command::StaticTag::new();
+
+pub fn countdef_tag() -> command::Tag {
+    COUNTDEF_TAG.get()
+}
 
 #[cfg(feature = "serde")]
 impl<T: serde::Serialize, const N: usize> serde::Serialize for Component<T, N> {
@@ -78,30 +83,33 @@ fn count_fn<T, S: HasComponent<Component<T, N>>, const N: usize>(
 
 /// Get the `\countdef` command.
 pub fn get_countdef<S: HasComponent<Component<i32, N>>, const N: usize>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_execution(countdef_fn)
+    command::BuiltIn::new_execution(countdef_fn).with_tag(countdef_tag())
 }
 
 /// Get the `\toksdef` command.
 pub fn get_toksdef<S: HasComponent<Component<Vec<token::Token>, N>>, const N: usize>(
 ) -> command::BuiltIn<S> {
-    command::BuiltIn::new_execution(countdef_fn)
+    command::BuiltIn::new_execution(countdef_fn).with_tag(countdef_tag())
 }
 
 fn countdef_fn<T: variable::SupportedType, S: HasComponent<Component<T, N>>, const N: usize>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> txl::Result<()> {
-    let (target, _, index) = <(token::CommandRef, OptionalEquals, parse::Uint<N>)>::parse(input)?;
-    // TODO: I suspect \countdef should honor \global, but haven't checked pdfTeX.
-    input.commands_map_mut().insert_variable_command(
-        target,
-        variable::Command::new_array(
-            ref_fn,
-            mut_fn,
-            variable::IndexResolver::Static(index.0.into()),
-        ),
-        groupingmap::Scope::Local,
-    );
+    let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
+    let (cmd_ref_or, _, index) =
+        <(Option<token::CommandRef>, OptionalEquals, parse::Uint<N>)>::parse(input)?;
+    if let Some(cmd_ref) = cmd_ref_or {
+        input.commands_map_mut().insert_variable_command(
+            cmd_ref,
+            variable::Command::new_array(
+                ref_fn,
+                mut_fn,
+                variable::IndexResolver::Static(index.0.into()),
+            ),
+            scope,
+        );
+    }
     Ok(())
 }
 
@@ -124,7 +132,7 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::the;
+    use crate::{prefix, the};
     use texlang::vm::implement_has_component;
     use texlang_testing::*;
 
@@ -132,6 +140,7 @@ mod tests {
     struct State {
         registers_i32: Component<i32, 256>,
         registers_token_list: Component<Vec<token::Token>, 256>,
+        prefix: prefix::Component,
         testing: TestingComponent,
     }
 
@@ -142,11 +151,17 @@ mod tests {
         ) -> Result<(), Box<dyn error::TexError>> {
             TestingComponent::recoverable_error_hook(self, recoverable_error)
         }
+        fn variable_assignment_scope_hook(
+            state: &mut Self,
+        ) -> texcraft_stdext::collections::groupingmap::Scope {
+            prefix::variable_assignment_scope_hook(state)
+        }
     }
 
     implement_has_component![State{
         registers_i32: Component<i32, 256>,
         registers_token_list: Component<Vec<token::Token>, 256>,
+        prefix: prefix::Component,
         testing: TestingComponent,
     }];
 
@@ -155,6 +170,7 @@ mod tests {
             ("the", the::get_the()),
             ("count", get_count()),
             ("countdef", get_countdef()),
+            ("global", prefix::get_global()),
             ("toks", get_toks()),
             ("toksdef", get_toksdef()),
         ])
@@ -179,6 +195,16 @@ mod tests {
                 countdef_with_count,
                 r"\countdef\A 23\A 4\count 1 0 \the\A",
                 r"4"
+            ),
+            (
+                countdef_local,
+                r"\count 1=1 \count 2=2 \countdef\A 1{\countdef\A 2}\the\A",
+                r"1"
+            ),
+            (
+                countdef_global,
+                r"\count 1=1 \count 2=2 \countdef\A 1{\global\countdef\A 2}\the\A",
+                r"2"
             ),
             (
                 countdef_with_same_count,
@@ -226,6 +252,7 @@ mod tests {
                 r"\countdef\A 260 \A= 4 \the\count 0",
                 "4"
             ),
+            (countdef_missing_cs, r"\countdef 260 End", "End"),
         ),
     ];
 }

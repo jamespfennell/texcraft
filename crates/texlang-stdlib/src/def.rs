@@ -49,7 +49,7 @@ fn parse_and_set_macro<S: TexlangState>(
     if set_globally_override {
         scope = groupingmap::Scope::Global;
     }
-    let target = token::CommandRef::parse(input)?;
+    let cmd_ref_or = Option::<token::CommandRef>::parse(input)?;
     let (prefix, raw_parameters, replacement_end_token) =
         parse_prefix_and_parameters(input.unexpanded())?;
     let parameters: Vec<texmacro::Parameter> = raw_parameters
@@ -67,9 +67,11 @@ fn parse_and_set_macro<S: TexlangState>(
         }
     }
     let user_defined_macro = texmacro::Macro::new(prefix, parameters, replacement);
-    input
-        .commands_map_mut()
-        .insert_macro(target, user_defined_macro, scope);
+    if let Some(cmd_ref) = cmd_ref_or {
+        input
+            .commands_map_mut()
+            .insert_macro(cmd_ref, user_defined_macro, scope);
+    }
     Ok(())
 }
 
@@ -552,6 +554,9 @@ mod test {
             r"\def\helloWorld{Hello World} ",
             r"\helloWorld"
         ),),
+        recoverable_failure_tests(
+            (bad_token_target, r"\def a other stuff{}Hello", "Hello"),
+        ),
         failure_tests(
             (end_of_input_scanning_target, "\\def"),
             (end_of_input_scanning_argument_text, "\\def\\A"),

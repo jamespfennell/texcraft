@@ -146,7 +146,9 @@ macro_rules! generate_tuple_impls {
 
 generate_tuple_impls![T1, T2, T3, T4, T5];
 
-impl<S: TexlangState> Parsable<S> for token::CommandRef {
+impl<S: TexlangState> Parsable<S> for Option<token::CommandRef> {
+    // TeX.2021.get_r_token
+    // TeX.2021.1215
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         while let Some(found_equals) = get_optional_element![
             input.unexpanded(),
@@ -162,8 +164,7 @@ impl<S: TexlangState> Parsable<S> for token::CommandRef {
             "a command must be a control sequence or an active character",
             token::Value::CommandRef(command_ref) => command_ref,
         ];
-        // TODO: in this case return the empty control sequence
-        Ok(ref_or.unwrap())
+        Ok(ref_or)
     }
 }
 

@@ -31,13 +31,13 @@ pub fn get_divide<S: TexlangState>() -> command::BuiltIn<S> {
 
 fn get_command<S: TexlangState, O: Op>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(math_primitive_fn::<S, O>)
-        .with_tag(get_variable_op_tag())
+        .with_tag(variable_op_tag())
         .with_doc(O::DOC)
 }
 
 static VARIABLE_OP_TAG: command::StaticTag = command::StaticTag::new();
 
-pub fn get_variable_op_tag() -> command::Tag {
+pub fn variable_op_tag() -> command::Tag {
     VARIABLE_OP_TAG.get()
 }
 

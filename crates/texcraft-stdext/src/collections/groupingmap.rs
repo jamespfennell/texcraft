@@ -227,7 +227,7 @@ pub type GroupingHashMap<K, V> = GroupingContainer<K, V, HashMap<K, V>>;
 pub type GroupingVec<V> = GroupingContainer<usize, V, Vec<Option<V>>>;
 
 /// Scope is used in the insertion method to determine the scope to insert at.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Scope {
     /// Insertions in the local scope are rolled back at the end of the current group.

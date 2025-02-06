@@ -165,7 +165,7 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn
     input: &mut vm::ExecutionInput<S>,
 ) -> Result<(), Box<command::Error>> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
-    let (index, _, target) = <(i32, To, token::CommandRef)>::parse(input)?;
+    let (index, _, cmd_ref_or) = <(i32, To, Option<token::CommandRef>)>::parse(input)?;
 
     #[derive(Copy, Clone, PartialEq, Eq)]
     enum Mode {
@@ -182,7 +182,10 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn
             } else {
                 Some(format!(
                     r"{}=",
-                    target.to_string(input.vm().cs_name_interner())
+                    match cmd_ref_or {
+                        None => "unreachable".to_string(),
+                        Some(cmd_ref) => cmd_ref.to_string(input.vm().cs_name_interner()),
+                    }
                 ))
             };
             (
@@ -254,9 +257,11 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn
     tokens.reverse();
     let user_defined_macro =
         texmacro::Macro::new(vec![], vec![], vec![texmacro::Replacement::Tokens(tokens)]);
-    input
-        .commands_map_mut()
-        .insert_macro(target, user_defined_macro, scope);
+    if let Some(cmd_ref) = cmd_ref_or {
+        input
+            .commands_map_mut()
+            .insert_macro(cmd_ref, user_defined_macro, scope);
+    }
     Ok(())
 }
 

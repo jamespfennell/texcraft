@@ -13,10 +13,13 @@ fn chardef_primitive_fn<S: TexlangState>(
     input: &mut vm::ExecutionInput<S>,
 ) -> txl::Result<()> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
-    let (target, _, c) = <(token::CommandRef, parse::OptionalEquals, char)>::parse(input)?;
-    input
-        .commands_map_mut()
-        .insert(target, command::Command::Character(c), scope);
+    let (cmd_ref_or, _, c) =
+        <(Option<token::CommandRef>, parse::OptionalEquals, char)>::parse(input)?;
+    if let Some(cmd_ref) = cmd_ref_or {
+        input
+            .commands_map_mut()
+            .insert(cmd_ref, command::Command::Character(c), scope);
+    }
     Ok(())
 }
 

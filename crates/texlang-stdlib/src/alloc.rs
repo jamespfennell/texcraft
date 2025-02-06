@@ -79,7 +79,10 @@ fn newint_primitive_fn<S: HasComponent<Component>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> txl::Result<()> {
-    let command_ref = token::CommandRef::parse(input)?;
+    let command_ref = Option::<token::CommandRef>::parse(input)?;
+    let Some(command_ref) = command_ref else {
+        return Ok(());
+    };
     let component = input.state_mut().component_mut();
     let index = component.singletons.len();
     component.singletons.push(Default::default());
@@ -123,8 +126,11 @@ fn newintarray_primitive_fn<S: HasComponent<Component>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> txl::Result<()> {
-    let command_ref = token::CommandRef::parse(input)?;
+    let command_ref = Option::<token::CommandRef>::parse(input)?;
     let len = parse::Uint::<{ parse::Uint::MAX }>::parse(input)?.0;
+    let Some(command_ref) = command_ref else {
+        return Ok(());
+    };
     let component = input.state_mut().component_mut();
     let start = component.arrays.len();
     component.arrays.resize(start + len, Default::default());

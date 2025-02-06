@@ -13,11 +13,16 @@ fn mathchardef_primitive_fn<S: TexlangState>(
     input: &mut vm::ExecutionInput<S>,
 ) -> txl::Result<()> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
-    let (target, _, c) =
-        <(token::CommandRef, parse::OptionalEquals, types::MathCode)>::parse(input)?;
-    input
-        .commands_map_mut()
-        .insert(target, command::Command::MathCharacter(c), scope);
+    let (cmd_ref_or, _, c) = <(
+        Option<token::CommandRef>,
+        parse::OptionalEquals,
+        types::MathCode,
+    )>::parse(input)?;
+    if let Some(cmd_ref) = cmd_ref_or {
+        input
+            .commands_map_mut()
+            .insert(cmd_ref, command::Command::MathCharacter(c), scope);
+    }
     Ok(())
 }
 

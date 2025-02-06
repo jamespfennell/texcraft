@@ -35,6 +35,7 @@
 use crate::alias;
 use crate::def;
 use crate::math;
+use crate::registers;
 use std::collections::HashSet;
 use texcraft_stdext::collections::groupingmap;
 use texlang::prelude as txl;
@@ -72,9 +73,13 @@ impl Default for Tags {
     fn default() -> Self {
         Self {
             can_be_prefixed_with_any: vec![def::def_tag()].into_iter().collect(),
-            can_be_prefixed_with_global: vec![math::get_variable_op_tag(), alias::let_tag()]
-                .into_iter()
-                .collect(),
+            can_be_prefixed_with_global: vec![
+                alias::let_tag(),
+                math::variable_op_tag(),
+                registers::countdef_tag(),
+            ]
+            .into_iter()
+            .collect(),
             global_tag: GLOBAL_TAG.get(),
             long_tag: LONG_TAG.get(),
             outer_tag: OUTER_TAG.get(),

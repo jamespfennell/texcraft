@@ -138,9 +138,11 @@ pub fn get_help<S: HasComponent<Component> + common::HasLogging>() -> command::B
 pub fn get_doc<S: TexlangState + common::HasLogging>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
         |token: token::Token, input: &mut vm::ExecutionInput<S>| -> txl::Result<()> {
-            let target = token::CommandRef::parse(input)?;
-            let name = target.to_string(input.vm().cs_name_interner());
-            let doc = match input.commands_map().get_command_slow(&target) {
+            let Some(cmd_ref) = Option::<token::CommandRef>::parse(input)? else {
+                return Ok(());
+            };
+            let name = cmd_ref.to_string(input.vm().cs_name_interner());
+            let doc = match input.commands_map().get_command_slow(&cmd_ref) {
                 None => format!["Unknown command {name}"],
                 Some(cmd) => match cmd.doc() {
                     None => format!["No documentation available for the {name} command"],

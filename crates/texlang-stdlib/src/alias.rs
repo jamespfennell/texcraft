@@ -26,24 +26,24 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
     input: &mut vm::ExecutionInput<S>,
 ) -> txl::Result<()> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
-    let alias = token::CommandRef::parse(input)?;
+    let cmd_ref_or = Option::<token::CommandRef>::parse(input)?;
     OptionalEqualsUnexpanded::parse(input)?;
-    match input.unexpanded().next()? {
-        None => {
-            return Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
-                "unexpected end of input while reading the right hand side of a \\let assignment",
-            )))
-        }
-        Some(token) => match token.value() {
+    let Some(token) = input.unexpanded().next()? else {
+        return Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
+            "unexpected end of input while reading the right hand side of a \\let assignment",
+        )));
+    };
+    if let Some(cmd_ref) = cmd_ref_or {
+        match token.value() {
             token::Value::CommandRef(command_ref) => {
                 input
                     .commands_map_mut()
-                    .alias_control_sequence(alias, &command_ref, scope);
+                    .alias_control_sequence(cmd_ref, &command_ref, scope);
             }
             _ => {
-                input.commands_map_mut().alias_token(alias, token, scope);
+                input.commands_map_mut().alias_token(cmd_ref, token, scope);
             }
-        },
+        };
     };
     Ok(())
 }
@@ -106,6 +106,7 @@ mod test {
             (let_character, r"\let\A=B\A", "B"),
             (let_unknown_cs_name, r"\let \B=\undefined", ""),
         ),
+        recoverable_failure_tests((missing_cs, r"\def\B{Hello}\let A=\B World", "=HelloWorld"),),
         serde_tests(
             (
                 alias_execution_primitive,
