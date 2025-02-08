@@ -56,6 +56,14 @@ pub enum DeserializationError {
     InconsistentSubFileSizes(SubFileSizes),
 }
 
+impl std::fmt::Display for DeserializationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.tftopl_message())
+    }
+}
+
+impl std::error::Error for DeserializationError {}
+
 impl DeserializationError {
     /// Returns the error message the TFtoPL program prints for this kind of error.
     pub fn tftopl_message(&self) -> String {

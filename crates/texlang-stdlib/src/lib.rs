@@ -15,6 +15,9 @@ use texlang::types;
 use texlang::types::CatCode;
 use texlang::vm;
 use texlang::vm::implement_has_component;
+use texlang_common::HasFileSystem;
+use texlang_common::HasLogging;
+use texlang_common::HasTerminalIn;
 
 pub mod alias;
 pub mod alloc;
@@ -108,88 +111,7 @@ impl TexlangState for StdLibState {
     }
 }
 
-impl HasDefaultBuiltInCommands for StdLibState {
-    fn default_built_in_commands() -> HashMap<&'static str, command::BuiltIn<Self>> {
-        HashMap::from([
-            ("advance", math::get_advance()),
-            //
-            ("batchmode", errormode::get_batchmode()),
-            //
-            ("catcode", codes::get_catcode()),
-            ("closein", input::get_closein()),
-            ("chardef", chardef::get_chardef()),
-            ("count", registers::get_count()),
-            ("countdef", registers::get_countdef()),
-            //
-            ("day", time::get_day()),
-            ("def", def::get_def()),
-            ("divide", math::get_divide()),
-            ("dumpFormat", job::get_dumpformat()),
-            ("dumpValidate", job::get_dumpvalidate()),
-            //
-            ("else", conditional::get_else()),
-            ("endinput", input::get_endinput()),
-            ("endlinechar", endlinechar::get_endlinechar()),
-            ("errorstopmode", errormode::get_errorstopmode()),
-            ("expandafter", expansion::get_expandafter_optimized()),
-            //
-            ("fi", conditional::get_fi()),
-            //
-            ("gdef", def::get_gdef()),
-            ("global", prefix::get_global()),
-            ("globaldefs", prefix::get_globaldefs()),
-            //
-            ("ifcase", conditional::get_ifcase()),
-            ("ifeof", input::get_ifeof()),
-            ("iffalse", conditional::get_iffalse()),
-            ("ifnum", conditional::get_ifnum()),
-            ("ifodd", conditional::get_ifodd()),
-            ("iftrue", conditional::get_iftrue()),
-            ("input", input::get_input()),
-            //
-            ("jobname", job::get_jobname()),
-            //
-            ("let", alias::get_let()),
-            ("long", prefix::get_long()),
-            //
-            ("mathchardef", mathchardef::get_mathchardef()),
-            ("mathcode", codes::get_mathcode()),
-            ("month", time::get_month()),
-            ("multiply", math::get_multiply()),
-            //
-            ("newInt", alloc::get_newint()),
-            (
-                "newInt_getter_provider_\u{0}",
-                alloc::get_newint_getter_provider(),
-            ),
-            ("newIntArray", alloc::get_newintarray()),
-            (
-                "newIntArray_getter_provider_\u{0}",
-                alloc::get_newintarray_getter_provider(),
-            ),
-            ("noexpand", expansion::get_noexpand()),
-            ("nonstopmode", errormode::get_nonstopmode()),
-            //
-            ("or", conditional::get_or()),
-            ("openin", input::get_openin()),
-            ("outer", prefix::get_outer()),
-            //
-            ("read", input::get_read()),
-            ("relax", expansion::get_relax()),
-            //
-            ("scrollmode", errormode::get_scrollmode()),
-            ("sleep", sleep::get_sleep()),
-            //
-            ("the", the::get_the()),
-            ("time", time::get_time()),
-            ("toks", registers::get_toks()),
-            ("toksdef", registers::get_toksdef()),
-            ("tracingmacros", tracingmacros::get_tracingmacros()),
-            //
-            ("year", time::get_year()),
-        ])
-    }
-}
+impl the::TheCompatible for StdLibState {}
 
 implement_has_component![StdLibState{
     alloc: alloc::Component,
@@ -214,6 +136,115 @@ impl texlang_common::HasFileSystem for StdLibState {}
 impl texlang_common::HasTerminalIn for StdLibState {
     fn terminal_in(&self) -> std::rc::Rc<std::cell::RefCell<dyn texlang_common::TerminalIn>> {
         self.error_mode.terminal_in()
+    }
+}
+
+pub fn built_in_commands<S>() -> HashMap<&'static str, command::BuiltIn<S>>
+where
+    S: TexlangState
+        + HasFileSystem
+        + HasTerminalIn
+        + HasLogging
+        + HasComponent<alloc::Component>
+        + HasComponent<codes::Component<CatCode>>
+        + HasComponent<codes::Component<types::MathCode>>
+        + HasComponent<conditional::Component>
+        + the::TheCompatible
+        + HasComponent<endlinechar::Component>
+        + HasComponent<errormode::Component>
+        + HasComponent<input::Component<16>>
+        + HasComponent<job::Component>
+        + HasComponent<prefix::Component>
+        + HasComponent<registers::Component<i32, 32768>>
+        + HasComponent<registers::Component<Vec<token::Token>, 256>>
+        + HasComponent<repl::Component>
+        + HasComponent<script::Component>
+        + HasComponent<time::Component>
+        + HasComponent<tracingmacros::Component>,
+{
+    HashMap::from([
+        ("advance", math::get_advance()),
+        //
+        ("batchmode", errormode::get_batchmode()),
+        //
+        ("catcode", codes::get_catcode()),
+        ("closein", input::get_closein()),
+        ("chardef", chardef::get_chardef()),
+        ("count", registers::get_count()),
+        ("countdef", registers::get_countdef()),
+        //
+        ("day", time::get_day()),
+        ("def", def::get_def()),
+        ("divide", math::get_divide()),
+        ("dumpFormat", job::get_dumpformat()),
+        ("dumpValidate", job::get_dumpvalidate()),
+        //
+        ("else", conditional::get_else()),
+        ("endinput", input::get_endinput()),
+        ("endlinechar", endlinechar::get_endlinechar()),
+        ("errorstopmode", errormode::get_errorstopmode()),
+        ("expandafter", expansion::get_expandafter_optimized()),
+        //
+        ("fi", conditional::get_fi()),
+        //
+        ("gdef", def::get_gdef()),
+        ("global", prefix::get_global()),
+        ("globaldefs", prefix::get_globaldefs()),
+        //
+        ("ifcase", conditional::get_ifcase()),
+        ("ifeof", input::get_ifeof()),
+        ("iffalse", conditional::get_iffalse()),
+        ("ifnum", conditional::get_ifnum()),
+        ("ifodd", conditional::get_ifodd()),
+        ("iftrue", conditional::get_iftrue()),
+        ("input", input::get_input()),
+        //
+        ("jobname", job::get_jobname()),
+        //
+        ("let", alias::get_let()),
+        ("long", prefix::get_long()),
+        //
+        ("mathchardef", mathchardef::get_mathchardef()),
+        ("mathcode", codes::get_mathcode()),
+        ("month", time::get_month()),
+        ("multiply", math::get_multiply()),
+        //
+        ("newInt", alloc::get_newint()),
+        (
+            "newInt_getter_provider_\u{0}",
+            alloc::get_newint_getter_provider(),
+        ),
+        ("newIntArray", alloc::get_newintarray()),
+        (
+            "newIntArray_getter_provider_\u{0}",
+            alloc::get_newintarray_getter_provider(),
+        ),
+        ("noexpand", expansion::get_noexpand()),
+        ("nonstopmode", errormode::get_nonstopmode()),
+        //
+        ("or", conditional::get_or()),
+        ("openin", input::get_openin()),
+        ("outer", prefix::get_outer()),
+        //
+        ("read", input::get_read()),
+        ("relax", expansion::get_relax()),
+        //
+        ("scrollmode", errormode::get_scrollmode()),
+        ("sleep", sleep::get_sleep()),
+        //
+        ("the", the::get_the()),
+        ("time", time::get_time()),
+        ("toks", registers::get_toks()),
+        ("toksdef", registers::get_toksdef()),
+        ("tracingmacros", tracingmacros::get_tracingmacros()),
+        //
+        ("year", time::get_year()),
+    ])
+}
+
+impl HasDefaultBuiltInCommands for StdLibState {
+    fn default_built_in_commands() -> HashMap<&'static str, command::BuiltIn<Self>> {
+        built_in_commands()
     }
 }
 

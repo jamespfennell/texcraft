@@ -17,6 +17,7 @@ pub struct FileLocation {
 }
 
 impl<S: TexlangState> Parsable<S> for FileLocation {
+    // scan_file_name
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let mut raw_string = String::new();
         let mut area_delimiter = None;
@@ -136,6 +137,15 @@ mod tests {
             FileLocation {
                 path: "".to_string(),
                 extension: Some("tex".to_string()),
+                area: None,
+            },
+        ),
+        (
+            empty,
+            "",
+            FileLocation {
+                path: "".to_string(),
+                extension: None,
                 area: None,
             },
         ),

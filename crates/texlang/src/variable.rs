@@ -152,7 +152,10 @@ impl<S> Command<S> {
     pub fn is_arithmetic(&self) -> bool {
         match self.getters {
             Getters::Int(_, _) => true,
-            Getters::CatCode(_, _) | Getters::MathCode(_, _) | Getters::TokenList(_, _) => false,
+            Getters::CatCode(_, _)
+            | Getters::MathCode(_, _)
+            | Getters::TokenList(_, _)
+            | Getters::Font(_, _) => false,
         }
     }
 }
@@ -176,6 +179,32 @@ impl<S: TexlangState> Command<S> {
             }
         };
         Ok(new_variable(&self.getters, index))
+    }
+
+    /// Resolve the command to obtain a [Variable] of a specific type.
+    pub fn resolve_type<T: SupportedType>(
+        &self,
+        token: token::Token,
+        input: &mut vm::ExpandedStream<S>,
+    ) -> txl::Result<Option<TypedVariable<S, T>>> {
+        let Some((ref_fn, ref_mut_fn)) = T::try_cast(self) else {
+            return Ok(None);
+        };
+        let index = match &self.index_resolver {
+            None => Index(0),
+            Some(index_resolver) => match index_resolver.resolve(token, input) {
+                Ok(index) => index,
+                Err(err) => {
+                    return Err(error::Error::new_propagated(
+                        input.vm(),
+                        error::OperationKind::VariableIndex,
+                        token,
+                        err,
+                    ))
+                }
+            },
+        };
+        Ok(Some(TypedVariable(ref_fn, ref_mut_fn, index)))
     }
 }
 
@@ -239,41 +268,6 @@ impl CommandKey {
             CommandKey::ArrayDynamic(k, _) => *k,
         }
     }
-}
-
-/// Immutable reference to the value of a variable.
-pub enum ValueRef<'a> {
-    Int(&'a i32),
-    CatCode(&'a types::CatCode),
-    MathCode(&'a types::MathCode),
-    TokenList(&'a [token::Token]),
-}
-
-/// TeX variable of any type.
-///
-/// A variable uniquely identifies a Rust value in the state, like an `i32`.
-/// Operations on this value (like reading or setting the value) can be done in two ways:
-///
-/// 1. (Easy, less flexible) Use the methods directly on this type like [Variable::value]
-///     to read the value.
-///     These methods are really ergonomic.
-///     The problem with the value method specifically is that the result
-///     is a reference which keeps the borrow of the state alive.
-///     Thus, while holding onto the result of the value, you can't do anything this the
-///     input stream like reading an argument.
-///     This is especially a problem when you need to perform a different action depending on the concrete type of the variable.
-///     
-/// 2. (Trickier, more flexible) Match on the type's enum variants to determine the
-///     concrete type of the variable.
-///     The [TypedVariable] value obtained in this way can be used to perform operations on the value.
-///     The main benefit of this approach is that after matching on the type, you can still use the input
-///     stream to do things because there is not borrow alive.
-///     
-pub enum Variable<S> {
-    Int(TypedVariable<S, i32>),
-    CatCode(TypedVariable<S, types::CatCode>),
-    MathCode(TypedVariable<S, types::MathCode>),
-    TokenList(TypedVariable<S, Vec<token::Token>>),
 }
 
 /// A key that uniquely identifies the getters ([RefFn] and [MutRefFn]) in a command or variable.
@@ -379,7 +373,9 @@ pub trait SupportedType: Sized {
         variable: &TypedVariable<S, Self>,
         scope: groupingmap::Scope,
         overwritten_value: Self,
-    );
+    ) {
+        (_, _, _, _) = (input, variable, scope, overwritten_value);
+    }
 
     /// Recycle a value that's about to be dropped.
     ///
@@ -393,6 +389,9 @@ pub trait SupportedType: Sized {
     ///
     /// Return `None` if the command has a different type to `Self`.
     fn new_typed_variable<S>(command: &Command<S>, index: Index) -> Option<TypedVariable<S, Self>>;
+
+    /// Try to cast a variable command to this type.
+    fn try_cast<S>(command: &Command<S>) -> Option<(RefFn<S, Self>, MutRefFn<S, Self>)>;
 }
 
 /// This function is used to implement the [SupportedType::update_save_stack] method.
@@ -433,7 +432,48 @@ fn update_save_stack<S, T: Clone + SupportedType, F>(
 }
 
 macro_rules! supported_type_impl {
-    ( $( ($type: path, $enum_variant: ident, $save_stack_field: ident $( , $recycle_fn: ident )? ), )+ ) => {
+    ( $(
+        {
+            rust_type: $rust_type: path,
+            enum_variant: $enum_variant: ident,
+            $( save_stack_field: $save_stack_field: ident, )?
+            $( recycle_fn: $recycle_fn: ident, )?
+        },
+    )+ ) => {
+
+        /// Immutable reference to the value of a variable.
+        pub enum ValueRef<'a> {
+            $(
+                $enum_variant(&'a $rust_type),
+            )+
+        }
+
+        /// TeX variable of any type.
+        ///
+        /// A variable uniquely identifies a Rust value in the state, like an `i32`.
+        /// Operations on this value (like reading or setting the value) can be done in two ways:
+        ///
+        /// 1. (Easy, less flexible) Use the methods directly on this type like [Variable::value]
+        ///     to read the value.
+        ///     These methods are really ergonomic.
+        ///     The problem with the value method specifically is that the result
+        ///     is a reference which keeps the borrow of the state alive.
+        ///     Thus, while holding onto the result of the value, you can't do anything this the
+        ///     input stream like reading an argument.
+        ///     This is especially a problem when you need to perform a different action depending on the concrete type of the variable.
+        ///
+        /// 2. (Trickier, more flexible) Match on the type's enum variants to determine the
+        ///     concrete type of the variable.
+        ///     The [TypedVariable] value obtained in this way can be used to perform operations on the value.
+        ///     The main benefit of this approach is that after matching on the type, you can still use the input
+        ///     stream to do things because there is not borrow alive.
+        ///
+        pub enum Variable<S> {
+            $(
+                $enum_variant(TypedVariable<S, $rust_type>),
+            )+
+        }
+
         fn new_variable<S>(getters: &Getters<S>, index: Index) -> Variable<S> {
             match getters {
                 $(
@@ -468,7 +508,7 @@ macro_rules! supported_type_impl {
 
         enum Getters<S> {
             $(
-                $enum_variant(RefFn<S, $type>, MutRefFn<S, $type>),
+                $enum_variant(RefFn<S, $rust_type>, MutRefFn<S, $rust_type>),
             )+
         }
 
@@ -493,7 +533,7 @@ macro_rules! supported_type_impl {
         }
 
         $(
-        impl SupportedType for $type {
+        impl SupportedType for $rust_type {
             fn new_command<S>(
                 ref_fn: RefFn<S, Self>,
                 ref_mut_fn: MutRefFn<S, Self>,
@@ -504,6 +544,7 @@ macro_rules! supported_type_impl {
                     index_resolver,
                 }
             }
+            $(
             fn update_save_stack<S>(
                 input: &mut vm::ExecutionInput<S>,
                 variable: &TypedVariable<S, Self>,
@@ -514,6 +555,7 @@ macro_rules! supported_type_impl {
                     &mut element.$save_stack_field
                 })
             }
+            )?
             $(
             fn recycle<S>(input: &mut vm::ExecutionInput<S>, overwritten_value: Self) {
                 $recycle_fn(input, overwritten_value)
@@ -528,31 +570,37 @@ macro_rules! supported_type_impl {
                     _ => None,
                 }
             }
+            fn try_cast<S>(command: &Command<S>) -> Option<(RefFn<S, Self>, MutRefFn<S, Self>)> {
+                match command.getters {
+                    Getters::$enum_variant(a, b) => Some((a,b)),
+                    _ => None,
+                }
+            }
         }
         )+
 
         /// Internal VM data structure used to implement TeX's grouping semantics.
         pub(crate) struct SaveStackElement<S> {
-            $(
-                $save_stack_field: SaveStackMap<S, $type>,
-            )+
+            $( $(
+                $save_stack_field: SaveStackMap<S, $rust_type>,
+            )? )+
         }
 
         impl<S> Default for SaveStackElement<S> {
             fn default() -> Self {
                 Self {
-                    $(
+                    $( $(
                         $save_stack_field: Default::default(),
-                    )+
+                    )? )+
                 }
             }
         }
 
         impl<S> SaveStackElement<S> {
             pub(crate) fn restore(self, input: &mut vm::ExecutionInput<S>) {
-                $(
+                $( $(
                     self.$save_stack_field.restore(input);
-                )+
+                )? )+
             }
 
             pub(crate) fn serializable<'a>(
@@ -560,18 +608,18 @@ macro_rules! supported_type_impl {
                 built_ins: &HashMap<GettersKey, token::CsName>,
             ) -> SerializableSaveStackElement<'a> {
                 SerializableSaveStackElement {
-                    $(
+                    $( $(
                         $save_stack_field: self.$save_stack_field.serializable(built_ins),
-                    )+
+                    )? )+
                 }
             }
         }
 
         #[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
         pub(crate) struct SerializableSaveStackElement<'a> {
-            $(
-                $save_stack_field: Vec<(token::CsName, usize, Cow<'a, $type>)>,
-            )+
+            $( $(
+                $save_stack_field: Vec<(token::CsName, usize, Cow<'a, $rust_type>)>,
+            )? )+
         }
 
         impl<'a> SerializableSaveStackElement<'a> {
@@ -580,9 +628,9 @@ macro_rules! supported_type_impl {
                 built_ins: &HashMap<token::CsName, command::BuiltIn<S>>,
             ) -> SaveStackElement<S> {
                 SaveStackElement {
-                    $(
+                    $( $(
                         $save_stack_field: SaveStackMap::from_deserialized(self.$save_stack_field, built_ins),
-                    )+
+                    )? )+
                 }
             }
         }
@@ -590,10 +638,37 @@ macro_rules! supported_type_impl {
 }
 
 supported_type_impl!(
-    (i32, Int, i32),
-    (types::CatCode, CatCode, catcode),
-    (types::MathCode, MathCode, math_code),
-    (Vec<token::Token>, TokenList, token_list, recycle_token_list),
+    {
+        rust_type: i32,
+        enum_variant: Int,
+        save_stack_field: i32,
+    },
+    {
+        rust_type: types::CatCode,
+        enum_variant: CatCode,
+        save_stack_field: catcode,
+    },
+    {
+        rust_type: types::MathCode,
+        enum_variant: MathCode,
+        save_stack_field: math_code,
+    },
+    {
+        rust_type: Vec<token::Token>,
+        enum_variant: TokenList,
+        save_stack_field: token_list,
+        recycle_fn: recycle_token_list,
+    },
+    {
+        rust_type: types::Font,
+        enum_variant: Font,
+        save_stack_field: font,
+    },
+    // {
+    //    rust_type: FontParam,
+    //    enum_variant: FontParam,
+    //    // no save_stack_field because font params are global
+    // }
 );
 
 fn recycle_token_list<S>(input: &mut vm::ExecutionInput<S>, overwritten_value: Vec<token::Token>) {

@@ -88,6 +88,11 @@ impl Default for Tags {
 }
 
 impl Component {
+    /// Register a command that can be prefixed with `\global`.
+    pub fn register_globally_prefixable_command(&mut self, tag: command::Tag) {
+        self.tags.can_be_prefixed_with_global.insert(tag);
+    }
+
     /// Read the value of the global flag and reset the flag to false.
     #[inline]
     fn read_and_reset_global(&mut self) -> groupingmap::Scope {
@@ -226,8 +231,8 @@ fn process_prefixes<S: HasComponent<Component>>(
         )),
         Some(&t) => match t.value() {
             token::Value::CommandRef(command_ref) => {
-                // First check if it's a variable command.
-                if let Some(command::Command::Variable(_)) =
+                // First check it it's a command that can be prefixed by global only.
+                if let Some(command::Command::Variable(_) | command::Command::Font(_)) =
                     input.commands_map_mut().get_command(&command_ref)
                 {
                     assert_only_global_prefix(input, t, prefix)?;
@@ -460,6 +465,7 @@ mod test {
             variable_assignment_scope_hook(state)
         }
     }
+    impl the::TheCompatible for State {}
 
     implement_has_component![State {
         prefix: Component,

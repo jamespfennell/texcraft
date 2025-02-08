@@ -172,6 +172,34 @@ impl<S: TexlangState> VM<S> {
                         Some(Command::MathCharacter(c)) => {
                             H::math_character_handler(input, token, *c)?
                         }
+                        Some(Command::Font(font)) => {
+                            let font = *font;
+                            let scope =
+                                TexlangState::variable_assignment_scope_hook(input.state_mut());
+                            let internal = &mut input.vm_mut().internal;
+                            match scope {
+                                groupingmap::Scope::Local => {
+                                    // If this is the first font assignment in this group,
+                                    // save the current value to the top of the stack. It will
+                                    // be restored from here when the group ends.
+                                    let current_font = internal.current_font;
+                                    if let Some(top) = internal.fonts_save_stack.last_mut() {
+                                        if top.is_none() {
+                                            *top = Some(current_font);
+                                        }
+                                    }
+                                }
+                                groupingmap::Scope::Global => {
+                                    // If this is a global font assignment, clear the stack
+                                    // entirely so that no font will be restored when groups end.
+                                    for font_or in &mut internal.fonts_save_stack {
+                                        *font_or = None;
+                                    }
+                                }
+                            }
+                            internal.current_font = font;
+                            input.state_mut().enable_font_hook(font);
+                        }
                         None => H::undefined_command_handler(input, token)?,
                     }
                 }
@@ -358,6 +386,27 @@ pub trait TexlangState: Sized {
         _ = self;
         Err(error.error)
     }
+
+    /// Hook that is invoked when a font is enabled.
+    ///
+    /// For example, after the TeX snippet `\the \textfont 1`, this hook
+    /// is invoked for the font stored in `\textfont 1`.
+    /// The hook is also called if a font needs to be reenabled after
+    /// a group ends.
+    ///
+    /// The default implementation is a no-op.
+    fn enable_font_hook(&mut self, font: types::Font) {
+        _ = font
+    }
+
+    /// Returns whether the command corresponding to the provided tag references
+    /// the currnet font when provided as an argument to a variable.
+    ///
+    /// This is used to implement the `\font` primitive.
+    fn is_current_font_command(&self, tag: command::Tag) -> bool {
+        _ = tag;
+        false
+    }
 }
 
 impl TexlangState for () {}
@@ -493,10 +542,16 @@ impl<S> VM<S> {
     pub fn cs_name_interner(&self) -> &CsNameInterner {
         &self.internal.cs_name_interner
     }
+    #[inline]
+    /// TODO: just put the CS name interner in the VM?
+    pub fn cs_name_interner_mut(&mut self) -> &mut CsNameInterner {
+        &mut self.internal.cs_name_interner
+    }
 
     fn begin_group(&mut self) {
         self.commands_map.begin_group();
         self.internal.save_stack.push(Default::default());
+        self.internal.fonts_save_stack.push(None);
     }
 
     pub fn trace(&self, token: Token) -> trace::SourceCodeTrace {
@@ -534,16 +589,26 @@ impl<S> VM<S> {
     pub(crate) fn stack_pop(&mut self) {
         self.internal.execution_stack.pop();
     }
+    pub fn current_font(&self) -> types::Font {
+        self.internal.current_font
+    }
 }
 
 impl<S: TexlangState> VM<S> {
-    fn end_group(&mut self, token: token::Token) -> txl::Result<()> {
+    fn end_group(&mut self, token: token::Token) -> Result<(), Box<error::Error>> {
+        // Restore commands
         match self.commands_map.end_group() {
             Ok(()) => (),
             Err(_) => return Err(self.fatal_error(EndOfGroupError { trace: token })),
         }
+        // Restore variable values
         let group = self.internal.save_stack.pop().unwrap();
         group.restore(ExecutionInput::new(self));
+        // Restore fonts
+        if let Some(font) = self.internal.fonts_save_stack.pop().unwrap() {
+            self.internal.current_font = font;
+            self.state.enable_font_hook(font);
+        }
         Ok(())
     }
 }
@@ -574,6 +639,8 @@ struct Internal<S> {
     #[cfg_attr(feature = "serde", serde(skip))]
     save_stack: Vec<variable::SaveStackElement<S>>,
 
+    current_font: types::Font,
+    fonts_save_stack: Vec<Option<types::Font>>,
     execution_stack: Vec<(error::OperationKind, Token)>,
 }
 
@@ -586,6 +653,8 @@ impl<S> Internal<S> {
             tracer: Default::default(),
             token_buffers: Default::default(),
             save_stack: Default::default(),
+            current_font: types::Font::NULL_FONT,
+            fonts_save_stack: Default::default(),
             execution_stack: Default::default(),
         }
     }

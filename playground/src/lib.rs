@@ -69,6 +69,8 @@ impl TexlangState for PlaygroundState {
     }
 }
 
+impl texlang_stdlib::the::TheCompatible for PlaygroundState {}
+
 implement_has_component![PlaygroundState{
     alloc: alloc::Component,
     codes_cat_code: codes::Component<types::CatCode>,

@@ -1,0 +1,23 @@
+[package]
+name = "texlang-font"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Texlang fonts integration"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+
+[dependencies]
+font = { path = "../font", version="0.1.0" }
+texlang = { path = "../texlang", version="0.1.0" }
+texlang-common = { path = "../texlang-common", version="0.1.0" }
+texlang-stdlib = { path = "../texlang-stdlib", version = "0.1.0" }
+serde = {version="^1.0", optional = true}
+
+[dev-dependencies]
+texlang-testing = { path = "../texlang-testing", version = "0.1.0", default-features = false }
+texcraft-stdext = { path = "../texcraft-stdext", version = "0.1.0" }
+
+[features]
+serde = ["dep:serde"]

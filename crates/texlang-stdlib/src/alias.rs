@@ -67,6 +67,7 @@ mod test {
         prefix: prefix::Component,
         testing: TestingComponent,
     }];
+    impl the::TheCompatible for State {}
 
     impl TexlangState for State {
         fn variable_assignment_scope_hook(

@@ -108,7 +108,7 @@ impl<K, S: Default> Default for Interner<K, S> {
 }
 
 /// Types implementing this trait can be used as keys in the [Interner].
-pub trait Key: Copy + Eq {
+pub trait Key: Copy {
     /// Try to create a key from the provided [usize]. The first [usize]
     /// passed to this method will be 0; the second 1; and so on.
     ///

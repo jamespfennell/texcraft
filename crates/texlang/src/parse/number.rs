@@ -131,6 +131,9 @@ fn parse_number_internal<S: TexlangState>(
                         variable::ValueRef::Int(i) => *i,
                         variable::ValueRef::CatCode(c) => *c as i32,
                         variable::ValueRef::MathCode(c) => c.0 as i32,
+                        variable::ValueRef::Font(_) => {
+                            todo!("scan a font into an int?");
+                        }
                         variable::ValueRef::TokenList(_) => {
                             return Err(stream.vm().fatal_error(
                                 parse::Error::new(
@@ -150,7 +153,8 @@ fn parse_number_internal<S: TexlangState>(
                     command::Command::Execution(..)
                     | command::Command::Expansion(..)
                     | command::Command::Macro(..)
-                    | command::Command::CharacterTokenAlias(..),
+                    | command::Command::CharacterTokenAlias(..)
+                    | command::Command::Font(..),
                 ) => {
                     let err = parse::Error::new(
                         "the beginning of a number",

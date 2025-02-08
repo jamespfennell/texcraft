@@ -534,6 +534,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
+name = "font"
+version = "0.1.0"
+
+[[package]]
 name = "getrandom"
 version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1277,9 +1281,14 @@ dependencies = [
  "performance",
  "rand",
  "rmp-serde",
+ "serde",
  "serde_json",
+ "texcraft-stdext",
  "texlang",
+ "texlang-common",
+ "texlang-font",
  "texlang-stdlib",
+ "tfm",
 ]
 
 [[package]]
@@ -1318,6 +1327,19 @@ name = "texlang-common"
 version = "0.1.0"
 dependencies = [
  "texlang",
+]
+
+[[package]]
+name = "texlang-font"
+version = "0.1.0"
+dependencies = [
+ "font",
+ "serde",
+ "texcraft-stdext",
+ "texlang",
+ "texlang-common",
+ "texlang-stdlib",
+ "texlang-testing",
 ]
 
 [[package]]
@@ -1363,6 +1385,7 @@ version = "0.1.0"
 dependencies = [
  "arbitrary",
  "ariadne",
+ "font",
  "serde",
 ]
 

@@ -186,7 +186,8 @@ fn math_primitive_fn<S: TexlangState, O: Op>(
         }
         variable::Variable::CatCode(_)
         | variable::Variable::TokenList(_)
-        | variable::Variable::MathCode(_) => {
+        | variable::Variable::MathCode(_)
+        | variable::Variable::Font(_) => {
             unreachable!("only arithmetic commands are considered");
         }
     }
@@ -236,6 +237,7 @@ mod tests {
             texlang_testing::TestingComponent::recoverable_error_hook(self, recoverable_error)
         }
     }
+    impl the::TheCompatible for State {}
 
     implement_has_component![State{
         catcode: codes::Component<CatCode>,

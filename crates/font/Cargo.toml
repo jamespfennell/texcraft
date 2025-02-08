@@ -1,0 +1,9 @@
+[package]
+name = "font"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Font abstractions"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
