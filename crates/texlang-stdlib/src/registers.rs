@@ -3,16 +3,28 @@
 use texlang::parse::OptionalEquals;
 use texlang::prelude as txl;
 use texlang::traits::*;
+use texlang::variable::SupportedType;
 use texlang::*;
 
 pub const COUNT_DOC: &str = "Get or set an integer register";
 pub const COUNTDEF_DOC: &str = "Bind an integer register to a control sequence";
 
-pub struct Component<T, const N: usize>(
+/// See [Component].
+pub struct DefaultMarker;
+
+/// Component required to have registers of type `T`.
+///
+/// The `Marker` generic parameter exists so that a single state type
+/// can contain multiple copies of this component (`Component<MarkerOne>`,
+/// `Component<MarkerTwo>`, etc.) and implement that HasComponent pattern
+/// multiple times. This allows for multiple register commands of the same
+/// type to be included in the same VM.
+pub struct Component<T, const N: usize, Marker = DefaultMarker>(
     // We currently box the values because putting them directly on the stack causes the
     // message pack decoder to stack overflow. It's a pity that we have to pay a runtime
     // cost due to this, and it would be nice to fix the issue another way.
     Box<[T; N]>,
+    std::marker::PhantomData<Marker>,
 );
 
 static COUNTDEF_TAG: command::StaticTag = command::StaticTag::new();
@@ -42,38 +54,42 @@ impl<'de, T: std::fmt::Debug + serde::Deserialize<'de>, const N: usize> serde::D
     {
         let v = Vec::<T>::deserialize(deserializer)?;
         let a: Box<[T; N]> = v.try_into().unwrap();
-        Ok(Component(a))
+        Ok(Component(a, Default::default()))
     }
 }
 
-impl<const N: usize> Default for Component<i32, N> {
-    fn default() -> Self {
-        Self(Box::new([Default::default(); N]))
-    }
-}
-
-impl<const N: usize> Default for Component<Vec<token::Token>, N> {
+impl<T: std::fmt::Debug + Default, const N: usize, Marker> Default for Component<T, N, Marker> {
     fn default() -> Self {
         let mut v = vec![];
         for _ in 0..N {
-            v.push(vec![])
+            v.push(T::default())
         }
-        Self(Box::new(v.try_into().unwrap()))
+        Self(Box::new(v.try_into().unwrap()), Default::default())
     }
 }
 
 /// Get the `\count` command.
 pub fn get_count<S: HasComponent<Component<i32, N>>, const N: usize>() -> command::BuiltIn<S> {
-    variable::Command::new_array(ref_fn, mut_fn, variable::IndexResolver::Dynamic(count_fn)).into()
+    new_registers_command()
 }
 
 /// Get the `\toks` command.
 pub fn get_toks<S: HasComponent<Component<Vec<token::Token>, N>>, const N: usize>(
 ) -> command::BuiltIn<S> {
+    new_registers_command()
+}
+
+/// Creates a new registers command that stores values in the component.
+pub fn new_registers_command<
+    T: SupportedType,
+    Marker: 'static,
+    S: HasComponent<Component<T, N, Marker>>,
+    const N: usize,
+>() -> command::BuiltIn<S> {
     variable::Command::new_array(ref_fn, mut_fn, variable::IndexResolver::Dynamic(count_fn)).into()
 }
 
-fn count_fn<T, S: HasComponent<Component<T, N>>, const N: usize>(
+fn count_fn<T, Marker: 'static, S: HasComponent<Component<T, N, Marker>>, const N: usize>(
     _: token::Token,
     input: &mut vm::ExpandedStream<S>,
 ) -> txl::Result<variable::Index> {
@@ -113,14 +129,14 @@ fn countdef_fn<T: variable::SupportedType, S: HasComponent<Component<T, N>>, con
     Ok(())
 }
 
-fn ref_fn<T, S: HasComponent<Component<T, N>>, const N: usize>(
+fn ref_fn<T, Marker: 'static, S: HasComponent<Component<T, N, Marker>>, const N: usize>(
     state: &S,
     index: variable::Index,
 ) -> &T {
     state.component().0.get(index.0).unwrap()
 }
 
-fn mut_fn<T, S: HasComponent<Component<T, N>>, const N: usize>(
+fn mut_fn<T, Marker: 'static, S: HasComponent<Component<T, N, Marker>>, const N: usize>(
     state: &mut S,
     index: variable::Index,
 ) -> &mut T {
@@ -157,6 +173,7 @@ mod tests {
             prefix::variable_assignment_scope_hook(state)
         }
     }
+    impl the::TheCompatible for State {}
 
     implement_has_component![State{
         registers_i32: Component<i32, 256>,

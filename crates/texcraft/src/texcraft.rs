@@ -8,7 +8,6 @@ use texlang::*;
 use texlang_stdlib::job;
 use texlang_stdlib::repl;
 use texlang_stdlib::script;
-use texlang_stdlib::StdLibState;
 
 /// This is a program that demonstrates some of the features of the
 ///   Texcraft project.
@@ -73,7 +72,7 @@ fn main() {
     }
 }
 
-fn run(vm: &mut vm::VM<StdLibState>, mut path: PathBuf) -> Result<(), Box<error::TracedError>> {
+fn run(vm: &mut vm::VM<State>, mut path: PathBuf) -> Result<(), Box<error::TracedError>> {
     if path.extension().is_none() {
         path.set_extension("tex");
     }
@@ -93,7 +92,7 @@ fn run(vm: &mut vm::VM<StdLibState>, mut path: PathBuf) -> Result<(), Box<error:
     Ok(())
 }
 
-fn repl(vm: &mut vm::VM<StdLibState>) {
+fn repl(vm: &mut vm::VM<State>) {
     println!("{}\n", REPL_START.trim());
     repl::run::run(
         vm,
@@ -133,7 +132,7 @@ Tips
 Website: https://texcraft.dev
 ";
 
-fn doc(vm: &vm::VM<StdLibState>, cs_name: Option<String>) -> Result<(), String> {
+fn doc(vm: &vm::VM<State>, cs_name: Option<String>) -> Result<(), String> {
     match cs_name {
         None => {
             let mut cs_names = Vec::new();
@@ -183,8 +182,8 @@ fn doc(vm: &vm::VM<StdLibState>, cs_name: Option<String>) -> Result<(), String> 
     }
 }
 
-fn new_vm(format_file_path: Option<PathBuf>, repl: bool) -> Box<vm::VM<StdLibState>> {
-    let mut m = StdLibState::default_built_in_commands();
+fn new_vm(format_file_path: Option<PathBuf>, repl: bool) -> Box<vm::VM<State>> {
+    let mut m = texlang_stdlib::built_in_commands();
     m.insert("par", script::get_par());
     m.insert("newline", script::get_newline());
     m.insert(
@@ -201,8 +200,11 @@ fn new_vm(format_file_path: Option<PathBuf>, repl: bool) -> Box<vm::VM<StdLibSta
         m.insert("dump", job::get_dump());
     }
 
+    m.insert("font", texlang_font::get_font());
+    m.insert("nullfont", texlang_font::get_nullfont());
+
     match format_file_path {
-        None => Box::new(vm::VM::<StdLibState>::new_with_built_in_commands(m)),
+        None => Box::new(vm::VM::<State>::new_with_built_in_commands(m)),
         Some(path) => {
             let format_file = std::fs::read(&path).unwrap();
             if path.extension().map(OsStr::to_str) == Some(Some("json")) {
@@ -214,5 +216,115 @@ fn new_vm(format_file_path: Option<PathBuf>, repl: bool) -> Box<vm::VM<StdLibSta
                 Box::new(vm::VM::deserialize_with_built_in_commands(&mut deserializer, m).unwrap())
             }
         }
+    }
+}
+
+use texlang::types::CatCode;
+use texlang_stdlib::*;
+
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+pub struct State {
+    pub alloc: alloc::Component,
+    pub codes_cat_code: codes::Component<CatCode>,
+    pub codes_math_code: codes::Component<types::MathCode>,
+    pub conditional: conditional::Component,
+    pub end_line_char: endlinechar::Component,
+    pub error_mode: errormode::Component,
+    pub font_repo: texlang_font::NoOpFontRepo<tfm::Font>,
+    pub fonts: texlang_font::FontComponent,
+    pub input: input::Component<16>,
+    pub job: job::Component,
+    pub prefix: prefix::Component,
+    pub registers_i32: registers::Component<i32, 32768>,
+    pub registers_token_list: registers::Component<Vec<token::Token>, 256>,
+    pub repl: repl::Component,
+    pub script: script::Component,
+    pub time: time::Component,
+    pub tracing_macros: tracingmacros::Component,
+}
+
+impl TexlangState for State {
+    #[inline]
+    fn cat_code(&self, c: char) -> texlang::types::CatCode {
+        codes::cat_code(self, c)
+    }
+
+    #[inline]
+    fn end_line_char(&self) -> Option<char> {
+        endlinechar::end_line_char(self)
+    }
+
+    #[inline]
+    fn post_macro_expansion_hook(
+        token: texlang::token::Token,
+        input: &vm::ExpansionInput<Self>,
+        tex_macro: &texlang::texmacro::Macro,
+        arguments: &[&[texlang::token::Token]],
+        reversed_expansion: &[texlang::token::Token],
+    ) {
+        tracingmacros::hook(token, input, tex_macro, arguments, reversed_expansion)
+    }
+
+    #[inline]
+    fn expansion_override_hook(
+        token: texlang::token::Token,
+        input: &mut vm::ExpansionInput<Self>,
+        tag: Option<texlang::command::Tag>,
+    ) -> texlang::prelude::Result<Option<texlang::token::Token>> {
+        expansion::noexpand_hook(token, input, tag)
+    }
+
+    #[inline]
+    fn variable_assignment_scope_hook(
+        state: &mut Self,
+    ) -> texcraft_stdext::collections::groupingmap::Scope {
+        prefix::variable_assignment_scope_hook(state)
+    }
+
+    fn recoverable_error_hook(
+        &self,
+        recoverable_error: texlang::error::TracedError,
+    ) -> Result<(), Box<dyn error::TexError>> {
+        errormode::recoverable_error_hook(self, recoverable_error)
+    }
+}
+
+implement_has_component![State{
+    alloc: alloc::Component,
+    codes_cat_code: codes::Component<CatCode>,
+    codes_math_code: codes::Component<types::MathCode>,
+    conditional: conditional::Component,
+    end_line_char: endlinechar::Component,
+    error_mode: errormode::Component,
+    fonts: texlang_font::FontComponent,
+    input: input::Component<16>,
+    job: job::Component,
+    prefix: prefix::Component,
+    registers_i32: registers::Component<i32, 32768>,
+    registers_token_list: registers::Component<Vec<token::Token>, 256>,
+    repl: repl::Component,
+    script: script::Component,
+    time: time::Component,
+    tracing_macros: tracingmacros::Component,
+}];
+
+impl texlang_common::HasLogging for State {}
+impl texlang_common::HasFileSystem for State {}
+impl texlang_common::HasTerminalIn for State {
+    fn terminal_in(&self) -> std::rc::Rc<std::cell::RefCell<dyn texlang_common::TerminalIn>> {
+        self.error_mode.terminal_in()
+    }
+}
+impl texlang_stdlib::the::TheCompatible for State {
+    fn get_command_ref_for_font(&self, font: types::Font) -> Option<token::CommandRef> {
+        texlang_font::FontComponent::get_command_ref_for_font(self, font)
+    }
+}
+
+impl texlang_font::HasFontRepo for State {
+    type FontRepo = texlang_font::NoOpFontRepo<tfm::Font>;
+
+    fn font_repo_mut(&mut self) -> &mut Self::FontRepo {
+        &mut self.font_repo
     }
 }

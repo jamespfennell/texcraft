@@ -417,12 +417,6 @@ impl<S: TexlangState> TokenStream for ExecutionInput<S> {
     }
 }
 
-impl<S: TexlangState> ExecutionInput<S> {
-    pub fn end_group(&mut self, token: Token) -> txl::Result<()> {
-        self.0 .0 .0.end_group(token)
-    }
-}
-
 impl<S> ExecutionInput<S> {
     /// Creates a mutable reference to this type from the [VM](vm::VM) type.
     #[inline]
@@ -476,7 +470,9 @@ impl<S> ExecutionInput<S> {
             Some(g) => Some((g, &self.0 .0 .0.state)),
         }
     }
-
+    pub(crate) fn vm_mut(&mut self) -> &mut vm::VM<S> {
+        &mut self.0 .0 .0
+    }
     /// Push tokens to the front of the input stream.
     ///
     /// The first token in the provided slice will be the next token read.
@@ -496,9 +492,11 @@ impl<S> ExecutionInput<S> {
             .token_buffers
             .push(super::TokenBuffer(token_buffer))
     }
+}
 
-    pub(crate) fn vm_mut(&mut self) -> &mut vm::VM<S> {
-        &mut self.0 .0 .0
+impl<S: TexlangState> ExecutionInput<S> {
+    pub fn end_group(&mut self, token: Token) -> Result<(), Box<error::Error>> {
+        self.0 .0 .0.end_group(token)
     }
 }
 

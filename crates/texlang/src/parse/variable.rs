@@ -62,6 +62,7 @@ pub struct OptionalEquals;
 
 impl<S: TexlangState> Parsable<S> for OptionalEquals {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+        // scan_optional_equals
         parse_optional_equals(input)?;
         Ok(OptionalEquals {})
     }

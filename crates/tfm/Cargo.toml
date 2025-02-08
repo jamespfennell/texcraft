@@ -10,6 +10,7 @@ keywords = ["tex", "texcraft"]
 categories = ["parser-implementations"]
 
 [dependencies]
+font = { path = "../font", version="0.1.0" }
 ariadne = {version="0.3.0", default-features = false, optional = true}
 arbitrary = { version = "1", features = ["derive"], optional = true }
 serde = {version="^1.0", optional = true}

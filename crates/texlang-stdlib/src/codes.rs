@@ -131,6 +131,7 @@ mod tests {
             TestingComponent::recoverable_error_hook(self, recoverable_error)
         }
     }
+    impl the::TheCompatible for State {}
 
     implement_has_component![State {
         catcode: Component<CatCode>,

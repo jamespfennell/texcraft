@@ -150,6 +150,7 @@ impl<S: TexlangState> Parsable<S> for Option<token::CommandRef> {
     // TeX.2021.get_r_token
     // TeX.2021.1215
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+        // Implements get_r_token
         while let Some(found_equals) = get_optional_element![
             input.unexpanded(),
             token::Value::Space(_) => true,

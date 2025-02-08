@@ -97,6 +97,9 @@ pub enum Command<S> {
     ///
     /// These commands are generally created using `\mathchardef`.
     MathCharacter(types::MathCode),
+
+    /// A command that enables a font.
+    Font(types::Font),
 }
 
 impl<S> std::fmt::Display for Command<S> {
@@ -109,6 +112,7 @@ impl<S> std::fmt::Display for Command<S> {
             Command::CharacterTokenAlias(_) => write![f, "a character token alias"],
             Command::Character(_) => write![f, "a character command"],
             Command::MathCharacter(_) => write![f, "a math character command"],
+            Command::Font(_) => write![f, "a font command"],
         }
     }
 }
@@ -123,7 +127,8 @@ impl<S> Command<S> {
             | Command::Variable(_)
             | Command::CharacterTokenAlias(_)
             | Command::Character(_)
-            | Command::MathCharacter(_) => None,
+            | Command::MathCharacter(_)
+            | Command::Font(_) => None,
         }
     }
 }
@@ -153,6 +158,11 @@ impl<S> BuiltIn<S> {
         Command::Variable(rc::Rc::new(cmd)).into()
     }
 
+    /// Create a new font built-in command.
+    pub fn new_font(font: types::Font) -> BuiltIn<S> {
+        Command::Font(font).into()
+    }
+
     /// Set the tag for this built-in command.
     pub fn with_tag(mut self, tag: Tag) -> BuiltIn<S> {
         match &mut self.cmd {
@@ -162,7 +172,8 @@ impl<S> BuiltIn<S> {
             | Command::Variable(_)
             | Command::CharacterTokenAlias(_)
             | Command::Character(_)
-            | Command::MathCharacter(_) => {
+            | Command::MathCharacter(_)
+            | Command::Font(_) => {
                 panic!("cannot add a tag to this type of command")
             }
         }
@@ -195,6 +206,7 @@ impl<S> Clone for Command<S> {
             Command::CharacterTokenAlias(tv) => Command::CharacterTokenAlias(*tv),
             Command::Character(c) => Command::Character(*c),
             Command::MathCharacter(c) => Command::MathCharacter(*c),
+            Command::Font(font) => Command::Font(*font),
         }
     }
 }
@@ -355,7 +367,8 @@ impl PrimitiveKey {
             Command::Macro(_)
             | Command::CharacterTokenAlias(_)
             | Command::Character(_)
-            | Command::MathCharacter(_) => None,
+            | Command::MathCharacter(_)
+            | Command::Font(_) => None,
         }
     }
 }

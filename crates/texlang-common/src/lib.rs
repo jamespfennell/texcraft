@@ -70,7 +70,7 @@ pub fn read_file_to_bytes<S: HasFileSystem + TexlangState>(
     vm: &texlang::vm::VM<S>,
     file_location: texlang::parse::FileLocation,
     default_extension: &str,
-) -> txl::Result<(std::path::PathBuf, Vec<u8>)> {
+) -> txl::Result<Option<(std::path::PathBuf, Vec<u8>)>> {
     let file_path = file_location.determine_full_path(
         vm.working_directory
             .as_ref()
@@ -83,11 +83,14 @@ pub fn read_file_to_bytes<S: HasFileSystem + TexlangState>(
         .borrow_mut()
         .read_to_bytes(&file_path)
     {
-        Ok(source_code) => Ok((file_path, source_code)),
-        Err(err) => Err(vm.fatal_error(IoError {
-            title: format!("could not read from `{}`", file_path.display()),
-            underlying_error: err,
-        })),
+        Ok(source_code) => Ok(Some((file_path, source_code))),
+        Err(err) => {
+            vm.error(IoError {
+                title: format!("could not read from `{}`", file_path.display()),
+                underlying_error: err,
+            })?;
+            Ok(None)
+        }
     }
 }
 

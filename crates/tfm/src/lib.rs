@@ -1066,6 +1066,15 @@ impl<'a> Iterator for NextLargerProgramIter<'a> {
     }
 }
 
+impl font::Format for Font {
+    const DEFAULT_FILE_EXTENSION: &'static str = "tfm";
+    type Error = format::DeserializationError;
+
+    fn parse(b: &[u8]) -> Result<Self, Self::Error> {
+        Font::deserialize_from_tfm(b)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

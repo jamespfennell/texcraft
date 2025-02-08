@@ -180,6 +180,13 @@ impl Token {
     token_constructor!(new_letter, Value::Letter);
     token_constructor!(new_other, Value::Other);
 
+    pub fn new_command_ref(command_ref: CommandRef, trace_key: trace::Key) -> Token {
+        Token {
+            value: Value::CommandRef(command_ref),
+            trace_key,
+        }
+    }
+
     pub fn new_active_character(c: char, trace_key: trace::Key) -> Token {
         Token {
             value: Value::CommandRef(CommandRef::ActiveCharacter(c)),
@@ -528,6 +535,7 @@ mod tests {
 
     #[test]
     fn token_size() {
+        assert_eq!(std::mem::size_of::<CommandRef>(), 8);
         assert_eq!(std::mem::size_of::<Value>(), 8);
         assert_eq!(std::mem::size_of::<Token>(), 12);
         assert_eq!(std::mem::size_of::<Result<Token, ()>>(), 12);

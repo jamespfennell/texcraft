@@ -202,7 +202,7 @@ pub fn get_newintarray_getter_provider<S: HasComponent<Component>>() -> command:
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::the::get_the;
+    use crate::the;
     use texlang::vm::implement_has_component;
     use texlang_testing::*;
 
@@ -218,6 +218,7 @@ mod test {
         alloc: Component,
         testing: TestingComponent,
     }];
+    impl the::TheCompatible for State {}
 
     fn built_in_commands() -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
@@ -228,7 +229,7 @@ mod test {
                 "newIntArray_getter_provider_\u{0}",
                 get_newintarray_getter_provider(),
             ),
-            ("the", get_the()),
+            ("the", the::get_the()),
         ])
     }
 
