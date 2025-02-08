@@ -179,6 +179,13 @@ impl<S: TexlangState> TokenStream for ExpandedStream<S> {
 #[repr(transparent)]
 pub struct UnexpandedStream<S>(vm::VM<S>);
 
+impl<S> UnexpandedStream<S> {
+    #[inline]
+    pub fn expansions_mut(&mut self) -> &mut Vec<Token> {
+        self.0.internal.expansions_mut()
+    }
+}
+
 impl<S: TexlangState> TokenStream for UnexpandedStream<S> {
     type S = S;
 

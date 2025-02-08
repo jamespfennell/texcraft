@@ -50,8 +50,12 @@ fn parse_and_set_macro<S: TexlangState>(
         scope = groupingmap::Scope::Global;
     }
     let cmd_ref_or = Option::<token::CommandRef>::parse(input)?;
-    let (prefix, raw_parameters, replacement_end_token) =
-        parse_prefix_and_parameters(input.unexpanded())?;
+    let PrefixAndParameters {
+        prefix,
+        raw_parameters,
+        replacement_end_token,
+        skip_replacement_scan,
+    } = parse_prefix_and_parameters(input.unexpanded())?;
     let parameters: Vec<texmacro::Parameter> = raw_parameters
         .into_iter()
         .map(|a| match a {
@@ -59,13 +63,23 @@ fn parse_and_set_macro<S: TexlangState>(
             RawParameter::Delimited(vec) => texmacro::Parameter::Delimited(Matcher::new(vec)),
         })
         .collect();
-    let mut replacement =
-        parse_replacement_text(input.unexpanded(), replacement_end_token, parameters.len())?;
-    for r in replacement.iter_mut() {
-        if let texmacro::Replacement::Tokens(tokens) = r {
-            tokens.reverse();
+    let replacement = if skip_replacement_scan {
+        vec![]
+    } else {
+        let Some(mut rs) =
+            parse_replacement_text(input.unexpanded(), replacement_end_token, parameters.len())?
+        else {
+            // Input ended while scanning the macro definition.
+            // We just end without definiting anything.
+            return Ok(());
+        };
+        for r in rs.iter_mut() {
+            if let texmacro::Replacement::Tokens(tokens) = r {
+                tokens.reverse();
+            }
         }
-    }
+        rs
+    };
     let user_defined_macro = texmacro::Macro::new(prefix, parameters, replacement);
     if let Some(cmd_ref) = cmd_ref_or {
         input
@@ -108,38 +122,46 @@ fn char_to_parameter_index(c: char) -> Option<usize> {
     }
 }
 
+struct PrefixAndParameters {
+    prefix: Vec<token::Token>,
+    raw_parameters: Vec<RawParameter>,
+    // For the weird #{ edge case
+    replacement_end_token: Option<token::Token>,
+    skip_replacement_scan: bool,
+}
+
+/// TeX.2021.474
 fn parse_prefix_and_parameters<S: TexlangState>(
     input: &mut vm::UnexpandedStream<S>,
-) -> txl::Result<(Vec<token::Token>, Vec<RawParameter>, Option<token::Token>)> {
+) -> txl::Result<PrefixAndParameters> {
     let mut prefix = Vec::new();
-    let mut parameters = Vec::new();
+    let mut raw_parameters: Vec<RawParameter> = Vec::new();
     let mut replacement_end_token = None;
+    let mut skip_replacement_scan = false;
 
     while let Some(token) = input.next()? {
         match token.value() {
             token::Value::BeginGroup(_) => {
-                return Ok((prefix, parameters, replacement_end_token));
+                break;
             }
             token::Value::EndGroup(_) => {
-                return Err(input.vm().fatal_error(error::SimpleTokenError::new(
+                input.vm().error(error::SimpleTokenError::new(
                     token,
                     "unexpected end group token while parsing the parameter of a macro definition",
-                )));
+                ))?;
+                skip_replacement_scan = true;
+                break;
             }
             token::Value::Parameter(_) => {
-                let parameter_token = match input.next()? {
-                    None => {
-                        return Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
-                "unexpected end of input while reading the token after a parameter token")));
-                        // TODO .add_note("a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
-                    }
-                    Some(token) => token,
+                // TeX.2021.476
+                let Some(parameter_token) = input.next()? else {
+                    break;
                 };
                 match parameter_token.value() {
                     token::Value::BeginGroup(_) => {
                         // In this case we end the group according to the special #{ rule
                         replacement_end_token = Some(parameter_token);
-                        match parameters.last_mut() {
+                        match raw_parameters.last_mut() {
                             None => {
                                 prefix.push(parameter_token);
                             }
@@ -147,40 +169,41 @@ fn parse_prefix_and_parameters<S: TexlangState>(
                                 spec.push(parameter_token);
                             }
                         }
-                        return Ok((prefix, parameters, replacement_end_token));
-                    }
-                    token::Value::CommandRef(..) => {
-                        return Err(input.vm().fatal_error(error::SimpleTokenError::new(
-                            parameter_token,
-                            "unexpected control sequence after a parameter token",
-                        )));
-                        // TODO: are we sure we really know what's going on here?
-                        // TODO "a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
+                        break;
                     }
                     _ => {
-                        let c = parameter_token.char().unwrap();
-                        let parameter_index = match char_to_parameter_index(c) {
-                            None => {
-                                return Err(input.vm().fatal_error(error::SimpleTokenError::new(
-                                    parameter_token,
-                                    "unexpected character after a parameter token",
-                                )));
-                                // TODO .add_note("a parameter token must be followed by a single digit number, another parameter token, or a closing brace {.")
-                            }
-                            Some(n) => n,
-                        };
-                        if parameter_index != parameters.len() {
-                            return Err(input.vm().fatal_error(InvalidParameterNumberError {
-                                parameter_number_token: parameter_token,
-                                parameter_index,
-                                parameters_so_far: parameters.len(),
-                            }));
+                        if raw_parameters.len() == 9 {
+                            input.vm().error(error::SimpleTokenError::new(
+                                token,
+                                "Too many parameters; you already have 9",
+                            ))?;
+                            continue;
                         }
-                        parameters.push(RawParameter::Undelimited);
+                        let parameter_index_correct = match parameter_token.char() {
+                            // control sequence
+                            None => false,
+                            // character token
+                            Some(c) => {
+                                match char_to_parameter_index(c) {
+                                    // non-numeric character token
+                                    None => false,
+                                    // numeric character token
+                                    Some(n) => n == raw_parameters.len(),
+                                }
+                            }
+                        };
+                        if !parameter_index_correct {
+                            input.vm().error(InvalidParameterNumberError {
+                                parameter_number_token: parameter_token,
+                                parameters_so_far: raw_parameters.len(),
+                            })?;
+                            input.expansions_mut().push(parameter_token);
+                        }
+                        raw_parameters.push(RawParameter::Undelimited);
                     }
                 }
             }
-            _ => match parameters.last_mut() {
+            _ => match raw_parameters.last_mut() {
                 None => {
                     prefix.push(token);
                 }
@@ -190,17 +213,22 @@ fn parse_prefix_and_parameters<S: TexlangState>(
             },
         }
     }
-    Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
-        "unexpected end of input while reading the parameter text of a macro",
-    )))
-    // TODO .add_note("the parameter text of a macro must end with a closing brace { or another token with catcode 1 (begin group)")
+    // We may end up here because the input ended in which case we should error.
+    // However this case will be handled when we try to scan the replacement
+    // text.
+    Ok(PrefixAndParameters {
+        prefix,
+        raw_parameters,
+        replacement_end_token,
+        skip_replacement_scan,
+    })
 }
 
 fn parse_replacement_text<S: TexlangState>(
     input: &mut vm::UnexpandedStream<S>,
     opt_final_token: Option<token::Token>,
     num_parameters: usize,
-) -> txl::Result<Vec<texmacro::Replacement>> {
+) -> txl::Result<Option<Vec<texmacro::Replacement>>> {
     // TODO: could we use a pool of vectors to avoid some of the allocations here?
     let mut result = vec![];
     let mut scope_depth = 0;
@@ -223,66 +251,54 @@ fn parse_replacement_text<S: TexlangState>(
                     if let Some(final_token) = opt_final_token {
                         push(&mut result, final_token);
                     }
-                    return Ok(result);
+                    return Ok(Some(result));
                 }
                 scope_depth -= 1;
             }
             token::Value::Parameter(_) => {
-                let parameter_token = match input.next()? {
-                    None => {
-                        return Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
-                            "unexpected end of input while reading a parameter number",
-                        )))
-                    }
-                    Some(token) => token,
+                let Some(parameter_token) = input.next()? else {
+                    break;
                 };
+
                 let c = match parameter_token.value() {
-                    token::Value::CommandRef(..) => {
-                        return Err(input.vm().fatal_error(error::SimpleTokenError::new(
-                            parameter_token,
-                            "unexpected character while reading a parameter number",
-                        )));
-                        // TODO .add_note("expected a number between 1 and 9 inclusive")
-                    }
                     token::Value::Parameter(_) => {
+                        // ## case
                         push(&mut result, parameter_token);
                         continue;
                     }
-                    _ => parameter_token.char().unwrap(),
+                    _ => parameter_token.char(),
                 };
-
-                let parameter_index = match char_to_parameter_index(c) {
-                    None => {
-                        return Err(input.vm().fatal_error(error::SimpleTokenError::new(
-                            parameter_token,
-                            "unexpected character while reading a parameter number",
-                        )));
-                        // TODO .add_note("expected a number between 1 and 9 inclusive")
-                    }
-                    Some(n) => n,
-                };
-                if parameter_index >= num_parameters {
-                    return Err(input.vm().fatal_error(error::SimpleTokenError::new(
-                        parameter_token,
-                        "unexpected character while reading a parameter number",
-                    )));
-
-                    /* TODO
-                            var msg string
-                            switch numParams {
-                            case 0:
-                                msg = "no parameter token because this macro has 0 parameters"
-                            case 1:
-                                msg = "the number 1 because this macro has only 1 parameter"
-                            default:
-                                msg = fmt.Sprintf(
-                                    "a number between 1 and %[1]d inclusive because this macro has only %[1]d parameters",
-                                    numParams)
+                let valid_index_or = match c {
+                    // control sequence
+                    None => None,
+                    Some(c) => match char_to_parameter_index(c) {
+                        // non-numeric character token
+                        None => None,
+                        // numeric character token
+                        Some(n) => {
+                            if n < num_parameters {
+                                Some(n)
+                            } else {
+                                None
                             }
-                            return nil, errors.NewUnexpectedTokenError(t, msg, "the number "+t.Value(), parsingArgumentTemplate)
-                    */
+                        }
+                    },
+                };
+                match valid_index_or {
+                    None => {
+                        // TeX.2021.479
+                        input.vm().error(error::SimpleTokenError::new(
+                            parameter_token,
+                            "illegal parameter number",
+                        ))?;
+                        // Fallback to the ## case
+                        input.expansions_mut().push(parameter_token);
+                        push(&mut result, token);
+                    }
+                    Some(valid_index) => {
+                        result.push(texmacro::Replacement::Parameter(valid_index));
+                    }
                 }
-                result.push(texmacro::Replacement::Parameter(parameter_index));
                 continue;
             }
             _ => {}
@@ -290,16 +306,15 @@ fn parse_replacement_text<S: TexlangState>(
 
         push(&mut result, token);
     }
-
-    Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
-        "unexpected end of input while reading a parameter number",
-    )))
+    input.vm().error(error::SimpleEndOfInputError::new(
+        "unexpected end of input while a macro definition",
+    ))?;
+    Ok(None)
 }
 
 #[derive(Debug)]
 struct InvalidParameterNumberError {
     parameter_number_token: token::Token,
-    parameter_index: usize,
     parameters_so_far: usize,
 }
 
@@ -309,7 +324,7 @@ impl error::TexError for InvalidParameterNumberError {
     }
 
     fn title(&self) -> String {
-        format!["unexpected parameter number {}", self.parameter_index + 1]
+        "unexpected parameter".to_string()
     }
 
     fn notes(&self) -> Vec<error::display::Note> {
@@ -555,36 +570,52 @@ mod test {
             r"\helloWorld"
         ),),
         recoverable_failure_tests(
-            (bad_token_target, r"\def a other stuff{}Hello", "Hello"),
-        ),
-        failure_tests(
-            (end_of_input_scanning_target, "\\def"),
-            (end_of_input_scanning_argument_text, "\\def\\A"),
-            (end_of_input_scanning_replacement, "\\def\\A{"),
-            (end_of_input_scanning_nested_replacement, "\\def\\A{{}"),
-            (end_of_input_reading_parameter_number, "\\def\\A#"),
-            (end_of_input_scanning_argument, "\\def\\A#1{} \\A"),
+            (end_of_input_scanning_target, r"\def", ""),
+            (end_of_input_scanning_argument_text, r"\def\A", ""),
+            (end_of_input_scanning_replacement, r"\def\A{", ""),
+            (end_of_input_scanning_nested_replacement, r"\def\A{{}", ""),
+            (end_of_input_reading_parameter_number, r"\def\A#", ""),
+            (end_of_input_scanning_argument, r"\def\A#1{X-#1-Z}\A Y{}\A", "X-Y-Z"),
             (
                 end_of_input_reading_value_for_parameter,
-                "\\def\\A#1{} \\A{this {is parameter 1 but it never ends}"
+                r"\def\A#1{#1}\A{correct}\A{this {is parameter 1 but it never ends}",
+                "correct",
             ),
-            (end_of_input_reading_prefix, "\\def\\A abc{} \\A ab"),
+            (end_of_input_reading_prefix, r"\def\A abc{def}\A abc\A ab", "def"),
             (
                 end_of_input_reading_delimiter,
-                "\\def\\A #1abc{} \\A {first parameter}ab"
+                r"\def\A #1abc{#1}\A xyzabc\A {first parameter}ab", "xyz"
             ),
-            (unexpected_token_target, "\\def a"),
-            (unexpected_token_argument, "\\def\\A }"),
-            (unexpected_token_parameter_number, "\\def\\A #a}"),
-            (unexpected_parameter_number_in_argument, "\\def\\A #2{}"),
-            (unexpected_parameter_token_in_replacement, "\\def\\A #1{#a}"),
-            (unexpected_parameter_number_in_replacement, "\\def\\A {#2}"),
+            (bad_token_target, r"\def a other stuff{}Hello", "Hello"),
+            (unexpected_token_argument, r"\def\A{Hello}\def\A }\A", ""),
+            (wrong_parameter_number_1, r"\def\A #2X{-#1-}\A Y2X", "-Y-"),
+            (wrong_parameter_number_2, r"\def\A #GX{-#1-}\A YGX", "-Y-"),
+            (wrong_parameter_number_3, r"\def\A #\def{-#1-}\A Y\def", "-Y-"),
+            (unexpected_end_group, r"\def\A{M}\def\A X}\A XY", r"Y"),
+            (too_many_parameters, r"\def\A#1#2#3#4#5#6#7#8#9#0{#9#8#7#6#5#4#3#2#1}\A abcdefghi", "ihgfedcba"),
             (
-                unexpected_parameter_number_in_replacement_2,
-                "\\def\\A #1{#2}"
+                invalid_parameter_in_replacement_1,
+                // invalid #1 becomes ##1
+                r"\def\A{\def\B##1{-#1-}}\A{}\B C",
+                "-C-",
             ),
-            (unexpected_token_in_prefix, "\\def\\A abc{d} \\A abd"),
-            // (recursive, r"\def\recursive{\recursive} \recursive"),
+            (
+                invalid_parameter_in_replacement_2,
+                // invalid #A becomes ##A
+                // we don't invoke the macro because this would output #A which is invalid.
+                // We instead just verify that the macro definition ends where it should.
+                r"\def\A{\def\B##1{-#A-}}Hello",
+                "Hello",
+            ),
+            (
+                invalid_parameter_in_replacement_3,
+                // invalid #\cs becomes ##\cs
+                // we don't invoke the macro because this would output #A which is invalid.
+                // We instead just verify that the macro definition ends where it should.
+                r"\def\A{\def\B##1{-#\cs-}}Hello",
+                "Hello",
+            ),
+            (prefix_does_not_match, r"\def\A abc{d}\A abdef", "ef"),
         ),
     ];
 }

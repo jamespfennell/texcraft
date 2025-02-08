@@ -64,13 +64,19 @@ impl Macro {
         token: Token,
         input: &mut vm::ExpansionInput<S>,
     ) -> Result<(), Box<command::Error>> {
-        remove_tokens_from_stream(&self.prefix, input.unexpanded())?;
+        let prefix_matched = remove_tokens_from_stream(&self.prefix, input.unexpanded())?;
+        if !prefix_matched {
+            return Ok(());
+        }
         let mut argument_indices: Vec<(usize, usize)> = Default::default();
         let mut argument_tokens = input.checkout_token_buffer();
         for (i, parameter) in self.parameters.iter().enumerate() {
             let start_index = argument_tokens.len();
-            let trim_outer_braces =
+            let (trim_outer_braces, parsed_argument) =
                 parameter.parse_argument(&token, input, i, &mut argument_tokens)?;
+            if !parsed_argument {
+                return Ok(());
+            }
             let element = match trim_outer_braces {
                 true => (start_index + 1, argument_tokens.len() - 1),
                 false => (start_index, argument_tokens.len()),
@@ -164,11 +170,12 @@ impl Parameter {
         input: &mut vm::ExpansionInput<S>,
         index: usize,
         result: &mut Vec<Token>,
-    ) -> Result<bool, Box<command::Error>> {
+    ) -> Result<(bool, bool), Box<command::Error>> {
         match self {
             Parameter::Undelimited => {
-                Parameter::parse_undelimited_argument(macro_token, input, index + 1, result)?;
-                Ok(false)
+                let parsed_argument =
+                    Parameter::parse_undelimited_argument(macro_token, input, index + 1, result)?;
+                Ok((false, parsed_argument))
             }
             Parameter::Delimited(matcher_factory) => Parameter::parse_delimited_argument(
                 macro_token,
@@ -186,7 +193,7 @@ impl Parameter {
         matcher_factory: &Matcher<Value>,
         param_num: usize,
         result: &mut Vec<Token>,
-    ) -> Result<bool, Box<command::Error>> {
+    ) -> Result<(bool, bool), Box<command::Error>> {
         let mut matcher = matcher_factory.start();
         let mut scope_depth = 0;
 
@@ -215,14 +222,16 @@ impl Parameter {
                 for _ in 0..matcher_factory.substring().len() {
                     result.pop();
                 }
-                return Ok(Parameter::should_trim_outer_braces_if_present(
-                    &result[start_index..],
+                return Ok((
+                    Parameter::should_trim_outer_braces_if_present(&result[start_index..]),
+                    true,
                 ));
             }
         }
-        return Err(stream.vm().fatal_error(error::SimpleEndOfInputError::new(format![
+        stream.vm().error(error::SimpleEndOfInputError::new(format![
             "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
-        ])));
+        ]))?;
+        Ok((false, false))
         /*
         TODO
         .add_note(format![
@@ -268,36 +277,39 @@ impl Parameter {
         input: &mut vm::ExpansionInput<S>,
         param_num: usize,
         result: &mut Vec<Token>,
-    ) -> Result<(), Box<command::Error>> {
+    ) -> Result<bool, Box<command::Error>> {
         parse::SpacesUnexpanded::parse(input)?;
         let input = input.unexpanded();
         let _opening_brace = match input.next()? {
             None => {
-                return Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(format![
+                input.vm().error(error::SimpleEndOfInputError::new(format![
                     "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
-                ])))
+                ]))?;
+                return Ok(false);
             }
             Some(token) => match token.value() {
                 token::Value::BeginGroup(_) => token,
                 _ => {
                     result.push(token);
-                    return Ok(());
+                    return Ok(true);
                 }
             },
         };
         match parse::finish_parsing_balanced_tokens(input, result)? {
-            true => Ok(()),
-            false => Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(format![
+            true => Ok(true),
+            false => {
+                input.vm().error(error::SimpleEndOfInputError::new(format![
                 "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
-            ]))),
-            /* TODO
-            .add_note(format![
-            "this argument started with a `{opening_brace}` and must be finished with a matching closing brace"
-        ])
-            .add_token_context(&opening_brace, "the argument started here:")
-            .add_token_context(macro_token, "the macro invocation started here:")
-            .cast()),
-             */
+            ]))?;
+                Ok(false)
+            } /* TODO
+                  .add_note(format![
+                  "this argument started with a `{opening_brace}` and must be finished with a matching closing brace"
+              ])
+                  .add_token_context(&opening_brace, "the argument started here:")
+                  .add_token_context(macro_token, "the macro invocation started here:")
+                  .cast()),
+                   */
         }
     }
 }
@@ -380,38 +392,28 @@ pub fn pretty_print_replacement_text(replacements: &[Replacement]) -> String {
 }
 
 /// Removes the provided vector of tokens from the front of the stream.
-///
-/// Returns an error if the stream does not start with the tokens.
 pub fn remove_tokens_from_stream<S: TexlangState>(
     tokens: &[Token],
     stream: &mut vm::UnexpandedStream<S>,
-) -> Result<(), Box<command::Error>> {
+) -> Result<bool, Box<command::Error>> {
     for prefix_token in tokens.iter() {
-        let stream_token =
-            match stream.next()? {
-                None => return Err(stream.vm().fatal_error(error::SimpleEndOfInputError::new(
+        let stream_token = match stream.next()? {
+            None => {
+                stream.vm().error(error::SimpleEndOfInputError::new(
                     "unexpected end of input while matching the prefix for a user-defined macro",
                     // TODO: add everything we've matched so far, and what we were expecting
-                ))),
-                Some(token) => token,
-            };
+                ))?;
+                return Ok(false);
+            }
+            Some(token) => token,
+        };
         if stream_token.value() != prefix_token.value() {
-            /*
-            let note = match &prefix_token.value {
-                ControlSequence(_) => {
-                    format!["expected a control sequence token \\{}", "name"]
-                }
-                _ => format![ //Character(c, catcode) => format![
-                    "expected a character token with value 'todo' and catcode todo",
-                    //c, catcode
-                ],
-            };
-             */
-            return Err(stream.vm().fatal_error(error::SimpleTokenError::new(
+            stream.vm().error(error::SimpleTokenError::new(
                 stream_token,
                 "unexpected token while matching the prefix for a user-defined macro",
-            )));
+            ))?;
+            return Ok(false);
         }
     }
-    Ok(())
+    Ok(true)
 }
