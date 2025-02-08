@@ -271,18 +271,8 @@ fn parse_replacement_text<S: TexlangState>(
                 let valid_index_or = match c {
                     // control sequence
                     None => None,
-                    Some(c) => match char_to_parameter_index(c) {
-                        // non-numeric character token
-                        None => None,
-                        // numeric character token
-                        Some(n) => {
-                            if n < num_parameters {
-                                Some(n)
-                            } else {
-                                None
-                            }
-                        }
-                    },
+                    // character
+                    Some(c) => char_to_parameter_index(c).filter(|&n| n < num_parameters)
                 };
                 match valid_index_or {
                     None => {
