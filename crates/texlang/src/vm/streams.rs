@@ -34,13 +34,11 @@ pub trait TokenStream {
     /// The type of the custom state in the VM.
     type S;
 
-    /// Gets the next token in the stream.
+    /// Gets the next token in the stream or error if the stream is exhausted.
     ///
     /// This method is almost the same
     /// as the `next` method in Rust's iterator trait, except a stream can return an error.
-    ///
-    /// As with iterators, a result of `Ok(None)` indicates that the stream is exhausted.
-    fn next(&mut self) -> txl::Result<Option<Token>>;
+    fn next<E: error::EndOfInputError>(&mut self, err: E) -> txl::Result<Token>;
 
     /// Peeks at the next token in the stream without removing it.
     ///
@@ -69,8 +67,11 @@ pub trait TokenStream {
     /// This method is mostly to make code self-documenting. It is typically used in
     /// situations where a peek has already occurred, and the token itself is not needed.
     fn consume(&mut self) -> txl::Result<()> {
-        self.next().map(|_| ())
+        self.next(error::TODO).map(|_| ())
     }
+
+    /// Returns a token to the front of the token stream.
+    fn back(&mut self, token: Token);
 
     /// Returns a reference to the VM.
     fn vm(&self) -> &vm::VM<Self::S>;
@@ -154,8 +155,12 @@ impl<S: TexlangState> TokenStream for ExpandedStream<S> {
     type S = S;
 
     #[inline]
-    fn next(&mut self) -> txl::Result<Option<Token>> {
-        stream::next_expanded(&mut self.unexpanded().0)
+    fn next<E: error::EndOfInputError>(&mut self, err: E) -> txl::Result<Token> {
+        match stream::next_expanded(&mut self.unexpanded().0) {
+            Ok(None) => Err(self.vm().fatal_error(error::EofError::new(err))),
+            Ok(Some(token)) => Ok(token),
+            Err(err) => Err(err),
+        }
     }
 
     #[inline]
@@ -166,6 +171,11 @@ impl<S: TexlangState> TokenStream for ExpandedStream<S> {
     #[inline]
     fn vm(&self) -> &vm::VM<Self::S> {
         &self.0 .0
+    }
+
+    #[inline]
+    fn back(&mut self, token: Token) {
+        self.0.back(token)
     }
 }
 
@@ -190,8 +200,12 @@ impl<S: TexlangState> TokenStream for UnexpandedStream<S> {
     type S = S;
 
     #[inline]
-    fn next(&mut self) -> txl::Result<Option<Token>> {
-        stream::next_unexpanded(&mut self.0)
+    fn next<E: error::EndOfInputError>(&mut self, err: E) -> txl::Result<Token> {
+        match stream::next_unexpanded(&mut self.0) {
+            Ok(None) => Err(self.vm().fatal_error(error::EofError::new(err))),
+            Ok(Some(token)) => Ok(token),
+            Err(err) => Err(err),
+        }
     }
 
     #[inline]
@@ -202,6 +216,11 @@ impl<S: TexlangState> TokenStream for UnexpandedStream<S> {
     #[inline]
     fn vm(&self) -> &vm::VM<S> {
         &self.0
+    }
+
+    #[inline]
+    fn back(&mut self, token: Token) {
+        self.expansions_mut().push(token)
     }
 }
 
@@ -239,8 +258,8 @@ impl<S> std::convert::AsMut<ExpandedStream<S>> for ExpansionInput<S> {
 impl<S: TexlangState> TokenStream for ExpansionInput<S> {
     type S = S;
 
-    fn next(&mut self) -> txl::Result<Option<Token>> {
-        self.0.next()
+    fn next<E: error::EndOfInputError>(&mut self, err: E) -> txl::Result<Token> {
+        self.0.next(err)
     }
 
     fn peek(&mut self) -> txl::Result<Option<&Token>> {
@@ -249,6 +268,10 @@ impl<S: TexlangState> TokenStream for ExpansionInput<S> {
 
     fn vm(&self) -> &vm::VM<Self::S> {
         self.0.vm()
+    }
+
+    fn back(&mut self, token: Token) {
+        self.0.back(token);
     }
 }
 
@@ -404,8 +427,8 @@ impl<S> std::convert::AsMut<ExpandedStream<S>> for ExecutionInput<S> {
 impl<S: TexlangState> TokenStream for ExecutionInput<S> {
     type S = S;
 
-    fn next(&mut self) -> txl::Result<Option<Token>> {
-        self.0.next()
+    fn next<E: error::EndOfInputError>(&mut self, err: E) -> txl::Result<Token> {
+        self.0.next(err)
     }
 
     fn peek(&mut self) -> txl::Result<Option<&Token>> {
@@ -414,6 +437,16 @@ impl<S: TexlangState> TokenStream for ExecutionInput<S> {
 
     fn vm(&self) -> &vm::VM<Self::S> {
         self.0.vm()
+    }
+
+    fn back(&mut self, token: Token) {
+        self.0.back(token);
+    }
+}
+
+impl<S: TexlangState> ExecutionInput<S> {
+    pub(crate) fn next_or(&mut self) -> txl::Result<Option<Token>> {
+        stream::next_expanded(&mut self.unexpanded().0)
     }
 }
 

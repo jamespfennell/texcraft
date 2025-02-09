@@ -221,20 +221,39 @@ fn process_prefixes<S: HasComponent<Component>>(
     input: &mut vm::ExecutionInput<S>,
 ) -> txl::Result<()> {
     complete_prefix(&mut prefix, input)?;
-    match input.peek()? {
-        None => Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
-            "end of input while looking for a command to prefix",
-        )
-        .with_note(
-            r"prefix commands (\global, \long, \outer) must be followed by a command to prefix",
-        )
-        )),
-        Some(&t) => match t.value() {
-            token::Value::CommandRef(command_ref) => {
-                // First check it it's a command that can be prefixed by global only.
-                if let Some(command::Command::Variable(_) | command::Command::Font(_)) =
-                    input.commands_map_mut().get_command(&command_ref)
-                {
+    let t = input.next(PrefixEndOfInputError {})?;
+    input.back(t);
+    match t.value() {
+        token::Value::CommandRef(command_ref) => {
+            // First check it it's a command that can be prefixed by global only.
+            if let Some(command::Command::Variable(_) | command::Command::Font(_)) =
+                input.commands_map_mut().get_command(&command_ref)
+            {
+                assert_only_global_prefix(input, t, prefix)?;
+                if prefix.global.is_some() {
+                    input
+                        .state_mut()
+                        .component_mut()
+                        .set_scope(groupingmap::Scope::Global);
+                }
+                return Ok(());
+            }
+            // Next check if it's a command that can be prefixed by any of the prefix command.
+            let component = input.state().component();
+            let tag = input.commands_map().get_tag(&command_ref);
+            if let Some(tag) = tag {
+                if component.tags.can_be_prefixed_with_any.contains(&tag) {
+                    if prefix.global.is_some() {
+                        input
+                            .state_mut()
+                            .component_mut()
+                            .set_scope(groupingmap::Scope::Global);
+                    }
+                    return Ok(());
+                }
+                // Next check if it's a command that can be prefixed by global only. In this case we check
+                // that no other prefixes are present.
+                if component.tags.can_be_prefixed_with_global.contains(&tag) {
                     assert_only_global_prefix(input, t, prefix)?;
                     if prefix.global.is_some() {
                         input
@@ -244,53 +263,40 @@ fn process_prefixes<S: HasComponent<Component>>(
                     }
                     return Ok(());
                 }
-                // Next check if it's a command that can be prefixed by any of the prefix command.
-                let component = input.state().component();
-                let tag = input.commands_map().get_tag(&command_ref);
-                if let Some(tag) = tag {
-                    if component.tags.can_be_prefixed_with_any.contains(&tag) {
-                        if prefix.global.is_some() {
-                            input
-                                .state_mut()
-                                .component_mut()
-                                .set_scope(groupingmap::Scope::Global);
-                        }
-                        return Ok(());
-                    }
-                    // Next check if it's a command that can be prefixed by global only. In this case we check
-                    // that no other prefixes are present.
-                    if component.tags.can_be_prefixed_with_global.contains(&tag) {
-                        assert_only_global_prefix(input, t, prefix)?;
-                        if prefix.global.is_some() {
-                            input
-                                .state_mut()
-                                .component_mut()
-                                .set_scope(groupingmap::Scope::Global);
-                        }
-                        return Ok(());
-                    }
-                }
-                // If we make it to here, this is not a valid target for the prefix command.
-                let (prefix_token, kind) = prefix.get_one();
-                Err(input.vm().fatal_error(Error {
-                    kind,
-                    got: t,
-                    prefix: prefix_token,
-                    prefix_kind: kind,
-                }
-                ))
             }
-            _ => {
-                let (prefix_token, kind) = prefix.get_one();
-                Err(input.vm().fatal_error(Error {
-                    kind,
-                    got: t,
-                    prefix: prefix_token,
-                    prefix_kind: kind,
-                }
-                ))
-            }
-        },
+            // If we make it to here, this is not a valid target for the prefix command.
+            let (prefix_token, kind) = prefix.get_one();
+            Err(input.vm().fatal_error(Error {
+                kind,
+                got: t,
+                prefix: prefix_token,
+                prefix_kind: kind,
+            }))
+        }
+        _ => {
+            let (prefix_token, kind) = prefix.get_one();
+            Err(input.vm().fatal_error(Error {
+                kind,
+                got: t,
+                prefix: prefix_token,
+                prefix_kind: kind,
+            }))
+        }
+    }
+}
+
+#[derive(Debug)]
+struct PrefixEndOfInputError;
+
+impl error::EndOfInputError for PrefixEndOfInputError {
+    fn doing(&self) -> String {
+        "scanning a command to prefix".into()
+    }
+    fn notes(&self) -> Vec<error::display::Note> {
+        vec![
+            r"prefix commands (\global, \long, \outer) must be followed by a command to prefix"
+                .into(),
+        ]
     }
 }
 
@@ -510,7 +516,7 @@ mod test {
             (global_defs_1, r"\i=5{\globaldefs=1 \i=8}\the\i", "8"),
             (global_defs_2, r"\i=5{\globaldefs=-1\global\i=8}\the\i", "5"),
         ),
-        failure_tests(
+        fatal_error_tests(
             (global_end_of_input, r"\global"),
             (global_with_character, r"\global a"),
             (global_with_undefined_command, r"\global \undefinedCommand"),

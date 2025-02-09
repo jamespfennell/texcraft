@@ -28,11 +28,7 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
     let cmd_ref_or = Option::<token::CommandRef>::parse(input)?;
     OptionalEqualsUnexpanded::parse(input)?;
-    let Some(token) = input.unexpanded().next()? else {
-        return Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
-            "unexpected end of input while reading the right hand side of a \\let assignment",
-        )));
-    };
+    let token = input.unexpanded().next(LetEndOfInputError {})?;
     if let Some(cmd_ref) = cmd_ref_or {
         match token.value() {
             token::Value::CommandRef(command_ref) => {
@@ -46,6 +42,15 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
         };
     };
     Ok(())
+}
+
+#[derive(Debug)]
+struct LetEndOfInputError;
+
+impl error::EndOfInputError for LetEndOfInputError {
+    fn doing(&self) -> String {
+        r"parsing the right hand side of a \let assignment".into()
+    }
 }
 
 #[cfg(test)]

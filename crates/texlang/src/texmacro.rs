@@ -72,11 +72,7 @@ impl Macro {
         let mut argument_tokens = input.checkout_token_buffer();
         for (i, parameter) in self.parameters.iter().enumerate() {
             let start_index = argument_tokens.len();
-            let (trim_outer_braces, parsed_argument) =
-                parameter.parse_argument(&token, input, i, &mut argument_tokens)?;
-            if !parsed_argument {
-                return Ok(());
-            }
+            let trim_outer_braces = parameter.parse_argument(input, i, &mut argument_tokens)?;
             let element = match trim_outer_braces {
                 true => (start_index + 1, argument_tokens.len() - 1),
                 false => (start_index, argument_tokens.len()),
@@ -166,19 +162,16 @@ impl Macro {
 impl Parameter {
     pub fn parse_argument<S: TexlangState>(
         &self,
-        macro_token: &Token,
         input: &mut vm::ExpansionInput<S>,
         index: usize,
         result: &mut Vec<Token>,
-    ) -> Result<(bool, bool), Box<command::Error>> {
+    ) -> Result<bool, Box<command::Error>> {
         match self {
             Parameter::Undelimited => {
-                let parsed_argument =
-                    Parameter::parse_undelimited_argument(macro_token, input, index + 1, result)?;
-                Ok((false, parsed_argument))
+                Parameter::parse_undelimited_argument(input, index + 1, result)?;
+                Ok(false)
             }
             Parameter::Delimited(matcher_factory) => Parameter::parse_delimited_argument(
-                macro_token,
                 input.unexpanded(),
                 matcher_factory,
                 index + 1,
@@ -188,12 +181,11 @@ impl Parameter {
     }
 
     fn parse_delimited_argument<S: TexlangState>(
-        macro_token: &Token,
         stream: &mut vm::UnexpandedStream<S>,
         matcher_factory: &Matcher<Value>,
         param_num: usize,
         result: &mut Vec<Token>,
-    ) -> Result<(bool, bool), Box<command::Error>> {
+    ) -> Result<bool, Box<command::Error>> {
         let mut matcher = matcher_factory.start();
         let mut scope_depth = 0;
 
@@ -205,7 +197,8 @@ impl Parameter {
             _ => 0,
         };
         let start_index = result.len();
-        while let Some(token) = stream.next()? {
+        loop {
+            let token = stream.next(DelimitedArgumentEndOfInputError { param_num })?;
             match token.value() {
                 token::Value::BeginGroup(_) => {
                     scope_depth += 1;
@@ -222,16 +215,11 @@ impl Parameter {
                 for _ in 0..matcher_factory.substring().len() {
                     result.pop();
                 }
-                return Ok((
-                    Parameter::should_trim_outer_braces_if_present(&result[start_index..]),
-                    true,
+                return Ok(Parameter::should_trim_outer_braces_if_present(
+                    &result[start_index..],
                 ));
             }
         }
-        stream.vm().error(error::SimpleEndOfInputError::new(format![
-            "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
-        ]))?;
-        Ok((false, false))
         /*
         TODO
         .add_note(format![
@@ -273,44 +261,58 @@ impl Parameter {
     }
 
     fn parse_undelimited_argument<S: TexlangState>(
-        macro_token: &Token,
         input: &mut vm::ExpansionInput<S>,
         param_num: usize,
         result: &mut Vec<Token>,
-    ) -> Result<bool, Box<command::Error>> {
+    ) -> Result<(), Box<command::Error>> {
         parse::SpacesUnexpanded::parse(input)?;
         let input = input.unexpanded();
-        let _opening_brace = match input.next()? {
-            None => {
-                input.vm().error(error::SimpleEndOfInputError::new(format![
-                    "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
-                ]))?;
-                return Ok(false);
+        let token = input.next(UnDelimitedArgumentEndOfInputError { param_num })?;
+        match token.value() {
+            token::Value::BeginGroup(_) => token,
+            _ => {
+                result.push(token);
+                return Ok(());
             }
-            Some(token) => match token.value() {
-                token::Value::BeginGroup(_) => token,
-                _ => {
-                    result.push(token);
-                    return Ok(true);
-                }
-            },
         };
-        match parse::finish_parsing_balanced_tokens(input, result)? {
-            true => Ok(true),
-            false => {
-                input.vm().error(error::SimpleEndOfInputError::new(format![
-                "unexpected end of input while reading argument #{param_num} for the macro {macro_token}"
-            ]))?;
-                Ok(false)
-            } /* TODO
-                  .add_note(format![
-                  "this argument started with a `{opening_brace}` and must be finished with a matching closing brace"
-              ])
-                  .add_token_context(&opening_brace, "the argument started here:")
-                  .add_token_context(macro_token, "the macro invocation started here:")
-                  .cast()),
-                   */
-        }
+        parse::finish_parsing_balanced_tokens(input, result)?;
+        Ok(())
+        /* TODO
+            .add_note(format![
+            "this argument started with a `{opening_brace}` and must be finished with a matching closing brace"
+        ])
+            .add_token_context(&opening_brace, "the argument started here:")
+            .add_token_context(macro_token, "the macro invocation started here:")
+            .cast()),
+             */
+    }
+}
+
+#[derive(Debug)]
+struct DelimitedArgumentEndOfInputError {
+    param_num: usize,
+}
+
+impl error::EndOfInputError for DelimitedArgumentEndOfInputError {
+    fn doing(&self) -> String {
+        "parsing a delimited argument for a macro".into()
+    }
+    fn notes(&self) -> Vec<error::display::Note> {
+        vec![format!("this is argument number {} for this macro", self.param_num).into()]
+    }
+}
+
+#[derive(Debug)]
+struct UnDelimitedArgumentEndOfInputError {
+    param_num: usize,
+}
+
+impl error::EndOfInputError for UnDelimitedArgumentEndOfInputError {
+    fn doing(&self) -> String {
+        "parsing an undelimited argument for a macro".into()
+    }
+    fn notes(&self) -> Vec<error::display::Note> {
+        vec![format!("this is argument number {} for this macro", self.param_num).into()]
     }
 }
 
@@ -397,16 +399,7 @@ pub fn remove_tokens_from_stream<S: TexlangState>(
     stream: &mut vm::UnexpandedStream<S>,
 ) -> Result<bool, Box<command::Error>> {
     for prefix_token in tokens.iter() {
-        let stream_token = match stream.next()? {
-            None => {
-                stream.vm().error(error::SimpleEndOfInputError::new(
-                    "unexpected end of input while matching the prefix for a user-defined macro",
-                    // TODO: add everything we've matched so far, and what we were expecting
-                ))?;
-                return Ok(false);
-            }
-            Some(token) => token,
-        };
+        let stream_token = stream.next(PrefixEndOfInputError {})?;
         if stream_token.value() != prefix_token.value() {
             stream.vm().error(error::SimpleTokenError::new(
                 stream_token,
@@ -416,4 +409,13 @@ pub fn remove_tokens_from_stream<S: TexlangState>(
         }
     }
     Ok(true)
+}
+
+#[derive(Debug)]
+struct PrefixEndOfInputError;
+
+impl error::EndOfInputError for PrefixEndOfInputError {
+    fn doing(&self) -> String {
+        "matching the prefix of a user-defined macro".into()
+    }
 }

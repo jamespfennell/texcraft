@@ -143,7 +143,8 @@ fn false_case<S: HasComponent<Component>>(
     input: &mut vm::ExpansionInput<S>,
 ) -> txl::Result<()> {
     let mut depth = 0;
-    while let Some(token) = input.unexpanded().next()? {
+    loop {
+        let token = input.unexpanded().next(FalseBranchEndOfInputError {})?;
         if let token::Value::CommandRef(command_ref) = &token.value() {
             let tag = input.commands_map().get_tag(command_ref);
             if tag == Some(input.state().component().tags.else_tag) && depth == 0 {
@@ -167,32 +168,19 @@ fn false_case<S: HasComponent<Component>>(
             }
         }
     }
-    let branch = pop_branch(input);
-    Err(input
-        .vm()
-        .fatal_error(FalseBranchEndOfInputError { branch }))
 }
 
 #[derive(Debug)]
-struct FalseBranchEndOfInputError {
-    branch: Option<Branch>,
-}
+struct FalseBranchEndOfInputError;
 
-impl error::TexError for FalseBranchEndOfInputError {
-    fn kind(&self) -> error::Kind {
-        error::Kind::EndOfInput
+impl error::EndOfInputError for FalseBranchEndOfInputError {
+    fn doing(&self) -> String {
+        r"skipping the true branch of an conditional command".into()
     }
-
-    fn title(&self) -> String {
-        "unexpected end of input while expanding an `if` command".into()
-    }
-
     fn notes(&self) -> Vec<error::display::Note> {
         vec![
             "each `if` command must be terminated by a `fi` command, with an optional `else` in between".into(),
             "this `if` command evaluated to false, and the input ended while skipping the true branch".into(),
-            "this is the `if` command involved in the error:".into(),
-            format!["{:?}", self.branch].into(),
         ]
     }
 }
@@ -298,8 +286,8 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
     input: &mut vm::ExpansionInput<S>,
 ) -> txl::Result<()> {
     // TODO: should we reading the number from the unexpanded stream? Probably!
-    let mut cases_to_skip = i32::parse(input)?;
-    if cases_to_skip == 0 {
+    let total_cases_to_skip = i32::parse(input)?;
+    if total_cases_to_skip == 0 {
         push_branch(
             input,
             Branch {
@@ -309,13 +297,18 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
         );
         return Ok(());
     }
+    let mut cases_left_to_skip = total_cases_to_skip;
     let mut depth = 0;
-    while let Some(token) = input.unexpanded().next()? {
+    loop {
+        let token = input.unexpanded().next(IfCaseEndOfInputError {
+            total_cases_to_skip,
+            cases_left_to_skip,
+        })?;
         if let token::Value::CommandRef(command_ref) = &token.value() {
             let tag = input.commands_map().get_tag(command_ref);
             if tag == Some(input.state().component().tags.or_tag) && depth == 0 {
-                cases_to_skip -= 1;
-                if cases_to_skip == 0 {
+                cases_left_to_skip -= 1;
+                if cases_left_to_skip == 0 {
                     push_branch(
                         input,
                         Branch {
@@ -347,27 +340,32 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
             }
         }
     }
-    Err(input.vm().fatal_error(IfCaseEndOfInputError {}))
 }
 
 #[derive(Debug)]
-struct IfCaseEndOfInputError;
+struct IfCaseEndOfInputError {
+    total_cases_to_skip: i32,
+    cases_left_to_skip: i32,
+}
 
-impl error::TexError for IfCaseEndOfInputError {
-    fn kind(&self) -> error::Kind {
-        error::Kind::EndOfInput
-    }
-
-    fn title(&self) -> String {
-        "unexpected end of input while expanding an `ifcase` command".into()
+impl error::EndOfInputError for IfCaseEndOfInputError {
+    fn doing(&self) -> String {
+        "skipping cases in an `ifcase` command".into()
     }
 
     fn notes(&self) -> Vec<error::display::Note> {
         vec![
             "each `ifcase` command must be matched by a `or`, `else` or `fi` command".into(),
-            "this `ifcase` case evaluated to %d and we skipped %d cases before the input ran out"
-                .into(),
-            "this is the `ifnum` command involved in the error:".into(),
+            format![
+                "this `ifcase` case evaluated to {}",
+                self.total_cases_to_skip
+            ]
+            .into(),
+            format![
+                "the input ended while skipping case {}",
+                self.total_cases_to_skip + 1 - self.cases_left_to_skip
+            ]
+            .into(),
         ]
     }
 }
@@ -398,7 +396,8 @@ fn or_primitive_fn<S: HasComponent<Component>>(
     }
 
     let mut depth = 0;
-    while let Some(token) = input.unexpanded().next()? {
+    loop {
+        let token = input.unexpanded().next(OrEndOfInputError {})?;
         if let token::Value::CommandRef(command_ref) = &token.value() {
             let tag = input.commands_map().get_tag(command_ref);
             if tag == Some(input.state().component().tags.if_tag) {
@@ -412,21 +411,15 @@ fn or_primitive_fn<S: HasComponent<Component>>(
             }
         }
     }
-    Err(input.vm().fatal_error(OrEndOfInputError {}))
 }
 
 #[derive(Debug)]
 struct OrEndOfInputError;
 
-impl error::TexError for OrEndOfInputError {
-    fn kind(&self) -> error::Kind {
-        error::Kind::EndOfInput
+impl error::EndOfInputError for OrEndOfInputError {
+    fn doing(&self) -> String {
+        "skipping cases in an `ifcase` command".into()
     }
-
-    fn title(&self) -> String {
-        "unexpected end of input while expanding an `or` command".into()
-    }
-
     fn notes(&self) -> Vec<error::display::Note> {
         vec![
         "each `or` command must be terminated by a `fi` command".into(),
@@ -464,7 +457,8 @@ fn else_primitive_fn<S: HasComponent<Component>>(
 
     // Now consume all of the tokens until the next \fi
     let mut depth = 0;
-    while let Some(token) = input.unexpanded().next()? {
+    loop {
+        let token = input.unexpanded().next(ElseEndOfInputError {})?;
         if let token::Value::CommandRef(command_ref) = &token.value() {
             let tag = input.commands_map().get_tag(command_ref);
             if tag == Some(input.state().component().tags.if_tag) {
@@ -478,19 +472,14 @@ fn else_primitive_fn<S: HasComponent<Component>>(
             }
         }
     }
-    Err(input.vm().fatal_error(ElseEndOfInputError {}))
 }
 
 #[derive(Debug)]
 struct ElseEndOfInputError;
 
-impl error::TexError for ElseEndOfInputError {
-    fn kind(&self) -> error::Kind {
-        error::Kind::EndOfInput
-    }
-
-    fn title(&self) -> String {
-        "unexpected end of input while expanding an `else` command".into()
+impl error::EndOfInputError for ElseEndOfInputError {
+    fn doing(&self) -> String {
+        r"skipping the false branch of an conditional command".into()
     }
 
     fn notes(&self) -> Vec<error::display::Note> {
@@ -651,7 +640,7 @@ mod tests {
             (fi_not_expected, r"a\fi b", "ab"),
             (or_not_expected, r"a\or b", "ab"),
         ),
-        failure_tests(
+        fatal_error_tests(
             (iftrue_end_of_input, r"\iftrue a\else b"),
             (iffalse_end_of_input, r"\iffalse a"),
         ),

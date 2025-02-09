@@ -172,50 +172,48 @@ impl<S: TexlangState> Parsable<S> for Option<token::CommandRef> {
 impl<S: TexlangState> Parsable<S> for Vec<token::Token> {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let mut result = input.checkout_token_buffer();
-        let first_token_or = input.next()?;
-        let got = match first_token_or {
-            None => "the input ended",
-            Some(first_token) => match first_token.value() {
-                token::Value::CommandRef(command_ref) => {
-                    match input.commands_map().get_command(&command_ref) {
-                        Some(command::Command::Variable(cmd)) => {
-                            if let crate::variable::ValueRef::TokenList(token_list) =
-                                cmd.clone().value(first_token, input)?
-                            {
-                                result.extend(token_list.iter());
-                                return Ok(result);
-                            };
-                            "a variable command of the wrong type (wanted a token list)"
-                        }
-                        Some(_) => "a command that is not a variable command",
-                        None => "an undefined command",
+        let first_token = input.next(TokenStreamEndOfInputError {})?;
+        let got = match first_token.value() {
+            token::Value::CommandRef(command_ref) => {
+                match input.commands_map().get_command(&command_ref) {
+                    Some(command::Command::Variable(cmd)) => {
+                        if let crate::variable::ValueRef::TokenList(token_list) =
+                            cmd.clone().value(first_token, input)?
+                        {
+                            result.extend(token_list.iter());
+                            return Ok(result);
+                        };
+                        "a variable command of the wrong type (wanted a token list)"
                     }
+                    Some(_) => "a command that is not a variable command",
+                    None => "an undefined command",
                 }
-                token::Value::BeginGroup(_) => {
-                    let found_end_group = finish_parsing_balanced_tokens(input, &mut result)?;
-                    if found_end_group {
-                        return Ok(result);
-                    }
-                    input.return_token_buffer(result);
-                    return Err(input.vm().fatal_error(parse::Error::new(
-                        "balanced braces",
-                        None,
-                        "",
-                    )));
-                }
-                _ => "a non-command, non-opening brace token",
-            },
+            }
+            token::Value::BeginGroup(_) => {
+                finish_parsing_balanced_tokens(input, &mut result)?;
+                return Ok(result);
+            }
+            _ => "a non-command, non-opening brace token",
         };
         input.return_token_buffer(result);
         Err(input.vm().fatal_error(
             parse::Error::new(
                 "an opening brace or a variable of type token list",
-                first_token_or,
+                Some(first_token),
                 "",
             )
             .with_got_override(format!("got {got}"))
             .with_annotation_override(got),
         ))
+    }
+}
+
+#[derive(Debug)]
+struct TokenStreamEndOfInputError;
+
+impl error::EndOfInputError for TokenStreamEndOfInputError {
+    fn doing(&self) -> String {
+        "parsing a token list".into()
     }
 }
 
@@ -228,16 +226,17 @@ impl<S: TexlangState> Parsable<S> for Vec<token::Token> {
 pub fn finish_parsing_balanced_tokens<S: vm::TokenStream>(
     stream: &mut S,
     result: &mut Vec<token::Token>,
-) -> txl::Result<bool> {
+) -> txl::Result<()> {
     let mut scope_depth = 0;
-    while let Some(token) = stream.next()? {
+    loop {
+        let token = stream.next(TokenStreamEndOfInputError {})?;
         match token.value() {
             token::Value::BeginGroup(_) => {
                 scope_depth += 1;
             }
             token::Value::EndGroup(_) => {
                 if scope_depth == 0 {
-                    return Ok(true);
+                    return Ok(());
                 }
                 scope_depth -= 1;
             }
@@ -245,7 +244,6 @@ pub fn finish_parsing_balanced_tokens<S: vm::TokenStream>(
         }
         result.push(token);
     }
-    Ok(false)
 }
 
 /// When parsed, this type consumes an arbitrary number of spaces from the unexpanded input stream

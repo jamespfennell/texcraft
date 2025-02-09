@@ -44,19 +44,17 @@ macro_rules! get_optional_element {
 
 macro_rules! get_optional_element_with_token {
     ($stream :expr, $($pat:pat => $result:expr,)+) => {
-       match match ($stream).peek()? {
+       match ($stream).peek()? {
             None => None,
             Some(token) => match token.value() {
                  $(
-                     $pat => Some($result),
+                     $pat => {
+                        let token = *token;
+                        ($stream).consume()?;
+                        Some(($result, token))
+                    },
                  )+
                  _ => None,
-            }
-        }{
-            None => None,
-            Some(i) => {
-                let token = ($stream).next()?.unwrap();
-                Some((i, token))
             }
         }
     };

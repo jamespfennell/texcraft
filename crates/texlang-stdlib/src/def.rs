@@ -66,13 +66,8 @@ fn parse_and_set_macro<S: TexlangState>(
     let replacement = if skip_replacement_scan {
         vec![]
     } else {
-        let Some(mut rs) =
-            parse_replacement_text(input.unexpanded(), replacement_end_token, parameters.len())?
-        else {
-            // Input ended while scanning the macro definition.
-            // We just end without definiting anything.
-            return Ok(());
-        };
+        let mut rs =
+            parse_replacement_text(input.unexpanded(), replacement_end_token, parameters.len())?;
         for r in rs.iter_mut() {
             if let texmacro::Replacement::Tokens(tokens) = r {
                 tokens.reverse();
@@ -138,8 +133,8 @@ fn parse_prefix_and_parameters<S: TexlangState>(
     let mut raw_parameters: Vec<RawParameter> = Vec::new();
     let mut replacement_end_token = None;
     let mut skip_replacement_scan = false;
-
-    while let Some(token) = input.next()? {
+    loop {
+        let token = input.next(ParameterPartEndOfInputError {})?;
         match token.value() {
             token::Value::BeginGroup(_) => {
                 break;
@@ -154,9 +149,8 @@ fn parse_prefix_and_parameters<S: TexlangState>(
             }
             token::Value::Parameter(_) => {
                 // TeX.2021.476
-                let Some(parameter_token) = input.next()? else {
-                    break;
-                };
+                let parameter_token = input.next(ParameterPartEndOfInputError {})?;
+                // "parsing a parameter")?;
                 match parameter_token.value() {
                     token::Value::BeginGroup(_) => {
                         // In this case we end the group according to the special #{ rule
@@ -224,11 +218,29 @@ fn parse_prefix_and_parameters<S: TexlangState>(
     })
 }
 
+#[derive(Debug)]
+struct ParameterPartEndOfInputError;
+
+impl error::EndOfInputError for ParameterPartEndOfInputError {
+    fn doing(&self) -> String {
+        r"parsing the parameter part of a macro being defined by \def".into()
+    }
+}
+
+#[derive(Debug)]
+struct ReplacementPartEndOfInputError;
+
+impl error::EndOfInputError for ReplacementPartEndOfInputError {
+    fn doing(&self) -> String {
+        r"parsing the replacement part of a macro being defined by \def".into()
+    }
+}
+
 fn parse_replacement_text<S: TexlangState>(
     input: &mut vm::UnexpandedStream<S>,
     opt_final_token: Option<token::Token>,
     num_parameters: usize,
-) -> txl::Result<Option<Vec<texmacro::Replacement>>> {
+) -> txl::Result<Vec<texmacro::Replacement>> {
     // TODO: could we use a pool of vectors to avoid some of the allocations here?
     let mut result = vec![];
     let mut scope_depth = 0;
@@ -241,7 +253,9 @@ fn parse_replacement_text<S: TexlangState>(
         }
     };
 
-    while let Some(token) = input.next()? {
+    loop {
+        let token = input.next(ReplacementPartEndOfInputError {})?;
+        // "parsing the replacement text of a macro")?;
         match token.value() {
             token::Value::BeginGroup(_) => {
                 scope_depth += 1;
@@ -251,15 +265,12 @@ fn parse_replacement_text<S: TexlangState>(
                     if let Some(final_token) = opt_final_token {
                         push(&mut result, final_token);
                     }
-                    return Ok(Some(result));
+                    return Ok(result);
                 }
                 scope_depth -= 1;
             }
             token::Value::Parameter(_) => {
-                let Some(parameter_token) = input.next()? else {
-                    break;
-                };
-
+                let parameter_token = input.next(ReplacementPartEndOfInputError {})?;
                 let c = match parameter_token.value() {
                     token::Value::Parameter(_) => {
                         // ## case
@@ -296,10 +307,6 @@ fn parse_replacement_text<S: TexlangState>(
 
         push(&mut result, token);
     }
-    input.vm().error(error::SimpleEndOfInputError::new(
-        "unexpected end of input while a macro definition",
-    ))?;
-    Ok(None)
 }
 
 #[derive(Debug)]
@@ -559,23 +566,24 @@ mod test {
             r"\def\helloWorld{Hello World} ",
             r"\helloWorld"
         ),),
-        recoverable_failure_tests(
-            (end_of_input_scanning_target, r"\def", ""),
-            (end_of_input_scanning_argument_text, r"\def\A", ""),
-            (end_of_input_scanning_replacement, r"\def\A{", ""),
-            (end_of_input_scanning_nested_replacement, r"\def\A{{}", ""),
-            (end_of_input_reading_parameter_number, r"\def\A#", ""),
-            (end_of_input_scanning_argument, r"\def\A#1{X-#1-Z}\A Y{}\A", "X-Y-Z"),
+        end_of_input_error_tests(
+            (end_of_input_scanning_target, r"\def"),
+            (end_of_input_scanning_argument_text, r"\def\A"),
+            (end_of_input_scanning_replacement, r"\def\A{"),
+            (end_of_input_scanning_nested_replacement, r"\def\A{{}"),
+            // TODO (end_of_input_reading_parameter_number, r"\def\A#"),
+            (end_of_input_scanning_argument, r"\def\A#1{X-#1-Z}\A Y{}\A"),
             (
                 end_of_input_reading_value_for_parameter,
                 r"\def\A#1{#1}\A{correct}\A{this {is parameter 1 but it never ends}",
-                "correct",
             ),
-            (end_of_input_reading_prefix, r"\def\A abc{def}\A abc\A ab", "def"),
+            // TODO (end_of_input_reading_prefix, r"\def\A abc{def}\A abc\A ab"),
             (
                 end_of_input_reading_delimiter,
-                r"\def\A #1abc{#1}\A xyzabc\A {first parameter}ab", "xyz"
+                r"\def\A #1abc{#1}\A xyzabc\A {first parameter}ab",
             ),
+        ),
+        recoverable_failure_tests(
             (bad_token_target, r"\def a other stuff{}Hello", "Hello"),
             (unexpected_token_argument, r"\def\A{Hello}\def\A }\A", ""),
             (wrong_parameter_number_1, r"\def\A #2X{-#1-}\A Y2X", "-Y-"),

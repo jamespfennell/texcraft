@@ -134,12 +134,8 @@ impl<S: TexlangState> VM<S> {
     }
     pub fn run_impl<H: Handlers<S>>(&mut self) -> txl::Result<()> {
         let input = ExecutionInput::new(self);
-        loop {
-            let token = match input.next()? {
-                None => break,
-                Some(token) => token,
-            };
-            // TODO: propagate the error return value from all of these
+
+        while let Some(token) = input.next_or()? {
             match token.value() {
                 Value::CommandRef(command_ref) => {
                     match input.commands_map().get_command(&command_ref) {

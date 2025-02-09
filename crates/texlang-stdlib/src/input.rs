@@ -456,7 +456,7 @@ mod tests {
             (nested, r"\input file3", r"content4"),
             (nested_2, r"\input \input file5", r"content1 "),
         ),
-        failure_tests(
+        fatal_error_tests(
             (file_does_not_exist, r"\input doesNotExist"),
             (recursive_input, r"\input recursive s"),
         ),
@@ -563,7 +563,7 @@ mod tests {
             r"\openin 0 file1 ",
             r"\ifeof 0 Closed\else Open\fi"
         ),),
-        failure_tests(
+        fatal_error_tests(
             (
                 file_has_unmatched_braces,
                 r"\openin 0 file5 \read 0 to \X (\X)",

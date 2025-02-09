@@ -256,6 +256,9 @@ pub struct ErrorCase {
 
 impl ErrorCase {
     /// Returns a vector of TeX snippets that exercise all error paths in Texlang.
+    ///
+    /// TODO: instead of duplicating these here, we should have a way of dumping all
+    /// error cases in the regular unit tests into a file.
     pub fn all_error_cases() -> Vec<ErrorCase> {
         let mut cases = vec![];
         for (description, source_code) in vec![
@@ -426,7 +429,7 @@ mod tests {
         )];
         for case in ErrorCase::all_error_cases() {
             println!("CASE {}", case.description);
-            run_failure_test::<StdLibState>(case.source_code, &options)
+            run_fatal_error_test::<StdLibState>(case.source_code, &options, false)
         }
     }
 }

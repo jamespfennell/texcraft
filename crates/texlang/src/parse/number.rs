@@ -99,16 +99,7 @@ fn parse_number_internal<S: TexlangState>(
     stream: &mut vm::ExpandedStream<S>,
 ) -> txl::Result<(token::Token, i32)> {
     let sign = parse_optional_signs(stream)?;
-    let first_token = match stream.next()? {
-        None => {
-            return Err(stream.vm().fatal_error(parse::Error::new(
-                "the beginning of a number",
-                None,
-                GUIDANCE_BEGINNING,
-            )))
-        }
-        Some(token) => token,
-    };
+    let first_token = stream.next(NumberEndOfInputError {})?;
     let result: i32 = match first_token.value() {
         Value::Other('0') => parse_constant::<S, 10>(stream, 0)?,
         Value::Other('1') => parse_constant::<S, 10>(stream, 1)?,
@@ -191,6 +182,18 @@ fn parse_number_internal<S: TexlangState>(
     Ok((first_token, result))
 }
 
+#[derive(Debug)]
+struct NumberEndOfInputError;
+
+impl error::EndOfInputError for NumberEndOfInputError {
+    fn doing(&self) -> String {
+        "parsing a number".into()
+    }
+    fn notes(&self) -> Vec<error::display::Note> {
+        vec![GUIDANCE_BEGINNING.into()]
+    }
+}
+
 /// Parses optional signs and spaces.
 ///
 /// If the combination of the signs is positive, [None] is returned.
@@ -217,16 +220,9 @@ fn parse_optional_signs<S: TexlangState>(
 // TeX.2021.442
 fn parse_character<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<i32> {
     // BUG: should be from the unexpanded stream
-    let c = match input.next()? {
-        None => {
-            input.vm().error(parse::Error::new(
-                "a character",
-                None,
-                "a character is a character token or single-character control sequence like \\a",
-            ))?;
-            '0'
-        }
-        Some(token) => match token.value() {
+    let c = {
+        let token = input.next(CharacterError {})?;
+        match token.value() {
             Value::CommandRef(token::CommandRef::ControlSequence(cs_name)) => {
                 let name = input.vm().cs_name_interner().resolve(cs_name).unwrap();
                 let mut iter = name.chars();
@@ -246,9 +242,24 @@ fn parse_character<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::R
                 }
             }
             _ => token.char().unwrap(),
-        },
+        }
     };
     Ok(c as i32)
+}
+
+#[derive(Debug)]
+struct CharacterError;
+
+impl error::EndOfInputError for CharacterError {
+    fn doing(&self) -> String {
+        "parsing a character".into()
+    }
+
+    fn notes(&self) -> Vec<error::display::Note> {
+        vec![
+            r"a character is a character token or single-character control sequence like \a".into(),
+        ]
+    }
 }
 
 // TODO: why is the radix a const parameter?

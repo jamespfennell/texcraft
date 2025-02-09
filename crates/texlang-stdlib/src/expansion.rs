@@ -27,30 +27,32 @@ pub fn noexpand_hook<S: TexlangState>(
     tag: Option<command::Tag>,
 ) -> txl::Result<Option<token::Token>> {
     // Fast path: this is not the \noexpand command.
-    // We want this check to be inlined into the VM functions that perform
+    // We want this check to be inlined into the VM functions that perform expansion.
     if tag != Some(NO_EXPAND_TAG.get()) {
         return Ok(None);
     }
-    // Slow path: this is not the \noexpand command.
-    // We don't want this check to be inlined because it will take up space in the instruction cache.
+    // Slow path: this is the \noexpand command.
+    // We don't want this check to be inlined into the VM because it will take up space in the instruction cache.
     noexpand_hook_finish(token, input)
 }
 
+#[cold]
 fn noexpand_hook_finish<S: TexlangState>(
-    token: token::Token,
+    _token: token::Token,
     input: &mut vm::ExpansionInput<S>,
 ) -> txl::Result<Option<token::Token>> {
-    match input.unexpanded().next()? {
-        None => Err(input.vm().fatal_error(error::SimpleTokenError::new(
-            token,
-            "unexpected end of input while expanding a `\\noexpand` command",
-        ))),
-        // TODO .add_note("the `\\noexpand` command must be followed by 1 token")
-        Some(token) => Ok(Some(token)),
+    Ok(Some(input.unexpanded().next(NoExpandEndOfInputError {})?))
+}
+
+#[derive(Debug)]
+struct NoExpandEndOfInputError;
+
+impl error::EndOfInputError for NoExpandEndOfInputError {
+    fn doing(&self) -> String {
+        r"determining which token to suppress expansion for".into()
     }
 }
 
-/// Get the simple `\expandafter` command.
 /// Get the simple `\expandafter` command.
 ///
 /// This is the simplest implementation of the command, and the
@@ -107,27 +109,14 @@ pub fn get_expandafter_optimized<S: TexlangState>() -> command::BuiltIn<S> {
 }
 
 fn expandafter_simple_fn<S: TexlangState>(
-    expandafter_token: token::Token,
+    _expandafter_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
 ) -> txl::Result<()> {
-    let next = match input.unexpanded().next()? {
-        None => {
-            return Err(expandafter_missing_first_token_error(
-                input,
-                expandafter_token,
-            ));
-        }
-        Some(next) => next,
-    };
-    if input.unexpanded().peek()?.is_none() {
-        return Err(expandafter_missing_second_token_error(
-            input,
-            expandafter_token,
-            next,
-        ));
-    }
+    let first = input.unexpanded().next(EndOfInputError { first: true })?;
+    let second = input.unexpanded().next(EndOfInputError { first: false })?;
+    input.expansions_mut().push(second);
     input.expanded().expand_once()?;
-    input.expansions_mut().push(next);
+    input.expansions_mut().push(first);
     Ok(())
 }
 
@@ -136,35 +125,17 @@ fn expandafter_optimized_fn<S: TexlangState>(
     input: &mut vm::ExpansionInput<S>,
 ) -> txl::Result<()> {
     let mut buffer: Vec<token::Token> = input.checkout_token_buffer();
-    let unexpanded_input = input.unexpanded();
     // The optimization implemented here is that if we have the following input:
     // \xa <token 1> \xa <token 2> ... \xa <token N> <token N+1>
     // we expand <token N+1> once.
     loop {
-        match unexpanded_input.next()? {
-            None => {
-                return Err(expandafter_missing_first_token_error(
-                    input,
-                    expandafter_token,
-                ))
-            }
-            Some(next) => buffer.push(next),
-        };
-        let token = match unexpanded_input.peek()? {
-            None => {
-                return Err(expandafter_missing_second_token_error(
-                    input,
-                    expandafter_token,
-                    *buffer.last().unwrap(),
-                ))
-            }
-            Some(token) => *token,
-        };
-        if token.value() != expandafter_token.value() {
+        let first = input.unexpanded().next(EndOfInputError { first: true })?;
+        buffer.push(first);
+        let second = input.unexpanded().next(EndOfInputError { first: false })?;
+        if second.value() != expandafter_token.value() {
+            input.expansions_mut().push(second);
             break;
         }
-        // Remove the \expandafter token from the stream
-        _ = unexpanded_input.next()?;
     }
     input.expanded().expand_once()?;
     input.expansions_mut().extend(buffer.iter().rev());
@@ -172,31 +143,17 @@ fn expandafter_optimized_fn<S: TexlangState>(
     Ok(())
 }
 
-fn expandafter_missing_first_token_error<S: TexlangState>(
-    input: &mut vm::ExpansionInput<S>,
-    expandafter_token: token::Token,
-) -> Box<error::Error> {
-    input.vm().fatal_error(error::SimpleTokenError::new(
-        expandafter_token,
-        "unexpected end of input while expanding an `\\expandafter` command",
-    ))
-    // TODO
-    // .add_note("the `\\expandafter` command must be followed by 2 tokens")
-    // .add_note("no more tokens were found")
+#[derive(Debug)]
+struct EndOfInputError {
+    first: bool,
 }
-
-fn expandafter_missing_second_token_error<S: TexlangState>(
-    input: &mut vm::ExpansionInput<S>,
-    expandafter_token: token::Token,
-    first_token: token::Token,
-) -> Box<error::Error> {
-    _ = first_token;
-    input.vm().fatal_error(error::SimpleTokenError::new(
-        expandafter_token,
-        "unexpected end of input while expanding an `\\expandafter` command",
-    ))
-    // TODO .add_note("the `\\expandafter` command must be followed by 2 tokens")
-    //.add_note("only 1 more tokens was found")
+impl error::EndOfInputError for EndOfInputError {
+    fn doing(&self) -> String {
+        format![
+            r"reading the {} token after \expandafter",
+            if self.first { "first" } else { "second" }
+        ]
+    }
 }
 
 /// Get the `\relax` command.
@@ -290,7 +247,7 @@ mod test {
             ),
             // peek
         ),
-        failure_tests((end_of_input, r"\noexpand"),),
+        fatal_error_tests((end_of_input, r"\noexpand"),),
     ];
 
     static PREFIX: &str = r"\def\mk#1#2{\def#1##1\notes##2\end{##1\notes##2#2\end}}\mk\a a\mk\b b\mk\c c\mk\d d\def\notes#1\end{#1}";
@@ -418,11 +375,11 @@ mod test {
         let options = vec![TestOption::BuiltInCommandsDyn(Box::new(|| {
             built_in_commands(optimized)
         }))];
-        run_failure_test(&input, &options);
+        run_fatal_error_test(&input, &options, false);
     }
 
     #[macro_export]
-    macro_rules! expandafter_failure_test {
+    macro_rules! expandafter_fatal_error_test {
         ($( ( $name: ident, $input: expr), )+) => {
             $(
             mod $name {
@@ -439,7 +396,7 @@ mod test {
         };
     }
 
-    expandafter_failure_test![
+    expandafter_fatal_error_test![
         (expandafter_missing_1st_token, r"\xa"),
         (expandafter_missing_2nd_token, r"\xa\a"),
         (expandafter_missing_1st_token_nested, r"\xa\xa\xa\a\xa\xa\b"),

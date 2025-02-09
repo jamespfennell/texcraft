@@ -103,9 +103,12 @@ pub mod run {
 /// This exits the REPL.
 pub fn get_exit<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
-        |_: token::Token, input: &mut vm::ExecutionInput<S>| -> txl::Result<()> {
+        |t: token::Token, input: &mut vm::ExecutionInput<S>| -> txl::Result<()> {
             HasComponent::<Component>::component_mut(input.state_mut()).quit_requested = true;
-            Err(input.vm().fatal_error(error::SimpleEndOfInputError::new(
+            // todo: mechanism to exit without erroring
+            // something like input.shutdown_vm()
+            Err(input.vm().fatal_error(error::SimpleTokenError::new(
+                t,
                 "quitting Texcraft REPL. This error should never be seen!",
             )))
         },

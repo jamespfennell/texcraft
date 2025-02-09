@@ -24,14 +24,7 @@ fn the_primitive_fn<S: TheCompatible>(
     the_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
 ) -> txl::Result<()> {
-    let token = match input.next()? {
-        None => {
-            return Err(input
-                .vm()
-                .fatal_error(error::SimpleEndOfInputError::new("TODO")))
-        }
-        Some(token) => token,
-    };
+    let token = input.next(EndOfInputError {})?;
     match &token.value() {
         token::Value::CommandRef(command_ref) => {
             match input.commands_map().get_command(command_ref) {
@@ -128,6 +121,15 @@ fn int_to_tokens(tokens: &mut Vec<token::Token>, the_token: token::Token, mut i:
     }
     if negative {
         tokens.push(token::Token::new_other('-', the_token.trace_key()));
+    }
+}
+
+#[derive(Debug)]
+struct EndOfInputError;
+
+impl error::EndOfInputError for EndOfInputError {
+    fn doing(&self) -> String {
+        r"determining the argument to \the".into()
     }
 }
 

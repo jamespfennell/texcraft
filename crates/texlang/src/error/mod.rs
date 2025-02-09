@@ -111,6 +111,58 @@ impl TracedError {
     }
 }
 
+pub trait EndOfInputError: std::fmt::Debug + 'static {
+    fn doing(&self) -> String;
+    fn notes(&self) -> Vec<display::Note> {
+        vec![]
+    }
+}
+
+pub const TODO: TodoError = TodoError {};
+
+#[derive(Debug)]
+pub struct TodoError {}
+
+impl EndOfInputError for TodoError {
+    fn doing(&self) -> String {
+        "? (TODO: add a specific end of input error for this case.)".into()
+    }
+    fn notes(&self) -> Vec<display::Note> {
+        vec![
+            "the Rust source code uses `texlang::error::TODO` for this error case".into(),
+            "a more specific end of input error needs to be added".into(),
+        ]
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct EofError {
+    doing: String,
+    notes: Vec<display::Note>,
+}
+
+impl EofError {
+    pub(crate) fn new<E: EndOfInputError>(err: E) -> Self {
+        Self {
+            doing: err.doing(),
+            notes: err.notes(),
+        }
+    }
+}
+
+impl TexError for EofError {
+    fn kind(&self) -> Kind {
+        Kind::EndOfInput
+    }
+
+    fn title(&self) -> String {
+        format!("Unexpected end of input while {}", self.doing)
+    }
+    fn notes(&self) -> Vec<display::Note> {
+        self.notes.clone()
+    }
+}
+
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StackTraceElement {
@@ -156,7 +208,7 @@ impl Error {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Kind {
     Token(token::Token),
@@ -240,46 +292,6 @@ impl TexError for SimpleTokenError {
 
     fn title(&self) -> String {
         self.title.clone()
-    }
-}
-
-// After the errors work creating custom errors will be easy.
-#[derive(Debug)]
-pub struct SimpleEndOfInputError {
-    pub title: String,
-    pub text_notes: Vec<String>,
-}
-
-impl SimpleEndOfInputError {
-    /// Create a new simple end of input error.
-    pub fn new<T: AsRef<str>>(title: T) -> Self {
-        Self {
-            title: title.as_ref().into(),
-            text_notes: vec![],
-        }
-    }
-
-    pub fn with_note<T: Into<String>>(mut self, note: T) -> Self {
-        self.text_notes.push(note.into());
-        self
-    }
-}
-
-impl TexError for SimpleEndOfInputError {
-    fn kind(&self) -> Kind {
-        Kind::EndOfInput
-    }
-
-    fn title(&self) -> String {
-        self.title.clone()
-    }
-
-    fn notes(&self) -> Vec<display::Note> {
-        let mut notes = vec![];
-        for text_note in &self.text_notes {
-            notes.push(text_note.into())
-        }
-        notes
     }
 }
 

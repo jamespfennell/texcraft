@@ -56,7 +56,7 @@ In fact the state is usually different; for example, in the first snippet above 
 
 ### Failure tests
 
-Run using [`run_failure_test`].
+Run using [`run_fatal_error_test`].
 
 These tests verify that a specific TeX snippet fails to execute.
 
@@ -79,7 +79,7 @@ The test verifies that the result from this is the same as the result from the V
 
 ## The test suite macro
 
-All of the test types can be run using the run functions described above (e.g., [`run_failure_test`]).
+All of the test types can be run using the run functions described above (e.g., [`run_fatal_error_test`]).
 However the preferred way to write a suite of unit tests is to use the [`test_suite`] macro.
 This macro removes a bunch of boilerplate and makes it easy to add new test cases.
 
@@ -317,7 +317,7 @@ fn compare_output<S>(
 /// Run a failure test.
 ///
 /// The test passes if execution of the provided input fails.
-pub fn run_failure_test<S>(input: &str, options: &[TestOption<S>])
+pub fn run_fatal_error_test<S>(input: &str, options: &[TestOption<S>], check_end_of_input: bool)
 where
     S: Default + HasComponent<TestingComponent>,
 {
@@ -325,20 +325,27 @@ where
 
     let mut vm = initialize_vm(&options);
     let result = execute_source_code::<S, texlang::vm::DefaultHandlers>(&mut vm, input, &options);
-    if let Ok((output, _)) = result {
-        println!("Expansion succeeded:");
-        println!(
-            "{}",
-            ::texlang::token::write_tokens(&output, vm.cs_name_interner())
-        );
-        panic!("Expansion failure test did not pass: expansion successful");
+    match result {
+        Ok((output, _)) => {
+            println!("Expansion succeeded:");
+            println!(
+                "{}",
+                ::texlang::token::write_tokens(&output, vm.cs_name_interner())
+            );
+            panic!("Expansion failure test did not pass: expansion successful");
+        }
+        Err(err) => {
+            if check_end_of_input {
+                assert_eq!(texlang::error::Kind::EndOfInput, err.error.kind());
+            }
+        }
     }
 }
 
 /// Run a state verification test.
 ///
 /// The test passes if after running the input TeX snippet,
-/// the state verifier function runs succesfully.
+/// the state verifier function runs successfully.
 pub fn run_state_test<S, H>(input: &str, options: &[TestOption<S>], state_verifier: impl Fn(&S))
 where
     S: Default + HasComponent<TestingComponent>,
@@ -564,7 +571,7 @@ impl<S: HasComponent<TestingComponent>, H: vm::Handlers<S>> vm::Handlers<S> for 
 ///         (case_1, "lhs_1", "rhs_1"),
 ///         (case_2, "lhs_2", "rhs_2"),
 ///     ),
-///     failure_tests(
+///     fatal_error_tests(
 ///         (case_3, "input_3"),
 ///         (case_4, "input_4"),
 ///     ),
@@ -588,7 +595,7 @@ impl<S: HasComponent<TestingComponent>, H: vm::Handlers<S>> vm::Handlers<S> for 
 ///     
 /// - `failure_tests(cases...)`: a list of failure test cases.
 ///     Each case is of the form (case name, input).
-///     The data here is fed into the [run_failure_test] test runner.
+///     The data here is fed into the [run_fatal_error_test] test runner.
 ///
 /// Only one `state()` argument may be provided, and if provided it must be in the first position.
 /// Only one `options()` argument may be provided, and if provided it must be in the first position
@@ -664,13 +671,12 @@ macro_rules! test_suite {
             }
         )*
     );
-    // failure_tests
-    // TODO: rename unrecoverable_error_tests
+    // fatal_error_tests
     (
         @state($state: ty),
         @handlers($handlers: ty),
         @options $options: tt,
-        failure_tests(
+        fatal_error_tests(
             $( ($name: ident, $input: expr $(,)? ), )*
         ),
     ) => (
@@ -679,7 +685,25 @@ macro_rules! test_suite {
             fn $name() {
                 let input = $input;
                 let options = vec! $options;
-                texlang_testing::run_failure_test::<$state>(&input, &options);
+                texlang_testing::run_fatal_error_test::<$state>(&input, &options, false);
+            }
+        )*
+    );
+    // end_of_input_error_tests
+    (
+        @state($state: ty),
+        @handlers($handlers: ty),
+        @options $options: tt,
+        end_of_input_error_tests(
+            $( ($name: ident, $input: expr $(,)? ), )*
+        ),
+    ) => (
+        $(
+            #[test]
+            fn $name() {
+                let input = $input;
+                let options = vec! $options;
+                texlang_testing::run_fatal_error_test::<$state>(&input, &options, true);
             }
         )*
     );
@@ -702,6 +726,7 @@ macro_rules! test_suite {
                     let mut options = vec! $options;
                     options.push(texlang_testing::TestOption::RecoverFromErrors(true));
                     // TODO: verify a recoverable error was thrown?
+                    // Yes. Also verify the number of errors.
                     texlang_testing::run_expansion_equality_test::<$state, $handlers>(&lhs, &rhs, true, &options);
                 }
                 #[test]
@@ -709,7 +734,7 @@ macro_rules! test_suite {
                     let input = $lhs;
                     let mut options = vec! $options;
                     options.push(texlang_testing::TestOption::RecoverFromErrors(false));
-                    texlang_testing::run_failure_test::<$state>(&input, &options);
+                    texlang_testing::run_fatal_error_test::<$state>(&input, &options, false);
                 }
             }
         )*

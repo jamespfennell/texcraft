@@ -258,7 +258,7 @@ mod test {
             (serde_singleton, r"\newInt\a \a=-1 ", r"\the\a"),
             (serde_array, r"\newIntArray\a 20 \a 3=-1 ", r"\the\a 3"),
         ),
-        failure_tests(
+        fatal_error_tests(
             (newintarray_out_of_bounds, r"\newIntArray \a 3 \a 3 = 2"),
             (newintarray_negative_index, r"\newIntArray \a 3 \a -3 = 2"),
             (newintarray_negative_length, r"\newIntArray \a -3"),
