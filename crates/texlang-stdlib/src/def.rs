@@ -272,7 +272,7 @@ fn parse_replacement_text<S: TexlangState>(
                     // control sequence
                     None => None,
                     // character
-                    Some(c) => char_to_parameter_index(c).filter(|&n| n < num_parameters)
+                    Some(c) => char_to_parameter_index(c).filter(|&n| n < num_parameters),
                 };
                 match valid_index_or {
                     None => {

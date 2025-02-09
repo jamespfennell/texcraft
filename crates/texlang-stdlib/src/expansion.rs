@@ -137,6 +137,9 @@ fn expandafter_optimized_fn<S: TexlangState>(
 ) -> txl::Result<()> {
     let mut buffer: Vec<token::Token> = input.checkout_token_buffer();
     let unexpanded_input = input.unexpanded();
+    // The optimization implemented here is that if we have the following input:
+    // \xa <token 1> \xa <token 2> ... \xa <token N> <token N+1>
+    // we expand <token N+1> once.
     loop {
         match unexpanded_input.next()? {
             None => {
@@ -164,69 +167,9 @@ fn expandafter_optimized_fn<S: TexlangState>(
         _ = unexpanded_input.next()?;
     }
     input.expanded().expand_once()?;
-
-    while let Some(&root) = buffer.first() {
-        if root.value() != expandafter_token.value() {
-            input.expansions_mut().extend(buffer.iter().rev());
-            break;
-        }
-        let mut last_expandafter_index = 0;
-        while let Some(next) = buffer.get(last_expandafter_index + 2) {
-            if next.value() != root.value() {
-                break;
-            }
-            last_expandafter_index += 2;
-        }
-        // We need to ensure that the buffer ends exactly one token after the last \expandafter token.
-        // There are three cases depending on whether the buffer is under-full, overfull, or exactly right.
-        match buffer
-            .len()
-            .checked_sub(last_expandafter_index + 1)
-            .unwrap()
-        {
-            // Under-full
-            0 => {
-                let next = match input.unexpanded().next()? {
-                    None => return Err(expandafter_missing_first_token_error(input, root)),
-                    Some(next) => next,
-                };
-                buffer.push(next);
-            }
-            // Exactly right
-            1 => {}
-            // Overfull
-            _ => {
-                input
-                    .expansions_mut()
-                    .extend(buffer[last_expandafter_index + 2..].iter().rev());
-                buffer.truncate(last_expandafter_index + 2);
-            }
-        }
-        // Check there is another token in the input. This is only relevant in the under-full and
-        // exactly right cases, but it's easier to put it here.
-        if input.unexpanded().peek()?.is_none() {
-            return Err(expandafter_missing_second_token_error(
-                input,
-                root,
-                *buffer.last().unwrap(),
-            ));
-        }
-        input.expanded().expand_once()?;
-        remove_even_indices(&mut buffer);
-    }
+    input.expansions_mut().extend(buffer.iter().rev());
     input.return_token_buffer(buffer);
     Ok(())
-}
-
-fn remove_even_indices(v: &mut Vec<token::Token>) {
-    let mut src = 1;
-    let mut dest = 0;
-    while let Some(token) = v.get(src) {
-        v[dest] = *token;
-        dest += 1;
-        src += 2;
-    }
-    v.truncate(dest);
 }
 
 fn expandafter_missing_first_token_error<S: TexlangState>(
@@ -292,6 +235,7 @@ mod test {
     fn built_in_commands(optimized: bool) -> HashMap<&'static str, command::BuiltIn<State>> {
         HashMap::from([
             ("def", crate::def::get_def()),
+            ("let", crate::alias::get_let()),
             ("noexpand", get_noexpand()),
             ("integer", TestingComponent::get_integer()),
             (
@@ -381,6 +325,15 @@ mod test {
     }
 
     expandafter_test![
+        // In the following test we alias \xa to \other so that the \expandafter optimizations don't kick in.
+        // This makes \other behave like the unoptimized \expandafter.
+        // It then triggers the case when the optimized \expandafter is only supposed to expand the input
+        // once, rather the repeatedly expanding to remove the \expandafter's at the front.
+        (
+            expandafter_only_once,
+            r"\let\other=\xa \other\noexpand\xa\xa\xa\a\b",
+            r"\noexpand\xa ba"
+        ),
         (texbook_p374_3, r"\xa\a\b", r"ba"),
         (texbook_p374_4, r"\xa\xa\xa\a\xa\b\c", "cba"),
         (
