@@ -1,16 +1,16 @@
 macro_rules! get_required_element {
     ($stream :expr, $expected: expr, $guidance: expr, $($pat:pat => $result:expr,)+) => {
         // TODO: probably should call get_optional_element_with_token
-        match ($stream).peek()?.copied() {
+        match ($stream).next_or()? {
             Some(token) => match token.value() {
                  $(
                      $pat => {
-                        ($stream).consume()?;
                         Some($result)
                      },
                  )+
                  _ => {
                     $stream.vm().error(crate::parse::Error::new($expected, Some(token), $guidance))?;
+                    $stream.back(token);
                     None
                  },
             }
@@ -24,19 +24,16 @@ macro_rules! get_required_element {
 
 macro_rules! get_optional_element {
     ($stream :expr, $($pat:pat => $result:expr,)+) => {
-        match match ($stream).peek()? {
+        match ($stream).next_or()? {
             None => None,
             Some(token) => match token.value() {
                  $(
                      $pat => Some($result),
                  )+
-                 _ => None,
-            }
-        }{
-            None => None,
-            Some(i) => {
-                ($stream).consume()?;
-                Some(i)
+                 _ => {
+                    $stream.back(token);
+                    None
+                 }
             }
         }
     };
@@ -44,17 +41,18 @@ macro_rules! get_optional_element {
 
 macro_rules! get_optional_element_with_token {
     ($stream :expr, $($pat:pat => $result:expr,)+) => {
-       match ($stream).peek()? {
+       match ($stream).next_or()? {
             None => None,
             Some(token) => match token.value() {
                  $(
                      $pat => {
-                        let token = *token;
-                        ($stream).consume()?;
                         Some(($result, token))
                     },
                  )+
-                 _ => None,
+                 _ => {
+                    $stream.back(token);
+                    None
+                 },
             }
         }
     };

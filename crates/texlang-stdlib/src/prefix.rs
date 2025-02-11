@@ -305,9 +305,9 @@ fn complete_prefix<S: HasComponent<Component>>(
     input: &mut vm::ExecutionInput<S>,
 ) -> txl::Result<()> {
     // BUG: spaces and \relax are allowed after prefixes per TeX source sections 1211 and 404.
-    let found_prefix = match input.peek()? {
+    let found_prefix = match input.next_or()? {
         None => false,
-        Some(&t) => match t.value() {
+        Some(t) => match t.value() {
             token::Value::CommandRef(command_ref) => {
                 let tag = input.commands_map().get_tag(&command_ref);
                 if tag == Some(input.state().component().tags.global_tag) {
@@ -320,16 +320,19 @@ fn complete_prefix<S: HasComponent<Component>>(
                     prefix.long = Some(t);
                     true
                 } else {
+                    input.back(t);
                     false
                 }
             }
-            _ => false,
+            _ => {
+                input.back(t);
+                false
+            }
         },
     };
     if !found_prefix {
         return Ok(());
     }
-    input.consume()?;
     complete_prefix(prefix, input)
 }
 

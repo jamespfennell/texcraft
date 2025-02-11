@@ -191,7 +191,7 @@ fn parse_prefix_and_parameters<S: TexlangState>(
                                 parameter_number_token: parameter_token,
                                 parameters_so_far: raw_parameters.len(),
                             })?;
-                            input.expansions_mut().push(parameter_token);
+                            input.back(parameter_token);
                         }
                         raw_parameters.push(RawParameter::Undelimited);
                     }
@@ -293,7 +293,7 @@ fn parse_replacement_text<S: TexlangState>(
                             "illegal parameter number",
                         ))?;
                         // Fallback to the ## case
-                        input.expansions_mut().push(parameter_token);
+                        input.back(parameter_token);
                         push(&mut result, token);
                     }
                     Some(valid_index) => {

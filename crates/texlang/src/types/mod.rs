@@ -25,7 +25,7 @@ impl<S: TexlangState> Parsable<S> for Font {
     ) -> Result<Self, Box<crate::error::Error>> {
         match Option::<Font>::parse(input)? {
             None => {
-                let token_or = input.peek()?.copied();
+                let token_or = input.peek()?;
                 input.vm().error(
                     parse::Error::new(
                     "a font reference",
@@ -44,24 +44,23 @@ impl<S: TexlangState> Parsable<S> for Option<Font> {
     fn parse_impl(
         input: &mut crate::vm::ExpandedStream<S>,
     ) -> Result<Self, Box<crate::error::Error>> {
-        let Some(token) = input.peek()?.copied() else {
+        let Some(token) = input.next_or()? else {
             return Ok(None);
         };
         let crate::token::Value::CommandRef(command_ref) = token.value() else {
+            input.back(token);
             return Ok(None);
         };
         match input.commands_map().get_command(&command_ref) {
             Some(command::Command::Font(f)) => {
                 let f = *f;
-                input.consume()?;
                 Ok(Some(f))
             }
             Some(command::Command::Variable(var)) => {
                 let var = var.clone();
-                input.consume()?;
                 match var.resolve_type::<Font>(token, input)? {
                     None => {
-                        input.expansions_mut().push(token);
+                        input.back(token);
                         Ok(None)
                     }
                     Some(typed_variable) => Ok(Some(*typed_variable.get(input.state()))),
@@ -69,13 +68,16 @@ impl<S: TexlangState> Parsable<S> for Option<Font> {
             }
             Some(command::Command::Execution(_, Some(tag))) => {
                 if input.state().is_current_font_command(*tag) {
-                    input.consume()?;
                     Ok(Some(input.vm().current_font()))
                 } else {
+                    input.back(token);
                     Ok(None)
                 }
             }
-            _ => Ok(None),
+            _ => {
+                input.back(token);
+                Ok(None)
+            }
         }
     }
 }

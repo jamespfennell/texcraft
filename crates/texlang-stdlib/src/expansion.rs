@@ -114,9 +114,9 @@ fn expandafter_simple_fn<S: TexlangState>(
 ) -> txl::Result<()> {
     let first = input.unexpanded().next(EndOfInputError { first: true })?;
     let second = input.unexpanded().next(EndOfInputError { first: false })?;
-    input.expansions_mut().push(second);
+    input.back(second);
     input.expanded().expand_once()?;
-    input.expansions_mut().push(first);
+    input.back(first);
     Ok(())
 }
 
@@ -133,7 +133,7 @@ fn expandafter_optimized_fn<S: TexlangState>(
         buffer.push(first);
         let second = input.unexpanded().next(EndOfInputError { first: false })?;
         if second.value() != expandafter_token.value() {
-            input.expansions_mut().push(second);
+            input.back(second);
             break;
         }
     }

@@ -32,42 +32,29 @@ use crate::*;
 /// the control sequence `makeatletter` followed by the control sequence `do@`.
 pub trait TokenStream {
     /// The type of the custom state in the VM.
-    type S;
+    type S: TexlangState;
 
     /// Gets the next token in the stream or error if the stream is exhausted.
     ///
     /// This method is almost the same
     /// as the `next` method in Rust's iterator trait, except a stream can return an error.
-    fn next<E: error::EndOfInputError>(&mut self, err: E) -> txl::Result<Token>;
+    fn next<E: error::EndOfInputError>(&mut self, err: E) -> txl::Result<Token> {
+        match self.next_or() {
+            Ok(None) => Err(self.vm().fatal_error(error::EofError::new(err))),
+            Ok(Some(token)) => Ok(token),
+            Err(err) => Err(err),
+        }
+    }
 
-    /// Peeks at the next token in the stream without removing it.
-    ///
-    /// In many situations it is necessary to examine the next token without consuming it.
-    /// For example when reading an integer from a stream, one needs to peek at the next token
-    /// to see if it is a digit and thus extends the currently parsed integer.
-    /// Consuming the token with [TokenStream::next] is not
-    /// correct in this situation if the token is not a digit.
-    ///
-    /// For consumers, it is important to note that the peek method requires a mutable reference
-    /// to the stream. This is because some mutable processing may be needed in order to determine
-    /// what the next token is. For example:
-    ///
-    /// 1. When reading tokens from a file, peeking at the next token may involve reading more bytes
-    ///     from the file and thus mutating the file pointer. sThis mutations is easy to undo in
-    ///     general.
-    ///
-    /// 1. When performing expansion on a stream, the next token in the stream may need to be expanded
-    ///     rather than returned. The next token will be the first token in the expansion in this case,
-    ///     or the following token in the remaining stream if the expansion returns no tokens.
-    ///     This mutation is generally irreversible.
-    fn peek(&mut self) -> txl::Result<Option<&Token>>;
+    /// Gets the next token in the stream or `Ok(None)` if the stream is exhausted.
+    fn next_or(&mut self) -> txl::Result<Option<Token>>;
 
-    /// Consumes the next token in the stream without returning it.
-    ///
-    /// This method is mostly to make code self-documenting. It is typically used in
-    /// situations where a peek has already occurred, and the token itself is not needed.
-    fn consume(&mut self) -> txl::Result<()> {
-        self.next(error::TODO).map(|_| ())
+    fn peek(&mut self) -> txl::Result<Option<Token>> {
+        let token_or = self.next_or()?;
+        if let Some(token) = token_or {
+            self.back(token);
+        }
+        Ok(token_or)
     }
 
     /// Returns a token to the front of the token stream.
@@ -155,17 +142,8 @@ impl<S: TexlangState> TokenStream for ExpandedStream<S> {
     type S = S;
 
     #[inline]
-    fn next<E: error::EndOfInputError>(&mut self, err: E) -> txl::Result<Token> {
-        match stream::next_expanded(&mut self.unexpanded().0) {
-            Ok(None) => Err(self.vm().fatal_error(error::EofError::new(err))),
-            Ok(Some(token)) => Ok(token),
-            Err(err) => Err(err),
-        }
-    }
-
-    #[inline]
-    fn peek(&mut self) -> txl::Result<Option<&Token>> {
-        stream::peek_expanded(&mut self.unexpanded().0)
+    fn next_or(&mut self) -> txl::Result<Option<Token>> {
+        stream::next_expanded(&mut self.unexpanded().0)
     }
 
     #[inline]
@@ -200,17 +178,8 @@ impl<S: TexlangState> TokenStream for UnexpandedStream<S> {
     type S = S;
 
     #[inline]
-    fn next<E: error::EndOfInputError>(&mut self, err: E) -> txl::Result<Token> {
-        match stream::next_unexpanded(&mut self.0) {
-            Ok(None) => Err(self.vm().fatal_error(error::EofError::new(err))),
-            Ok(Some(token)) => Ok(token),
-            Err(err) => Err(err),
-        }
-    }
-
-    #[inline]
-    fn peek(&mut self) -> txl::Result<Option<&Token>> {
-        stream::peek_unexpanded(&mut self.0)
+    fn next_or(&mut self) -> txl::Result<Option<Token>> {
+        stream::next_unexpanded(&mut self.0)
     }
 
     #[inline]
@@ -258,12 +227,8 @@ impl<S> std::convert::AsMut<ExpandedStream<S>> for ExpansionInput<S> {
 impl<S: TexlangState> TokenStream for ExpansionInput<S> {
     type S = S;
 
-    fn next<E: error::EndOfInputError>(&mut self, err: E) -> txl::Result<Token> {
-        self.0.next(err)
-    }
-
-    fn peek(&mut self) -> txl::Result<Option<&Token>> {
-        self.0.peek()
+    fn next_or(&mut self) -> txl::Result<Option<Token>> {
+        self.0.next_or()
     }
 
     fn vm(&self) -> &vm::VM<Self::S> {
@@ -427,12 +392,8 @@ impl<S> std::convert::AsMut<ExpandedStream<S>> for ExecutionInput<S> {
 impl<S: TexlangState> TokenStream for ExecutionInput<S> {
     type S = S;
 
-    fn next<E: error::EndOfInputError>(&mut self, err: E) -> txl::Result<Token> {
-        self.0.next(err)
-    }
-
-    fn peek(&mut self) -> txl::Result<Option<&Token>> {
-        self.0.peek()
+    fn next_or(&mut self) -> txl::Result<Option<Token>> {
+        self.0.next_or()
     }
 
     fn vm(&self) -> &vm::VM<Self::S> {
@@ -665,48 +626,6 @@ mod stream {
                 next_expanded(vm)
             }
             _ => Ok(Some(token)),
-        }
-    }
-
-    pub fn peek_expanded<S: TexlangState>(vm: &mut vm::VM<S>) -> txl::Result<Option<&Token>> {
-        let (token, command) = match peek_unexpanded(vm)? {
-            None => return Ok(None),
-            Some(token) => match token.value() {
-                token::Value::CommandRef(command_ref) => (
-                    unsafe { launder(token) },
-                    vm.commands_map.get_command(&command_ref),
-                ),
-                _ => return Ok(Some(unsafe { launder(token) })),
-            },
-        };
-        match command {
-            Some(command::Command::Expansion(command, tag)) => {
-                let command = *command;
-                let token = *token;
-                let tag = *tag;
-                consume_peek(vm);
-                match S::expansion_override_hook(token, ExpansionInput::new(vm), tag) {
-                    Ok(None) => (),
-                    Ok(Some(override_expansion)) => {
-                        vm.internal.expansions_mut().push(override_expansion);
-                        return Ok(vm.internal.expansions().last());
-                    }
-                    Err(err) => return Err(err),
-                };
-                vm.stack_push(token, error::OperationKind::Expansion);
-                let err_or = command(token, ExpansionInput::new(vm));
-                vm.stack_pop();
-                err_or?;
-                peek_expanded(vm)
-            }
-            Some(command::Command::Macro(command)) => {
-                let command = command.clone();
-                let token = *token;
-                consume_peek(vm);
-                command.call(token, ExpansionInput::new(vm))?;
-                peek_expanded(vm)
-            }
-            _ => Ok(Some(unsafe { launder(token) })),
         }
     }
 

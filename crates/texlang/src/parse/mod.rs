@@ -252,13 +252,15 @@ pub struct SpacesUnexpanded;
 impl<S: TexlangState> Parsable<S> for SpacesUnexpanded {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let input = input.unexpanded();
-        while let Some(token) = input.peek()? {
+        while let Some(token) = input.next_or()? {
             match token.value() {
                 token::Value::Space(_) => {
-                    input.consume()?;
                     continue;
                 }
-                _ => break,
+                _ => {
+                    input.back(token);
+                    break;
+                }
             }
         }
         Ok(SpacesUnexpanded {})
@@ -267,7 +269,7 @@ impl<S: TexlangState> Parsable<S> for SpacesUnexpanded {
 
 impl<S: TexlangState> Parsable<S> for Option<char> {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
-        let Some(token) = input.peek()? else {
+        let Some(token) = input.next_or()? else {
             return Ok(None);
         };
         let c = match token.value() {
@@ -278,17 +280,22 @@ impl<S: TexlangState> Parsable<S> for Option<char> {
             | token::Value::Parameter(_)
             | token::Value::Superscript(_)
             | token::Value::Subscript(_)
-            | token::Value::Space(_) => return Ok(None),
+            | token::Value::Space(_) => {
+                        input.back(token);
+                return Ok(None)
+            },
             token::Value::Letter(c) => c,
             token::Value::Other(c) => c,
             token::Value::CommandRef(command_ref) => {
                 match input.commands_map().get_command(&command_ref) {
                     Some(command::Command::Character(c)) => *c,
-                    _ => return Ok(None),
+                    _ => {
+                        input.back(token);
+                        return Ok(None);
+                    }
                 }
             }
         };
-        input.consume()?;
         Ok(Some(c))
     }
 }

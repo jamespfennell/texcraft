@@ -46,7 +46,7 @@ fn the_primitive_fn<S: TheCompatible>(
                             let command_ref = input.state().get_command_ref_for_font(font).unwrap();
                             let font_token =
                                 token::Token::new_command_ref(command_ref, the_token.trace_key());
-                            input.expansions_mut().push(font_token);
+                            input.back(font_token);
                         }
                         variable::ValueRef::TokenList(t) => {
                             expansions.extend(t.iter().rev());
@@ -102,7 +102,7 @@ fn font_to_tokens<S: TexlangState + TheCompatible>(
 ) {
     let command_ref = input.state().get_command_ref_for_font(font).unwrap();
     let font_token = token::Token::new_command_ref(command_ref, the_token.trace_key());
-    input.expansions_mut().push(font_token);
+    input.back(font_token);
 }
 
 fn int_to_tokens(tokens: &mut Vec<token::Token>, the_token: token::Token, mut i: i32) {

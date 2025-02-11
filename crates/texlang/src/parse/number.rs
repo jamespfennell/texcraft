@@ -270,9 +270,9 @@ fn parse_constant<S: TexlangState, const RADIX: i32>(
     let mut started = RADIX == 10;
     let mut too_big = false;
     loop {
-        let next = match stream.peek()? {
+        let next = match stream.next_or()? {
             None => break,
-            Some(next) => *next,
+            Some(next) => next,
         };
         let lsd_or = match next.value() {
             token::Value::Other(c) => {
@@ -301,11 +301,13 @@ fn parse_constant<S: TexlangState, const RADIX: i32>(
             _ => None,
         };
         let lsd = match lsd_or {
-            None => break,
+            None => {
+                stream.back(next);
+                break;
+            }
             Some(lsd) => lsd,
         };
         started = true;
-        stream.consume()?;
         result = match add_lsd::<RADIX>(result, lsd) {
             Some(n) => n,
             None => {
@@ -331,7 +333,7 @@ fn parse_constant<S: TexlangState, const RADIX: i32>(
             }
             _ => unreachable!(),
         };
-        let got = stream.peek()?.copied();
+        let got = stream.peek()?;
         stream
             .vm()
             .error(parse::Error::new(expected, got, guidance))?;

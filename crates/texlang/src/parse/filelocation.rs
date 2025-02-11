@@ -23,19 +23,20 @@ impl<S: TexlangState> Parsable<S> for FileLocation {
         let mut area_delimiter = None;
         let mut ext_delimiter = None;
         loop {
-            let t = match input.peek()? {
+            let t = match input.next_or()? {
                 None => break,
                 Some(t) => t,
             };
             if let token::Value::Space(_) = t.value() {
-                let _ = input.consume();
                 break;
             }
             let c = match t.char() {
-                None => break,
+                None => {
+                    input.back(t);
+                    break;
+                }
                 Some(c) => c,
             };
-            let _ = input.consume();
             match c {
                 '>' | ':' => {
                     area_delimiter = Some(raw_string.len() + 1);
