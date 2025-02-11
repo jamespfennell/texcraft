@@ -31,7 +31,7 @@ pub fn hook<S: HasComponent<Component>>(
     if input.state().component().tracing_macros <= 0 {
         return;
     }
-    let trace = input.trace(token);
+    let trace = input.vm().trace(token);
     println!(
         "{}{}",
         "Macro expansion trace of ".bold(),

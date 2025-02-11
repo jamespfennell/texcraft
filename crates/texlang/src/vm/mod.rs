@@ -155,8 +155,7 @@ impl<S: TexlangState> VM<S> {
                         }
                         Some(Command::CharacterTokenAlias(token_value)) => {
                             // TODO: should add tests for when this is begin group and end group.
-                            input
-                                .push_token(Token::new_from_value(*token_value, token.trace_key()));
+                            input.back(Token::new_from_value(*token_value, token.trace_key()));
                         }
                         Some(Command::Expansion(_, _)) | Some(Command::Macro(_)) => {
                             H::unexpanded_expansion_command(input, token)?

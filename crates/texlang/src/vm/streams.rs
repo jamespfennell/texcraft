@@ -74,14 +74,6 @@ pub trait TokenStream {
     fn state(&self) -> &Self::S {
         &self.vm().state
     }
-
-    fn trace(&self, token: Token) -> trace::SourceCodeTrace {
-        self.vm().trace(token)
-    }
-
-    fn trace_end_of_input(&self) -> trace::SourceCodeTrace {
-        self.vm().internal.tracer.trace_end_of_input()
-    }
 }
 
 /// A [TokenStream] that performs expansion.
@@ -108,7 +100,7 @@ impl<S: TexlangState> ExpandedStream<S> {
     /// This method only expands a single token. If, after the expansion, the next token
     /// is expandable it will not be expanded.
     pub fn expand_once(&mut self) -> txl::Result<bool> {
-        stream::expand_once(&mut self.unexpanded().0)
+        stream::expand_once(self.vm_mut())
     }
 
     pub fn checkout_token_buffer(&mut self) -> Vec<Token> {
@@ -167,13 +159,6 @@ impl<S: TexlangState> TokenStream for ExpandedStream<S> {
 #[repr(transparent)]
 pub struct UnexpandedStream<S>(vm::VM<S>);
 
-impl<S> UnexpandedStream<S> {
-    #[inline]
-    pub fn expansions_mut(&mut self) -> &mut Vec<Token> {
-        self.0.internal.expansions_mut()
-    }
-}
-
 impl<S: TexlangState> TokenStream for UnexpandedStream<S> {
     type S = S;
 
@@ -189,7 +174,7 @@ impl<S: TexlangState> TokenStream for UnexpandedStream<S> {
 
     #[inline]
     fn back(&mut self, token: Token) {
-        self.expansions_mut().push(token)
+        self.0.internal.expansions_mut().push(token)
     }
 }
 
@@ -406,8 +391,9 @@ impl<S: TexlangState> TokenStream for ExecutionInput<S> {
 }
 
 impl<S: TexlangState> ExecutionInput<S> {
+    #[inline]
     pub(crate) fn next_or(&mut self) -> txl::Result<Option<Token>> {
-        stream::next_expanded(&mut self.unexpanded().0)
+        self.0.next_or()
     }
 }
 
@@ -467,14 +453,6 @@ impl<S> ExecutionInput<S> {
     pub(crate) fn vm_mut(&mut self) -> &mut vm::VM<S> {
         &mut self.0 .0 .0
     }
-    /// Push tokens to the front of the input stream.
-    ///
-    /// The first token in the provided slice will be the next token read.
-    // TODO: destroy
-    #[inline]
-    pub(crate) fn push_token(&mut self, token: Token) {
-        self.0 .0 .0.internal.expansions_mut().push(token);
-    }
 
     /// Return a token buffer, allowing it to be reused.
     pub fn return_token_buffer(&mut self, mut token_buffer: Vec<Token>) {
@@ -492,19 +470,6 @@ impl<S: TexlangState> ExecutionInput<S> {
     pub fn end_group(&mut self, token: Token) -> Result<(), Box<error::Error>> {
         self.0 .0 .0.end_group(token)
     }
-}
-
-/// Strips the lifetime from the token.
-///
-/// This function is intended to get around limitations of the borrow checker only. It
-/// should only be used when the code is actually fine but the borrow checker is being
-/// too conservative. Don't do anything fancy.
-///
-/// See this question for the type of code this function is designed for:
-/// https://stackoverflow.com/questions/69680201/is-this-use-of-unsafe-trivially-safe
-#[inline]
-unsafe fn launder<'a>(token: &Token) -> &'a Token {
-    &*(token as *const Token)
 }
 
 mod stream {
@@ -543,46 +508,10 @@ mod stream {
             // The EndOfLine case is never returned from the lexer but we silently handle it.
             lexer::Result::EndOfLine | lexer::Result::EndOfInput => {}
         }
-        next_unexpanded_recurse(vm)
-    }
-
-    fn next_unexpanded_recurse<S: TexlangState>(vm: &mut vm::VM<S>) -> txl::Result<Option<Token>> {
-        if vm.internal.pop_source() {
-            next_unexpanded(vm)
-        } else {
-            Ok(None)
+        if !vm.internal.pop_source() {
+            return Ok(None);
         }
-    }
-
-    #[inline]
-    pub fn peek_unexpanded<S: TexlangState>(vm: &mut vm::VM<S>) -> txl::Result<Option<&Token>> {
-        if let Some(token) = vm.internal.current_source.expansions.last() {
-            return Ok(Some(unsafe { launder(token) }));
-        }
-        match vm.internal.current_source.root.next(
-            &vm.state,
-            &mut vm.internal.cs_name_interner,
-            false,
-        ) {
-            lexer::Result::Token(token) => {
-                vm.internal.current_source.expansions.push(token);
-                return Ok(vm.internal.current_source.expansions.last());
-            }
-            lexer::Result::InvalidCharacter(c, trace_key) => {
-                return Err(build_invalid_character_error(vm, c, trace_key));
-            }
-            // The EndOfLine case is never returned from the lexer but we silently handle it.
-            lexer::Result::EndOfLine | lexer::Result::EndOfInput => {}
-        }
-        peek_unexpanded_recurse(vm)
-    }
-
-    fn peek_unexpanded_recurse<S: TexlangState>(vm: &mut vm::VM<S>) -> txl::Result<Option<&Token>> {
-        if vm.internal.pop_source() {
-            peek_unexpanded(vm)
-        } else {
-            Ok(None)
-        }
+        next_unexpanded(vm)
     }
 
     fn build_invalid_character_error<S: TexlangState>(
@@ -630,22 +559,22 @@ mod stream {
     }
 
     pub fn expand_once<S: TexlangState>(vm: &mut vm::VM<S>) -> txl::Result<bool> {
-        let (token, command) = match peek_unexpanded(vm)? {
+        let (token, command) = match next_unexpanded(vm)? {
             None => return Ok(false),
             Some(token) => match token.value() {
-                token::Value::CommandRef(command_ref) => (
-                    unsafe { launder(token) },
-                    vm.commands_map.get_command(&command_ref),
-                ),
-                _ => return Ok(false),
+                token::Value::CommandRef(command_ref) => {
+                    (token, vm.commands_map.get_command(&command_ref))
+                }
+                _ => {
+                    vm.internal.expansions_mut().push(token);
+                    return Ok(false);
+                }
             },
         };
         match command {
             Some(command::Command::Expansion(command, tag)) => {
                 let command = *command;
-                let token = *token;
                 let tag = *tag;
-                consume_peek(vm);
                 match S::expansion_override_hook(token, ExpansionInput::new(vm), tag) {
                     Ok(None) => (),
                     Ok(Some(override_expansion)) => {
@@ -662,19 +591,13 @@ mod stream {
             }
             Some(command::Command::Macro(command)) => {
                 let command = command.clone();
-                let token = *token;
-                consume_peek(vm);
                 command.call(token, ExpansionInput::new(vm))?;
                 Ok(true)
             }
-            _ => Ok(false),
+            _ => {
+                vm.internal.expansions_mut().push(token);
+                Ok(false)
+            }
         }
-    }
-
-    #[inline]
-    pub fn consume_peek<S>(vm: &mut vm::VM<S>) {
-        // When we peek at a token, it is placed on top of the expansions stack.
-        // So to consume the token, we just need to remove it from the stack.
-        vm.internal.current_source.expansions.pop();
     }
 }

@@ -281,9 +281,9 @@ impl<S: TexlangState> Parsable<S> for Option<char> {
             | token::Value::Superscript(_)
             | token::Value::Subscript(_)
             | token::Value::Space(_) => {
-                        input.back(token);
-                return Ok(None)
-            },
+                input.back(token);
+                return Ok(None);
+            }
             token::Value::Letter(c) => c,
             token::Value::Other(c) => c,
             token::Value::CommandRef(command_ref) => {
