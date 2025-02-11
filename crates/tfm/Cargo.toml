@@ -18,5 +18,5 @@ serde = {version="^1.0", optional = true}
 [features]
 default = []
 ariadne = ["dep:ariadne"]
-arbitrary = ["dep:arbitrary"]
-serde = ["dep:serde"]
+arbitrary = ["dep:arbitrary", "font/arbitrary"]
+serde = ["dep:serde", "font/serde"]
