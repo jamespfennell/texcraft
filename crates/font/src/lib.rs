@@ -98,3 +98,40 @@ impl std::fmt::Display for Number {
         Ok(())
     }
 }
+
+/// Glue.
+///
+/// In Knuth's TeX this struct is not passed around directly; instead
+/// Knuth essentially uses `std::rc::Rc<Glue>`.
+/// This optimization is based on the fact that very few distinct glue
+/// values appear in a document, and that the pointer takes up less
+/// space than the struct.
+/// We might consider performing such an optimization.
+///
+/// Described in TeX.2021.150.
+pub struct Glue {
+    pub width: Number,
+    pub stretch: Number,
+    pub shrink: Number,
+    pub stretch_order: GlueOrder,
+    pub shrink_order: GlueOrder,
+}
+
+/// Order of infinity of a glue stretch or shrink.
+///
+/// When setting a list of boxes, TeX stretches or shrinks glue boxes.
+/// In some cases it is desirable that TeX only stretches some subset of the
+/// glue boxes.
+/// For example, when setting centered text, TeX only stretches the two glue
+/// boxes at each end of the list and leaves all other glue intact.
+///
+/// To achieve this, each glue stretch or shrink has an order of infinity.
+/// If a list contains glue of some order (e.g. [GlueOrder::Fil]),
+/// then glues of a lower order (e.g. [GlueOrder::Normal]) are not stretched
+/// or shrunk.
+pub enum GlueOrder {
+    Normal,
+    Fil,
+    Fill,
+    Filll,
+}

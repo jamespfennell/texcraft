@@ -1,0 +1,12 @@
+[package]
+name = "boxworks"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "The Knuth/TeX typesetting engine"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+
+[dependencies]
+font = { path = "../font", version="0.1.0" }

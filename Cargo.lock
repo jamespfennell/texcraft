@@ -176,6 +176,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "boxworks"
+version = "0.1.0"
+dependencies = [
+ "font",
+]
+
+[[package]]
 name = "bstr"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"

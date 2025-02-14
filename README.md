@@ -13,10 +13,22 @@ The same code can be shared between engines - for example,
     primitive](https://github.com/jamespfennell/texcraft/blob/main/crates/texlang-stdlib/src/registers.rs)
     can be used both for TeX '82 (which has 256 memory registers) and pdfTeX (which has over 32,000 registers).
 
-The first part of the projec that was built is a [fast](https://github.com/jamespfennell/texcraft/tree/main/performance)
-  TeX language interpreter called Texlang,
-  and a standard library of primitives such as `\def` that work with this interpreter.
-No typesetting work has been done yet.
+As of 2025, the project is divided into two main subprojects:
+
+- **Texlang** is a [fast](https://github.com/jamespfennell/texcraft/tree/main/performance)
+    TeX language interpreter.
+    It provides APIs for defining TeX primitives
+    and is thus the core of any "TeX engine" built with Texcraft.
+    Texlang's standard library contains
+    implementations of many TeX primitives like `\def` and `\expandafter`.
+
+- **Boxworks** is an implementation of the typesetting engine inside TeX.
+    It is designed to be fully independent of the TeX language.
+    One of the main goals of Boxworks is to support creating brand new typesetting
+    languages that use the engine for performing the actual typesetting.
+
+There are other smaller parts of the project, for example
+    a Rust crate for working with TeX font metric data.
 
 ## Trying it out
 
@@ -48,8 +60,6 @@ The [documentation website](https://texcraft.dev) will eventually beginner-frien
 
 There is a lot of low hanging fruit that is intentionally left unpicked so
     people who want to contribute to Texcraft have a good starting point.
-Right now the main focus is on completing the Texlang standard library, which is a collection
-    of non-typesetting TeX commands like `\def` that every TeX distribution includes.
 
 ## Related projects
 
