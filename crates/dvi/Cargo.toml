@@ -1,0 +1,13 @@
+[package]
+name = "dvi"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "DVI document format"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+
+[dependencies]
+
+[features]

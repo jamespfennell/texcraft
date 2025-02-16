@@ -1,0 +1,12 @@
+[package]
+name = "dvi-bin"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = {version="4.4.8", features=["derive", "wrap_help"]}
+dvi = { version = "0.1", path = "../dvi"}
+
+[[bin]]
+name = "dvitools"
+path = "src/dvitools.rs"

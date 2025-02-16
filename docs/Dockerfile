@@ -22,6 +22,7 @@ RUN mdbook test -L target/debug/deps
 # Built the Rust reference
 RUN RUSTDOCFLAGS="-D warnings" cargo doc --all-features --lib --no-deps \
   -p boxworks \
+  -p dvi \
   -p texcraft-stdext \
   -p texlang \
   -p texlang-common \

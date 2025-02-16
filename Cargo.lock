@@ -498,6 +498,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
+name = "dvi"
+version = "0.1.0"
+
+[[package]]
+name = "dvi-bin"
+version = "0.1.0"
+dependencies = [
+ "clap 4.4.8",
+ "dvi",
+]
+
+[[package]]
 name = "either"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
