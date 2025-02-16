@@ -170,7 +170,7 @@ pub fn deserialize(b: &[u8]) -> Result<Option<(Op, &[u8])>, InvalidDviFile> {
                 num_223_bytes: num_end_bytes,
             }
         }
-        250 | 251 | 252 | 253 | 254 | 255 => {
+        250..=255 => {
             return Err(InvalidDviFile::InvalidOpCode(op_code));
         }
     };

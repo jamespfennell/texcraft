@@ -1,5 +1,3 @@
-use std::u32;
-
 use super::*;
 
 pub fn serialize(op: &Op, b: &mut Vec<u8>) {
@@ -202,7 +200,7 @@ impl<'a> Writer<'a> {
             b.push(b2);
             return;
         }
-        let is_3_byte = -1 * 2_i32.pow(23) <= i && i < 2_i32.pow(23);
+        let is_3_byte = -2_i32.pow(23) <= i && i < 2_i32.pow(23);
         let [b1, b2, b3, b4] = if is_3_byte && i < 0 {
             // We manually handle the case of negative integers taking
             // up three bytes.
