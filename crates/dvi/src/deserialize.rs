@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn deserialize(b: &[u8]) -> Result<Option<(Op, &[u8])>, InvalidDviFile> {
+pub fn deserialize(b: &[u8]) -> Result<Option<(Op, &[u8])>, InvalidDviData> {
     let Some((&op_code, tail)) = b.split_first() else {
         return Ok(None);
     };
@@ -171,7 +171,7 @@ pub fn deserialize(b: &[u8]) -> Result<Option<(Op, &[u8])>, InvalidDviFile> {
             }
         }
         250..=255 => {
-            return Err(InvalidDviFile::InvalidOpCode(op_code));
+            return Err(InvalidDviData::InvalidOpCode(op_code));
         }
     };
     Ok(Some((op, d.b)))
@@ -183,23 +183,23 @@ pub struct Deserializer<'a> {
 }
 
 impl<'a> Deserializer<'a> {
-    fn u8(&mut self) -> Result<u8, InvalidDviFile> {
+    fn u8(&mut self) -> Result<u8, InvalidDviData> {
         Ok(u8::from_be_bytes(self.get::<1>()?))
     }
 
-    fn i8(&mut self) -> Result<i8, InvalidDviFile> {
+    fn i8(&mut self) -> Result<i8, InvalidDviData> {
         Ok(i8::from_be_bytes(self.get::<1>()?))
     }
 
-    fn i16(&mut self) -> Result<i16, InvalidDviFile> {
+    fn i16(&mut self) -> Result<i16, InvalidDviData> {
         Ok(i16::from_be_bytes(self.get::<2>()?))
     }
 
-    fn u16(&mut self) -> Result<u16, InvalidDviFile> {
+    fn u16(&mut self) -> Result<u16, InvalidDviData> {
         Ok(u16::from_be_bytes(self.get::<2>()?))
     }
 
-    fn i24(&mut self) -> Result<i32, InvalidDviFile> {
+    fn i24(&mut self) -> Result<i32, InvalidDviData> {
         let bs = self.get::<3>()?;
         let u = u32::from_be_bytes([0, bs[0], bs[1], bs[2]]);
         let u = if u < 2_u32.pow(23) {
@@ -216,41 +216,41 @@ impl<'a> Deserializer<'a> {
         Ok(u as i32)
     }
 
-    fn u24(&mut self) -> Result<u32, InvalidDviFile> {
+    fn u24(&mut self) -> Result<u32, InvalidDviData> {
         let bs = self.get::<3>()?;
         Ok(u32::from_be_bytes([0, bs[0], bs[1], bs[2]]))
     }
 
-    fn i32(&mut self) -> Result<i32, InvalidDviFile> {
+    fn i32(&mut self) -> Result<i32, InvalidDviData> {
         Ok(i32::from_be_bytes(self.get::<4>()?))
     }
 
-    fn u32(&mut self) -> Result<u32, InvalidDviFile> {
+    fn u32(&mut self) -> Result<u32, InvalidDviData> {
         Ok(u32::from_be_bytes(self.get::<4>()?))
     }
 
-    fn string(&mut self) -> Result<String, InvalidDviFile> {
+    fn string(&mut self) -> Result<String, InvalidDviData> {
         let l: u8 = self.u8()?;
         self.string_l(l)
     }
 
-    fn string_l(&mut self, l: u8) -> Result<String, InvalidDviFile> {
+    fn string_l(&mut self, l: u8) -> Result<String, InvalidDviData> {
         let Some((comment, tail)) = self.b.split_at_checked(l as usize) else {
-            return Err(InvalidDviFile::Truncated(self.op_code));
+            return Err(InvalidDviData::Truncated(self.op_code));
         };
         self.b = tail;
         Ok(String::from_utf8_lossy(comment).into())
     }
 
-    fn extension(&mut self, l: u32) -> Result<Op, InvalidDviFile> {
+    fn extension(&mut self, l: u32) -> Result<Op, InvalidDviData> {
         let Some((data, tail)) = self.b.split_at_checked(l as usize) else {
-            return Err(InvalidDviFile::Truncated(self.op_code));
+            return Err(InvalidDviData::Truncated(self.op_code));
         };
         self.b = tail;
         Ok(Op::Extension(data.into()))
     }
 
-    fn font_def(&mut self, number: u32) -> Result<Op, InvalidDviFile> {
+    fn font_def(&mut self, number: u32) -> Result<Op, InvalidDviData> {
         let checksum = self.u32()?;
         let at_size = self.u32()?;
         let design_size = self.u32()?;
@@ -266,9 +266,9 @@ impl<'a> Deserializer<'a> {
         })
     }
 
-    fn get<const N: usize>(&mut self) -> Result<[u8; N], InvalidDviFile> {
+    fn get<const N: usize>(&mut self) -> Result<[u8; N], InvalidDviData> {
         let Some((head, tail)) = self.b.split_at_checked(N) else {
-            return Err(InvalidDviFile::Truncated(self.op_code));
+            return Err(InvalidDviData::Truncated(self.op_code));
         };
         self.b = tail;
         Ok(head.try_into().expect("slice has length N"))

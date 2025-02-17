@@ -36,13 +36,10 @@ impl Cli {
             Ok(b) => b,
             Err(err) => return Err(format!("failed to read `{}`: {}", self.path.display(), err)),
         };
-        for op_or_err in dvi::OpIter::new(&b) {
-            let op = match op_or_err {
-                Ok(op) => op,
-                Err(err) => return Err(format!("{}", err)),
-            };
+        let mut result = Ok(());
+        for op in dvi::Deserializer::new(&b, &mut result) {
             println!("{:?}", op);
         }
-        Ok(())
+        result.map_err(|err| format!("{}", err)) 
     }
 }

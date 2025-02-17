@@ -2,6 +2,15 @@
 //!
 //! This crate implements the DVI ("device-independent file format") format.
 //!
+//! The most important type in the crate is [`Op`],
+//! which describes a single operation or
+//! command in a DVI file. A DVI file is just a list of such operations.
+//!
+//! The crate provides an iterator,
+//! [`Deserializer`], that accepts raw DVI bytes and returns
+//! the operations in the DVI data.
+//!
+//!
 //! ## Knuth's description of the format
 //!
 //! The text in this section was written by Donald Knuth.
@@ -103,7 +112,42 @@
 mod deserialize;
 mod serialize;
 
-/// Variable in a DVI file.
+/// A variable in DVI data.
+///
+/// DVI data has access to four variables.
+/// These variables are set using the [`Op::SetVar`] operation
+/// and used in the [`Op::Move`] operation.
+///
+/// These variables and associated operations exist to support
+/// the following optimization.
+/// It is possible to replace repeated
+/// identical [`Op::Right`]/[`Op::Down`] operations with sets and moves
+/// that serialize to a smaller number of bytes.
+/// For example this DVI sequence:
+/// ```
+/// vec![
+///     dvi::Op::Down(300),
+///     dvi::Op::Down(300),
+///     dvi::Op::Down(300),
+/// ];
+/// ```
+/// is identical to this DVI sequence:
+/// ```
+/// vec![
+///     // Set Y to 300 and move down by that value.
+///     dvi::Op::SetVar(dvi::Var::Y, 300),
+///     // Move down by the current value of Y, 300.
+///     dvi::Op::Move(dvi::Var::Y),
+///     dvi::Op::Move(dvi::Var::Y),
+/// ];
+/// ```
+/// The first sequence serializes to 9 bytes,
+/// while the second serializes to 5 bytes.
+/// This optimization is performed in TeX.2021.595 and onwards.
+///
+/// Of the four variables, [`Var::W`] and [`Var::X`] operate on the
+/// horizontal part of the cursor _h_, and [`Var::Y`] and [`Var::Z`]
+/// operate on the vertical part of the cursor _v_.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Var {
     W = 0,
@@ -112,7 +156,7 @@ pub enum Var {
     Z = 3,
 }
 
-/// Operation that appears in a DVI file.
+/// Operation that appears in DVI data.
 ///
 /// The documentation for each variant is adapted from TeX.2021.585.
 /// However the variants don't map one-to-one on to commands as described
@@ -452,21 +496,72 @@ pub enum Op {
 impl Op {
     /// Deserialize the next operation from the provided binary slice.
     ///
-    /// If this succeeds, the return value contains the part of the slice
-    /// that was not consumed.
-    pub fn deserialize(b: &[u8]) -> Result<Option<(Self, &[u8])>, InvalidDviFile> {
+    /// Note that in general it is easier to perform deserialization using the
+    /// [`Deserializer`] iterator.
+    ///
+    /// There are three possible return values from this method.
+    /// If the deserialization succeeds, the return value contains the operation
+    /// and the tail of the slice that was not consumed.
+    /// This tail can be used to deserialize the next operation:
+    ///
+    /// ```
+    /// let data = vec![128, 4, 129, 1, 0];
+    /// let (op, tail) = dvi::Op::deserialize(&data).unwrap().unwrap();
+    /// assert_eq![op, dvi::Op::TypesetChar{char: 4, move_h: true}];
+    /// assert_eq![tail, &[129, 1, 0]];
+    ///
+    /// let (op, tail) = dvi::Op::deserialize(&tail).unwrap().unwrap();
+    /// assert_eq![op, dvi::Op::TypesetChar{char: 256, move_h: true}];
+    /// assert_eq![tail, &[]];
+    /// ```
+    ///
+    /// If the slice is exhausted, the method returns [`None`]:
+    ///
+    /// ```
+    /// let data = vec![];
+    /// assert_eq![dvi::Op::deserialize(&data), Ok(None)];
+    /// ```
+    ///
+    /// If the data is not valid DVI data, an error is returned:
+    /// ```
+    /// let data_1 = vec![254];
+    /// assert_eq![
+    ///     dvi::Op::deserialize(&data_1),
+    ///     Err(dvi::InvalidDviData::InvalidOpCode(254)),
+    /// ];
+    ///
+    /// let data_2 = vec![129, 1];
+    /// assert_eq![
+    ///     dvi::Op::deserialize(&data_2),
+    ///     Err(dvi::InvalidDviData::Truncated(129)),
+    /// ];
+    /// ```
+    pub fn deserialize(b: &[u8]) -> Result<Option<(Self, &[u8])>, InvalidDviData> {
         deserialize::deserialize(b)
     }
 
-    /// Serialize this operation to the provided binary vector.
+    /// Serialize this operation to bytes and append them to the provided vector.
+    ///
+    /// Unless you want close control over allocations, it's likely easier
+    /// to use the top-level [`serialize()`] function.
+    /// 
+    /// ```
+    /// let mut data = vec![];
+    /// let op = dvi::Op::Right(256);
+    /// op.serialize(&mut data);
+    /// assert_eq![data, vec![144, 1, 0]];
+    /// ```
     pub fn serialize(&self, b: &mut Vec<u8>) {
         serialize::serialize(self, b)
     }
 }
 
-/// Error returned from [`Op::deserialize`] if the DVI file is invalid.
-#[derive(Debug)]
-pub enum InvalidDviFile {
+/// Error returned if deserializing DVI data fails.
+///
+/// This error is returned from the [`Op::deserialize`] method
+/// and the [`Deserializer`] iterator.
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub enum InvalidDviData {
     /// An invalid op code appeared.
     InvalidOpCode(u8),
     /// The file ended while parsing the payload of an operation.
@@ -474,46 +569,103 @@ pub enum InvalidDviFile {
     Truncated(u8),
 }
 
-impl std::error::Error for InvalidDviFile {}
+impl std::error::Error for InvalidDviData {}
 
-impl std::fmt::Display for InvalidDviFile {
+impl std::fmt::Display for InvalidDviData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            InvalidDviFile::InvalidOpCode(op_code) => {
+            InvalidDviData::InvalidOpCode(op_code) => {
                 write!(f, "invalid op code {op_code}")
             }
-            InvalidDviFile::Truncated(op_code) => {
-                write!(f, "file ended while parsing payload for op code {op_code}")
+            InvalidDviData::Truncated(op_code) => {
+                write!(f, "data ended while parsing payload for op code {op_code}")
             }
         }
     }
 }
 
-/// Iterator over each [`Op`] in a DVI file.
-pub struct OpIter<'a> {
+/// Iterator that deserializes bytes into [`Op`] values.
+///
+/// ```
+/// let data: Vec<u8> = vec![158, 1, 0, 68, 86, 73];
+/// let mut result = Ok(());
+/// let ops: Vec<dvi::Op> = dvi::Deserializer::new(&data, &mut result).collect();
+/// assert_eq![result, Ok(())];
+/// assert_eq![
+///     ops,
+///     vec![
+///         dvi::Op::Down(256),
+///         dvi::Op::TypesetChar{char: 'D' as u32, move_h: true},
+///         dvi::Op::TypesetChar{char: 'V' as u32, move_h: true},
+///         dvi::Op::TypesetChar{char: 'I' as u32, move_h: true},
+///     ],
+/// ];
+/// ```
+///
+/// The deserializer returns [`Op`] values so that it can easily compose with other
+/// iterators.
+/// However the DVI data can be invalid.
+/// This error is reported through a side channel result value:
+///
+/// ```
+/// let invalid_data: Vec<u8> = vec![158, 1, 0, 255];
+/// let mut result = Ok(());
+/// let ops: Vec<dvi::Op> = dvi::Deserializer::new(&invalid_data, &mut result).collect();
+/// assert_eq![result, Err(dvi::InvalidDviData::InvalidOpCode(255))];
+/// assert_eq![
+///     ops,
+///     // Ops in the file before the error is hit are returned in the iterator.
+///     vec![dvi::Op::Down(256)],
+/// ];
+/// ```
+pub struct Deserializer<'a> {
     b: &'a [u8],
+    result: &'a mut Result<(), InvalidDviData>,
 }
 
-impl<'a> OpIter<'a> {
+impl<'a> Deserializer<'a> {
     /// Create a new iterator from the provided binary slice.
-    pub fn new(b: &'a [u8]) -> Self {
-        Self { b }
+    pub fn new(b: &'a [u8], result: &'a mut Result<(), InvalidDviData>) -> Self {
+        Self { b, result }
     }
 }
 
-impl<'a> Iterator for OpIter<'a> {
-    type Item = Result<Op, InvalidDviFile>;
+impl<'a> Iterator for Deserializer<'a> {
+    type Item = Op;
 
     fn next(&mut self) -> Option<Self::Item> {
         match Op::deserialize(self.b) {
             Ok(None) => None,
             Ok(Some((op, b))) => {
                 self.b = b;
-                Some(Ok(op))
+                Some(op)
             }
-            Err(err) => Some(Err(err)),
+            Err(err) => {
+                *self.result = Err(err);
+                None
+            }
         }
     }
+}
+
+/// Serialize operations to DVI data bytes.
+/// 
+/// ```
+/// let ops = vec![
+///     dvi::Op::Down(256),
+///     dvi::Op::TypesetChar{char: 'D' as u32, move_h: true},
+///     dvi::Op::TypesetChar{char: 'V' as u32, move_h: true},
+///     dvi::Op::TypesetChar{char: 'I' as u32, move_h: true},
+/// ];
+/// let data = dvi::serialize(ops);
+/// assert_eq!(data, vec![158, 1, 0, 68, 86, 73]);
+/// ```
+pub fn serialize<I: IntoIterator<Item=Op>>(i: I) -> Vec<u8> {
+    let mut v = vec![];
+    for op in i {
+        op.serialize(&mut v);
+    }
+    v
 }
 
 #[cfg(test)]
@@ -527,10 +679,9 @@ mod tests {
     }
 
     fn run_deserialize_test(b: Vec<u8>, want: Op) {
-        let got: Vec<Op> = OpIter::new(&b)
-            .into_iter()
-            .map(|item| item.unwrap())
-            .collect();
+        let mut result = Ok(());
+        let got: Vec<Op> = Deserializer::new(&b, &mut result).into_iter().collect();
+        assert_eq!(Ok(()), result);
         assert_eq!(got, vec![want]);
     }
 
