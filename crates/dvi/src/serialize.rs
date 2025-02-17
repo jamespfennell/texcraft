@@ -20,8 +20,8 @@ pub fn serialize(op: &Op, b: &mut Vec<u8>) {
             move_h,
         } => {
             w.u8(if *move_h { 132 } else { 137 });
-            w.u32(*height);
-            w.u32(*width);
+            w.i32(*height);
+            w.i32(*width);
         }
         Op::NoOp => {
             b.push(138);

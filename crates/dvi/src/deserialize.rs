@@ -27,8 +27,8 @@ pub fn deserialize(b: &[u8]) -> Result<Option<(Op, &[u8])>, InvalidDviData> {
             move_h: true,
         },
         132 => Op::TypesetRule {
-            height: d.u32()?,
-            width: d.u32()?,
+            height: d.i32()?,
+            width: d.i32()?,
             move_h: true,
         },
         133 => Op::TypesetChar {
@@ -48,8 +48,8 @@ pub fn deserialize(b: &[u8]) -> Result<Option<(Op, &[u8])>, InvalidDviData> {
             move_h: false,
         },
         137 => Op::TypesetRule {
-            height: d.u32()?,
-            width: d.u32()?,
+            height: d.i32()?,
+            width: d.i32()?,
             move_h: false,
         },
         138 => Op::NoOp,

@@ -9,14 +9,13 @@
 //! The crate provides an iterator,
 //! [`Deserializer`], that accepts raw DVI bytes and returns
 //! the operations in the DVI data.
-//!
+//! The inverse of this deserializer is the
+//! [`serialize()`] function.
 //!
 //! ## Knuth's description of the format
 //!
 //! The text in this section was written by Donald Knuth.
-//! It appears as documentation in TeX.
-//!
-//! [TeX.2021.583]
+//! It appears as documentation in TeX.2021.583.
 //!
 //! The most important output produced by a run of TeX is the "device
 //! independent" (DVI) file that specifies where characters and rules
@@ -70,44 +69,6 @@
 //! page occupies bytes 1000 to 1999, then the `bop` that starts in byte 1000
 //! points to 100 and the `bop` that starts in byte 2000 points to 1000. (The
 //! very first `bop`, i.e., the one starting in byte 100, has a pointer of -1.)
-//!
-//! [TeX.2021.584]
-//!
-//! The DVI format is intended to be both compact and easily interpreted
-//! by a machine. Compactness is achieved by making most of the information
-//! implicit instead of explicit. When a DVI-reading program reads the
-//! commands for a page, it keeps track of several quantities:
-//!
-//! 1. The current font _f_ is an integer; this value is changed only
-//!     by `fnt` and `fnt_num` commands
-//!     (both commands are represented by [`Op::EnableFont`]).
-//!
-//! 2. The current position on the page
-//!     is given by two numbers called the horizontal and vertical coordinates,
-//!     _h_ and _v_. Both coordinates are zero at the upper left corner of the page;
-//!     moving to the right corresponds to increasing the horizontal coordinate, and
-//!     moving down corresponds to increasing the vertical coordinate. Thus, the
-//!     coordinates are essentially Cartesian, except that vertical directions are
-//!     flipped; the Cartesian version of (_h_,_v_) would be (_h_,_-v_).
-//!
-//! 3. The current spacing amounts are given by four numbers _w_, _x_, _y_, and _z_,
-//!     where _w_ and _x_ are used for horizontal spacing and where _y_ and _z_
-//!     are used for vertical spacing.
-//!
-//! 4. There is a stack containing
-//!     (_h_,_v_,_w_,_x_,_y_,_z_) values; the DVI commands `push`
-//!     ([`Op::Push`]) and `pop` ([`Op::Pop`]) are used to
-//!     change the current level of operation. Note that the current font _f_ is
-//!     not pushed and popped; the stack contains only information about
-//!     positioning.
-//!
-//! The values of _h_, _v_, _w_, _x_, _y_, and _z_ are signed integers having up
-//! to 32 bits, including the sign. Since they represent physical distances,
-//! there is a small unit of measurement such that increasing _h_ by 1 means
-//! moving a certain tiny distance to the right. The actual unit of
-//! measurement is variable, as explained below; TeX sets things up so that
-//! its DVI output is in sp units, i.e., scaled points, in agreement with
-//! all the scaled dimensions in TeX's data structures.
 
 mod deserialize;
 mod serialize;
@@ -148,7 +109,7 @@ mod serialize;
 /// Of the four variables, [`Var::W`] and [`Var::X`] operate on the
 /// horizontal part of the cursor _h_, and [`Var::Y`] and [`Var::Z`]
 /// operate on the vertical part of the cursor _v_.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Var {
     W = 0,
     X = 1,
@@ -209,9 +170,9 @@ pub enum Op {
     ///     of pixels per DVI unit.
     TypesetRule {
         /// Height of the rule.
-        height: u32,
+        height: i32,
         /// Width of the rule.
-        width: u32,
+        width: i32,
         /// If true, after typesetting the rule,
         /// increase _h_ by the width of the rule.
         ///
@@ -544,7 +505,7 @@ impl Op {
     ///
     /// Unless you want close control over allocations, it's likely easier
     /// to use the top-level [`serialize()`] function.
-    /// 
+    ///
     /// ```
     /// let mut data = vec![];
     /// let op = dvi::Op::Right(256);
@@ -649,7 +610,7 @@ impl<'a> Iterator for Deserializer<'a> {
 }
 
 /// Serialize operations to DVI data bytes.
-/// 
+///
 /// ```
 /// let ops = vec![
 ///     dvi::Op::Down(256),
@@ -660,12 +621,278 @@ impl<'a> Iterator for Deserializer<'a> {
 /// let data = dvi::serialize(ops);
 /// assert_eq!(data, vec![158, 1, 0, 68, 86, 73]);
 /// ```
-pub fn serialize<I: IntoIterator<Item=Op>>(i: I) -> Vec<u8> {
+pub fn serialize<I: IntoIterator<Item = Op>>(i: I) -> Vec<u8> {
     let mut v = vec![];
     for op in i {
         op.serialize(&mut v);
     }
     v
+}
+
+/// Data structure for tracking values in DVI data.
+///
+/// The DVI format refers to seven runtime values that are modified based
+/// on operations in the data.
+/// These seven values are:
+///
+/// - The current font, _f_.
+///
+/// - The two coordinates of the current cursor position, (_h_,_v_).
+///
+/// - The four values of the four variables
+///     [`Var::W`],
+///     [`Var::X`],
+///     [`Var::Y`],
+///     [`Var::Z`].
+///
+/// This data structure provides a mechanism for calculating these values
+/// as DVI operations are run:
+///
+/// ```
+/// let mut values: dvi::Values = Default::default();
+/// assert_eq!(values.y(), 0);
+///
+/// values.update(&dvi::Op::SetVar(dvi::Var::Y, 3));
+/// assert_eq!(values.y(), 3);
+///
+/// values.update(&dvi::Op::Push);
+/// values.update(&dvi::Op::SetVar(dvi::Var::Y, 5));
+/// assert_eq!(values.y(), 5);
+///
+/// values.update(&dvi::Op::Pop);
+/// assert_eq!(values.y(), 3);
+/// ```
+///
+/// Six of the values are just integers, which are simple to deal with.
+/// The value of _h_ is more complicated;
+/// see the documentation on [`Values::h`] for more information.
+///
+/// ## Knuth's description of the values
+///
+/// This text is from TeX.2021.584.
+///
+/// The DVI format is intended to be both compact and easily interpreted
+/// by a machine. Compactness is achieved by making most of the information
+/// implicit instead of explicit. When a DVI-reading program reads the
+/// commands for a page, it keeps track of several quantities:
+///
+/// 1. The current font _f_ is an integer; this value is changed only
+///     by `fnt` and `fnt_num` commands
+///     (both commands are represented by [`Op::EnableFont`]).
+///
+/// 2. The current position on the page
+///     is given by two numbers called the horizontal and vertical coordinates,
+///     _h_ and _v_. Both coordinates are zero at the upper left corner of the page;
+///     moving to the right corresponds to increasing the horizontal coordinate, and
+///     moving down corresponds to increasing the vertical coordinate. Thus, the
+///     coordinates are essentially Cartesian, except that vertical directions are
+///     flipped; the Cartesian version of (_h_,_v_) would be (_h_,_-v_).
+///
+/// 3. The current spacing amounts are given by four numbers _w_, _x_, _y_, and _z_,
+///     where _w_ and _x_ are used for horizontal spacing and where _y_ and _z_
+///     are used for vertical spacing.
+///
+/// 4. There is a stack containing
+///     (_h_,_v_,_w_,_x_,_y_,_z_) values; the DVI commands `push`
+///     ([`Op::Push`]) and `pop` ([`Op::Pop`]) are used to
+///     change the current level of operation. Note that the current font _f_ is
+///     not pushed and popped; the stack contains only information about
+///     positioning.
+///
+/// The values of _h_, _v_, _w_, _x_, _y_, and _z_ are signed integers having up
+/// to 32 bits, including the sign. Since they represent physical distances,
+/// there is a small unit of measurement such that increasing _h_ by 1 means
+/// moving a certain tiny distance to the right. The actual unit of
+/// measurement is variable, as explained below; TeX sets things up so that
+/// its DVI output is in sp units, i.e., scaled points, in agreement with
+/// all the scaled dimensions in TeX's data structures.
+#[derive(Default)]
+pub struct Values {
+    f: u32,
+    top: StackValues,
+    tail: Vec<StackValues>,
+}
+
+#[derive(Default, Clone, PartialEq, Eq)]
+struct StackValues {
+    h: i32,
+    h_chars: Vec<(u32, u32)>,
+    v: i32,
+    vars: [i32; 4],
+}
+
+impl Values {
+    /// Update the values by applying the provided operation.
+    pub fn update(&mut self, op: &Op) -> bool {
+        match op {
+            Op::TypesetChar { char, move_h } => {
+                if *move_h {
+                    self.top.h_chars.push((*char, self.f()));
+                    true
+                } else {
+                    false
+                }
+            }
+            Op::TypesetRule {
+                height: _,
+                width,
+                move_h,
+            } => {
+                if *move_h {
+                    self.top.h += *width;
+                    *width != 0
+                } else {
+                    false
+                }
+            }
+            Op::NoOp => false,
+            Op::BeginPage {
+                parameters: _,
+                previous_begin_page: _,
+            } => {
+                self.tail = vec![];
+                let new: StackValues = Default::default();
+                let changed = self.top != new;
+                self.top = new;
+                changed
+            }
+            Op::EndPage => false,
+            Op::Push => {
+                self.tail.push(self.top.clone());
+                false
+            }
+            Op::Pop => {
+                let Some(top) = self.tail.pop() else {
+                    return false;
+                };
+                let changed = top != self.top;
+                self.top = top;
+                changed
+            }
+            Op::Right(d) => {
+                self.top.h += *d;
+                *d != 0
+            }
+            Op::Move(var) => {
+                let d = self.top.vars[*var as usize];
+                match var {
+                    Var::W | Var::X => {
+                        self.top.h += d;
+                    }
+                    Var::Y | Var::Z => {
+                        self.top.v += d;
+                    }
+                }
+                d != 0
+            }
+            Op::SetVar(var, i) => {
+                let old = self.top.vars[*var as usize];
+                self.top.vars[*var as usize] = *i;
+                match var {
+                    Var::W | Var::X => {
+                        self.top.h += *i;
+                    }
+                    Var::Y | Var::Z => {
+                        self.top.v += *i;
+                    }
+                }
+                // This is only a noop if the old and new values are both zero.
+                // In this case the variable assignment does nothing, and
+                // the position is also unchanged.
+                old != 0 || *i != 0
+            }
+            Op::Down(d) => {
+                self.top.v += *d;
+                *d != 0
+            }
+            Op::EnableFont(f) => {
+                let old = self.f;
+                self.f = *f;
+                old != *f
+            }
+            Op::Extension(_)
+            | Op::DefineFont { .. }
+            | Op::Preamble { .. }
+            | Op::BeginPostamble { .. }
+            | Op::EndPostamble { .. } => false,
+        }
+    }
+    /// Get the current value of the font, _f_.
+    ///
+    /// Note that unlike every other value, the font is not affected by
+    /// push and pop operations.
+    ///
+    /// ```
+    /// let mut values: dvi::Values = Default::default();
+    /// values.update(&dvi::Op::EnableFont(1));
+    /// assert_eq![values.f(), 1];
+    /// values.update(&dvi::Op::Push);
+    /// values.update(&dvi::Op::EnableFont(2));
+    /// assert_eq![values.f(), 2];
+    /// values.update(&dvi::Op::Pop);
+    /// assert_eq![values.f(), 2];
+    /// ```
+    pub fn f(&self) -> u32 {
+        self.f
+    }
+    /// Get the current value of the horizontal position, _h_.
+    ///
+    /// The value of _h_ is more complicated than other values.
+    /// The DVI format includes a `set_char` command that typesets a character
+    /// and then increases _h_ by the width of that character.
+    /// The problem is that without looking up the font metric file,
+    ///     the data structure doesn't know by how much to increase _h_.
+    /// Thus, the value of _h_ in this data structure is an integer
+    ///     plus a slice of characters whose widths should be added to
+    ///     get the true value of _h_.
+    ///
+    /// ```
+    /// let mut values: dvi::Values = Default::default();
+    /// // move h 3 units to the right
+    /// values.update(&dvi::Op::Right(1));
+    /// // set the font
+    /// values.update(&dvi::Op::EnableFont(2));
+    /// // typeset DVI and move h each time
+    /// values.update(&dvi::Op::TypesetChar{char: 'D' as u32, move_h: true});
+    /// values.update(&dvi::Op::TypesetChar{char: 'V' as u32, move_h: true});
+    /// values.update(&dvi::Op::TypesetChar{char: 'I' as u32, move_h: true});
+    ///
+    /// assert_eq![
+    ///     values.h(),
+    ///     (1_i32, [
+    ///         ('D' as u32, 2_u32),
+    ///         ('V' as u32, 2_u32),
+    ///         ('I' as u32, 2_u32),
+    ///     ].as_slice()),
+    /// ];
+    /// ```
+    pub fn h(&self) -> (i32, &[(u32, u32)]) {
+        (self.top.h, self.top.h_chars.as_slice())
+    }
+    /// Get the current value of the vertical position, _v_.
+    pub fn v(&self) -> i32 {
+        self.top.v
+    }
+    /// Get the current value of a variable.
+    pub fn var(&self, var: Var) -> i32 {
+        self.top.vars[var as usize]
+    }
+    /// Get the current value of the variable _w_.
+    pub fn w(&self) -> i32 {
+        self.var(Var::W)
+    }
+    /// Get the current value of the variable _x_.
+    pub fn x(&self) -> i32 {
+        self.var(Var::X)
+    }
+    /// Get the current value of the variable _y_.
+    pub fn y(&self) -> i32 {
+        self.var(Var::Y)
+    }
+    /// Get the current value of the variable _z_.
+    pub fn z(&self) -> i32 {
+        self.var(Var::Z)
+    }
 }
 
 #[cfg(test)]
@@ -1119,6 +1346,288 @@ mod tests {
                 postamble: 2,
                 num_223_bytes: 6
             }
+        ),
+    );
+
+    #[derive(Default)]
+    struct WantValues {
+        f: u32,
+        h: i32,
+        h_chars: Vec<(u32, u32)>,
+        v: i32,
+        w: i32,
+        x: i32,
+        y: i32,
+        z: i32,
+    }
+
+    fn run_values_test(ops: Vec<Op>, changed: Vec<bool>, want_values: WantValues) {
+        let mut values: Values = Default::default();
+        for (i, op) in ops.into_iter().enumerate() {
+            let want_changed = changed[i];
+            let got_changed = values.update(&op);
+            assert_eq!(want_changed, got_changed);
+        }
+        assert_eq!(values.f(), want_values.f, "unexpected f value");
+        assert_eq!(values.h().0, want_values.h, "unexpected h.0 value");
+        assert_eq!(values.h().1, want_values.h_chars, "unexpected h.1 value");
+        assert_eq!(values.v(), want_values.v, "unexpected v value");
+        assert_eq!(values.w(), want_values.w, "unexpected w value");
+        assert_eq!(values.x(), want_values.x, "unexpected x value");
+        assert_eq!(values.y(), want_values.y, "unexpected y value");
+        assert_eq!(values.z(), want_values.z, "unexpected z value");
+    }
+
+    macro_rules! values_tests {
+        ( $(
+            (
+                $name: ident,
+                [ $( $op: expr ),+ ],
+                [ $( $changed: expr ),+ ],
+                $( f: $want_f: expr, )?
+                $( h: $want_h: expr, )?
+                $( h_chars: $want_h_chars: expr, )?
+                $( v: $want_v: expr, )?
+                $( w: $want_w: expr, )?
+                $( x: $want_x: expr, )?
+                $( y: $want_y: expr, )?
+                $( z: $want_z: expr, )?
+            ),
+        )+ ) => {
+            $(
+                #[test]
+                fn $name() {
+                    let ops = vec![ $( $op, )+ ];
+                    let changed = vec![ $( $changed, )+ ];
+                    let mut want_values: WantValues = Default::default();
+                    $( want_values.f = $want_f; )?
+                    $( want_values.h = $want_h; )?
+                    $( want_values.h_chars = $want_h_chars; )?
+                    $( want_values.v = $want_v; )?
+                    $( want_values.w = $want_w; )?
+                    $( want_values.x = $want_x; )?
+                    $( want_values.y = $want_y; )?
+                    $( want_values.z = $want_z; )?
+                    run_values_test(ops, changed, want_values);
+                }
+            )+
+        };
+    }
+
+    values_tests!(
+        (
+            noop,
+            [Op::NoOp],
+            [false],
+            f: 0,
+        ),
+        (
+            extension,
+            [Op::Extension(vec![1,2,3])],
+            [false],
+            f: 0,
+        ),
+        (
+            define_font,
+            [Op::DefineFont{ number: 0, checksum: 1, at_size: 2, design_size: 3, area: "".to_string(), name: "".to_string() }],
+            [false],
+            f: 0,
+        ),
+        (
+            preamble,
+            [Op::Preamble{ dvi_format: 1, unit_numerator: 2, unit_denominator: 3, magnification: 4, comment: "".to_string() }],
+            [false],
+            f: 0,
+        ),
+        (
+            begin_postamble,
+            [Op::BeginPostamble{ final_begin_page: 1, unit_numerator: 2, unit_denominator: 3, magnification: 4, largest_height: 5, largest_width: 6, max_stack_depth: 7, num_pages: 8 }],
+            [false],
+            f: 0,
+        ),
+        (
+            end_postamble,
+            [Op::EndPostamble{ postamble: 1, dvi_format: 2, num_223_bytes: 3 }],
+            [false],
+            f: 0,
+        ),
+        (
+            enable_font_1,
+            [Op::EnableFont(3), Op::EnableFont(3)],
+            [true, false],
+            f: 3,
+        ),
+        (
+            enable_font_2,
+            [Op::EnableFont(3), Op::Push, Op::EnableFont(5), Op::Pop],
+            [true, false, true, false],
+            f: 5,
+        ),
+        (
+            var_w_1,
+            [Op::SetVar(Var::W, 5), Op::SetVar(Var::W, 5)],
+            [true, true],
+            h: 10,
+            w: 5,
+        ),
+        (
+            var_w_2,
+            [Op::SetVar(Var::W, 5), Op::Push, Op::SetVar(Var::W, 3), Op::Pop],
+            [true, false, true, true],
+            h: 5,
+            w: 5,
+        ),
+        (
+            var_w_3,
+            [Op::SetVar(Var::W, 5), Op::Push, Op::SetVar(Var::W, 5), Op::Pop],
+            [true, false, true, true],
+            h: 5,
+            w: 5,
+        ),
+        (
+            var_w_4,
+            [Op::SetVar(Var::W, 5), Op::SetVar(Var::W, 0), Op::SetVar(Var::W, 0)],
+            [true, true, false],
+            h: 5,
+            w: 0,
+        ),
+        (
+            var_w_5,
+            [Op::SetVar(Var::W, 5), Op::Move(Var::W)],
+            [true, true],
+            h: 10,
+            w: 5,
+        ),
+        (
+            var_w_6,
+            [Op::SetVar(Var::W, 0), Op::Move(Var::W)],
+            [false, false],
+            h: 0,
+            w: 0,
+        ),
+        (
+            var_x,
+            [Op::SetVar(Var::X, 5), Op::SetVar(Var::X, 5), Op::Move(Var::X)],
+            [true, true, true],
+            h: 15,
+            x: 5,
+        ),
+        (
+            var_y,
+            [Op::SetVar(Var::Y, 5), Op::SetVar(Var::Y, 5), Op::Move(Var::Y)],
+            [true, true, true],
+            v: 15,
+            y: 5,
+        ),
+        (
+            var_z,
+            [Op::SetVar(Var::Z, 5), Op::SetVar(Var::Z, 5), Op::Move(Var::Z)],
+            [true, true, true],
+            v: 15,
+            z: 5,
+        ),
+        (
+            right_1,
+            [Op::Right(5)],
+            [true],
+            h: 5,
+        ),
+        (
+            right_2,
+            [Op::Right(0)],
+            [false],
+            h: 0,
+        ),
+        (
+            down_1,
+            [Op::Down(5)],
+            [true],
+            v: 5,
+        ),
+        (
+            down_2,
+            [Op::Down(0)],
+            [false],
+            v: 0,
+        ),
+        (
+            rule_1,
+            [Op::TypesetRule{height: 2, width: 3, move_h: true}],
+            [true],
+            h: 3,
+        ),
+        (
+            rule_2,
+            [Op::TypesetRule{height: 2, width: 0, move_h: true}],
+            [false],
+            h: 0,
+        ),
+        (
+            rule_3,
+            [Op::TypesetRule{height: 2, width: 3, move_h: false}],
+            [false],
+            h: 0,
+        ),
+        (
+            begin_page_1,
+            [
+                Op::SetVar(Var::W, 1),
+                Op::SetVar(Var::X, 2),
+                Op::SetVar(Var::Y, 3),
+                Op::SetVar(Var::Z, 4),
+                Op::BeginPage { parameters: Default::default(), previous_begin_page: 1 }
+            ],
+            [true, true, true, true, true],
+            h: 0,
+            v: 0,
+            w: 0,
+            x: 0,
+            y: 0,
+            z: 0,
+        ),
+        (
+            begin_page_2,
+            [
+                Op::SetVar(Var::W, 0),
+                Op::SetVar(Var::X, 0),
+                Op::SetVar(Var::Y, 0),
+                Op::SetVar(Var::Z, 0),
+                Op::BeginPage { parameters: Default::default(), previous_begin_page: 1 }
+            ],
+            [false, false, false, false, false],
+            h: 0,
+            v: 0,
+            w: 0,
+            x: 0,
+            y: 0,
+            z: 0,
+        ),
+        (
+            end_page,
+            [Op::EndPage],
+            [false],
+            h: 0,
+        ),
+        (
+            typeset_char_1,
+            [Op::TypesetChar{char: 1, move_h: true}],
+            [true],
+            h: 0,
+            h_chars: vec![(1, 0)],
+        ),
+        (
+            typeset_char_2,
+            [Op::TypesetChar{char: 1, move_h: false}],
+            [false],
+            h: 0,
+            h_chars: vec![],
+        ),
+        (
+            typeset_char_3,
+            [Op::Push, Op::TypesetChar{char: 1, move_h: true}, Op::Pop],
+            [false, true, true],
+            h: 0,
+            h_chars: vec![],
         ),
     );
 }

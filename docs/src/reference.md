@@ -6,6 +6,7 @@ The texcraft.dev version is from the most recent deployment of the website.
 | Name              | Rust documentation 
 | ----------------- | ------------------
 | `boxworks`        | [texcraft.dev](/reference/boxworks/)
+| `dvi`        | [texcraft.dev](/reference/dvi/)
 | `texlang`         | [docs.rs](https://docs.rs/texlang) / [texcraft.dev](/reference/texlang/)
 | `texlang-common`  | [docs.rs](https://docs.rs/texlang-common) / [texcraft.dev](/reference/texlang_common)
 | `texlang-font`    | [texcraft.dev](/reference/texlang_font)
