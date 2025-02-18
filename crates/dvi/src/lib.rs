@@ -72,6 +72,7 @@
 
 mod deserialize;
 mod serialize;
+pub mod transforms;
 
 /// A variable in DVI data.
 ///
