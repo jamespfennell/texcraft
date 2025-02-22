@@ -26,11 +26,25 @@ pub trait FontFormat: Sized {
 pub struct Scaled(pub i32);
 
 impl Scaled {
-    /// Representation of the number 0 as a [Number].
+    /// Representation of the number 0 as a [Scaled].
     pub const ZERO: Scaled = Scaled(0);
 
-    /// Representation of the number 1 as a [Number].
+    /// Representation of the number 1 as a [Scaled].
     pub const ONE: Scaled = Scaled(1 << 16);
+
+    /// Representation of the number 2 as a [Scaled].
+    pub const TWO: Scaled = Scaled(1 << 17);
+
+    /// Creates a scaled number from a decimal fraction.
+    /// 
+    /// TeX.2021.102.
+    pub fn from_decimal_fraction(digits: &[u8]) -> Scaled {
+        let mut a = 0;
+        for d in digits.iter().rev() {
+            a = (a + (*d as i32) * Scaled::TWO.0) / 10
+        }
+        Scaled((a+1)/2)
+    }
 }
 
 impl std::ops::Add<Scaled> for Scaled {
