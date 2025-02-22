@@ -3,7 +3,7 @@
 //! This crate implements font loading and
 //! font variable management for Texlang.
 
-use font::Format;
+use core::FontFormat;
 use texlang as txl;
 use texlang::command;
 use texlang::error;
@@ -94,7 +94,7 @@ pub trait HasFontRepo {
 /// a font repo that they will use for getting font metric data.
 pub trait FontRepo {
     /// Format of files that are store in this repo
-    type Format: font::Format;
+    type Format: core::FontFormat;
     fn add_font(&mut self, id: types::Font, font: Self::Format);
 }
 
@@ -107,7 +107,7 @@ impl<T> Default for NoOpFontRepo<T> {
     }
 }
 
-impl<T: font::Format> FontRepo for NoOpFontRepo<T> {
+impl<T: core::FontFormat> FontRepo for NoOpFontRepo<T> {
     type Format = T;
 
     fn add_font(&mut self, _: types::Font, _: Self::Format) {}
@@ -265,7 +265,7 @@ mod tests {
             write!(f, "invalid font file")
         }
     }
-    impl font::Format for MockFont {
+    impl core::FontFormat for MockFont {
         const DEFAULT_FILE_EXTENSION: &'static str = "mock";
         type Error = MockFontError;
         fn parse(b: &[u8]) -> Result<Self, Self::Error> {

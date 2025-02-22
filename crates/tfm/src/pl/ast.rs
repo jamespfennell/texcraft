@@ -4,7 +4,7 @@
 
 use super::cst;
 use super::error::*;
-use crate::{ligkern::lang::PostLigOperation, Char, Face, NamedParameter, Number};
+use crate::{ligkern::lang::PostLigOperation, Char, Face, NamedParameter, FixWord};
 use std::ops::Range;
 
 /// Abstract syntax tree for property list files
@@ -358,7 +358,7 @@ pub enum Root {
     /// you have a font that has been digitized with 600 pixels per em,
     ///     and the design size is one em;
     ///     then you could say `(DESIGNUNITS R 600)` if you wanted to give all of your measurements in units of pixels.
-    DesignUnits(SingleValue<Number>),
+    DesignUnits(SingleValue<FixWord>),
 
     /// A string that identifies the correspondence between the numeric codes and font characters.
     /// Its length must be less than 40.
@@ -442,12 +442,12 @@ node_impl!(
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum FontDimension {
     /// A named parameters like `(SLANT R -.25)`.
-    NamedParam(NamedParameter, SingleValue<Number>),
+    NamedParam(NamedParameter, SingleValue<FixWord>),
 
     /// The notation `PARAMETER n` provides another way to specify the nth parameter;
     ///     for example, `(PARAMETER D 1 R −.25)` is another way to specify that the `SLANT` is −0.25.
     /// The value of n must be strictly positive and less than max param words.
-    IndexedParam(TupleValue<ParameterNumber, Number>),
+    IndexedParam(TupleValue<ParameterNumber, FixWord>),
 
     /// A comment that is ignored.
     Comment(String),
@@ -596,16 +596,16 @@ node_impl!(
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum Character {
     /// The character's width in design units.
-    Width(SingleValue<Option<Number>>),
+    Width(SingleValue<Option<FixWord>>),
 
     /// The character's height in design units.
-    Height(SingleValue<Number>),
+    Height(SingleValue<FixWord>),
 
     /// The character's depth in design units.
-    Depth(SingleValue<Number>),
+    Depth(SingleValue<FixWord>),
 
     /// The character's italic correction in design units.
-    ItalicCorrection(SingleValue<Number>),
+    ItalicCorrection(SingleValue<FixWord>),
 
     /// Specifies the character that follows the present one in a "charlist."
     /// The value must be the number of a character in the font,
@@ -709,7 +709,7 @@ pub enum LigTable {
     ///     otherwise go on to the next instruction."
     /// The value of r, which is in design units, is often negative.
     /// Character code c must exist in the font.
-    Kern(TupleValue<Char, Number>),
+    Kern(TupleValue<Char, FixWord>),
 
     /// A stop instruction ends a ligature/kern program.
     /// It must follow either a `LIG` or `KRN` instruction, not a `LABEL` or `STOP` or `SKIP`.
@@ -1099,7 +1099,7 @@ impl TryParse for bool {
     }
 }
 
-impl Parse for Number {
+impl Parse for FixWord {
     // PLtoTF.2014.62
     fn parse(input: &mut Input) -> (Self, Range<usize>) {
         input.consume_spaces();
@@ -1113,7 +1113,7 @@ impl Parse for Number {
                     knuth_pltotf_offset: Some(span.end),
                     kind: ParseWarningKind::InvalidPrefixForDecimalNumber,
                 });
-                return (Number::ZERO, span);
+                return (FixWord::ZERO, span);
             }
         }
         input.consume_spaces();
@@ -1174,7 +1174,7 @@ impl Parse for Number {
             acc
         };
 
-        if integer_part >= 2048 || (fractional_part >= Number::UNITY.0 && integer_part == 2047) {
+        if integer_part >= 2048 || (fractional_part >= FixWord::ONE.0 && integer_part == 2047) {
             let span_end = input.raw_data_span.start;
             input.skip_error(ParseWarning {
                 span: number_span_start..span_end,
@@ -1182,14 +1182,14 @@ impl Parse for Number {
                 kind: ParseWarningKind::DecimalNumberIsTooBig,
             });
             return if integer_part == 2047 {
-                (Number::UNITY, span_start..span_end)
+                (FixWord::ONE, span_start..span_end)
             } else {
-                (Number::ZERO, span_start..span_end)
+                (FixWord::ZERO, span_start..span_end)
             };
         }
 
         let modulus = integer_part
-            .checked_mul(Number::UNITY.0)
+            .checked_mul(FixWord::ONE.0)
             .unwrap()
             .checked_add(fractional_part)
             .unwrap();
@@ -1198,7 +1198,7 @@ impl Parse for Number {
         } else {
             modulus
         };
-        (Number(result), span_start..input.raw_data_span.start)
+        (FixWord(result), span_start..input.raw_data_span.start)
     }
     fn to_string(self, _: &LowerOpts) -> Option<String> {
         Some(format!["R {self}"])
@@ -1209,35 +1209,35 @@ impl Parse for Number {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum DesignSize {
-    Valid(Number),
+    Valid(FixWord),
     Invalid,
 }
 
 impl Default for DesignSize {
     fn default() -> Self {
-        DesignSize::Valid(Number::UNITY * 10)
+        DesignSize::Valid(FixWord::ONE * 10)
     }
 }
 
 impl DesignSize {
-    pub fn get(&self) -> Number {
+    pub fn get(&self) -> FixWord {
         match self {
             DesignSize::Valid(v) => *v,
-            DesignSize::Invalid => Number::UNITY * 10,
+            DesignSize::Invalid => FixWord::ONE * 10,
         }
     }
 }
 
-impl From<Number> for DesignSize {
-    fn from(value: Number) -> Self {
+impl From<FixWord> for DesignSize {
+    fn from(value: FixWord) -> Self {
         Self::Valid(value)
     }
 }
 
 impl Parse for DesignSize {
     fn parse(input: &mut Input) -> (Self, Range<usize>) {
-        let (n, r) = Number::parse(input);
-        let d = if n < Number::UNITY {
+        let (n, r) = FixWord::parse(input);
+        let d = if n < FixWord::ONE {
             input.errors.push(ParseWarning {
                 span: r.start..input.raw_data_span.end,
                 knuth_pltotf_offset: Some(input.raw_data_span.end),
@@ -1257,9 +1257,9 @@ impl Parse for DesignSize {
     }
 }
 
-impl Parse for Option<Number> {
+impl Parse for Option<FixWord> {
     fn parse(input: &mut Input) -> (Self, Range<usize>) {
-        let (n, r) = Number::parse(input);
+        let (n, r) = FixWord::parse(input);
         (Some(n), r)
     }
 
@@ -1720,7 +1720,7 @@ mod tests {
             fix_word_integer,
             r"(DESIGNSIZE D 1)",
             vec![Root::DesignSize(SingleValue {
-                data: Number::UNITY.into(),
+                data: FixWord::ONE.into(),
                 data_span: 12..15,
             })],
             vec![],
@@ -1729,7 +1729,7 @@ mod tests {
             fix_word_decimal,
             r"(DESIGNSIZE D 11.5)",
             vec![Root::DesignSize(SingleValue {
-                data: (Number::UNITY * 23 / 2).into(),
+                data: (FixWord::ONE * 23 / 2).into(),
                 data_span: 12..18,
             })],
             vec![],
@@ -1741,7 +1741,7 @@ mod tests {
                 data: Char::X,
                 data_span: 11..14,
                 children: vec![Character::Width(SingleValue {
-                    data: Some(Number::UNITY * -23 / 2),
+                    data: Some(FixWord::ONE * -23 / 2),
                     data_span: 23..30,
                 })]
             }),],
@@ -1751,7 +1751,7 @@ mod tests {
             fix_word_too_big,
             r"(DESIGNSIZE D 2047.9999999)",
             vec![Root::DesignSize(SingleValue {
-                data: Number::UNITY.into(),
+                data: FixWord::ONE.into(),
                 data_span: 12..26,
             })],
             vec![ParseWarning {
@@ -1813,11 +1813,11 @@ mod tests {
                     data_span: 78..83,
                 }),
                 Root::DesignSize(SingleValue {
-                    data: (Number::UNITY * 10).into(),
+                    data: (FixWord::ONE * 10).into(),
                     data_span: 109..113,
                 }),
                 Root::DesignUnits(SingleValue {
-                    data: Number::UNITY * 18,
+                    data: FixWord::ONE * 18,
                     data_span: 140..144,
                 }),
                 Root::Comment(" A COMMENT IS IGNORED".into()),
@@ -1833,42 +1833,42 @@ mod tests {
                         FontDimension::NamedParam(
                             NamedParameter::Slant,
                             SingleValue {
-                                data: Number::UNITY * -1 / 4,
+                                data: FixWord::ONE * -1 / 4,
                                 data_span: 369..375,
                             }
                         ),
                         FontDimension::NamedParam(
                             NamedParameter::Space,
                             SingleValue {
-                                data: Number::UNITY * 6,
+                                data: FixWord::ONE * 6,
                                 data_span: 399..402,
                             }
                         ),
                         FontDimension::NamedParam(
                             NamedParameter::Shrink,
                             SingleValue {
-                                data: Number::UNITY * 2,
+                                data: FixWord::ONE * 2,
                                 data_span: 427..430,
                             }
                         ),
                         FontDimension::NamedParam(
                             NamedParameter::Stretch,
                             SingleValue {
-                                data: Number::UNITY * 3,
+                                data: FixWord::ONE * 3,
                                 data_span: 456..459,
                             }
                         ),
                         FontDimension::NamedParam(
                             NamedParameter::XHeight,
                             SingleValue {
-                                data: Number(1055 * Number::UNITY.0 / 100 + 1),
+                                data: FixWord(1055 * FixWord::ONE.0 / 100 + 1),
                                 data_span: 485..492,
                             }
                         ),
                         FontDimension::NamedParam(
                             NamedParameter::Quad,
                             SingleValue {
-                                data: Number::UNITY * 18,
+                                data: FixWord::ONE * 18,
                                 data_span: 515..519,
                             }
                         ),
@@ -1911,7 +1911,7 @@ mod tests {
                         LigTable::Kern(TupleValue {
                             left: Char(0o51),
                             left_span: 724..728,
-                            right: Number::UNITY * 3 / 2,
+                            right: FixWord::ONE * 3 / 2,
                             right_span: 729..734,
                         }),
                         LigTable::Lig(
@@ -1934,15 +1934,15 @@ mod tests {
                     data_span: 828..831,
                     children: vec![
                         Character::Width(SingleValue {
-                            data: Some(Number::UNITY * 6),
+                            data: Some(FixWord::ONE * 6),
                             data_span: 855..858,
                         }),
                         Character::Height(SingleValue {
-                            data: Number::UNITY * 27 / 2,
+                            data: FixWord::ONE * 27 / 2,
                             data_span: 883..889,
                         }),
                         Character::ItalicCorrection(SingleValue {
-                            data: Number::UNITY * 3 / 2,
+                            data: FixWord::ONE * 3 / 2,
                             data_span: 914..919,
                         }),
                     ]

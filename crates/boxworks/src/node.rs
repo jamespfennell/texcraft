@@ -1,9 +1,10 @@
-use font;
+use core;
 /// Data structures for boxes
 ///
 /// This module implements the entirety of TeX.2021 part 10, data structures
 /// for boxes and their friends.
-use font::{GlueOrder, Number};
+use core::GlueOrder;
+use core::Scaled as Number;
 
 /// Horizontal node.
 pub enum Horizontal {
@@ -175,7 +176,7 @@ pub struct Insertion {
     pub height: Number,
     /// Used in case this insertion is split.
     pub split_max_depth: Number,
-    pub split_top_skip: font::Glue,
+    pub split_top_skip: core::Glue,
     /// Penalty to be used if this insertion floats to a subsequent
     /// page after a split insertion of the same class.
     pub float_penalty: u32,
@@ -343,7 +344,7 @@ impl Vertical {
 /// Described in TeX.2021.149.
 pub struct Glue {
     pub kind: GlueKind,
-    pub glue: font::Glue,
+    pub glue: core::Glue,
 }
 
 /// The kind of a glue node.

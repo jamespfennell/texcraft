@@ -52,28 +52,28 @@ pub struct File {
     pub unset_char_tags: BTreeMap<Char, u8>,
 
     /// Character widths
-    pub widths: Vec<Number>,
+    pub widths: Vec<FixWord>,
 
     /// Character heights
-    pub heights: Vec<Number>,
+    pub heights: Vec<FixWord>,
 
     /// Character depths
-    pub depths: Vec<Number>,
+    pub depths: Vec<FixWord>,
 
     /// Character italic corrections
-    pub italic_corrections: Vec<Number>,
+    pub italic_corrections: Vec<FixWord>,
 
     /// Lig kern program.
     pub lig_kern_program: ligkern::lang::Program,
 
     /// Kerns. These are referenced from inside the lig kern commands.
-    pub kerns: Vec<Number>,
+    pub kerns: Vec<FixWord>,
 
     /// Extensible characters.
     pub extensible_chars: Vec<ExtensibleRecipe>,
 
     /// Font parameters.
-    pub params: Vec<Number>,
+    pub params: Vec<FixWord>,
 }
 
 /// Data about one character in a .tfm file.
@@ -172,10 +172,10 @@ impl Default for File {
             char_dimens: Default::default(),
             char_tags: Default::default(),
             unset_char_tags: Default::default(),
-            widths: vec![Number::ZERO],
-            heights: vec![Number::ZERO],
-            depths: vec![Number::ZERO],
-            italic_corrections: vec![Number::ZERO],
+            widths: vec![FixWord::ZERO],
+            heights: vec![FixWord::ZERO],
+            depths: vec![FixWord::ZERO],
+            italic_corrections: vec![FixWord::ZERO],
             lig_kern_program: Default::default(),
             kerns: vec![],
             extensible_chars: vec![],
@@ -294,15 +294,15 @@ impl From<crate::pl::File> for File {
         for (char, char_dimens) in &pl_file.char_dimens {
             widths.push(char_dimens.width.unwrap_or_default());
             match char_dimens.height {
-                None | Some(Number::ZERO) => {}
+                None | Some(FixWord::ZERO) => {}
                 Some(height) => heights.push(height),
             }
             match char_dimens.depth {
-                None | Some(Number::ZERO) => {}
+                None | Some(FixWord::ZERO) => {}
                 Some(depth) => depths.push(depth),
             }
             match char_dimens.italic_correction {
-                None | Some(Number::ZERO) => {}
+                None | Some(FixWord::ZERO) => {}
                 Some(italic_correction) => italic_corrections.push(italic_correction),
             }
             char_bounds = Some(match char_bounds {
@@ -475,20 +475,20 @@ impl From<crate::pl::File> for File {
 /// By the pigeon-hole principle, there exists a `k` such that the range `[m * 2^{k-1}, m * 2^k]`
 ///     contains O(n^2) elements.
 /// In the worst-case, the solution is the maximum element of this range.
-pub fn compress(values: &[Number], max_size: u8) -> (Vec<Number>, HashMap<Number, NonZeroU8>) {
+pub fn compress(values: &[FixWord], max_size: u8) -> (Vec<FixWord>, HashMap<FixWord, NonZeroU8>) {
     let max_size = max_size as usize;
     let dedup_values = {
-        let s: HashSet<Number> = values.iter().copied().collect();
+        let s: HashSet<FixWord> = values.iter().copied().collect();
         // remove the zero value for non-widths
         // and then add it back in at the start
-        let mut v: Vec<Number> = s.into_iter().collect();
+        let mut v: Vec<FixWord> = s.into_iter().collect();
         v.sort();
         v
     };
     // After deduplication, it is possible we don't need to compress at all so we can exit early.
     // This also handles the case when the values slice is empty.
     if dedup_values.len() <= max_size {
-        let m: HashMap<Number, NonZeroU8> = dedup_values
+        let m: HashMap<FixWord, NonZeroU8> = dedup_values
             .iter()
             .enumerate()
             .map(|(i, &w)| {
@@ -497,7 +497,7 @@ pub fn compress(values: &[Number], max_size: u8) -> (Vec<Number>, HashMap<Number
                 (w, i) })
             .collect();
         let mut dedup_values = dedup_values;
-        dedup_values.push(Number::ZERO);
+        dedup_values.push(FixWord::ZERO);
         dedup_values.rotate_right(1);
         return (dedup_values, m);
     }
@@ -507,7 +507,7 @@ pub fn compress(values: &[Number], max_size: u8) -> (Vec<Number>, HashMap<Number
     //
     // Invariant: delta<lower is never a solution.
     // Because delta must be non-negative, we initialize it to zero.
-    let mut lower = Number::ZERO;
+    let mut lower = FixWord::ZERO;
     // Invariant: delta=upper is always solution.
     // To initialize upper and begin the search we construct a solution that always works: a single
     // interval encompassing the entire slice and the largest delta possible.
@@ -525,7 +525,7 @@ pub fn compress(values: &[Number], max_size: u8) -> (Vec<Number>, HashMap<Number
         let mut interval_start = *dedup_values.first().unwrap();
         // The smallest delta such that the candidate solution will be the same.
         // This is the maximum of all gaps that don't start a new interval.
-        let mut delta_lower = Number::ZERO;
+        let mut delta_lower = FixWord::ZERO;
         // The largest delta such that the candidate solution will be different.
         // This is the minimum of all gaps that start a new interval.
         let mut delta_upper = max_delta;
@@ -563,8 +563,8 @@ pub fn compress(values: &[Number], max_size: u8) -> (Vec<Number>, HashMap<Number
         buffer.clear();
     }
 
-    let mut value_to_index = HashMap::<Number, NonZeroU8>::new();
-    let mut result = vec![Number::ZERO];
+    let mut value_to_index = HashMap::<FixWord, NonZeroU8>::new();
+    let mut result = vec![FixWord::ZERO];
     let mut previous = 0_usize;
     for i in solution {
         let interval = &dedup_values[previous..i];
@@ -661,10 +661,10 @@ impl std::fmt::Display for Section {
 mod tests {
     use super::*;
 
-    fn run_compress_test(values: Vec<Number>, max_size: u8, want: Vec<Number>, want_map: Vec<u8>) {
+    fn run_compress_test(values: Vec<FixWord>, max_size: u8, want: Vec<FixWord>, want_map: Vec<u8>) {
         let (got, got_map) = compress(&values, max_size);
         assert_eq!(got, want);
-        let want_map: HashMap<Number, NonZeroU8> = want_map
+        let want_map: HashMap<FixWord, NonZeroU8> = want_map
             .into_iter()
             .enumerate()
             .map(|(i, t)| (values[i], t.try_into().unwrap()))
@@ -688,66 +688,66 @@ mod tests {
     }
 
     compress_tests!(
-        (no_op_0, vec![], 1, vec![Number(0)], vec![],),
+        (no_op_0, vec![], 1, vec![FixWord(0)], vec![],),
         (
             no_op_2,
-            vec![Number::UNITY * 2, Number::UNITY],
+            vec![FixWord::ONE * 2, FixWord::ONE],
             2,
-            vec![Number(0), Number::UNITY, Number::UNITY * 2],
+            vec![FixWord(0), FixWord::ONE, FixWord::ONE * 2],
             vec![2, 1],
         ),
         (
             just_deduplication,
-            vec![Number::UNITY, Number::UNITY],
+            vec![FixWord::ONE, FixWord::ONE],
             1,
-            vec![Number(0), Number::UNITY],
+            vec![FixWord(0), FixWord::ONE],
             vec![1, 1],
         ),
         (
             simple_compression_case,
-            vec![Number::UNITY, Number::UNITY * 2],
+            vec![FixWord::ONE, FixWord::ONE * 2],
             1,
-            vec![Number(0), Number::UNITY * 3 / 2],
+            vec![FixWord(0), FixWord::ONE * 3 / 2],
             vec![1, 1],
         ),
         (
             simple_compression_case_2,
             vec![
-                Number::UNITY,
-                Number::UNITY * 2,
-                Number::UNITY * 200,
-                Number::UNITY * 201
+                FixWord::ONE,
+                FixWord::ONE * 2,
+                FixWord::ONE * 200,
+                FixWord::ONE * 201
             ],
             2,
-            vec![Number(0), Number::UNITY * 3 / 2, Number::UNITY * 401 / 2],
+            vec![FixWord(0), FixWord::ONE * 3 / 2, FixWord::ONE * 401 / 2],
             vec![1, 1, 2, 2],
         ),
         (
             lower_upper_close_edge_case_1,
-            vec![Number(1), Number(3)],
+            vec![FixWord(1), FixWord(3)],
             1,
-            vec![Number(0), Number(2)],
+            vec![FixWord(0), FixWord(2)],
             vec![1, 1],
         ),
         (
             lower_upper_close_edge_case_2,
-            vec![Number(0), Number(2)],
+            vec![FixWord(0), FixWord(2)],
             1,
-            vec![Number(0), Number(1)],
+            vec![FixWord(0), FixWord(1)],
             vec![1, 1],
         ),
         (
             lower_upper_close_edge_case_3,
-            vec![Number(1), Number(4)],
+            vec![FixWord(1), FixWord(4)],
             1,
-            vec![Number(0), Number(2)],
+            vec![FixWord(0), FixWord(2)],
             vec![1, 1],
         ),
         (
             lower_upper_close_edge_case_4,
-            vec![Number(1), Number(2)],
+            vec![FixWord(1), FixWord(2)],
             1,
-            vec![Number(0), Number(1)],
+            vec![FixWord(0), FixWord(1)],
             vec![1, 1],
         ),
     );

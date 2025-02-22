@@ -115,7 +115,7 @@ impl Serializable for (Option<CharDimensions>, SerializableCharTag) {
     }
 }
 
-impl Serializable for Number {
+impl Serializable for FixWord {
     fn serialize(&self, b: &mut Vec<u8>, _: Option<Char>) {
         (self.0 as u32).serialize(b, None)
     }

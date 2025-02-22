@@ -9,4 +9,4 @@ repository = "https://github.com/jamespfennell/texcraft"
 keywords = ["tex", "texcraft"]
 
 [dependencies]
-font = { path = "../font", version="0.1.0" }
+core = { path = "../core", version="0.1.0" }

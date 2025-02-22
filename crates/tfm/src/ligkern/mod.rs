@@ -79,7 +79,7 @@
 
 mod compiler;
 use crate::Char;
-use crate::Number;
+use crate::FixWord;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 pub mod lang;
@@ -90,7 +90,7 @@ pub mod lang;
 pub struct CompiledProgram {
     left_to_pairs: BTreeMap<Char, (u16, u16)>,
     pairs: Vec<(Char, RawReplacement)>,
-    middle_chars: Vec<(Char, Number)>,
+    middle_chars: Vec<(Char, FixWord)>,
 }
 
 #[derive(Debug, Clone)]
@@ -105,7 +105,7 @@ impl CompiledProgram {
     /// Compile a lig/kern program.
     pub fn compile(
         program: &lang::Program,
-        kerns: &[Number],
+        kerns: &[FixWord],
         entrypoints: HashMap<Char, u16>,
     ) -> (CompiledProgram, Vec<InfiniteLoopError>) {
         compiler::compile(program, kerns, &entrypoints)
@@ -219,7 +219,7 @@ pub struct Replacement<'a> {
     /// Operation to perform on the left character.
     pub left_char_operation: LeftCharOperation,
     /// Slice of characters and kerns to insert after the left character.
-    pub middle_chars: &'a [(Char, Number)],
+    pub middle_chars: &'a [(Char, FixWord)],
     /// Last character to insert.
     pub last_char: Char,
 }
@@ -253,7 +253,7 @@ pub enum LeftCharOperation {
     /// Delete the left character.
     Delete,
     /// Retain the left character and append the specified kern.
-    AppendKern(Number),
+    AppendKern(FixWord),
 }
 
 /// Iterator over the replacement of a character pair in a lig/kern program.
@@ -271,12 +271,12 @@ enum IterState {
 }
 
 impl<'a> ReplacementIter<'a> {
-    fn i(&self) -> (IterState, Option<(Char, Number)>) {
+    fn i(&self) -> (IterState, Option<(Char, FixWord)>) {
         match self.state {
             IterState::LeftChar => (
                 IterState::MiddleChar(0),
                 match self.full_operation.left_char_operation {
-                    LeftCharOperation::Retain => Some((self.left_char, Number::ZERO)),
+                    LeftCharOperation::Retain => Some((self.left_char, FixWord::ZERO)),
                     LeftCharOperation::Delete => None,
                     LeftCharOperation::AppendKern(kern) => Some((self.left_char, kern)),
                 },
@@ -287,7 +287,7 @@ impl<'a> ReplacementIter<'a> {
             },
             IterState::LastChar => (
                 IterState::Exhausted,
-                Some((self.full_operation.last_char, Number::ZERO)),
+                Some((self.full_operation.last_char, FixWord::ZERO)),
             ),
             IterState::Exhausted => (IterState::Exhausted, None),
         }
@@ -295,7 +295,7 @@ impl<'a> ReplacementIter<'a> {
 }
 
 impl<'a> Iterator for ReplacementIter<'a> {
-    type Item = (Char, Number);
+    type Item = (Char, FixWord);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {

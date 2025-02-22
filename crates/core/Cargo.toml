@@ -1,9 +1,9 @@
 [package]
-name = "font"
+name = "core"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-description = "Font abstractions"
+description = "Core types and abstractions used in Texcraft"
 homepage = "https://texcraft.dev"
 repository = "https://github.com/jamespfennell/texcraft"
 keywords = ["tex", "texcraft"]

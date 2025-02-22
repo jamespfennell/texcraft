@@ -15,7 +15,7 @@ use crate::{
     format::{self, ExtensibleRecipe},
     ligkern,
     pl::ast::{DesignSize, ParameterNumber},
-    Char, Header, NamedParameter, NextLargerProgram, NextLargerProgramWarning, Number,
+    Char, Header, NamedParameter, NextLargerProgram, NextLargerProgramWarning, FixWord,
 };
 
 pub mod ast;
@@ -50,10 +50,10 @@ pub const MAX_LIG_KERN_INSTRUCTIONS: u16 = (i16::MAX as u16) - 257;
 /// Data about one character in a .pl file.
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct CharDimensions {
-    pub width: Option<Number>,
-    pub height: Option<Number>,
-    pub depth: Option<Number>,
-    pub italic_correction: Option<Number>,
+    pub width: Option<FixWord>,
+    pub height: Option<FixWord>,
+    pub depth: Option<FixWord>,
+    pub italic_correction: Option<FixWord>,
 }
 
 /// Tag of a character in a .pl file.
@@ -89,13 +89,13 @@ impl CharTag {
 #[derive(PartialEq, Eq, Debug)]
 pub struct File {
     pub header: Header,
-    pub design_units: Number,
+    pub design_units: FixWord,
     pub char_dimens: BTreeMap<Char, CharDimensions>,
     pub char_tags: BTreeMap<Char, CharTag>,
     /// Tags that have been unset, but whose discriminant is still written to a .tfm file by PLtoTF.
     pub unset_char_tags: BTreeMap<Char, u8>,
     pub lig_kern_program: ligkern::lang::Program,
-    pub params: Vec<Number>,
+    pub params: Vec<FixWord>,
 
     /// Additional widths that appear in the plst file but not appear in the fully parsed file.
     ///
@@ -107,20 +107,20 @@ pub struct File {
     /// In this case the width `8.0` is not in the fully parsed file because it is overwritten
     ///     by `9.0`.
     /// However pltotf still writes the `8.0` width to the .tfm file.
-    pub additional_widths: Vec<Number>,
+    pub additional_widths: Vec<FixWord>,
     /// Additional heights; similar to additional widths.
-    pub additional_heights: Vec<Number>,
+    pub additional_heights: Vec<FixWord>,
     /// Additional depths; similar to additional widths.
-    pub additional_depths: Vec<Number>,
+    pub additional_depths: Vec<FixWord>,
     /// Additional italic corrections; similar to additional widths.
-    pub additional_italics: Vec<Number>,
+    pub additional_italics: Vec<FixWord>,
 }
 
 impl Default for File {
     fn default() -> Self {
         Self {
             header: Header::pl_default(),
-            design_units: Number::UNITY,
+            design_units: FixWord::ONE,
             char_dimens: Default::default(),
             char_tags: Default::default(),
             unset_char_tags: Default::default(),
@@ -326,7 +326,7 @@ impl File {
                         match node {
                             ast::Character::Width(v) => {
                                 if let Some(additional_width) =
-                                    char_dimens.width.replace(v.data.unwrap_or(Number::ZERO))
+                                    char_dimens.width.replace(v.data.unwrap_or(FixWord::ZERO))
                                 {
                                     file.additional_widths.push(additional_width);
                                 }
@@ -438,7 +438,7 @@ impl File {
                         file.char_dimens.insert(
                             *next_larger,
                             CharDimensions {
-                                width: Some(Number::ZERO),
+                                width: Some(FixWord::ZERO),
                                 ..Default::default()
                             },
                         );
@@ -567,7 +567,7 @@ impl From<crate::format::File> for File {
 
         File {
             header: tfm_file.header,
-            design_units: Number::UNITY,
+            design_units: FixWord::ONE,
             char_dimens,
             char_tags,
             unset_char_tags: Default::default(),
@@ -1013,7 +1013,7 @@ mod tests {
             "(DESIGNSIZE R 3.0)",
             File {
                 header: Header {
-                    design_size: (Number::UNITY * 3).into(),
+                    design_size: (FixWord::ONE * 3).into(),
                     ..Header::pl_default()
                 },
                 ..Default::default()
@@ -1023,7 +1023,7 @@ mod tests {
             design_units,
             "(DESIGNUNITS R 2.0)",
             File {
-                design_units: Number::UNITY * 2,
+                design_units: FixWord::ONE * 2,
                 ..Default::default()
             },
         ),
@@ -1099,7 +1099,7 @@ mod tests {
             named_param,
             "(FONTDIMEN (STRETCH D 13.0))",
             File {
-                params: vec![Number::ZERO, Number::ZERO, Number::UNITY * 13],
+                params: vec![FixWord::ZERO, FixWord::ZERO, FixWord::ONE * 13],
                 ..Default::default()
             },
         ),
@@ -1107,7 +1107,7 @@ mod tests {
             indexed_param,
             "(FONTDIMEN (PARAMETER D 2 D 15.0))",
             File {
-                params: vec![Number::ZERO, Number::UNITY * 15],
+                params: vec![FixWord::ZERO, FixWord::ONE * 15],
                 ..Default::default()
             },
         ),
@@ -1119,7 +1119,7 @@ mod tests {
                     instructions: vec![ligkern::lang::Instruction {
                         next_instruction: None,
                         right_char: 'r'.try_into().unwrap(),
-                        operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
+                        operation: ligkern::lang::Operation::Kern(FixWord::ONE * 15),
                     },],
                     right_boundary_char: None,
                     left_boundary_char_entrypoint: None,
@@ -1137,12 +1137,12 @@ mod tests {
                         ligkern::lang::Instruction {
                             next_instruction: None,
                             right_char: 'r'.try_into().unwrap(),
-                            operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
+                            operation: ligkern::lang::Operation::Kern(FixWord::ONE * 15),
                         },
                         ligkern::lang::Instruction {
                             next_instruction: None,
                             right_char: 't'.try_into().unwrap(),
-                            operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
+                            operation: ligkern::lang::Operation::Kern(FixWord::ONE * 15),
                         },
                     ],
                     right_boundary_char: None,
@@ -1160,7 +1160,7 @@ mod tests {
                     instructions: vec![ligkern::lang::Instruction {
                         next_instruction: Some(3),
                         right_char: 'r'.try_into().unwrap(),
-                        operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
+                        operation: ligkern::lang::Operation::Kern(FixWord::ONE * 15),
                     },],
                     right_boundary_char: None,
                     left_boundary_char_entrypoint: None,
@@ -1199,7 +1199,7 @@ mod tests {
                     instructions: vec![ligkern::lang::Instruction {
                         next_instruction: None,
                         right_char: 'r'.try_into().unwrap(),
-                        operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
+                        operation: ligkern::lang::Operation::Kern(FixWord::ONE * 15),
                     },],
                     right_boundary_char: None,
                     left_boundary_char_entrypoint: None,
@@ -1220,7 +1220,7 @@ mod tests {
                     instructions: vec![ligkern::lang::Instruction {
                         next_instruction: None,
                         right_char: 'r'.try_into().unwrap(),
-                        operation: ligkern::lang::Operation::Kern(Number::UNITY * 15),
+                        operation: ligkern::lang::Operation::Kern(FixWord::ONE * 15),
                     },],
                     right_boundary_char: None,
                     left_boundary_char_entrypoint: Some(0),
@@ -1236,7 +1236,7 @@ mod tests {
                 char_dimens: BTreeMap::from([(
                     'r'.try_into().unwrap(),
                     CharDimensions {
-                        width: Some(Number::UNITY * 15),
+                        width: Some(FixWord::ONE * 15),
                         ..Default::default()
                     }
                 )]),
@@ -1250,7 +1250,7 @@ mod tests {
                 char_dimens: BTreeMap::from([(
                     'r'.try_into().unwrap(),
                     CharDimensions {
-                        height: Some(Number::UNITY * 15),
+                        height: Some(FixWord::ONE * 15),
                         ..Default::default()
                     }
                 )]),
@@ -1264,7 +1264,7 @@ mod tests {
                 char_dimens: BTreeMap::from([(
                     'r'.try_into().unwrap(),
                     CharDimensions {
-                        depth: Some(Number::UNITY * 15),
+                        depth: Some(FixWord::ONE * 15),
                         ..Default::default()
                     }
                 )]),
@@ -1278,7 +1278,7 @@ mod tests {
                 char_dimens: BTreeMap::from([(
                     'r'.try_into().unwrap(),
                     CharDimensions {
-                        italic_correction: Some(Number::UNITY * 15),
+                        italic_correction: Some(FixWord::ONE * 15),
                         ..Default::default()
                     }
                 )]),
@@ -1400,7 +1400,7 @@ mod tests {
                     }
                 ),
             ]),
-            widths: vec![Number::ZERO, Number::UNITY, Number::UNITY * 2],
+            widths: vec![FixWord::ZERO, FixWord::ONE, FixWord::ONE * 2],
             ..Default::default()
         },
         File {
@@ -1408,14 +1408,14 @@ mod tests {
                 (
                     'A'.try_into().unwrap(),
                     CharDimensions {
-                        width: Some(Number::UNITY),
+                        width: Some(FixWord::ONE),
                         ..Default::default()
                     }
                 ),
                 (
                     'C'.try_into().unwrap(),
                     CharDimensions {
-                        width: Some(Number::UNITY * 2),
+                        width: Some(FixWord::ONE * 2),
                         ..Default::default()
                     }
                 ),

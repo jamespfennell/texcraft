@@ -501,7 +501,7 @@ impl Header {
     fn deserialize(mut b: &[u8]) -> Self {
         let checksum = Some(u32::deserialize(b));
         b = &b[4..];
-        let design_size = Number::deserialize(b);
+        let design_size = FixWord::deserialize(b);
         b = b.get(4..).unwrap_or(&[0; 0]);
         let character_coding_scheme = deserialize_string(b.get(0..40).unwrap_or(&[0; 0]));
         b = b.get(40..).unwrap_or(&[0; 0]);
@@ -584,10 +584,10 @@ impl Deserializable for u32 {
     }
 }
 
-impl Deserializable for Number {
+impl Deserializable for FixWord {
     #[inline]
     fn deserialize(b: &[u8]) -> Self {
-        Number(u32::deserialize(b) as i32)
+        FixWord(u32::deserialize(b) as i32)
     }
 }
 
@@ -840,7 +840,7 @@ mod tests {
             Ok(File {
                 header: Header {
                     checksum: Some(7),
-                    design_size: Number(11),
+                    design_size: FixWord(11),
                     design_size_valid: true,
                     character_coding_scheme: Some(format!["A{}", " ".repeat(238)]),
                     font_family: Some(format!["B{}", " ".repeat(98)]),
@@ -894,7 +894,7 @@ mod tests {
             File {
                 header: Header {
                     checksum: Some(7),
-                    design_size: Number(11),
+                    design_size: FixWord(11),
                     design_size_valid: true,
                     character_coding_scheme: None,
                     font_family: None,
@@ -918,7 +918,7 @@ mod tests {
             File {
                 header: Header {
                     checksum: Some(7),
-                    design_size: Number(11),
+                    design_size: FixWord(11),
                     design_size_valid: true,
                     character_coding_scheme: Some("ABC".into()),
                     font_family: Some("DEF".into()),
@@ -976,16 +976,16 @@ mod tests {
                 ]),
                 char_tags: BTreeMap::from([(Char(72), CharTag::Ligature(23)),]),
                 widths: vec![
-                    Number(0),
-                    Number(0),
-                    Number(1),
-                    Number(2),
-                    Number(3),
-                    Number(4)
+                    FixWord(0),
+                    FixWord(0),
+                    FixWord(1),
+                    FixWord(2),
+                    FixWord(3),
+                    FixWord(4)
                 ],
-                heights: vec![Number(0), Number(1), Number(2)],
-                depths: vec![Number(0), Number(1), Number(2), Number(3)],
-                italic_corrections: vec![Number(0), Number(1), Number(2), Number(3), Number(4)],
+                heights: vec![FixWord(0), FixWord(1), FixWord(2)],
+                depths: vec![FixWord(0), FixWord(1), FixWord(2), FixWord(3)],
+                italic_corrections: vec![FixWord(0), FixWord(1), FixWord(2), FixWord(3), FixWord(4)],
                 ..Default::default()
             },
         ),
@@ -1020,16 +1020,16 @@ mod tests {
                     }
                 ),]),
                 widths: vec![
-                    Number(0),
-                    Number(0),
-                    Number(1),
-                    Number(2),
-                    Number(3),
-                    Number(4)
+                    FixWord(0),
+                    FixWord(0),
+                    FixWord(1),
+                    FixWord(2),
+                    FixWord(3),
+                    FixWord(4)
                 ],
-                heights: vec![Number(0), Number(1), Number(2)],
-                depths: vec![Number(0), Number(1), Number(2), Number(3)],
-                italic_corrections: vec![Number(0), Number(1), Number(2), Number(3), Number(4)],
+                heights: vec![FixWord(0), FixWord(1), FixWord(2)],
+                depths: vec![FixWord(0), FixWord(1), FixWord(2), FixWord(3)],
+                italic_corrections: vec![FixWord(0), FixWord(1), FixWord(2), FixWord(3), FixWord(4)],
                 ..Default::default()
             },
         ),
@@ -1047,11 +1047,11 @@ mod tests {
             ],
             File {
                 header: Header::tfm_default(),
-                widths: vec![Number::ZERO, Number(23)],
-                heights: vec![Number::ZERO, Number(29)],
-                depths: vec![Number::ZERO, Number(31)],
-                italic_corrections: vec![Number::ZERO, Number(37)],
-                kerns: vec![Number(37)],
+                widths: vec![FixWord::ZERO, FixWord(23)],
+                heights: vec![FixWord::ZERO, FixWord(29)],
+                depths: vec![FixWord::ZERO, FixWord(31)],
+                italic_corrections: vec![FixWord::ZERO, FixWord(37)],
+                kerns: vec![FixWord(37)],
                 ..Default::default()
             },
         ),
@@ -1219,16 +1219,16 @@ mod tests {
             File {
                 header: Header::tfm_default(),
                 params: vec![
-                    Number(11),
-                    Number(13),
-                    Number(17),
-                    Number(19),
-                    Number(23),
-                    Number(29),
-                    Number(31),
-                    Number(37),
-                    Number(41),
-                    Number(43),
+                    FixWord(11),
+                    FixWord(13),
+                    FixWord(17),
+                    FixWord(19),
+                    FixWord(23),
+                    FixWord(29),
+                    FixWord(31),
+                    FixWord(37),
+                    FixWord(41),
+                    FixWord(43),
                 ],
                 ..Default::default()
             },

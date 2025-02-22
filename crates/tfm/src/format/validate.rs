@@ -170,14 +170,14 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
     if let Some(family) = &mut file.header.font_family {
         validate_string(family, 19, &mut warnings);
     }
-    if file.header.design_size < Number::ZERO {
+    if file.header.design_size < FixWord::ZERO {
         warnings.push(ValidationWarning::DesignSizeIsNegative);
-        file.header.design_size = Number::UNITY * 10;
+        file.header.design_size = FixWord::ONE * 10;
         file.header.design_size_valid = false;
     }
-    if file.header.design_size < Number::UNITY {
+    if file.header.design_size < FixWord::ONE {
         warnings.push(ValidationWarning::DesignSizeIsTooSmall);
-        file.header.design_size = Number::UNITY * 10;
+        file.header.design_size = FixWord::ONE * 10;
         file.header.design_size_valid = false;
     }
 
@@ -187,7 +187,7 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
         }
         if !elem.is_abs_less_than_16() {
             warnings.push(ValidationWarning::ParameterIsTooBig(i + 1));
-            *elem = Number::ZERO
+            *elem = FixWord::ZERO
         }
     }
 
@@ -221,7 +221,7 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
         ),
     ] {
         if let Some(first) = array.first_mut() {
-            if *first != Number::ZERO {
+            if *first != FixWord::ZERO {
                 warnings.push(first_dimension_non_zero);
                 // We zero out the number below because we may still want to issue
                 // a warning for number too big.
@@ -247,10 +247,10 @@ pub fn validate_and_fix(file: &mut File) -> Vec<ValidationWarning> {
         for (i, elem) in array.iter_mut().enumerate() {
             if !elem.is_abs_less_than_16() {
                 warnings.push(dimension_too_big(i));
-                *elem = Number::ZERO
+                *elem = FixWord::ZERO
             }
             if i == 0 && zero_first_element {
-                *elem = Number::ZERO
+                *elem = FixWord::ZERO
             }
         }
     }

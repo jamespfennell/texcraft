@@ -179,7 +179,7 @@ dependencies = [
 name = "boxworks"
 version = "0.1.0"
 dependencies = [
- "font",
+ "core",
 ]
 
 [[package]]
@@ -346,6 +346,14 @@ name = "constant_time_eq"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
+
+[[package]]
+name = "core"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "serde",
+]
 
 [[package]]
 name = "core-foundation-sys"
@@ -551,14 +559,6 @@ name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
-
-[[package]]
-name = "font"
-version = "0.1.0"
-dependencies = [
- "arbitrary",
- "serde",
-]
 
 [[package]]
 name = "getrandom"
@@ -1356,7 +1356,7 @@ dependencies = [
 name = "texlang-font"
 version = "0.1.0"
 dependencies = [
- "font",
+ "core",
  "serde",
  "texcraft-stdext",
  "texlang",
@@ -1408,7 +1408,7 @@ version = "0.1.0"
 dependencies = [
  "arbitrary",
  "ariadne",
- "font",
+ "core",
  "serde",
 ]
 

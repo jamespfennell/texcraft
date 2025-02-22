@@ -151,7 +151,6 @@
 //! We will fix the bug and add your files to the testing corpus.
 
 pub mod algorithms;
-pub use font::Number;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     num::NonZeroU8,
@@ -176,7 +175,7 @@ pub struct Font {
     pub next_larger_program: NextLargerProgram,
 
     /// Font parameters.
-    pub params: Vec<Number>,
+    pub params: Vec<FixWord>,
 }
 
 impl Font {
@@ -258,7 +257,7 @@ pub struct Header {
     /// In TeX82, this is stored in the `font_check` array (TeX82.2021.549).
     pub checksum: Option<u32>,
     /// In TeX82, this is stored in the `font_dsize` array (TeX82.2021.549).
-    pub design_size: Number,
+    pub design_size: FixWord,
     pub design_size_valid: bool,
     pub character_coding_scheme: Option<String>,
     pub font_family: Option<String>,
@@ -275,7 +274,7 @@ impl Header {
     pub fn pl_default() -> Header {
         Header {
             checksum: None,
-            design_size: Number::UNITY * 10,
+            design_size: FixWord::ONE * 10,
             design_size_valid: true,
             character_coding_scheme: Some("UNSPECIFIED".into()),
             font_family: Some("UNSPECIFIED".into()),
@@ -291,7 +290,7 @@ impl Header {
     pub fn tfm_default() -> Header {
         Header {
             checksum: Some(0),
-            design_size: Number::ZERO,
+            design_size: FixWord::ZERO,
             design_size_valid: true,
             character_coding_scheme: None,
             font_family: None,
@@ -368,10 +367,10 @@ impl Char {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CharDimensions {
-    pub width: Number,
-    pub height: Number,
-    pub depth: Number,
-    pub italic_correction: Number,
+    pub width: FixWord,
+    pub height: FixWord,
+    pub depth: FixWord,
+    pub italic_correction: FixWord,
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -978,12 +977,100 @@ impl<'a> Iterator for NextLargerProgramIter<'a> {
     }
 }
 
-impl font::Format for Font {
+impl core::FontFormat for Font {
     const DEFAULT_FILE_EXTENSION: &'static str = "tfm";
     type Error = format::DeserializationError;
 
     fn parse(b: &[u8]) -> Result<Self, Self::Error> {
         Font::deserialize_from_tfm(b)
+    }
+}
+
+/// Fixed-width numeric type used in TFM files.
+///
+/// This numeric type has 11 bits for the integer part,
+/// 20 bits for the fractional part, and a single signed bit.
+/// The inner value is the number multiplied by 2^20.
+/// It is called a `fix_word` in TFtoPL.
+///
+/// In property list files, this type is represented as a decimal number
+///   with up to 6 digits after the decimal point.
+/// This is a non-lossy representation
+///   because 10^(-6) is larger than 2^(-20).
+#[derive(Default, PartialEq, Eq, Debug, Copy, Clone, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct FixWord(pub i32);
+
+impl FixWord {
+    /// Representation of the number 0 as a [Number].
+    pub const ZERO: FixWord = FixWord(0);
+
+    /// Representation of the number 1 as a [Number].
+    pub const ONE: FixWord = FixWord(1 << 20);
+
+    /// Returns true if the number is less than 16.0 in magnitude according to Knuth.
+    ///
+    /// The number +16.0 is not allowed.
+    /// This is covered in the E2E tests.
+    /// See `check_fix` in TFtoPL.2014.60.
+    pub fn is_abs_less_than_16(&self) -> bool {
+        *self >= FixWord::ONE * -16 && *self < FixWord::ONE * 16
+    }
+}
+
+impl std::fmt::Display for FixWord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TFtoPL.2014.40-43
+        if self.0 < 0 {
+            write!(f, "-")?;
+        }
+        let integer_part = (self.0 / FixWord::ONE.0).abs();
+        write!(f, "{integer_part}.")?;
+        let mut fp = (self.0 % FixWord::ONE.0).abs();
+        fp = 10 * fp + 5;
+        let mut delta = 10;
+        loop {
+            if delta > 0o4_000_000 {
+                fp = fp + 0o2_000_000 - delta / 2;
+            }
+            write!(f, "{}", fp / 0o4_000_000)?;
+            fp = 10 * (fp % 0o4_000_000);
+            delta *= 10;
+            if fp <= delta {
+                break;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl std::ops::Add<FixWord> for FixWord {
+    type Output = FixWord;
+    fn add(self, rhs: FixWord) -> Self::Output {
+        FixWord(self.0 + rhs.0)
+    }
+}
+impl std::ops::Sub<FixWord> for FixWord {
+    type Output = FixWord;
+    fn sub(self, rhs: FixWord) -> Self::Output {
+        FixWord(self.0 - rhs.0)
+    }
+}
+
+impl std::ops::Mul<i32> for FixWord {
+    type Output = FixWord;
+
+    fn mul(self, rhs: i32) -> Self::Output {
+        FixWord(self.0 * rhs)
+    }
+}
+
+impl std::ops::Div<i32> for FixWord {
+    type Output = FixWord;
+
+    fn div(self, rhs: i32) -> Self::Output {
+        FixWord(self.0 / rhs)
     }
 }
 

@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use crate::Char;
-use crate::Number;
+use crate::FixWord;
 
 /// A lig/kern program.
 ///
@@ -60,7 +60,7 @@ pub enum Operation {
     /// Insert a kern between the current character and the next character.
     ///
     /// The variant payload is the size of the kern.
-    Kern(Number),
+    Kern(FixWord),
     /// Insert a kern between the current character and the next character.
     ///
     /// The variant payload is the index of the kern in the kerns array.
@@ -270,9 +270,9 @@ impl Program {
         new_entrypoints
     }
 
-    pub fn unpack_kerns(&mut self) -> Vec<Number> {
+    pub fn unpack_kerns(&mut self) -> Vec<FixWord> {
         let mut kerns = vec![];
-        let mut kerns_dedup = HashMap::<Number, usize>::new();
+        let mut kerns_dedup = HashMap::<FixWord, usize>::new();
         for instruction in &mut self.instructions {
             if let Operation::Kern(kern) = instruction.operation {
                 use std::collections::hash_map::Entry;
@@ -291,7 +291,7 @@ impl Program {
         kerns
     }
 
-    pub fn pack_kerns(&mut self, kerns: &[Number]) {
+    pub fn pack_kerns(&mut self, kerns: &[FixWord]) {
         for i in &mut self.instructions {
             if let Operation::KernAtIndex(index) = &i.operation {
                 // TODO: log a warning if the index is not in the kerns array as
@@ -336,7 +336,7 @@ impl Program {
         smallest_char: Char,
         entrypoints: I,
         char_exists: T,
-        kerns: &[Number],
+        kerns: &[FixWord],
     ) -> Vec<ValidationWarning>
     where
         I: Iterator<Item = (Char, u8)>,
@@ -421,7 +421,7 @@ impl Program {
                 Operation::KernAtIndex(k) => {
                     if *k as usize >= kerns.len() {
                         warnings.push(ValidationWarning::KernIndexTooBig(i));
-                        instruction.operation = Operation::Kern(Number::ZERO);
+                        instruction.operation = Operation::Kern(FixWord::ZERO);
                     }
                 }
                 Operation::Ligature {

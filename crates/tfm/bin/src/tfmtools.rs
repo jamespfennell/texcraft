@@ -400,7 +400,7 @@ impl LigKern {
             print!("    {} {} ->", l, r);
             for (c, k) in lig_kern_program.get_replacement_iter(l, r) {
                 print!(" {}", c);
-                if k != tfm::Number::ZERO {
+                if k != tfm::FixWord::ZERO {
                     print!(" k({k})");
                 }
             }

@@ -2,7 +2,7 @@
 //!
 //! This crate implements the Knuth/TeX typesetting engine.
 
-use tfm::Number;
+use tfm::FixWord;
 
 pub struct Engine {
     font: tfm::Font,
@@ -35,7 +35,7 @@ impl Engine {
         }
         for (_c, kern) in replacement.middle_chars {
             // self.do_char((*c).into());
-            if *kern != Number::ZERO {
+            if *kern != FixWord::ZERO {
                 // self.do_kern(*kern);
             }
         }
