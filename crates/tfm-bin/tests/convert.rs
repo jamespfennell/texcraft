@@ -4,13 +4,13 @@ use std::process::Command;
 
 macro_rules! include_str_from_corpus {
     ( $p: expr ) => {
-        include_str![concat!["../../corpus/", $p]]
+        include_str![concat!["../../tfm/corpus/", $p]]
     };
 }
 
 macro_rules! include_bytes_from_corpus {
     ( $p: expr ) => {
-        include_bytes![concat!["../../corpus/", $p]]
+        include_bytes![concat!["../../tfm/corpus/", $p]]
     };
 }
 

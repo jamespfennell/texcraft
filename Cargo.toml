@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "crates/*",
-    "crates/tfm/bin",
     "crates/tfm/fuzz",
     "performance",
     "playground",
