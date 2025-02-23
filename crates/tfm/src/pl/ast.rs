@@ -4,7 +4,7 @@
 
 use super::cst;
 use super::error::*;
-use crate::{ligkern::lang::PostLigOperation, Char, Face, NamedParameter, FixWord};
+use crate::{ligkern::lang::PostLigOperation, Char, Face, FixWord, NamedParameter};
 use std::ops::Range;
 
 /// Abstract syntax tree for property list files

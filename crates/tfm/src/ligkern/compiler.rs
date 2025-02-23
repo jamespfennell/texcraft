@@ -446,7 +446,11 @@ mod tests {
     use super::*;
     use lang::PostLigOperation::*;
 
-    fn new_kern(next_instruction: Option<u8>, right_char: char, kern: FixWord) -> lang::Instruction {
+    fn new_kern(
+        next_instruction: Option<u8>,
+        right_char: char,
+        kern: FixWord,
+    ) -> lang::Instruction {
         lang::Instruction {
             next_instruction,
             right_char: right_char.try_into().unwrap(),
@@ -784,7 +788,11 @@ mod tests {
                         ('B', FixWord::ZERO)
                     ]
                 ),
-                ('Z', 'B', vec![('Y', FixWord::ZERO * 3), ('B', FixWord::ZERO)]),
+                (
+                    'Z',
+                    'B',
+                    vec![('Y', FixWord::ZERO * 3), ('B', FixWord::ZERO)]
+                ),
             ],
         ),
         (
@@ -818,7 +826,11 @@ mod tests {
                         ('B', FixWord::ZERO)
                     ]
                 ),
-                ('Z', 'B', vec![('Y', FixWord::ZERO * 3), ('B', FixWord::ZERO)]),
+                (
+                    'Z',
+                    'B',
+                    vec![('Y', FixWord::ZERO * 3), ('B', FixWord::ZERO)]
+                ),
             ],
         ),
         (

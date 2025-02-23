@@ -985,7 +985,13 @@ mod tests {
                 ],
                 heights: vec![FixWord(0), FixWord(1), FixWord(2)],
                 depths: vec![FixWord(0), FixWord(1), FixWord(2), FixWord(3)],
-                italic_corrections: vec![FixWord(0), FixWord(1), FixWord(2), FixWord(3), FixWord(4)],
+                italic_corrections: vec![
+                    FixWord(0),
+                    FixWord(1),
+                    FixWord(2),
+                    FixWord(3),
+                    FixWord(4)
+                ],
                 ..Default::default()
             },
         ),
@@ -1029,7 +1035,13 @@ mod tests {
                 ],
                 heights: vec![FixWord(0), FixWord(1), FixWord(2)],
                 depths: vec![FixWord(0), FixWord(1), FixWord(2), FixWord(3)],
-                italic_corrections: vec![FixWord(0), FixWord(1), FixWord(2), FixWord(3), FixWord(4)],
+                italic_corrections: vec![
+                    FixWord(0),
+                    FixWord(1),
+                    FixWord(2),
+                    FixWord(3),
+                    FixWord(4)
+                ],
                 ..Default::default()
             },
         ),

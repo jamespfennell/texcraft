@@ -15,7 +15,7 @@ use crate::{
     format::{self, ExtensibleRecipe},
     ligkern,
     pl::ast::{DesignSize, ParameterNumber},
-    Char, Header, NamedParameter, NextLargerProgram, NextLargerProgramWarning, FixWord,
+    Char, FixWord, Header, NamedParameter, NextLargerProgram, NextLargerProgramWarning,
 };
 
 pub mod ast;

@@ -64,7 +64,7 @@
 //! let (tfm_file_or_error, deserialization_warnings) = tfm::format::File::deserialize(tfm_bytes);
 //! let mut tfm_file = tfm_file_or_error.expect("cmr10.tfm is a valid .tfm file");
 //! assert_eq![deserialization_warnings, vec![], "the data in cmr10.tfm is 100% valid, so there are no deserialization warnings"];
-//! // TODO assert_eq![tfm_file.header.design_size, tfm::Number::UNITY * 10]; make it 11 to be more interesting
+//! // TODO assert_eq![tfm_file.header.design_size, tfm::FixWord::UNITY * 10]; make it 11 to be more interesting
 //! // TODO query some data
 //!
 //! // Validate the .tfm file.
@@ -1003,10 +1003,10 @@ impl core::FontFormat for Font {
 pub struct FixWord(pub i32);
 
 impl FixWord {
-    /// Representation of the number 0 as a [Number].
+    /// Representation of the number 0 as a [FixWord].
     pub const ZERO: FixWord = FixWord(0);
 
-    /// Representation of the number 1 as a [Number].
+    /// Representation of the number 1 as a [FixWord].
     pub const ONE: FixWord = FixWord(1 << 20);
 
     /// Returns true if the number is less than 16.0 in magnitude according to Knuth.

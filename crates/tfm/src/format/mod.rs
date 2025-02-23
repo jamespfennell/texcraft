@@ -21,7 +21,7 @@ pub use validate::ValidationWarning;
 /// The struct contain multiple vectors.
 /// In TeX and TFtoPL there is an optimization in which all of data in the vectors
 /// is stored in one large vector of 32-bit integers.
-/// The conversion from [u32] to the specific types like [Number] are then done when the
+/// The conversion from [u32] to the specific types like [FixWord] are then done when the
 /// data is needed.
 /// This makes the memory footprint of this type much more compact,
 ///     and such a change may be considered in the future.
@@ -661,7 +661,12 @@ impl std::fmt::Display for Section {
 mod tests {
     use super::*;
 
-    fn run_compress_test(values: Vec<FixWord>, max_size: u8, want: Vec<FixWord>, want_map: Vec<u8>) {
+    fn run_compress_test(
+        values: Vec<FixWord>,
+        max_size: u8,
+        want: Vec<FixWord>,
+        want_map: Vec<u8>,
+    ) {
         let (got, got_map) = compress(&values, max_size);
         assert_eq!(got, want);
         let want_map: HashMap<FixWord, NonZeroU8> = want_map

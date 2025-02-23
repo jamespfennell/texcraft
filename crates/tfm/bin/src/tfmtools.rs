@@ -443,9 +443,9 @@ impl Undebug {
                 Ok(())
             }
             Err((err, n)) => {
-                let source = tfm::pl::AriadneSource::new(self.input.as_path(), &data);
+                let source = ariadne::Source::from(data.clone());
                 let range = line_range(&data, n);
-                let builder = ariadne::Report::build(ariadne::ReportKind::Error, (), range.start)
+                let builder = ariadne::Report::build(ariadne::ReportKind::Error, range.clone())
                     .with_message("failed to parse `tfmtools debug` output");
                 let builder = builder.with_label(
                     ariadne::Label::new(range)
@@ -453,7 +453,7 @@ impl Undebug {
                         .with_color(ariadne::Color::Red),
                 );
                 let report = builder.finish();
-                report.eprint(&source).unwrap();
+                report.eprint(source).unwrap();
                 Err("".into())
             }
         }
@@ -561,9 +561,16 @@ impl PlPath {
             Err(err) => return Err(format!("Failed to read `{}`: {}", self.0.display(), err)),
         };
         let (pl_file, warnings) = tfm::pl::File::from_pl_source_code(&data);
-        let source = tfm::pl::AriadneSource::new(self.0.as_path(), &data);
+        let source = ariadne::Source::from(data.as_str());
+        let path = self.0.as_os_str().to_string_lossy();
+        let cache: (&str, _) = (&path, source);
         for warning in &warnings {
-            warning.ariadne_report().eprint(&source).unwrap();
+            // Note that the cache contains the Source type, which contains
+            // a vector of lines in the file, and this is cloned for each error.
+            // This is not great, but is the only default behavior the ariadne
+            // crate supports. An alternative would be to implement ariadne::Cache
+            // for &Source and then there would be no cloning.
+            warning.ariadne_report(&path).eprint(cache.clone()).unwrap();
         }
         Ok((pl_file, warnings))
     }

@@ -348,19 +348,22 @@ impl ParseWarningKind {
 
 impl ParseWarning {
     #[cfg(feature = "ariadne")]
-    pub fn ariadne_report(&self) -> ariadne::Report {
+    pub fn ariadne_report<'a>(
+        &self,
+        file_name: &'a str,
+    ) -> ariadne::Report<'a, (&'a str, std::ops::Range<usize>)> {
         use ariadne::*;
         let light_blue = Color::Fixed(81);
 
         let data = self.kind.data();
-        let mut builder = Report::build(ReportKind::Error, (), self.span.start)
+        let mut builder = Report::build(ReportKind::Error, (file_name, self.span.clone()))
             .with_code(format![
                 "{}.{}",
                 data.pltotf_section.0, data.pltotf_section.1,
             ])
             .with_message(&data.problem)
             .with_label(
-                Label::new(self.span.clone())
+                Label::new((file_name, self.span.clone()))
                     .with_message(&data.problem)
                     .with_color(light_blue),
             )
@@ -369,34 +372,6 @@ impl ParseWarning {
             builder = builder.with_help(data.rule);
         }
         builder.finish()
-    }
-}
-
-#[cfg(feature = "ariadne")]
-pub struct AriadneSource {
-    source: ariadne::Source,
-    path: std::path::PathBuf,
-}
-
-#[cfg(feature = "ariadne")]
-impl AriadneSource {
-    pub fn new(pl_path: &std::path::Path, pl_source: &str) -> Self {
-        let s: String = super::Chars::new(pl_source).collect();
-        Self {
-            source: s.into(),
-            path: pl_path.into(),
-        }
-    }
-}
-
-#[cfg(feature = "ariadne")]
-impl ariadne::Cache<()> for &AriadneSource {
-    fn fetch(&mut self, _: &()) -> Result<&ariadne::Source, Box<dyn std::fmt::Debug + '_>> {
-        Ok(&self.source)
-    }
-
-    fn display<'a>(&self, _: &'a ()) -> Option<Box<dyn std::fmt::Display + 'a>> {
-        Some(Box::new(format!["{}", self.path.display()]))
     }
 }
 
