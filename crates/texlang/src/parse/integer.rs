@@ -5,17 +5,26 @@
 //! is given on page X of the TeXBook.
 
 use crate::prelude as txl;
-use crate::token::Value;
+use crate::token::{CommandRef, Value};
 use crate::traits::*;
 use crate::*;
 
 impl<S: TexlangState> Parsable<S> for i32 {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
-        let (_, i): (token::Token, i32) = parse_number_internal(input)?;
+        let (_, i, _) = parse_integer(input)?;
         Ok(i)
     }
 }
 
+/// When parsed, this type returns a nonnegative integer with the provided upper bound.
+///
+/// This type is used to implement the following parsing logic in TeX:
+///
+/// - TeX.2021.433 (scan_eight_bit_int) where N=256.
+/// - TeX.2021.434 (scan_char_num) where N=256.
+/// - TeX.2021.435 (scan_four_bit_int) where N=16.
+/// - TeX.2021.436 (scan_fifteen_bit_int) where N=2^15.
+/// - TeX.2021.437 (scan_twenty_seven_bit_int) where N=2^27.
 #[derive(Debug, PartialEq, Eq, Default)]
 pub struct Uint<const N: usize>(pub usize);
 
@@ -25,7 +34,7 @@ impl Uint<0> {
 
 impl<S: TexlangState, const N: usize> Parsable<S> for Uint<N> {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
-        let (first_token, i): (token::Token, i32) = parse_number_internal(input)?;
+        let (first_token, i, _) = parse_integer(input)?;
         if i < 0 || i as usize >= N {
             input.vm().error(OutOfBoundsError::<N> {
                 first_token,
@@ -68,7 +77,7 @@ impl<S: TexlangState> Parsable<S> for char {
 // TODO: move to types/catcode.rs
 impl<S: TexlangState> Parsable<S> for types::CatCode {
     fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
-        let (token, i): (token::Token, i32) = parse_number_internal(input)?;
+        let (token, i, _) = parse_integer(input)?;
         if let Ok(val_u8) = u8::try_from(i) {
             if let Ok(cat_code) = types::CatCode::try_from(val_u8) {
                 return Ok(cat_code);
@@ -95,83 +104,41 @@ const GUIDANCE_BEGINNING: &str =
 - A command that references a variable, like \\year.
 ";
 
-fn parse_number_internal<S: TexlangState>(
+/// TeX.2021.440 (scan_int)
+pub(crate) fn parse_integer<S: TexlangState>(
     stream: &mut vm::ExpandedStream<S>,
-) -> txl::Result<(token::Token, i32)> {
+) -> txl::Result<(token::Token, i32, Option<u8>)> {
     let sign = parse_optional_signs(stream)?;
     let first_token = stream.next(NumberEndOfInputError {})?;
-    let result: i32 = match first_token.value() {
-        Value::Other('0') => parse_constant::<S, 10>(stream, 0)?,
-        Value::Other('1') => parse_constant::<S, 10>(stream, 1)?,
-        Value::Other('2') => parse_constant::<S, 10>(stream, 2)?,
-        Value::Other('3') => parse_constant::<S, 10>(stream, 3)?,
-        Value::Other('4') => parse_constant::<S, 10>(stream, 4)?,
-        Value::Other('5') => parse_constant::<S, 10>(stream, 5)?,
-        Value::Other('6') => parse_constant::<S, 10>(stream, 6)?,
-        Value::Other('7') => parse_constant::<S, 10>(stream, 7)?,
-        Value::Other('8') => parse_constant::<S, 10>(stream, 8)?,
-        Value::Other('9') => parse_constant::<S, 10>(stream, 9)?,
-        Value::Other('\'') => parse_constant::<S, 8>(stream, 0)?,
-        Value::Other('"') => parse_constant::<S, 16>(stream, 0)?,
-        Value::Other('`') => parse_character(stream)?,
-        Value::CommandRef(command_ref) => {
-            let cmd = stream.commands_map().get_command(&command_ref);
-            match cmd {
-                Some(command::Command::Variable(cmd)) => {
-                    match cmd.clone().value(first_token, stream)? {
-                        variable::ValueRef::Int(i) => *i,
-                        variable::ValueRef::CatCode(c) => *c as i32,
-                        variable::ValueRef::MathCode(c) => c.0 as i32,
-                        variable::ValueRef::Font(_) => {
-                            todo!("scan a font into an int?");
-                        }
-                        variable::ValueRef::TokenList(_) => {
-                            return Err(stream.vm().fatal_error(
-                                parse::Error::new(
-                                    "the beginning of a number",
-                                    Some(first_token),
-                                    GUIDANCE_BEGINNING,
-                                )
-                                .with_annotation_override("token list variable"),
-                            ));
-                        }
-                    }
-                }
-                Some(command::Command::Character(c)) => (*c as u32).try_into().unwrap(),
-                Some(command::Command::MathCharacter(c)) => c.0 as i32,
-                None
-                | Some(
-                    command::Command::Execution(..)
-                    | command::Command::Expansion(..)
-                    | command::Command::Macro(..)
-                    | command::Command::CharacterTokenAlias(..)
-                    | command::Command::Font(..),
-                ) => {
-                    let err = parse::Error::new(
-                        "the beginning of a number",
-                        Some(first_token),
-                        GUIDANCE_BEGINNING,
-                    )
-                    .with_annotation_override(match cmd {
-                        None => "undefined control sequence".to_string(),
-                        Some(cmd) => format!["control sequence referencing {cmd}"],
-                    });
-                    stream.expansions_mut().push(first_token);
-                    return Err(stream.vm().fatal_error(err));
-                }
-            }
-        }
+    let (result, radix) = match first_token.value() {
+        Value::Other('0') => (parse_constant::<S, 10>(stream, 0)?, Some(10_u8)),
+        Value::Other('1') => (parse_constant::<S, 10>(stream, 1)?, Some(10_u8)),
+        Value::Other('2') => (parse_constant::<S, 10>(stream, 2)?, Some(10_u8)),
+        Value::Other('3') => (parse_constant::<S, 10>(stream, 3)?, Some(10_u8)),
+        Value::Other('4') => (parse_constant::<S, 10>(stream, 4)?, Some(10_u8)),
+        Value::Other('5') => (parse_constant::<S, 10>(stream, 5)?, Some(10_u8)),
+        Value::Other('6') => (parse_constant::<S, 10>(stream, 6)?, Some(10_u8)),
+        Value::Other('7') => (parse_constant::<S, 10>(stream, 7)?, Some(10_u8)),
+        Value::Other('8') => (parse_constant::<S, 10>(stream, 8)?, Some(10_u8)),
+        Value::Other('9') => (parse_constant::<S, 10>(stream, 9)?, Some(10_u8)),
+        Value::Other('\'') => (parse_constant::<S, 8>(stream, 0)?, Some(8_u8)),
+        Value::Other('"') => (parse_constant::<S, 16>(stream, 0)?, Some(16_u8)),
+        Value::Other('`') => (parse_character(stream)?, None),
+        Value::CommandRef(command_ref) => (
+            parse_internal_number(stream, first_token, command_ref)?.integer(),
+            None,
+        ),
+        // TeX.2021.446
         _ => {
-            stream.expansions_mut().push(first_token);
+            stream.back(first_token);
             stream.vm().error(parse::Error::new(
                 "the beginning of a number",
                 Some(first_token),
                 GUIDANCE_BEGINNING,
             ))?;
-            0
+            (0, None)
         }
     };
-    get_optional_element![stream, Value::Space(_) => (),];
     let result = match sign {
         None => result,
         // The only i32 that is not safe to multiply by -1 is i32::MIN.
@@ -179,7 +146,89 @@ fn parse_number_internal<S: TexlangState>(
         // is i32::MIN again.
         Some(_) => result.wrapping_mul(-1),
     };
-    Ok((first_token, result))
+    Ok((first_token, result, radix))
+}
+
+#[derive(Debug)]
+pub(crate) enum InternalNumber {
+    Integer(i32),
+    Dimen(core::Scaled),
+}
+
+impl InternalNumber {
+    pub(crate) fn integer(&self) -> i32 {
+        use InternalNumber::*;
+        match self {
+            Integer(i) => *i,
+            Dimen(scaled) => scaled.0,
+        }
+    }
+}
+
+/// This function reimplements TeX.2021.413 (scan_something_internal) under the following
+/// conditions:
+///
+/// - level is int_val, dimen_val, glue_val or mu_val; i.e., the call to this function
+///   is looking for a number, not a token list or font. The token list or font cases
+///   are handled elsewhere.
+///
+/// - negative is false. The negative=true case is handled by the caller to this function.
+///
+/// - The logic around casting between types (i.e. TeX.2021.429) is omitted. Instead
+///   callers of this function perform the casting. The motivation is to make the code
+///   more explicit and avoid parameters that change logic and/or return types.
+pub(crate) fn parse_internal_number<S: TexlangState>(
+    input: &mut vm::ExpandedStream<S>,
+    first_token: token::Token,
+    command_ref: CommandRef,
+) -> txl::Result<InternalNumber> {
+    let cmd = input.commands_map().get_command(&command_ref);
+    match cmd {
+        Some(command::Command::Variable(cmd)) => {
+            match cmd.clone().value(first_token, input)? {
+                variable::ValueRef::Int(i) => Ok(InternalNumber::Integer(*i)),
+                variable::ValueRef::CatCode(c) => Ok(InternalNumber::Integer(*c as i32)),
+                variable::ValueRef::MathCode(c) => Ok(InternalNumber::Integer(c.0 as i32)),
+                variable::ValueRef::Dimen(d) => Ok(InternalNumber::Dimen(*d)),
+                variable::ValueRef::Font(_) => {
+                    // This case behaves identically to the TokenListCase
+                    todo!("scan a font into an int?");
+                }
+                variable::ValueRef::TokenList(_) => {
+                    return Err(input.vm().fatal_error(
+                        parse::Error::new(
+                            "the beginning of a number",
+                            Some(first_token),
+                            GUIDANCE_BEGINNING,
+                        )
+                        .with_annotation_override("token list variable"),
+                    ));
+                }
+            }
+        }
+        Some(command::Command::Character(c)) => Ok(InternalNumber::Integer(*c as i32)),
+        Some(command::Command::MathCharacter(c)) => Ok(InternalNumber::Integer(c.0 as i32)),
+        None
+        | Some(
+            command::Command::Execution(..)
+            | command::Command::Expansion(..)
+            | command::Command::Macro(..)
+            | command::Command::CharacterTokenAlias(..)
+            | command::Command::Font(..),
+        ) => {
+            let err = parse::Error::new(
+                "the beginning of a number",
+                Some(first_token),
+                GUIDANCE_BEGINNING,
+            )
+            .with_annotation_override(match cmd {
+                None => "undefined control sequence".to_string(),
+                Some(cmd) => format!["control sequence referencing {cmd}"],
+            });
+            input.expansions_mut().push(first_token);
+            return Err(input.vm().fatal_error(err));
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -198,7 +247,9 @@ impl error::EndOfInputError for NumberEndOfInputError {
 ///
 /// If the combination of the signs is positive, [None] is returned.
 /// Otherwise, the Token corresponding to the last negative sign is returned.
-fn parse_optional_signs<S: TexlangState>(
+///
+/// This is TeX.2021.441.
+pub fn parse_optional_signs<S: TexlangState>(
     stream: &mut vm::ExpandedStream<S>,
 ) -> txl::Result<Option<token::Token>> {
     let mut result = None;
@@ -244,6 +295,7 @@ fn parse_character<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::R
             _ => token.char().unwrap(),
         }
     };
+    super::OptionalSpace::parse(input)?;
     Ok(c as i32)
 }
 
@@ -262,6 +314,7 @@ impl error::EndOfInputError for CharacterError {
     }
 }
 
+/// TeX.2021.444-445
 // TODO: why is the radix a const parameter?
 fn parse_constant<S: TexlangState, const RADIX: i32>(
     stream: &mut vm::ExpandedStream<S>,
@@ -338,6 +391,7 @@ fn parse_constant<S: TexlangState, const RADIX: i32>(
             .vm()
             .error(parse::Error::new(expected, got, guidance))?;
     }
+    super::OptionalSpace::parse(stream)?;
     Ok(result)
 }
 

@@ -1340,6 +1340,7 @@ name = "texlang"
 version = "0.1.0"
 dependencies = [
  "colored",
+ "core",
  "once_cell",
  "serde",
  "texcraft-stdext",
@@ -1372,6 +1373,7 @@ dependencies = [
  "bincode",
  "chrono",
  "colored",
+ "core",
  "linefeed",
  "rmp-serde",
  "serde",

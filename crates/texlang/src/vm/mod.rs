@@ -321,6 +321,28 @@ pub trait TexlangState: Sized {
         Some('\r')
     }
 
+    /// Get the em width for the current font.
+    ///
+    /// The default implementation returns `12pt`.
+    fn em_width(&self) -> core::Scaled {
+        core::Scaled::ONE * 12
+    }
+
+    /// Get the ex height for the current font.
+    ///
+    /// The default implementation returns `12pt`.
+    fn ex_height(&self) -> core::Scaled {
+        core::Scaled::ONE * 12
+    }
+
+    /// Get the current magnification ratio (e.g. value of \mag).
+    ///
+    /// The default implementation returns `1000`, which corresponds to
+    /// no magnification.
+    fn magnification_ratio(&self) -> i32 {
+        1000
+    }
+
     /// Hook that is invoked after a TeX macro is expanded.
     ///
     /// This hook is designed to support the `\tracingmacros` primitive.

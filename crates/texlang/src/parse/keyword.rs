@@ -5,7 +5,7 @@ use crate::vm;
 
 /// Parses a keyword from the input stream.
 ///
-/// scan_keyword
+/// TeX.2021.407 scan_keyword
 pub fn parse_keyword<S: TexlangState>(
     input: &mut vm::ExpandedStream<S>,
     keyword: &str,

@@ -392,8 +392,8 @@ mod tests {
             ),
             (
                 math_and_active_char,
-                r"\catcode`\A=13 \countdef A5 \countdef ~6 ~=7 A=8 \advance~byA \the~",
-                r"15",
+                r"-\catcode`\A=13 \countdef A5 \countdef ~6 ~=7 A=8 \advance~byA \the~",
+                r"- 15",
             ),
             /*
                         s.cat_code_map_mut().insert(

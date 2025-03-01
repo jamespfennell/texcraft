@@ -151,7 +151,7 @@ impl<S> Command<S> {
     /// TODO: we should just expose the type.
     pub fn is_arithmetic(&self) -> bool {
         match self.getters {
-            Getters::Int(_, _) => true,
+            Getters::Int(_, _) | Getters::Dimen(_, _) => true,
             Getters::CatCode(_, _)
             | Getters::MathCode(_, _)
             | Getters::TokenList(_, _)
@@ -359,7 +359,7 @@ impl<S, T> Hash for TypedVariable<S, T> {
 /// It exists to make the variables API more ergonomic.
 /// For example, it is used to provide a uniform constructor [Command::new_array] for commands.
 /// The trait cannot be implemented for new types.
-pub trait SupportedType: Sized {
+pub trait SupportedType: Sized + Debug {
     /// Create a new command of this type with the provided reference functions and index resolver.
     fn new_command<S>(
         ref_fn: RefFn<S, Self>,
@@ -642,6 +642,11 @@ supported_type_impl!(
         rust_type: i32,
         enum_variant: Int,
         save_stack_field: i32,
+    },
+    {
+        rust_type: core::Scaled,
+        enum_variant: Dimen,
+        save_stack_field: dimen,
     },
     {
         rust_type: types::CatCode,

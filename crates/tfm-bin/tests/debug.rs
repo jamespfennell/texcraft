@@ -118,7 +118,11 @@ debug_undebug_roundtrip_tests!(
         ],
     ),
     // cmex10 contains extensible recipes
-    (cmex10, "../../tfm/corpus/computer-modern/cmex10.tfm", vec![]),
+    (
+        cmex10,
+        "../../tfm/corpus/computer-modern/cmex10.tfm",
+        vec![]
+    ),
     // rashii2 has bc=16
     (rashii2, "../../tfm/corpus/ctan/rashii2-1.tfm", vec![]),
 );

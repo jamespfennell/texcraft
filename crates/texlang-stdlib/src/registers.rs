@@ -73,6 +73,12 @@ pub fn get_count<S: HasComponent<Component<i32, N>>, const N: usize>() -> comman
     new_registers_command()
 }
 
+/// Get the `\dimen` command.
+pub fn get_dimen<S: HasComponent<Component<core::Scaled, N>>, const N: usize>(
+) -> command::BuiltIn<S> {
+    new_registers_command()
+}
+
 /// Get the `\toks` command.
 pub fn get_toks<S: HasComponent<Component<Vec<token::Token>, N>>, const N: usize>(
 ) -> command::BuiltIn<S> {
@@ -152,9 +158,11 @@ mod tests {
     use texlang::vm::implement_has_component;
     use texlang_testing::*;
 
-    #[derive(Default, serde::Serialize, serde::Deserialize)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[derive(Default)]
     struct State {
         registers_i32: Component<i32, 256>,
+        registers_dimen: Component<core::Scaled, 256>,
         registers_token_list: Component<Vec<token::Token>, 256>,
         prefix: prefix::Component,
         testing: TestingComponent,
@@ -177,6 +185,7 @@ mod tests {
 
     implement_has_component![State{
         registers_i32: Component<i32, 256>,
+        registers_dimen: Component<core::Scaled, 256>,
         registers_token_list: Component<Vec<token::Token>, 256>,
         prefix: prefix::Component,
         testing: TestingComponent,
@@ -187,6 +196,7 @@ mod tests {
             ("the", the::get_the()),
             ("count", get_count()),
             ("countdef", get_countdef()),
+            ("dimen", get_dimen()),
             ("global", prefix::get_global()),
             ("toks", get_toks()),
             ("toksdef", get_toksdef()),
@@ -243,6 +253,92 @@ mod tests {
                 r"\toks 1 = {Hola, Mundo}\toks 2 = \toks 1 \the \toks 2",
                 r"Hola, Mundo"
             ),
+            (
+                dimen_to_int_1,
+                r"\dimen 1 = 40sp \count 1 = \dimen 1 \the \count 1",
+                r"40",
+            ),
+            (
+                dimen_to_int_2,
+                r"\dimen 1 = 40in \count 1 = \dimen 1 \the \count 1",
+                r"189451468",
+            ),
+            (
+                int_to_dimen_1,
+                r"\count 1 = 40 \dimen 1 = \count 1 pt \the \dimen 1",
+                r"40.0pt",
+            ),
+            (
+                int_to_dimen_2,
+                r"\count 1 = -40 \dimen 1 = \count 1 pt \the \dimen 1",
+                r"-40.0pt",
+            ),
+            (
+                int_to_dimen_3,
+                // <int><int> is interpreted as <int>*<int>sp, so the result here is 40*2sp
+                r"\count 3 = 40 \count 5 = 2 \dimen 7 = \count 3 \count 5 \the \dimen 7",
+                r"0.00122pt",
+            ),
+            (
+                int_to_dimen_4,
+                r"\count 1 = 40 \dimen 2 = 5sp \dimen 1 = \count 1 \dimen 2 \the \dimen 1",
+                r"0.00305pt",
+            ),
+            (
+                dimen_to_dimen_1,
+                r"\dimen 1 = 10pt \dimen 2 = 5 \dimen 1 \the \dimen 2",
+                r"50.0pt",
+            ),
+            (
+                dimen_to_dimen_2,
+                r"\dimen 2 = 10pt \dimen 1 = - 1.5 \dimen 2 \the \dimen 1",
+                r"-15.0pt",
+            ),
+            (
+                dimen_to_dimen_3,
+                r"\dimen 2 = 5pt \dimen 1 = - 1.5 \dimen 2 \the \dimen 1",
+                r"-7.5pt",
+            ),
+            (
+                dimen_to_dimen_4,
+                r"\dimen 2 = -10pt \dimen 1 = 1.5 \dimen 2 \the \dimen 1",
+                r"-15.0pt",
+            ),
+            (
+                dimen_to_dimen_5,
+                r"\dimen 2 = -5pt \dimen 1 = 1.5 \dimen 2 \the \dimen 1",
+                r"-7.5pt",
+            ),
+            (
+                dimen_to_dimen_6,
+                r"\dimen 2 = -10pt \dimen 1 = - 1.5 \dimen 2 \the \dimen 1",
+                r"15.0pt",
+            ),
+            (
+                dimen_to_dimen_7,
+                r"\dimen 2 = -5pt \dimen 1 = - 1.5 \dimen 2 \the \dimen 1",
+                r"7.5pt",
+            ),
+            (
+                int_dimen_to_dimen_1,
+                r"\count 1 = 2 \dimen 1 = 3pt \dimen 2 = \count 1 \dimen 1 \the \dimen 2",
+                r"6.0pt",
+            ),
+            (
+                int_dimen_to_dimen_2,
+                r"\count 1 = -2 \dimen 1 = 3pt \dimen 2 = \count 1 \dimen 1 \the \dimen 2",
+                r"-6.0pt",
+            ),
+            (
+                int_dimen_to_dimen_3,
+                r"\count 1 = 2 \dimen 1 = -3pt \dimen 2 = \count 1 \dimen 1 \the \dimen 2",
+                r"-6.0pt",
+            ),
+            (
+                int_dimen_to_dimen_4,
+                r"\count 1 = 2 \dimen 1 = 3pt \dimen 2 = -\count 1 \dimen 1 \the \dimen 2",
+                r"-6.0pt",
+            ),
         ),
         serde_tests(
             (serde_basic, r"\count 100 200 ", r"\the \count 100"),
@@ -270,6 +366,66 @@ mod tests {
                 "4"
             ),
             (countdef_missing_cs, r"\countdef 260 End", "End"),
+            (
+                dimen_to_dimen_too_big_1,
+                r"\dimen 1 = 10000pt \dimen 2 = 2 \dimen 1 \the \dimen 2",
+                r"16383.99998pt",
+            ),
+            (
+                dimen_to_dimen_too_big_2,
+                r"\dimen 1 = -10000pt \dimen 2 = 2 \dimen 1 \the \dimen 2",
+                r"-16383.99998pt",
+            ),
+            (
+                dimen_to_dimen_too_big_3,
+                r"\dimen 1 = 10000pt \dimen 2 = -2 \dimen 1 \the \dimen 2",
+                r"-16383.99998pt",
+            ),
+            (
+                dimen_to_dimen_too_big_4,
+                r"\dimen 1 = -10000pt \dimen 2 = -2 \dimen 1 \the \dimen 2",
+                r"16383.99998pt",
+            ),
+            (
+                int_to_dimen_too_big_1,
+                r"\count 1 = 400 \dimen 1 = \count 1 in \the \dimen 1",
+                r"16383.99998pt",
+            ),
+            (
+                int_to_dimen_too_big_2,
+                r"\count 1 = -400 \dimen 1 = \count 1 in \the \dimen 1",
+                r"-16383.99998pt",
+            ),
+            (
+                int_to_dimen_too_big_3,
+                r"\count 1 = 400 \dimen 1 = - \count 1 in \the \dimen 1",
+                r"-16383.99998pt",
+            ),
+            (
+                int_to_dimen_too_big_4,
+                r"\count 1 = -400 \dimen 1 = - \count 1 in \the \dimen 1",
+                r"16383.99998pt",
+            ),
+            (
+                int_dimen_to_dimen_too_big_1,
+                r"\count 1 = 2 \dimen 1 = 10000pt \dimen 2 = \count 1 \dimen 1 \the \dimen 2",
+                r"16383.99998pt",
+            ),
+            (
+                int_dimen_to_dimen_too_big_2,
+                r"\count 1 = 2 \dimen 1 = 10000pt \dimen 2 = -\count 1 \dimen 1 \the \dimen 2",
+                r"-16383.99998pt",
+            ),
+            (
+                int_dimen_to_dimen_too_big_3,
+                r"\count 1 = -2 \dimen 1 = 10000pt \dimen 2 = \count 1 \dimen 1 \the \dimen 2",
+                r"-16383.99998pt",
+            ),
+            (
+                int_dimen_to_dimen_too_big_4,
+                r"\count 1 = 2 \dimen 1 = -10000pt \dimen 2 = \count 1 \dimen 1 \the \dimen 2",
+                r"-16383.99998pt",
+            ),
         ),
     ];
 }

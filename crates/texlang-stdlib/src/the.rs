@@ -25,6 +25,7 @@ fn the_primitive_fn<S: TheCompatible>(
     input: &mut vm::ExpansionInput<S>,
 ) -> txl::Result<()> {
     let token = input.next(EndOfInputError {})?;
+    // TeX.2021.465
     match &token.value() {
         token::Value::CommandRef(command_ref) => {
             match input.commands_map().get_command(command_ref) {
@@ -33,13 +34,14 @@ fn the_primitive_fn<S: TheCompatible>(
                     let (state, expansions) = input.state_and_expansions_mut();
                     match variable.value(state) {
                         variable::ValueRef::Int(i) => {
-                            int_to_tokens(expansions, the_token, *i);
+                            write(expansions, the_token, *i);
                         }
                         variable::ValueRef::CatCode(i) => {
-                            int_to_tokens(expansions, the_token, (*i as u8).into());
+                            write(expansions, the_token, (*i as u8) as i32);
                         }
-                        variable::ValueRef::MathCode(i) => {
-                            int_to_tokens(expansions, the_token, i.0 as i32)
+                        variable::ValueRef::MathCode(i) => write(expansions, the_token, i.0 as i32),
+                        variable::ValueRef::Dimen(d) => {
+                            write(expansions, the_token, *d);
                         }
                         variable::ValueRef::Font(font) => {
                             let font = *font;
@@ -54,16 +56,12 @@ fn the_primitive_fn<S: TheCompatible>(
                     };
                 }
                 Some(command::Command::Character(c)) => {
-                    let c = *c;
-                    int_to_tokens(
-                        input.expansions_mut(),
-                        the_token,
-                        (c as u32).try_into().unwrap(),
-                    );
+                    let i = *c as i32;
+                    write(input.expansions_mut(), the_token, i);
                 }
                 Some(command::Command::MathCharacter(c)) => {
-                    let c = *c;
-                    int_to_tokens(input.expansions_mut(), the_token, c.0 as i32);
+                    let i = c.0 as i32;
+                    write(input.expansions_mut(), the_token, i);
                 }
                 Some(command::Command::Font(font)) => {
                     // \the is a no-op for font commands?
@@ -105,23 +103,38 @@ fn font_to_tokens<S: TexlangState + TheCompatible>(
     input.back(font_token);
 }
 
-fn int_to_tokens(tokens: &mut Vec<token::Token>, the_token: token::Token, mut i: i32) {
-    if i == 0 {
-        tokens.push(token::Token::new_other('0', the_token.trace_key()));
-        return;
+/// Implementation of [`std::fmt::Write`] that writes to a token buffer.
+///
+/// As well as being sort of elegant (?), converting values to tokens this way
+/// avoids all allocations outside of the buffer.
+struct TokenWrite<'a>(&'a mut Vec<token::Token>, token::trace::Key);
+
+impl<'a> std::fmt::Write for TokenWrite<'a> {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        for c in s.chars() {
+            self.write_char(c)?;
+        }
+        Ok(())
     }
-    let negative = i < 0;
-    while i != 0 {
-        let digit = (i % 10).abs();
-        tokens.push(token::Token::new_other(
-            char::from_digit(digit.try_into().unwrap(), 10).unwrap(),
-            the_token.trace_key(),
-        ));
-        i /= 10;
+    fn write_char(&mut self, c: char) -> std::fmt::Result {
+        let token = if c == ' ' {
+            token::Token::new_space(c, self.1)
+        } else if c.is_ascii_alphabetic() {
+            token::Token::new_letter(c, self.1)
+        } else {
+            token::Token::new_other(c, self.1)
+        };
+        self.0.push(token);
+        Ok(())
     }
-    if negative {
-        tokens.push(token::Token::new_other('-', the_token.trace_key()));
-    }
+}
+
+fn write<D: std::fmt::Display>(buffer: &mut Vec<token::Token>, the_token: token::Token, value: D) {
+    let start = buffer.len();
+    use std::fmt::Write;
+    let mut t = TokenWrite(buffer, the_token.trace_key());
+    write!(t, "{value}").expect("the token writer cannot error");
+    buffer[start..].reverse();
 }
 
 #[derive(Debug)]

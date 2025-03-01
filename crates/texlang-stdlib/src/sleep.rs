@@ -1,7 +1,7 @@
 //! Primitive that pauses execution for a duration of time
 
-use core::time;
 use std::thread;
+use std::time;
 use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;

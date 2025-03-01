@@ -18,7 +18,7 @@ path = "bin/errors.rs"
 chrono = {version="0.4.19", default-features = false, features = ["clock"], optional = true}
 
 linefeed = {version = "0.6", optional = true}
-
+core = { path = "../core" }
 texcraft-stdext = { path = "../texcraft-stdext", version = "0.1.0" }
 texlang = { path = "../texlang", version="0.1.0" }
 texlang-common = { path = "../texlang-common", version = "0.1.0" }

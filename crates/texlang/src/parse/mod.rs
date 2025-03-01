@@ -16,17 +16,18 @@
 #[macro_use]
 mod helpers;
 
+mod dimen;
 mod filelocation;
+mod integer;
 mod keyword;
-mod number;
 mod relation;
 #[cfg(test)]
 mod testing;
 mod variable;
 
 pub use filelocation::FileLocation;
+pub use integer::Uint;
 pub use keyword::parse_keyword;
-pub use number::Uint;
 pub use relation::Ordering;
 pub use variable::ArithmeticVariable;
 pub use variable::OptionalEquals;
@@ -34,6 +35,7 @@ pub use variable::OptionalEqualsUnexpanded;
 
 use crate::prelude as txl;
 use crate::traits::*;
+use crate::types::CatCode;
 use crate::*;
 
 /// Implementations of this trait are elements of the TeX grammar than can be parsed from a stream of tokens.
@@ -297,5 +299,20 @@ impl<S: TexlangState> Parsable<S> for Option<char> {
             }
         };
         Ok(Some(c))
+    }
+}
+
+/// When parsed, this type consumes an optional space from the token stream.
+pub struct OptionalSpace;
+
+impl<S: TexlangState> Parsable<S> for OptionalSpace {
+    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+        // TeX.2021.443
+        if let Some(next) = input.next_or()? {
+            if next.cat_code() != Some(CatCode::Space) {
+                input.back(next);
+            }
+        }
+        Ok(OptionalSpace {})
     }
 }

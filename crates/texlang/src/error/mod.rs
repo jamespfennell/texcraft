@@ -135,6 +135,21 @@ impl EndOfInputError for TodoError {
     }
 }
 
+impl TexError for TodoError {
+    fn kind(&self) -> Kind {
+        Kind::FailedPrecondition
+    }
+    fn title(&self) -> String {
+        "? (TODO: add a specific end of input error for this case.)".into()
+    }
+    fn notes(&self) -> Vec<display::Note> {
+        vec![
+            "the Rust source code uses `texlang::error::TODO` for this error case".into(),
+            "a more specific end of input error needs to be added".into(),
+        ]
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct EofError {
     doing: String,

@@ -1,17 +1,22 @@
 //! Operations on variables (add, multiply, divide)
 
+use core::Scaled;
+
+use texcraft_stdext::collections::groupingmap;
 use texlang::prelude as txl;
 use texlang::traits::*;
+use texlang::variable::SupportedType;
+use texlang::variable::TypedVariable;
 use texlang::*;
 
 /// Get the `\advance` command.
 pub fn get_advance<S: TexlangState>() -> command::BuiltIn<S> {
-    get_command::<S, AddOp>()
+    get_command::<S, AdvanceOp>()
 }
 
 /// Get the `\advanceChecked` command.
 pub fn get_advance_checked<S: TexlangState>() -> command::BuiltIn<S> {
-    get_command::<S, AddCheckedOp>()
+    get_command::<S, AdvanceCheckedOp>()
 }
 
 /// Get the `\multiply` command.
@@ -41,36 +46,105 @@ pub fn variable_op_tag() -> command::Tag {
     VARIABLE_OP_TAG.get()
 }
 
-trait Op {
-    const DOC: &'static str = "";
-    type Error: error::TexError;
-    fn perform(lhs: i32, rhs: i32) -> Result<i32, Self::Error>;
+trait Number: Sized + Default + SupportedType + Copy + std::fmt::Display {
+    fn wrapping_add(lhs: Self, rhs: Self) -> Self;
+    fn checked_add(lhs: Self, rhs: Self) -> Option<Self>;
+    fn checked_mul(lhs: Self, rhs: i32) -> Option<Self>;
+    fn wrapping_mul(lhs: Self, rhs: i32) -> Self;
+    fn checked_div(lhs: Self, rhs: i32) -> Option<Self>;
 }
 
-struct AddOp;
-
-impl Op for AddOp {
-    const DOC: &'static str = "Add an integer to a variable";
-    type Error = OverflowError;
-    fn perform(lhs: i32, rhs: i32) -> Result<i32, Self::Error> {
-        // Note: TeX silently overflows in \advance
-        Ok(lhs.wrapping_add(rhs))
+impl Number for i32 {
+    fn wrapping_add(lhs: Self, rhs: Self) -> Self {
+        lhs.wrapping_add(rhs)
+    }
+    fn checked_add(lhs: Self, rhs: Self) -> Option<Self> {
+        lhs.checked_add(rhs)
+    }
+    fn checked_mul(lhs: Self, rhs: i32) -> Option<Self> {
+        lhs.checked_mul(rhs)
+    }
+    fn wrapping_mul(lhs: Self, rhs: i32) -> Self {
+        lhs.wrapping_mul(rhs)
+    }
+    fn checked_div(lhs: Self, rhs: i32) -> Option<Self> {
+        lhs.checked_div(rhs)
     }
 }
 
-struct AddCheckedOp;
+impl Number for core::Scaled {
+    fn wrapping_add(lhs: Self, rhs: Self) -> Self {
+        core::Scaled(lhs.0.wrapping_add(rhs.0))
+    }
+    fn checked_add(lhs: Self, rhs: Self) -> Option<Self> {
+        Some(core::Scaled(lhs.0.checked_add(rhs.0)?))
+    }
+    fn checked_mul(lhs: Self, rhs: i32) -> Option<Self> {
+        // TODO: need to really probe the overflow behavior here!
+        lhs.nx_plus_y(rhs, Scaled::ZERO).ok()
+    }
+    fn wrapping_mul(lhs: Self, rhs: i32) -> Self {
+        core::Scaled(lhs.0.wrapping_mul(rhs))
+    }
+    fn checked_div(lhs: Self, rhs: i32) -> Option<Self> {
+        Some(core::Scaled(lhs.0.checked_div(rhs)?))
+    }
+}
 
-impl Op for AddCheckedOp {
-    const DOC: &'static str = "Add an integer to a variable and error on overflow";
+trait Op {
+    const DOC: &'static str;
+    const RHS_SAME: bool;
+    type Error: error::TexError;
+    fn apply<N: Number>(lhs: N, rhs_i: i32, rhs_n: N) -> Result<N, Self::Error>;
+
+    fn apply_to_variable<S: TexlangState, N: Number + Parsable<S>>(
+        variable: TypedVariable<S, N>,
+        input: &mut vm::ExecutionInput<S>,
+        scope: groupingmap::Scope,
+    ) -> txl::Result<()> {
+        let lhs = *variable.get(input.state());
+        let (rhs_i, rhs_n) = if Self::RHS_SAME {
+            (0_i32, N::parse(input)?)
+        } else {
+            (i32::parse(input)?, Default::default())
+        };
+        let result = match Self::apply(lhs, rhs_i, rhs_n) {
+            Ok(result) => result,
+            Err(err) => {
+                return input.vm().error(err);
+            }
+        };
+        variable.set(input, scope, result);
+        Ok(())
+    }
+}
+
+struct AdvanceOp;
+
+impl Op for AdvanceOp {
+    const DOC: &'static str = "Add a quantity to a variable";
+    const RHS_SAME: bool = true;
     type Error = OverflowError;
-    fn perform(lhs: i32, rhs: i32) -> Result<i32, Self::Error> {
-        match lhs.checked_add(rhs) {
+    fn apply<N: Number>(lhs: N, _: i32, rhs_n: N) -> Result<N, Self::Error> {
+        // TeX silently overflows in \advance
+        Ok(N::wrapping_add(lhs, rhs_n))
+    }
+}
+
+struct AdvanceCheckedOp;
+
+impl Op for AdvanceCheckedOp {
+    const DOC: &'static str = "Add a number to a variable (error on overflow)";
+    const RHS_SAME: bool = true;
+    type Error = OverflowError;
+    fn apply<N: Number>(lhs: N, _: i32, rhs_n: N) -> Result<N, Self::Error> {
+        match N::checked_add(lhs, rhs_n) {
             Some(result) => Ok(result),
             None => Err(OverflowError {
                 op_name: "addition",
-                lhs,
-                rhs,
-                wrapped_result: lhs.wrapping_add(rhs),
+                lhs: format!["{lhs}"],
+                rhs: format!["{rhs_n}"],
+                wrapped_result: format!["{}", N::wrapping_add(lhs, rhs_n)],
             }),
         }
     }
@@ -80,15 +154,16 @@ struct MultiplyOp;
 
 impl Op for MultiplyOp {
     const DOC: &'static str = "Multiply a variable by an integer";
+    const RHS_SAME: bool = false;
     type Error = OverflowError;
-    fn perform(lhs: i32, rhs: i32) -> Result<i32, Self::Error> {
-        match lhs.checked_mul(rhs) {
+    fn apply<N: Number>(lhs: N, rhs_i: i32, _: N) -> Result<N, Self::Error> {
+        match N::checked_mul(lhs, rhs_i) {
             Some(result) => Ok(result),
             None => Err(OverflowError {
                 op_name: "multiplication",
-                lhs,
-                rhs,
-                wrapped_result: lhs.wrapping_mul(rhs),
+                lhs: format!["{lhs}"],
+                rhs: format!["{rhs_i}"],
+                wrapped_result: format!["{}", N::wrapping_mul(lhs, rhs_i)],
             }),
         }
     }
@@ -97,10 +172,11 @@ impl Op for MultiplyOp {
 struct MultiplyWrappedOp;
 
 impl Op for MultiplyWrappedOp {
-    const DOC: &'static str = "Multiply a variable by an integer and wrap on overflow";
+    const DOC: &'static str = "Multiply a variable by an integer (wrap on overflow)";
+    const RHS_SAME: bool = false;
     type Error = OverflowError;
-    fn perform(lhs: i32, rhs: i32) -> Result<i32, Self::Error> {
-        Ok(lhs.wrapping_mul(rhs))
+    fn apply<N: Number>(lhs: N, rhs_i: i32, _: N) -> Result<N, Self::Error> {
+        Ok(N::wrapping_mul(lhs, rhs_i))
     }
 }
 
@@ -108,21 +184,26 @@ struct DivideOp;
 
 impl Op for DivideOp {
     const DOC: &'static str = "Divide a variable by an integer";
+    const RHS_SAME: bool = false;
     type Error = DivisionByZeroError;
-    fn perform(lhs: i32, rhs: i32) -> Result<i32, Self::Error> {
-        if rhs == 0 {
-            return Err(DivisionByZeroError { numerator: lhs });
+    fn apply<N: Number>(lhs: N, rhs_i: i32, _: N) -> Result<N, Self::Error> {
+        match N::checked_div(lhs, rhs_i) {
+            Some(result) => Ok(result),
+            None => {
+                Err(DivisionByZeroError {
+                    numerator: format!["{lhs}"],
+                })
+            }
         }
-        Ok(lhs.wrapping_div(rhs))
     }
 }
 
 #[derive(Debug)]
 struct OverflowError {
     op_name: &'static str,
-    lhs: i32,
-    rhs: i32,
-    wrapped_result: i32,
+    lhs: String,
+    rhs: String,
+    wrapped_result: String,
 }
 
 impl error::TexError for OverflowError {
@@ -145,7 +226,7 @@ impl error::TexError for OverflowError {
 
 #[derive(Debug)]
 struct DivisionByZeroError {
-    numerator: i32,
+    numerator: String,
 }
 
 impl error::TexError for DivisionByZeroError {
@@ -162,6 +243,7 @@ impl error::TexError for DivisionByZeroError {
     }
 }
 
+/// TeX.2021.446-1240
 fn math_primitive_fn<S: TexlangState, O: Op>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
@@ -172,18 +254,8 @@ fn math_primitive_fn<S: TexlangState, O: Op>(
     };
     OptionalBy::parse(input)?;
     match variable {
-        variable::Variable::Int(variable) => {
-            let lhs = *variable.get(input.state());
-            let rhs = i32::parse(input)?;
-            let result = match O::perform(lhs, rhs) {
-                Ok(result) => result,
-                Err(err) => {
-                    return input.vm().error(err);
-                }
-            };
-            variable.set(input, scope, result);
-            Ok(())
-        }
+        variable::Variable::Int(variable) => O::apply_to_variable(variable, input, scope),
+        variable::Variable::Dimen(variable) => O::apply_to_variable(variable, input, scope),
         variable::Variable::CatCode(_)
         | variable::Variable::TokenList(_)
         | variable::Variable::MathCode(_)
@@ -221,6 +293,7 @@ mod tests {
         catcode: codes::Component<CatCode>,
         prefix: prefix::Component,
         registers: registers::Component<i32, 256>,
+        registers_dimen: registers::Component<core::Scaled, 256>,
         testing: TestingComponent,
     }
 
@@ -243,6 +316,7 @@ mod tests {
         catcode: codes::Component<CatCode>,
         prefix: prefix::Component,
         registers: registers::Component<i32, 256>,
+        registers_dimen: registers::Component<core::Scaled, 256>,
         testing: TestingComponent,
     }];
 
@@ -256,19 +330,20 @@ mod tests {
             //
             ("catcode", codes::get_catcode()),
             ("count", registers::get_count()),
+            ("dimen", registers::get_dimen()),
             ("global", prefix::get_global()),
             ("the", the::get_the()),
         ])
     }
 
     macro_rules! arithmetic_tests {
-        ( $( ($name: ident, $op: expr, $lhs: expr, $rhs: expr, $expected: expr) ),* $(,)? ) => {
+        ( $register: expr, $( ($name: ident, $op: expr, $lhs: expr, $rhs: expr, $expected: expr) ),* $(,)? ) => {
             test_suite![
                 expansion_equality_tests(
                     $(
                         (
                             $name,
-                            format![r"\count 1 {} {} \count 1 {} \the\count 1", $lhs, $op, $rhs],
+                            format![r"{} 1 {} {} {} 1 {} \the{} 1", $register, $lhs, $op, $register, $rhs, $register],
                             $expected
                         ),
                     )*
@@ -278,6 +353,7 @@ mod tests {
     }
 
     arithmetic_tests![
+        r"\count",
         (advance_base_case, r"\advance", "1", "2", "3"),
         (advance_base_case_with_by, r"\advance", "1", "by 2", "3"),
         (advance_negative_summand, r"\advance", "10", "-2", "8"),
@@ -323,6 +399,13 @@ mod tests {
         )
     ];
 
+    arithmetic_tests![
+        r"\dimen",
+        (advance_dimen_1, r"\advance", "1pt", "2pt", "3.0pt"),
+        (advance_dimen_2, r"\advance", "0.025pt", "0.5pt", "0.525pt"),
+        (mul_dimen_1, r"\multiply", "10pt", "2", "20.0pt"),
+        (div_dimen_1, r"\divide", "10pt", "2", "5.0pt"),
+    ];
     test_suite![
         expansion_equality_tests(
             (
