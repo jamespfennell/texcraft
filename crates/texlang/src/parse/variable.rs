@@ -2,66 +2,6 @@ use crate::prelude as txl;
 use crate::traits::*;
 use crate::*;
 
-/// Parses an arithmetic variable (integer, glue, dimension, etc).
-pub struct ArithmeticVariable<S>(pub Option<variable::Variable<S>>);
-
-impl<S: TexlangState> Parsable<S> for ArithmeticVariable<S> {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
-        let token = input.next(ArithmeticVariableEndOfInput {})?;
-        match token.value() {
-            token::Value::CommandRef(command_ref) => {
-                match input.commands_map().get_command(&command_ref) {
-                    None => {
-                        input.vm().error(
-                            parse::Error::new("a variable", Some(token), "")
-                                .with_got_override("got an undefined control sequence")
-                                .with_annotation_override("undefined control sequence"),
-                        )?;
-                        Ok(ArithmeticVariable(None))
-                    }
-                    Some(command::Command::Variable(cmd)) => {
-                        if !cmd.is_arithmetic() {
-                            input.vm().error(
-                                parse::Error::new("an arithmetic variable", Some(token), "")
-                                    .with_got_override("got a non-arithmetic variable"),
-                            )?;
-                            Ok(ArithmeticVariable(None))
-                        } else {
-                            Ok(ArithmeticVariable(Some(cmd.clone().resolve(token, input)?)))
-                        }
-                    }
-                    Some(cmd) => {
-                        input.vm().error(
-                            parse::Error::new("a variable", Some(token), "")
-                                .with_got_override("got a non-variable command")
-                                .with_annotation_override(format![
-                                    "control sequence referencing {cmd}"
-                                ]),
-                        )?;
-                        Ok(ArithmeticVariable(None))
-                    }
-                }
-            }
-            _ => {
-                input.vm().error(
-                    parse::Error::new("a variable", Some(token), "")
-                        .with_got_override("got a character token"),
-                )?;
-                Ok(ArithmeticVariable(None))
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-struct ArithmeticVariableEndOfInput;
-
-impl error::EndOfInputError for ArithmeticVariableEndOfInput {
-    fn doing(&self) -> String {
-        "parsing an arithmetic variable".into()
-    }
-}
-
 /// When parsed, this type consumes an optional equals from the token stream.
 pub struct OptionalEquals;
 

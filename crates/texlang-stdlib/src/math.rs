@@ -189,11 +189,9 @@ impl Op for DivideOp {
     fn apply<N: Number>(lhs: N, rhs_i: i32, _: N) -> Result<N, Self::Error> {
         match N::checked_div(lhs, rhs_i) {
             Some(result) => Ok(result),
-            None => {
-                Err(DivisionByZeroError {
-                    numerator: format!["{lhs}"],
-                })
-            }
+            None => Err(DivisionByZeroError {
+                numerator: format!["{lhs}"],
+            }),
         }
     }
 }
@@ -249,19 +247,60 @@ fn math_primitive_fn<S: TexlangState, O: Op>(
     input: &mut vm::ExecutionInput<S>,
 ) -> txl::Result<()> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
-    let Some(variable) = texlang::parse::ArithmeticVariable::parse(input)?.0 else {
-        return Ok(());
-    };
-    OptionalBy::parse(input)?;
-    match variable {
-        variable::Variable::Int(variable) => O::apply_to_variable(variable, input, scope),
-        variable::Variable::Dimen(variable) => O::apply_to_variable(variable, input, scope),
-        variable::Variable::CatCode(_)
-        | variable::Variable::TokenList(_)
-        | variable::Variable::MathCode(_)
-        | variable::Variable::Font(_) => {
-            unreachable!("only arithmetic commands are considered");
+    let token = input.next(ArithmeticVariableEndOfInput {})?;
+    match token.value() {
+        token::Value::CommandRef(command_ref) => {
+            match input.commands_map().get_command(&command_ref) {
+                None => input.vm().error(
+                    parse::Error::new("a variable", Some(token), "")
+                        .with_got_override("got an undefined control sequence")
+                        .with_annotation_override("undefined control sequence"),
+                ),
+                Some(command::Command::Variable(cmd)) => {
+                    if !cmd.is_arithmetic() {
+                        input.vm().error(
+                            parse::Error::new("an arithmetic variable", Some(token), "")
+                                .with_got_override("got a non-arithmetic variable"),
+                        )?;
+                        return Ok(());
+                    }
+                    let variable = cmd.clone().resolve(token, input.as_mut())?;
+                    OptionalBy::parse(input)?;
+                    match variable {
+                        variable::Variable::Int(variable) => {
+                            O::apply_to_variable(variable, input, scope)
+                        }
+                        variable::Variable::Dimen(variable) => {
+                            O::apply_to_variable(variable, input, scope)
+                        }
+                        variable::Variable::CatCode(_)
+                        | variable::Variable::TokenList(_)
+                        | variable::Variable::MathCode(_)
+                        | variable::Variable::Font(_) => {
+                            unreachable!("only arithmetic commands are considered");
+                        }
+                    }
+                }
+                Some(cmd) => input.vm().error(
+                    parse::Error::new("a variable", Some(token), "")
+                        .with_got_override("got a non-variable command")
+                        .with_annotation_override(format!["control sequence referencing {cmd}"]),
+                ),
+            }
         }
+        _ => input.vm().error(
+            parse::Error::new("a variable", Some(token), "")
+                .with_got_override("got a character token"),
+        ),
+    }
+}
+
+#[derive(Debug)]
+struct ArithmeticVariableEndOfInput;
+
+impl error::EndOfInputError for ArithmeticVariableEndOfInput {
+    fn doing(&self) -> String {
+        "parsing an arithmetic variable".into()
     }
 }
 

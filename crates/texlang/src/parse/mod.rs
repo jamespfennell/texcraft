@@ -29,7 +29,6 @@ pub use filelocation::FileLocation;
 pub use integer::Uint;
 pub use keyword::parse_keyword;
 pub use relation::Ordering;
-pub use variable::ArithmeticVariable;
 pub use variable::OptionalEquals;
 pub use variable::OptionalEqualsUnexpanded;
 
