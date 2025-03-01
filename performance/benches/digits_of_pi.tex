@@ -8,36 +8,34 @@
 %
 % - Texcraft: n cannot be larger than 7559 as the algorithm requires n + (10n)//3 + 12
 %   integers in memory, and we assume 2^15 registers, as in pdfTeX.
-%   The playground has a version of this script that uses Texcraft allocation commands
-%   instead of \count registers and is thus not subject to this restriction.
-%   But also, for some currently unknown value of n, 32-bit integer overflow will occur
+%   But, for some currently unknown value of n, 32-bit integer overflow will occur
 %   and the result will be incorrect. From the original paper [1] we know that this n
 %   is at least 5000. 
 %
 % \count register layout:
 %
 % - [0, 25196): used for the length 10n/3 working array
-% - [25196, 32756): used for storing the n results
-% - [32756, 32768=2^15): used for 12 named variables via \countdef
+% - [25196, 32755): used for storing the n results
+% - [32755, 32768=2^15): used for 13 named variables via \countdef
 %
 % [1] http://www.cs.williams.edu/~heeringa/classes/cs135/s15/readings/spigot.pdf
 
 % While loop: repeatedly executes #2 while `\ifnum #1` is true
-\def\while#1#2{
-  \ifnum #1
+\def\while#1#2{%
+  \ifnum #1%
     #2%
-    \while{#1}{#2}\fi
+    \while{#1}{#2}\fi%
 }
 
 % Modulus: calculates `#1 % #2` and puts the result in #1
 \countdef \tempTwo 32756
-\def\modulus#1#2{
-  \tempTwo = #1
-  \divide \tempTwo by #2
-  \multiply \tempTwo by #2
-  \multiply \tempTwo by -1
-  \advance \tempTwo by #1
-  #1= \tempTwo
+\def\modulus#1#2{%
+  \tempTwo = #1%
+  \divide \tempTwo by #2%
+  \multiply \tempTwo by #2%
+  \multiply \tempTwo by -1%
+  \advance \tempTwo by #1%
+  #1= \tempTwo%
 }
 
 \countdef \n 32767
@@ -65,7 +63,6 @@
 }
 
 \countdef \j 32763
-\countdef \k 32762 % todo: can remove
 \countdef \carry 32761
 \countdef \preDigit 32760
 \countdef \firstPreDigit 32759
@@ -139,11 +136,17 @@
 \while{\resultIndex < \n}{\result\resultIndex-1\advance\resultIndex1}
 
 \advance\n by 25196
+\countdef \s 32755
 \i=25196
+pi =
 \while{\i<\n}{%
-  \ifnum \result\i > -1 \the\result\i \fi
+  \ifnum \result\i>-1 \the\result\i\fi%
+  \ifnum \i=25196 .\fi %
   \advance\i by 1%
-}
+  \s=\i%
+  \modulus{\s}{20}%
+  \ifnum \s=0 \fi%
+}...
 
 % To run on pdfTeX, uncomment the following line.
 % \end

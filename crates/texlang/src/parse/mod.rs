@@ -248,9 +248,9 @@ pub fn finish_parsing_balanced_tokens<S: vm::TokenStream>(
 }
 
 /// When parsed, this type consumes an arbitrary number of spaces from the input stream
-/// 
+///
 /// TODO: we should audit all places Knuth uses this, and ensure we're using it too.
-/// 
+///
 /// TeX.2021.406
 pub struct Spaces;
 

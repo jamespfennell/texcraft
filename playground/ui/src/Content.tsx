@@ -28,169 +28,154 @@ export const PrimesDotTex = new TexFile("primes.tex", "TODO", "calculate the fir
 export const DigitsOfPiDotTex = new TexFile("digits-of-pi.tex", String.raw
 `% Digits of pi using the Rabinowitz and Wagon spigot algorithm [1]
 %
-% The maximum number of digits to produce after the decimal point is
-% configured here:
+% This TeX script calculates the first n digits of pi. It uses \count registers
+% for working memory and is runnable on both Texcraft and pdfTeX. The variable n 
+% is specified at the end of the script, and is restricted as follows:
 %
-\newInt \N
-\N = 50
+% - pdfTeX: n cannot be much larger than 1000 as pdfTeX runs out of stack space.
 %
-% Notes:
+% - Texcraft: n cannot be larger than 7559 as the algorithm requires n + (10n)//3 + 12
+%   integers in memory, and we assume 2^15 registers, as in pdfTeX.
+%   But, for some currently unknown value of n, 32-bit integer overflow will occur
+%   and the result will be incorrect. From the original paper [1] we know that this n
+%   is at least 5000. 
 %
-% - Sometimes the algorithm produces fewer digits than \N; for example, if
-%   \N=4 it only produces 3 digits. This is known property of the spigot
-%   algorithm
+% \count register layout:
 %
-% - The algorithm is O(n^2) and thus becomes quite slow quite fast for
-%   larger numbers of digits.
-%
-% - TeX uses 32 bit integers and if \N is large enough overflow will occur and the
-%   result will be incorrect. This \N is at least 5000. Its exact value is not
-%   known yet.
-%
-% - This script uses Texcraft's allocation commands (\newInt and \newIntArray) and
-%   thus does not work on existing TeX engines like pdfTeX. There is a version
-%   of this script that uses \count registers instead and that can run on both
-%   pdfTeX and Texcraft [2]. The use of allocation commands allows for arbitrary
-%   amounts of memory to be used and for the typical memory bounds in TeX to be
-%   bypassed.
+% - [0, 25196): used for the length 10n/3 working array
+% - [25196, 32755): used for storing the n results
+% - [32755, 32768=2^15): used for 13 named variables via \countdef
 %
 % [1] http://www.cs.williams.edu/~heeringa/classes/cs135/s15/readings/spigot.pdf
-% [2] https://github.com/jamespfennell/texcraft/blob/main/performance/digits-of-pi.tex
 
 % While loop: repeatedly executes #2 while \`\ifnum #1\` is true
-\def\while#1#2{
-  \ifnum #1
+\def\while#1#2{%
+  \ifnum #1%
     #2%
-    \while{#1}{#2}\fi
+    \while{#1}{#2}\fi%
 }
 
 % Modulus: calculates \`#1 % #2\` and puts the result in #1
-\newInt \modulusTemp
-\def\modulus#1#2{
-  \modulusTemp = #1
-  \divide \modulusTemp by #2
-  \multiply \modulusTemp by #2
-  \multiply \modulusTemp by -1
-  \advance \modulusTemp by #1
-  #1= \modulusTemp
+\countdef \tempTwo 32756
+\def\modulus#1#2{%
+  \tempTwo = #1%
+  \divide \tempTwo by #2%
+  \multiply \tempTwo by #2%
+  \multiply \tempTwo by -1%
+  \advance \tempTwo by #1%
+  #1= \tempTwo%
 }
 
-% Computes n digits of pi and stores the result in a provided array.
-%
-% The first argument is the number of digits to generate. It can be provided
-% as a constant or as an integer variable. The second argument is a control
-% sequence pointing to an array in which the result will be stored. The array
-% must enough space to store n digits
-%
-% The algorithm sometimes produces less than n digits. The tail of the array
-% may contain -1 values indicating those digits were no calculated.
-\def\computeDigitsOfPi#1#2{
-  \newInt \n
-  \n = #1
-  \newInt\resultIndex
+\countdef \n 32767
+% Any changes to the following line will break the benchmark Rust code as it assumes
+% the string '\n = 100' appears exactly.
+\n = 100
 
-  % allocate an array of length (10n)/3
-  \newInt \len
-  \len = \n
-  \multiply \len by 10
-  \divide \len by 3
-  \newIntArray \r \len
+\def\result{\count}
+\countdef \resultIndex 32766
+\resultIndex = 25196
 
-  % initialize each element of the array to 2
-  \newInt \i
-  \i = 0
-  \while{\i < \len}{
-    \r \i = 2
-    \advance \i by 1
+% allocate an array of length (10n)/3
+\countdef \len 32765
+\len = \n
+\multiply \len by 10
+\divide \len by 3
+\def\r{\count}
+
+% initialize each element of the array to 2
+\countdef \i 32764
+\i = 0
+\while{\i < \len}{
+  \r \i = 2
+  \advance \i by 1
+}
+
+\countdef \j 32763
+\countdef \carry 32761
+\countdef \preDigit 32760
+\countdef \firstPreDigit 32759
+\firstPreDigit = -1
+\countdef \numTrailingPreDigits 32758
+\numTrailingPreDigits = 0
+
+\countdef \outerLoopIndex 32757
+\outerLoopIndex = 0
+\while{\outerLoopIndex < \n}{
+  \advance \outerLoopIndex by 1
+  %
+  \i = \len
+  \while{\i > 0}{
+    \advance \i by -1
+    %
+    % r[i] = r[i] * 10 + carry
+    \multiply \r \i by 10
+    \advance \r \i by \carry
+    %
+    % Calculate j = 2i+1
+    \j = 2
+    \multiply \j by \i
+    \advance \j by 1
+    %
+    % carry = (r[i]/j)(i)
+    \carry = \r \i
+    \divide \carry by \j
+    \multiply \carry by \i
+    %
+    % r[i] = r[i] % j
+    \ifnum \i > 0 \modulus{\r\i}{\j} \fi
   }
-
-  \newInt \j
-  \newInt \k
-  \newInt \carry
-  \newInt \preDigit
-  \newInt \firstPreDigit
-  \firstPreDigit = -1
-  \newInt \numTrailingPreDigits
-  \numTrailingPreDigits = 0
-
-  \newInt \outerLoopIndex
-  \outerLoopIndex = 0
-  \while{\outerLoopIndex < \n}{
-    \advance \outerLoopIndex by 1
-    %
-    \i = \len
-    \while{\i > 0}{
-      \advance \i by -1
-      %
-      % r[i] = r[i] * 10 + carry
-      \multiply \r \i by 10
-      \advance \r \i by \carry
-      %
-      % Calculate j = 2i+1
-      \j = 2
-      \multiply \j by \i
-      \advance \j by 1
-      %
-      % carry = (r[i]/j)(i)
-      \carry = \r \i
-      \divide \carry by \j
-      \multiply \carry by \i
-      %
-      % r[i] = r[i] % j
-      \ifnum \i > 0 \modulus{\r\i}{\j} \fi
-    }
-    %
-    \preDigit = \r 0
-    \divide \preDigit by 10
-    %
-    \ifnum \preDigit < 9
-      \ifnum \firstPreDigit > -1
-        #2\resultIndex = \firstPreDigit
-        \advance\resultIndex by 1
-      \fi
-      \while{\numTrailingPreDigits > 0}{
-        #2\resultIndex = 9
-        \advance\resultIndex by 1
-        \advance\numTrailingPreDigits by -1
-      }
-      \firstPreDigit = \preDigit
-    \fi
-    \ifnum \preDigit = 9
-      \advance\numTrailingPreDigits by 1
-    \fi
-    \ifnum \preDigit = 10
-      \ifnum \firstPreDigit < 9
-        \advance \firstPreDigit by 1
-      \else 
-        \firstPreDigit = 0
-      \fi
-      #2\resultIndex = \firstPreDigit
+  %
+  \preDigit = \r 0
+  \divide \preDigit by 10
+  %
+  \ifnum \preDigit < 9
+    \ifnum \firstPreDigit > -1
+      \result\resultIndex = \firstPreDigit
       \advance\resultIndex by 1
-      \while{\numTrailingPreDigits > 0}{
-        #2\resultIndex = 0
-        \advance\resultIndex by 1
-        \advance\numTrailingPreDigits by -1
-      }
+    \fi
+    \while{\numTrailingPreDigits > 0}{
+      \result\resultIndex = 9
+      \advance\resultIndex by 1
+      \advance\numTrailingPreDigits by -1
+    }
+    \firstPreDigit = \preDigit
+  \fi
+  \ifnum \preDigit = 9
+    \advance\numTrailingPreDigits by 1
+  \fi
+  \ifnum \preDigit = 10
+    \ifnum \firstPreDigit < 9
+      \advance \firstPreDigit by 1
+    \else 
       \firstPreDigit = 0
     \fi
-    \modulus{\r 0}{10}
-  }
-
-  \while{\resultIndex < \n}{#2\resultIndex-1\advance\resultIndex1}
+    \result\resultIndex = \firstPreDigit
+    \advance\resultIndex by 1
+    \while{\numTrailingPreDigits > 0}{
+      \result\resultIndex = 0
+      \advance\resultIndex by 1
+      \advance\numTrailingPreDigits by -1
+    }
+    \firstPreDigit = 0
+  \fi
+  \modulus{\r 0}{10}
 }
 
-\advance\N by 2
-\newIntArray \digits \N
-\computeDigitsOfPi \N \digits
+\while{\resultIndex < \n}{\result\resultIndex-1\advance\resultIndex1}
 
-π ≅
-\i=0
-\newInt \temp
-\while{\i<\N}{%
-  \ifnum \digits\i > -1 \the\digits\i \fi
-  \ifnum \i=0.\fi
+\advance\n by 25196
+\countdef \s 32755
+\i=25196
+pi =
+
+\while{\i<\n}{%
+  \ifnum \result\i>-1 \the\result\i\fi%
+  \ifnum \i=25196 .\fi %
   \advance\i by 1%
-}
+  \s=\i%
+  \modulus{\s}{20}%
+  \ifnum \s=0\newline \fi%
+}...
 `, "compute the first n digits of pi");
 
 
