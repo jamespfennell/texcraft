@@ -293,6 +293,7 @@ convert_tests!(
         cmr10_windows_newlines,
         pltotf("computer-modern/cmr10", "_windows_newlines.plst", ".tfm")
     ),
+    (trip, roundtrip("ctan/trip")),
     (cmss8, roundtrip("computer-modern/cmss8")),
     (cmex10, roundtrip("computer-modern/cmex10")),
     (cminch, roundtrip("computer-modern/cminch")),
