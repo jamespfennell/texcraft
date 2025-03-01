@@ -25,6 +25,7 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
 ) -> txl::Result<()> {
+    // TeX.2021.1221
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
     let cmd_ref_or = Option::<token::CommandRef>::parse(input)?;
     OptionalEqualsUnexpanded::parse(input)?;

@@ -386,6 +386,11 @@ mod tests {
     test_suite![
         expansion_equality_tests(
             (
+                relation_before_spaces,
+                r"\countdef\A1 \A=2 \def\cmp#1{\ifnum#1 <3}\cmp{\A}Pass\else Fail \fi",
+                r"Pass"
+            ),
+            (
                 overwrite_else,
                 r"\def\else{}\ifodd 2 \else should be skipped \fi",
                 r""

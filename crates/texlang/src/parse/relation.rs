@@ -17,7 +17,9 @@ impl Default for Ordering {
 }
 
 impl Parsable for Ordering {
+    // TeX.2021.503
     fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+        super::Spaces::parse(input)?;
         let ordering_or = get_required_element![
             input,
             "a relation",
@@ -36,7 +38,8 @@ mod tests {
     use crate::parse::testing::*;
 
     parse_success_tests![
-        (less_than, r"<a", Ordering(std::cmp::Ordering::Less)),
+        (less_than_1, r"<a", Ordering(std::cmp::Ordering::Less)),
+        (less_than_2, r"<a", Ordering(std::cmp::Ordering::Less)),
         (equals, r"=a", Ordering(std::cmp::Ordering::Equal)),
         (greater_than, r">a", Ordering(std::cmp::Ordering::Greater)),
     ];

@@ -247,6 +247,30 @@ pub fn finish_parsing_balanced_tokens<S: vm::TokenStream>(
     }
 }
 
+/// When parsed, this type consumes an arbitrary number of spaces from the input stream
+/// 
+/// TODO: we should audit all places Knuth uses this, and ensure we're using it too.
+/// 
+/// TeX.2021.406
+pub struct Spaces;
+
+impl Parsable for Spaces {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+        while let Some(token) = input.next_or()? {
+            match token.value() {
+                token::Value::Space(_) => {
+                    continue;
+                }
+                _ => {
+                    input.back(token);
+                    break;
+                }
+            }
+        }
+        Ok(Spaces {})
+    }
+}
+
 /// When parsed, this type consumes an arbitrary number of spaces from the unexpanded input stream
 pub struct SpacesUnexpanded;
 
