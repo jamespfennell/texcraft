@@ -230,7 +230,7 @@ pub struct State {
     pub conditional: conditional::Component,
     pub end_line_char: endlinechar::Component,
     pub error_mode: errormode::Component,
-    pub font_repo: texlang_font::NoOpFontRepo<tfm::Font>,
+    pub font_repo: texlang_font::NoOpFontRepo<tfm::File>,
     pub fonts: texlang_font::FontComponent,
     pub input: input::Component<16>,
     pub job: job::Component,
@@ -322,7 +322,7 @@ impl texlang_stdlib::the::TheCompatible for State {
 }
 
 impl texlang_font::HasFontRepo for State {
-    type FontRepo = texlang_font::NoOpFontRepo<tfm::Font>;
+    type FontRepo = texlang_font::NoOpFontRepo<tfm::File>;
 
     fn font_repo_mut(&mut self) -> &mut Self::FontRepo {
         &mut self.font_repo

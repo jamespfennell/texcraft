@@ -214,7 +214,7 @@ impl Convert {
             }
             TfOrPlPath::Pl(pl_path) => {
                 let (pl_file, _) = pl_path.read()?;
-                let tfm_file: tfm::format::File = pl_file.into();
+                let tfm_file: tfm::File = pl_file.into();
                 let tfm_bytes = tfm_file.serialize();
                 let tfm_path: TfPath = match &self.output {
                     Some(TfOrPlPath::Pl(_pl_path)) => todo!(),
@@ -264,21 +264,21 @@ struct Debug {
 }
 
 #[derive(Clone, Debug)]
-struct Section(tfm::format::Section);
+struct Section(tfm::Section);
 
 impl Section {
     const ALL_VARIANTS: [Section; 11] = [
-        Section(tfm::format::Section::SubFileSizes),
-        Section(tfm::format::Section::Header),
-        Section(tfm::format::Section::CharInfos),
-        Section(tfm::format::Section::Widths),
-        Section(tfm::format::Section::Heights),
-        Section(tfm::format::Section::Depths),
-        Section(tfm::format::Section::ItalicCorrections),
-        Section(tfm::format::Section::LigKern),
-        Section(tfm::format::Section::Kerns),
-        Section(tfm::format::Section::ExtensibleRecipes),
-        Section(tfm::format::Section::Params),
+        Section(tfm::Section::SubFileSizes),
+        Section(tfm::Section::Header),
+        Section(tfm::Section::CharInfos),
+        Section(tfm::Section::Widths),
+        Section(tfm::Section::Heights),
+        Section(tfm::Section::Depths),
+        Section(tfm::Section::ItalicCorrections),
+        Section(tfm::Section::LigKern),
+        Section(tfm::Section::Kerns),
+        Section(tfm::Section::ExtensibleRecipes),
+        Section(tfm::Section::Params),
     ];
 }
 
@@ -289,7 +289,7 @@ impl clap::ValueEnum for Section {
 
     fn to_possible_value(&self) -> Option<clap::builder::PossibleValue> {
         Some(clap::builder::PossibleValue::new(
-            tfm::format::Section::NAMES[self.0 as usize],
+            tfm::Section::NAMES[self.0 as usize],
         ))
     }
 }
@@ -301,7 +301,7 @@ impl Debug {
             file: tfm_file,
             ..
         } = self.path.read(self.skip_validation)?;
-        let raw_file = tfm::format::RawFile::deserialize(&tfm_bytes).0.unwrap();
+        let raw_file = tfm::RawFile::deserialize(&tfm_bytes).0.unwrap();
 
         let path = if self.omit_tfm_path {
             None
@@ -315,12 +315,12 @@ impl Debug {
             (true, false) => (Some(&raw_file), None),
             (false, true) => (None, Some(&tfm_file)),
         };
-        let sections: Vec<tfm::format::Section> = {
-            let s: HashSet<tfm::format::Section> = self.section.iter().map(|s| s.0).collect();
+        let sections: Vec<tfm::Section> = {
+            let s: HashSet<tfm::Section> = self.section.iter().map(|s| s.0).collect();
             match s.is_empty() {
-                true => tfm::format::Section::ALL_SECTIONS.into(),
+                true => tfm::Section::ALL_SECTIONS.into(),
                 false => {
-                    let mut v: Vec<tfm::format::Section> = s.into_iter().collect();
+                    let mut v: Vec<tfm::Section> = s.into_iter().collect();
                     v.sort();
                     v
                 }
@@ -328,7 +328,7 @@ impl Debug {
         };
         print!(
             "{}",
-            tfm::format::debug(path, sub_file_sizes, tfm_file, raw_file, sections)
+            tfm::debug(path, sub_file_sizes, tfm_file, raw_file, sections)
         );
         Ok(())
     }
@@ -437,7 +437,7 @@ impl Undebug {
                 ))
             }
         };
-        match tfm::format::RawFile::from_debug_output(&data, self.keep_sub_file_sizes) {
+        match tfm::RawFile::from_debug_output(&data, self.keep_sub_file_sizes) {
             Ok(b) => {
                 self.output.write(&b)?;
                 Ok(())
@@ -487,9 +487,9 @@ pub struct TfPath(pub std::path::PathBuf);
 
 pub struct Tfm {
     pub bytes: Vec<u8>,
-    pub file: tfm::format::File,
-    pub deserialization_warnings: Vec<tfm::format::DeserializationWarning>,
-    pub validation_warnings: Vec<tfm::format::ValidationWarning>,
+    pub file: tfm::File,
+    pub deserialization_warnings: Vec<tfm::DeserializationWarning>,
+    pub validation_warnings: Vec<tfm::ValidationWarning>,
 }
 
 impl TfPath {
@@ -501,7 +501,7 @@ impl TfPath {
     }
     pub fn read(&self, skip_validation: bool) -> Result<Tfm, String> {
         let bytes = self.read_bytes()?;
-        let (tfm_file_or, deserialization_warnings) = tfm::format::File::deserialize(&bytes);
+        let (tfm_file_or, deserialization_warnings) = tfm::File::deserialize(&bytes);
         for warning in &deserialization_warnings {
             eprintln!("{}", warning.tftopl_message())
         }

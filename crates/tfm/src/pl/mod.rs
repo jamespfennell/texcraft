@@ -12,10 +12,10 @@ The property list (.pl) file format.
 use std::collections::{BTreeMap, HashMap};
 
 use crate::{
-    format::{self, ExtensibleRecipe},
     ligkern,
     pl::ast::{DesignSize, ParameterNumber},
-    Char, FixWord, Header, NamedParameter, NextLargerProgram, NextLargerProgramWarning,
+    Char, ExtensibleRecipe, FixWord, Header, NamedParameter, NextLargerProgram,
+    NextLargerProgramWarning,
 };
 
 pub mod ast;
@@ -61,7 +61,7 @@ pub struct CharDimensions {
 pub enum CharTag {
     Ligature(u16),
     List(Char),
-    Extension(format::ExtensibleRecipe),
+    Extension(ExtensibleRecipe),
 }
 
 impl CharTag {
@@ -498,8 +498,8 @@ impl File {
     }
 }
 
-impl From<crate::format::File> for File {
-    fn from(tfm_file: crate::format::File) -> Self {
+impl From<crate::File> for File {
+    fn from(tfm_file: crate::File) -> Self {
         let char_dimens: BTreeMap<Char, CharDimensions> = tfm_file
             .char_dimens
             .iter()
@@ -508,8 +508,8 @@ impl From<crate::format::File> for File {
                     *c,
                     CharDimensions {
                         width: match info.width_index {
-                            format::WidthIndex::Invalid => None,
-                            format::WidthIndex::Valid(n) => {
+                            super::WidthIndex::Invalid => None,
+                            super::WidthIndex::Valid(n) => {
                                 tfm_file.widths.get(n.get() as usize).copied()
                             }
                         },
@@ -552,12 +552,12 @@ impl From<crate::format::File> for File {
             .char_tags
             .into_iter()
             .filter_map(|(c, tag)| match tag {
-                format::CharTag::Ligature(_) => lig_kern_entrypoints
+                super::CharTag::Ligature(_) => lig_kern_entrypoints
                     .get(&c)
                     .map(|e| (c, CharTag::Ligature(*e))),
-                format::CharTag::List(l) => Some((c, CharTag::List(l))),
+                super::CharTag::List(l) => Some((c, CharTag::List(l))),
                 // If the extension index is invalid we drop the tag.
-                format::CharTag::Extension(i) => tfm_file
+                super::CharTag::Extension(i) => tfm_file
                     .extensible_chars
                     .get(i as usize)
                     .cloned()
@@ -963,7 +963,7 @@ impl<'a> Iterator for Chars<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{format::WidthIndex, Face};
+    use crate::{Face, WidthIndex};
 
     fn run_from_pl_source_code_test(source: &str, mut want: File) {
         want.header.seven_bit_safe = Some(true);
@@ -1350,7 +1350,7 @@ mod tests {
         ),
     );
 
-    fn run_from_tfm_file_test(tfm_file: crate::format::File, want: File) {
+    fn run_from_tfm_file_test(tfm_file: crate::File, want: File) {
         let got: File = tfm_file.into();
         assert_eq!(got, want);
     }
@@ -1370,11 +1370,11 @@ mod tests {
 
     from_tfm_file_tests!((
         gap_in_chars,
-        crate::format::File {
+        crate::File {
             char_dimens: BTreeMap::from([
                 (
                     Char('A'.try_into().unwrap()),
-                    crate::format::CharDimensions {
+                    crate::CharDimensions {
                         width_index: WidthIndex::Valid(1.try_into().unwrap()),
                         height_index: 0,
                         depth_index: 0,
@@ -1383,7 +1383,7 @@ mod tests {
                 ),
                 (
                     Char('C'.try_into().unwrap()),
-                    crate::format::CharDimensions {
+                    crate::CharDimensions {
                         width_index: WidthIndex::Valid(2.try_into().unwrap()),
                         height_index: 0,
                         depth_index: 0,
@@ -1392,7 +1392,7 @@ mod tests {
                 ),
                 (
                     Char('E'.try_into().unwrap()),
-                    crate::format::CharDimensions {
+                    crate::CharDimensions {
                         width_index: WidthIndex::Invalid,
                         height_index: 0,
                         depth_index: 0,
@@ -1427,7 +1427,7 @@ mod tests {
                     }
                 ),
             ]),
-            ..<File as From<crate::format::File>>::from(Default::default())
+            ..<File as From<crate::File>>::from(Default::default())
         },
     ),);
 }

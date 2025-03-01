@@ -1,18 +1,18 @@
 //! The tftopl and pltotf algorithms.
 
-use crate::format::ValidationWarning;
+use crate::ValidationWarning;
 use std::fmt::Write;
 
 /// Output of the tftopl algorithm.
 pub struct TfmToPlOutput {
-    pub pl_data: Result<String, crate::format::DeserializationError>,
+    pub pl_data: Result<String, crate::DeserializationError>,
     pub error_messages: Vec<TfmToPlErrorMessage>,
 }
 
 /// An error message written by the tftopl algorithm.
 pub enum TfmToPlErrorMessage {
-    DeserializationWarning(crate::format::DeserializationWarning),
-    ValidationWarning(crate::format::ValidationWarning),
+    DeserializationWarning(crate::DeserializationWarning),
+    ValidationWarning(crate::ValidationWarning),
 }
 
 impl TfmToPlErrorMessage {
@@ -33,7 +33,7 @@ pub fn tfm_to_pl(
     display_format: &dyn Fn(&crate::pl::File) -> crate::pl::CharDisplayFormat,
 ) -> Result<TfmToPlOutput, std::fmt::Error> {
     let mut error_messages = Vec::<TfmToPlErrorMessage>::new();
-    let (tfm_file_or, warnings) = crate::format::File::deserialize(tfm_data);
+    let (tfm_file_or, warnings) = crate::File::deserialize(tfm_data);
     for warning in warnings {
         error_messages.push(TfmToPlErrorMessage::DeserializationWarning(warning));
     }
@@ -50,7 +50,7 @@ pub fn tfm_to_pl(
     let infinite_loop = warnings.iter().any(|w| {
         matches!(
             w,
-            crate::format::ValidationWarning::LigKernWarning(
+            crate::ValidationWarning::LigKernWarning(
                 crate::ligkern::lang::ValidationWarning::InfiniteLoop(_),
             )
         )
@@ -58,7 +58,7 @@ pub fn tfm_to_pl(
     let warnings = filter_lig_kern_warnings(warnings);
     let tfm_modified = warnings
         .iter()
-        .map(crate::format::ValidationWarning::tfm_file_modified)
+        .map(crate::ValidationWarning::tfm_file_modified)
         .any(|t| t);
     for warning in warnings {
         error_messages.push(TfmToPlErrorMessage::ValidationWarning(warning));
@@ -90,7 +90,7 @@ fn filter_lig_kern_warnings(mut warnings: Vec<ValidationWarning>) -> Vec<Validat
     while let Some(warning) = warnings.pop() {
         if matches!(
             warning,
-            crate::format::ValidationWarning::LigKernWarning(
+            crate::ValidationWarning::LigKernWarning(
                 crate::ligkern::lang::ValidationWarning::InfiniteLoop(_),
             )
         ) {

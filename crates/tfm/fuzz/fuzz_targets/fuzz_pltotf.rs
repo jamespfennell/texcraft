@@ -39,7 +39,7 @@ fuzz_target!(|ast: tfm::pl::ast::Ast| {
         }
         s
     };
-    let tfm_file: tfm::format::File = pl_file.into();
+    let tfm_file: tfm::File = pl_file.into();
     let texcraft_output: Vec<u8> = tfm_file.serialize();
 
     if knuth_stdout == texcraft_output && knuth_stderr == texcraft_stderr {

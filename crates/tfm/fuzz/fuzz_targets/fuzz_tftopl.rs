@@ -5,7 +5,7 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::io::Write;
 use std::process::Command;
-use tfm::format::SubFileSizes;
+use tfm::SubFileSizes;
 
 fuzz_target!(|input: Input| {
     let tfm_bytes = input.tfm_bytes();
