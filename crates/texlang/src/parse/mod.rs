@@ -38,12 +38,12 @@ use crate::types::CatCode;
 use crate::*;
 
 /// Implementations of this trait are elements of the TeX grammar than can be parsed from a stream of tokens.
-pub trait Parsable<S: TexlangState>: Sized {
+pub trait Parsable: Sized {
     /// Parses a value from an input stream.
     ///
     /// This method just delegates to [Parsable::parse_impl].
     #[inline]
-    fn parse<I>(input: &mut I) -> txl::Result<Self>
+    fn parse<S: TexlangState, I>(input: &mut I) -> txl::Result<Self>
     where
         I: AsMut<vm::ExpandedStream<S>>,
     {
@@ -51,7 +51,7 @@ pub trait Parsable<S: TexlangState>: Sized {
     }
 
     /// Parses a value from the [vm::ExpandedStream].
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self>;
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self>;
 }
 
 #[derive(Debug)]
@@ -137,8 +137,8 @@ macro_rules! generate_tuple_impls {
     ( $first: ident, $( $name: ident ),+ ) => {
         generate_tuple_impls![ $( $name ),+];
 
-        impl<S: TexlangState, $first : Parsable<S>, $( $name : Parsable<S> ),+> Parsable<S> for ($first, $( $name ),+) {
-            fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+        impl<$first : Parsable, $( $name : Parsable ),+> Parsable for ($first, $( $name ),+) {
+            fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
                 Ok(($first::parse(input)?, $( $name::parse(input)? ),+))
             }
         }
@@ -147,10 +147,10 @@ macro_rules! generate_tuple_impls {
 
 generate_tuple_impls![T1, T2, T3, T4, T5];
 
-impl<S: TexlangState> Parsable<S> for Option<token::CommandRef> {
+impl Parsable for Option<token::CommandRef> {
     // TeX.2021.get_r_token
     // TeX.2021.1215
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         // Implements get_r_token
         while let Some(found_equals) = get_optional_element![
             input.unexpanded(),
@@ -170,8 +170,8 @@ impl<S: TexlangState> Parsable<S> for Option<token::CommandRef> {
     }
 }
 
-impl<S: TexlangState> Parsable<S> for Vec<token::Token> {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+impl Parsable for Vec<token::Token> {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let mut result = input.checkout_token_buffer();
         let first_token = input.next(TokenStreamEndOfInputError {})?;
         let got = match first_token.value() {
@@ -250,8 +250,8 @@ pub fn finish_parsing_balanced_tokens<S: vm::TokenStream>(
 /// When parsed, this type consumes an arbitrary number of spaces from the unexpanded input stream
 pub struct SpacesUnexpanded;
 
-impl<S: TexlangState> Parsable<S> for SpacesUnexpanded {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+impl Parsable for SpacesUnexpanded {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let input = input.unexpanded();
         while let Some(token) = input.next_or()? {
             match token.value() {
@@ -268,8 +268,8 @@ impl<S: TexlangState> Parsable<S> for SpacesUnexpanded {
     }
 }
 
-impl<S: TexlangState> Parsable<S> for Option<char> {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+impl Parsable for Option<char> {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let Some(token) = input.next_or()? else {
             return Ok(None);
         };
@@ -304,8 +304,8 @@ impl<S: TexlangState> Parsable<S> for Option<char> {
 /// When parsed, this type consumes an optional space from the token stream.
 pub struct OptionalSpace;
 
-impl<S: TexlangState> Parsable<S> for OptionalSpace {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+impl Parsable for OptionalSpace {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         // TeX.2021.443
         if let Some(next) = input.next_or()? {
             if next.cat_code() != Some(CatCode::Space) {

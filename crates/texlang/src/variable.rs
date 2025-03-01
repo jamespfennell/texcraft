@@ -324,7 +324,7 @@ where
 impl<S, T> TypedVariable<S, T>
 where
     S: TexlangState,
-    T: SupportedType + crate::parse::Parsable<S>,
+    T: SupportedType,
 {
     fn set_using_input(
         &self,
@@ -359,7 +359,7 @@ impl<S, T> Hash for TypedVariable<S, T> {
 /// It exists to make the variables API more ergonomic.
 /// For example, it is used to provide a uniform constructor [Command::new_array] for commands.
 /// The trait cannot be implemented for new types.
-pub trait SupportedType: Sized + Debug {
+pub trait SupportedType: Sized + Debug + Parsable {
     /// Create a new command of this type with the provided reference functions and index resolver.
     fn new_command<S>(
         ref_fn: RefFn<S, Self>,

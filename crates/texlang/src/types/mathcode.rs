@@ -18,8 +18,8 @@ impl MathCode {
     pub const MAX: usize = 32767;
 }
 
-impl<S: TexlangState> Parsable<S> for MathCode {
-    fn parse_impl(
+impl Parsable for MathCode {
+    fn parse_impl<S: TexlangState>(
         input: &mut crate::vm::ExpandedStream<S>,
     ) -> Result<Self, Box<crate::error::Error>> {
         let raw = parse::Uint::<{ MathCode::MAX + 1 }>::parse(input)?;

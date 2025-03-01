@@ -97,7 +97,7 @@ trait Op {
     type Error: error::TexError;
     fn apply<N: Number>(lhs: N, rhs_i: i32, rhs_n: N) -> Result<N, Self::Error>;
 
-    fn apply_to_variable<S: TexlangState, N: Number + Parsable<S>>(
+    fn apply_to_variable<S: TexlangState, N: Number>(
         variable: TypedVariable<S, N>,
         input: &mut vm::ExecutionInput<S>,
         scope: groupingmap::Scope,
@@ -307,8 +307,8 @@ impl error::EndOfInputError for ArithmeticVariableEndOfInput {
 /// When parsed, this type consumes an optional `by` keyword from the input stream.
 struct OptionalBy;
 
-impl<S: TexlangState> Parsable<S> for OptionalBy {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+impl Parsable for OptionalBy {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         texlang::parse::parse_keyword(input, "by")?;
         Ok(OptionalBy)
     }

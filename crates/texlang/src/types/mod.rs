@@ -19,8 +19,8 @@ impl Font {
     pub const NULL_FONT: Font = Font(0);
 }
 
-impl<S: TexlangState> Parsable<S> for Font {
-    fn parse_impl(
+impl Parsable for Font {
+    fn parse_impl<S: TexlangState>(
         input: &mut crate::vm::ExpandedStream<S>,
     ) -> Result<Self, Box<crate::error::Error>> {
         match Option::<Font>::parse(input)? {
@@ -40,8 +40,8 @@ impl<S: TexlangState> Parsable<S> for Font {
     }
 }
 
-impl<S: TexlangState> Parsable<S> for Option<Font> {
-    fn parse_impl(
+impl Parsable for Option<Font> {
+    fn parse_impl<S: TexlangState>(
         input: &mut crate::vm::ExpandedStream<S>,
     ) -> Result<Self, Box<crate::error::Error>> {
         let Some(token) = input.next_or()? else {

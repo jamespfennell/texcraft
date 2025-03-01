@@ -9,8 +9,8 @@ use crate::token::{CommandRef, Value};
 use crate::traits::*;
 use crate::*;
 
-impl<S: TexlangState> Parsable<S> for i32 {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+impl Parsable for i32 {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let (_, i, _) = parse_integer(input)?;
         Ok(i)
     }
@@ -32,8 +32,8 @@ impl Uint<0> {
     pub const MAX: usize = i32::MAX as usize;
 }
 
-impl<S: TexlangState, const N: usize> Parsable<S> for Uint<N> {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+impl<const N: usize> Parsable for Uint<N> {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let (first_token, i, _) = parse_integer(input)?;
         if i < 0 || i as usize >= N {
             input.vm().error(OutOfBoundsError::<N> {
@@ -66,8 +66,8 @@ impl<const N: usize> error::TexError for OutOfBoundsError<N> {
     }
 }
 
-impl<S: TexlangState> Parsable<S> for char {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+impl Parsable for char {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let u1 = Uint::<{ char::MAX as usize }>::parse(input)?;
         let u2: u32 = u1.0.try_into().unwrap();
         Ok(char::from_u32(u2).unwrap())
@@ -75,8 +75,8 @@ impl<S: TexlangState> Parsable<S> for char {
 }
 
 // TODO: move to types/catcode.rs
-impl<S: TexlangState> Parsable<S> for types::CatCode {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+impl Parsable for types::CatCode {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let (token, i, _) = parse_integer(input)?;
         if let Ok(val_u8) = u8::try_from(i) {
             if let Ok(cat_code) = types::CatCode::try_from(val_u8) {

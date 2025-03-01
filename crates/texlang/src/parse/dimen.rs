@@ -6,8 +6,8 @@ use crate::token::Value;
 use crate::traits::*;
 use crate::*;
 
-impl<S: TexlangState> Parsable<S> for Scaled {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+impl Parsable for Scaled {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let negative = super::integer::parse_optional_signs(input)?.is_some();
         let first_token = input.next(DimenEndOfInputError {})?;
         let (integer_part, has_fractional_part) = match first_token.value() {
@@ -150,7 +150,7 @@ fn scan_and_apply_units<S: TexlangState>(
 
     // Finally try to scan unit constants.
     // TeX.2021.458
-    let scaled_unit = <core::ScaledUnit as Parsable<S>>::parse(input)?;
+    let scaled_unit = <core::ScaledUnit as Parsable>::parse(input)?;
     super::OptionalSpace::parse(input)?;
     let (integer_part, fractional_part) = match scaled_unit {
         // For sp units, the fractional part is silently dropped.
@@ -186,8 +186,8 @@ fn xn_over_d(x: i32, n: i32, d: i32) -> Result<(i32, i32), core::OverflowError> 
     Ok((a.0, b.0))
 }
 
-impl<S: TexlangState> Parsable<S> for core::ScaledUnit {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+impl Parsable for core::ScaledUnit {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         use core::ScaledUnit;
         for (keyword, unit) in [
             ("pt", ScaledUnit::Point),

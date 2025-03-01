@@ -371,8 +371,8 @@ impl error::TexError for UnmatchedBracesError {
 /// When parsed, this type consumes a required `to` keyword from the input stream.
 struct To;
 
-impl<S: TexlangState> Parsable<S> for To {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+impl Parsable for To {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         texlang::parse::parse_keyword(input, "to")?;
         Ok(To {})
     }

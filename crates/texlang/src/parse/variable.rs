@@ -5,8 +5,8 @@ use crate::*;
 /// When parsed, this type consumes an optional equals from the token stream.
 pub struct OptionalEquals;
 
-impl<S: TexlangState> Parsable<S> for OptionalEquals {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+impl Parsable for OptionalEquals {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         // scan_optional_equals
         parse_optional_equals(input)?;
         Ok(OptionalEquals {})
@@ -16,8 +16,8 @@ impl<S: TexlangState> Parsable<S> for OptionalEquals {
 /// When parsed, this type consumes an optional equals from the token stream without performing expansion.
 pub struct OptionalEqualsUnexpanded;
 
-impl<S: TexlangState> Parsable<S> for OptionalEqualsUnexpanded {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+impl Parsable for OptionalEqualsUnexpanded {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         parse_optional_equals(input.unexpanded())?;
         Ok(OptionalEqualsUnexpanded {})
     }

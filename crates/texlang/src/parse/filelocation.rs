@@ -16,9 +16,9 @@ pub struct FileLocation {
     pub area: Option<String>,
 }
 
-impl<S: TexlangState> Parsable<S> for FileLocation {
+impl Parsable for FileLocation {
     // scan_file_name
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let mut raw_string = String::new();
         let mut area_delimiter = None;
         let mut ext_delimiter = None;

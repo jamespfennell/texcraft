@@ -16,8 +16,8 @@ impl Default for Ordering {
     }
 }
 
-impl<S: TexlangState> Parsable<S> for Ordering {
-    fn parse_impl(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+impl Parsable for Ordering {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let ordering_or = get_required_element![
             input,
             "a relation",
