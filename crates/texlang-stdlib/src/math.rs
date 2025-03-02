@@ -1,7 +1,5 @@
 //! Operations on variables (add, multiply, divide)
 
-use core::Scaled;
-
 use texcraft_stdext::collections::groupingmap;
 use texlang::prelude as txl;
 use texlang::traits::*;
@@ -74,20 +72,37 @@ impl Number for i32 {
 
 impl Number for core::Scaled {
     fn wrapping_add(lhs: Self, rhs: Self) -> Self {
-        core::Scaled(lhs.0.wrapping_add(rhs.0))
+        lhs.wrapping_add(rhs)
     }
     fn checked_add(lhs: Self, rhs: Self) -> Option<Self> {
-        Some(core::Scaled(lhs.0.checked_add(rhs.0)?))
+        lhs.checked_add(rhs)
     }
     fn checked_mul(lhs: Self, rhs: i32) -> Option<Self> {
-        // TODO: need to really probe the overflow behavior here!
-        lhs.nx_plus_y(rhs, Scaled::ZERO).ok()
+        lhs.checked_mul(rhs)
     }
     fn wrapping_mul(lhs: Self, rhs: i32) -> Self {
-        core::Scaled(lhs.0.wrapping_mul(rhs))
+        lhs.wrapping_mul(rhs)
     }
     fn checked_div(lhs: Self, rhs: i32) -> Option<Self> {
-        Some(core::Scaled(lhs.0.checked_div(rhs)?))
+        lhs.checked_div(rhs)
+    }
+}
+
+impl Number for core::Glue {
+    fn wrapping_add(lhs: Self, rhs: Self) -> Self {
+        lhs.wrapping_add(rhs)
+    }
+    fn checked_add(lhs: Self, rhs: Self) -> Option<Self> {
+        lhs.checked_add(rhs)
+    }
+    fn checked_mul(lhs: Self, rhs: i32) -> Option<Self> {
+        lhs.checked_mul(rhs)
+    }
+    fn wrapping_mul(lhs: Self, rhs: i32) -> Self {
+        lhs.wrapping_mul(rhs)
+    }
+    fn checked_div(lhs: Self, rhs: i32) -> Option<Self> {
+        lhs.checked_div(rhs)
     }
 }
 
@@ -273,6 +288,9 @@ fn math_primitive_fn<S: TexlangState, O: Op>(
                         variable::Variable::Dimen(variable) => {
                             O::apply_to_variable(variable, input, scope)
                         }
+                        variable::Variable::Glue(variable) => {
+                            O::apply_to_variable(variable, input, scope)
+                        }
                         variable::Variable::CatCode(_)
                         | variable::Variable::TokenList(_)
                         | variable::Variable::MathCode(_)
@@ -333,6 +351,7 @@ mod tests {
         prefix: prefix::Component,
         registers: registers::Component<i32, 256>,
         registers_dimen: registers::Component<core::Scaled, 256>,
+        registers_skip: registers::Component<core::Glue, 256>,
         testing: TestingComponent,
     }
 
@@ -356,6 +375,7 @@ mod tests {
         prefix: prefix::Component,
         registers: registers::Component<i32, 256>,
         registers_dimen: registers::Component<core::Scaled, 256>,
+        registers_skip: registers::Component<core::Glue, 256>,
         testing: TestingComponent,
     }];
 
@@ -370,6 +390,7 @@ mod tests {
             ("catcode", codes::get_catcode()),
             ("count", registers::get_count()),
             ("dimen", registers::get_dimen()),
+            ("skip", registers::get_skip()),
             ("global", prefix::get_global()),
             ("the", the::get_the()),
         ])
@@ -444,6 +465,41 @@ mod tests {
         (advance_dimen_2, r"\advance", "0.025pt", "0.5pt", "0.525pt"),
         (mul_dimen_1, r"\multiply", "10pt", "2", "20.0pt"),
         (div_dimen_1, r"\divide", "10pt", "2", "5.0pt"),
+    ];
+
+    arithmetic_tests![
+        r"\skip",
+        (
+            advance_glue_1,
+            r"\advance",
+            "1pt plus 2pt minus 3pt",
+            "60pt plus 50pt minus 40pt",
+            "61.0pt plus 52.0pt minus 43.0pt"
+        ),
+        // This next test IS correct. The skip is expanded before the addition
+        // as part of scanning the optional plus/minus keywords...
+        (advance_glue_2, r"\advance", "0.025pt", "0.5pt", "0.025pt"),
+        (
+            advance_glue_3,
+            r"\advance",
+            "1pt plus 2fill minus 3fil",
+            "60pt plus 50pt minus 40filll",
+            "61.0pt plus 2.0fill minus 40.0filll"
+        ),
+        (
+            mul_glue_1,
+            r"\multiply",
+            "1pt plus 2pt minus 1.25pt",
+            "2",
+            "2.0pt plus 4.0pt minus 2.5pt"
+        ),
+        (
+            div_glue_1,
+            r"\divide",
+            "10pt plus 20pt minus 3pt",
+            "2",
+            "5.0pt plus 10.0pt minus 1.5pt"
+        ),
     ];
     test_suite![
         expansion_equality_tests(

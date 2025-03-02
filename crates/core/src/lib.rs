@@ -23,7 +23,6 @@ pub trait FontFormat: Sized {
 /// 16 bits for the fractional part, and a single signed bit.
 /// The inner value is the number multiplied by 2^16.
 #[derive(Default, PartialEq, Eq, Debug, Copy, Clone, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Scaled(pub i32);
 
@@ -120,36 +119,58 @@ impl Scaled {
     pub fn abs(self) -> Scaled {
         Scaled(self.0.abs())
     }
+
+    pub fn wrapping_add(self, rhs: Scaled) -> Self {
+        Scaled(self.0.wrapping_add(rhs.0))
+    }
+    pub fn checked_add(self, rhs: Scaled) -> Option<Self> {
+        Some(Scaled(self.0.checked_add(rhs.0)?))
+    }
+    pub fn wrapping_mul(self, rhs: i32) -> Self {
+        Scaled(self.0.wrapping_mul(rhs))
+    }
+    pub fn checked_mul(self, rhs: i32) -> Option<Self> {
+        // TODO: need to really probe the overflow behavior here!
+        // I actually think it's correct, but we should add tests.
+        self.nx_plus_y(rhs, Scaled::ZERO).ok()
+    }
+    pub fn checked_div(self, rhs: i32) -> Option<Self> {
+        Some(Scaled(self.0.checked_div(rhs)?))
+    }
 }
 
 #[derive(Debug)]
 pub struct OverflowError;
 
 impl std::fmt::Display for Scaled {
-    // TeX.2021.103
     fn fmt(&self, fm: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = *self;
         // Integer part
-        write!(fm, "{}.", s.integer_part())?;
-        // Fractional part
-        let mut f = s.abs().fractional_part() * 10 + Scaled(5);
-        let mut delta = Scaled(10);
-        loop {
-            if delta > Scaled::ONE {
-                // round the last digit
-                f = f + Scaled(0o100000 - 50000);
-            }
-            fm.write_char(char::from_digit(f.integer_part().try_into().unwrap(), 10).unwrap())?;
-            f = f.fractional_part() * 10;
-            delta = delta * 10;
-            if f <= delta {
-                break;
-            }
-        }
+        print_scaled_no_units(*self, fm)?;
         // Units
         write!(fm, "pt")?;
         Ok(())
     }
+}
+
+// TeX.2021.103 print_scaled
+fn print_scaled_no_units(s: Scaled, fm: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(fm, "{}.", s.integer_part())?;
+    // Fractional part
+    let mut f = s.abs().fractional_part() * 10 + Scaled(5);
+    let mut delta = Scaled(10);
+    loop {
+        if delta > Scaled::ONE {
+            // round the last digit
+            f = f + Scaled(0o100000 - 50000);
+        }
+        fm.write_char(char::from_digit(f.integer_part().try_into().unwrap(), 10).unwrap())?;
+        f = f.fractional_part() * 10;
+        delta = delta * 10;
+        if f <= delta {
+            break;
+        }
+    }
+    Ok(())
 }
 
 impl std::ops::Add<Scaled> for Scaled {
@@ -263,13 +284,112 @@ impl ScaledUnit {
 /// We might consider performing such an optimization.
 ///
 /// Described in TeX.2021.150.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Glue {
     pub width: Scaled,
     pub stretch: Scaled,
     pub stretch_order: GlueOrder,
     pub shrink: Scaled,
     pub shrink_order: GlueOrder,
+}
+
+impl std::ops::Mul<i32> for Glue {
+    type Output = Glue;
+    fn mul(self, rhs: i32) -> Self::Output {
+        Glue {
+            width: self.width * rhs,
+            stretch: self.stretch * rhs,
+            stretch_order: self.stretch_order,
+            shrink: self.shrink * rhs,
+            shrink_order: self.shrink_order,
+        }
+    }
+}
+
+impl Glue {
+    /// TeX.2021.1239
+    pub fn wrapping_add(self, rhs: Glue) -> Self {
+        use std::cmp::Ordering::*;
+        Glue {
+            width: self.width.wrapping_add(rhs.width),
+            stretch: match self.stretch_order.cmp(&rhs.stretch_order) {
+                Less => rhs.stretch,
+                Equal => self.stretch.wrapping_add(rhs.stretch),
+                Greater => self.stretch,
+            },
+            stretch_order: self.stretch_order.max(rhs.stretch_order),
+            shrink: match self.shrink_order.cmp(&rhs.shrink_order) {
+                Less => rhs.shrink,
+                Equal => self.shrink.wrapping_add(rhs.shrink),
+                Greater => self.shrink,
+            },
+            shrink_order: self.shrink_order.max(rhs.shrink_order),
+        }
+    }
+    pub fn checked_add(self, rhs: Glue) -> Option<Self> {
+        use std::cmp::Ordering::*;
+        Some(Glue {
+            width: self.width.checked_add(rhs.width)?,
+            stretch: match self.stretch_order.cmp(&rhs.stretch_order) {
+                Less => rhs.stretch,
+                Equal => self.stretch.checked_add(rhs.stretch)?,
+                Greater => self.stretch,
+            },
+            stretch_order: self.stretch_order.max(rhs.stretch_order),
+            shrink: match self.shrink_order.cmp(&rhs.shrink_order) {
+                Less => rhs.shrink,
+                Equal => self.shrink.checked_add(rhs.shrink)?,
+                Greater => self.shrink,
+            },
+            shrink_order: self.shrink_order.max(rhs.shrink_order),
+        })
+    }
+    pub fn checked_mul(self, rhs: i32) -> Option<Self> {
+        Some(Glue {
+            width: self.width.checked_mul(rhs)?,
+            stretch: self.stretch.checked_mul(rhs)?,
+            stretch_order: self.stretch_order,
+            shrink: self.shrink.checked_mul(rhs)?,
+            shrink_order: self.shrink_order,
+        })
+    }
+    pub fn wrapping_mul(self, rhs: i32) -> Self {
+        Glue {
+            width: self.width.wrapping_mul(rhs),
+            stretch: self.stretch.wrapping_mul(rhs),
+            stretch_order: self.stretch_order,
+            shrink: self.shrink.wrapping_mul(rhs),
+            shrink_order: self.shrink_order,
+        }
+    }
+    pub fn checked_div(self, rhs: i32) -> Option<Self> {
+        Some(Glue {
+            width: self.width.checked_div(rhs)?,
+            stretch: self.stretch.checked_div(rhs)?,
+            stretch_order: self.stretch_order,
+            shrink: self.shrink.checked_div(rhs)?,
+            shrink_order: self.shrink_order,
+        })
+    }
+}
+
+impl std::fmt::Display for Glue {
+    // TeX.2021.177 print_spec with s="pt"
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.width)?;
+        if self.stretch != Scaled::ZERO {
+            write!(f, " plus ")?;
+            print_scaled_no_units(self.stretch, f)?;
+            write!(f, "{}", self.stretch_order.inf_str().unwrap_or("pt"))?;
+        }
+        if self.shrink != Scaled::ZERO {
+            write!(f, " minus ")?;
+            print_scaled_no_units(self.shrink, f)?;
+            write!(f, "{}", self.shrink_order.inf_str().unwrap_or("pt"))?;
+        }
+        Ok(())
+    }
 }
 
 /// Order of infinity of a glue stretch or shrink.
@@ -284,8 +404,10 @@ pub struct Glue {
 /// If a list contains glue of some order (e.g. [GlueOrder::Fil]),
 /// then glues of a lower order (e.g. [GlueOrder::Normal]) are not stretched
 /// or shrunk.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum GlueOrder {
+    #[default]
     Normal,
     Fil,
     Fill,
@@ -302,6 +424,25 @@ impl GlueOrder {
             "filll" => Filll,
             _ => return None,
         })
+    }
+    pub fn inf_str(&self) -> Option<&'static str> {
+        use GlueOrder::*;
+        match self {
+            Normal => None,
+            Fil => Some("fil"),
+            Fill => Some("fill"),
+            Filll => Some("filll"),
+        }
+    }
+    /// Returns the next highest glue order.
+    pub fn next(&self) -> Option<Self> {
+        use GlueOrder::*;
+        match self {
+            Normal => Some(Fil),
+            Fil => Some(Fill),
+            Fill => Some(Filll),
+            Filll => None,
+        }
     }
 }
 

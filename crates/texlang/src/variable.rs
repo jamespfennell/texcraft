@@ -151,7 +151,7 @@ impl<S> Command<S> {
     /// TODO: we should just expose the type.
     pub fn is_arithmetic(&self) -> bool {
         match self.getters {
-            Getters::Int(_, _) | Getters::Dimen(_, _) => true,
+            Getters::Int(_, _) | Getters::Dimen(_, _) | Getters::Glue(_, _) => true,
             Getters::CatCode(_, _)
             | Getters::MathCode(_, _)
             | Getters::TokenList(_, _)
@@ -647,6 +647,11 @@ supported_type_impl!(
         rust_type: core::Scaled,
         enum_variant: Dimen,
         save_stack_field: dimen,
+    },
+    {
+        rust_type: core::Glue,
+        enum_variant: Glue,
+        save_stack_field: glue,
     },
     {
         rust_type: types::CatCode,

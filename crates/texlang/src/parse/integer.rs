@@ -153,6 +153,7 @@ pub(crate) fn parse_integer<S: TexlangState>(
 pub(crate) enum InternalNumber {
     Integer(i32),
     Dimen(core::Scaled),
+    Glue(core::Glue),
 }
 
 impl InternalNumber {
@@ -161,6 +162,7 @@ impl InternalNumber {
         match self {
             Integer(i) => *i,
             Dimen(scaled) => scaled.0,
+            Glue(glue) => glue.width.0,
         }
     }
 }
@@ -190,6 +192,7 @@ pub(crate) fn parse_internal_number<S: TexlangState>(
                 variable::ValueRef::CatCode(c) => Ok(InternalNumber::Integer(*c as i32)),
                 variable::ValueRef::MathCode(c) => Ok(InternalNumber::Integer(c.0 as i32)),
                 variable::ValueRef::Dimen(d) => Ok(InternalNumber::Dimen(*d)),
+                variable::ValueRef::Glue(g) => Ok(InternalNumber::Glue(*g)),
                 variable::ValueRef::Font(_) => {
                     // This case behaves identically to the TokenListCase
                     todo!("scan a font into an int?");

@@ -9,10 +9,8 @@ repository = "https://github.com/jamespfennell/texcraft"
 keywords = ["tex", "texcraft"]
 
 [dependencies]
-arbitrary = { version = "1", features = ["derive"], optional = true }
 serde = {version="^1.0", optional = true}
 
 [features]
 default = []
-arbitrary = ["dep:arbitrary"]
 serde = ["dep:serde"]

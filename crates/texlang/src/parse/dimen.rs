@@ -8,101 +8,119 @@ use crate::*;
 
 impl Parsable for Scaled {
     fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
-        let negative = super::integer::parse_optional_signs(input)?.is_some();
-        let first_token = input.next(DimenEndOfInputError {})?;
-        let (integer_part, has_fractional_part) = match first_token.value() {
-            Value::CommandRef(command_ref) => {
-                // TeX.2021.449
-                use super::integer::InternalNumber;
-                match super::integer::parse_internal_number(input, first_token, command_ref)? {
-                    InternalNumber::Integer(i) => (i, false),
-                    InternalNumber::Dimen(d) => {
-                        if negative {
-                            return Ok(-d);
-                        }
-                        return Ok(d);
-                    }
-                }
-            }
-            Value::Other(',' | '.') => (0, true),
-            _ => {
-                input.back(first_token);
-                let (_, i, radix) = super::integer::parse_integer(input)?;
-                // We scan for a fractional part if the integer was an decimal constant
-                // and the next token is a period or comma.
-                let has_fractional_part = match radix {
-                    Some(10) => match input.next_or()? {
-                        Some(next) => match next.value() {
-                            Value::Other(',' | '.') => true,
-                            _ => {
-                                input.back(next);
-                                false
-                            }
-                        },
-                        None => false,
-                    },
-                    _ => false,
-                };
-                (i, has_fractional_part)
-            }
-        };
-        let fractional_part = if has_fractional_part {
-            scan_decimal_fraction(input)?
-        } else {
-            Scaled::ZERO
-        };
-
-        let (negative, integer_part) = if integer_part < 0 {
-            // This can only happen if the integer was parsed from an internal integer.
-            // In this case the fractional part is always 0.
-            (!negative, -integer_part)
-        } else {
-            (negative, integer_part)
-        };
-        let s = match scan_and_apply_units(input, integer_part, fractional_part)? {
-            ScanAndApplyResult::Scaled(s) => s,
-            ScanAndApplyResult::Overflow(neg) => {
-                input.vm().error(
-                    parse::Error::new(
-                        "a dimension in the range (-2^14pt,2^14pt)",
-                        Some(first_token),
-                        "",
-                    )
-                    .with_got_override("a dimension that's too large"),
-                )?;
-                if neg {
-                    -core::Scaled::MAX_DIMEN
-                } else {
-                    core::Scaled::MAX_DIMEN
-                }
-            }
-        };
-        if negative {
-            Ok(-s)
-        } else {
-            Ok(s)
-        }
+        scan_dimen(input, None)
     }
 }
 
-enum ScanAndApplyResult {
-    // A finite result.
-    Scaled(Scaled),
-    // An overflowed result.
-    // The boolean specified is true if it was negative overflow.
-    Overflow(bool),
+// TeX.2021.448 scan_dimen with:
+//
+// - shortcut=false
+// - the inf parameter is replaced by an optional pointer to a glue order
+pub(crate) fn scan_dimen<S: TexlangState>(
+    input: &mut vm::ExpandedStream<S>,
+    glue_order: Option<&mut core::GlueOrder>,
+) -> txl::Result<core::Scaled> {
+    let negative = match super::integer::parse_optional_signs(input)? {
+        None => 1,
+        Some(_) => -1,
+    };
+    let first_token = input.next(DimenEndOfInputError {})?;
+    let (negative, integer_part, fractional_part) = match first_token.value() {
+        Value::CommandRef(command_ref) => {
+            // TeX.2021.449
+            use super::integer::InternalNumber;
+            match super::integer::parse_internal_number(input, first_token, command_ref)? {
+                InternalNumber::Integer(i) => (negative * i.signum(), i.abs(), Scaled::ZERO),
+                InternalNumber::Dimen(d) => {
+                    return Ok(d * negative);
+                }
+                InternalNumber::Glue(g) => {
+                    return Ok(g.width * negative);
+                }
+            }
+        }
+        _ => {
+            let (i, f) = scan_constant_dimen(input, first_token)?;
+            (negative, i, f)
+        }
+    };
+    Ok(scan_and_apply_units(
+        input,
+        first_token,
+        integer_part,
+        fractional_part,
+        glue_order,
+    )? * negative)
 }
 
-/// TeX.2021.453, except infinite units are not handled.
-///
-/// Returns `Ok(None)` if overflow occurs.
-fn scan_and_apply_units<S: TexlangState>(
+/// Part of TeX.2021.448
+pub(crate) fn scan_constant_dimen<S: TexlangState>(
     input: &mut vm::ExpandedStream<S>,
+    first_token: token::Token,
+) -> txl::Result<(i32, core::Scaled)> {
+    Ok(match first_token.value() {
+        Value::Other(',' | '.') => (0, scan_decimal_fraction(input)?),
+        _ => {
+            input.back(first_token);
+            let (_, i, radix) = super::integer::parse_integer(input)?;
+            // We scan for a fractional part if the integer was an decimal constant
+            // and the next token is a period or comma.
+            let fractional_part = if radix == Some(10) {
+                match input.next_or()? {
+                    Some(next) => match next.value() {
+                        Value::Other(',' | '.') => scan_decimal_fraction(input)?,
+                        _ => {
+                            input.back(next);
+                            Scaled::ZERO
+                        }
+                    },
+                    None => Scaled::ZERO,
+                }
+            } else {
+                Scaled::ZERO
+            };
+            (i, fractional_part)
+        }
+    })
+}
+
+/// TeX.2021.453
+pub(crate) fn scan_and_apply_units<S: TexlangState>(
+    input: &mut vm::ExpandedStream<S>,
+    first_token: token::Token,
     integer_part: i32,
     fractional_part: Scaled,
-) -> txl::Result<ScanAndApplyResult> {
+    glue_order: Option<&mut core::GlueOrder>,
+) -> txl::Result<core::Scaled> {
     // todo: scan spaces and non-call tokens
-    // First try to scan from an internal number.
+
+    // First try to scan for infinite units, if this is the stretch
+    // or shrink of a glue.
+    if let Some(glue_order) = glue_order {
+        if parse_keyword(input, "fil")? {
+            *glue_order = core::GlueOrder::Fil;
+            while let Some(token) = input.next_or()? {
+                match token.value() {
+                    token::Value::Letter('l' | 'L') => match glue_order.next() {
+                        None => {
+                            input.vm().error(fillll_error(token))?;
+                        }
+                        Some(o) => *glue_order = o,
+                    },
+                    _ => {
+                        input.back(token);
+                        break;
+                    }
+                }
+            }
+            super::OptionalSpace::parse(input)?;
+            return match Scaled::from_integer(integer_part) {
+                Ok(integer_part) => Ok(integer_part + fractional_part),
+                Err(_) => handle_overflow(input, first_token, false),
+            };
+        }
+    }
+    // Then try to scan from an internal number.
     // TeX.2021.455
     if let Some(next) = input.next_or()? {
         let v_or = match next.value() {
@@ -113,6 +131,7 @@ fn scan_and_apply_units<S: TexlangState>(
                         // TeX silently interprets an integer as sp points in this position
                         InternalNumber::Integer(i) => Scaled(i),
                         InternalNumber::Dimen(scaled) => scaled,
+                        InternalNumber::Glue(glue) => glue.width,
                     },
                 )
             }
@@ -130,15 +149,13 @@ fn scan_and_apply_units<S: TexlangState>(
             }
         };
         if let Some(v) = v_or {
-            let Ok(adjusted_fractional_part) = v.xn_over_d(fractional_part.0, 0o200000) else {
-                return Ok(ScanAndApplyResult::Overflow(v < Scaled::ZERO));
+            let adjusted_fractional_part = v
+                .xn_over_d(fractional_part.0, Scaled::ONE.0)
+                .expect("n<d=Scaled::ONE, so overflow can't occur");
+            return match v.nx_plus_y(integer_part, adjusted_fractional_part.0) {
+                Ok(s) => Ok(s),
+                Err(_) => handle_overflow(input, first_token, v < Scaled::ZERO),
             };
-            return Ok(
-                match v.nx_plus_y(integer_part, adjusted_fractional_part.0) {
-                    Ok(s) => ScanAndApplyResult::Scaled(s),
-                    Err(_) => ScanAndApplyResult::Overflow(v < Scaled::ZERO),
-                },
-            );
         }
     }
 
@@ -156,17 +173,17 @@ fn scan_and_apply_units<S: TexlangState>(
         // For sp units, the fractional part is silently dropped.
         ScaledUnit::ScaledPoint => {
             let s = Scaled(integer_part);
-            return Ok(if s > Scaled::MAX_DIMEN {
-                ScanAndApplyResult::Overflow(false)
+            return if s > Scaled::MAX_DIMEN {
+                handle_overflow(input, first_token, false)
             } else {
-                ScanAndApplyResult::Scaled(s)
-            });
+                Ok(s)
+            };
         }
         ScaledUnit::Point => (integer_part, fractional_part),
         _ => {
             let (n, d) = scaled_unit.conversion_fraction();
             let Ok((i, remainder)) = xn_over_d(integer_part, n, d) else {
-                return Ok(ScanAndApplyResult::Overflow(false));
+                return handle_overflow(input, first_token, false);
             };
             let f = fractional_part
                 .nx_plus_y(n, Scaled::from_integer(remainder).expect("remainder<d<=7200<2^13, so a valid scaled number"))
@@ -175,10 +192,35 @@ fn scan_and_apply_units<S: TexlangState>(
             (i + f.integer_part(), f.fractional_part())
         }
     };
-    let Ok(integer_part) = Scaled::from_integer(integer_part) else {
-        return Ok(ScanAndApplyResult::Overflow(false));
-    };
-    Ok(ScanAndApplyResult::Scaled(integer_part + fractional_part))
+    match Scaled::from_integer(integer_part) {
+        Ok(integer_part) => Ok(integer_part + fractional_part),
+        Err(_) => handle_overflow(input, first_token, false),
+    }
+}
+
+fn handle_overflow<S: TexlangState>(
+    input: &mut vm::ExpandedStream<S>,
+    first_token: token::Token,
+    neg: bool,
+) -> txl::Result<core::Scaled> {
+    input.vm().error(
+        parse::Error::new(
+            "a dimension in the range (-2^14pt,2^14pt)",
+            Some(first_token),
+            "",
+        )
+        .with_got_override("a dimension that's too large"),
+    )?;
+    Ok(if neg {
+        -core::Scaled::MAX_DIMEN
+    } else {
+        core::Scaled::MAX_DIMEN
+    })
+}
+
+fn fillll_error(token: token::Token) -> parse::Error {
+    parse::Error::new("an infinite glue stretch or shrink order", Some(token), "")
+        .with_got_override("too many l characters")
 }
 
 fn xn_over_d(x: i32, n: i32, d: i32) -> Result<(i32, i32), core::OverflowError> {
@@ -251,7 +293,7 @@ struct DimenEndOfInputError;
 
 impl error::EndOfInputError for DimenEndOfInputError {
     fn doing(&self) -> String {
-        "parsing a number".into()
+        "parsing a dimension".into()
     }
 }
 

@@ -79,6 +79,12 @@ pub fn get_dimen<S: HasComponent<Component<core::Scaled, N>>, const N: usize>(
     new_registers_command()
 }
 
+/// Get the `\skip` command.
+pub fn get_skip<S: HasComponent<Component<core::Glue, N>>, const N: usize>() -> command::BuiltIn<S>
+{
+    new_registers_command()
+}
+
 /// Get the `\toks` command.
 pub fn get_toks<S: HasComponent<Component<Vec<token::Token>, N>>, const N: usize>(
 ) -> command::BuiltIn<S> {
@@ -169,6 +175,12 @@ mod tests {
     }
 
     impl TexlangState for State {
+        fn em_width(&self) -> core::Scaled {
+            self.registers_dimen.0[254]
+        }
+        fn ex_height(&self) -> core::Scaled {
+            self.registers_dimen.0[255]
+        }
         fn recoverable_error_hook(
             &self,
             recoverable_error: error::TracedError,
@@ -285,6 +297,11 @@ mod tests {
                 r"0.00305pt",
             ),
             (
+                int_to_dimen_5,
+                r"\count 1 = 0 \dimen 2 = 5sp \dimen 1 = \count 1 \dimen 2 \the \dimen 1",
+                r"0.0pt",
+            ),
+            (
                 dimen_to_dimen_1,
                 r"\dimen 1 = 10pt \dimen 2 = 5 \dimen 1 \the \dimen 2",
                 r"50.0pt",
@@ -338,6 +355,21 @@ mod tests {
                 int_dimen_to_dimen_4,
                 r"\count 1 = 2 \dimen 1 = 3pt \dimen 2 = -\count 1 \dimen 1 \the \dimen 2",
                 r"-6.0pt",
+            ),
+            (
+                int_dimen_to_dimen_5,
+                r"\count 1 = 2 \dimen 1 = 0pt \dimen 2 = -\count 1 \dimen 1 \the \dimen 2",
+                r"0.0pt",
+            ),
+            (
+                em_dimen,
+                r"\dimen 254 = 2.25pt \dimen 0 = 4.5em \the \dimen 0",
+                r"10.125pt",
+            ),
+            (
+                ex_dimen,
+                r"\dimen 255 = 2.25pt \dimen 0 = 4.5ex \the \dimen 0",
+                r"10.125pt",
             ),
         ),
         serde_tests(

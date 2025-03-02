@@ -43,6 +43,9 @@ fn the_primitive_fn<S: TheCompatible>(
                         variable::ValueRef::Dimen(d) => {
                             write(expansions, the_token, *d);
                         }
+                        variable::ValueRef::Glue(g) => {
+                            write(expansions, the_token, *g);
+                        }
                         variable::ValueRef::Font(font) => {
                             let font = *font;
                             let command_ref = input.state().get_command_ref_for_font(font).unwrap();
