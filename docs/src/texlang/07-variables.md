@@ -1,7 +1,7 @@
 # TeX variables
 
 The documentation so far has covered two of three type of primitives in TeX:
-    expansion primitives and execution primtives.
+    expansion primitives and execution primitives.
 In this section we discuss the third type: variables.
 
 The TeX language includes typed variables.
@@ -270,15 +270,15 @@ in the Texlang standard library.
 
 Not all variable types have been implemented yet.
 
-| Type      | Rust type      | Register accessor command | Implemented in Texlang?
+| TeX Type      | Rust type      | Register accessor command | Implemented in Texlang?
 |-----------|----------------|--------------------------|----------------
 | Integer   | `i32`          | `\count`                 | Yes
-| Dimension | TBD            | `\dimen`                 | No
-| Glue      | TBD            | `\skip`                  | No
+| Dimension | [`core::Scaled`](https://texcraft.dev/reference/core/struct.Scaled.html)            | `\dimen`                 | Yes
+| Glue      | [`core::Glue`](https://texcraft.dev/reference/core/struct.Scaled.html)             | `\skip`                  | Yes
 | Muglue    | TBD            | `\muskip`                | No
 | Box       | TBD            | `\box` and `\setbox`     | No
-| Category code  | [`CatCode`](super::token::CatCode) | `\catcode` | Yes
-| Math code | TBD            | `\mathcode`              | No
+| Category code  | [`CatCode`](https://texcraft.dev/reference/texlang/types/enum.CatCode.html) | `\catcode` | Yes
+| Math code | [`MathCode`](https://texcraft.dev/reference/texlang/types/enum.MathCode.html)            | `\mathcode`              | Yes
 | Delimiter code | TBD       | `\delcode`               | No
 | Space factor code | TBD    | `\sfcode`                | No
-| Token list | `Vec<`[`Token`](super::token::Token)`>`    | `\toks`                | No
+| Token list | [`Rc<Token>`](https://texcraft.dev/reference/texlang/token/struct.Token.html) | `\toks`                | No

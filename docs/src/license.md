@@ -1,12 +1,13 @@
 # License
 
 The Texcraft project is dual-licensed under
-    the [Apache License, Version 2.0]() or the [MIT license]().
+    the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+    or the [MIT license](https://opensource.org/license/mit).
 
 This dual-license scheme is the convention in the Rust ecosystem.
 The Texcraft project aims to keep this license scheme in the long run.
-However the TeX ecosystem at large generally prefers the GPL,
-    and some future parts of Texcraft may need to be GPL'd too depending on how the project develops.
+The TeX ecosystem at large often uses other licenses,
+    and some future parts of Texcraft may need to use those licenses depending on how the project develops.
 See [use of existing TeX source code](#use-of-existing-tex-source-code) below for more information.
 
 There are some additional files in the repository, used only for testing,
@@ -49,7 +50,4 @@ We have used the following sources:
 | TeX     | [`tex.web`](https://github.com/TeX-Live/texlive-source/blob/f1b12d7a20aaad9200cc4948ff481ffa90648c34/texk/web2c/tex.web) | [Public domain](https://www.tug.org/texinfohtml/web2c.html#Legalisms)
 | TFtoPL  | [`tftopl.web`](https://github.com/TeX-Live/texlive-source/blob/f1b12d7a20aaad9200cc4948ff481ffa90648c34/texk/web2c/tftopl.web) | [Public domain](https://www.tug.org/texinfohtml/web2c.html#Legalisms)
 | PLtoTF  | [`pltotf.web`](https://github.com/TeX-Live/texlive-source/blob/f1b12d7a20aaad9200cc4948ff481ffa90648c34/texk/web2c/pltotf.web) | [Public domain](https://www.tug.org/texinfohtml/web2c.html#Legalisms)
-
-
-
 

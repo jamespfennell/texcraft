@@ -52,7 +52,7 @@ As usual, implementations of these traits can usually be generated automatically
 
 ### A note on tags
 
-In a [previous section](05-primtive-tags.md) we discussed primitive tags.
+In a [previous section](05-primitive-tags.md) we discussed primitive tags.
 These provide unique identifiers that are generated using a global counter at runtime.
 Tags sometimes appear in the state, but they are not safe to serialize and deserialize.
 Deserialized tags may collide with new tags generated using the global counter.

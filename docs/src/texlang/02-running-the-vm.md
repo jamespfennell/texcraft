@@ -19,7 +19,7 @@ Running the VM is generally a four step process:
     At this point you will need to decide which concrete state type you're using.
     The state concept was described in high-level terms in 
         [the previous section](introduction.md), and we will gain hands-on experience with it
-        [the primitives with state section](stateful-primtives.md).
+        [the primitives with state section](stateful-primitives.md).
     For the moment, to keep things simple, we're just going to use a
         pre-existing state type that exists in the Texlang standard library crate:
         [`::texlang_stdlib::testing::State`](https://docs.rs/texlang-stdlib/latest/texlang_stdlib/testing/struct.State.html).

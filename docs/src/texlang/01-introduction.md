@@ -1,1 +1,1 @@
-# Introductory concepts
+# Introduction to Texlang
