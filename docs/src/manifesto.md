@@ -79,7 +79,7 @@ It's important to recognize straight away that the decoupled multi-pass architec
 In TeX, all stages of the compilation process from lexing through to page building are tied together.
 In TeX, it's possible to change the lexing rules depending on how many pages have been typeset so far:
 
-```
+```tex
 % If the page number is odd...
 \ifodd \pageno
     % ...change the meaning of the letter T to be open brace and X to be close brace

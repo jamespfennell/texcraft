@@ -6,12 +6,7 @@
 
 !bin
 !performance
-!crates/texlang
-!crates/texlang-common
-!crates/texlang-stdlib
-!crates/texlang-testing
-!crates/texcraft-stdext
-!crates/tfm
+!crates
 
 # Playground Rust files
 !playground/Cargo.toml

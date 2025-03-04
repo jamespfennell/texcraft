@@ -30,7 +30,7 @@ There are other smaller parts of the project, for example
     [TeX font metric data](https://texcraft.dev/reference/tfm/)
     and [DVI output files](https://texcraft.dev/reference/dvi/).
 
-The [project manifesto](manifesto.md) describes the big-picture ideas and goals behind project.
+The [project manifesto](https://texcraft.dev/manifesto.html) describes the big-picture ideas and goals behind project.
 
 ## Trying it out
 
