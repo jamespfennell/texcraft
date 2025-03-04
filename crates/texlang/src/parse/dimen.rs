@@ -1,4 +1,4 @@
-use core::{Scaled, ScaledUnit};
+use core::Scaled;
 
 use super::keyword::parse_keyword;
 use crate::prelude as txl;
@@ -166,34 +166,10 @@ pub(crate) fn scan_and_apply_units<S: TexlangState>(
     }
 
     // Finally try to scan unit constants.
-    // TeX.2021.458
     let scaled_unit = <core::ScaledUnit as Parsable>::parse(input)?;
     super::OptionalSpace::parse(input)?;
-    let (integer_part, fractional_part) = match scaled_unit {
-        // For sp units, the fractional part is silently dropped.
-        ScaledUnit::ScaledPoint => {
-            let s = Scaled(integer_part);
-            return if s > Scaled::MAX_DIMEN {
-                handle_overflow(input, first_token, false)
-            } else {
-                Ok(s)
-            };
-        }
-        ScaledUnit::Point => (integer_part, fractional_part),
-        _ => {
-            let (n, d) = scaled_unit.conversion_fraction();
-            let Ok((i, remainder)) = xn_over_d(integer_part, n, d) else {
-                return handle_overflow(input, first_token, false);
-            };
-            let f = fractional_part
-                .nx_plus_y(n, Scaled::from_integer(remainder).expect("remainder<d<=7200<2^13, so a valid scaled number"))
-                .expect("fractional_part<2^16, remainder<2^16*d, so nx_plus_y<2^16(n+d). Each (n,d) makes this <2^30")
-                / d;
-            (i + f.integer_part(), f.fractional_part())
-        }
-    };
-    match Scaled::from_integer(integer_part) {
-        Ok(integer_part) => Ok(integer_part + fractional_part),
+    match Scaled::new(integer_part, fractional_part, scaled_unit) {
+        Ok(s) => Ok(s),
         Err(_) => handle_overflow(input, first_token, false),
     }
 }
@@ -221,11 +197,6 @@ fn handle_overflow<S: TexlangState>(
 fn fillll_error(token: token::Token) -> parse::Error {
     parse::Error::new("an infinite glue stretch or shrink order", Some(token), "")
         .with_got_override("too many l characters")
-}
-
-fn xn_over_d(x: i32, n: i32, d: i32) -> Result<(i32, i32), core::OverflowError> {
-    let (a, b) = Scaled(x).xn_over_d(n, d)?;
-    Ok((a.0, b.0))
 }
 
 impl Parsable for core::ScaledUnit {
@@ -285,7 +256,7 @@ fn scan_decimal_fraction<S: TexlangState>(
             i += 1;
         }
     }
-    Ok(Scaled::from_decimal_fraction(&digits[0..i]))
+    Ok(Scaled::from_decimal_digits(&digits[0..i]))
 }
 
 #[derive(Debug)]
@@ -313,20 +284,21 @@ mod tests {
         (one_pt_negative, "-1pt", -Scaled::ONE),
         (two_pt, "2pt", Scaled::TWO),
         (empty_point, ".pt", Scaled::ZERO), // TeX.2021.452
-        (fraction_1, "0.5pt", Scaled::from_decimal_fraction(&[5])),
-        (fraction_2, "-0.5pt", -Scaled::from_decimal_fraction(&[5])),
+        (fraction_1, "0.5pt", Scaled::from_decimal_digits(&[5])),
+        (fraction_2, "-0.5pt", -Scaled::from_decimal_digits(&[5])),
         (
             fraction_3,
             "1.5pt",
-            Scaled::ONE + Scaled::from_decimal_fraction(&[5])
+            Scaled::ONE + Scaled::from_decimal_digits(&[5])
         ),
         (
             fraction_4,
             "-1.5pt",
-            -Scaled::ONE - Scaled::from_decimal_fraction(&[5])
+            -Scaled::ONE - Scaled::from_decimal_digits(&[5])
         ),
         (units_in_1, "1in", (Scaled::ONE * 7227) / 100),
         (units_in_2, "1 in", (Scaled::ONE * 7227) / 100),
+        (units_in_3, "0.075in", Scaled(355207)),
         (units_pc, "1pc", Scaled::ONE * 12),
         (units_cm, "1cm", (Scaled::ONE * 7227) / 254),
         (units_mm, "1mm", (Scaled::ONE * 7227) / 2540),

@@ -58,12 +58,39 @@ impl Scaled {
     /// Creates a scaled number from a decimal fraction.
     ///
     /// TeX.2021.102.
-    pub fn from_decimal_fraction(digits: &[u8]) -> Scaled {
+    pub fn from_decimal_digits(digits: &[u8]) -> Scaled {
         let mut a = 0;
         for d in digits.iter().rev() {
             a = (a + (*d as i32) * Scaled::TWO.0) / 10
         }
         Scaled((a + 1) / 2)
+    }
+
+    /// Creates a scaled number from the provided components.
+    ///
+    /// TeX.2021.458
+    pub fn new(
+        integer_part: i32,
+        fractional_part: Scaled,
+        scaled_unit: ScaledUnit,
+    ) -> Result<Scaled, OverflowError> {
+        if scaled_unit == ScaledUnit::ScaledPoint {
+            return if integer_part > Scaled::MAX_DIMEN.0 {
+                Err(OverflowError)
+            } else {
+                // For sp units, the fractional part is silently dropped.
+                Ok(Scaled(integer_part))
+            };
+        }
+        let (n, d) = scaled_unit.conversion_fraction();
+        // xn_over_d, but with integer arguments
+        let (Scaled(i), Scaled(remainder)) = Scaled(integer_part).xn_over_d(n, d)?;
+        let f =
+            fractional_part.nx_plus_y(n, Scaled::from_integer(remainder).expect("remainder<d<=7200<2^13, so a valid scaled number"))
+            .expect("fractional_part<2^16, remainder<2^16*d, so nx_plus_y<2^16(n+d). Each (n,d) makes this <2^30")
+            / d;
+        let integer_part = Scaled::from_integer(i + f.integer_part())?;
+        Ok(integer_part + f.fractional_part())
     }
 
     /// Calculates the integer division _xn_/_d_ and remainder, where _x_ is this scaled number
@@ -454,7 +481,4 @@ mod tests {
     fn type_sizes() {
         assert_eq!(16, std::mem::size_of::<Glue>());
     }
-
-    #[test]
-    fn xn_over_d() {}
 }

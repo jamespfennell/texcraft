@@ -1,0 +1,19 @@
+[package]
+name = "boxworlds-bin"
+version = "0.2.0"
+edition = "2021"
+license = "MIT"
+description = "Boxworks binaries"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+
+[dependencies]
+boxworks-lang = {path="../boxworks-lang" , features = ["ariadne"]}
+clap = {version="4.3.3", default-features=false, features=["std", "derive"]}
+ariadne = {version="0.5.0", default-features = false }
+colored = "2"
+
+[[bin]]
+name = "box"
+path = "src/box.rs"

@@ -1,0 +1,20 @@
+# Invalid type (positional arg)
+text(1pc)
+
+# Invalid type (keyword arg)
+text(font="45")
+
+# Positional args after keyword args
+text(font=3, "Hello")
+
+# Too many positional args
+text("Hello", 3, 3, "World", "Mundo")
+
+# Duplicate keyword args
+text(content="Hello", content="World")
+
+# Duplicate positional and keyword args
+text("Hello", content="World")
+
+# Invalid keyword arg
+text(random="Hello")

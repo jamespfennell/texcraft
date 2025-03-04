@@ -1,0 +1,18 @@
+[package]
+name = "boxworks-lang"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Boxworks domain-specific language"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+
+[dependencies]
+boxworks = { path = "../boxworks", version="0.1.0"}
+core = { path = "../core" }
+ariadne = {version="0.5.0", default-features = false, optional = true}
+
+[features]
+default = []
+ariadne = ["dep:ariadne"]

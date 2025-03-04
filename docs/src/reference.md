@@ -16,6 +16,7 @@
 ## Boxworks
 
 - [`boxworks`](/reference/boxworks/)
+- [`boxworks-lang`](/reference/boxworks_lang/)
 
 ## Other
 

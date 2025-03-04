@@ -7,6 +7,7 @@ use core::GlueOrder;
 use core::Scaled as Number;
 
 /// Horizontal node.
+#[derive(Debug)]
 pub enum Horizontal {
     Char(Char),
     HList(HList),
@@ -24,7 +25,48 @@ pub enum Horizontal {
     Penalty(Penalty),
 }
 
+impl Eq for Horizontal {}
+
+macro_rules! horizontal_impl {
+    ( $( $variant: ident , )+ ) => {
+        impl PartialEq for Horizontal {
+            fn eq(&self, other: &Self) -> bool {
+                match (self, other) {
+                    $(
+                    (Self::$variant(l), Self::$variant(r)) => l == r,
+                    )+
+                    _ =>false,
+                }
+            }
+        }
+        $(
+        impl From<$variant> for Horizontal {
+            fn from(value: $variant) -> Self {
+                Horizontal::$variant(value)
+            }
+        }
+        )+
+    };
+}
+
+horizontal_impl!(
+    Char,
+    HList,
+    VList,
+    Rule,
+    Mark,
+    Insertion,
+    Adjust,
+    Ligature,
+    Discretionary,
+    Math,
+    Glue,
+    Kern,
+    Penalty,
+);
+
 /// Vertical node.
+#[derive(Debug)]
 pub enum Vertical {
     HList(HList),
     VList(VList),
@@ -38,11 +80,32 @@ pub enum Vertical {
     Penalty(Penalty),
 }
 
+impl PartialEq for Vertical {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::HList(l0), Self::HList(r0)) => l0 == r0,
+            (Self::VList(l0), Self::VList(r0)) => l0 == r0,
+            (Self::Rule(l0), Self::Rule(r0)) => l0 == r0,
+            (Self::Mark(l0), Self::Mark(r0)) => l0 == r0,
+            (Self::Insertion(l0), Self::Insertion(r0)) => l0 == r0,
+            (Self::Whatsit(_), Self::Whatsit(_)) => false,
+            (Self::Math(l0), Self::Math(r0)) => l0 == r0,
+            (Self::Glue(l0), Self::Glue(r0)) => l0 == r0,
+            (Self::Kern(l0), Self::Kern(r0)) => l0 == r0,
+            (Self::Penalty(l0), Self::Penalty(r0)) => l0 == r0,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Vertical {}
+
 /// A character in a specific font.
 ///
 /// This node can only appear in horizontal mode.
 ///
 /// Described in TeX.2021.134.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Char {
     pub char: char,
     pub font: u32,
@@ -51,6 +114,7 @@ pub struct Char {
 /// A box made from a horizontal list.
 ///
 /// Described in TeX.2021.135.
+#[derive(Debug, PartialEq, Eq)]
 pub struct HList {
     pub height: Number,
     pub width: Number,
@@ -75,9 +139,14 @@ pub struct HList {
 /// using a float is okay.
 ///
 /// Described in TeX.2021.109.
+#[derive(Debug, PartialEq)]
 pub struct GlueRatio(pub f32);
 
+// TODO: ensure that glue ratio cannot be NaN
+impl Eq for GlueRatio {}
+
 /// Description of whether the glue should stretch, shrink, or remain rigid.
+#[derive(Debug, PartialEq, Eq)]
 pub enum GlueSign {
     Stretching,
     Shrinking,
@@ -114,6 +183,7 @@ impl Default for HList {
 /// instead of [Horizontal] nodes.
 ///
 /// Described in TeX.2021.137.
+#[derive(Debug, PartialEq, Eq)]
 pub struct VList {
     pub height: Number,
     pub width: Number,
@@ -135,6 +205,7 @@ pub struct VList {
 /// in a vlist.
 ///
 /// Described in TeX.2021.138.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Rule {
     pub height: Number,
     pub width: Number,
@@ -169,6 +240,7 @@ impl Default for Rule {
 /// This node is related to the TeX primitive `\insert`.
 ///
 /// Described in TeX.2021.140.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Insertion {
     pub box_number: u8,
     /// Slightly misnamed: it actually holds the natural height plus depth
@@ -190,6 +262,7 @@ pub struct Insertion {
 /// to depend on Texlang. So for the moment just leaving a dummy list.
 ///
 /// Described in TeX.2021.141.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Mark {
     pub list: Vec<()>,
 }
@@ -199,6 +272,7 @@ pub struct Mark {
 /// E.g., used to implement the TeX primitive `\vadjust`.
 ///
 /// Described in TeX.2021.142.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Adjust {
     pub list: Vec<Vertical>,
 }
@@ -206,6 +280,7 @@ pub struct Adjust {
 /// A ligature.
 ///
 /// Described in TeX.2021.143.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Ligature {
     pub included_left_boundary: bool,
     pub included_right_boundary: bool,
@@ -230,6 +305,7 @@ pub struct Ligature {
 /// we just piggy back on the hlist type.
 ///
 /// Described in TeX.2021.145.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Discretionary {
     /// Material to insert before this node, if the break occurs here.
     pub pre_break: Vec<Horizontal>,
@@ -266,11 +342,12 @@ impl Default for Discretionary {
 /// so we'll eventually find out.
 ///
 /// Described in TeX.2021.146.
-pub trait Whatsit {}
+pub trait Whatsit: std::fmt::Debug {}
 
 /// A marker placed before or after math mode.
 ///
 /// Described in TeX.2021.147.
+#[derive(Debug, PartialEq, Eq)]
 pub enum Math {
     Before,
     After,
@@ -342,15 +419,27 @@ impl Vertical {
 /// A piece of glue.
 ///
 /// Described in TeX.2021.149.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Glue {
     pub kind: GlueKind,
-    pub glue: core::Glue,
+    pub value: core::Glue,
+}
+
+impl From<core::Glue> for Glue {
+    fn from(value: core::Glue) -> Self {
+        Self {
+            kind: Default::default(),
+            value,
+        }
+    }
 }
 
 /// The kind of a glue node.
 ///
 /// Described in TeX.2021.149.
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum GlueKind {
+    #[default]
     Normal,
     ConditionalMath,
     Math,
@@ -369,6 +458,7 @@ pub enum GlueKind {
 /// A kern.
 ///
 /// Described in TeX.2021.155.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Kern {
     pub kind: KernKind,
     pub width: Number,
@@ -377,6 +467,7 @@ pub struct Kern {
 /// The kind of a kern node.
 ///
 /// Described in TeX.2021.155.
+#[derive(Debug, PartialEq, Eq)]
 pub enum KernKind {
     /// Inserted from font information or math mode calculations.
     Normal,
@@ -394,6 +485,7 @@ pub enum KernKind {
 /// A penalty.
 ///
 /// Described in TeX.2021.157.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Penalty {
     pub value: i32,
 }
