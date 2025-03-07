@@ -2,8 +2,8 @@
 //!
 //! This crate defines a domain-specific language (DSL) for Boxworks.
 //! This language is used to describe Boxworks elements in Knuth's box-and-glue model.
-//! The initial motiviation for the language is to make it
-//!     easy to create Boxwork primitives,
+//! The initial motivation for the language is to make it
+//!     easy to create Boxworks primitives,
 //!     like horizontal and vertical lists,
 //!     for use in unit testing.
 //!
@@ -189,8 +189,8 @@
 //! | Number | Name    | Type      | Default |
 //! |--------|---------|-----------|---------|
 //! | 1      | `width` | dimension | `0pt`   |
-//! | 2      | `stretch` | glue stretch or shink | `0pt`   |
-//! | 3      | `shrink` | glue stretch or shink | `0pt`   |
+//! | 2      | `stretch` | glue stretch or shrink | `0pt`   |
+//! | 3      | `shrink` | glue stretch or shrink | `0pt`   |
 //!
 //! #### `kern`: add a kern node to the current list
 //!
@@ -259,7 +259,44 @@ impl<'a> Str<'a> {
     }
 }
 
-/// Parse Boxworks language source code into a horizontal list.
+/// Write a horizontal list as Box language.
+pub fn write_horizontal_list(list: &[node::Horizontal]) -> String {
+    let mut s = String::new();
+    for elem in list {
+        use node::Horizontal::*;
+        use std::fmt::Write;
+        match elem {
+            Char(char) => {
+                writeln!(&mut s, "text(\"{}\", font={})", char.char, char.font).unwrap();
+            }
+            Glue(glue) => {
+                writeln!(
+                    &mut s,
+                    "glue({}, {}, {})",
+                    glue.value.width, glue.value.stretch, glue.value.shrink
+                )
+                .unwrap();
+            }
+            Kern(kern) => {
+                writeln!(&mut s, "kern({})", kern.width).unwrap();
+            }
+            Ligature(lig) => {
+                writeln!(
+                    &mut s,
+                    "lig(\"{}\", font={}, original=\"{}\")",
+                    lig.char.escape_default(),
+                    lig.font,
+                    lig.original_chars
+                )
+                .unwrap();
+            }
+            _ => todo!(),
+        }
+    }
+    s
+}
+
+/// Parse Box language source code into a horizontal list.
 pub fn parse_horizontal_list(source: &str) -> Result<Vec<node::Horizontal>, Vec<Error>> {
     let mut lexer = lexer::Lexer::new(source);
     let mut v: Vec<node::Horizontal> = vec![];

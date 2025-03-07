@@ -14,12 +14,16 @@ struct Cli {
 #[derive(Parser)]
 enum SubCommand {
     Check(Check),
+    Tex(Tex),
 }
 
 fn main() {
     let args: Cli = Cli::parse();
     let result = match args.sub_command {
         SubCommand::Check(c) => c.run(),
+        SubCommand::Tex(tex) => match tex.sub_command {
+            TexSubCommand::Hlist(tex_convert_text) => tex_convert_text.run(),
+        },
     };
     if let Err(err) = result {
         println!["{err}"];
@@ -50,6 +54,38 @@ impl Check {
             }
             return Err(format!("Input file had {} errors", errs.len()));
         }
+        Ok(())
+    }
+}
+
+/// Perform operations related to TeX.
+#[derive(Parser)]
+struct Tex {
+    #[clap(subcommand)]
+    sub_command: TexSubCommand,
+}
+
+#[derive(Parser)]
+enum TexSubCommand {
+    Hlist(TexHlist),
+}
+
+/// Print the horizontal list that TeX builds for some text.
+#[derive(Parser)]
+struct TexHlist {
+    /// The text used to build the list.
+    text: String,
+}
+
+impl TexHlist {
+    fn run(self) -> Result<(), String> {
+        let (fonts, list) = boxworks::tex::build_horizontal_list(&self.text);
+        println!("# fonts:");
+        for (i, font) in fonts.into_iter().enumerate() {
+            println!("# {i}: {font}");
+        }
+        let s = boxworks_lang::write_horizontal_list(&list);
+        print!("{s}");
         Ok(())
     }
 }

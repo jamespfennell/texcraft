@@ -6,3 +6,4 @@
 //! languages that use this engine to perform the actual typesetting.
 
 pub mod node;
+pub mod tex;

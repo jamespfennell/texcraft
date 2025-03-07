@@ -196,6 +196,7 @@ name = "boxworlds-bin"
 version = "0.2.0"
 dependencies = [
  "ariadne",
+ "boxworks",
  "boxworks-lang",
  "clap 4.4.8",
  "colored",

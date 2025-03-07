@@ -1,12 +1,18 @@
+//! Core data structures for the typesetting engine.
+//!
+//! This module contains the fundamental data structures for the Boxworks typesetting engine.
+//! As in TeX, the Boxworks is based around various lists (horizontal, vertical, etc.)
+//!     that contains elements (which themselves may be nested lists).
+//! The Rust representations of these lists and their elements are defined here.
+//!
+//! This module implements the entirety of TeX.2021 part 10, "data structures
+//! for boxes and their friends".
+
 use core;
-/// Data structures for boxes
-///
-/// This module implements the entirety of TeX.2021 part 10, data structures
-/// for boxes and their friends.
 use core::GlueOrder;
 use core::Scaled as Number;
 
-/// Horizontal node.
+/// Element of a horizontal list.
 #[derive(Debug)]
 pub enum Horizontal {
     Char(Char),
@@ -65,7 +71,7 @@ horizontal_impl!(
     Penalty,
 );
 
-/// Vertical node.
+/// Element of a vertical list.
 #[derive(Debug)]
 pub enum Vertical {
     HList(HList),
@@ -289,9 +295,10 @@ pub struct Ligature {
     /// The original characters that were replaced by the ligature.
     /// This is used if the engine needs to break apart the ligature
     /// in order to perform hyphenation.
-    /// For the moment this is a vector, but we probably should avoid allocating
+    /// For the moment this is a string, but we probably should avoid allocating
     /// per-ligature-node as they may be common.
-    pub original_chars: Vec<char>,
+    /// Maybe we can use an Rc<str>, where all the rcs are in a pool in the font.
+    pub original_chars: String,
 }
 
 // Two constructors for ligature nodes are provided in TeX.2021.144

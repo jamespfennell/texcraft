@@ -37,6 +37,7 @@
         "globaldefs",
         "groupingmap",
         "Hasher",
+        "Hlist",
         "Hola",
         "ifcase",
         "ifeof",

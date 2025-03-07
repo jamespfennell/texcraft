@@ -9,6 +9,7 @@ repository = "https://github.com/jamespfennell/texcraft"
 keywords = ["tex", "texcraft"]
 
 [dependencies]
+boxworks = {path="../boxworks" }
 boxworks-lang = {path="../boxworks-lang" , features = ["ariadne"]}
 clap = {version="4.3.3", default-features=false, features=["std", "derive"]}
 ariadne = {version="0.5.0", default-features = false }
