@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use crate::node;
+use crate::ds;
 
 /// Build a horizontal list from some text.
 ///
@@ -24,7 +24,7 @@ use crate::node;
 ///
 /// This function is the inverse of TeX.2021.173 and onwards
 /// (part 12 of TeX: displaying boxes).
-pub fn build_horizontal_list(s: &str) -> (Vec<String>, Vec<node::Horizontal>) {
+pub fn build_horizontal_list(s: &str) -> (Vec<String>, Vec<ds::Horizontal>) {
     let mut v = vec![];
     let mut fonts = vec![];
     let mut font_to_idx: HashMap<&str, usize> = Default::default();
@@ -50,8 +50,8 @@ pub fn build_horizontal_list(s: &str) -> (Vec<String>, Vec<node::Horizontal>) {
             assert_eq!(words.next(), Some("minus"));
             let shrink = parse_scaled(words.next().expect("glue has 5 words"));
             v.push(
-                node::Glue {
-                    kind: node::GlueKind::Normal,
+                ds::Glue {
+                    kind: ds::GlueKind::Normal,
                     value: core::Glue {
                         width,
                         stretch,
@@ -67,8 +67,8 @@ pub fn build_horizontal_list(s: &str) -> (Vec<String>, Vec<node::Horizontal>) {
             let mut words = kern_spec.split_ascii_whitespace();
             let width = parse_scaled(words.next().expect("glue has 1 word"));
             v.push(
-                node::Kern {
-                    kind: node::KernKind::Normal,
+                ds::Kern {
+                    kind: ds::KernKind::Normal,
                     width,
                 }
                 .into(),
@@ -94,7 +94,7 @@ pub fn build_horizontal_list(s: &str) -> (Vec<String>, Vec<node::Horizontal>) {
                 let og_chars = words.next().expect("lig has 4 words");
                 let og_chars = og_chars.strip_suffix(")").expect("lig ends with ')'");
                 v.push(
-                    node::Ligature {
+                    ds::Ligature {
                         included_left_boundary: false,
                         included_right_boundary: false,
                         char,
@@ -105,7 +105,7 @@ pub fn build_horizontal_list(s: &str) -> (Vec<String>, Vec<node::Horizontal>) {
                 );
             } else {
                 v.push(
-                    node::Char {
+                    ds::Char {
                         char,
                         font: font_idx,
                     }

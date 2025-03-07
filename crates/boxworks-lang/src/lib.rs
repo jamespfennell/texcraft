@@ -17,7 +17,7 @@
 //!
 //! ```
 //! use core;
-//! use boxworks::node;
+//! use boxworks::ds;
 //! use boxworks_lang as bwl;
 //!
 //! let source = r#"
@@ -32,12 +32,12 @@
 //!     text("V")
 //! "#;
 //! let got = bwl::parse_horizontal_list(&source);
-//! let want: Vec<node::Horizontal> = vec![
-//!     node::Char{char: 'B', font: 0}.into(),
-//!     node::Char{char: 'o', font: 0}.into(),
-//!     node::Char{char: 'x', font: 0}.into(),
-//!     node::Glue{
-//!         kind: node::GlueKind::Normal,
+//! let want: Vec<ds::Horizontal> = vec![
+//!     ds::Char{char: 'B', font: 0}.into(),
+//!     ds::Char{char: 'o', font: 0}.into(),
+//!     ds::Char{char: 'x', font: 0}.into(),
+//!     ds::Glue{
+//!         kind: ds::GlueKind::Normal,
 //!         // Right now spaces are converted to the glue 10pt plus 4pt minus 4pt.
 //!         // We will eventually support customizing this.
 //!         value: core::Glue{
@@ -48,12 +48,12 @@
 //!             shrink_order: core::GlueOrder::Normal,
 //!         }
 //!     }.into(),
-//!     node::Char{char: 'L', font: 0}.into(),
-//!     node::Char{char: 'a', font: 0}.into(),
-//!     node::Char{char: 'n', font: 0}.into(),
-//!     node::Char{char: 'g', font: 0}.into(),
-//!     node::Glue{
-//!         kind: node::GlueKind::Normal,
+//!     ds::Char{char: 'L', font: 0}.into(),
+//!     ds::Char{char: 'a', font: 0}.into(),
+//!     ds::Char{char: 'n', font: 0}.into(),
+//!     ds::Char{char: 'g', font: 0}.into(),
+//!     ds::Glue{
+//!         kind: ds::GlueKind::Normal,
 //!         value: core::Glue{
 //!             width: core::Scaled::new(
 //!                 1,  // integer part
@@ -74,16 +74,16 @@
 //!             shrink_order: core::GlueOrder::Normal,
 //!         }
 //!     }.into(),
-//!     node::Char{char: 'A', font: 0}.into(),
-//!     node::Kern{
-//!         kind: node::KernKind::Normal,
+//!     ds::Char{char: 'A', font: 0}.into(),
+//!     ds::Kern{
+//!         kind: ds::KernKind::Normal,
 //!         width: -core::Scaled::new(
 //!                 0,  // integer part
 //!                 core::Scaled::from_decimal_digits(&[1]),  // fractional part
 //!                 core::ScaledUnit::Point,  // units
 //!             ).unwrap(),
 //!     }.into(),
-//!     node::Char{char: 'V', font: 0}.into(),
+//!     ds::Char{char: 'V', font: 0}.into(),
 //! ];
 //! assert_eq![got, Ok(want)];
 //! ```
@@ -108,13 +108,13 @@
 //!
 //! ```
 //! # use boxworks_lang as bwl;
-//! # use boxworks::node;
+//! # use boxworks::ds;
 //! let source = r#"
 //!     text("A", 1)
 //! "#;
 //! assert_eq![
 //!     bwl::parse_horizontal_list(&source),
-//!     Ok(vec![node::Char{char: 'A', font: 1}.into()])
+//!     Ok(vec![ds::Char{char: 'A', font: 1}.into()])
 //! ];
 //! ```
 //!
@@ -122,13 +122,13 @@
 //!
 //! ```
 //! # use boxworks_lang as bwl;
-//! # use boxworks::node;
+//! # use boxworks::ds;
 //! let source = r#"
 //!     text(font=2, content="B")
 //! "#;
 //! assert_eq![
 //!     bwl::parse_horizontal_list(&source),
-//!     Ok(vec![node::Char{char: 'B', font: 2}.into()])
+//!     Ok(vec![ds::Char{char: 'B', font: 2}.into()])
 //! ];
 //! ```
 //!
@@ -136,13 +136,13 @@
 //!
 //! ```
 //! # use boxworks_lang as bwl;
-//! # use boxworks::node;
+//! # use boxworks::ds;
 //! let source = r#"
 //!     text("C", font=3)
 //! "#;
 //! assert_eq![
 //!     bwl::parse_horizontal_list(&source),
-//!     Ok(vec![node::Char{char: 'C', font: 3}.into()])
+//!     Ok(vec![ds::Char{char: 'C', font: 3}.into()])
 //! ];
 //! ```
 //!
@@ -151,7 +151,7 @@
 //!
 //! ```
 //! # use boxworks_lang as bwl;
-//! # use boxworks::node;
+//! # use boxworks::ds;
 //! let source = r#"
 //!     text(content="C", 3)
 //! "#;
@@ -181,7 +181,7 @@
 //!
 //! #### `glue`: add a glue node to the current list
 //!
-//! Adds a value of the Rust type [`boxworks::node::Glue`]
+//! Adds a value of the Rust type [`boxworks::ds::Glue`]
 //! to the current list.
 //!
 //! Parameters:
@@ -194,7 +194,7 @@
 //!
 //! #### `kern`: add a kern node to the current list
 //!
-//! Adds a value of the Rust type [`boxworks::node::Kern`]
+//! Adds a value of the Rust type [`boxworks::ds::Kern`]
 //! to the current list.
 //!
 //! Parameters:
@@ -220,7 +220,7 @@
 //!     to the glue `10pt plus 4pt minus 4pt`.
 //!
 //! - For all other characters, adds a value of the Rust type
-//!     [`boxworks::node::Char`].
+//!     [`boxworks::ds::Char`].
 //!
 //! Parameters:
 //!
@@ -231,7 +231,7 @@
 mod lexer;
 use core::{GlueOrder, Scaled};
 
-use boxworks::node;
+use boxworks::ds;
 mod error;
 pub use error::{Error, ErrorLabel};
 
@@ -260,10 +260,10 @@ impl<'a> Str<'a> {
 }
 
 /// Write a horizontal list as Box language.
-pub fn write_horizontal_list(list: &[node::Horizontal]) -> String {
+pub fn write_horizontal_list(list: &[ds::Horizontal]) -> String {
     let mut s = String::new();
     for elem in list {
-        use node::Horizontal::*;
+        use ds::Horizontal::*;
         use std::fmt::Write;
         match elem {
             Char(char) => {
@@ -297,9 +297,9 @@ pub fn write_horizontal_list(list: &[node::Horizontal]) -> String {
 }
 
 /// Parse Box language source code into a horizontal list.
-pub fn parse_horizontal_list(source: &str) -> Result<Vec<node::Horizontal>, Vec<Error>> {
+pub fn parse_horizontal_list(source: &str) -> Result<Vec<ds::Horizontal>, Vec<Error>> {
     let mut lexer = lexer::Lexer::new(source);
-    let mut v: Vec<node::Horizontal> = vec![];
+    let mut v: Vec<ds::Horizontal> = vec![];
     let calls = parse_list(&mut lexer);
     for call in calls {
         match call.func_name {
@@ -313,8 +313,8 @@ pub fn parse_horizontal_list(source: &str) -> Result<Vec<node::Horizontal>, Vec<
                     continue;
                 }
                 v.push(
-                    node::Glue {
-                        kind: node::GlueKind::Normal,
+                    ds::Glue {
+                        kind: ds::GlueKind::Normal,
                         value: core::Glue {
                             width: args.width.value,
                             stretch: args.stretch.value.0,
@@ -334,8 +334,8 @@ pub fn parse_horizontal_list(source: &str) -> Result<Vec<node::Horizontal>, Vec<
                     continue;
                 }
                 v.push(
-                    node::Kern {
-                        kind: node::KernKind::Normal,
+                    ds::Kern {
+                        kind: ds::KernKind::Normal,
                         width: args.kern.value,
                     }
                     .into(),
@@ -352,8 +352,8 @@ pub fn parse_horizontal_list(source: &str) -> Result<Vec<node::Horizontal>, Vec<
                 for c in args.content.value.chars() {
                     if c.is_whitespace() {
                         v.push(
-                            node::Glue {
-                                kind: node::GlueKind::Normal,
+                            ds::Glue {
+                                kind: ds::GlueKind::Normal,
                                 value: core::Glue {
                                     width: Scaled::ONE * 10,
                                     stretch: Scaled::ONE * 4,
@@ -366,7 +366,7 @@ pub fn parse_horizontal_list(source: &str) -> Result<Vec<node::Horizontal>, Vec<
                         continue;
                     }
                     v.push(
-                        node::Char {
+                        ds::Char {
                             char: c,
                             font: args.font.value as u32,
                         }

@@ -5,5 +5,5 @@
 //! One of the main goals of Boxworks is to support creating new typesetting
 //! languages that use this engine to perform the actual typesetting.
 
-pub mod node;
+pub mod ds;
 pub mod tex;
