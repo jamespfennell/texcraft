@@ -51,7 +51,7 @@ You can verify that Texcraft's libraries don't have any third-party
     dependencies by running the following command.
 The output should only reference Texcraft libraries:
 
-```
+```sh
 cargo tree -e normal --features="" --no-default-features \
     -p "boxworks*" \
     -p core \
@@ -66,7 +66,7 @@ I haven't put `colored` behind a feature yet.
 
 Conversely, this shows the dependency tree when all features are enabled:
 
-```
+```sh
 cargo tree -e normal --all-features \
     -p "boxworks*" \
     -p core \
