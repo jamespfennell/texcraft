@@ -36,7 +36,6 @@ use crate::token;
 use crate::types;
 use crate::variable;
 use crate::vm;
-use once_cell::sync::OnceCell;
 use std::num;
 use std::rc;
 use std::sync;
@@ -321,7 +320,7 @@ impl Tag {
 /// let second_get = TAG.get();
 /// assert_eq!(first_get, second_get);
 /// ```
-pub struct StaticTag(OnceCell<Tag>);
+pub struct StaticTag(std::sync::OnceLock<Tag>);
 
 impl Default for StaticTag {
     fn default() -> Self {
@@ -332,7 +331,7 @@ impl Default for StaticTag {
 impl StaticTag {
     /// Create a new static tag.
     pub const fn new() -> StaticTag {
-        StaticTag(OnceCell::new())
+        StaticTag(std::sync::OnceLock::new())
     }
 
     /// Get the actual [Tag] out of this [StaticTag].

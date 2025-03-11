@@ -807,7 +807,6 @@ impl std::fmt::Display for Section {
 ///
 /// This is defined in TFtoPL.2014.10.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Header {
     /// The font checksum, if specified.
     ///
@@ -870,7 +869,6 @@ impl Header {
 /// TFM and PL files only support 1-byte characters.
 #[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Char(pub u8);
 
 impl std::fmt::Display for Char {
@@ -930,7 +928,6 @@ impl Char {
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FaceWeight {
     Light,
     Medium,
@@ -939,7 +936,6 @@ pub enum FaceWeight {
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FaceSlope {
     Roman,
     Italic,
@@ -947,7 +943,6 @@ pub enum FaceSlope {
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FaceExpansion {
     Regular,
     Condensed,
@@ -956,7 +951,6 @@ pub enum FaceExpansion {
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Face {
     Valid(FaceWeight, FaceSlope, FaceExpansion),
     Other(u8),
@@ -1301,7 +1295,6 @@ impl NextLargerProgramWarning {
 /// ```
 ///
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NextLargerProgram {
     entrypoints: HashMap<Char, u8>,
     next_larger: Vec<(Char, NonZeroU8)>,
@@ -1554,7 +1547,6 @@ impl core::FontFormat for File {
 ///   because 10^(-6) is larger than 2^(-20).
 #[derive(Default, PartialEq, Eq, Debug, Copy, Clone, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FixWord(pub i32);
 
 impl FixWord {

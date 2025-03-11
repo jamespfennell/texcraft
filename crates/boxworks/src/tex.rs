@@ -144,7 +144,12 @@ fn parse_scaled(s: &str) -> core::Scaled {
         .parse()
         .expect("integer part is an integer");
     let mut f = [0_u8; 17];
-    for (k, c) in parts.next().expect("scaled has a fractional part").chars().enumerate() {
+    for (k, c) in parts
+        .next()
+        .expect("scaled has a fractional part")
+        .chars()
+        .enumerate()
+    {
         f[k] = c
             .to_digit(10)
             .expect("fractional part are digits")

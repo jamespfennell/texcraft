@@ -13,29 +13,43 @@ name = "texlang-all-errors"
 path = "bin/errors.rs"
 
 [dependencies]
-
-# In the time module for getting the current time on startup.
-chrono = {version="0.4.19", default-features = false, features = ["clock"], optional = true}
-
-linefeed = {version = "0.6", optional = true}
+# Texcraft
 core = { path = "../core" }
 texcraft-stdext = { path = "../texcraft-stdext", version = "0.1.0" }
 texlang = { path = "../texlang", version="0.1.0" }
 texlang-common = { path = "../texlang-common", version = "0.1.0" }
 
-# Nice terminal output.
+# This should be a dev-dependency, but this breaks `cargo t`
+# I think there's actually a bug in cargo.
+# The problem is that it invokes `rustc` on texlang_testing with
+# the serde feature enabled but without passing serde as a dependency.
+texlang-testing = { path = "../texlang-testing" }
+
+# Third-party
+
+## In the time module, for getting the current time on startup.
+chrono = {version="0.4.19", default-features = false, features = ["clock"], optional = true}
+
+## In the REPL module, for reading terminal input in a nice way
+linefeed = {version = "0.6", optional = true }
+
+## In the tracing macros module
 colored = "2"
 
+## The usual suspects
 serde = {version="^1.0", optional = true}
 serde_json = {version="1.0", optional = true}
 rmp-serde = {version="^1.0", optional = true}
 bincode = {version="2.0.0-rc.3", default-features = false, features = ["alloc", "serde"], optional = true}
 
 [dev-dependencies]
-texlang-testing = { path = "../texlang-testing", version = "0.1.0" }
 
 [features]
 default = ["time"]
 time = ["dep:chrono"]
 repl = ["dep:linefeed"]
-serde = ["dep:serde", "dep:serde_json", "dep:rmp-serde", "dep:bincode", "texcraft-stdext/serde", "texlang/serde"]
+serde = [
+    "dep:serde", "dep:serde_json", "dep:rmp-serde",
+    "dep:bincode", "texcraft-stdext/serde", "texlang/serde",
+    "texlang-testing/serde"
+]

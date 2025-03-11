@@ -10,13 +10,14 @@ keywords = ["tex", "texcraft"]
 categories = ["parser-implementations"]
 
 [dependencies]
+# Texcraft
 core = { path = "../core" }
-ariadne = {version="0.5.0", default-features = false, optional = true}
+
+# Third-party
 arbitrary = { version = "1", features = ["derive"], optional = true }
-serde = {version="^1.0", optional = true}
+ariadne = {version="0.5.0", default-features = false, optional = true }
 
 [features]
 default = []
 ariadne = ["dep:ariadne"]
 arbitrary = ["dep:arbitrary"]
-serde = ["dep:serde"]

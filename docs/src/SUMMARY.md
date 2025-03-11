@@ -34,9 +34,11 @@
 
 # Project governance
 
-- [Fuzz testing guide](fuzzing.md)
+- [Fuzz testing guide](governance/fuzzing.md)
 
-- [License information](license.md)
+- [Dependencies policy](governance/dependencies.md)
+
+- [License information](governance/license.md)
 
 # Texcraft Rust reference
 

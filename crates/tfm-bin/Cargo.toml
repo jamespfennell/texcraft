@@ -4,8 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-clap = {version="4.4.8", features=["derive", "wrap_help"]}
-tfm = { version = "0.1", path = "../tfm", features = ["ariadne"]}
+# Texcraft
+tfm = { path = "../tfm", features = ["ariadne"] }
+
+# Third-party
+clap = { version="4.4.8", features=["derive", "wrap_help"] }
 ariadne = {version="0.5.0"}
 
 [dev-dependencies]

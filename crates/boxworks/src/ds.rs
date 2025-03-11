@@ -297,7 +297,7 @@ pub struct Ligature {
     /// in order to perform hyphenation.
     /// For the moment this is a string, but we probably should avoid allocating
     /// per-ligature-node as they may be common.
-    /// Maybe we can use an Rc<str>, where all the rcs are in a pool in the font.
+    /// Maybe we can use an `Rc<str>`, where all the rcs are in a pool in the font.
     pub original_chars: String,
 }
 

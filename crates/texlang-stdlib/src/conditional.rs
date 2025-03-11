@@ -533,7 +533,8 @@ mod tests {
     use texlang::vm::implement_has_component;
     use texlang_testing::*;
 
-    #[derive(Default, serde::Serialize, serde::Deserialize)]
+    #[derive(Default)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     struct State {
         conditional: Component,
         testing: TestingComponent,

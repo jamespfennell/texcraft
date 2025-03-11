@@ -116,7 +116,8 @@ mod tests {
     use crate::the;
     use texlang_testing::*;
 
-    #[derive(Default, serde::Serialize, serde::Deserialize)]
+    #[derive(Default)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     struct State {
         catcode: Component<CatCode>,
         math_code: Component<types::MathCode>,

@@ -9,15 +9,18 @@ repository = "https://github.com/jamespfennell/texcraft"
 keywords = ["tex", "texcraft"]
 
 [dependencies]
-core = { path = "../core", version="0.1.0" }
-texlang = { path = "../texlang", version="0.1.0" }
-texlang-common = { path = "../texlang-common", version="0.1.0" }
-texlang-stdlib = { path = "../texlang-stdlib", version = "0.1.0" }
+# Texcraft
+core = { path = "../core" }
+texlang = { path = "../texlang" }
+texlang-common = { path = "../texlang-common" }
+texlang-stdlib = { path = "../texlang-stdlib", default-features=false, features=[] }
+
+# Third-party
 serde = {version="^1.0", optional = true}
 
 [dev-dependencies]
-texlang-testing = { path = "../texlang-testing", version = "0.1.0", default-features = false }
-texcraft-stdext = { path = "../texcraft-stdext", version = "0.1.0" }
+texlang-testing = { path = "../texlang-testing" }
+texcraft-stdext = { path = "../texcraft-stdext" }
 
 [features]
-serde = ["dep:serde"]
+serde = ["dep:serde", "texlang-testing/serde", "texlang-stdlib/serde" ]

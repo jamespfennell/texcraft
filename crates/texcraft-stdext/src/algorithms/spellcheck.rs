@@ -61,7 +61,6 @@
 //! We use a circular buffer of size `m+2` to do this.
 
 use crate::collections::circularbuffer::CircularBuffer;
-use colored::*;
 use std::ops::Index;
 
 /// Find words in the provided dictionary that are close to the search word.
@@ -187,15 +186,6 @@ impl DiffOp {
             DiffOp::Modify(_, c) => Some(*c),
         }
     }
-
-    fn colored(&self) -> colored::ColoredString {
-        match self {
-            DiffOp::Keep(c) => c.to_string().normal(),
-            DiffOp::Add(c) => c.to_string().on_green(), //.bold(),
-            DiffOp::Subtract(c) => c.to_string().on_red(),
-            DiffOp::Modify(_, c) => c.to_string().on_yellow(), //.bold(),
-        }
-    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -211,14 +201,6 @@ impl WordDiff {
 
     pub fn right(&self) -> String {
         self.ops.iter().filter_map(DiffOp::right).collect()
-    }
-
-    pub fn colored(&self) -> String {
-        let mut s = String::default();
-        for diff in self.ops.iter() {
-            s = format!["{}{}", s, diff.colored()];
-        }
-        s
     }
 }
 
