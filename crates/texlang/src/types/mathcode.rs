@@ -1,3 +1,4 @@
+use crate::prelude as txl;
 use crate::{parse, traits::*};
 
 /// A math code.
@@ -19,9 +20,7 @@ impl MathCode {
 }
 
 impl Parsable for MathCode {
-    fn parse_impl<S: TexlangState>(
-        input: &mut crate::vm::ExpandedStream<S>,
-    ) -> Result<Self, Box<crate::error::Error>> {
+    fn parse_impl<S: TexlangState>(input: &mut crate::vm::ExpandedStream<S>) -> txl::Result<Self> {
         let raw = parse::Uint::<{ MathCode::MAX + 1 }>::parse(input)?;
         Ok(MathCode(raw.0.try_into().unwrap()))
     }

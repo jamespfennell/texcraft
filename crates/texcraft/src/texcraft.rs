@@ -72,7 +72,7 @@ fn main() {
     }
 }
 
-fn run(vm: &mut vm::VM<State>, mut path: PathBuf) -> Result<(), Box<error::TracedError>> {
+fn run(vm: &mut vm::VM<State>, mut path: PathBuf) -> Result<(), Box<error::TracedTexError>> {
     if path.extension().is_none() {
         path.set_extension("tex");
     }
@@ -283,7 +283,7 @@ impl TexlangState for State {
 
     fn recoverable_error_hook(
         &self,
-        recoverable_error: texlang::error::TracedError,
+        recoverable_error: texlang::error::TracedTexError,
     ) -> Result<(), Box<dyn error::TexError>> {
         errormode::recoverable_error_hook(self, recoverable_error)
     }

@@ -4,8 +4,8 @@ mod catcode;
 mod mathcode;
 use crate::command;
 use crate::parse;
+use crate::prelude as txl;
 use crate::traits::*;
-
 pub use catcode::CatCode;
 pub use mathcode::MathCode;
 
@@ -20,13 +20,11 @@ impl Font {
 }
 
 impl Parsable for Font {
-    fn parse_impl<S: TexlangState>(
-        input: &mut crate::vm::ExpandedStream<S>,
-    ) -> Result<Self, Box<crate::error::Error>> {
+    fn parse_impl<S: TexlangState>(input: &mut crate::vm::ExpandedStream<S>) -> txl::Result<Self> {
         match Option::<Font>::parse(input)? {
             None => {
                 let token_or = input.peek()?;
-                input.vm().error(
+                input.error(
                     parse::Error::new(
                     "a font reference",
                     token_or,
@@ -41,10 +39,8 @@ impl Parsable for Font {
 }
 
 impl Parsable for Option<Font> {
-    fn parse_impl<S: TexlangState>(
-        input: &mut crate::vm::ExpandedStream<S>,
-    ) -> Result<Self, Box<crate::error::Error>> {
-        let Some(token) = input.next_or()? else {
+    fn parse_impl<S: TexlangState>(input: &mut crate::vm::ExpandedStream<S>) -> txl::Result<Self> {
+        let Some(token) = input.next()? else {
             return Ok(None);
         };
         let crate::token::Value::CommandRef(command_ref) = token.value() else {

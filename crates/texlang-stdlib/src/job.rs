@@ -95,7 +95,7 @@ fn dump_primitive_fn<
     output_file.set_extension(match component.dump_format {
         1 => "fmt.json",
         2 => "fmt.bincode",
-        _ => "fmt",
+        _ => "fmt.mp",
     });
 
     // TODO: error handle all these serialization errors.
@@ -104,7 +104,7 @@ fn dump_primitive_fn<
         1 => serde_json::to_vec_pretty(input.vm()).unwrap(),
         2 => bincode::serde::encode_to_vec(input.vm(), bincode::config::standard()).unwrap(),
         i => {
-            return Err(input.vm().fatal_error(
+            return Err(input.fatal_error(
                 error::SimpleFailedPreconditionError::new(format![
                     r"\dumpFormat has invalid value {i}",
                 ])

@@ -183,7 +183,7 @@ mod tests {
         }
         fn recoverable_error_hook(
             &self,
-            recoverable_error: error::TracedError,
+            recoverable_error: error::TracedTexError,
         ) -> Result<(), Box<dyn error::TexError>> {
             TestingComponent::recoverable_error_hook(self, recoverable_error)
         }

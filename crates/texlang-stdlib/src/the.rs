@@ -24,7 +24,7 @@ fn the_primitive_fn<S: TheCompatible>(
     the_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
 ) -> txl::Result<()> {
-    let token = input.next(EndOfInputError {})?;
+    let token = input.next_or_err(EndOfInputError {})?;
     // TeX.2021.465
     match &token.value() {
         token::Value::CommandRef(command_ref) => {

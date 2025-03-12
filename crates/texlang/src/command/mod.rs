@@ -42,7 +42,6 @@ use std::sync;
 
 pub(crate) mod map;
 
-pub use crate::error::Error;
 pub use map::Map;
 
 /// The Rust type of expansion primitive functions.

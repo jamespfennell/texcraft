@@ -66,7 +66,7 @@ impl<S: TexlangState> TexlangState for WrappedState<S> {
     }
     fn recoverable_error_hook(
         &self,
-        recoverable_error: crate::error::TracedError,
+        recoverable_error: crate::error::TracedTexError,
     ) -> Result<(), Box<dyn crate::error::TexError>> {
         let mut num_errors = self.num_errors.borrow_mut();
         *num_errors = *num_errors + 1;

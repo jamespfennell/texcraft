@@ -144,7 +144,9 @@ fn false_case<S: HasComponent<Component>>(
 ) -> txl::Result<()> {
     let mut depth = 0;
     loop {
-        let token = input.unexpanded().next(FalseBranchEndOfInputError {})?;
+        let token = input
+            .unexpanded()
+            .next_or_err(FalseBranchEndOfInputError {})?;
         if let token::Value::CommandRef(command_ref) = &token.value() {
             let tag = input.commands_map().get_tag(command_ref);
             if tag == Some(input.state().component().tags.else_tag) && depth == 0 {
@@ -300,7 +302,7 @@ fn if_case_primitive_fn<S: HasComponent<Component>>(
     let mut cases_left_to_skip = total_cases_to_skip;
     let mut depth = 0;
     loop {
-        let token = input.unexpanded().next(IfCaseEndOfInputError {
+        let token = input.unexpanded().next_or_err(IfCaseEndOfInputError {
             total_cases_to_skip,
             cases_left_to_skip,
         })?;
@@ -388,7 +390,7 @@ fn or_primitive_fn<S: HasComponent<Component>>(
         Some(branch) => matches!(branch.kind, BranchKind::Switch),
     };
     if !is_valid {
-        input.vm().error(error::SimpleTokenError::new(
+        input.error(error::SimpleTokenError::new(
             ifcase_token,
             "unexpected `or` command",
         ))?;
@@ -397,7 +399,7 @@ fn or_primitive_fn<S: HasComponent<Component>>(
 
     let mut depth = 0;
     loop {
-        let token = input.unexpanded().next(OrEndOfInputError {})?;
+        let token = input.unexpanded().next_or_err(OrEndOfInputError {})?;
         if let token::Value::CommandRef(command_ref) = &token.value() {
             let tag = input.commands_map().get_tag(command_ref);
             if tag == Some(input.state().component().tags.if_tag) {
@@ -448,7 +450,7 @@ fn else_primitive_fn<S: HasComponent<Component>>(
         Some(branch) => matches!(branch.kind, BranchKind::True | BranchKind::Switch),
     };
     if !is_valid {
-        input.vm().error(error::SimpleTokenError::new(
+        input.error(error::SimpleTokenError::new(
             else_token,
             "unexpected `else` command",
         ))?;
@@ -458,7 +460,7 @@ fn else_primitive_fn<S: HasComponent<Component>>(
     // Now consume all of the tokens until the next \fi
     let mut depth = 0;
     loop {
-        let token = input.unexpanded().next(ElseEndOfInputError {})?;
+        let token = input.unexpanded().next_or_err(ElseEndOfInputError {})?;
         if let token::Value::CommandRef(command_ref) = &token.value() {
             let tag = input.commands_map().get_tag(command_ref);
             if tag == Some(input.state().component().tags.if_tag) {
@@ -510,7 +512,7 @@ fn fi_primitive_fn<S: HasComponent<Component>>(
     // Or in the true branch: \iftrue\fi
     // Or in a switch statement.
     if branch.is_none() {
-        input.vm().error(error::SimpleTokenError::new(
+        input.error(error::SimpleTokenError::new(
             token,
             "unexpected `fi` command",
         ))?;
@@ -543,7 +545,7 @@ mod tests {
     impl TexlangState for State {
         fn recoverable_error_hook(
             &self,
-            error: error::TracedError,
+            error: error::TracedTexError,
         ) -> Result<(), Box<dyn error::TexError>> {
             TestingComponent::recoverable_error_hook(self, error)
         }

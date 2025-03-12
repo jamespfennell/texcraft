@@ -23,7 +23,7 @@ impl Parsable for FileLocation {
         let mut area_delimiter = None;
         let mut ext_delimiter = None;
         loop {
-            let t = match input.next_or()? {
+            let t = match input.next()? {
                 None => break,
                 Some(t) => t,
             };

@@ -221,7 +221,7 @@ fn process_prefixes<S: HasComponent<Component>>(
     input: &mut vm::ExecutionInput<S>,
 ) -> txl::Result<()> {
     complete_prefix(&mut prefix, input)?;
-    let t = input.next(PrefixEndOfInputError {})?;
+    let t = input.next_or_err(PrefixEndOfInputError {})?;
     input.back(t);
     match t.value() {
         token::Value::CommandRef(command_ref) => {
@@ -266,7 +266,7 @@ fn process_prefixes<S: HasComponent<Component>>(
             }
             // If we make it to here, this is not a valid target for the prefix command.
             let (prefix_token, kind) = prefix.get_one();
-            Err(input.vm().fatal_error(Error {
+            Err(input.fatal_error(Error {
                 kind,
                 got: t,
                 prefix: prefix_token,
@@ -275,7 +275,7 @@ fn process_prefixes<S: HasComponent<Component>>(
         }
         _ => {
             let (prefix_token, kind) = prefix.get_one();
-            Err(input.vm().fatal_error(Error {
+            Err(input.fatal_error(Error {
                 kind,
                 got: t,
                 prefix: prefix_token,
@@ -305,7 +305,7 @@ fn complete_prefix<S: HasComponent<Component>>(
     input: &mut vm::ExecutionInput<S>,
 ) -> txl::Result<()> {
     // BUG: spaces and \relax are allowed after prefixes per TeX source sections 1211 and 404.
-    let found_prefix = match input.next_or()? {
+    let found_prefix = match input.next()? {
         None => false,
         Some(t) => match t.value() {
             token::Value::CommandRef(command_ref) => {
@@ -342,14 +342,14 @@ fn assert_only_global_prefix<S: TexlangState>(
     prefix: Prefix,
 ) -> txl::Result<()> {
     if let Some(outer_token) = prefix.outer {
-        Err(input.vm().fatal_error(Error {
+        Err(input.fatal_error(Error {
             kind: Kind::Outer,
             got: token,
             prefix: outer_token,
             prefix_kind: Kind::Outer,
         }))
     } else if let Some(long_token) = prefix.long {
-        Err(input.vm().fatal_error(Error {
+        Err(input.fatal_error(Error {
             kind: Kind::Long,
             got: token,
             prefix: long_token,
@@ -446,9 +446,10 @@ pub fn get_assert_global_is_false<S: HasComponent<Component>>() -> command::Buil
         input: &mut vm::ExecutionInput<S>,
     ) -> txl::Result<()> {
         match input.state_mut().component_mut().read_and_reset_global() {
-            groupingmap::Scope::Global => Err(input.vm().fatal_error(
-                error::SimpleTokenError::new(token, "assertion failed: global is true"),
-            )),
+            groupingmap::Scope::Global => Err(input.fatal_error(error::SimpleTokenError::new(
+                token,
+                "assertion failed: global is true",
+            ))),
             groupingmap::Scope::Local => Ok(()),
         }
     }

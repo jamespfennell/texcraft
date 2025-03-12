@@ -38,19 +38,19 @@ pub trait TokenStream {
     ///
     /// This method is almost the same
     /// as the `next` method in Rust's iterator trait, except a stream can return an error.
-    fn next<E: error::EndOfInputError>(&mut self, err: E) -> txl::Result<Token> {
-        match self.next_or() {
-            Ok(None) => Err(self.vm().fatal_error(error::EofError::new(err))),
+    fn next_or_err<E: error::EndOfInputError>(&mut self, err: E) -> txl::Result<Token> {
+        match self.next() {
+            Ok(None) => Err(self.fatal_error(error::EofError::new(err))),
             Ok(Some(token)) => Ok(token),
             Err(err) => Err(err),
         }
     }
 
     /// Gets the next token in the stream or `Ok(None)` if the stream is exhausted.
-    fn next_or(&mut self) -> txl::Result<Option<Token>>;
+    fn next(&mut self) -> txl::Result<Option<Token>>;
 
     fn peek(&mut self) -> txl::Result<Option<Token>> {
-        let token_or = self.next_or()?;
+        let token_or = self.next()?;
         if let Some(token) = token_or {
             self.back(token);
         }
@@ -62,6 +62,30 @@ pub trait TokenStream {
 
     /// Returns a reference to the VM.
     fn vm(&self) -> &vm::VM<Self::S>;
+
+    /// Informs the VM that a fatal error has occurred.
+    ///
+    /// This fatal error causes the VM to shutdown.
+    ///
+    /// The returned shutdown signal must be propagated
+    ///     by returning `Err(shutdown_signal)` to the calling code.
+    /// If the shutdown signal is ignored, the VM will eventually panic.
+    /// See [`super::ShutdownSignal`] for more information.
+    #[must_use]
+    fn fatal_error<E: error::TexError>(&mut self, err: E) -> super::ShutdownSignal;
+
+    /// Informs the VM that a recoverable error has occurred.
+    ///
+    /// The VM responds either with `Ok(())`,
+    ///     indicating that the error should be recovered from,
+    /// or `Err(ShutdownSignal{})`,
+    ///     indicating that the error is fatal and the VM is shutting down.
+    ///
+    /// In the error case,
+    ///     the returned shutdown signal must be propagated using Rust's `?` operator.
+    /// If the shutdown signal is ignored, the VM will eventually panic.
+    /// See [`super::ShutdownSignal`] for more information.
+    fn error<E: error::TexError>(&mut self, err: E) -> txl::Result<()>;
 
     /// Returns a reference to the commands map.
     #[inline]
@@ -134,7 +158,7 @@ impl<S: TexlangState> TokenStream for ExpandedStream<S> {
     type S = S;
 
     #[inline]
-    fn next_or(&mut self) -> txl::Result<Option<Token>> {
+    fn next(&mut self) -> txl::Result<Option<Token>> {
         stream::next_expanded(&mut self.unexpanded().0)
     }
 
@@ -146,6 +170,12 @@ impl<S: TexlangState> TokenStream for ExpandedStream<S> {
     #[inline]
     fn back(&mut self, token: Token) {
         self.0.back(token)
+    }
+    fn fatal_error<E: error::TexError>(&mut self, err: E) -> super::ShutdownSignal {
+        self.0 .0.fatal_error(err)
+    }
+    fn error<E: error::TexError>(&mut self, err: E) -> txl::Result<()> {
+        self.0 .0.error(err)
     }
 }
 
@@ -163,7 +193,7 @@ impl<S: TexlangState> TokenStream for UnexpandedStream<S> {
     type S = S;
 
     #[inline]
-    fn next_or(&mut self) -> txl::Result<Option<Token>> {
+    fn next(&mut self) -> txl::Result<Option<Token>> {
         stream::next_unexpanded(&mut self.0)
     }
 
@@ -175,6 +205,12 @@ impl<S: TexlangState> TokenStream for UnexpandedStream<S> {
     #[inline]
     fn back(&mut self, token: Token) {
         self.0.internal.expansions_mut().push(token)
+    }
+    fn fatal_error<E: error::TexError>(&mut self, err: E) -> super::ShutdownSignal {
+        self.0.fatal_error(err)
+    }
+    fn error<E: error::TexError>(&mut self, err: E) -> txl::Result<()> {
+        self.0.error(err)
     }
 }
 
@@ -212,8 +248,8 @@ impl<S> std::convert::AsMut<ExpandedStream<S>> for ExpansionInput<S> {
 impl<S: TexlangState> TokenStream for ExpansionInput<S> {
     type S = S;
 
-    fn next_or(&mut self) -> txl::Result<Option<Token>> {
-        self.0.next_or()
+    fn next(&mut self) -> txl::Result<Option<Token>> {
+        self.0.next()
     }
 
     fn vm(&self) -> &vm::VM<Self::S> {
@@ -222,6 +258,12 @@ impl<S: TexlangState> TokenStream for ExpansionInput<S> {
 
     fn back(&mut self, token: Token) {
         self.0.back(token);
+    }
+    fn fatal_error<E: error::TexError>(&mut self, err: E) -> super::ShutdownSignal {
+        self.0 .0 .0.fatal_error(err)
+    }
+    fn error<E: error::TexError>(&mut self, err: E) -> txl::Result<()> {
+        self.0 .0 .0.error(err)
     }
 }
 
@@ -377,8 +419,8 @@ impl<S> std::convert::AsMut<ExpandedStream<S>> for ExecutionInput<S> {
 impl<S: TexlangState> TokenStream for ExecutionInput<S> {
     type S = S;
 
-    fn next_or(&mut self) -> txl::Result<Option<Token>> {
-        self.0.next_or()
+    fn next(&mut self) -> txl::Result<Option<Token>> {
+        self.0.next()
     }
 
     fn vm(&self) -> &vm::VM<Self::S> {
@@ -388,12 +430,18 @@ impl<S: TexlangState> TokenStream for ExecutionInput<S> {
     fn back(&mut self, token: Token) {
         self.0.back(token);
     }
+    fn fatal_error<E: error::TexError>(&mut self, err: E) -> super::ShutdownSignal {
+        self.0 .0 .0.fatal_error(err)
+    }
+    fn error<E: error::TexError>(&mut self, err: E) -> txl::Result<()> {
+        self.0 .0 .0.error(err)
+    }
 }
 
 impl<S: TexlangState> ExecutionInput<S> {
-    #[inline]
-    pub(crate) fn next_or(&mut self) -> txl::Result<Option<Token>> {
-        self.0.next_or()
+    /// Shutdown the VM.
+    pub fn shutdown(&mut self) -> super::ShutdownSignal {
+        self.0 .0 .0.shutdown()
     }
 }
 
@@ -467,7 +515,7 @@ impl<S> ExecutionInput<S> {
 }
 
 impl<S: TexlangState> ExecutionInput<S> {
-    pub fn end_group(&mut self, token: Token) -> Result<(), Box<error::Error>> {
+    pub fn end_group(&mut self, token: Token) -> txl::Result<()> {
         self.0 .0 .0.end_group(token)
     }
 }
@@ -518,7 +566,7 @@ mod stream {
         vm: &mut vm::VM<S>,
         c: char,
         trace_key: trace::Key,
-    ) -> Box<error::Error> {
+    ) -> vm::ShutdownSignal {
         vm.fatal_error(lexer::InvalidCharacterError::new(vm, c, trace_key))
     }
 

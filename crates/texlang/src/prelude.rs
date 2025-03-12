@@ -5,4 +5,4 @@
 //! aliases at the crate level.
 
 /// Result type in Texlang.
-pub type Result<T> = std::result::Result<T, Box<crate::error::Error>>;
+pub type Result<T> = std::result::Result<T, crate::vm::ShutdownSignal>;

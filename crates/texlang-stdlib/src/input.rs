@@ -20,12 +20,17 @@ pub fn get_input<S: TexlangState + common::HasFileSystem>() -> command::BuiltIn<
 fn input_fn<S: TexlangState + common::HasFileSystem>(
     input_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<(), Box<command::Error>> {
+) -> txl::Result<()> {
     let file_location = FileLocation::parse(input)?;
     let (file_path, source_code) =
-        texlang_common::read_file_to_string(input.vm(), file_location, "tex")?;
+        match texlang_common::read_file_to_string(input.vm(), file_location, "tex") {
+            Ok(ok) => ok,
+            Err(err) => {
+                return Err(input.fatal_error(err));
+            }
+        };
     if input.vm().num_current_sources() > 100 {
-        return Err(input.vm().fatal_error(TooManyInputs {}));
+        return Err(input.fatal_error(TooManyInputs {}));
     }
     input.push_source(input_token, file_path, source_code)?;
     Ok(())
@@ -52,7 +57,7 @@ pub fn get_endinput<S: TexlangState>() -> command::BuiltIn<S> {
 fn endinput_fn<S: TexlangState>(
     _: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<(), Box<command::Error>> {
+) -> txl::Result<()> {
     input.end_current_file();
     Ok(())
 }
@@ -103,7 +108,7 @@ pub fn get_openin<const N: usize, S: HasComponent<Component<N>> + common::HasFil
 fn openin_fn<const N: usize, S: HasComponent<Component<N>> + common::HasFileSystem>(
     openin_token: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> Result<(), Box<command::Error>> {
+) -> txl::Result<()> {
     let (u, _, file_location) = <(parse::Uint<N>, OptionalEquals, FileLocation)>::parse(input)?;
     let lexer_or = match texlang_common::read_file_to_string(input.vm(), file_location, "tex") {
         // If the file fails to open TeX does not error out.
@@ -143,7 +148,7 @@ pub fn get_closein<const N: usize, S: HasComponent<Component<N>>>() -> command::
 fn closein_fn<const N: usize, S: HasComponent<Component<N>>>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> Result<(), Box<command::Error>> {
+) -> txl::Result<()> {
     let u = parse::Uint::<N>::parse(input)?;
     *input
         .state_mut()
@@ -163,7 +168,7 @@ pub fn get_read<const N: usize, S: HasComponent<Component<N>> + common::HasTermi
 fn read_fn<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn>(
     _: token::Token,
     input: &mut vm::ExecutionInput<S>,
-) -> Result<(), Box<command::Error>> {
+) -> txl::Result<()> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
     let (index, _, cmd_ref_or) = <(i32, To, Option<token::CommandRef>)>::parse(input)?;
 
@@ -222,7 +227,7 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn
                 tokens.push(token);
             }
             (lexer::Result::InvalidCharacter(c, trace_key), _) => {
-                return Err(input.vm().fatal_error(lexer::InvalidCharacterError::new(
+                return Err(input.fatal_error(lexer::InvalidCharacterError::new(
                     input.vm(),
                     c,
                     trace_key,
@@ -235,9 +240,7 @@ fn read_fn<const N: usize, S: HasComponent<Component<N>> + common::HasTerminalIn
             }
             (lexer::Result::EndOfInput, Mode::File) => {
                 if let Some(unmatched_brace) = braces.pop() {
-                    return Err(input
-                        .vm()
-                        .fatal_error(UnmatchedBracesError { unmatched_brace }));
+                    return Err(input.fatal_error(UnmatchedBracesError { unmatched_brace }));
                 }
                 more_lines_exist = false;
                 break;
@@ -293,7 +296,7 @@ fn read_from_terminal<S: TexlangState>(
         .borrow_mut()
         .read_line(prompt.as_deref(), &mut buffer)
     {
-        return Err(input.vm().fatal_error(IoError {
+        return Err(input.fatal_error(IoError {
             title: "failed to read from the terminal".into(),
             underlying_error: err,
         }));

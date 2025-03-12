@@ -134,13 +134,13 @@ fn parse_prefix_and_parameters<S: TexlangState>(
     let mut replacement_end_token = None;
     let mut skip_replacement_scan = false;
     loop {
-        let token = input.next(ParameterPartEndOfInputError {})?;
+        let token = input.next_or_err(ParameterPartEndOfInputError {})?;
         match token.value() {
             token::Value::BeginGroup(_) => {
                 break;
             }
             token::Value::EndGroup(_) => {
-                input.vm().error(error::SimpleTokenError::new(
+                input.error(error::SimpleTokenError::new(
                     token,
                     "unexpected end group token while parsing the parameter of a macro definition",
                 ))?;
@@ -149,7 +149,7 @@ fn parse_prefix_and_parameters<S: TexlangState>(
             }
             token::Value::Parameter(_) => {
                 // TeX.2021.476
-                let parameter_token = input.next(ParameterPartEndOfInputError {})?;
+                let parameter_token = input.next_or_err(ParameterPartEndOfInputError {})?;
                 // "parsing a parameter")?;
                 match parameter_token.value() {
                     token::Value::BeginGroup(_) => {
@@ -167,7 +167,7 @@ fn parse_prefix_and_parameters<S: TexlangState>(
                     }
                     _ => {
                         if raw_parameters.len() == 9 {
-                            input.vm().error(error::SimpleTokenError::new(
+                            input.error(error::SimpleTokenError::new(
                                 token,
                                 "Too many parameters; you already have 9",
                             ))?;
@@ -187,7 +187,7 @@ fn parse_prefix_and_parameters<S: TexlangState>(
                             }
                         };
                         if !parameter_index_correct {
-                            input.vm().error(InvalidParameterNumberError {
+                            input.error(InvalidParameterNumberError {
                                 parameter_number_token: parameter_token,
                                 parameters_so_far: raw_parameters.len(),
                             })?;
@@ -254,7 +254,7 @@ fn parse_replacement_text<S: TexlangState>(
     };
 
     loop {
-        let token = input.next(ReplacementPartEndOfInputError {})?;
+        let token = input.next_or_err(ReplacementPartEndOfInputError {})?;
         // "parsing the replacement text of a macro")?;
         match token.value() {
             token::Value::BeginGroup(_) => {
@@ -270,7 +270,7 @@ fn parse_replacement_text<S: TexlangState>(
                 scope_depth -= 1;
             }
             token::Value::Parameter(_) => {
-                let parameter_token = input.next(ReplacementPartEndOfInputError {})?;
+                let parameter_token = input.next_or_err(ReplacementPartEndOfInputError {})?;
                 let c = match parameter_token.value() {
                     token::Value::Parameter(_) => {
                         // ## case
@@ -288,7 +288,7 @@ fn parse_replacement_text<S: TexlangState>(
                 match valid_index_or {
                     None => {
                         // TeX.2021.479
-                        input.vm().error(error::SimpleTokenError::new(
+                        input.error(error::SimpleTokenError::new(
                             parameter_token,
                             "illegal parameter number",
                         ))?;
@@ -361,7 +361,7 @@ mod test {
         }
         fn recoverable_error_hook(
             &self,
-            recoverable_error: error::TracedError,
+            recoverable_error: error::TracedTexError,
         ) -> Result<(), Box<dyn error::TexError>> {
             texlang_testing::TestingComponent::recoverable_error_hook(self, recoverable_error)
         }

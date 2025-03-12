@@ -13,7 +13,7 @@ impl Parsable for Glue {
             None => 1,
             Some(_) => -1,
         };
-        let first_token = input.next(GlueEndOfInputError {})?;
+        let first_token = input.next_or_err(GlueEndOfInputError {})?;
         let width = match first_token.value() {
             Value::CommandRef(command_ref) => {
                 use super::integer::InternalNumber;

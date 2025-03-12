@@ -72,6 +72,8 @@ impl<S> IndexResolver<S> {
     ) -> txl::Result<Index> {
         match self {
             IndexResolver::Static(addr) => Ok(*addr),
+            // TODO: we should add support for propagation information here.
+            // We need to add to the execution stack
             IndexResolver::Dynamic(f) => f(token, input),
         }
     }
@@ -192,17 +194,7 @@ impl<S: TexlangState> Command<S> {
         };
         let index = match &self.index_resolver {
             None => Index(0),
-            Some(index_resolver) => match index_resolver.resolve(token, input) {
-                Ok(index) => index,
-                Err(err) => {
-                    return Err(error::Error::new_propagated(
-                        input.vm(),
-                        error::OperationKind::VariableIndex,
-                        token,
-                        err,
-                    ))
-                }
-            },
+            Some(index_resolver) => index_resolver.resolve(token, input)?,
         };
         Ok(Some(TypedVariable(ref_fn, ref_mut_fn, index)))
     }

@@ -29,7 +29,7 @@ fn let_primitive_fn<S: HasComponent<prefix::Component>>(
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
     let cmd_ref_or = Option::<token::CommandRef>::parse(input)?;
     OptionalEqualsUnexpanded::parse(input)?;
-    let token = input.unexpanded().next(LetEndOfInputError {})?;
+    let token = input.unexpanded().next_or_err(LetEndOfInputError {})?;
     if let Some(cmd_ref) = cmd_ref_or {
         match token.value() {
             token::Value::CommandRef(command_ref) => {
@@ -84,7 +84,7 @@ mod test {
         }
         fn recoverable_error_hook(
             &self,
-            recoverable_error: error::TracedError,
+            recoverable_error: error::TracedTexError,
         ) -> Result<(), Box<dyn error::TexError>> {
             TestingComponent::recoverable_error_hook(self, recoverable_error)
         }

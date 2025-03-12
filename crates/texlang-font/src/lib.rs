@@ -4,9 +4,9 @@
 //! font variable management for Texlang.
 
 use core::FontFormat;
-use texlang as txl;
 use texlang::command;
 use texlang::error;
+use texlang::prelude as txl;
 use texlang::token;
 use texlang::traits::*;
 use texlang::types;
@@ -49,7 +49,7 @@ impl FontComponent {
         _ = state;
         tag == FONT_TAG.get()
     }
-    pub fn initialize<S: HasComponent<FontComponent>>(vm: &mut txl::vm::VM<S>) {
+    pub fn initialize<S: HasComponent<FontComponent>>(vm: &mut vm::VM<S>) {
         let cs_name = vm.cs_name_interner_mut().get_or_intern("nullfont");
         vm.state.component_mut().font_infos.push(FontInfo {
             command_ref: token::CommandRef::ControlSequence(cs_name),
@@ -114,10 +114,7 @@ impl<T: core::FontFormat> FontRepo for NoOpFontRepo<T> {
 }
 
 /// TeX.2014.1257
-fn font_primitive_fn<S>(
-    _: token::Token,
-    input: &mut vm::ExecutionInput<S>,
-) -> Result<(), Box<error::Error>>
+fn font_primitive_fn<S>(_: token::Token, input: &mut vm::ExecutionInput<S>) -> txl::Result<()>
 where
     S: TexlangState + texlang_common::HasFileSystem + HasComponent<FontComponent> + HasFontRepo,
 {
@@ -128,13 +125,15 @@ where
         texlang::parse::OptionalEquals,
         texlang::parse::FileLocation,
     )>::parse(input)?;
-    let Some((path, tfm_bytes)) = texlang_common::read_file_to_bytes(
+    let (path, tfm_bytes) = match texlang_common::read_file_to_bytes(
         input.vm(),
         file_location,
         FontFormat::<S>::DEFAULT_FILE_EXTENSION,
-    )?
-    else {
-        return Ok(());
+    ) {
+        Ok(ok) => ok,
+        Err(err) => {
+            return input.error(err);
+        }
     };
 
     let font = match FontFormat::<S>::parse(&tfm_bytes) {
@@ -143,8 +142,7 @@ where
             let err = FontError {
                 inner: Box::new(err),
             };
-            input.vm().error(err)?;
-            return Ok(());
+            return input.error(err);
         }
     };
 
@@ -178,9 +176,9 @@ struct FontError {
     inner: Box<dyn std::error::Error>,
 }
 
-impl txl::error::TexError for FontError {
+impl error::TexError for FontError {
     fn kind(&self) -> error::Kind {
-        txl::error::Kind::FailedPrecondition
+        error::Kind::FailedPrecondition
     }
 
     fn title(&self) -> String {
@@ -200,7 +198,7 @@ where
 fn fontname_primitive_fn<S>(
     token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-) -> Result<(), Box<error::Error>>
+) -> txl::Result<()>
 where
     S: HasComponent<FontComponent>,
 {
@@ -316,7 +314,7 @@ mod tests {
         }
         fn recoverable_error_hook(
             &self,
-            recoverable_error: error::TracedError,
+            recoverable_error: error::TracedTexError,
         ) -> Result<(), Box<dyn error::TexError>> {
             texlang_testing::TestingComponent::recoverable_error_hook(self, recoverable_error)
         }

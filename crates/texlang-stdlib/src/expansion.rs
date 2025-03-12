@@ -41,7 +41,9 @@ fn noexpand_hook_finish<S: TexlangState>(
     _token: token::Token,
     input: &mut vm::ExpansionInput<S>,
 ) -> txl::Result<Option<token::Token>> {
-    Ok(Some(input.unexpanded().next(NoExpandEndOfInputError {})?))
+    Ok(Some(
+        input.unexpanded().next_or_err(NoExpandEndOfInputError {})?,
+    ))
 }
 
 #[derive(Debug)]
@@ -112,8 +114,12 @@ fn expandafter_simple_fn<S: TexlangState>(
     _expandafter_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
 ) -> txl::Result<()> {
-    let first = input.unexpanded().next(EndOfInputError { first: true })?;
-    let second = input.unexpanded().next(EndOfInputError { first: false })?;
+    let first = input
+        .unexpanded()
+        .next_or_err(EndOfInputError { first: true })?;
+    let second = input
+        .unexpanded()
+        .next_or_err(EndOfInputError { first: false })?;
     input.back(second);
     input.expanded().expand_once()?;
     input.back(first);
@@ -129,9 +135,13 @@ fn expandafter_optimized_fn<S: TexlangState>(
     // \xa <token 1> \xa <token 2> ... \xa <token N> <token N+1>
     // we expand <token N+1> once.
     loop {
-        let first = input.unexpanded().next(EndOfInputError { first: true })?;
+        let first = input
+            .unexpanded()
+            .next_or_err(EndOfInputError { first: true })?;
         buffer.push(first);
-        let second = input.unexpanded().next(EndOfInputError { first: false })?;
+        let second = input
+            .unexpanded()
+            .next_or_err(EndOfInputError { first: false })?;
         if second.value() != expandafter_token.value() {
             input.back(second);
             break;

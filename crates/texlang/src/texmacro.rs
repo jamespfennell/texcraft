@@ -1,8 +1,8 @@
 //! Implementation of TeX user defined macros.
 
-use crate::command;
 use crate::error;
 use crate::parse;
+use crate::prelude as txl;
 use crate::token;
 use crate::token::Token;
 use crate::token::Value;
@@ -63,7 +63,7 @@ impl Macro {
         &self,
         token: Token,
         input: &mut vm::ExpansionInput<S>,
-    ) -> Result<(), Box<command::Error>> {
+    ) -> txl::Result<()> {
         let prefix_matched = remove_tokens_from_stream(&self.prefix, input.unexpanded())?;
         if !prefix_matched {
             return Ok(());
@@ -165,7 +165,7 @@ impl Parameter {
         input: &mut vm::ExpansionInput<S>,
         index: usize,
         result: &mut Vec<Token>,
-    ) -> Result<bool, Box<command::Error>> {
+    ) -> txl::Result<bool> {
         match self {
             Parameter::Undelimited => {
                 Parameter::parse_undelimited_argument(input, index + 1, result)?;
@@ -185,7 +185,7 @@ impl Parameter {
         matcher_factory: &Matcher<Value>,
         param_num: usize,
         result: &mut Vec<Token>,
-    ) -> Result<bool, Box<command::Error>> {
+    ) -> txl::Result<bool> {
         let mut matcher = matcher_factory.start();
         let mut scope_depth = 0;
 
@@ -198,7 +198,7 @@ impl Parameter {
         };
         let start_index = result.len();
         loop {
-            let token = stream.next(DelimitedArgumentEndOfInputError { param_num })?;
+            let token = stream.next_or_err(DelimitedArgumentEndOfInputError { param_num })?;
             match token.value() {
                 token::Value::BeginGroup(_) => {
                     scope_depth += 1;
@@ -264,10 +264,10 @@ impl Parameter {
         input: &mut vm::ExpansionInput<S>,
         param_num: usize,
         result: &mut Vec<Token>,
-    ) -> Result<(), Box<command::Error>> {
+    ) -> txl::Result<()> {
         parse::SpacesUnexpanded::parse(input)?;
         let input = input.unexpanded();
-        let token = input.next(UnDelimitedArgumentEndOfInputError { param_num })?;
+        let token = input.next_or_err(UnDelimitedArgumentEndOfInputError { param_num })?;
         match token.value() {
             token::Value::BeginGroup(_) => token,
             _ => {
@@ -397,11 +397,11 @@ pub fn pretty_print_replacement_text(replacements: &[Replacement]) -> String {
 pub fn remove_tokens_from_stream<S: TexlangState>(
     tokens: &[Token],
     stream: &mut vm::UnexpandedStream<S>,
-) -> Result<bool, Box<command::Error>> {
+) -> txl::Result<bool> {
     for prefix_token in tokens.iter() {
-        let stream_token = stream.next(PrefixEndOfInputError {})?;
+        let stream_token = stream.next_or_err(PrefixEndOfInputError {})?;
         if stream_token.value() != prefix_token.value() {
-            stream.vm().error(error::SimpleTokenError::new(
+            stream.error(error::SimpleTokenError::new(
                 stream_token,
                 "unexpected token while matching the prefix for a user-defined macro",
             ))?;

@@ -83,7 +83,7 @@ pub trait Handlers<S: TexlangState> {
         math_character: types::MathCode,
     ) -> txl::Result<()> {
         _ = math_character;
-        Err(input.vm().fatal_error(error::SimpleTokenError::new(
+        Err(input.fatal_error(error::SimpleTokenError::new(
             token,
             "math characters can only appear in math mode",
         )))
@@ -96,9 +96,7 @@ pub trait Handlers<S: TexlangState> {
         input: &mut ExecutionInput<S>,
         token: token::Token,
     ) -> txl::Result<()> {
-        Err(input
-            .vm()
-            .fatal_error(error::UndefinedCommandError::new(input.vm(), token)))
+        Err(input.fatal_error(error::UndefinedCommandError::new(input.vm(), token)))
     }
 
     /// Handler to invoke for expansion commands that were not expanded.
@@ -114,6 +112,22 @@ pub trait Handlers<S: TexlangState> {
         _ = (token, input);
         Ok(())
     }
+
+    /// Handler to invoke when the input ends.
+    ///
+    /// In TeX the user is prompted to add additional input and if no
+    ///     input is provided a fatal error is thrown.
+    /// To end the VM without an error the user has to write `\end`
+    ///     or `\dump`.
+    ///
+    /// In this handler, if `Ok(())` is returned, the VM starts running again
+    ///     under the assumption that additional TeX source has been added to the VM.
+    /// Otherwise the shutdown signal causes the VM to stop.
+    ///
+    /// The default implementation shuts down the VM with no error.
+    fn end_of_input_handler(input: &mut ExecutionInput<S>) -> txl::Result<()> {
+        Err(input.shutdown())
+    }
 }
 
 #[derive(Default)]
@@ -126,17 +140,27 @@ impl<S: TexlangState> VM<S> {
     ///
     /// It is assumed that the VM has been preloaded with TeX source code using the
     /// [VM::push_source] method.
-    pub fn run<H: Handlers<S>>(&mut self) -> Result<(), Box<error::TracedError>> {
-        match self.run_impl::<H>() {
-            Ok(_) => Ok(()),
-            Err(err) => Err(Box::new(err.traced)),
+    pub fn run<H: Handlers<S>>(&mut self) -> Result<(), Box<error::TracedTexError>> {
+        self.run_impl::<H>();
+        match self.internal.shutdown_status.take() {
+            ShutdownStatus::None => unreachable!(),
+            ShutdownStatus::Normal => Ok(()),
+            ShutdownStatus::Error(traced_error) => Err(Box::new(traced_error)),
         }
     }
-    pub fn run_impl<H: Handlers<S>>(&mut self) -> txl::Result<()> {
+    fn run_impl<H: Handlers<S>>(&mut self) -> ShutdownSignal {
         let input = ExecutionInput::new(self);
 
-        while let Some(token) = input.next_or()? {
-            match token.value() {
+        loop {
+            let token = match input.next() {
+                Ok(None) => match H::end_of_input_handler(input) {
+                    Ok(_) => continue,
+                    Err(signal) => return signal,
+                },
+                Ok(Some(token)) => token,
+                Err(signal) => return signal,
+            };
+            let r = match token.value() {
                 Value::CommandRef(command_ref) => {
                     match input.commands_map().get_command(&command_ref) {
                         Some(Command::Execution(cmd, _)) => {
@@ -146,26 +170,27 @@ impl<S: TexlangState> VM<S> {
                                 .stack_push(token, error::OperationKind::Execution);
                             let err_or = cmd(token, input);
                             input.vm_mut().stack_pop();
-                            err_or?;
+                            err_or
                         }
                         Some(Command::Variable(cmd)) => {
                             let cmd = cmd.clone();
                             let scope = S::variable_assignment_scope_hook(input.state_mut());
-                            cmd.set_value_using_input(token, input, scope)?;
+                            cmd.set_value_using_input(token, input, scope)
                         }
                         Some(Command::CharacterTokenAlias(token_value)) => {
                             // TODO: should add tests for when this is begin group and end group.
                             input.back(Token::new_from_value(*token_value, token.trace_key()));
+                            Ok(())
                         }
                         Some(Command::Expansion(_, _)) | Some(Command::Macro(_)) => {
-                            H::unexpanded_expansion_command(input, token)?
+                            H::unexpanded_expansion_command(input, token)
                         }
                         Some(Command::Character(c)) => {
                             let token = Token::new_other(*c, token.trace_key()); // Remove
-                            H::character_handler(input, token, *c)?
+                            H::character_handler(input, token, *c)
                         }
                         Some(Command::MathCharacter(c)) => {
-                            H::math_character_handler(input, token, *c)?
+                            H::math_character_handler(input, token, *c)
                         }
                         Some(Command::Font(font)) => {
                             let font = *font;
@@ -194,16 +219,16 @@ impl<S: TexlangState> VM<S> {
                             }
                             internal.current_font = font;
                             input.state_mut().enable_font_hook(font);
+                            Ok(())
                         }
-                        None => H::undefined_command_handler(input, token)?,
+                        None => H::undefined_command_handler(input, token),
                     }
                 }
                 Value::BeginGroup(_) => {
                     input.begin_group();
+                    Ok(())
                 }
-                Value::EndGroup(_) => {
-                    input.end_group(token)?;
-                }
+                Value::EndGroup(_) => input.end_group(token),
                 Value::MathShift(c)
                 | Value::AlignmentTab(c)
                 | Value::Parameter(c)
@@ -211,26 +236,32 @@ impl<S: TexlangState> VM<S> {
                 | Value::Subscript(c)
                 | Value::Space(c)
                 | Value::Letter(c)
-                | Value::Other(c) => H::character_handler(input, token, c)?,
+                | Value::Other(c) => H::character_handler(input, token, c),
             };
+            if let Err(signal) = r {
+                return signal;
+            }
         }
-        Ok(())
     }
 
-    // TODO: expose via the input instead types
-    pub fn fatal_error<E: error::TexError>(&self, err: E) -> Box<error::Error> {
+    pub(crate) fn shutdown(&mut self) -> ShutdownSignal {
+        self.internal.shutdown_status.transition_to_normal();
+        ShutdownSignal {}
+    }
+    pub(crate) fn fatal_error<E: error::TexError>(&mut self, err: E) -> ShutdownSignal {
         let err: Box<dyn error::TexError> = Box::new(err);
-        let traced = error::TracedError::new(
+        let traced = error::TracedTexError::new(
             err,
             &self.internal.tracer,
             &self.internal.cs_name_interner,
             self.generate_stack_trace(),
         );
-        Box::new(error::Error::new(traced))
+        self.internal.shutdown_status.transition_to_error(traced);
+        ShutdownSignal {}
     }
-    pub fn error<E: error::TexError>(&self, err: E) -> Result<(), Box<error::Error>> {
+    pub(crate) fn error<E: error::TexError>(&mut self, err: E) -> txl::Result<()> {
         let err: Box<dyn error::TexError> = Box::new(err);
-        let traced = error::TracedError::new(
+        let traced = error::TracedTexError::new(
             err,
             &self.internal.tracer,
             &self.internal.cs_name_interner,
@@ -239,13 +270,14 @@ impl<S: TexlangState> VM<S> {
         match self.state.recoverable_error_hook(traced) {
             Ok(_) => Ok(()),
             Err(err) => {
-                let traced = error::TracedError::new(
+                let traced = error::TracedTexError::new(
                     err,
                     &self.internal.tracer,
                     &self.internal.cs_name_interner,
                     self.generate_stack_trace(),
                 );
-                Err(Box::new(error::Error::new(traced)))
+                self.internal.shutdown_status.transition_to_error(traced);
+                Err(ShutdownSignal {})
             }
         }
     }
@@ -368,7 +400,7 @@ pub trait TexlangState: Sized {
         token: token::Token,
         input: &mut ExpansionInput<Self>,
         tag: Option<command::Tag>,
-    ) -> Result<Option<Token>, Box<command::Error>> {
+    ) -> txl::Result<Option<Token>> {
         _ = (token, input, tag);
         Ok(None)
     }
@@ -398,7 +430,7 @@ pub trait TexlangState: Sized {
     /// Note that the returned error in this case is not the 100th error itself.
     fn recoverable_error_hook(
         &self,
-        error: error::TracedError,
+        error: error::TracedTexError,
     ) -> Result<(), Box<dyn error::TexError>> {
         _ = self;
         Err(error.error)
@@ -612,7 +644,7 @@ impl<S> VM<S> {
 }
 
 impl<S: TexlangState> VM<S> {
-    fn end_group(&mut self, token: token::Token) -> Result<(), Box<error::Error>> {
+    fn end_group(&mut self, token: token::Token) -> txl::Result<()> {
         // Restore commands
         match self.commands_map.end_group() {
             Ok(()) => (),
@@ -647,6 +679,7 @@ struct Internal<S> {
 
     tracer: trace::Tracer,
 
+    // Token buffers are thrown away in serialization - there's nothing we need to keep.
     #[cfg_attr(feature = "serde", serde(skip))]
     token_buffers: std::collections::BinaryHeap<TokenBuffer>,
 
@@ -659,6 +692,10 @@ struct Internal<S> {
     current_font: types::Font,
     fonts_save_stack: Vec<Option<types::Font>>,
     execution_stack: Vec<(error::OperationKind, Token)>,
+
+    // We assume the VM is never saved during shutdown.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    shutdown_status: ShutdownStatus,
 }
 
 impl<S> Internal<S> {
@@ -673,6 +710,7 @@ impl<S> Internal<S> {
             current_font: types::Font::NULL_FONT,
             fonts_save_stack: Default::default(),
             execution_stack: Default::default(),
+            shutdown_status: Default::default(),
         }
     }
 }
@@ -775,6 +813,94 @@ impl PartialOrd for TokenBuffer {
 impl Ord for TokenBuffer {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.0.capacity().cmp(&other.0.capacity())
+    }
+}
+
+/// A signal that the VM is shutting down.
+///
+/// A value of this type is returned in the error payload of
+///     the [`Result`](crate::prelude::Result) of Texlang commands and basically all other Texlang functions.
+/// The only thing to do with the signal is to propagate it up the
+///     Rust call stack using Rust's `?` operator.
+/// Eventually the signal will reach the main VM loop, and the VM will stop.
+///
+/// The stop signal should _not_ be ignored or otherwise "handled".
+/// For example, this code is incorrect:
+///
+/// ```
+/// # use texlang::token;
+/// # use texlang::vm;
+/// # use texlang::traits::*;
+/// # use texlang::prelude as txl;
+/// fn execution_primitive_fn<S: TexlangState>(
+///    token: token::Token,
+///    input: &mut vm::ExecutionInput<S>,
+///) -> txl::Result<()> {
+///     let i = match i32::parse(input) {
+///         Ok(i) => i,
+///         Err(_shutdown_signal) => {
+///             // This is incorrect - the shutdown signal must be propagated!
+///             0
+///         }
+///     };
+///     println!["Parsed integer {i}"];
+///     Ok(())
+/// }
+/// ```
+///
+/// In this case the VM will eventually panic when it realizes that the shutdown was ignored.
+/// The correct code is this:
+///
+/// ```
+/// # use texlang::token;
+/// # use texlang::vm;
+/// # use texlang::traits::*;
+/// # use texlang::prelude as txl;
+/// fn execution_primitive_fn<S: TexlangState>(
+///    token: token::Token,
+///    input: &mut vm::ExecutionInput<S>,
+///) -> txl::Result<()> {
+///     let i = i32::parse(input)?;
+///     println!["Parsed integer {i}"];
+///     Ok(())
+/// }
+/// ```
+/// ## Generating the shutdown signal
+///
+/// The signal can originate either with a fatal error,
+///     or from a TeX control
+///     sequence that wants to stop execution (e.g. the `\end` primitive).
+#[derive(Debug)]
+pub struct ShutdownSignal {}
+
+#[derive(Debug, Default)]
+enum ShutdownStatus {
+    /// The VM is not shutting down.
+    #[default]
+    None,
+    /// The VM is shuting down for an expected reason.
+    Normal,
+    /// The VM is shuting down because of a fatal error.
+    Error(error::TracedTexError),
+}
+
+impl ShutdownStatus {
+    fn transition_to_normal(&mut self) {
+        if !matches!(self, ShutdownStatus::None) {
+            panic!("shutdown signal ignored")
+        }
+        *self = ShutdownStatus::Normal;
+    }
+    fn transition_to_error(&mut self, err: error::TracedTexError) {
+        if !matches!(self, ShutdownStatus::None) {
+            panic!("shutdown signal ignored")
+        }
+        *self = ShutdownStatus::Error(err);
+    }
+    fn take(&mut self) -> ShutdownStatus {
+        let mut s = ShutdownStatus::None;
+        std::mem::swap(self, &mut s);
+        s
     }
 }
 

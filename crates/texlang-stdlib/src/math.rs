@@ -126,7 +126,7 @@ trait Op {
         let result = match Self::apply(lhs, rhs_i, rhs_n) {
             Ok(result) => result,
             Err(err) => {
-                return input.vm().error(err);
+                return input.error(err);
             }
         };
         variable.set(input, scope, result);
@@ -262,18 +262,18 @@ fn math_primitive_fn<S: TexlangState, O: Op>(
     input: &mut vm::ExecutionInput<S>,
 ) -> txl::Result<()> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
-    let token = input.next(ArithmeticVariableEndOfInput {})?;
+    let token = input.next_or_err(ArithmeticVariableEndOfInput {})?;
     match token.value() {
         token::Value::CommandRef(command_ref) => {
             match input.commands_map().get_command(&command_ref) {
-                None => input.vm().error(
+                None => input.error(
                     parse::Error::new("a variable", Some(token), "")
                         .with_got_override("got an undefined control sequence")
                         .with_annotation_override("undefined control sequence"),
                 ),
                 Some(command::Command::Variable(cmd)) => {
                     if !cmd.is_arithmetic() {
-                        input.vm().error(
+                        input.error(
                             parse::Error::new("an arithmetic variable", Some(token), "")
                                 .with_got_override("got a non-arithmetic variable"),
                         )?;
@@ -299,14 +299,14 @@ fn math_primitive_fn<S: TexlangState, O: Op>(
                         }
                     }
                 }
-                Some(cmd) => input.vm().error(
+                Some(cmd) => input.error(
                     parse::Error::new("a variable", Some(token), "")
                         .with_got_override("got a non-variable command")
                         .with_annotation_override(format!["control sequence referencing {cmd}"]),
                 ),
             }
         }
-        _ => input.vm().error(
+        _ => input.error(
             parse::Error::new("a variable", Some(token), "")
                 .with_got_override("got a character token"),
         ),
@@ -363,7 +363,7 @@ mod tests {
         }
         fn recoverable_error_hook(
             &self,
-            recoverable_error: error::TracedError,
+            recoverable_error: error::TracedTexError,
         ) -> Result<(), Box<dyn error::TexError>> {
             texlang_testing::TestingComponent::recoverable_error_hook(self, recoverable_error)
         }

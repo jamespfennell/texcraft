@@ -36,7 +36,7 @@ impl<const N: usize> Parsable for Uint<N> {
     fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let (first_token, i, _) = parse_integer(input)?;
         if i < 0 || i as usize >= N {
-            input.vm().error(OutOfBoundsError::<N> {
+            input.error(OutOfBoundsError::<N> {
                 first_token,
                 got: i,
             })?;
@@ -83,7 +83,7 @@ impl Parsable for types::CatCode {
                 return Ok(cat_code);
             }
         }
-        input.vm().error(parse::Error {
+        input.error(parse::Error {
             expected: "a category code number (an integer in the range [0, 15])".into(),
             got: Some(token),
             got_override: format!["got the integer {i}"],
@@ -109,7 +109,7 @@ pub(crate) fn parse_integer<S: TexlangState>(
     stream: &mut vm::ExpandedStream<S>,
 ) -> txl::Result<(token::Token, i32, Option<u8>)> {
     let sign = parse_optional_signs(stream)?;
-    let first_token = stream.next(NumberEndOfInputError {})?;
+    let first_token = stream.next_or_err(NumberEndOfInputError {})?;
     let (result, radix) = match first_token.value() {
         Value::Other('0') => (parse_constant::<S, 10>(stream, 0)?, Some(10_u8)),
         Value::Other('1') => (parse_constant::<S, 10>(stream, 1)?, Some(10_u8)),
@@ -131,7 +131,7 @@ pub(crate) fn parse_integer<S: TexlangState>(
         // TeX.2021.446
         _ => {
             stream.back(first_token);
-            stream.vm().error(parse::Error::new(
+            stream.error(parse::Error::new(
                 "the beginning of a number",
                 Some(first_token),
                 GUIDANCE_BEGINNING,
@@ -198,14 +198,14 @@ pub(crate) fn parse_internal_number<S: TexlangState>(
                     todo!("scan a font into an int?");
                 }
                 variable::ValueRef::TokenList(_) => {
-                    return Err(input.vm().fatal_error(
+                    Err(input.fatal_error(
                         parse::Error::new(
                             "the beginning of a number",
                             Some(first_token),
                             GUIDANCE_BEGINNING,
                         )
                         .with_annotation_override("token list variable"),
-                    ));
+                    ))
                 }
             }
         }
@@ -229,7 +229,7 @@ pub(crate) fn parse_internal_number<S: TexlangState>(
                 Some(cmd) => format!["control sequence referencing {cmd}"],
             });
             input.expansions_mut().push(first_token);
-            return Err(input.vm().fatal_error(err));
+            Err(input.fatal_error(err))
         }
     }
 }
@@ -275,7 +275,7 @@ pub fn parse_optional_signs<S: TexlangState>(
 fn parse_character<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<i32> {
     // BUG: should be from the unexpanded stream
     let c = {
-        let token = input.next(CharacterError {})?;
+        let token = input.next_or_err(CharacterError {})?;
         match token.value() {
             Value::CommandRef(token::CommandRef::ControlSequence(cs_name)) => {
                 let name = input.vm().cs_name_interner().resolve(cs_name).unwrap();
@@ -286,7 +286,7 @@ fn parse_character<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::R
                     // \expandafter \i \expandafter ` \csname\endcsname
                     (Some(c), 0) => c,
                     _ => {
-                        input.vm().error(parse::Error::new(
+                        input.error(parse::Error::new(
                             "a character",
                             Some(token),
                             "a character is a character token or single-character control sequence like \\a",
@@ -326,7 +326,7 @@ fn parse_constant<S: TexlangState, const RADIX: i32>(
     let mut started = RADIX == 10;
     let mut too_big = false;
     loop {
-        let next = match stream.next_or()? {
+        let next = match stream.next()? {
             None => break,
             Some(next) => next,
         };
@@ -368,9 +368,7 @@ fn parse_constant<S: TexlangState, const RADIX: i32>(
             Some(n) => n,
             None => {
                 if !too_big {
-                    stream
-                        .vm()
-                        .error(add_lsd_error::<RADIX>(next, result, lsd))?;
+                    stream.error(add_lsd_error::<RADIX>(next, result, lsd))?;
                     too_big = true;
                 }
                 i32::MAX
@@ -390,9 +388,7 @@ fn parse_constant<S: TexlangState, const RADIX: i32>(
             _ => unreachable!(),
         };
         let got = stream.peek()?;
-        stream
-            .vm()
-            .error(parse::Error::new(expected, got, guidance))?;
+        stream.error(parse::Error::new(expected, got, guidance))?;
     }
     super::OptionalSpace::parse(stream)?;
     Ok(result)

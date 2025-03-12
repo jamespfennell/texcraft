@@ -1,4 +1,8 @@
 //! Error handling
+//!
+//! This is reference documentation.
+//! The Texlang documentation has a [dedicated page about error handling
+//! ](<https://texcraft.dev/texlang/09-errors.html>).
 
 use std::collections::HashMap;
 
@@ -17,7 +21,7 @@ pub mod display;
 ///     serializable, and future work to make this better is welcome!
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TracedError {
+pub struct TracedTexError {
     #[cfg_attr(
         feature = "serde",
         serde(
@@ -81,7 +85,7 @@ impl TexError for SerializableError {
     }
 }
 
-impl TracedError {
+impl TracedTexError {
     pub(crate) fn new(
         error: Box<dyn TexError>,
         tracer: &trace::Tracer,
@@ -102,7 +106,7 @@ impl TracedError {
             .into_iter()
             .map(|token| (token, tracer.trace(token, cs_name_interner)))
             .collect();
-        TracedError {
+        TracedTexError {
             error,
             stack_trace,
             token_traces,
@@ -111,6 +115,7 @@ impl TracedError {
     }
 }
 
+/// Implementations of this trait describe an error in which in the input ended prematurely.
 pub trait EndOfInputError: std::fmt::Debug + 'static {
     fn doing(&self) -> String;
     fn notes(&self) -> Vec<display::Note> {
@@ -118,10 +123,22 @@ pub trait EndOfInputError: std::fmt::Debug + 'static {
     }
 }
 
-pub const TODO: TodoError = TodoError {};
+/// An error for work-in-progress Texlang code.
+/// 
+/// When working on Texlang code it's often nice to figure out the logic first,
+///     and then go through later to polish the error cases.
+/// This function returns a "TODO" error that helps with this process.
+/// 
+/// Use the return value of this function in any place you plan to generate an error.
+/// Later on, follow Texlang best practices and create a specific error
+///     type for the case with a good error message.
+#[allow(non_snake_case)]
+pub fn TODO() -> impl TexError + EndOfInputError {
+    TodoError{}
+}
 
 #[derive(Debug)]
-pub struct TodoError {}
+struct TodoError {}
 
 impl EndOfInputError for TodoError {
     fn doing(&self) -> String {
@@ -129,7 +146,7 @@ impl EndOfInputError for TodoError {
     }
     fn notes(&self) -> Vec<display::Note> {
         vec![
-            "the Rust source code uses `texlang::error::TODO` for this error case".into(),
+            "the Rust source code uses `texlang::error::TODO()` for this error case".into(),
             "a more specific end of input error needs to be added".into(),
         ]
     }
@@ -140,12 +157,12 @@ impl TexError for TodoError {
         Kind::FailedPrecondition
     }
     fn title(&self) -> String {
-        "? (TODO: add a specific end of input error for this case.)".into()
+        "? (TODO: add a specific error for this case.)".into()
     }
     fn notes(&self) -> Vec<display::Note> {
         vec![
-            "the Rust source code uses `texlang::error::TODO` for this error case".into(),
-            "a more specific end of input error needs to be added".into(),
+            "the Rust source code uses `texlang::error::TODO()` for this error case".into(),
+            "a more specific error needs to be added".into(),
         ]
     }
 }
@@ -178,6 +195,7 @@ impl TexError for EofError {
     }
 }
 
+/// Element of a stack trace.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StackTraceElement {
@@ -186,51 +204,32 @@ pub struct StackTraceElement {
     pub trace: trace::SourceCodeTrace,
 }
 
-/// Texlang error type
-///
-/// Note that serializing and deserializing this type results in type erasure.
-/// Also the serialization format is private.
-/// This is not by design: the minimal amount of work was done to make the type
-///     serializable, and future work to make this better is welcome!
-#[derive(Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Error {
-    pub(crate) traced: TracedError,
-}
-
-impl std::fmt::Display for TracedError {
+impl std::fmt::Display for TracedTexError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         display::format_error(f, self)
     }
 }
 
-impl Error {
-    pub fn new(traced: TracedError) -> Self {
-        Self { traced }
-    }
-    pub fn new_propagated<S>(
-        vm: &vm::VM<S>,
-        context: OperationKind,
-        token: token::Token,
-        mut error: Box<Error>,
-    ) -> Box<Error> {
-        error.traced.stack_trace.push(StackTraceElement {
-            context,
-            token,
-            trace: vm.trace(token),
-        });
-        error
-    }
-}
-
+/// The type of an error.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Kind {
+    /// An error at a particular TeX token.
+    /// 
+    /// For example, a TeX command expects a number but the next token is a letter.
     Token(token::Token),
+    /// An end-of-input error.
+    /// 
+    /// For example, a TeX command expects a number but there is no more input.
     EndOfInput,
+    /// Some external condition does not hold and so the TeX code is incorrect.
+    /// 
+    /// For example, a TeX command tries to open a file a particular path,
+    ///     but the file does not exist.
     FailedPrecondition,
 }
 
+/// Implementations of this trait describe an error in TeX source code.
 pub trait TexError: std::fmt::Debug + 'static {
     fn kind(&self) -> Kind;
 
@@ -349,13 +348,20 @@ impl TexError for SimpleFailedPreconditionError {
     }
 }
 
+/// Concrete error for the case when a command is undefined.
+/// 
+/// This error is returned when a control sequence or active character
+///     is not defined.
 #[derive(Debug)]
 pub struct UndefinedCommandError {
+    /// The token that was referred to an undefined command.
     pub token: token::Token,
+    /// Control sequences that are spelled similarly to the token.
     pub close_names: Vec<WordDiff>,
 }
 
 impl UndefinedCommandError {
+    /// Create a new undefined command error.
     pub fn new<S>(vm: &vm::VM<S>, token: token::Token) -> UndefinedCommandError {
         let name = match &token.value() {
             token::Value::CommandRef(command_ref) => command_ref.to_string(vm.cs_name_interner()),

@@ -6,9 +6,12 @@
 *.dvi
 *.json
 *.fmt
+*.mp
 *.bincode
 flamegraph.svg
 perf.data*
 callgrind*
 pkg
 tmp
+docs/docs
+

@@ -14,7 +14,7 @@ pub fn parse_keyword<S: TexlangState>(
         // keyword is empty
         return Ok(true);
     };
-    let Some(token) = input.next_or()? else {
+    let Some(token) = input.next()? else {
         // input ended, keyword does not match
         return Ok(false);
     };

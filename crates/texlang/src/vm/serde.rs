@@ -1,14 +1,24 @@
 //! Serialization and deserialization of VMs
 //!
-//! Texlang VMs can be serialized using the standard serde infrastructure
-//!     because they always satisfy the [`::serde::Serialize`] trait.
+//! Texcraft's documentation website has a
+//!     [dedicated page about serializing and deserializing VMs](https://texcraft.dev/texlang/11-serde.html).
+//! The documentation here is for reference.
 //!
-//! In the case when the VM's state type implements [`super::HasDefaultBuiltInCommands`],
-//!     the VM satisfies the [`::serde::Deserialize`] trait too.
+//! ## Serialization
 //!
-//! If the state type doesn't implement this trait, deserialization is slightly more complicated
-//!     because the set of built-in commands needs to be provided at deserialization time.
-//! This is because the built-in commands which are regular Rust functions,
+//! If the state type `S` implements [`::serde::Serialize`] then
+//!     the Texlang VM `vm::V<S>` satisfies the [`::serde::Serialize`] trait too.
+//! VMs can thus be serialized using the standard Serde infrastructure.
+//!
+//! ## Deserialization
+//!
+//! If the state `S` implements [`::serde::Deserialize`] and
+//!     the Texlang trait [`super::HasDefaultBuiltInCommands`],
+//!     the Texlang VM `vm::V<S>` satisfies the [`::serde::Deserialize`] trait too.
+//!
+//! If the state doesn't implement the Texlang trait, deserialization is slightly more complicated
+//!     because the set of built-in primitives needs to be provided at deserialization time.
+//! This is because the built-in primitives which are regular Rust functions,
 //!     and it is not possible to fully serialize and deserialize Rust functions.
 //! Deserialization of VMs is thus a two-step process:
 //!
@@ -19,8 +29,6 @@
 //!
 //! The Texlang VM has a [`deserialize_with_built_in_commands` convenience method](super::VM::deserialize_with_built_in_commands)
 //!     which performs both of these steps at once.
-//! In the case when VM's state type implements [`super::HasDefaultBuiltInCommands`],
-//!     the VM's implementation of [`::serde::Deserialize`] handles all this automatically.
 
 use crate::*;
 use serde::{Deserialize, Deserializer, Serialize};

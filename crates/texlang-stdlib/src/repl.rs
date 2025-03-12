@@ -107,7 +107,7 @@ pub fn get_exit<S: HasComponent<Component>>() -> command::BuiltIn<S> {
             HasComponent::<Component>::component_mut(input.state_mut()).quit_requested = true;
             // todo: mechanism to exit without erroring
             // something like input.shutdown_vm()
-            Err(input.vm().fatal_error(error::SimpleTokenError::new(
+            Err(input.fatal_error(error::SimpleTokenError::new(
                 t,
                 "quitting Texcraft REPL. This error should never be seen!",
             )))
@@ -126,7 +126,7 @@ pub fn get_help<S: HasComponent<Component> + common::HasLogging>() -> command::B
                 .clone();
             match writeln![input.state().terminal_out().borrow_mut(), "{help}"] {
                 Ok(_) => Ok(()),
-                Err(err) => Err(input.vm().fatal_error(error::SimpleTokenError::new(
+                Err(err) => Err(input.fatal_error(error::SimpleTokenError::new(
                     token,
                     format!["failed to write help text: {err}"],
                 ))),
@@ -154,7 +154,7 @@ pub fn get_doc<S: TexlangState + common::HasLogging>() -> command::BuiltIn<S> {
             };
             match writeln![input.state().terminal_out().borrow_mut(), "{doc}"] {
                 Ok(_) => Ok(()),
-                Err(err) => Err(input.vm().fatal_error(error::SimpleTokenError::new(
+                Err(err) => Err(input.fatal_error(error::SimpleTokenError::new(
                     token,
                     format!["failed to write doc text: {err}"],
                 ))),

@@ -4,7 +4,10 @@ use crate::token::trace::{self, SourceCodeTrace};
 use crate::{error, token};
 use colored::*;
 
-pub fn format_error(f: &mut std::fmt::Formatter<'_>, err: &error::TracedError) -> std::fmt::Result {
+pub fn format_error(
+    f: &mut std::fmt::Formatter<'_>,
+    err: &error::TracedTexError,
+) -> std::fmt::Result {
     let root = err.error.as_ref();
     let stack = &err.stack_trace;
 

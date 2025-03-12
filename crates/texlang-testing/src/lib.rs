@@ -117,7 +117,7 @@ impl TestingComponent {
     /// States used in unit testing must be configured to use this hook.
     pub fn recoverable_error_hook<S: HasComponent<Self>>(
         state: &S,
-        recoverable_error: error::TracedError,
+        recoverable_error: error::TracedTexError,
     ) -> Result<(), Box<dyn error::TexError>> {
         let component = state.component();
         if component.recover_from_errors {
@@ -154,7 +154,7 @@ pub struct State {
 impl TexlangState for State {
     fn recoverable_error_hook(
         &self,
-        recoverable_error: error::TracedError,
+        recoverable_error: error::TracedTexError,
     ) -> Result<(), Box<dyn error::TexError>> {
         TestingComponent::recoverable_error_hook(self, recoverable_error)
     }
@@ -486,7 +486,7 @@ fn execute_source_code<S, H>(
     vm: &mut vm::VM<S>,
     source: &str,
     options: &ResolvedOptions<S>,
-) -> Result<(Vec<token::Token>, usize), Box<error::TracedError>>
+) -> Result<(Vec<token::Token>, usize), Box<error::TracedTexError>>
 where
     S: Default + HasComponent<TestingComponent>,
     H: texlang::vm::Handlers<S>,
@@ -544,9 +544,7 @@ impl<S: HasComponent<TestingComponent>, H: vm::Handlers<S>> vm::Handlers<S> for 
             input.state_mut().component_mut().tokens.push(token);
             Ok(())
         } else {
-            Err(input
-                .vm()
-                .fatal_error(error::UndefinedCommandError::new(input.vm(), token)))
+            Err(input.fatal_error(error::UndefinedCommandError::new(input.vm(), token)))
         }
     }
 

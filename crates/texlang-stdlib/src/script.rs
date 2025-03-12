@@ -98,7 +98,7 @@ fn par_primitive_fn<S: HasComponent<Component>>(
 /// Run the Texlang interpreter for the provided VM and return the result as a string.
 pub fn run_to_string<S: HasComponent<Component>>(
     vm: &mut vm::VM<S>,
-) -> Result<String, Box<error::TracedError>> {
+) -> Result<String, Box<error::TracedTexError>> {
     let buffer = Rc::new(RefCell::new(Vec::<u8>::new()));
     vm.state.component_mut().io_writer = buffer.clone();
     run(vm)?;
@@ -107,7 +107,9 @@ pub fn run_to_string<S: HasComponent<Component>>(
 }
 
 /// Run the Texlang interpreter for the provided VM and return the result as list of tokens.
-pub fn run<S: HasComponent<Component>>(vm: &mut vm::VM<S>) -> Result<(), Box<error::TracedError>> {
+pub fn run<S: HasComponent<Component>>(
+    vm: &mut vm::VM<S>,
+) -> Result<(), Box<error::TracedTexError>> {
     vm.run::<Handlers>()
 }
 

@@ -361,7 +361,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error;
 
     enum Instruction {
         ControlSequence(&'static str),
@@ -540,6 +539,10 @@ mod tests {
         assert_eq!(std::mem::size_of::<Token>(), 12);
         assert_eq!(std::mem::size_of::<Result<Token, ()>>(), 12);
         assert_eq!(std::mem::size_of::<Result<Option<Token>, ()>>(), 12);
-        assert_eq!(std::mem::size_of::<Result<Token, Box<error::Error>>>(), 16);
+        assert_eq!(std::mem::size_of::<crate::prelude::Result<Token>>(), 12);
+        assert_eq!(
+            std::mem::size_of::<crate::prelude::Result<Option<Token>>>(),
+            12
+        );
     }
 }

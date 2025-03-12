@@ -24,7 +24,7 @@ pub(crate) fn scan_dimen<S: TexlangState>(
         None => 1,
         Some(_) => -1,
     };
-    let first_token = input.next(DimenEndOfInputError {})?;
+    let first_token = input.next_or_err(DimenEndOfInputError {})?;
     let (negative, integer_part, fractional_part) = match first_token.value() {
         Value::CommandRef(command_ref) => {
             // TeX.2021.449
@@ -66,7 +66,7 @@ pub(crate) fn scan_constant_dimen<S: TexlangState>(
             // We scan for a fractional part if the integer was an decimal constant
             // and the next token is a period or comma.
             let fractional_part = if radix == Some(10) {
-                match input.next_or()? {
+                match input.next()? {
                     Some(next) => match next.value() {
                         Value::Other(',' | '.') => scan_decimal_fraction(input)?,
                         _ => {
@@ -99,11 +99,11 @@ pub(crate) fn scan_and_apply_units<S: TexlangState>(
     if let Some(glue_order) = glue_order {
         if parse_keyword(input, "fil")? {
             *glue_order = core::GlueOrder::Fil;
-            while let Some(token) = input.next_or()? {
+            while let Some(token) = input.next()? {
                 match token.value() {
                     token::Value::Letter('l' | 'L') => match glue_order.next() {
                         None => {
-                            input.vm().error(fillll_error(token))?;
+                            input.error(fillll_error(token))?;
                         }
                         Some(o) => *glue_order = o,
                     },
@@ -122,7 +122,7 @@ pub(crate) fn scan_and_apply_units<S: TexlangState>(
     }
     // Then try to scan from an internal number.
     // TeX.2021.455
-    if let Some(next) = input.next_or()? {
+    if let Some(next) = input.next()? {
         let v_or = match next.value() {
             Value::CommandRef(command_ref) => {
                 use super::integer::InternalNumber;
@@ -179,7 +179,7 @@ fn handle_overflow<S: TexlangState>(
     first_token: token::Token,
     neg: bool,
 ) -> txl::Result<core::Scaled> {
-    input.vm().error(
+    input.error(
         parse::Error::new(
             "a dimension in the range (-2^14pt,2^14pt)",
             Some(first_token),
@@ -217,7 +217,7 @@ impl Parsable for core::ScaledUnit {
                 return Ok(unit);
             }
         }
-        input.vm().error(error::TODO)?;
+        input.error(error::TODO())?;
         Ok(core::ScaledUnit::Point)
     }
 }
@@ -231,7 +231,7 @@ fn scan_decimal_fraction<S: TexlangState>(
     // we don't need to allocate a vector to store the digits.
     let mut digits = [0_u8; 17];
     let mut i = 0_usize;
-    while let Some(token) = input.next_or()? {
+    while let Some(token) = input.next()? {
         let d: u8 = match token.value() {
             Value::Other('0') => 0,
             Value::Other('1') => 1,

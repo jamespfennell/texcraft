@@ -15,7 +15,7 @@ pub struct Component {
     mode: Mode,
     #[cfg_attr(feature = "serde", serde(skip))]
     default_terminal: DefaultTerminal,
-    errors: RefCell<Vec<error::TracedError>>,
+    errors: RefCell<Vec<error::TracedTexError>>,
 }
 
 impl Component {
@@ -87,7 +87,7 @@ pub fn get_batchmode<S: HasComponent<Component>>() -> command::BuiltIn<S> {
 
 pub fn recoverable_error_hook<S: HasComponent<Component> + common::HasLogging>(
     state: &S,
-    recoverable_error: error::TracedError,
+    recoverable_error: error::TracedTexError,
 ) -> Result<(), Box<dyn error::TexError>> {
     match &state.component().mode {
         Mode::ErrorStop => {

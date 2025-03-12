@@ -174,7 +174,7 @@ impl Parsable for Option<token::CommandRef> {
 impl Parsable for Vec<token::Token> {
     fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let mut result = input.checkout_token_buffer();
-        let first_token = input.next(TokenStreamEndOfInputError {})?;
+        let first_token = input.next_or_err(TokenStreamEndOfInputError {})?;
         let got = match first_token.value() {
             token::Value::CommandRef(command_ref) => {
                 match input.commands_map().get_command(&command_ref) {
@@ -198,7 +198,7 @@ impl Parsable for Vec<token::Token> {
             _ => "a non-command, non-opening brace token",
         };
         input.return_token_buffer(result);
-        Err(input.vm().fatal_error(
+        Err(input.fatal_error(
             parse::Error::new(
                 "an opening brace or a variable of type token list",
                 Some(first_token),
@@ -231,7 +231,7 @@ pub fn finish_parsing_balanced_tokens<S: vm::TokenStream>(
 ) -> txl::Result<()> {
     let mut scope_depth = 0;
     loop {
-        let token = stream.next(TokenStreamEndOfInputError {})?;
+        let token = stream.next_or_err(TokenStreamEndOfInputError {})?;
         match token.value() {
             token::Value::BeginGroup(_) => {
                 scope_depth += 1;
@@ -257,7 +257,7 @@ pub struct Spaces;
 
 impl Parsable for Spaces {
     fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
-        while let Some(token) = input.next_or()? {
+        while let Some(token) = input.next()? {
             match token.value() {
                 token::Value::Space(_) => {
                     continue;
@@ -278,7 +278,7 @@ pub struct SpacesUnexpanded;
 impl Parsable for SpacesUnexpanded {
     fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let input = input.unexpanded();
-        while let Some(token) = input.next_or()? {
+        while let Some(token) = input.next()? {
             match token.value() {
                 token::Value::Space(_) => {
                     continue;
@@ -295,7 +295,7 @@ impl Parsable for SpacesUnexpanded {
 
 impl Parsable for Option<char> {
     fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
-        let Some(token) = input.next_or()? else {
+        let Some(token) = input.next()? else {
             return Ok(None);
         };
         let c = match token.value() {
@@ -332,7 +332,7 @@ pub struct OptionalSpace;
 impl Parsable for OptionalSpace {
     fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         // TeX.2021.443
-        if let Some(next) = input.next_or()? {
+        if let Some(next) = input.next()? {
             if next.cat_code() != Some(CatCode::Space) {
                 input.back(next);
             }
