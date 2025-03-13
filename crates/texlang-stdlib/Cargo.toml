@@ -34,7 +34,7 @@ chrono = {version="0.4.19", default-features = false, features = ["clock"], opti
 linefeed = {version = "0.6", optional = true }
 
 ## In the tracing macros module
-colored = "2"
+colored = "3"
 
 ## The usual suspects
 serde = {version="^1.0", optional = true}

@@ -197,16 +197,14 @@ pub(crate) fn parse_internal_number<S: TexlangState>(
                     // This case behaves identically to the TokenListCase
                     todo!("scan a font into an int?");
                 }
-                variable::ValueRef::TokenList(_) => {
-                    Err(input.fatal_error(
-                        parse::Error::new(
-                            "the beginning of a number",
-                            Some(first_token),
-                            GUIDANCE_BEGINNING,
-                        )
-                        .with_annotation_override("token list variable"),
-                    ))
-                }
+                variable::ValueRef::TokenList(_) => Err(input.fatal_error(
+                    parse::Error::new(
+                        "the beginning of a number",
+                        Some(first_token),
+                        GUIDANCE_BEGINNING,
+                    )
+                    .with_annotation_override("token list variable"),
+                )),
             }
         }
         Some(command::Command::Character(c)) => Ok(InternalNumber::Integer(*c as i32)),

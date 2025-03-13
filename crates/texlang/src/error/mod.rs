@@ -124,17 +124,17 @@ pub trait EndOfInputError: std::fmt::Debug + 'static {
 }
 
 /// An error for work-in-progress Texlang code.
-/// 
+///
 /// When working on Texlang code it's often nice to figure out the logic first,
 ///     and then go through later to polish the error cases.
 /// This function returns a "TODO" error that helps with this process.
-/// 
+///
 /// Use the return value of this function in any place you plan to generate an error.
 /// Later on, follow Texlang best practices and create a specific error
 ///     type for the case with a good error message.
 #[allow(non_snake_case)]
 pub fn TODO() -> impl TexError + EndOfInputError {
-    TodoError{}
+    TodoError {}
 }
 
 #[derive(Debug)]
@@ -215,15 +215,15 @@ impl std::fmt::Display for TracedTexError {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Kind {
     /// An error at a particular TeX token.
-    /// 
+    ///
     /// For example, a TeX command expects a number but the next token is a letter.
     Token(token::Token),
     /// An end-of-input error.
-    /// 
+    ///
     /// For example, a TeX command expects a number but there is no more input.
     EndOfInput,
     /// Some external condition does not hold and so the TeX code is incorrect.
-    /// 
+    ///
     /// For example, a TeX command tries to open a file a particular path,
     ///     but the file does not exist.
     FailedPrecondition,
@@ -349,7 +349,7 @@ impl TexError for SimpleFailedPreconditionError {
 }
 
 /// Concrete error for the case when a command is undefined.
-/// 
+///
 /// This error is returned when a control sequence or active character
 ///     is not defined.
 #[derive(Debug)]
