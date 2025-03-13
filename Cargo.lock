@@ -1300,6 +1300,7 @@ version = "0.2.0"
 dependencies = [
  "clap 4.4.8",
  "colored",
+ "core",
  "performance",
  "rand",
  "rmp-serde",
@@ -1318,6 +1319,7 @@ name = "texcraft-playground"
 version = "0.0.0"
 dependencies = [
  "console_error_panic_hook",
+ "core",
  "texcraft-stdext",
  "texlang",
  "texlang-stdlib",

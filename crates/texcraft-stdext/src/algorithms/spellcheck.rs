@@ -67,7 +67,7 @@ use std::ops::Index;
 ///
 /// The return value is an ordered list corresponding to every word in the dictionary, with
 /// the closest matches first.
-pub fn find_close_words(dictionary: Vec<String>, word: &str) -> Vec<WordDiff> {
+pub fn find_close_words(dictionary: &[&str], word: &str) -> Vec<WordDiff> {
     // TODO: accept a generic iterator
     let size_hint = dictionary.len();
     //size_hint() {
@@ -76,7 +76,7 @@ pub fn find_close_words(dictionary: Vec<String>, word: &str) -> Vec<WordDiff> {
     //};
     let mut comparisons = Vec::with_capacity(size_hint);
     for valid_word in dictionary {
-        let comparison = levenshtein_distance(word, valid_word.as_str()); // word);
+        let comparison = levenshtein_distance(word, valid_word); // word);
         comparisons.push(comparison);
     }
     comparisons.sort_by(|a, b| a.distance.cmp(&b.distance));
@@ -326,9 +326,9 @@ mod tests {
 
     #[test]
     fn find_close_words_test() {
-        let dictionary = vec!["james".to_string(), "laura".to_string(), "mint".to_string()];
+        let dictionary = vec!["james", "laura", "mint"];
         let word = "janes";
-        let result = find_close_words(dictionary, &word);
+        let result = find_close_words(&dictionary, &word);
 
         assert_eq![result[0].right(), "james"];
         assert_eq![result[1].right(), "laura"];

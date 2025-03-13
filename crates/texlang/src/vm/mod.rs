@@ -571,7 +571,7 @@ impl<S> VM<S> {
     /// Return a regular hash map with all the commands as they are currently defined.
     ///
     /// This function is extremely slow and is only intended to be invoked on error paths.
-    pub fn get_commands_as_map_slow(&self) -> HashMap<String, BuiltIn<S>> {
+    pub fn get_commands_as_map_slow(&self) -> HashMap<&str, BuiltIn<S>> {
         let map_1: HashMap<CsName, BuiltIn<S>> = self.commands_map.to_hash_map_slow();
         let mut map = HashMap::new();
         for (cs_name, cmd) in map_1 {
@@ -579,7 +579,7 @@ impl<S> VM<S> {
                 None => continue,
                 Some(cs_name_str) => cs_name_str,
             };
-            map.insert(cs_name_str.to_string(), cmd);
+            map.insert(cs_name_str, cmd);
         }
         map
     }

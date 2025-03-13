@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
+use core;
 use texcraft_stdext::collections::groupingmap;
 use texlang::prelude as txl;
 use texlang::traits::*;
@@ -46,6 +47,8 @@ struct PlaygroundState {
     end_line_char: endlinechar::Component,
     prefix: prefix::Component,
     registers_i32: registers::Component<i32, 32768>,
+    registers_scaled: registers::Component<core::Scaled, 32768>,
+    registers_glue: registers::Component<core::Glue, 32768>,
     registers_token_list: registers::Component<Vec<token::Token>, 256>,
     script: script::Component,
     time: time::Component,
@@ -79,6 +82,8 @@ implement_has_component![PlaygroundState{
     end_line_char: endlinechar::Component,
     prefix: prefix::Component,
     registers_i32: registers::Component<i32, 32768>,
+    registers_scaled: registers::Component<core::Scaled, 32768>,
+    registers_glue: registers::Component<core::Glue, 32768>,
     registers_token_list: registers::Component<Vec<token::Token>, 256>,
     script: script::Component,
     time: time::Component,
@@ -101,6 +106,7 @@ impl HasDefaultBuiltInCommands for PlaygroundState {
             //
             ("day", time::get_day()),
             ("def", def::get_def()),
+            ("dimen", registers::get_dimen()),
             ("divide", math::get_divide()),
             //
             ("else", conditional::get_else()),
@@ -140,6 +146,8 @@ impl HasDefaultBuiltInCommands for PlaygroundState {
             ("par", script::get_par()),
             //
             ("relax", expansion::get_relax()),
+            //
+            ("skip", registers::get_skip()),
             //
             ("the", the::get_the()),
             ("toks", registers::get_toks()),

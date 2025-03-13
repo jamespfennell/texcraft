@@ -19,82 +19,95 @@ pub struct Component {
     quit_requested: bool,
 }
 
+/// Start a REPL session using the provided VM.
 #[cfg(feature = "repl")]
-pub mod run {
-    use super::*;
+pub fn start<S: HasComponent<script::Component> + HasComponent<Component>>(
+    vm: &mut vm::VM<S>,
+    opts: RunOptions,
+) {
     use linefeed::{Interface, ReadResult};
 
-    pub fn run<S: HasComponent<script::Component> + HasComponent<Component>>(
-        vm: &mut vm::VM<S>,
-        opts: RunOptions,
-    ) {
-        let c = HasComponent::<Component>::component_mut(&mut vm.state);
-        c.help = opts.help.into();
-        c.quit_requested = false;
-        let reader = Interface::new("").unwrap();
+    let c = HasComponent::<Component>::component_mut(&mut vm.state);
+    c.help = opts.help.into();
+    c.quit_requested = false;
 
-        reader.set_prompt(opts.prompt).unwrap();
+    let reader = Interface::new("").unwrap();
+    reader.set_prompt(opts.prompt).unwrap();
+    script::set_io_writer(vm, std::io::stdout());
 
-        let mut names: Vec<String> = vm.get_commands_as_map_slow().into_keys().collect();
-        names.sort();
-        let mut num_names = names.len();
-        let a = Arc::new(ControlSequenceCompleter { names });
-        reader.set_completer(a);
-        script::set_io_writer(vm, std::io::stdout());
-        while let ReadResult::Input(input) = reader.read_line().unwrap() {
-            reader.add_history(input.clone());
+    let mut num_commands: Option<usize> = None;
+    loop {
+        // We detect new commands (via \def say) by seeing if the number of commands
+        // have changed. This is incorrect though; in the following case, the
+        // commands will not be updated:
+        //
+        // TeX> {
+        // TeX> \def \Apple{A}
+        // TeX> } \def \Orange{B}
+        //
+        // Instead we need to iterate over all commands in the map and
+        // check the diff.
+        if Some(vm.commands_map.len()) != num_commands {
+            let mut names: Vec<String> = vm
+                .get_commands_as_map_slow()
+                .into_keys()
+                .map(|s| format!["{s}"])
+                .collect();
+            names.sort();
+            num_commands = Some(names.len());
+            let a = Arc::new(ControlSequenceCompleter { names });
+            reader.set_completer(a);
+        }
 
-            vm.clear_sources();
-            vm.push_source("".to_string(), input).unwrap();
-            match script::run(vm) {
-                Ok(()) => (),
-                Err(err) => {
-                    if HasComponent::<Component>::component(&vm.state).quit_requested {
-                        return;
-                    }
-                    println!("{err}");
-                    continue;
-                }
-            };
-            // TODO: better new line handling in the REPL
-            println!();
-            if vm.commands_map.len() != num_names {
-                let mut names: Vec<String> = vm.get_commands_as_map_slow().into_keys().collect();
-                names.sort();
-                num_names = names.len();
-                let a = Arc::new(ControlSequenceCompleter { names });
-                reader.set_completer(a);
+        let ReadResult::Input(input) = reader.read_line().unwrap() else {
+            break;
+        };
+        reader.add_history(input.clone());
+
+        vm.clear_sources();
+        vm.push_source("".to_string(), input).unwrap();
+        match script::run(vm) {
+            Ok(()) => (),
+            Err(err) => {
+                println!("{err}");
+                continue;
+            }
+        };
+        if HasComponent::<Component>::component(&vm.state).quit_requested {
+            return;
+        }
+        // TODO: better new line handling in the REPL
+        println!();
+    }
+}
+
+struct ControlSequenceCompleter {
+    names: Vec<String>,
+}
+
+#[cfg(feature = "repl")]
+impl<Term: linefeed::Terminal> linefeed::Completer<Term> for ControlSequenceCompleter {
+    fn complete(
+        &self,
+        word: &str,
+        prompter: &linefeed::Prompter<Term>,
+        start: usize,
+        _end: usize,
+    ) -> Option<Vec<linefeed::Completion>> {
+        if !prompter.buffer()[..start].ends_with('\\') {
+            return None;
+        }
+        let mut completions = Vec::new();
+        for name in &self.names {
+            if name.starts_with(word) {
+                completions.push(linefeed::Completion {
+                    completion: name.to_string(),
+                    display: Some(format!["\\{name}"]),
+                    suffix: linefeed::Suffix::Default,
+                });
             }
         }
-    }
-
-    struct ControlSequenceCompleter {
-        names: Vec<String>,
-    }
-
-    impl<Term: linefeed::Terminal> linefeed::Completer<Term> for ControlSequenceCompleter {
-        fn complete(
-            &self,
-            word: &str,
-            prompter: &linefeed::Prompter<Term>,
-            start: usize,
-            _end: usize,
-        ) -> Option<Vec<linefeed::Completion>> {
-            if prompter.buffer()[..start].ends_with('\\') {
-                return None;
-            }
-            let mut completions = Vec::new();
-            for name in &self.names {
-                if name.starts_with(word) {
-                    completions.push(linefeed::Completion {
-                        completion: name.clone(),
-                        display: None,
-                        suffix: linefeed::Suffix::Default,
-                    });
-                }
-            }
-            Some(completions)
-        }
+        Some(completions)
     }
 }
 
@@ -103,14 +116,9 @@ pub mod run {
 /// This exits the REPL.
 pub fn get_exit<S: HasComponent<Component>>() -> command::BuiltIn<S> {
     command::BuiltIn::new_execution(
-        |t: token::Token, input: &mut vm::ExecutionInput<S>| -> txl::Result<()> {
+        |_: token::Token, input: &mut vm::ExecutionInput<S>| -> txl::Result<()> {
             HasComponent::<Component>::component_mut(input.state_mut()).quit_requested = true;
-            // todo: mechanism to exit without erroring
-            // something like input.shutdown_vm()
-            Err(input.fatal_error(error::SimpleTokenError::new(
-                t,
-                "quitting Texcraft REPL. This error should never be seen!",
-            )))
+            Err(input.shutdown())
         },
     )
 }

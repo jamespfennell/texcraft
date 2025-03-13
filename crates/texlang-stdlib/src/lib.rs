@@ -56,6 +56,8 @@ pub struct StdLibState {
     pub job: job::Component,
     pub prefix: prefix::Component,
     pub registers_i32: registers::Component<i32, 32768>,
+    pub registers_scaled: registers::Component<core::Scaled, 32768>,
+    pub registers_glue: registers::Component<core::Glue, 32768>,
     pub registers_token_list: registers::Component<Vec<token::Token>, 256>,
     pub repl: repl::Component,
     pub script: script::Component,
@@ -124,6 +126,8 @@ implement_has_component![StdLibState{
     job: job::Component,
     prefix: prefix::Component,
     registers_i32: registers::Component<i32, 32768>,
+    registers_scaled: registers::Component<core::Scaled, 32768>,
+    registers_glue: registers::Component<core::Glue, 32768>,
     registers_token_list: registers::Component<Vec<token::Token>, 256>,
     repl: repl::Component,
     script: script::Component,
@@ -156,6 +160,8 @@ where
         + HasComponent<job::Component>
         + HasComponent<prefix::Component>
         + HasComponent<registers::Component<i32, 32768>>
+        + HasComponent<registers::Component<core::Scaled, 32768>>
+        + HasComponent<registers::Component<core::Glue, 32768>>
         + HasComponent<registers::Component<Vec<token::Token>, 256>>
         + HasComponent<repl::Component>
         + HasComponent<script::Component>
@@ -175,6 +181,7 @@ where
         //
         ("day", time::get_day()),
         ("def", def::get_def()),
+        ("dimen", registers::get_dimen()),
         ("divide", math::get_divide()),
         ("dumpFormat", job::get_dumpformat()),
         ("dumpValidate", job::get_dumpvalidate()),
@@ -230,6 +237,7 @@ where
         ("relax", expansion::get_relax()),
         //
         ("scrollmode", errormode::get_scrollmode()),
+        ("skip", registers::get_skip()),
         ("sleep", sleep::get_sleep()),
         //
         ("the", the::get_the()),

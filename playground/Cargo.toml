@@ -20,6 +20,7 @@ web-sys = {version = "0.3.22", features = ["console"]}
 # in debug mode.
 console_error_panic_hook = "0.1.5"
 
+core = { path = "../crates/core", default-features = false }
 texcraft-stdext = { path = "../crates/texcraft-stdext", default-features = false }
 texlang = { path = "../crates/texlang", default-features = false }
 texlang-stdlib = { path = "../crates/texlang-stdlib", default-features = false }

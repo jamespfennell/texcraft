@@ -1,5 +1,6 @@
 use clap::Parser;
 use colored::Colorize;
+use core;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::PathBuf;
@@ -94,7 +95,7 @@ fn run(vm: &mut vm::VM<State>, mut path: PathBuf) -> Result<(), Box<error::Trace
 
 fn repl(vm: &mut vm::VM<State>) {
     println!("{}\n", REPL_START.trim());
-    repl::run::run(
+    repl::start(
         vm,
         repl::RunOptions {
             prompt: "TeX> ",
@@ -236,6 +237,8 @@ pub struct State {
     pub job: job::Component,
     pub prefix: prefix::Component,
     pub registers_i32: registers::Component<i32, 32768>,
+    pub registers_scaled: registers::Component<core::Scaled, 32768>,
+    pub registers_glue: registers::Component<core::Glue, 32768>,
     pub registers_token_list: registers::Component<Vec<token::Token>, 256>,
     pub repl: repl::Component,
     pub script: script::Component,
@@ -301,6 +304,8 @@ implement_has_component![State{
     job: job::Component,
     prefix: prefix::Component,
     registers_i32: registers::Component<i32, 32768>,
+    registers_scaled: registers::Component<core::Scaled, 32768>,
+    registers_glue: registers::Component<core::Glue, 32768>,
     registers_token_list: registers::Component<Vec<token::Token>, 256>,
     repl: repl::Component,
     script: script::Component,
