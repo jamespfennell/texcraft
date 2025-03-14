@@ -10,7 +10,6 @@ keywords = ["tex", "texcraft"]
 
 [dependencies]
 clap = {version="4.3.3", default-features=false, features=["std", "derive"]}
-colored = "3"
 rand = "0.8.4"
 rmp-serde = {version="^1.0"}
 serde_json = {version="1.0"} 

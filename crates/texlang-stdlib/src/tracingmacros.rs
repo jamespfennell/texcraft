@@ -1,6 +1,6 @@
 //! TeX macro debugging
 
-use colored::*;
+use texcraft_stdext::color::Colorize;
 use texlang::{command, texmacro, token::write_tokens, traits::*, variable, vm};
 
 /// Component for storing state related to macro tracing.

@@ -61,9 +61,6 @@ cargo tree -e normal --features="" --no-default-features \
     -p tfm
 ```
 
-Right now it doesn't because
-I haven't put `colored` behind a feature yet.
-
 Conversely, this shows the dependency tree when all features are enabled:
 
 ```sh

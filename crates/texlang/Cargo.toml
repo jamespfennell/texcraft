@@ -15,9 +15,9 @@ core = { path="../core" }
 texcraft-stdext = { path = "../texcraft-stdext" }
 
 # Third-party
-colored = { version="3" }
 serde = {features = ["derive"], version="^1.0", optional = true}
 
 [features]
-default = []
+default = ["color"]
+color = ["texcraft-stdext/color"]
 serde = ["dep:serde", "texcraft-stdext/serde", "core/serde"]

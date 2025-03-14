@@ -11,10 +11,12 @@ categories = ["algorithms", "data-structures"]
 
 [dependencies]
 serde = {features = ["derive"], version="^1.0", optional = true}
+colored = { version="3", optional=true }
 
 [dev-dependencies]
 serde_json = "1.0"
 
 [features]
 default = []
+color = ["dep:colored"]
 serde = ["dep:serde"]

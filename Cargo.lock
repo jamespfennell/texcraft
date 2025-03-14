@@ -1299,7 +1299,6 @@ name = "texcraft"
 version = "0.2.0"
 dependencies = [
  "clap 4.4.8",
- "colored",
  "core",
  "performance",
  "rand",
@@ -1331,6 +1330,7 @@ dependencies = [
 name = "texcraft-stdext"
 version = "0.1.0"
 dependencies = [
+ "colored",
  "serde",
  "serde_json",
 ]
@@ -1339,7 +1339,6 @@ dependencies = [
 name = "texlang"
 version = "0.1.0"
 dependencies = [
- "colored",
  "core",
  "serde",
  "texcraft-stdext",
@@ -1371,7 +1370,6 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "chrono",
- "colored",
  "core",
  "linefeed",
  "rmp-serde",

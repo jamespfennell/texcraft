@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-
 use crate::token::trace::{self, SourceCodeTrace};
 use crate::{error, token};
-use colored::*;
+use std::collections::HashMap;
+use texcraft_stdext::color::{self, Colorize};
 
 pub fn format_error(
     f: &mut std::fmt::Formatter<'_>,
@@ -63,17 +62,17 @@ struct PrimaryLine<'a> {
     notes: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum PrimaryLineKind {
     Error,
     Context,
 }
 
 impl PrimaryLineKind {
-    fn color(&self) -> colored::Color {
+    fn color(&self, s: &str) -> color::ColoredString {
         match self {
-            PrimaryLineKind::Error => colored::Color::BrightRed,
-            PrimaryLineKind::Context => colored::Color::Yellow,
+            PrimaryLineKind::Error => s.bright_red(),
+            PrimaryLineKind::Context => s.bright_yellow(),
         }
     }
 }
@@ -84,10 +83,9 @@ impl std::fmt::Display for PrimaryLineKind {
             f,
             "{}",
             match self {
-                PrimaryLineKind::Error => "Error",
-                PrimaryLineKind::Context => "Context",
+                PrimaryLineKind::Error => "Error".bright_red(),
+                PrimaryLineKind::Context => "Context".bright_yellow(),
             }
-            .color(self.color())
             .bold()
         )
     }
@@ -100,13 +98,7 @@ impl<'a> std::fmt::Display for PrimaryLine<'a> {
             indent: margin_width,
         };
         writeln!(f, "{}: {}", self.kind, self.title.bold())?;
-        fmt_source_code_trace(
-            &printer,
-            f,
-            self.source,
-            &self.token_annotation,
-            self.kind.color(),
-        )?;
+        fmt_source_code_trace(&printer, f, self.source, &self.token_annotation, self.kind)?;
 
         for (i, note) in self.notes.iter().enumerate() {
             let mut note_lines = note.trim_end().lines();
@@ -142,7 +134,7 @@ impl<'a> std::fmt::Display for ErrorStack<'a> {
                 writeln!(f)?;
             }
             let (s, p) = (&propagated.trace, &propagated.context);
-            fmt_source_code_trace_light(f, s, 2, PrimaryLineKind::Context.color(), p.action())?;
+            fmt_source_code_trace_light(f, s, 2, PrimaryLineKind::Context, p.action())?;
         }
         Ok(())
     }
@@ -220,7 +212,7 @@ fn fmt_source_code_trace(
     f: &mut std::fmt::Formatter<'_>,
     s: &trace::SourceCodeTrace,
     annotation: &str,
-    annotation_color: colored::Color,
+    line_kind: PrimaryLineKind,
 ) -> std::fmt::Result {
     printer
         .new_line()
@@ -248,8 +240,8 @@ fn fmt_source_code_trace(
         .with_content(format![
             "{}{} {}",
             " ".repeat(s.index),
-            "^".repeat(s.value.len()).color(annotation_color).bold(),
-            annotation.color(annotation_color).bold(),
+            line_kind.color(&"^".repeat(s.value.len())).bold(),
+            line_kind.color(annotation).bold(),
         ])
         .print(f)?;
     Ok(())
@@ -262,7 +254,7 @@ fn highlight_substring(line: &str, start: usize, length: usize) -> String {
     format![
         "{}{}{}",
         &line[..start],
-        line[start..start + length].bold(),
+        (&line[start..start + length]).bold(),
         line[start + length..].trim_end(),
     ]
 }
@@ -271,7 +263,7 @@ fn fmt_source_code_trace_light(
     f: &mut std::fmt::Formatter<'_>,
     s: &SourceCodeTrace,
     indent: usize,
-    underline_color: colored::Color,
+    line_kind: PrimaryLineKind,
     annotation: &str,
 ) -> std::fmt::Result {
     let prefix = format!(
@@ -294,7 +286,7 @@ fn fmt_source_code_trace_light(
         f,
         "{}  {} {}",
         " ".repeat(prefix.len() + s.index),
-        "^".repeat(s.value.len()).color(underline_color).bold(),
+        line_kind.color(&"^".repeat(s.value.len())).bold(),
         annotation,
     )?;
     Ok(())
@@ -338,7 +330,7 @@ impl<'a> std::fmt::Display for TracedNote<'a> {
             TracedNote::Text(s) => write!(f, "{s}"),
             TracedNote::SourceCodeTrace(s, trace) => {
                 write!(f, "{s}\n\n")?;
-                fmt_source_code_trace_light(f, trace, 2, PrimaryLineKind::Error.color(), "")
+                fmt_source_code_trace_light(f, trace, 2, PrimaryLineKind::Error, "")
             }
         }
     }

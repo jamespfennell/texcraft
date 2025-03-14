@@ -51,7 +51,7 @@ pub fn start<S: HasComponent<script::Component> + HasComponent<Component>>(
             let mut names: Vec<String> = vm
                 .get_commands_as_map_slow()
                 .into_keys()
-                .map(|s| format!["{s}"])
+                .map(|s| s.to_string())
                 .collect();
             names.sort();
             num_commands = Some(names.len());

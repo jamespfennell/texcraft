@@ -33,9 +33,6 @@ chrono = {version="0.4.19", default-features = false, features = ["clock"], opti
 ## In the REPL module, for reading terminal input in a nice way
 linefeed = {version = "0.6", optional = true }
 
-## In the tracing macros module
-colored = "3"
-
 ## The usual suspects
 serde = {version="^1.0", optional = true}
 serde_json = {version="1.0", optional = true}
@@ -46,10 +43,11 @@ bincode = {version="2.0.0-rc.3", default-features = false, features = ["alloc", 
 
 [features]
 default = ["time"]
-time = ["dep:chrono"]
+color = ["texcraft-stdext/color"]
 repl = ["dep:linefeed"]
 serde = [
     "dep:serde", "dep:serde_json", "dep:rmp-serde",
     "dep:bincode", "texcraft-stdext/serde", "texlang/serde",
     "texlang-testing/serde"
 ]
+time = ["dep:chrono"]

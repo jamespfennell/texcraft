@@ -388,7 +388,7 @@ impl TexError for UndefinedCommandError {
 
     fn notes(&self) -> Vec<display::Note> {
         let mut notes: Vec<display::Note> = Default::default();
-        use colored::Colorize;
+        use texcraft_stdext::color::Colorize;
         if let Some(close_name) = self.close_names.first() {
             notes.push(format!["did you mean \\{}?\n", close_name.right().bold(),].into());
         }

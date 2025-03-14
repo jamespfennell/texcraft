@@ -1,9 +1,8 @@
 use clap::Parser;
-use colored::Colorize;
-use core;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::PathBuf;
+use texcraft_stdext::color::Colorize;
 use texlang::traits::*;
 use texlang::*;
 use texlang_stdlib::job;

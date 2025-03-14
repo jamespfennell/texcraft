@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
-use core;
 use texcraft_stdext::collections::groupingmap;
 use texlang::prelude as txl;
 use texlang::traits::*;

@@ -8,8 +8,8 @@ use crate::token::Token;
 use crate::token::Value;
 use crate::traits::*;
 use crate::vm;
-use colored::*;
 use texcraft_stdext::algorithms::substringsearch::Matcher;
+use texcraft_stdext::color::Colorize;
 
 /// A TeX Macro.
 #[derive(Debug, Clone)]
