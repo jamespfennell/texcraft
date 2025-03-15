@@ -20,13 +20,11 @@ enum SubCommand {
 fn main() {
     let args: Cli = Cli::parse();
     let result = match args.sub_command {
-        SubCommand::Check(c) => c.run(),
-        SubCommand::Tex(tex) => match tex.sub_command {
-            TexSubCommand::Hlist(tex_convert_text) => tex_convert_text.run(),
-        },
+        SubCommand::Check(check) => check.run(),
+        SubCommand::Tex(tex) => tex.run(),
     };
     if let Err(err) = result {
-        println!["{err}"];
+        println!["Error: {err}"];
         std::process::exit(1);
     }
 }
@@ -63,29 +61,54 @@ impl Check {
 struct Tex {
     #[clap(subcommand)]
     sub_command: TexSubCommand,
+
+    /// The TeX engine to use (e.g. `tex`, `pdftex`).
+    ///
+    /// Defaults to `tex`.
+    #[clap(short, long)]
+    tex_engine: Option<String>,
+}
+
+impl Tex {
+    fn run(self) -> Result<(), String> {
+        match boxworks::tex::new_tex_engine_binary(self.tex_engine.unwrap_or("tex".to_string())) {
+            Ok(tex_engine) => match self.sub_command {
+                TexSubCommand::Hlists(tex_convert_text) => {
+                    tex_convert_text.run(tex_engine.as_ref())
+                }
+            },
+            Err(err) => Err(format!["{err}"]),
+        }
+    }
 }
 
 #[derive(Parser)]
 enum TexSubCommand {
-    Hlist(TexHlist),
+    Hlists(TexHlists),
 }
 
-/// Print the horizontal list that TeX builds for some text.
+/// Print the horizontal lists that TeX builds for some contents.
 #[derive(Parser)]
-struct TexHlist {
-    /// The text used to build the list.
-    text: String,
+struct TexHlists {
+    /// The contents used to build the lists.
+    ///
+    /// Each element of contents is used to build a separate horizontal list.
+    contents: Vec<String>,
 }
 
-impl TexHlist {
-    fn run(self) -> Result<(), String> {
-        let (fonts, list) = boxworks::tex::build_horizontal_list(&self.text);
+impl TexHlists {
+    fn run(self, tex_engine: &dyn boxworks::tex::TexEngine) -> Result<(), String> {
+        let (fonts, hlists) =
+            boxworks::tex::build_horizontal_lists(tex_engine, &mut self.contents.iter());
         println!("# fonts:");
-        for (i, font) in fonts.into_iter().enumerate() {
-            println!("# {i}: {font}");
+        for (font_name, font_number) in fonts.into_iter() {
+            println!("# - {font_name}={font_number}");
         }
-        let s = boxworks_lang::write_horizontal_list(&list);
-        print!("{s}");
+        for (i, hlist) in hlists.into_iter().enumerate() {
+            println!("#");
+            println!("# hlist {}", i + 1);
+            print!("{}", boxworks_lang::write_horizontal_list(&hlist));
+        }
         Ok(())
     }
 }

@@ -260,30 +260,35 @@ impl<'a> Str<'a> {
 }
 
 /// Write a horizontal list as Box language.
-pub fn write_horizontal_list(list: &[ds::Horizontal]) -> String {
+pub fn write_horizontal_list(list: &ds::HList) -> String {
+    use std::fmt::Write;
     let mut s = String::new();
-    for elem in list {
+    writeln!(&mut s, "hlist(").unwrap();
+    writeln!(&mut s, "  width={},", list.width).unwrap();
+    writeln!(&mut s, "  depth={},", list.depth).unwrap();
+    writeln!(&mut s, "  height={},", list.height).unwrap();
+    writeln!(&mut s, "  content=[").unwrap();
+    for elem in &list.list {
         use ds::Horizontal::*;
-        use std::fmt::Write;
         match elem {
             Char(char) => {
-                writeln!(&mut s, "text(\"{}\", font={})", char.char, char.font).unwrap();
+                writeln!(&mut s, "    text(\"{}\", font={})", char.char, char.font).unwrap();
             }
             Glue(glue) => {
                 writeln!(
                     &mut s,
-                    "glue({}, {}, {})",
+                    "    glue({}, {}, {})",
                     glue.value.width, glue.value.stretch, glue.value.shrink
                 )
                 .unwrap();
             }
             Kern(kern) => {
-                writeln!(&mut s, "kern({})", kern.width).unwrap();
+                writeln!(&mut s, "    kern({})", kern.width).unwrap();
             }
             Ligature(lig) => {
                 writeln!(
                     &mut s,
-                    "lig(\"{}\", font={}, original=\"{}\")",
+                    "    lig(\"{}\", font={}, original=\"{}\")",
                     lig.char.escape_default(),
                     lig.font,
                     lig.original_chars
@@ -293,6 +298,7 @@ pub fn write_horizontal_list(list: &[ds::Horizontal]) -> String {
             _ => todo!(),
         }
     }
+    writeln!(&mut s, "  ],\n)").unwrap();
     s
 }
 

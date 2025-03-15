@@ -38,6 +38,7 @@
         "groupingmap",
         "Hasher",
         "Hlist",
+        "Hlists",
         "Hola",
         "ifcase",
         "ifeof",
