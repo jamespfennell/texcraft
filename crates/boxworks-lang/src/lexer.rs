@@ -1,3 +1,5 @@
+//! Lexer and tokens for Box language.
+
 pub struct Lexer<'a> {
     s: &'a str,
     u: usize,
@@ -16,6 +18,9 @@ impl<'a> Lexer<'a> {
     }
     pub fn errs_mut(&mut self) -> &mut Vec<super::Error<'a>> {
         &mut self.errs
+    }
+    pub fn cur_pos(&self) -> usize {
+        self.u
     }
 }
 

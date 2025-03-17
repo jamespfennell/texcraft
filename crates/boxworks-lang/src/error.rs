@@ -41,6 +41,9 @@ pub enum Error<'a> {
         first_assignment: Str<'a>,
         second_assignment: Str<'a>,
     },
+
+    /// The specified function does not exist.
+    NoSuchFunction { function_name: Str<'a> },
 }
 
 impl<'a> Error<'a> {
@@ -55,6 +58,9 @@ impl<'a> Error<'a> {
             NoSuchArgument { .. } => "No such argument to this function".into(),
             DuplicateArgument { parameter_name, .. } => {
                 format!["The `{parameter_name}` argument was provided multiple times"]
+            }
+            NoSuchFunction { function_name } => {
+                format!["Unknown function `{function_name}`"]
             }
         }
     }
@@ -75,6 +81,7 @@ impl<'a> Error<'a> {
             DuplicateArgument {
                 first_assignment, ..
             } => first_assignment.span(),
+            NoSuchFunction { function_name } => function_name.span(),
         }
     }
     pub fn labels(&self) -> Vec<ErrorLabel> {
@@ -157,6 +164,12 @@ impl<'a> Error<'a> {
                     text: "the second value appear here".to_string(),
                 },
             ],
+            NoSuchFunction { function_name } => vec![
+                ErrorLabel {
+                    span: function_name.span(),
+                    text: "there is no function with this name".to_string(),
+                },
+            ],
         }
     }
     pub fn notes(&self) -> Vec<String> {
@@ -171,7 +184,8 @@ impl<'a> Error<'a> {
             IncorrectType { .. }
             | TooManyPositionalArgs { .. }
             | NoSuchArgument { .. }
-            | DuplicateArgument { .. } => vec![],
+            | DuplicateArgument { .. }
+            | NoSuchFunction { .. } => vec![],
         }
     }
 }
@@ -271,5 +285,6 @@ mod tests {
             r#"text(random="Hello")"#,
             Error::NoSuchArgument,
         ),
+        (invalid_func_name, r#"random()"#, Error::NoSuchFunction,),
     );
 }

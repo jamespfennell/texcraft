@@ -14,6 +14,7 @@ struct Cli {
 #[derive(Parser)]
 enum SubCommand {
     Check(Check),
+    Fmt(Fmt),
     Tex(Tex),
 }
 
@@ -21,6 +22,7 @@ fn main() {
     let args: Cli = Cli::parse();
     let result = match args.sub_command {
         SubCommand::Check(check) => check.run(),
+        SubCommand::Fmt(fmt) => fmt.run(),
         SubCommand::Tex(tex) => tex.run(),
     };
     if let Err(err) = result {
@@ -52,6 +54,36 @@ impl Check {
             }
             return Err(format!("Input file had {} errors", errs.len()));
         }
+        Ok(())
+    }
+}
+
+/// Format a Box file.
+#[derive(Parser)]
+struct Fmt {
+    /// Path to the Box file.
+    path: PathBuf,
+}
+
+impl Fmt {
+    fn run(self) -> Result<(), String> {
+        let source = match fs::read_to_string(&self.path) {
+            Ok(source) => source,
+            Err(err) => {
+                return Err(format!["failed to open file {:?}: {err}", &self.path]);
+            }
+        };
+        match bwl::format(&source) {
+            Ok(s) => print!["{s}"],
+            Err(errs) => {
+                let path = self.path.to_string_lossy();
+                let cache: (&str, _) = (&path, ariadne::Source::from(source.clone()));
+                for err in &errs {
+                    err.ariadne_report(&path).print(cache.clone()).unwrap();
+                }
+                return Err(format!("Input file had {} errors", errs.len()));
+            }
+        };
         Ok(())
     }
 }

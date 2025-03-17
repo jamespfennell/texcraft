@@ -16,5 +16,8 @@ text(content="Hello", content="World")
 # Duplicate positional and keyword args
 text("Hello", content="World")
 
+# Invalid function name
+random()
+
 # Invalid keyword arg
 text(random="Hello")
