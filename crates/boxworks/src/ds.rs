@@ -429,15 +429,15 @@ impl Vertical {
 /// Described in TeX.2021.149.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Glue {
-    pub kind: GlueKind,
     pub value: core::Glue,
+    pub kind: GlueKind,
 }
 
 impl From<core::Glue> for Glue {
     fn from(value: core::Glue) -> Self {
         Self {
-            kind: Default::default(),
             value,
+            kind: Default::default(),
         }
     }
 }
@@ -468,8 +468,8 @@ pub enum GlueKind {
 /// Described in TeX.2021.155.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Kern {
-    pub kind: KernKind,
     pub width: Number,
+    pub kind: KernKind,
 }
 
 /// The kind of a kern node.

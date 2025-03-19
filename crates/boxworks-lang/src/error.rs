@@ -24,7 +24,7 @@ pub enum Error<'a> {
 
     /// Too many positional arguments provided.
     TooManyPositionalArgs {
-        extra_positional_args: Vec<Str<'a>>,
+        extra_positional_arg: Str<'a>,
         function_name: Str<'a>,
         max_positional_args: usize,
     },
@@ -70,13 +70,9 @@ impl<'a> Error<'a> {
             PositionalArgAfterKeywordArg { positional_arg, .. } => positional_arg.span(),
             IncorrectType { got_raw_value, .. } => got_raw_value.span(),
             TooManyPositionalArgs {
-                extra_positional_args,
+                extra_positional_arg: extra_positional_args,
                 ..
-            } => {
-                let first = extra_positional_args.first().unwrap();
-                let last = extra_positional_args.last().unwrap();
-                first.start..last.end
-            }
+            } => extra_positional_args.span(),
             NoSuchArgument { argument, .. } => argument.span(),
             DuplicateArgument {
                 first_assignment, ..
@@ -121,18 +117,15 @@ impl<'a> Error<'a> {
                     ],
                 },
             ],
-            TooManyPositionalArgs { extra_positional_args, function_name, max_positional_args } => vec![
+            TooManyPositionalArgs { extra_positional_arg: _, function_name, max_positional_args } => vec![
                 ErrorLabel {
                     span: self.main_span(),
-                    text: format![
-                        "{} extra arguments were provided",
-                        extra_positional_args.len(),
-                    ],
+                    text: "an extra positional arguments was provided".to_string(),
                 },
                 ErrorLabel {
                     span: function_name.span(),
                     text: format![
-                        "The `{}` function accepts up to {max_positional_args} arguments",
+                        "The `{}` function accepts up to {max_positional_args} positional arguments",
                         function_name.str()
                     ],
                 },
@@ -261,9 +254,14 @@ mod tests {
             Error::IncorrectType,
         ),
         (
-            too_many_positional_args,
-            r#"text("Hello", 3, 3, "World", "Mundo")"#,
+            too_many_positional_args_1,
+            r#"text("Hello", 3, "Mundo")"#,
             Error::TooManyPositionalArgs,
+        ),
+        (
+            too_many_positional_args_2,
+            r#"text("Hello", font=3, "Mundo")"#,
+            Error::PositionalArgAfterKeywordArg,
         ),
         (
             positional_arg_after_keyword_arg,

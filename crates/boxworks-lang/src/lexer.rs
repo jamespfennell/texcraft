@@ -1,5 +1,7 @@
 //! Lexer and tokens for Box language.
 
+use std::borrow::Cow;
+
 pub struct Lexer<'a> {
     s: &'a str,
     u: usize,
@@ -30,7 +32,7 @@ pub struct Token<'a> {
     pub source: super::Str<'a>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TokenValue<'a> {
     SquareOpen,
     SquareClose,
@@ -39,32 +41,35 @@ pub enum TokenValue<'a> {
     Comma,
     Equal,
     Keyword(&'a str),
-    String(&'a str),
+    String(Cow<'a, str>),
     Integer(i32),
     Scaled(core::Scaled),
     InfiniteGlue(core::Scaled, core::GlueOrder),
 }
 
-impl<'a> Iterator for Lexer<'a> {
-    type Item = Token<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
+impl<'a> Lexer<'a> {
+    pub fn next(&mut self, comments: &mut Vec<&'a str>) -> Option<Token<'a>> {
         if let Some(cached) = self.cache.take() {
             return Some(cached);
         }
         // Consume whitespace and comments
-        let mut in_comment = false;
+        let mut comment_start: Option<usize> = None;
         while let Some(c) = self.s[self.u..].chars().next() {
             let should_skip = match c {
                 '\n' => {
-                    in_comment = false;
+                    if let Some(comment_start) = comment_start {
+                        comments.push(&self.s[comment_start..self.u]);
+                    }
+                    comment_start = None;
                     true
                 }
                 '#' => {
-                    in_comment = true;
+                    if comment_start.is_none() {
+                        comment_start = Some(self.u + 1);
+                    }
                     true
                 }
-                c => in_comment || c.is_whitespace(),
+                c => comment_start.is_some() || c.is_whitespace(),
             };
             if !should_skip {
                 break;
@@ -103,7 +108,7 @@ impl<'a> Iterator for Lexer<'a> {
                         }
                     }
                 }
-                String(&self.s[u + 1..self.u - 1])
+                String(Cow::Borrowed(&self.s[u + 1..self.u - 1]))
             }
             '0'..='9' => {
                 let start = (c as i32) - ('0' as i32);
@@ -134,8 +139,8 @@ impl<'a> Lexer<'a> {
     pub fn error(&mut self, err: super::Error<'a>) {
         self.errs.push(err);
     }
-    pub fn peek(&mut self) -> Option<Token<'a>> {
-        let next = self.next();
+    pub fn peek(&mut self, comments: &mut Vec<&'a str>) -> Option<Token<'a>> {
+        let next = self.next(comments);
         self.cache = next.clone();
         next
     }

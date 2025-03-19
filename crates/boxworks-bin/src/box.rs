@@ -136,10 +136,14 @@ impl TexHlists {
         for (font_name, font_number) in fonts.into_iter() {
             println!("# - {font_name}={font_number}");
         }
-        for (i, hlist) in hlists.into_iter().enumerate() {
+
+        use bwl::convert::ToBoxLang;
+        let lang: Vec<bwl::ast::Hlist<'static>> = hlists.to_box_lang();
+        for (i, hlist) in lang.into_iter().enumerate() {
             println!("#");
             println!("# hlist {}", i + 1);
-            print!("{}", boxworks_lang::write_horizontal_list(&hlist));
+            println!("{}", bwl::ast::Horizontal::Hlist(hlist));
+            // print!("{}", boxworks_lang::write_horizontal_list(&hlist));
         }
         Ok(())
     }

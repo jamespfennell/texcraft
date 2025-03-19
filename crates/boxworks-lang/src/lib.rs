@@ -229,13 +229,14 @@
 //! | 1      | `content` | string | `""`   |
 //! | 2      | `font` | integer | `0`   |
 pub mod ast;
+pub mod convert;
 mod error;
 pub mod lexer;
 pub mod parse;
+use convert::ToBoxworks;
 pub use error::{Error, ErrorLabel};
 
 use boxworks::ds;
-use core::Scaled;
 
 /// String type used in error messages.
 #[derive(Debug, Clone)]
@@ -298,110 +299,10 @@ pub fn format(source: &str) -> Result<String, Vec<error::Error>> {
     Ok(s)
 }
 
-/// Write a horizontal list as Box language.
-pub fn write_horizontal_list(list: &ds::HList) -> String {
-    use std::fmt::Write;
-    let mut s = String::new();
-    writeln!(&mut s, "hlist(").unwrap();
-    writeln!(&mut s, "  width={},", list.width).unwrap();
-    writeln!(&mut s, "  depth={},", list.depth).unwrap();
-    writeln!(&mut s, "  height={},", list.height).unwrap();
-    writeln!(&mut s, "  content=[").unwrap();
-    for elem in &list.list {
-        use ds::Horizontal::*;
-        match elem {
-            Char(char) => {
-                writeln!(&mut s, "    text(\"{}\", font={})", char.char, char.font).unwrap();
-            }
-            Glue(glue) => {
-                writeln!(
-                    &mut s,
-                    "    glue({}, {}, {})",
-                    glue.value.width, glue.value.stretch, glue.value.shrink
-                )
-                .unwrap();
-            }
-            Kern(kern) => {
-                writeln!(&mut s, "    kern({})", kern.width).unwrap();
-            }
-            Ligature(lig) => {
-                writeln!(
-                    &mut s,
-                    "    lig(\"{}\", font={}, original=\"{}\")",
-                    lig.char.escape_default(),
-                    lig.font,
-                    lig.original_chars
-                )
-                .unwrap();
-            }
-            _ => todo!(),
-        }
-    }
-    writeln!(&mut s, "  ],\n)").unwrap();
-    s
-}
-
 /// Parse Box language source code into a horizontal list.
 pub fn parse_horizontal_list(source: &str) -> Result<Vec<ds::Horizontal>, Vec<Error>> {
     let ast_nodes = ast::parse_horizontal_list(source)?;
-    let mut v = vec![];
-    for h in ast_nodes {
-        use ast::Horizontal::*;
-        match h {
-            Glue(args) => {
-                v.push(
-                    ds::Glue {
-                        kind: ds::GlueKind::Normal,
-                        value: core::Glue {
-                            width: args.width.value,
-                            stretch: args.stretch.value.0,
-                            stretch_order: args.stretch.value.1,
-                            shrink: args.shrink.value.0,
-                            shrink_order: args.shrink.value.1,
-                        },
-                    }
-                    .into(),
-                );
-            }
-            Kern(args) => {
-                v.push(
-                    ds::Kern {
-                        kind: ds::KernKind::Normal,
-                        width: args.kern.value,
-                    }
-                    .into(),
-                );
-            }
-            Text(args) => {
-                for c in args.content.value.chars() {
-                    if c.is_whitespace() {
-                        v.push(
-                            ds::Glue {
-                                kind: ds::GlueKind::Normal,
-                                value: core::Glue {
-                                    width: Scaled::ONE * 10,
-                                    stretch: Scaled::ONE * 4,
-                                    shrink: Scaled::ONE * 4,
-                                    ..Default::default()
-                                },
-                            }
-                            .into(),
-                        );
-                        continue;
-                    }
-                    v.push(
-                        ds::Char {
-                            char: c,
-                            font: args.font.value as u32,
-                        }
-                        .into(),
-                    );
-                }
-            }
-            Hlist(_) => todo!(),
-        }
-    }
-    Ok(v)
+    Ok(ast_nodes.to_boxworks())
 }
 
 #[cfg(test)]
@@ -410,30 +311,48 @@ mod tests {
 
     #[test]
     fn test_format() {
-        let input = r#"hlist
+        let input = r#"# This is a
+#  list of things
+hlist
 
         (
-
     1.0pt, height =2.0pt,
 
-    contents = [ glue(  ) 
+    contents = [ # glue is good
+        glue(  ) 
     
-    text("Hello", font =  
-    
-    0) text("World")] ,
+text("Hello", font = 
+# we use an unusual font here
+1)
 
+    text("Hello", font =  
+
+
+    0) text("World")] ,
+        # Infinite glue
     other=3.0fill
+    # there are no more arguments
 )
 "#;
-        let want = r#"hlist(
+        let want = r#"# This is a
+#  list of things
+hlist(
   1.0pt,
   height=2.0pt,
   contents=[
+    # glue is good
     glue()
+    text(
+      "Hello",
+      # we use an unusual font here
+      font=1,
+    )
     text("Hello", font=0)
     text("World")
   ],
+  # Infinite glue
   other=3.0fill,
+  # there are no more arguments
 )
 "#;
         let got = format(&input).unwrap();

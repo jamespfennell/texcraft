@@ -4,14 +4,27 @@ use super::error::Error;
 use super::lexer;
 use super::parse;
 use super::Str;
+use std::borrow::Cow;
 
 /// Element of a horizontal list
 #[derive(Debug, PartialEq, Eq)]
 pub enum Horizontal<'a> {
-    Text(TextArgs<'a>),
-    Glue(GlueArgs<'a>),
-    Kern(KernArgs<'a>),
-    Hlist(HlistArgs<'a>),
+    Text(Text<'a>),
+    Glue(Glue<'a>),
+    Kern(Kern<'a>),
+    Hlist(Hlist<'a>),
+}
+
+impl<'a> Horizontal<'a> {
+    pub fn lower(&self) -> parse::FuncCall<'a> {
+        lower_horizontal(self)
+    }
+}
+
+impl<'a> std::fmt::Display for Horizontal<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.lower())
+    }
 }
 
 /// Parse Box language source code into a horizontal list.
@@ -69,6 +82,13 @@ macro_rules! functions {
                     }
                 }
             }
+            fn lower(&self) -> Vec<(Option<Str<'static>>, parse::Arg<$lifetime>)> {
+                vec![
+                    $(
+                        (Some(stringify!($field_name).into()), self.$field_name.lower()),
+                    )+
+                ]
+            }
         }
         )+
 
@@ -89,6 +109,18 @@ macro_rules! functions {
             };
             Some(h)
         }
+        fn lower_horizontal<'a>(h: &Horizontal<'a>) -> parse::FuncCall<'a> {
+            match h {
+                $( $(
+                    Horizontal::$variant(args) => parse::FuncCall {
+                        comments: vec![],
+                        func_name: $func_name.into(),
+                        args: args.lower(),
+                        trailing_comments: vec![],
+                    },
+                )? )+
+            }
+        }
     };
 }
 
@@ -106,23 +138,39 @@ trait Args<'b>: Default {
     fn build(call: &parse::FuncCall<'b>, errs: &mut Vec<Error<'b>>) -> Option<Self> {
         let mut p: Self = Default::default();
         let start = errs.len();
-        let mut iter = call.pos_args.iter();
-        for field_name in Self::FIELD_NAMES {
-            let Some(node) = iter.next() else {
-                break;
+        let mut field_names = Self::FIELD_NAMES.iter();
+        let mut last_keyword_arg: Option<Str> = None;
+        for (keyword_or, arg) in &call.args {
+            let field_name = match keyword_or {
+                // Positional argument
+                None => {
+                    if let Some(keyword_arg) = &last_keyword_arg {
+                        errs.push(Error::PositionalArgAfterKeywordArg {
+                            positional_arg: arg.source.clone(),
+                            keyword_arg: keyword_arg.clone(),
+                        });
+                        continue;
+                    }
+                    let Some(field_name) = field_names.next() else {
+                        errs.push(Error::TooManyPositionalArgs {
+                            extra_positional_arg: arg.source.clone(),
+                            function_name: call.func_name.clone(),
+                            max_positional_args: Self::FIELD_NAMES.len(),
+                        });
+                        continue;
+                    };
+                    Str::new(field_name)
+                }
+                // Keyword argument
+                Some(field_name) => {
+                    last_keyword_arg = Some(Str {
+                        end: arg.source.end,
+                        ..*field_name
+                    });
+                    field_name.clone()
+                }
             };
-            p.assign_to_field(Str::new(field_name), node, call, errs);
-        }
-        let extra_positional_args: Vec<Str<'b>> = iter.map(|node| node.source.clone()).collect();
-        if !extra_positional_args.is_empty() {
-            errs.push(Error::TooManyPositionalArgs {
-                extra_positional_args,
-                function_name: call.func_name.clone(),
-                max_positional_args: Self::FIELD_NAMES.len(),
-            });
-        }
-        for (field_name, node) in &call.keyword_args {
-            p.assign_to_field(field_name.clone(), node, call, errs);
+            p.assign_to_field(field_name, arg, call, errs);
         }
         if errs.len() == start {
             Some(p)
@@ -130,12 +178,14 @@ trait Args<'b>: Default {
             None
         }
     }
+
+    fn lower(&self) -> Vec<(Option<Str<'static>>, parse::Arg<'b>)>;
 }
 
 functions!(
     (
-        struct TextArgs<'a> {
-            content: &'a str,
+        struct Text<'a> {
+            content: Cow<'a, str>,
             font: i32,
         }
         impl Horizontal {
@@ -144,7 +194,7 @@ functions!(
         }
     ),
     (
-        struct GlueArgs<'a> {
+        struct Glue<'a> {
             width: core::Scaled,
             stretch: (core::Scaled, core::GlueOrder),
             shrink: (core::Scaled, core::GlueOrder),
@@ -155,8 +205,8 @@ functions!(
         }
     ),
     (
-        struct KernArgs<'a> {
-            kern: core::Scaled,
+        struct Kern<'a> {
+            width: core::Scaled,
         }
         impl Horizontal {
             func_name: "kern",
@@ -164,7 +214,7 @@ functions!(
         }
     ),
     (
-        struct HlistArgs<'a> {
+        struct Hlist<'a> {
             width: core::Scaled,
             content: Vec<Horizontal<'a>>,
         }
@@ -187,9 +237,22 @@ pub struct Arg<'a, T> {
     pub source: Option<Str<'a>>,
 }
 
+impl<'a, T> From<T> for Arg<'a, T> {
+    fn from(value: T) -> Self {
+        Arg {
+            value,
+            source: None,
+        }
+    }
+}
+
+// I think this private_bounds warning is a Rust bug?
+// All of the impl methods are private to this module so the bound
+// can't be seen from outside the module.
+#[allow(private_bounds)]
 impl<'a, T> Arg<'a, T>
 where
-    T: TryCast<'a>,
+    T: Value<'a>,
 {
     fn assign(
         &mut self,
@@ -220,11 +283,21 @@ where
             }),
         }
     }
+    fn lower(&self) -> parse::Arg<'a> {
+        parse::Arg {
+            comments: vec![],
+            value: self.value.lower(),
+            source: self.source.clone().unwrap_or("".into()),
+        }
+    }
 }
 
-/// Types that can possibly be obtained from a [`parse::Value`].
-pub trait TryCast<'a>: Sized {
-    /// Try to cast the value to this type.
+/// Values in the AST.
+///
+/// These can possibly be obtained from a [`parse::Value`]
+///     and always lowered to a [`parse::Value`].
+trait Value<'a>: Sized {
+    /// Try to cast a [`parse::Value`] to this type.
     fn try_cast(value: &parse::Value<'a>) -> Result<Self, TryCastError>;
 
     /// Try to cast the value to this type in cases where multiple errors can occur.
@@ -235,27 +308,33 @@ pub trait TryCast<'a>: Sized {
         _ = errs;
         Self::try_cast(value)
     }
+
+    /// Lower this value to a [`parse::Value`].
+    fn lower(&self) -> parse::Value<'a>;
 }
 
 /// Error created when casting a value to a concrete type fails.
-pub struct TryCastError {
+struct TryCastError {
     pub got: &'static str,
     pub want: &'static str,
 }
 
-impl<'a> TryCast<'a> for &'a str {
+impl<'a> Value<'a> for Cow<'a, str> {
     fn try_cast(value: &parse::Value<'a>) -> Result<Self, TryCastError> {
         match value {
-            parse::Value::String(s) => Ok(*s),
+            parse::Value::String(s) => Ok(s.clone()),
             _ => Err(TryCastError {
                 got: value.description(),
                 want: "a string",
             }),
         }
     }
+    fn lower(&self) -> parse::Value<'a> {
+        parse::Value::String(self.clone())
+    }
 }
 
-impl<'a> TryCast<'a> for i32 {
+impl<'a> Value<'a> for i32 {
     fn try_cast(value: &parse::Value<'a>) -> Result<Self, TryCastError> {
         match value {
             parse::Value::Integer(i) => Ok(*i),
@@ -265,9 +344,12 @@ impl<'a> TryCast<'a> for i32 {
             }),
         }
     }
+    fn lower(&self) -> parse::Value<'a> {
+        parse::Value::Integer(*self)
+    }
 }
 
-impl<'a> TryCast<'a> for core::Scaled {
+impl<'a> Value<'a> for core::Scaled {
     fn try_cast(value: &parse::Value<'a>) -> Result<Self, TryCastError> {
         match value {
             parse::Value::Scaled(i) => Ok(*i),
@@ -277,9 +359,12 @@ impl<'a> TryCast<'a> for core::Scaled {
             }),
         }
     }
+    fn lower(&self) -> parse::Value<'a> {
+        parse::Value::Scaled(*self)
+    }
 }
 
-impl<'a> TryCast<'a> for (core::Scaled, core::GlueOrder) {
+impl<'a> Value<'a> for (core::Scaled, core::GlueOrder) {
     fn try_cast(value: &parse::Value<'a>) -> Result<Self, TryCastError> {
         match value {
             parse::Value::Scaled(i) => Ok((*i, core::GlueOrder::Normal)),
@@ -290,9 +375,12 @@ impl<'a> TryCast<'a> for (core::Scaled, core::GlueOrder) {
             }),
         }
     }
+    fn lower(&self) -> parse::Value<'a> {
+        parse::Value::InfiniteGlue(self.0, self.1)
+    }
 }
 
-impl<'a> TryCast<'a> for Vec<Horizontal<'a>> {
+impl<'a> Value<'a> for Vec<Horizontal<'a>> {
     fn try_cast(value: &parse::Value<'a>) -> Result<Self, TryCastError> {
         _ = value;
         unimplemented!("must call try_cast_complex")
@@ -309,6 +397,9 @@ impl<'a> TryCast<'a> for Vec<Horizontal<'a>> {
             }),
         }
     }
+    fn lower(&self) -> parse::Value<'a> {
+        parse::Value::List(self.iter().map(|e| e.lower()).collect())
+    }
 }
 
 #[cfg(test)]
@@ -323,13 +414,13 @@ mod tests {
             )
         "#;
 
-        let want = vec![Horizontal::Hlist(HlistArgs {
+        let want = vec![Horizontal::Hlist(Hlist {
             width: Arg {
                 value: core::Scaled::ONE.into(),
                 source: Some("1pt".into()),
             },
             content: Arg {
-                value: vec![Horizontal::Text(TextArgs {
+                value: vec![Horizontal::Text(Text {
                     content: Arg {
                         value: "Hello".into(),
                         source: Some(r#""Hello""#.into()),
