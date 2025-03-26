@@ -230,15 +230,15 @@
 //! | 2      | `font` | integer | `0`   |
 pub mod ast;
 pub mod convert;
+pub mod cst;
 mod error;
 pub mod lexer;
-pub mod parse;
 use convert::ToBoxworks;
-pub use error::{Error, ErrorLabel};
+pub use error::{Error, ErrorAccumulator, ErrorLabel};
 
 use boxworks::ds;
 
-/// String type used in error messages.
+/// String type used in the crate's public API.
 #[derive(Debug, Clone)]
 pub struct Str<'a> {
     value: &'a str,
@@ -259,6 +259,9 @@ impl<'a> Str<'a> {
     }
     fn str(&self) -> &'a str {
         &self.value[self.span()]
+    }
+    fn is_empty(&self) -> bool {
+        self.start == self.end
     }
 }
 
@@ -288,14 +291,12 @@ impl<'a> Eq for Str<'a> {}
 
 /// Pretty-format Box source code.
 pub fn format(source: &str) -> Result<String, Vec<error::Error>> {
-    let mut l = lexer::Lexer::new(source);
-    let func_calls = parse::parse_list(&mut l);
-    l.check_errors()?;
+    let errs: ErrorAccumulator = Default::default();
+    let l = lexer::Lexer::new(source, errs.clone());
+    let func_calls = cst::parse_using_lexer(l, errs.clone());
+    errs.check()?;
     let mut s = String::new();
-    for func_call in func_calls {
-        use std::fmt::Write;
-        write!(&mut s, "{func_call}").unwrap();
-    }
+    cst::pretty_print(&mut s, func_calls).expect("no errors writing to string");
     Ok(s)
 }
 
@@ -330,7 +331,7 @@ text("Hello", font =
 
     0) text("World")] ,
         # Infinite glue
-    other=3.0fill
+    other=3.0fill,
     # there are no more arguments
 )
 "#;

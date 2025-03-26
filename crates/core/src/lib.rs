@@ -165,24 +165,34 @@ impl Scaled {
         Some(Scaled(self.0.checked_div(rhs)?))
     }
     // TeX.2021.103 print_scaled
-    pub fn display_no_units(self, fm: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(fm, "{}.", self.integer_part())?;
-        // Fractional part
-        let mut f = self.abs().fractional_part() * 10 + Scaled(5);
-        let mut delta = Scaled(10);
-        loop {
-            if delta > Scaled::ONE {
-                // round the last digit
-                f = f + Scaled(0o100000 - 50000);
-            }
-            fm.write_char(char::from_digit(f.integer_part().try_into().unwrap(), 10).unwrap())?;
-            f = f.fractional_part() * 10;
-            delta = delta * 10;
-            if f <= delta {
-                break;
+    pub fn display_no_units(self) -> impl std::fmt::Display {
+        struct D {
+            s: Scaled,
+        }
+        impl std::fmt::Display for D {
+            fn fmt(&self, fm: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(fm, "{}.", self.s.integer_part())?;
+                // Fractional part
+                let mut f = self.s.abs().fractional_part() * 10 + Scaled(5);
+                let mut delta = Scaled(10);
+                loop {
+                    if delta > Scaled::ONE {
+                        // round the last digit
+                        f = f + Scaled(0o100000 - 50000);
+                    }
+                    fm.write_char(
+                        char::from_digit(f.integer_part().try_into().unwrap(), 10).unwrap(),
+                    )?;
+                    f = f.fractional_part() * 10;
+                    delta = delta * 10;
+                    if f <= delta {
+                        break;
+                    }
+                }
+                Ok(())
             }
         }
-        Ok(())
+        D { s: self }
     }
 }
 
@@ -192,7 +202,7 @@ pub struct OverflowError;
 impl std::fmt::Display for Scaled {
     fn fmt(&self, fm: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Integer part
-        self.display_no_units(fm)?;
+        write!(fm, "{}", self.display_no_units())?;
         // Units
         write!(fm, "pt")?;
         Ok(())
@@ -406,12 +416,12 @@ impl std::fmt::Display for Glue {
         write!(f, "{}", self.width)?;
         if self.stretch != Scaled::ZERO {
             write!(f, " plus ")?;
-            self.stretch.display_no_units(f)?;
+            write!(f, "{}", self.stretch.display_no_units())?;
             write!(f, "{}", self.stretch_order)?;
         }
         if self.shrink != Scaled::ZERO {
             write!(f, " minus ")?;
-            self.shrink.display_no_units(f)?;
+            write!(f, "{}", self.shrink.display_no_units())?;
             write!(f, "{}", self.shrink_order)?;
         }
         Ok(())

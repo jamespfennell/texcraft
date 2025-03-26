@@ -1,8 +1,10 @@
 //! Box language abstract syntax tree
 //!
+use crate::ErrorAccumulator;
+
+use super::cst;
 use super::error::Error;
 use super::lexer;
-use super::parse;
 use super::Str;
 use std::borrow::Cow;
 
@@ -16,7 +18,7 @@ pub enum Horizontal<'a> {
 }
 
 impl<'a> Horizontal<'a> {
-    pub fn lower(&self) -> parse::FuncCall<'a> {
+    pub fn lower(&self) -> cst::FuncCall<'a> {
         lower_horizontal(self)
     }
 }
@@ -29,14 +31,15 @@ impl<'a> std::fmt::Display for Horizontal<'a> {
 
 /// Parse Box language source code into a horizontal list.
 pub fn parse_horizontal_list(source: &str) -> Result<Vec<Horizontal>, Vec<Error>> {
-    let mut lexer = lexer::Lexer::new(source);
-    let calls = parse::parse_list(&mut lexer);
-    let v = convert(&calls, lexer.errs_mut());
-    lexer.check_errors()?;
+    let errs: ErrorAccumulator = Default::default();
+    let lexer = lexer::Lexer::new(source, errs.clone());
+    let calls = cst::Tree::build(cst::parse_using_lexer(lexer, errs.clone()));
+    let v = convert(&calls.calls, &errs);
+    errs.check()?;
     Ok(v)
 }
 
-fn convert<'a>(calls: &[parse::FuncCall<'a>], errs: &mut Vec<Error<'a>>) -> Vec<Horizontal<'a>> {
+fn convert<'a>(calls: &[cst::FuncCall<'a>], errs: &ErrorAccumulator<'a>) -> Vec<Horizontal<'a>> {
     let mut v: Vec<Horizontal> = vec![];
     for call in calls {
         if let Some(elem) = convert_call(call, errs) {
@@ -69,7 +72,7 @@ macro_rules! functions {
         }
         impl<$lifetime> Args<$lifetime> for $name <$lifetime> {
             const FIELD_NAMES: &'static[&'static str] = &[ $( stringify!($field_name), )+];
-            fn assign_to_field(&mut self, field_name: Str<$lifetime>, arg: &parse::Arg<$lifetime>, call: &parse::FuncCall<$lifetime>, errs: &mut Vec<Error<$lifetime>>)
+            fn assign_to_field(&mut self, field_name: Str<$lifetime>, arg: &cst::Arg<$lifetime>, call: &cst::FuncCall<$lifetime>, errs: &ErrorAccumulator<$lifetime>)
             {
                 match field_name.str() {
                 $(
@@ -78,14 +81,14 @@ macro_rules! functions {
                     }
                 )+
                     _ => {
-                        errs.push(Error::NoSuchArgument{function_name: call.func_name.clone(), argument: field_name });
+                        errs.add(Error::NoSuchArgument{function_name: call.func_name.clone(), argument: field_name });
                     }
                 }
             }
-            fn lower(&self) -> Vec<(Option<Str<'static>>, parse::Arg<$lifetime>)> {
+            fn lower(&self) -> Vec<cst::Arg<$lifetime>> {
                 vec![
                     $(
-                        (Some(stringify!($field_name).into()), self.$field_name.lower()),
+                        self.$field_name.lower(Some(stringify!($field_name).into())),
                     )+
                 ]
             }
@@ -93,15 +96,15 @@ macro_rules! functions {
         )+
 
         fn convert_call<'a>(
-            call: &parse::FuncCall<'a>,
-            errs: &mut Vec<Error<'a>>,
+            call: &cst::FuncCall<'a>,
+            errs: &ErrorAccumulator<'a>,
         ) -> Option<Horizontal<'a>> {
             let h = match call.func_name.str() {
                 $( $(
                     $func_name => Horizontal::$variant($name::build(&call, errs)?),
                 )? )+
                 _ => {
-                    errs.push(Error::NoSuchFunction {
+                    errs.add(Error::NoSuchFunction {
                         function_name: call.func_name.clone(),
                     });
                     return None;
@@ -109,10 +112,10 @@ macro_rules! functions {
             };
             Some(h)
         }
-        fn lower_horizontal<'a>(h: &Horizontal<'a>) -> parse::FuncCall<'a> {
+        fn lower_horizontal<'a>(h: &Horizontal<'a>) -> cst::FuncCall<'a> {
             match h {
                 $( $(
-                    Horizontal::$variant(args) => parse::FuncCall {
+                    Horizontal::$variant(args) => cst::FuncCall {
                         comments: vec![],
                         func_name: $func_name.into(),
                         args: args.lower(),
@@ -130,30 +133,30 @@ trait Args<'b>: Default {
     fn assign_to_field(
         &mut self,
         field_name: Str<'b>,
-        arg: &parse::Arg<'b>,
-        call: &parse::FuncCall<'b>,
-        errs: &mut Vec<Error<'b>>,
+        arg: &cst::Arg<'b>,
+        call: &cst::FuncCall<'b>,
+        errs: &ErrorAccumulator<'b>,
     );
 
-    fn build(call: &parse::FuncCall<'b>, errs: &mut Vec<Error<'b>>) -> Option<Self> {
+    fn build(call: &cst::FuncCall<'b>, errs: &ErrorAccumulator<'b>) -> Option<Self> {
         let mut p: Self = Default::default();
         let start = errs.len();
         let mut field_names = Self::FIELD_NAMES.iter();
         let mut last_keyword_arg: Option<Str> = None;
-        for (keyword_or, arg) in &call.args {
-            let field_name = match keyword_or {
+        for arg in &call.args {
+            let field_name = match &arg.key {
                 // Positional argument
                 None => {
                     if let Some(keyword_arg) = &last_keyword_arg {
-                        errs.push(Error::PositionalArgAfterKeywordArg {
-                            positional_arg: arg.source.clone(),
+                        errs.add(Error::PositionalArgAfterKeywordArg {
+                            positional_arg: arg.value_source.clone(),
                             keyword_arg: keyword_arg.clone(),
                         });
                         continue;
                     }
                     let Some(field_name) = field_names.next() else {
-                        errs.push(Error::TooManyPositionalArgs {
-                            extra_positional_arg: arg.source.clone(),
+                        errs.add(Error::TooManyPositionalArgs {
+                            extra_positional_arg: arg.value_source.clone(),
                             function_name: call.func_name.clone(),
                             max_positional_args: Self::FIELD_NAMES.len(),
                         });
@@ -164,7 +167,7 @@ trait Args<'b>: Default {
                 // Keyword argument
                 Some(field_name) => {
                     last_keyword_arg = Some(Str {
-                        end: arg.source.end,
+                        end: arg.value_source.end,
                         ..*field_name
                     });
                     field_name.clone()
@@ -179,7 +182,7 @@ trait Args<'b>: Default {
         }
     }
 
-    fn lower(&self) -> Vec<(Option<Str<'static>>, parse::Arg<'b>)>;
+    fn lower(&self) -> Vec<cst::Arg<'b>>;
 }
 
 functions!(
@@ -256,61 +259,62 @@ where
 {
     fn assign(
         &mut self,
-        arg: &parse::Arg<'a>,
+        arg: &cst::Arg<'a>,
         field_name: &'a str,
-        call: &parse::FuncCall<'a>,
-        errs: &mut Vec<Error<'a>>,
+        call: &cst::FuncCall<'a>,
+        errs: &ErrorAccumulator<'a>,
     ) {
         if let Some(first_assignment) = &self.source {
-            errs.push(Error::DuplicateArgument {
+            errs.add(Error::DuplicateArgument {
                 parameter_name: field_name,
                 first_assignment: first_assignment.clone(),
-                second_assignment: arg.source.clone(),
+                second_assignment: arg.value_source.clone(),
             });
             return;
         }
         match T::try_cast_complex(&arg.value, errs) {
             Ok(val) => {
                 self.value = val;
-                self.source = Some(arg.source.clone());
+                self.source = Some(arg.value_source.clone());
             }
-            Err(err) => errs.push(Error::IncorrectType {
+            Err(err) => errs.add(Error::IncorrectType {
                 wanted_type: err.want,
                 got_type: err.got,
-                got_raw_value: arg.source.clone(),
+                got_raw_value: arg.value_source.clone(),
                 function_name: call.func_name.clone(),
                 parameter_name: field_name,
             }),
         }
     }
-    fn lower(&self) -> parse::Arg<'a> {
-        parse::Arg {
+    fn lower(&self, key: Option<Str<'a>>) -> cst::Arg<'a> {
+        cst::Arg {
             comments: vec![],
+            key,
             value: self.value.lower(),
-            source: self.source.clone().unwrap_or("".into()),
+            value_source: self.source.clone().unwrap_or("".into()),
         }
     }
 }
 
 /// Values in the AST.
 ///
-/// These can possibly be obtained from a [`parse::Value`]
-///     and always lowered to a [`parse::Value`].
+/// These can possibly be obtained from a [`cst::Value`]
+///     and always lowered to a [`cst::Value`].
 trait Value<'a>: Sized {
-    /// Try to cast a [`parse::Value`] to this type.
-    fn try_cast(value: &parse::Value<'a>) -> Result<Self, TryCastError>;
+    /// Try to cast a [`cst::Value`] to this type.
+    fn try_cast(value: &cst::Value<'a>) -> Result<Self, TryCastError>;
 
     /// Try to cast the value to this type in cases where multiple errors can occur.
     fn try_cast_complex(
-        value: &parse::Value<'a>,
-        errs: &mut Vec<Error<'a>>,
+        value: &cst::Value<'a>,
+        errs: &ErrorAccumulator<'a>,
     ) -> Result<Self, TryCastError> {
         _ = errs;
         Self::try_cast(value)
     }
 
-    /// Lower this value to a [`parse::Value`].
-    fn lower(&self) -> parse::Value<'a>;
+    /// Lower this value to a [`cst::Value`].
+    fn lower(&self) -> cst::Value<'a>;
 }
 
 /// Error created when casting a value to a concrete type fails.
@@ -320,85 +324,88 @@ struct TryCastError {
 }
 
 impl<'a> Value<'a> for Cow<'a, str> {
-    fn try_cast(value: &parse::Value<'a>) -> Result<Self, TryCastError> {
+    fn try_cast(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
         match value {
-            parse::Value::String(s) => Ok(s.clone()),
+            cst::Value::String(s) => Ok(s.clone()),
             _ => Err(TryCastError {
                 got: value.description(),
                 want: "a string",
             }),
         }
     }
-    fn lower(&self) -> parse::Value<'a> {
-        parse::Value::String(self.clone())
+    fn lower(&self) -> cst::Value<'a> {
+        cst::Value::String(self.clone())
     }
 }
 
 impl<'a> Value<'a> for i32 {
-    fn try_cast(value: &parse::Value<'a>) -> Result<Self, TryCastError> {
+    fn try_cast(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
         match value {
-            parse::Value::Integer(i) => Ok(*i),
+            cst::Value::Integer(i) => Ok(*i),
             _ => Err(TryCastError {
                 got: value.description(),
                 want: "an integer",
             }),
         }
     }
-    fn lower(&self) -> parse::Value<'a> {
-        parse::Value::Integer(*self)
+    fn lower(&self) -> cst::Value<'a> {
+        cst::Value::Integer(*self)
     }
 }
 
 impl<'a> Value<'a> for core::Scaled {
-    fn try_cast(value: &parse::Value<'a>) -> Result<Self, TryCastError> {
+    fn try_cast(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
         match value {
-            parse::Value::Scaled(i) => Ok(*i),
+            cst::Value::Scaled(i) => Ok(*i),
             _ => Err(TryCastError {
                 got: value.description(),
                 want: "a number",
             }),
         }
     }
-    fn lower(&self) -> parse::Value<'a> {
-        parse::Value::Scaled(*self)
+    fn lower(&self) -> cst::Value<'a> {
+        cst::Value::Scaled(*self)
     }
 }
 
 impl<'a> Value<'a> for (core::Scaled, core::GlueOrder) {
-    fn try_cast(value: &parse::Value<'a>) -> Result<Self, TryCastError> {
+    fn try_cast(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
         match value {
-            parse::Value::Scaled(i) => Ok((*i, core::GlueOrder::Normal)),
-            parse::Value::InfiniteGlue(s, o) => Ok((*s, *o)),
+            cst::Value::Scaled(i) => Ok((*i, core::GlueOrder::Normal)),
+            cst::Value::InfiniteGlue(s, o) => Ok((*s, *o)),
             _ => Err(TryCastError {
                 got: value.description(),
                 want: "a stretch or shrink glue component",
             }),
         }
     }
-    fn lower(&self) -> parse::Value<'a> {
-        parse::Value::InfiniteGlue(self.0, self.1)
+    fn lower(&self) -> cst::Value<'a> {
+        cst::Value::InfiniteGlue(self.0, self.1)
     }
 }
 
 impl<'a> Value<'a> for Vec<Horizontal<'a>> {
-    fn try_cast(value: &parse::Value<'a>) -> Result<Self, TryCastError> {
+    fn try_cast(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
         _ = value;
         unimplemented!("must call try_cast_complex")
     }
     fn try_cast_complex(
-        value: &parse::Value<'a>,
-        errs: &mut Vec<Error<'a>>,
+        value: &cst::Value<'a>,
+        errs: &ErrorAccumulator<'a>,
     ) -> Result<Self, TryCastError> {
         match value {
-            parse::Value::List(l) => Ok(convert(l, errs)),
+            cst::Value::List(l) => Ok(convert(&l.calls, errs)),
             _ => Err(TryCastError {
                 got: value.description(),
                 want: "a list",
             }),
         }
     }
-    fn lower(&self) -> parse::Value<'a> {
-        parse::Value::List(self.iter().map(|e| e.lower()).collect())
+    fn lower(&self) -> cst::Value<'a> {
+        cst::Value::List(cst::Tree {
+            calls: self.iter().map(|e| e.lower()).collect(),
+            trailing_comments: vec![],
+        })
     }
 }
 

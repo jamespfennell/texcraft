@@ -1,37 +1,35 @@
 //! Lexer and tokens for Box language.
 
+use super::Str;
+use crate::Error;
 use std::borrow::Cow;
 
+/// Box language lexer.
 pub struct Lexer<'a> {
     s: &'a str,
     u: usize,
-    cache: Option<Token<'a>>,
-    errs: Vec<super::Error<'a>>,
+    errs: super::ErrorAccumulator<'a>,
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(s: &'a str) -> Self {
+    /// Create a new Box language lexer.
+    pub fn new(source: &'a str, errs: super::ErrorAccumulator<'a>) -> Self {
         Self {
-            s,
+            s: source,
             u: 0,
-            cache: None,
-            errs: vec![],
+            errs,
         }
-    }
-    pub fn errs_mut(&mut self) -> &mut Vec<super::Error<'a>> {
-        &mut self.errs
-    }
-    pub fn cur_pos(&self) -> usize {
-        self.u
     }
 }
 
+/// A token in the Box language.
 #[derive(Clone)]
 pub struct Token<'a> {
     pub value: TokenValue<'a>,
-    pub source: super::Str<'a>,
+    pub source: Str<'a>,
 }
 
+/// Value of a token in the Box language.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TokenValue<'a> {
     SquareOpen,
@@ -40,27 +38,33 @@ pub enum TokenValue<'a> {
     RoundClose,
     Comma,
     Equal,
-    Keyword(&'a str),
+    Keyword,
     String(Cow<'a, str>),
     Integer(i32),
     Scaled(core::Scaled),
     InfiniteGlue(core::Scaled, core::GlueOrder),
+    Comment,
 }
 
-impl<'a> Lexer<'a> {
-    pub fn next(&mut self, comments: &mut Vec<&'a str>) -> Option<Token<'a>> {
-        if let Some(cached) = self.cache.take() {
-            return Some(cached);
-        }
+impl<'a> Iterator for Lexer<'a> {
+    type Item = Token<'a>;
+
+    fn next(&mut self) -> Option<Token<'a>> {
         // Consume whitespace and comments
         let mut comment_start: Option<usize> = None;
         while let Some(c) = self.s[self.u..].chars().next() {
             let should_skip = match c {
                 '\n' => {
-                    if let Some(comment_start) = comment_start {
-                        comments.push(&self.s[comment_start..self.u]);
+                    if let Some(comment_start) = comment_start.take() {
+                        return Some(Token {
+                            value: TokenValue::Comment,
+                            source: Str {
+                                value: self.s,
+                                start: comment_start,
+                                end: self.u,
+                            },
+                        });
                     }
-                    comment_start = None;
                     true
                 }
                 '#' => {
@@ -93,7 +97,7 @@ impl<'a> Lexer<'a> {
                 while let Some(n @ 'a'..='z' | n @ 'A'..='Z' | n @ '_') = iter.next() {
                     self.u += n.len_utf8();
                 }
-                Keyword(&self.s[u..self.u])
+                Keyword
             }
             '"' => {
                 loop {
@@ -112,14 +116,14 @@ impl<'a> Lexer<'a> {
             }
             '0'..='9' => {
                 let start = (c as i32) - ('0' as i32);
-                self.parse_number(false, start)
+                self.parse_number(false, start, u)
             }
-            '-' => self.parse_number(true, 0),
+            '-' => self.parse_number(true, 0, u),
             c => todo!("{c:?}"),
         };
         Some(Token {
             value,
-            source: super::Str {
+            source: Str {
                 value: self.s,
                 start: u,
                 end: self.u,
@@ -129,24 +133,14 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    pub fn check_errors(self) -> Result<(), Vec<super::Error<'a>>> {
-        if self.errs.is_empty() {
-            Ok(())
-        } else {
-            Err(self.errs)
-        }
-    }
-    pub fn error(&mut self, err: super::Error<'a>) {
-        self.errs.push(err);
-    }
-    pub fn peek(&mut self, comments: &mut Vec<&'a str>) -> Option<Token<'a>> {
-        let next = self.next(comments);
-        self.cache = next.clone();
-        next
-    }
-    fn parse_number(&mut self, negative: bool, start: i32) -> TokenValue<'a> {
+    fn parse_number(
+        &mut self,
+        negative: bool,
+        initial_value: i32,
+        start_idx: usize,
+    ) -> TokenValue<'a> {
         let mut iter = self.s[self.u..].chars();
-        let mut n = start;
+        let mut n = initial_value;
         let mut parsing_n = true;
         let mut d = [0_u8; 17];
         let mut next_d = 0_usize;
@@ -196,7 +190,19 @@ impl<'a> Lexer<'a> {
                     if let Some(glue_order) = core::GlueOrder::parse(raw_unit) {
                         return TokenValue::InfiniteGlue(s, glue_order);
                     }
-                    panic!("did not recognize unit");
+                    self.errs.add(Error::InvalidDimensionUnit {
+                        dimension: Str {
+                            value: self.s,
+                            start: start_idx,
+                            end: self.u,
+                        },
+                        unit: Str {
+                            value: self.s,
+                            start: u,
+                            end: self.u,
+                        },
+                    });
+                    return TokenValue::Scaled(core::Scaled::ZERO);
                 }
                 _ => {
                     if !parsing_n {

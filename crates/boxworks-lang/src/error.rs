@@ -44,6 +44,12 @@ pub enum Error<'a> {
 
     /// The specified function does not exist.
     NoSuchFunction { function_name: Str<'a> },
+
+    /// A closing square bracket token ']' was unmatched.
+    UnmatchedClosingSquareBracket { square_close: Str<'a> },
+
+    /// An invalid unit was provided for a dimension.
+    InvalidDimensionUnit { dimension: Str<'a>, unit: Str<'a> },
 }
 
 impl<'a> Error<'a> {
@@ -62,8 +68,13 @@ impl<'a> Error<'a> {
             NoSuchFunction { function_name } => {
                 format!["Unknown function `{function_name}`"]
             }
+            UnmatchedClosingSquareBracket { .. } => "Unmatched closing square bracket".into(),
+            InvalidDimensionUnit { dimension: _, unit } => {
+                format!["Dimension has an invalid unit '{unit}'"]
+            }
         }
     }
+    // TODO: this looks like a waste of time?
     pub fn main_span(&self) -> std::ops::Range<usize> {
         use Error::*;
         match self {
@@ -78,6 +89,8 @@ impl<'a> Error<'a> {
                 first_assignment, ..
             } => first_assignment.span(),
             NoSuchFunction { function_name } => function_name.span(),
+            UnmatchedClosingSquareBracket { square_close } => square_close.span(),
+            InvalidDimensionUnit { dimension, unit: _ } => dimension.span(),
         }
     }
     pub fn labels(&self) -> Vec<ErrorLabel> {
@@ -163,6 +176,18 @@ impl<'a> Error<'a> {
                     text: "there is no function with this name".to_string(),
                 },
             ],
+            UnmatchedClosingSquareBracket{ square_close } => vec![
+                ErrorLabel {
+                    span: square_close.span(),
+                    text: "this bracket does not correspond to any preceding opening square bracket".to_string(),
+                },
+            ],
+            InvalidDimensionUnit { dimension: _, unit } => vec![
+                ErrorLabel {
+                    span: unit.span(),
+                    text: "valid units are the same as TeX".to_string(),
+                },
+            ],
         }
     }
     pub fn notes(&self) -> Vec<String> {
@@ -174,11 +199,15 @@ impl<'a> Error<'a> {
                         .to_string(),
                 ]
             }
+            UnmatchedClosingSquareBracket { .. } => {
+                vec!["The token will be ignored".to_string()]
+            }
             IncorrectType { .. }
             | TooManyPositionalArgs { .. }
             | NoSuchArgument { .. }
             | DuplicateArgument { .. }
-            | NoSuchFunction { .. } => vec![],
+            | NoSuchFunction { .. }
+            | InvalidDimensionUnit { .. } => vec![],
         }
     }
 }
@@ -217,6 +246,32 @@ impl<'a> Error<'a> {
     }
 }
 
+/// A data structure for accumulating errors.
+#[derive(Clone, Debug, Default)]
+pub struct ErrorAccumulator<'a> {
+    errs: std::rc::Rc<std::cell::RefCell<Vec<Error<'a>>>>,
+}
+
+impl<'a> ErrorAccumulator<'a> {
+    pub fn add(&self, err: Error<'a>) {
+        self.errs.borrow_mut().push(err);
+    }
+    pub fn len(&self) -> usize {
+        self.errs.borrow().len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    pub fn check(self) -> Result<(), Vec<Error<'a>>> {
+        let errs = self.errs.take();
+        if errs.is_empty() {
+            Ok(())
+        } else {
+            Err(errs)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243,6 +298,11 @@ mod tests {
         };
     }
     error_tests!(
+        (
+            invalid_dimension_unit,
+            "glue(0plx)",
+            Error::InvalidDimensionUnit,
+        ),
         (
             invalid_type_positional,
             r#"text(1pc)"#,
@@ -284,5 +344,21 @@ mod tests {
             Error::NoSuchArgument,
         ),
         (invalid_func_name, r#"random()"#, Error::NoSuchFunction,),
+        (
+            trailing_closed_square,
+            "text()]",
+            Error::UnmatchedClosingSquareBracket,
+        ),
+        /*
+        "hlist(contents=[]])"
+        ",text()"
+        "text,()"
+        "text(,)"
+        "text(content,="Hello")"
+        "text(content=,"Hello")"
+        "text(content=("Ignored"(3pt)[)"World)"
+        "text(content[(ignored]="Hello")
+        "text("Hello""
+         */
     );
 }

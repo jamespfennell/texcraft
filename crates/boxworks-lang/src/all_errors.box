@@ -1,3 +1,6 @@
+# Invalid unit
+glue(30plx)
+
 # Invalid type (positional arg)
 text(1pc)
 
@@ -21,3 +24,5 @@ random()
 
 # Invalid keyword arg
 text(random="Hello")
+
+]
