@@ -16,39 +16,26 @@
 //!     with a type like a [`Tree`], calling code instead iterates
 //!     over the tree.
 //!
-//! The [`TreeIter`] is not a standard Rust iterator.
-//! It's somewhere between a state machine and a Rust iterator.
-//! To advance to the next stage of iteration the method [`TreeIter::next`]
-//! is invoked.
-//! This consumes the iterator, and returns a value of type [`TreeItem`].
-//! This value describes the next element in the tree and the iterator
-//!     that can be used to continue the iteration.
-//! The next iterator may be the same [`TreeIter`], or if the next element
-//!     of the tree is a function call ([`TreeItem::FuncCallStart`]), the iterator will be an
-//!     [`ArgsIter`] that iterates over arguments to that call.
-//! The [`ArgsIter`] works the same as the tree iterator but returns values
-//!     of type [`ArgsItem`].
 
+use super::lexer;
+use super::Str;
 use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::fmt::Write;
 
-use super::error::Error;
-use super::lexer;
-use super::Str;
-
 /// Iterator representation of a CST.
-pub trait TreeIter<'a>: Sized {
+pub trait TreeIter<'a>: Iterator<Item = TreeItem<'a, Self::ArgsIter>> {
     /// Args iterator associated to this iterator.
     type ArgsIter: ArgsIter<'a, TreeIter = Self>;
-    /// Move to the next stage of iterator.
-    fn next(self) -> TreeItem<'a, Self::ArgsIter, Self>;
+    
+    /// Return the remaining source to be parsed.
+    fn remaining_source(&self) -> Str<'a>;
 }
 
 /// Item returned by [`TreeIter`].
-pub enum TreeItem<'a, A, F> {
+pub enum TreeItem<'a, A> {
     /// A function call, like `text("Hello", font=3)`.
-    FuncCallStart {
+    FuncCall {
         /// Name of the function
         func_name: Str<'a>,
         /// Iterator over the arguments of the function.
@@ -58,58 +45,17 @@ pub enum TreeItem<'a, A, F> {
     Comment {
         /// Value of the comment.
         value: &'a str,
-        /// The same iterator that returned this comment.
-        iter: F,
     },
-    /// Marker that the iteration has ended.
-    Exhausted {
-        /// Closing brace token the ended the list, if present.
-        closing_brace: Str<'a>,
-        /// Parent iterator.
-        ///
-        /// If this is the root tree, then this field is ignored.
-        ///
-        /// Otherwise, this tree is the argument to a function.
-        /// In this case the parent iterator is the iterator over that function's arguments.
-        /// Using this iterator the rest of the arguments of the function can be obtained.
-        iter: A,
-    },
-}
-
-impl<'a> TreeItem<'a, (), ()> {
-    /// Populate the iterators on an item.
-    pub fn into<T, A: From<T>, F: From<T>>(self, t: T) -> TreeItem<'a, A, F> {
-        use TreeItem::*;
-        match self {
-            FuncCallStart { func_name, iter: _ } => FuncCallStart {
-                func_name,
-                iter: t.into(),
-            },
-            Comment { value, iter: _ } => Comment {
-                value,
-                iter: t.into(),
-            },
-            Exhausted {
-                closing_brace,
-                iter: _,
-            } => Exhausted {
-                closing_brace,
-                iter: t.into(),
-            },
-        }
-    }
 }
 
 /// Iterator over the arguments of a function.
-pub trait ArgsIter<'a>: Sized {
+pub trait ArgsIter<'a>: Iterator<Item = ArgsItem<'a, Self::TreeIter>> {
     /// Tree iterator associated to this iterator.
     type TreeIter: TreeIter<'a, ArgsIter = Self>;
-    /// Move to the next stage of iterator.
-    fn next(self) -> ArgsItem<'a, Self, Self::TreeIter>;
 }
 
 /// Item returned by [`ArgsIter`].
-pub enum ArgsItem<'a, A, F> {
+pub enum ArgsItem<'a, F> {
     /// A non-list argument, like `3pt` or `font=5`.
     Regular {
         /// Key of the argument, if present.
@@ -121,9 +67,6 @@ pub enum ArgsItem<'a, A, F> {
         value: Value<'a>,
         /// Source of the value in the source code.
         value_source: Str<'a>,
-        /// Iterator over the remaining arguments of the function.
-        /// This is the same iterator that returned this item.
-        iter: A,
     },
     /// A list argument.
     List {
@@ -139,57 +82,11 @@ pub enum ArgsItem<'a, A, F> {
         /// This will satisfy the [`TreeIter`] trait.
         iter: F,
     },
-    /// Marker that the iteration has ended.
-    Exhausted {
-        /// Parent iterator.
-        ///
-        /// The current [`ArgsIter`] that returned this item is
-        ///     an iterator over the arguments of a function.
-        /// This parent iterator is an iterator over the list of functions
-        ///     that included that function.
-        iter: F,
-    },
     /// A comment.
     Comment {
         /// Value of the comment.
         value: &'a str,
-        /// The same iterator that returned this comment.
-        iter: A,
     },
-}
-
-impl<'a> ArgsItem<'a, (), ()> {
-    /// Populate the iterators on an item.
-    pub fn into<T, A: From<T>, F: From<T>>(self, t: T) -> ArgsItem<'a, A, F> {
-        use ArgsItem::*;
-        match self {
-            Regular {
-                key,
-                value,
-                value_source,
-                iter: _,
-            } => Regular {
-                key,
-                value,
-                value_source,
-                iter: t.into(),
-            },
-            List {
-                key,
-                square_open,
-                iter: _,
-            } => List {
-                key,
-                square_open,
-                iter: t.into(),
-            },
-            Exhausted { iter: _ } => Exhausted { iter: t.into() },
-            Comment { value, iter: _ } => Comment {
-                value,
-                iter: t.into(),
-            },
-        }
-    }
 }
 
 /// Pretty print a Box CST.
@@ -284,67 +181,59 @@ fn pretty_print_impl<'a, W: std::fmt::Write, T: TreeIter<'a>>(
     w: &mut W,
     mut iter: T,
     depth: usize,
-) -> Result<T::ArgsIter, std::fmt::Error> {
+) -> std::fmt::Result {
     let indent = Indent(depth);
     let mut ap: ArgsPrinter = ArgsPrinter {
         indent: depth,
         ..Default::default()
     };
     loop {
-        iter = match iter.next() {
-            TreeItem::FuncCallStart {
+        match iter.next() {
+            Some(TreeItem::FuncCall {
                 func_name,
                 mut iter,
-            } => {
+            }) => {
                 write!(w, "{indent}{func_name}(")?;
                 loop {
-                    iter = match iter.next() {
-                        ArgsItem::Comment { value, iter } => {
+                    match iter.next() {
+                        Some(ArgsItem::Comment { value }) => {
                             ap.activate_multiline(w)?;
                             write!(w, "\n{indent}  #{value}")?;
-                            iter
                         }
-                        ArgsItem::Regular {
+                        Some(ArgsItem::Regular {
                             key,
                             value,
                             value_source: _,
-                            iter,
-                        } => {
+                        }) => {
                             ap.print(w, key, value)?;
-                            iter
                         }
-                        ArgsItem::List {
+                        Some(ArgsItem::List {
                             key,
                             square_open: _,
                             iter,
-                        } => {
+                        }) => {
                             ap.activate_multiline(w)?;
                             write!(w, "\n{indent}  ")?;
                             if let Some(key) = key {
                                 write!(w, "{key}=")?;
                             }
                             writeln!(w, "[")?;
-                            let iter = pretty_print_impl(w, iter, depth + 4)?;
+                            pretty_print_impl(w, iter, depth + 4)?;
                             write!(w, "{indent}  ],")?;
-                            iter
                         }
-                        ArgsItem::Exhausted { iter } => {
+                        None => {
                             ap.flush(w)?;
                             writeln!(w, ")")?;
-                            break iter;
+                            break;
                         }
                     }
                 }
             }
-            TreeItem::Comment { value, iter } => {
+            Some(TreeItem::Comment { value }) => {
                 writeln!(w, "{indent}#{value}").unwrap();
-                iter
             }
-            TreeItem::Exhausted {
-                closing_brace: _,
-                iter,
-            } => {
-                break Ok(iter);
+            None => {
+                break Ok(());
             }
         };
     }
@@ -360,10 +249,10 @@ pub struct Tree<'a> {
 impl<'a> Tree<'a> {
     /// Built a CST from a tree iterator.
     pub fn build(iter: impl TreeIter<'a>) -> Self {
-        Self::build_impl(iter).0
+        Self::build_impl(iter)
     }
 
-    fn build_impl<I: TreeIter<'a>>(mut iter: I) -> (Self, Str<'a>, I::ArgsIter) {
+    fn build_impl<I: TreeIter<'a>>(mut iter: I) -> Self {
         let mut comments = vec![];
         let take_comments = |comments: &mut Vec<&'a str>| {
             let mut v = vec![];
@@ -371,88 +260,70 @@ impl<'a> Tree<'a> {
             v
         };
         let mut calls = vec![];
-        let s = loop {
-            iter = match iter.next() {
-                TreeItem::FuncCallStart {
+        loop {
+            match iter.next() {
+                Some(TreeItem::FuncCall {
                     func_name,
                     mut iter,
-                } => {
+                }) => {
                     let func_comments = take_comments(&mut comments);
                     let mut args: Vec<Arg<'a>> = vec![];
-                    let iter = loop {
-                        iter = match iter.next() {
-                            ArgsItem::Exhausted { iter } => break iter,
-                            ArgsItem::Regular {
+                    loop {
+                        match iter.next() {
+                            None => break,
+                            Some(ArgsItem::Regular {
                                 key,
                                 value,
                                 value_source,
-                                iter,
-                            } => {
+                            }) => {
                                 args.push(Arg {
                                     comments: take_comments(&mut comments),
                                     key,
                                     value,
                                     value_source,
                                 });
-                                iter
                             }
-                            ArgsItem::List {
+                            Some(ArgsItem::List {
                                 key,
-                                square_open,
+                                square_open: _,
                                 iter,
-                            } => {
-                                let (inner_tree, end, iter) = Tree::build_impl(iter);
-                                let s = Str {
-                                    end: end.end,
-                                    ..square_open
-                                };
+                            }) => {
+                                let value_source = iter.remaining_source();
+                                // Include the enclosing [] braces.
+                                let inner_tree = Tree::build_impl(iter);
                                 args.push(Arg {
                                     comments: take_comments(&mut comments),
                                     key,
                                     value: Value::List(inner_tree),
-                                    value_source: s,
+                                    value_source,
                                 });
-                                iter
                             }
-                            ArgsItem::Comment { value, iter } => {
+                            Some(ArgsItem::Comment { value }) => {
                                 comments.push(value);
-                                iter
                             }
                         };
-                    };
+                    }
                     calls.push(FuncCall {
                         comments: func_comments,
                         func_name,
                         args,
                         trailing_comments: take_comments(&mut comments),
                     });
-                    iter
                 }
-                TreeItem::Comment { value, iter } => {
+                Some(TreeItem::Comment { value }) => {
                     comments.push(value);
-                    iter
                 }
-                TreeItem::Exhausted {
-                    closing_brace,
-                    iter,
-                } => break (closing_brace, iter),
+                None => break,
             };
-        };
-        (
-            Self {
-                calls,
-                trailing_comments: comments,
-            },
-            s.0,
-            s.1,
-        )
+        }
+        Self {
+            calls,
+            trailing_comments: comments,
+        }
     }
 
     pub fn iter<'b>(&'b self) -> impl TreeIter<'a> + 'b {
-        let mut iter = ExplicitIter {
-            tree_stack: vec![],
-            args_stack: vec![],
-        };
+        let mut iter = ExplicitIter { tree_stack: vec![] };
         iter.push_tree(self);
         iter
     }
@@ -467,12 +338,16 @@ impl<'a> std::fmt::Display for Tree<'a> {
 /// Iterator over an explicit CST.
 struct ExplicitIter<'a, 'b> {
     tree_stack: Vec<TreeStackElem<'a, 'b>>,
-    args_stack: Vec<ArgsStackElem<'a, 'b>>,
 }
 
 enum TreeStackElem<'a, 'b> {
     FuncCall(&'b FuncCall<'a>),
     Comments(&'b [&'a str]),
+}
+
+/// Iterator over an explicit CST.
+struct ExplicitArgsIter<'a, 'b> {
+    args_stack: Vec<ArgsStackElem<'a, 'b>>,
 }
 
 enum ArgsStackElem<'a, 'b> {
@@ -493,6 +368,9 @@ impl<'a, 'b> ExplicitIter<'a, 'b> {
         self.tree_stack
             .push(TreeStackElem::Comments(&call.comments));
     }
+}
+
+impl<'a, 'b> ExplicitArgsIter<'a, 'b> {
     fn push_args(&mut self, call: &'b FuncCall<'a>) {
         self.args_stack
             .push(ArgsStackElem::Comments(&call.trailing_comments));
@@ -504,31 +382,31 @@ impl<'a, 'b> ExplicitIter<'a, 'b> {
 }
 
 impl<'a, 'b> TreeIter<'a> for ExplicitIter<'a, 'b> {
-    type ArgsIter = Self;
+    type ArgsIter = ExplicitArgsIter<'a, 'b>;
 
-    fn next(mut self) -> TreeItem<'a, Self::ArgsIter, Self> {
+    fn remaining_source(&self) -> Str<'a> {
+        "".into()
+    }
+}
+
+impl<'a, 'b> Iterator for ExplicitIter<'a, 'b> {
+    type Item = TreeItem<'a, ExplicitArgsIter<'a, 'b>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let Some(last) = self.tree_stack.pop() else {
-                return TreeItem::Exhausted {
-                    closing_brace: "".into(),
-                    iter: self,
-                };
-            };
-            match last {
+            match self.tree_stack.pop()? {
                 TreeStackElem::FuncCall(func_call) => {
-                    self.push_args(func_call);
-                    return TreeItem::FuncCallStart {
+                    let mut iter = ExplicitArgsIter { args_stack: vec![] };
+                    iter.push_args(func_call);
+                    return Some(TreeItem::FuncCall {
                         func_name: func_call.func_name.clone(),
-                        iter: self,
-                    };
+                        iter,
+                    });
                 }
                 TreeStackElem::Comments(items) => {
                     if let Some((head, tail)) = items.split_first() {
                         self.tree_stack.push(TreeStackElem::Comments(tail));
-                        return TreeItem::Comment {
-                            value: head,
-                            iter: self,
-                        };
+                        return Some(TreeItem::Comment { value: head });
                     }
                 }
             }
@@ -536,39 +414,38 @@ impl<'a, 'b> TreeIter<'a> for ExplicitIter<'a, 'b> {
     }
 }
 
-impl<'a, 'b> ArgsIter<'a> for ExplicitIter<'a, 'b> {
-    type TreeIter = Self;
-    fn next(mut self) -> ArgsItem<'a, Self, Self::TreeIter> {
+impl<'a, 'b> ArgsIter<'a> for ExplicitArgsIter<'a, 'b> {
+    type TreeIter = ExplicitIter<'a, 'b>;
+}
+
+impl<'a, 'b> Iterator for ExplicitArgsIter<'a, 'b> {
+    type Item = ArgsItem<'a, ExplicitIter<'a, 'b>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let Some(last) = self.args_stack.pop() else {
-                return ArgsItem::Exhausted { iter: self };
-            };
-            match last {
+            match self.args_stack.pop()? {
                 ArgsStackElem::Arg(arg) => {
                     return match arg.value.try_clone_value() {
-                        Ok(v) => ArgsItem::Regular {
+                        Ok(v) => Some(ArgsItem::Regular {
                             key: arg.key.clone(),
                             value: v,
                             value_source: arg.value_source.clone(),
-                            iter: self,
-                        },
+                        }),
                         Err(tree) => {
-                            self.push_tree(tree);
-                            ArgsItem::List {
+                            let mut iter = ExplicitIter { tree_stack: vec![] };
+                            iter.push_tree(tree);
+                            Some(ArgsItem::List {
                                 key: arg.key.clone(),
                                 square_open: "".into(),
-                                iter: self,
-                            }
+                                iter,
+                            })
                         }
                     };
                 }
                 ArgsStackElem::Comments(items) => {
                     if let Some((head, tail)) = items.split_first() {
                         self.args_stack.push(ArgsStackElem::Comments(tail));
-                        return ArgsItem::Comment {
-                            value: head,
-                            iter: self,
-                        };
+                        return Some(ArgsItem::Comment { value: head });
                     }
                 }
             }
@@ -586,34 +463,38 @@ pub fn parse<'a>(source: &'a str, errs: super::ErrorAccumulator<'a>) -> impl Tre
 ///
 /// In general it's easier to use the [`parse`] function.
 pub fn parse_using_lexer<'a>(
-    lexer: impl Iterator<Item = lexer::Token<'a>>,
+    lexer: lexer::Lexer<'a>,
     errs: super::ErrorAccumulator<'a>,
 ) -> impl TreeIter<'a> {
     ParseTreeIter {
         next_tree: None,
-        next_arg: None,
-        comments: Default::default(),
-        next_token: None,
-        list_stack: vec![],
-        lexer,
-        errs,
+        c: ParseIterCommon {
+            comments: Default::default(),
+            next_token: None,
+            lexer,
+            errs,
+        },
     }
 }
 
-struct ParseTreeIter<'a, I> {
-    next_tree: Option<TreeItem<'a, (), ()>>,
-    next_arg: Option<ArgsItem<'a, (), ()>>,
+struct ParseTreeIter<'a> {
+    next_tree: Option<(Str<'a>, lexer::Lexer<'a>)>,
+    c: ParseIterCommon<'a>,
+}
+
+struct ParseArgsIter<'a> {
+    next_arg: Option<ArgsItem<'a, ParseTreeIter<'a>>>,
+    c: ParseIterCommon<'a>,
+}
+
+struct ParseIterCommon<'a> {
     comments: VecDeque<&'a str>,
     next_token: Option<lexer::Token<'a>>,
-    lexer: I,
-    list_stack: Vec<lexer::Token<'a>>,
+    lexer: lexer::Lexer<'a>,
     errs: super::ErrorAccumulator<'a>,
 }
 
-impl<'a, I> ParseTreeIter<'a, I>
-where
-    I: Iterator<Item = lexer::Token<'a>>,
-{
+impl<'a> ParseIterCommon<'a> {
     fn next_token(&mut self) -> Option<lexer::Token<'a>> {
         let token_or = self.peek_token();
         self.next_token = None;
@@ -623,12 +504,20 @@ where
         match self.next_token.clone() {
             None => {
                 for token in self.lexer.by_ref() {
-                    if token.value == lexer::TokenValue::Comment {
-                        self.comments.push_back(token.source.str());
-                        continue;
+                    match token.value {
+                        lexer::TokenValue::Comment => {
+                            self.comments.push_back(token.source.str());
+                        }
+                        lexer::TokenValue::SquareClose => {
+                            self.errs.add(crate::Error::UnmatchedClosingSquareBracket {
+                                square_close: token.source,
+                            });
+                        }
+                        _ => {
+                            self.next_token = Some(token);
+                            break;
+                        }
                     }
-                    self.next_token = Some(token);
-                    break;
                 }
                 self.next_token.clone()
             }
@@ -637,100 +526,97 @@ where
     }
 }
 
-impl<'a, I> TreeIter<'a> for ParseTreeIter<'a, I>
-where
-    I: Iterator<Item = lexer::Token<'a>>,
-{
-    type ArgsIter = Self;
-    fn next(mut self) -> TreeItem<'a, Self::ArgsIter, Self> {
-        if let Some(comment) = self.comments.pop_front() {
-            return TreeItem::Comment {
-                value: comment,
-                iter: self,
-            };
-        }
-        if let Some(next) = self.next_tree.take() {
-            return next.into(self);
-        }
-        let Some(next) = self.next_token() else {
-            // We assume that this function was called WITHOUT parsing [.
-            // Otherwise we would expect the list to end with ].
-            // TODO: return an error if this is not true
-            // We should pass Option<Token>
-            // TODO: return any trailing comments too!
-            assert!(self.list_stack.is_empty());
-            if self.comments.is_empty() {
-                return TreeItem::Exhausted {
-                    closing_brace: "".into(),
-                    iter: self,
-                };
+impl<'a> TreeIter<'a> for ParseTreeIter<'a> {
+    type ArgsIter = ParseArgsIter<'a>;
+    fn remaining_source(&self) -> Str<'a> {
+        let mut s = self.c.lexer.remaining_source();
+        // We include the '[' before...
+        if let Some(i) = s.start.checked_sub(1) {
+            if (s.value.as_bytes()[i] as u32) == ('[' as u32) {
+                s.start = i;
             }
-            return TreeIter::next(self);
+        }
+        // ...and the ']' after
+        if s.value[s.end..].starts_with(']') {
+            s.end += 1;
+        }
+        s
+    }
+}
+
+impl<'a> Iterator for ParseTreeIter<'a> {
+    type Item = TreeItem<'a, ParseArgsIter<'a>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(comment) = self.c.comments.pop_front() {
+            return Some(TreeItem::Comment { value: comment });
+        }
+        if let Some((func_name, lexer)) = self.next_tree.take() {
+            return Some(TreeItem::FuncCall {
+                func_name,
+                iter: ParseArgsIter {
+                    next_arg: None,
+                    c: ParseIterCommon {
+                        comments: Default::default(),
+                        next_token: None,
+                        lexer,
+                        errs: self.c.errs.clone(),
+                    },
+                },
+            });
+        }
+        let Some(next) = self.c.next_token() else {
+            if self.c.comments.is_empty() {
+                return None;
+            }
+            return self.next();
         };
         // parse function name
         let func_name = match next.value {
             lexer::TokenValue::Keyword => next.source,
-            lexer::TokenValue::SquareClose => {
-                if self.list_stack.pop().is_none() {
-                    self.errs.add(Error::UnmatchedClosingSquareBracket {
-                        square_close: next.source.clone(),
-                    });
-                    return TreeIter::next(self);
-                }
-                if let Some(lexer::TokenValue::Comma) = self.peek_token().map(|t| t.value) {
-                    self.next_token();
-                };
-                self.next_tree = Some(TreeItem::Exhausted {
-                    closing_brace: next.source,
-                    iter: (),
-                });
-                return TreeIter::next(self);
-            }
             _ => todo!("error: expected keyword"),
         };
         // parse (
-        assert_eq!(
-            self.next_token().map(|t| t.value),
-            Some(lexer::TokenValue::RoundOpen)
-        );
-        self.next_tree = Some(TreeItem::FuncCallStart {
-            func_name,
-            iter: (),
-        });
-        return TreeIter::next(self);
+        let closing = match self.c.next_token().map(|t| t.value) {
+            Some(lexer::TokenValue::RoundOpen { closing }) => closing.unwrap(),
+            _ => todo!("error"),
+        };
+        let inner = self.c.lexer.split_nested(closing);
+        self.next_tree = Some((func_name, inner));
+        self.next()
     }
 }
 
-impl<'a, I> ArgsIter<'a> for ParseTreeIter<'a, I>
-where
-    I: Iterator<Item = lexer::Token<'a>>,
-{
-    type TreeIter = Self;
-    fn next(mut self) -> ArgsItem<'a, Self, Self::TreeIter> {
-        if let Some(comment) = self.comments.pop_front() {
-            return ArgsItem::Comment {
-                value: comment,
-                iter: self,
-            };
+impl<'a> ArgsIter<'a> for ParseArgsIter<'a> {
+    type TreeIter = ParseTreeIter<'a>;
+}
+
+impl<'a> Iterator for ParseArgsIter<'a> {
+    type Item = ArgsItem<'a, ParseTreeIter<'a>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(comment) = self.c.comments.pop_front() {
+            return Some(ArgsItem::Comment { value: comment });
         }
         if let Some(next) = self.next_arg.take() {
-            return next.into(self);
+            return Some(next);
         }
-        let next = self.peek_token().unwrap();
-        let key = match next.value {
-            // no more arguments
-            lexer::TokenValue::RoundClose => {
-                // consume the ) token
-                self.next_token();
-                self.next_arg = Some(ArgsItem::Exhausted { iter: () });
-                return ArgsIter::next(self);
+        let next = match self.c.peek_token() {
+            None => {
+                if self.c.comments.is_empty() {
+                    return None;
+                }
+                return self.next();
             }
+            Some(next) => next,
+        };
+        let key = match next.value {
             // key=value argument
             lexer::TokenValue::Keyword => {
                 // consume the keyword token
-                self.next_token();
+                self.c.next_token();
                 assert_eq!(
-                    self.next_token().map(|t| t.value),
+                    self.c.next_token().map(|t| t.value),
                     Some(lexer::TokenValue::Equal)
                 );
                 Some(next.source)
@@ -738,37 +624,49 @@ where
             // positional argument
             _ => None,
         };
-        let value_token = self.next_token().unwrap();
+        let value_token = self.c.next_token().unwrap();
         let value = match value_token.value {
             lexer::TokenValue::String(s) => Value::String(s),
             lexer::TokenValue::Integer(n) => Value::Integer(n),
             lexer::TokenValue::Scaled(n) => Value::Scaled(n),
             lexer::TokenValue::InfiniteGlue(s, o) => Value::InfiniteGlue(s, o),
-            lexer::TokenValue::SquareOpen => {
-                self.list_stack.push(value_token.clone());
+            lexer::TokenValue::SquareOpen { closing } => {
+                let lexer = self.c.lexer.split_nested(closing.unwrap());
                 self.next_arg = Some(ArgsItem::List {
                     key,
                     square_open: value_token.source,
-                    iter: (),
+                    iter: ParseTreeIter {
+                        next_tree: None,
+                        c: ParseIterCommon {
+                            comments: Default::default(),
+                            next_token: None,
+                            lexer,
+                            errs: self.c.errs.clone(),
+                        },
+                    },
                 });
-                return ArgsIter::next(self);
+                // Consume an optional ',' after the value.
+                if let Some(lexer::TokenValue::Comma) = self.c.peek_token().map(|t| t.value) {
+                    // Consume the ',' token.
+                    self.c.next_token();
+                }
+                return self.next();
             }
             a => {
                 panic!("expected value, instead got {a:?}")
             }
         };
         // Consume an optional ',' after the value.
-        if let Some(lexer::TokenValue::Comma) = self.peek_token().map(|t| t.value) {
+        if let Some(lexer::TokenValue::Comma) = self.c.peek_token().map(|t| t.value) {
             // Consume the ',' token.
-            self.next_token();
+            self.c.next_token();
         }
         self.next_arg = Some(ArgsItem::Regular {
             key,
             value,
             value_source: value_token.source,
-            iter: (),
         });
-        return ArgsIter::next(self);
+        self.next()
     }
 }
 
@@ -864,10 +762,7 @@ pub struct FuncCall<'a> {
 
 impl<'a> FuncCall<'a> {
     pub fn iter<'b>(&'b self) -> impl TreeIter<'a> + 'b {
-        let mut iter = ExplicitIter {
-            tree_stack: vec![],
-            args_stack: vec![],
-        };
+        let mut iter = ExplicitIter { tree_stack: vec![] };
         iter.push_func_call(self);
         iter
     }
