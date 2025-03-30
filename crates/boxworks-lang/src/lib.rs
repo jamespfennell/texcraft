@@ -283,6 +283,7 @@ impl<'a> std::fmt::Display for Str<'a> {
 
 impl<'a> PartialEq for Str<'a> {
     fn eq(&self, other: &Self) -> bool {
+        println!("Checking {} == {}", self.str(), other.str());
         self.str() == other.str()
     }
 }

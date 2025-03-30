@@ -1,5 +1,6 @@
 //! Box language abstract syntax tree
 //!
+use crate::cst::TreeIter;
 use crate::ErrorAccumulator;
 
 use super::cst;
@@ -33,17 +34,22 @@ impl<'a> std::fmt::Display for Horizontal<'a> {
 pub fn parse_horizontal_list(source: &str) -> Result<Vec<Horizontal>, Vec<Error>> {
     let errs: ErrorAccumulator = Default::default();
     let lexer = lexer::Lexer::new(source, errs.clone());
-    let calls = cst::Tree::build(cst::parse_using_lexer(lexer, errs.clone()));
-    let v = convert(&calls.calls, &errs);
+    let calls = cst::parse_using_lexer(lexer, errs.clone());
+    let v = convert(calls, &errs);
     errs.check()?;
     Ok(v)
 }
 
-fn convert<'a>(calls: &[cst::FuncCall<'a>], errs: &ErrorAccumulator<'a>) -> Vec<Horizontal<'a>> {
+fn convert<'a>(calls: impl cst::TreeIter<'a>, errs: &ErrorAccumulator<'a>) -> Vec<Horizontal<'a>> {
     let mut v: Vec<Horizontal> = vec![];
     for call in calls {
-        if let Some(elem) = convert_call(call, errs) {
-            v.push(elem);
+        match call {
+            cst::TreeItem::FuncCall { func_name, iter } => {
+                if let Some(elem) = convert_call(func_name, iter, errs) {
+                    v.push(elem);
+                }
+            }
+            cst::TreeItem::Comment { value: _ } => continue,
         }
     }
     v
@@ -72,16 +78,16 @@ macro_rules! functions {
         }
         impl<$lifetime> Args<$lifetime> for $name <$lifetime> {
             const FIELD_NAMES: &'static[&'static str] = &[ $( stringify!($field_name), )+];
-            fn assign_to_field(&mut self, field_name: Str<$lifetime>, arg: &cst::Arg<$lifetime>, call: &cst::FuncCall<$lifetime>, errs: &ErrorAccumulator<$lifetime>)
+            fn assign_to_field<T: cst::TreeIter<$lifetime>>(&mut self, field_name: Str<$lifetime>, arg: cst::ArgsItem<$lifetime, T>, func_name: Str<$lifetime>, value_source: Str<$lifetime>,  errs: &ErrorAccumulator<$lifetime>)
             {
                 match field_name.str() {
                 $(
                     stringify!($field_name) => {
-                        self.$field_name.assign(arg, field_name.str(), call, errs);
+                        self.$field_name.assign(arg, field_name.str(), func_name.clone(), value_source, errs);
                     }
                 )+
                     _ => {
-                        errs.add(Error::NoSuchArgument{function_name: call.func_name.clone(), argument: field_name });
+                        errs.add(Error::NoSuchArgument{function_name: func_name.clone(), argument: field_name });
                     }
                 }
             }
@@ -96,16 +102,17 @@ macro_rules! functions {
         )+
 
         fn convert_call<'a>(
-            call: &cst::FuncCall<'a>,
+            func_name: Str<'a>,
+            call: impl cst::ArgsIter<'a>,
             errs: &ErrorAccumulator<'a>,
         ) -> Option<Horizontal<'a>> {
-            let h = match call.func_name.str() {
+            let h = match func_name.str() {
                 $( $(
-                    $func_name => Horizontal::$variant($name::build(&call, errs)?),
+                    $func_name => Horizontal::$variant($name::build(func_name, call, errs)?),
                 )? )+
                 _ => {
                     errs.add(Error::NoSuchFunction {
-                        function_name: call.func_name.clone(),
+                        function_name: func_name.clone(),
                     });
                     return None;
                 }
@@ -130,34 +137,52 @@ macro_rules! functions {
 /// Concrete strongly-type arguments to a function.
 trait Args<'b>: Default {
     const FIELD_NAMES: &'static [&'static str];
-    fn assign_to_field(
+    fn assign_to_field<T: cst::TreeIter<'b>>(
         &mut self,
         field_name: Str<'b>,
-        arg: &cst::Arg<'b>,
-        call: &cst::FuncCall<'b>,
+        arg: cst::ArgsItem<'b, T>,
+        func_name: Str<'b>,
+        value_source: Str<'b>,
         errs: &ErrorAccumulator<'b>,
     );
 
-    fn build(call: &cst::FuncCall<'b>, errs: &ErrorAccumulator<'b>) -> Option<Self> {
+    fn build(
+        func_name: Str<'b>,
+        args: impl cst::ArgsIter<'b>,
+        errs: &ErrorAccumulator<'b>,
+    ) -> Option<Self> {
         let mut p: Self = Default::default();
         let start = errs.len();
         let mut field_names = Self::FIELD_NAMES.iter();
         let mut last_keyword_arg: Option<Str> = None;
-        for arg in &call.args {
-            let field_name = match &arg.key {
+        for arg in args {
+            let (key, value_source) = match &arg {
+                cst::ArgsItem::Regular {
+                    key,
+                    value: _,
+                    value_source,
+                } => (key, value_source.clone()),
+                cst::ArgsItem::List {
+                    key,
+                    square_open: _,
+                    iter,
+                } => (key, iter.remaining_source()),
+                cst::ArgsItem::Comment { .. } => continue,
+            };
+            let field_name = match key {
                 // Positional argument
                 None => {
                     if let Some(keyword_arg) = &last_keyword_arg {
                         errs.add(Error::PositionalArgAfterKeywordArg {
-                            positional_arg: arg.value_source.clone(),
+                            positional_arg: value_source,
                             keyword_arg: keyword_arg.clone(),
                         });
                         continue;
                     }
                     let Some(field_name) = field_names.next() else {
                         errs.add(Error::TooManyPositionalArgs {
-                            extra_positional_arg: arg.value_source.clone(),
-                            function_name: call.func_name.clone(),
+                            extra_positional_arg: value_source,
+                            function_name: func_name.clone(),
                             max_positional_args: Self::FIELD_NAMES.len(),
                         });
                         continue;
@@ -167,13 +192,13 @@ trait Args<'b>: Default {
                 // Keyword argument
                 Some(field_name) => {
                     last_keyword_arg = Some(Str {
-                        end: arg.value_source.end,
+                        end: value_source.end,
                         ..*field_name
                     });
                     field_name.clone()
                 }
             };
-            p.assign_to_field(field_name, arg, call, errs);
+            p.assign_to_field(field_name, arg, func_name.clone(), value_source, errs);
         }
         if errs.len() == start {
             Some(p)
@@ -257,31 +282,37 @@ impl<'a, T> Arg<'a, T>
 where
     T: Value<'a>,
 {
-    fn assign(
+    fn assign<F: cst::TreeIter<'a>>(
         &mut self,
-        arg: &cst::Arg<'a>,
+        arg: cst::ArgsItem<'a, F>,
         field_name: &'a str,
-        call: &cst::FuncCall<'a>,
+        func_name: Str<'a>,
+        value_source: Str<'a>,
         errs: &ErrorAccumulator<'a>,
     ) {
         if let Some(first_assignment) = &self.source {
             errs.add(Error::DuplicateArgument {
                 parameter_name: field_name,
                 first_assignment: first_assignment.clone(),
-                second_assignment: arg.value_source.clone(),
+                second_assignment: value_source,
             });
             return;
         }
-        match T::try_cast_complex(&arg.value, errs) {
+        let cast_result = match arg {
+            cst::ArgsItem::Regular { value, .. } => T::try_cast_from_value(&value),
+            cst::ArgsItem::List { iter, .. } => T::try_cast_from_list(iter, errs),
+            cst::ArgsItem::Comment { .. } => return,
+        };
+        match cast_result {
             Ok(val) => {
                 self.value = val;
-                self.source = Some(arg.value_source.clone());
+                self.source = Some(value_source.clone());
             }
             Err(err) => errs.add(Error::IncorrectType {
                 wanted_type: err.want,
                 got_type: err.got,
-                got_raw_value: arg.value_source.clone(),
-                function_name: call.func_name.clone(),
+                got_raw_value: value_source.clone(),
+                function_name: func_name.clone(),
                 parameter_name: field_name,
             }),
         }
@@ -301,16 +332,28 @@ where
 /// These can possibly be obtained from a [`cst::Value`]
 ///     and always lowered to a [`cst::Value`].
 trait Value<'a>: Sized {
+    const DESCRIPTION: &'static str;
+
     /// Try to cast a [`cst::Value`] to this type.
-    fn try_cast(value: &cst::Value<'a>) -> Result<Self, TryCastError>;
+    fn try_cast_from_value(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
+        Self::type_mismatch_error(value.description())
+    }
 
     /// Try to cast the value to this type in cases where multiple errors can occur.
-    fn try_cast_complex(
-        value: &cst::Value<'a>,
+    fn try_cast_from_list<F: cst::TreeIter<'a>>(
+        value: F,
         errs: &ErrorAccumulator<'a>,
     ) -> Result<Self, TryCastError> {
+        _ = value;
         _ = errs;
-        Self::try_cast(value)
+        Self::type_mismatch_error("a list")
+    }
+
+    fn type_mismatch_error(got: &'static str) -> Result<Self, TryCastError> {
+        Err(TryCastError {
+            got,
+            want: Self::DESCRIPTION,
+        })
     }
 
     /// Lower this value to a [`cst::Value`].
@@ -324,13 +367,11 @@ struct TryCastError {
 }
 
 impl<'a> Value<'a> for Cow<'a, str> {
-    fn try_cast(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
+    const DESCRIPTION: &'static str = "a string";
+    fn try_cast_from_value(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
         match value {
             cst::Value::String(s) => Ok(s.clone()),
-            _ => Err(TryCastError {
-                got: value.description(),
-                want: "a string",
-            }),
+            _ => Self::type_mismatch_error(value.description()),
         }
     }
     fn lower(&self) -> cst::Value<'a> {
@@ -339,13 +380,11 @@ impl<'a> Value<'a> for Cow<'a, str> {
 }
 
 impl<'a> Value<'a> for i32 {
-    fn try_cast(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
+    const DESCRIPTION: &'static str = "an integer";
+    fn try_cast_from_value(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
         match value {
             cst::Value::Integer(i) => Ok(*i),
-            _ => Err(TryCastError {
-                got: value.description(),
-                want: "an integer",
-            }),
+            _ => Self::type_mismatch_error(value.description()),
         }
     }
     fn lower(&self) -> cst::Value<'a> {
@@ -354,13 +393,11 @@ impl<'a> Value<'a> for i32 {
 }
 
 impl<'a> Value<'a> for core::Scaled {
-    fn try_cast(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
+    const DESCRIPTION: &'static str = "a number";
+    fn try_cast_from_value(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
         match value {
             cst::Value::Scaled(i) => Ok(*i),
-            _ => Err(TryCastError {
-                got: value.description(),
-                want: "a number",
-            }),
+            _ => Self::type_mismatch_error(value.description()),
         }
     }
     fn lower(&self) -> cst::Value<'a> {
@@ -369,14 +406,12 @@ impl<'a> Value<'a> for core::Scaled {
 }
 
 impl<'a> Value<'a> for (core::Scaled, core::GlueOrder) {
-    fn try_cast(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
+    const DESCRIPTION: &'static str = "a stretch or shrink glue component";
+    fn try_cast_from_value(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
         match value {
             cst::Value::Scaled(i) => Ok((*i, core::GlueOrder::Normal)),
             cst::Value::InfiniteGlue(s, o) => Ok((*s, *o)),
-            _ => Err(TryCastError {
-                got: value.description(),
-                want: "a stretch or shrink glue component",
-            }),
+            _ => Self::type_mismatch_error(value.description()),
         }
     }
     fn lower(&self) -> cst::Value<'a> {
@@ -385,21 +420,12 @@ impl<'a> Value<'a> for (core::Scaled, core::GlueOrder) {
 }
 
 impl<'a> Value<'a> for Vec<Horizontal<'a>> {
-    fn try_cast(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
-        _ = value;
-        unimplemented!("must call try_cast_complex")
-    }
-    fn try_cast_complex(
-        value: &cst::Value<'a>,
+    const DESCRIPTION: &'static str = "a list";
+    fn try_cast_from_list<F: cst::TreeIter<'a>>(
+        value: F,
         errs: &ErrorAccumulator<'a>,
     ) -> Result<Self, TryCastError> {
-        match value {
-            cst::Value::List(l) => Ok(convert(&l.calls, errs)),
-            _ => Err(TryCastError {
-                got: value.description(),
-                want: "a list",
-            }),
-        }
+        Ok(convert(value, errs))
     }
     fn lower(&self) -> cst::Value<'a> {
         cst::Value::List(cst::Tree {

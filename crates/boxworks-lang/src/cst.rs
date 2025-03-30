@@ -27,7 +27,7 @@ use std::fmt::Write;
 pub trait TreeIter<'a>: Iterator<Item = TreeItem<'a, Self::ArgsIter>> {
     /// Args iterator associated to this iterator.
     type ArgsIter: ArgsIter<'a, TreeIter = Self>;
-    
+
     /// Return the remaining source to be parsed.
     fn remaining_source(&self) -> Str<'a>;
 }
