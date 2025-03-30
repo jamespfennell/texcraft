@@ -303,7 +303,7 @@ pub fn format(source: &str) -> Result<String, Vec<error::Error>> {
 
 /// Parse Box language source code into a horizontal list.
 pub fn parse_horizontal_list(source: &str) -> Result<Vec<ds::Horizontal>, Vec<Error>> {
-    let ast_nodes = ast::parse_horizontal_list(source)?;
+    let ast_nodes = ast::parse_hlist(source)?;
     Ok(ast_nodes.to_boxworks())
 }
 

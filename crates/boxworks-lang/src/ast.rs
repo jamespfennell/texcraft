@@ -5,7 +5,6 @@ use crate::ErrorAccumulator;
 
 use super::cst;
 use super::error::Error;
-use super::lexer;
 use super::Str;
 use std::borrow::Cow;
 
@@ -31,21 +30,24 @@ impl<'a> std::fmt::Display for Horizontal<'a> {
 }
 
 /// Parse Box language source code into a horizontal list.
-pub fn parse_horizontal_list(source: &str) -> Result<Vec<Horizontal>, Vec<Error>> {
+pub fn parse_hlist(source: &str) -> Result<Vec<Horizontal>, Vec<Error>> {
     let errs: ErrorAccumulator = Default::default();
-    let lexer = lexer::Lexer::new(source, errs.clone());
-    let calls = cst::parse_using_lexer(lexer, errs.clone());
-    let v = convert(calls, &errs);
+    let calls = cst::parse(source, errs.clone());
+    let v = parse_hlist_using_cst(calls, &errs);
     errs.check()?;
     Ok(v)
 }
 
-fn convert<'a>(calls: impl cst::TreeIter<'a>, errs: &ErrorAccumulator<'a>) -> Vec<Horizontal<'a>> {
+/// Parse a hlist using an explicitly provided CST.
+pub fn parse_hlist_using_cst<'a>(
+    cst: impl cst::TreeIter<'a>,
+    errs: &ErrorAccumulator<'a>,
+) -> Vec<Horizontal<'a>> {
     let mut v: Vec<Horizontal> = vec![];
-    for call in calls {
+    for call in cst {
         match call {
-            cst::TreeItem::FuncCall { func_name, iter } => {
-                if let Some(elem) = convert_call(func_name, iter, errs) {
+            cst::TreeItem::FuncCall { func_name, args } => {
+                if let Some(elem) = convert_call(func_name, args, errs) {
                     v.push(elem);
                 }
             }
@@ -83,11 +85,11 @@ macro_rules! functions {
                 match field_name.str() {
                 $(
                     stringify!($field_name) => {
-                        self.$field_name.assign(arg, field_name.str(), func_name.clone(), value_source, errs);
+                        self.$field_name.assign(arg, field_name.str(), func_name, value_source, errs);
                     }
                 )+
                     _ => {
-                        errs.add(Error::NoSuchArgument{function_name: func_name.clone(), argument: field_name });
+                        errs.add(Error::NoSuchArgument{function_name: func_name, argument: field_name });
                     }
                 }
             }
@@ -112,7 +114,7 @@ macro_rules! functions {
                 )? )+
                 _ => {
                     errs.add(Error::NoSuchFunction {
-                        function_name: func_name.clone(),
+                        function_name: func_name,
                     });
                     return None;
                 }
@@ -135,21 +137,21 @@ macro_rules! functions {
 }
 
 /// Concrete strongly-type arguments to a function.
-trait Args<'b>: Default {
+trait Args<'a>: Default {
     const FIELD_NAMES: &'static [&'static str];
-    fn assign_to_field<T: cst::TreeIter<'b>>(
+    fn assign_to_field<T: cst::TreeIter<'a>>(
         &mut self,
-        field_name: Str<'b>,
-        arg: cst::ArgsItem<'b, T>,
-        func_name: Str<'b>,
-        value_source: Str<'b>,
-        errs: &ErrorAccumulator<'b>,
+        field_name: Str<'a>,
+        arg: cst::ArgsItem<'a, T>,
+        func_name: Str<'a>,
+        value_source: Str<'a>,
+        errs: &ErrorAccumulator<'a>,
     );
 
     fn build(
-        func_name: Str<'b>,
-        args: impl cst::ArgsIter<'b>,
-        errs: &ErrorAccumulator<'b>,
+        func_name: Str<'a>,
+        args: impl cst::ArgsIter<'a>,
+        errs: &ErrorAccumulator<'a>,
     ) -> Option<Self> {
         let mut p: Self = Default::default();
         let start = errs.len();
@@ -165,8 +167,8 @@ trait Args<'b>: Default {
                 cst::ArgsItem::List {
                     key,
                     square_open: _,
-                    iter,
-                } => (key, iter.remaining_source()),
+                    tree,
+                } => (key, tree.remaining_source()),
                 cst::ArgsItem::Comment { .. } => continue,
             };
             let field_name = match key {
@@ -207,7 +209,7 @@ trait Args<'b>: Default {
         }
     }
 
-    fn lower(&self) -> Vec<cst::Arg<'b>>;
+    fn lower(&self) -> Vec<cst::Arg<'a>>;
 }
 
 functions!(
@@ -298,21 +300,30 @@ where
             });
             return;
         }
-        let cast_result = match arg {
-            cst::ArgsItem::Regular { value, .. } => T::try_cast_from_value(&value),
-            cst::ArgsItem::List { iter, .. } => T::try_cast_from_list(iter, errs),
+        let (cast_result, value_type) = match arg {
+            cst::ArgsItem::Regular { value, .. } => match &value {
+                cst::Value::List(tree) => (T::try_cast_list(tree.iter(), errs), "a list"),
+                cst::Value::Integer(i) => (T::try_cast_integer(*i), "an integer"),
+                cst::Value::Scaled(scaled) => (T::try_cast_scaled(*scaled), "a number"),
+                cst::Value::InfiniteGlue(scaled, glue_order) => (
+                    T::try_cast_infinite_glue(*scaled, *glue_order),
+                    "an infinite glue",
+                ),
+                cst::Value::String(cow) => (T::try_cast_string(cow.clone()), "a string"),
+            },
+            cst::ArgsItem::List { tree, .. } => (T::try_cast_list(tree, errs), "a list"),
             cst::ArgsItem::Comment { .. } => return,
         };
         match cast_result {
-            Ok(val) => {
+            Some(val) => {
                 self.value = val;
-                self.source = Some(value_source.clone());
+                self.source = Some(value_source);
             }
-            Err(err) => errs.add(Error::IncorrectType {
-                wanted_type: err.want,
-                got_type: err.got,
-                got_raw_value: value_source.clone(),
-                function_name: func_name.clone(),
+            None => errs.add(Error::IncorrectType {
+                wanted_type: T::DESCRIPTION,
+                got_type: value_type,
+                got_raw_value: value_source,
+                function_name: func_name,
                 parameter_name: field_name,
             }),
         }
@@ -334,45 +345,33 @@ where
 trait Value<'a>: Sized {
     const DESCRIPTION: &'static str;
 
-    /// Try to cast a [`cst::Value`] to this type.
-    fn try_cast_from_value(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
-        Self::type_mismatch_error(value.description())
+    fn try_cast_integer(_i: i32) -> Option<Self> {
+        None
     }
-
-    /// Try to cast the value to this type in cases where multiple errors can occur.
-    fn try_cast_from_list<F: cst::TreeIter<'a>>(
-        value: F,
-        errs: &ErrorAccumulator<'a>,
-    ) -> Result<Self, TryCastError> {
-        _ = value;
-        _ = errs;
-        Self::type_mismatch_error("a list")
+    fn try_cast_string(_s: Cow<'a, str>) -> Option<Self> {
+        None
     }
-
-    fn type_mismatch_error(got: &'static str) -> Result<Self, TryCastError> {
-        Err(TryCastError {
-            got,
-            want: Self::DESCRIPTION,
-        })
+    fn try_cast_scaled(_s: core::Scaled) -> Option<Self> {
+        None
+    }
+    fn try_cast_infinite_glue(_s: core::Scaled, _o: core::GlueOrder) -> Option<Self> {
+        None
+    }
+    fn try_cast_list<F: cst::TreeIter<'a>>(
+        _value: F,
+        _errs: &ErrorAccumulator<'a>,
+    ) -> Option<Self> {
+        None
     }
 
     /// Lower this value to a [`cst::Value`].
     fn lower(&self) -> cst::Value<'a>;
 }
 
-/// Error created when casting a value to a concrete type fails.
-struct TryCastError {
-    pub got: &'static str,
-    pub want: &'static str,
-}
-
 impl<'a> Value<'a> for Cow<'a, str> {
     const DESCRIPTION: &'static str = "a string";
-    fn try_cast_from_value(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
-        match value {
-            cst::Value::String(s) => Ok(s.clone()),
-            _ => Self::type_mismatch_error(value.description()),
-        }
+    fn try_cast_string(s: Cow<'a, str>) -> Option<Self> {
+        Some(s)
     }
     fn lower(&self) -> cst::Value<'a> {
         cst::Value::String(self.clone())
@@ -381,11 +380,8 @@ impl<'a> Value<'a> for Cow<'a, str> {
 
 impl<'a> Value<'a> for i32 {
     const DESCRIPTION: &'static str = "an integer";
-    fn try_cast_from_value(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
-        match value {
-            cst::Value::Integer(i) => Ok(*i),
-            _ => Self::type_mismatch_error(value.description()),
-        }
+    fn try_cast_integer(i: i32) -> Option<Self> {
+        Some(i)
     }
     fn lower(&self) -> cst::Value<'a> {
         cst::Value::Integer(*self)
@@ -394,11 +390,8 @@ impl<'a> Value<'a> for i32 {
 
 impl<'a> Value<'a> for core::Scaled {
     const DESCRIPTION: &'static str = "a number";
-    fn try_cast_from_value(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
-        match value {
-            cst::Value::Scaled(i) => Ok(*i),
-            _ => Self::type_mismatch_error(value.description()),
-        }
+    fn try_cast_scaled(s: core::Scaled) -> Option<Self> {
+        Some(s)
     }
     fn lower(&self) -> cst::Value<'a> {
         cst::Value::Scaled(*self)
@@ -407,12 +400,11 @@ impl<'a> Value<'a> for core::Scaled {
 
 impl<'a> Value<'a> for (core::Scaled, core::GlueOrder) {
     const DESCRIPTION: &'static str = "a stretch or shrink glue component";
-    fn try_cast_from_value(value: &cst::Value<'a>) -> Result<Self, TryCastError> {
-        match value {
-            cst::Value::Scaled(i) => Ok((*i, core::GlueOrder::Normal)),
-            cst::Value::InfiniteGlue(s, o) => Ok((*s, *o)),
-            _ => Self::type_mismatch_error(value.description()),
-        }
+    fn try_cast_scaled(s: core::Scaled) -> Option<Self> {
+        Some((s, core::GlueOrder::Normal))
+    }
+    fn try_cast_infinite_glue(s: core::Scaled, o: core::GlueOrder) -> Option<Self> {
+        Some((s, o))
     }
     fn lower(&self) -> cst::Value<'a> {
         cst::Value::InfiniteGlue(self.0, self.1)
@@ -421,11 +413,8 @@ impl<'a> Value<'a> for (core::Scaled, core::GlueOrder) {
 
 impl<'a> Value<'a> for Vec<Horizontal<'a>> {
     const DESCRIPTION: &'static str = "a list";
-    fn try_cast_from_list<F: cst::TreeIter<'a>>(
-        value: F,
-        errs: &ErrorAccumulator<'a>,
-    ) -> Result<Self, TryCastError> {
-        Ok(convert(value, errs))
+    fn try_cast_list<F: cst::TreeIter<'a>>(value: F, errs: &ErrorAccumulator<'a>) -> Option<Self> {
+        Some(parse_hlist_using_cst(value, errs))
     }
     fn lower(&self) -> cst::Value<'a> {
         cst::Value::List(cst::Tree {
@@ -439,7 +428,7 @@ impl<'a> Value<'a> for Vec<Horizontal<'a>> {
 mod tests {
     use super::*;
     #[test]
-    fn parse_hlist() {
+    fn hlist() {
         let input = r#"
             hlist(
                 width=1pt,
@@ -467,7 +456,7 @@ mod tests {
             },
         })];
 
-        let got = parse_horizontal_list(&input).expect("parsing succeeds");
+        let got = parse_hlist(&input).expect("parsing succeeds");
 
         assert_eq!(got, want);
     }

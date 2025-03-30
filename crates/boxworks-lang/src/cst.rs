@@ -39,7 +39,7 @@ pub enum TreeItem<'a, A> {
         /// Name of the function
         func_name: Str<'a>,
         /// Iterator over the arguments of the function.
-        iter: A,
+        args: A,
     },
     /// A comment, like `# this is a comment`.
     Comment {
@@ -80,7 +80,7 @@ pub enum ArgsItem<'a, F> {
         /// Iterator over the items in this list.
         ///
         /// This will satisfy the [`TreeIter`] trait.
-        iter: F,
+        tree: F,
     },
     /// A comment.
     Comment {
@@ -92,9 +92,9 @@ pub enum ArgsItem<'a, F> {
 /// Pretty print a Box CST.
 pub fn pretty_print<'a, W: std::fmt::Write>(
     w: &mut W,
-    iter: impl TreeIter<'a>,
+    tree: impl TreeIter<'a>,
 ) -> std::fmt::Result {
-    pretty_print_impl(w, iter, 0)?;
+    pretty_print_impl(w, tree, 0)?;
     Ok(())
 }
 
@@ -179,7 +179,7 @@ impl std::fmt::Display for Indent {
 
 fn pretty_print_impl<'a, W: std::fmt::Write, T: TreeIter<'a>>(
     w: &mut W,
-    mut iter: T,
+    mut tree: T,
     depth: usize,
 ) -> std::fmt::Result {
     let indent = Indent(depth);
@@ -188,14 +188,14 @@ fn pretty_print_impl<'a, W: std::fmt::Write, T: TreeIter<'a>>(
         ..Default::default()
     };
     loop {
-        match iter.next() {
+        match tree.next() {
             Some(TreeItem::FuncCall {
                 func_name,
-                mut iter,
+                mut args,
             }) => {
                 write!(w, "{indent}{func_name}(")?;
                 loop {
-                    match iter.next() {
+                    match args.next() {
                         Some(ArgsItem::Comment { value }) => {
                             ap.activate_multiline(w)?;
                             write!(w, "\n{indent}  #{value}")?;
@@ -210,7 +210,7 @@ fn pretty_print_impl<'a, W: std::fmt::Write, T: TreeIter<'a>>(
                         Some(ArgsItem::List {
                             key,
                             square_open: _,
-                            iter,
+                            tree,
                         }) => {
                             ap.activate_multiline(w)?;
                             write!(w, "\n{indent}  ")?;
@@ -218,7 +218,7 @@ fn pretty_print_impl<'a, W: std::fmt::Write, T: TreeIter<'a>>(
                                 write!(w, "{key}=")?;
                             }
                             writeln!(w, "[")?;
-                            pretty_print_impl(w, iter, depth + 4)?;
+                            pretty_print_impl(w, tree, depth + 4)?;
                             write!(w, "{indent}  ],")?;
                         }
                         None => {
@@ -248,11 +248,11 @@ pub struct Tree<'a> {
 
 impl<'a> Tree<'a> {
     /// Built a CST from a tree iterator.
-    pub fn build(iter: impl TreeIter<'a>) -> Self {
-        Self::build_impl(iter)
+    pub fn build(tree: impl TreeIter<'a>) -> Self {
+        Self::build_impl(tree)
     }
 
-    fn build_impl<I: TreeIter<'a>>(mut iter: I) -> Self {
+    fn build_impl<I: TreeIter<'a>>(mut tree: I) -> Self {
         let mut comments = vec![];
         let take_comments = |comments: &mut Vec<&'a str>| {
             let mut v = vec![];
@@ -261,48 +261,41 @@ impl<'a> Tree<'a> {
         };
         let mut calls = vec![];
         loop {
-            match iter.next() {
-                Some(TreeItem::FuncCall {
-                    func_name,
-                    mut iter,
-                }) => {
+            match tree.next() {
+                Some(TreeItem::FuncCall { func_name, args }) => {
                     let func_comments = take_comments(&mut comments);
-                    let mut args: Vec<Arg<'a>> = vec![];
-                    loop {
-                        match iter.next() {
-                            None => break,
-                            Some(ArgsItem::Regular {
+                    let args: Vec<Arg<'a>> = args
+                        .filter_map(|item| match item {
+                            ArgsItem::Regular {
                                 key,
                                 value,
                                 value_source,
-                            }) => {
-                                args.push(Arg {
-                                    comments: take_comments(&mut comments),
-                                    key,
-                                    value,
-                                    value_source,
-                                });
-                            }
-                            Some(ArgsItem::List {
+                            } => Some(Arg {
+                                comments: take_comments(&mut comments),
+                                key,
+                                value,
+                                value_source,
+                            }),
+                            ArgsItem::List {
                                 key,
                                 square_open: _,
-                                iter,
-                            }) => {
-                                let value_source = iter.remaining_source();
-                                // Include the enclosing [] braces.
-                                let inner_tree = Tree::build_impl(iter);
-                                args.push(Arg {
+                                tree,
+                            } => {
+                                let value_source = tree.remaining_source();
+                                let inner_tree = Tree::build_impl(tree);
+                                Some(Arg {
                                     comments: take_comments(&mut comments),
                                     key,
                                     value: Value::List(inner_tree),
                                     value_source,
-                                });
+                                })
                             }
-                            Some(ArgsItem::Comment { value }) => {
+                            ArgsItem::Comment { value } => {
                                 comments.push(value);
+                                None
                             }
-                        };
-                    }
+                        })
+                        .collect();
                     calls.push(FuncCall {
                         comments: func_comments,
                         func_name,
@@ -400,7 +393,7 @@ impl<'a, 'b> Iterator for ExplicitIter<'a, 'b> {
                     iter.push_args(func_call);
                     return Some(TreeItem::FuncCall {
                         func_name: func_call.func_name.clone(),
-                        iter,
+                        args: iter,
                     });
                 }
                 TreeStackElem::Comments(items) => {
@@ -437,7 +430,7 @@ impl<'a, 'b> Iterator for ExplicitArgsIter<'a, 'b> {
                             Some(ArgsItem::List {
                                 key: arg.key.clone(),
                                 square_open: "".into(),
-                                iter,
+                                tree: iter,
                             })
                         }
                     };
@@ -554,7 +547,7 @@ impl<'a> Iterator for ParseTreeIter<'a> {
         if let Some((func_name, lexer)) = self.next_tree.take() {
             return Some(TreeItem::FuncCall {
                 func_name,
-                iter: ParseArgsIter {
+                args: ParseArgsIter {
                     next_arg: None,
                     c: ParseIterCommon {
                         comments: Default::default(),
@@ -635,7 +628,7 @@ impl<'a> Iterator for ParseArgsIter<'a> {
                 self.next_arg = Some(ArgsItem::List {
                     key,
                     square_open: value_token.source,
-                    iter: ParseTreeIter {
+                    tree: ParseTreeIter {
                         next_tree: None,
                         c: ParseIterCommon {
                             comments: Default::default(),
