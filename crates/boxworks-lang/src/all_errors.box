@@ -25,4 +25,16 @@ random()
 # Invalid keyword arg
 text(random="Hello")
 
+# Unmatched closing bracket
 ]
+
+# Junk while parsing a function name
+, text()
+text, ()
+
+# Missing function name
+(ignored)
+
+# Mismatched braces
+text(]
+hlist(content=[))

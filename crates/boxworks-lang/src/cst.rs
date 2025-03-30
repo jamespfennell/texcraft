@@ -17,6 +17,8 @@
 //!     over the tree.
 //!
 
+use crate::Error;
+
 use super::lexer;
 use super::Str;
 use std::borrow::Cow;
@@ -189,10 +191,7 @@ fn pretty_print_impl<'a, W: std::fmt::Write, T: TreeIter<'a>>(
     };
     for item in tree {
         match item {
-            TreeItem::FuncCall {
-                func_name,
-                args,
-            } => {
+            TreeItem::FuncCall { func_name, args } => {
                 write!(w, "{indent}{func_name}(")?;
                 for item in args {
                     match item {
@@ -495,9 +494,9 @@ impl<'a> ParseIterCommon<'a> {
                         lexer::TokenValue::Comment => {
                             self.comments.push_back(token.source.str());
                         }
-                        lexer::TokenValue::SquareClose => {
-                            self.errs.add(crate::Error::UnmatchedClosingSquareBracket {
-                                square_close: token.source,
+                        lexer::TokenValue::SquareClose | lexer::TokenValue::RoundClose => {
+                            self.errs.add(crate::Error::UnmatchedClosingBracket {
+                                close: token.source,
                             });
                         }
                         _ => {
@@ -511,22 +510,56 @@ impl<'a> ParseIterCommon<'a> {
             Some(token) => Some(token),
         }
     }
+
+    fn parse_required<T, F: Fn(&lexer::Token<'a>) -> Option<T>>(
+        &mut self,
+        f: F,
+        want: &'static str,
+    ) -> Option<T> {
+        loop {
+            let token = self.next_token()?;
+            if let Some(t) = f(&token) {
+                return Some(t);
+            }
+            let skipped = match token.value {
+                lexer::TokenValue::SquareOpen { closing }
+                | lexer::TokenValue::RoundOpen { closing } => {
+                    let inner = self.lexer.split_nested(closing);
+                    let mut s = inner.remaining_source();
+                    include_parens(&mut s);
+                    s
+                }
+                _ => token.source.clone(),
+            };
+            self.errs.add(Error::UnexpectedToken {
+                want,
+                got: token.source,
+                skipped,
+            });
+        }
+    }
+}
+
+fn include_parens(s: &mut Str) {
+    // We include the '[' before...
+    if let Some(i) = s.start.checked_sub(1) {
+        if (s.value.as_bytes()[i] as u32) == ('[' as u32)
+            || (s.value.as_bytes()[i] as u32) == ('(' as u32)
+        {
+            s.start = i;
+        }
+    }
+    // ...and the ']' after
+    if s.value[s.end..].starts_with(']') || s.value[s.end..].starts_with(')') {
+        s.end += 1;
+    }
 }
 
 impl<'a> TreeIter<'a> for ParseTreeIter<'a> {
     type ArgsIter = ParseArgsIter<'a>;
     fn remaining_source(&self) -> Str<'a> {
         let mut s = self.c.lexer.remaining_source();
-        // We include the '[' before...
-        if let Some(i) = s.start.checked_sub(1) {
-            if (s.value.as_bytes()[i] as u32) == ('[' as u32) {
-                s.start = i;
-            }
-        }
-        // ...and the ']' after
-        if s.value[s.end..].starts_with(']') {
-            s.end += 1;
-        }
+        include_parens(&mut s);
         s
     }
 }
@@ -552,21 +585,40 @@ impl<'a> Iterator for ParseTreeIter<'a> {
                 },
             });
         }
-        let Some(next) = self.c.next_token() else {
-            if self.c.comments.is_empty() {
-                return None;
-            }
-            return self.next();
-        };
+
         // parse function name
-        let func_name = match next.value {
-            lexer::TokenValue::Keyword => next.source,
-            _ => todo!("error: expected keyword"),
+        let func_name_or = self.c.parse_required(
+            |token| match token.value {
+                lexer::TokenValue::Keyword => Some(token.source.clone()),
+                _ => None,
+            },
+            "a function name",
+        );
+        let func_name = match func_name_or {
+            Some(func_name) => func_name,
+            None => {
+                if self.c.comments.is_empty() {
+                    return None;
+                }
+                return self.next();
+            }
         };
         // parse (
-        let closing = match self.c.next_token().map(|t| t.value) {
-            Some(lexer::TokenValue::RoundOpen { closing }) => closing.unwrap(),
-            _ => todo!("error"),
+        let closing_or = self.c.parse_required(
+            |token| match token.value {
+                lexer::TokenValue::RoundOpen { closing } => Some(closing),
+                _ => None,
+            },
+            "opening parenthesis",
+        );
+        let closing = match closing_or {
+            Some(closing) => closing,
+            None => {
+                self.c.errs.add(Error::MissingArgsForFunction {
+                    function_name: func_name,
+                });
+                return self.next();
+            }
         };
         let inner = self.c.lexer.split_nested(closing);
         self.next_tree = Some((func_name, inner));
@@ -618,7 +670,7 @@ impl<'a> Iterator for ParseArgsIter<'a> {
             lexer::TokenValue::Scaled(n) => Value::Scaled(n),
             lexer::TokenValue::InfiniteGlue(s, o) => Value::InfiniteGlue(s, o),
             lexer::TokenValue::SquareOpen { closing } => {
-                let lexer = self.c.lexer.split_nested(closing.unwrap());
+                let lexer = self.c.lexer.split_nested(closing);
                 self.next_arg = Some(ArgsItem::List {
                     key,
                     square_open: value_token.source,

@@ -32,6 +32,16 @@ pub struct ClosingParen {
     op_i: usize,
 }
 
+impl ClosingParen {
+    fn str<'a>(&self, source: &'a str) -> Str<'a> {
+        Str {
+            value: source,
+            start: self.source_idx.get(),
+            end: self.source_idx.get() + 1,
+        }
+    }
+}
+
 impl<'a> Lexer<'a> {
     /// Create a new Box language lexer.
     pub fn new(source: &'a str, errs: super::ErrorAccumulator<'a>) -> Self {
@@ -46,17 +56,22 @@ impl<'a> Lexer<'a> {
     }
 
     /// Splits off a nested lexer.
-    pub fn split_nested(&mut self, closing_paren: ClosingParen) -> Self {
+    pub fn split_nested(&mut self, closing_paren: Option<ClosingParen>) -> Self {
         let inner = Self {
             s: self.s,
             l: self.l,
-            u: closing_paren.source_idx.get(),
+            u: match closing_paren {
+                Some(c) => c.source_idx.get(),
+                None => self.u,
+            },
             op: self.op.clone(),
             op_i: self.op_i,
             errs: self.errs.clone(),
         };
-        self.l = closing_paren.source_idx.get() + 1;
-        self.op_i = closing_paren.op_i;
+        (self.l, self.op_i) = match closing_paren {
+            Some(c) => (c.source_idx.get() + 1, c.op_i),
+            None => (self.u, self.op.len()),
+        };
         inner
     }
 
@@ -76,7 +91,6 @@ impl<'a> Lexer<'a> {
         }
         struct Stack {
             i: usize,
-            is_round: bool,
         }
         let mut v: Vec<Option<ClosingParen>> = vec![];
         let mut stack = vec![];
@@ -85,10 +99,7 @@ impl<'a> Lexer<'a> {
         for c in source.chars() {
             match (c, state) {
                 ('(' | '[', State::Regular) => {
-                    stack.push(Stack {
-                        i: v.len(),
-                        is_round: c == '(',
-                    });
+                    stack.push(Stack { i: v.len() });
                     v.push(None);
                 }
                 (')' | ']', State::Regular) => {
@@ -97,10 +108,6 @@ impl<'a> Lexer<'a> {
                             source_idx: i.try_into().unwrap(),
                             op_i: v.len(),
                         });
-                        let is_round = c == ')';
-                        if s.is_round != is_round {
-                            stack.push(s);
-                        }
                     }
                 }
                 ('\n', State::Comment) => {
@@ -201,17 +208,33 @@ impl<'a> Iterator for Lexer<'a> {
         self.l += c.len_utf8();
         use TokenValue::*;
         let value = match c {
-            '[' => {
+            '[' | '(' => {
                 let closing = self.op.get(self.op_i).cloned().flatten();
+                let open = Str {
+                    value: self.s,
+                    start,
+                    end: start + 1,
+                };
+                match &closing {
+                    Some(closing) => {
+                        let close = closing.str(self.s);
+                        let want = if c == '[' { "]" } else { ")" };
+                        if close.str() != want {
+                            self.errs.add(Error::MismatchedBraces { open, close });
+                        }
+                    }
+                    None => {
+                        self.errs.add(Error::UnmatchedOpeningBracket { open });
+                    }
+                };
                 self.op_i += 1;
-                SquareOpen { closing }
+                if c == '[' {
+                    SquareOpen { closing }
+                } else {
+                    RoundOpen { closing }
+                }
             }
             ']' => SquareClose,
-            '(' => {
-                let closing = self.op.get(self.op_i).cloned().flatten();
-                self.op_i += 1;
-                RoundOpen { closing }
-            }
             ')' => RoundClose,
             '=' => Equal,
             ',' => Comma,

@@ -45,11 +45,27 @@ pub enum Error<'a> {
     /// The specified function does not exist.
     NoSuchFunction { function_name: Str<'a> },
 
-    /// A closing square bracket token ']' was unmatched.
-    UnmatchedClosingSquareBracket { square_close: Str<'a> },
+    /// An opening bracket token '[' or '(' was unmatched.
+    UnmatchedOpeningBracket { open: Str<'a> },
+
+    /// A closing bracket token ']' or ')' was unmatched.
+    UnmatchedClosingBracket { close: Str<'a> },
 
     /// An invalid unit was provided for a dimension.
     InvalidDimensionUnit { dimension: Str<'a>, unit: Str<'a> },
+
+    /// An unexpected token was encountered.
+    UnexpectedToken {
+        want: &'static str,
+        got: Str<'a>,
+        skipped: Str<'a>,
+    },
+
+    /// A function name appeared without any arguments
+    MissingArgsForFunction { function_name: Str<'a> },
+
+    /// Mismatched braces - e.g. [) or (].
+    MismatchedBraces { open: Str<'a>, close: Str<'a> },
 }
 
 impl<'a> Error<'a> {
@@ -68,29 +84,18 @@ impl<'a> Error<'a> {
             NoSuchFunction { function_name } => {
                 format!["Unknown function `{function_name}`"]
             }
-            UnmatchedClosingSquareBracket { .. } => "Unmatched closing square bracket".into(),
+            UnmatchedOpeningBracket { .. } => "Unmatched opening bracket".into(),
+            UnmatchedClosingBracket { .. } => "Unmatched closing bracket".into(),
             InvalidDimensionUnit { dimension: _, unit } => {
                 format!["Dimension has an invalid unit '{unit}'"]
             }
-        }
-    }
-    // TODO: this looks like a waste of time?
-    pub fn main_span(&self) -> std::ops::Range<usize> {
-        use Error::*;
-        match self {
-            PositionalArgAfterKeywordArg { positional_arg, .. } => positional_arg.span(),
-            IncorrectType { got_raw_value, .. } => got_raw_value.span(),
-            TooManyPositionalArgs {
-                extra_positional_arg: extra_positional_args,
-                ..
-            } => extra_positional_args.span(),
-            NoSuchArgument { argument, .. } => argument.span(),
-            DuplicateArgument {
-                first_assignment, ..
-            } => first_assignment.span(),
-            NoSuchFunction { function_name } => function_name.span(),
-            UnmatchedClosingSquareBracket { square_close } => square_close.span(),
-            InvalidDimensionUnit { dimension, unit: _ } => dimension.span(),
+            UnexpectedToken { want, .. } => {
+                format!["unexpected token while looking for {want}"]
+            }
+            MissingArgsForFunction { function_name } => {
+                format!["no arguments provided for '{function_name}'"]
+            }
+            MismatchedBraces { open, close } => format!["mismatched braces '{open}' and '{close}'"],
         }
     }
     pub fn labels(&self) -> Vec<ErrorLabel> {
@@ -130,9 +135,9 @@ impl<'a> Error<'a> {
                     ],
                 },
             ],
-            TooManyPositionalArgs { extra_positional_arg: _, function_name, max_positional_args } => vec![
+            TooManyPositionalArgs { extra_positional_arg, function_name, max_positional_args } => vec![
                 ErrorLabel {
-                    span: self.main_span(),
+                    span: extra_positional_arg.span(),
                     text: "an extra positional arguments was provided".to_string(),
                 },
                 ErrorLabel {
@@ -145,7 +150,7 @@ impl<'a> Error<'a> {
             ],
             NoSuchArgument { function_name, argument } => vec![
                 ErrorLabel {
-                    span: self.main_span(),
+                    span: argument.span(),
                     text: format![
                         "an argument with name `{}` appears here",
                         argument.str(),
@@ -176,10 +181,16 @@ impl<'a> Error<'a> {
                     text: "there is no function with this name".to_string(),
                 },
             ],
-            UnmatchedClosingSquareBracket{ square_close } => vec![
+            UnmatchedOpeningBracket{ open: close } => vec![
                 ErrorLabel {
-                    span: square_close.span(),
-                    text: "this bracket does not correspond to any preceding opening square bracket".to_string(),
+                    span: close.span(),
+                    text: "this bracket does not correspond to any subsequent closing bracket".to_string(),
+                },
+            ],
+            UnmatchedClosingBracket{ close } => vec![
+                ErrorLabel {
+                    span: close.span(),
+                    text: "this bracket does not correspond to any preceding opening bracket".to_string(),
                 },
             ],
             InvalidDimensionUnit { dimension: _, unit } => vec![
@@ -188,6 +199,32 @@ impl<'a> Error<'a> {
                     text: "valid units are the same as TeX".to_string(),
                 },
             ],
+            UnexpectedToken { want: _, got, skipped } => vec![
+                ErrorLabel {
+                    span: got.span(),
+                    text: "this token was not expected".to_string(),
+                },
+                ErrorLabel {
+                    span: skipped.span(),
+                    text: "this source code will be skipped".to_string(),
+                },
+            ],
+            MissingArgsForFunction { function_name } => vec![
+                ErrorLabel {
+                    span: function_name.span(),
+                    text: "a function name must be followed by arguments".to_string(),
+                },
+            ],
+            MismatchedBraces { open, close } => vec![
+                ErrorLabel {
+                    span: open.span(),
+                    text: format!["the opening brace is '{open}'"],
+                },
+                ErrorLabel {
+                    span: close.span(),
+                    text: format!["the closing brace is '{close}'"],
+                },
+            ]
         }
     }
     pub fn notes(&self) -> Vec<String> {
@@ -199,10 +236,18 @@ impl<'a> Error<'a> {
                         .to_string(),
                 ]
             }
-            UnmatchedClosingSquareBracket { .. } => {
+            UnmatchedClosingBracket { .. } | UnmatchedOpeningBracket { .. } => {
                 vec!["The token will be ignored".to_string()]
             }
-            IncorrectType { .. }
+            MismatchedBraces { .. } => {
+                vec![
+                    "A '(' opening brace must be closed by ')' and similar for '[' and ']'"
+                        .to_string(),
+                ]
+            }
+            UnexpectedToken { .. }
+            | MissingArgsForFunction { .. }
+            | IncorrectType { .. }
             | TooManyPositionalArgs { .. }
             | NoSuchArgument { .. }
             | DuplicateArgument { .. }
@@ -228,7 +273,7 @@ impl<'a> Error<'a> {
         file_name: &'a str,
     ) -> ariadne::Report<'static, (&str, std::ops::Range<usize>)> {
         let mut report =
-            ariadne::Report::build(ariadne::ReportKind::Error, (file_name, self.main_span()))
+            ariadne::Report::build(ariadne::ReportKind::Error, (file_name, 0..file_name.len()))
                 .with_message(self.message());
         let mut color = ariadne::Color::BrightRed;
         for label in self.labels() {
@@ -278,13 +323,13 @@ mod tests {
 
     pub fn get_unique_err(source: &str) -> Error {
         let mut errs = super::super::parse_horizontal_list(source).unwrap_err();
-        assert_eq!(errs.len(), 1);
+        assert_eq!(errs.len(), 1, "{:?}", errs);
         errs.pop().unwrap()
     }
 
     macro_rules! error_tests {
         ( $(
-            ($name: ident, $source: expr, Error:: $want_variant: ident,),
+            ($name: ident, $source: expr, $want_variant: ident,),
         )+ ) => {
             $(
             #[test]
@@ -292,73 +337,78 @@ mod tests {
                 let source = $source;
                 let err = get_unique_err(source);
                 println!["got: {err:?}"];
-                assert!(matches!(err, Error::$want_variant {..}));
+                assert!(matches!(err, Error::$want_variant {..}), "{:?}", err);
             }
             )+
         };
     }
     error_tests!(
-        (
-            invalid_dimension_unit,
-            "glue(0plx)",
-            Error::InvalidDimensionUnit,
-        ),
-        (
-            invalid_type_positional,
-            r#"text(1pc)"#,
-            Error::IncorrectType,
-        ),
-        (
-            invalid_type_keyword,
-            r#"text(content=1pc)"#,
-            Error::IncorrectType,
-        ),
+        (invalid_dimension_unit, "glue(0plx)", InvalidDimensionUnit,),
+        (invalid_type_positional, r#"text(1pc)"#, IncorrectType,),
+        (invalid_type_keyword, r#"text(content=1pc)"#, IncorrectType,),
         (
             too_many_positional_args_1,
             r#"text("Hello", 3, "Mundo")"#,
-            Error::TooManyPositionalArgs,
+            TooManyPositionalArgs,
         ),
         (
             too_many_positional_args_2,
             r#"text("Hello", font=3, "Mundo")"#,
-            Error::PositionalArgAfterKeywordArg,
+            PositionalArgAfterKeywordArg,
         ),
         (
             positional_arg_after_keyword_arg,
             r#"text(font=3, "Hello")"#,
-            Error::PositionalArgAfterKeywordArg,
+            PositionalArgAfterKeywordArg,
         ),
         (
             duplicate_keyword_args,
             r#"text(content="Hello", content="World")"#,
-            Error::DuplicateArgument,
+            DuplicateArgument,
         ),
         (
             duplicate_positional_and_keyword_args,
             r#"text("Hello", content="Mundo")"#,
-            Error::DuplicateArgument,
+            DuplicateArgument,
         ),
         (
             invalid_keyword_arg,
             r#"text(random="Hello")"#,
-            Error::NoSuchArgument,
+            NoSuchArgument,
         ),
-        (invalid_func_name, r#"random()"#, Error::NoSuchFunction,),
+        (invalid_func_name, r#"random()"#, NoSuchFunction,),
+        (trailing_closed_square, "text()]", UnmatchedClosingBracket,),
+        (trailing_open_square, "text())", UnmatchedClosingBracket,),
         (
-            trailing_closed_square,
-            "text()]",
-            Error::UnmatchedClosingSquareBracket,
+            unexpected_token_before_func_name,
+            ",text()",
+            UnexpectedToken,
         ),
+        (unexpected_token_after_func_name, "text,()", UnexpectedToken,),
+        (missing_func_name, "()", UnexpectedToken,),
+        (
+            missing_paren_after_func_name,
+            "text",
+            MissingArgsForFunction,
+        ),
+        (incorrect_func_braces, "text[]()", UnexpectedToken,),
+        (incorrect_closing_brace_round, "text(]", MismatchedBraces,),
+        (
+            incorrect_closing_brace_square,
+            "hlist(content=[))",
+            MismatchedBraces,
+        ),
+        (
+            unmatched_opening_brace_round,
+            r#"text("Hello""#,
+            UnmatchedOpeningBracket,
+        ),
+        // (empty_argument, "text(,)", UnmatchedClosingBracket,),
         /*
-        "hlist(contents=[]])"
-        ",text()"
-        "text,()"
-        "text(,)"
         "text(content,="Hello")"
         "text(content=,"Hello")"
         "text(content=("Ignored"(3pt)[)"World)"
         "text(content[(ignored]="Hello")
-        "text("Hello""
          */
     );
 }
