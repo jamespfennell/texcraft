@@ -66,6 +66,9 @@ pub enum Error<'a> {
 
     /// Mismatched braces - e.g. [) or (].
     MismatchedBraces { open: Str<'a>, close: Str<'a> },
+
+    /// Input ended while parsing a function keyword argument
+    IncompleteKeywordArg { keyword: Str<'a> },
 }
 
 impl<'a> Error<'a> {
@@ -96,6 +99,7 @@ impl<'a> Error<'a> {
                 format!["no arguments provided for '{function_name}'"]
             }
             MismatchedBraces { open, close } => format!["mismatched braces '{open}' and '{close}'"],
+            IncompleteKeywordArg { .. } => "incomplete keyword argument".into(),
         }
     }
     pub fn labels(&self) -> Vec<ErrorLabel> {
@@ -224,6 +228,12 @@ impl<'a> Error<'a> {
                     span: close.span(),
                     text: format!["the closing brace is '{close}'"],
                 },
+            ],
+            IncompleteKeywordArg { keyword  } => vec![
+                ErrorLabel {
+                    span: keyword.span(),
+                    text: "a value was not provided for this keyword".into(),
+                },
             ]
         }
     }
@@ -252,6 +262,7 @@ impl<'a> Error<'a> {
             | NoSuchArgument { .. }
             | DuplicateArgument { .. }
             | NoSuchFunction { .. }
+            | IncompleteKeywordArg { .. }
             | InvalidDimensionUnit { .. } => vec![],
         }
     }
@@ -403,12 +414,23 @@ mod tests {
             r#"text("Hello""#,
             UnmatchedOpeningBracket,
         ),
-        // (empty_argument, "text(,)", UnmatchedClosingBracket,),
-        /*
-        "text(content,="Hello")"
-        "text(content=,"Hello")"
-        "text(content=("Ignored"(3pt)[)"World)"
-        "text(content[(ignored]="Hello")
-         */
+        (
+            unexpected_token_in_args_1,
+            "glue(,width=1pt)",
+            UnexpectedToken,
+        ),
+        (
+            unexpected_token_in_args_2,
+            "glue(width,=1pt)",
+            UnexpectedToken,
+        ),
+        (
+            unexpected_token_in_args_3,
+            "glue(width=,1pt)",
+            UnexpectedToken,
+        ),
+        (unexpected_token_in_args_4, "glue(,1pt)", UnexpectedToken,),
+        (end_of_input_in_args_1, "glue(width)", IncompleteKeywordArg,),
+        (end_of_input_in_args_2, "glue(width=)", IncompleteKeywordArg,),
     );
 }

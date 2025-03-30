@@ -17,6 +17,7 @@
 //!     over the tree.
 //!
 
+use crate::lexer::ClosingParen;
 use crate::Error;
 
 use super::lexer;
@@ -226,7 +227,7 @@ fn pretty_print_impl<'a, W: std::fmt::Write, T: TreeIter<'a>>(
                 writeln!(w, ")")?;
             }
             TreeItem::Comment { value } => {
-                writeln!(w, "{indent}#{value}").unwrap();
+                writeln!(w, "{indent}#{value}")?;
             }
         };
     }
@@ -481,59 +482,70 @@ struct ParseIterCommon<'a> {
 }
 
 impl<'a> ParseIterCommon<'a> {
-    fn next_token(&mut self) -> Option<lexer::Token<'a>> {
-        let token_or = self.peek_token();
-        self.next_token = None;
-        token_or
-    }
-    fn peek_token(&mut self) -> Option<lexer::Token<'a>> {
-        match self.next_token.clone() {
-            None => {
-                for token in self.lexer.by_ref() {
-                    match token.value {
-                        lexer::TokenValue::Comment => {
-                            self.comments.push_back(token.source.str());
-                        }
-                        lexer::TokenValue::SquareClose | lexer::TokenValue::RoundClose => {
-                            self.errs.add(crate::Error::UnmatchedClosingBracket {
-                                close: token.source,
-                            });
-                        }
-                        _ => {
-                            self.next_token = Some(token);
-                            break;
-                        }
-                    }
+    fn refill(&mut self) {
+        if self.next_token.is_some() {
+            return;
+        }
+        for token in self.lexer.by_ref() {
+            match token.value {
+                lexer::TokenValue::Comment => {
+                    self.comments.push_back(token.source.str());
                 }
-                self.next_token.clone()
+                lexer::TokenValue::SquareClose | lexer::TokenValue::RoundClose => {
+                    self.errs.add(crate::Error::UnmatchedClosingBracket {
+                        close: token.source,
+                    });
+                }
+                _ => {
+                    self.next_token = Some(token);
+                    break;
+                }
             }
-            Some(token) => Some(token),
         }
     }
 
-    fn parse_required<T, F: Fn(&lexer::Token<'a>) -> Option<T>>(
+    fn parse_optional<F: Fn(&lexer::Token<'a>) -> bool>(&mut self, f: F) {
+        self.refill();
+        if let Some(token) = &self.next_token {
+            if f(&token) {
+                self.next_token = None;
+            }
+        }
+    }
+
+    fn parse_required<T, F: FnMut(lexer::Token<'a>) -> Option<T>>(
         &mut self,
-        f: F,
+        mut f: F,
         want: &'static str,
     ) -> Option<T> {
         loop {
-            let token = self.next_token()?;
-            if let Some(t) = f(&token) {
-                return Some(t);
+            self.refill();
+            let token = self.next_token.take()?;
+            enum Skipped {
+                Parens(Option<ClosingParen>),
+                Other,
             }
             let skipped = match token.value {
                 lexer::TokenValue::SquareOpen { closing }
-                | lexer::TokenValue::RoundOpen { closing } => {
+                | lexer::TokenValue::RoundOpen { closing } => Skipped::Parens(closing),
+                _ => Skipped::Other,
+            };
+            let token_source = token.source.clone();
+            if let Some(t) = f(token) {
+                return Some(t);
+            }
+            let skipped = match skipped {
+                Skipped::Parens(closing) => {
                     let inner = self.lexer.split_nested(closing);
                     let mut s = inner.remaining_source();
                     include_parens(&mut s);
                     s
                 }
-                _ => token.source.clone(),
+                Skipped::Other => token_source.clone(),
             };
             self.errs.add(Error::UnexpectedToken {
                 want,
-                got: token.source,
+                got: token_source,
                 skipped,
             });
         }
@@ -589,7 +601,7 @@ impl<'a> Iterator for ParseTreeIter<'a> {
         // parse function name
         let func_name_or = self.c.parse_required(
             |token| match token.value {
-                lexer::TokenValue::Keyword => Some(token.source.clone()),
+                lexer::TokenValue::Keyword => Some(token.source),
                 _ => None,
             },
             "a function name",
@@ -640,40 +652,83 @@ impl<'a> Iterator for ParseArgsIter<'a> {
         if let Some(next) = self.next_arg.take() {
             return Some(next);
         }
-        let next = match self.c.peek_token() {
-            None => {
-                if self.c.comments.is_empty() {
-                    return None;
+
+        enum ArgStart<'a> {
+            Value(lexer::Token<'a>),
+            Keyword(Str<'a>),
+        }
+        let start = self.c.parse_required(
+            |token| {
+                use lexer::TokenValue;
+                match token.value {
+                    TokenValue::String(_)
+                    | TokenValue::Integer(_)
+                    | TokenValue::Scaled(_)
+                    | TokenValue::InfiniteGlue(_, _)
+                    | TokenValue::SquareOpen { .. } => Some(ArgStart::Value(token)),
+                    lexer::TokenValue::Keyword => Some(ArgStart::Keyword(token.source)),
+                    _ => None,
                 }
-                return self.next();
+            },
+            "a function argument",
+        );
+        let Some(start) = start else {
+            if self.c.comments.is_empty() {
+                return None;
             }
-            Some(next) => next,
+            return self.next();
         };
-        let key = match next.value {
-            // key=value argument
-            lexer::TokenValue::Keyword => {
-                // consume the keyword token
-                self.c.next_token();
-                assert_eq!(
-                    self.c.next_token().map(|t| t.value),
-                    Some(lexer::TokenValue::Equal)
+        let (key, value) = match start {
+            ArgStart::Keyword(key) => {
+                self.c.parse_required(
+                    |token| match token.value {
+                        lexer::TokenValue::Equal => Some(()),
+                        _ => None,
+                    },
+                    "an equals",
                 );
-                Some(next.source)
+                let value = self.c.parse_required(
+                    |token| {
+                        use lexer::TokenValue;
+                        match token.value {
+                            TokenValue::String(_)
+                            | TokenValue::Integer(_)
+                            | TokenValue::Scaled(_)
+                            | TokenValue::InfiniteGlue(_, _)
+                            | TokenValue::SquareOpen { .. } => Some(token),
+                            _ => None,
+                        }
+                    },
+                    "value of a keyword argument",
+                );
+                let Some(value) = value else {
+                    self.c
+                        .errs
+                        .add(Error::IncompleteKeywordArg { keyword: key });
+                    return self.next();
+                };
+                (Some(key), value)
             }
-            // positional argument
-            _ => None,
+            ArgStart::Value(value) => (None, value),
         };
-        let value_token = self.c.next_token().unwrap();
-        let value = match value_token.value {
+        let mut c = None;
+        let value_v = match value.value {
             lexer::TokenValue::String(s) => Value::String(s),
             lexer::TokenValue::Integer(n) => Value::Integer(n),
             lexer::TokenValue::Scaled(n) => Value::Scaled(n),
             lexer::TokenValue::InfiniteGlue(s, o) => Value::InfiniteGlue(s, o),
             lexer::TokenValue::SquareOpen { closing } => {
-                let lexer = self.c.lexer.split_nested(closing);
-                self.next_arg = Some(ArgsItem::List {
+                c = closing;
+                Value::List(Default::default())
+            }
+            _ => unreachable!(),
+        };
+        self.next_arg = Some(match value_v {
+            Value::List(_) => {
+                let lexer = self.c.lexer.split_nested(c);
+                ArgsItem::List {
                     key,
-                    square_open: value_token.source,
+                    square_open: value.source,
                     tree: ParseTreeIter {
                         next_tree: None,
                         c: ParseIterCommon {
@@ -683,28 +738,17 @@ impl<'a> Iterator for ParseArgsIter<'a> {
                             errs: self.c.errs.clone(),
                         },
                     },
-                });
-                // Consume an optional ',' after the value.
-                if let Some(lexer::TokenValue::Comma) = self.c.peek_token().map(|t| t.value) {
-                    // Consume the ',' token.
-                    self.c.next_token();
                 }
-                return self.next();
             }
-            a => {
-                panic!("expected value, instead got {a:?}")
-            }
-        };
-        // Consume an optional ',' after the value.
-        if let Some(lexer::TokenValue::Comma) = self.c.peek_token().map(|t| t.value) {
-            // Consume the ',' token.
-            self.c.next_token();
-        }
-        self.next_arg = Some(ArgsItem::Regular {
-            key,
-            value,
-            value_source: value_token.source,
+            value_v => ArgsItem::Regular {
+                key,
+                value: value_v,
+                value_source: value.source,
+            },
         });
+        // Consume an optional ',' after the value.
+        self.c
+            .parse_optional(|token| matches!(token.value, lexer::TokenValue::Comma));
         self.next()
     }
 }
@@ -746,7 +790,7 @@ pub enum Value<'a> {
 impl<'a> Value<'a> {
     /// Attempts to clone the value.
     ///
-    /// This method is indented for fast code, and will accordingly not clone a tree.
+    /// This method is intended for fast code, and will accordingly not clone a tree.
     /// If the value is a tree, it returns the tree in the error payload.
     pub fn try_clone_value(&self) -> Result<Self, &Tree<'a>> {
         use Value::*;
@@ -754,6 +798,8 @@ impl<'a> Value<'a> {
             Integer(i) => Integer(*i),
             Scaled(scaled) => Scaled(*scaled),
             InfiniteGlue(scaled, glue_order) => InfiniteGlue(*scaled, *glue_order),
+            // TODO: the string clone here is pretty bad.
+            // May be better to have a cheap clonable string.
             String(cow) => String(cow.clone()),
             List(tree) => return Err(tree),
         };

@@ -38,3 +38,7 @@ text, ()
 # Mismatched braces
 text(]
 hlist(content=[))
+
+# Incomplete keyword arg
+glue(width)
+glue(width=)
