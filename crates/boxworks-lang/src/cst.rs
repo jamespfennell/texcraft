@@ -179,7 +179,7 @@ impl std::fmt::Display for Indent {
 
 fn pretty_print_impl<'a, W: std::fmt::Write, T: TreeIter<'a>>(
     w: &mut W,
-    mut tree: T,
+    tree: T,
     depth: usize,
 ) -> std::fmt::Result {
     let indent = Indent(depth);
@@ -187,31 +187,31 @@ fn pretty_print_impl<'a, W: std::fmt::Write, T: TreeIter<'a>>(
         indent: depth,
         ..Default::default()
     };
-    loop {
-        match tree.next() {
-            Some(TreeItem::FuncCall {
+    for item in tree {
+        match item {
+            TreeItem::FuncCall {
                 func_name,
-                mut args,
-            }) => {
+                args,
+            } => {
                 write!(w, "{indent}{func_name}(")?;
-                loop {
-                    match args.next() {
-                        Some(ArgsItem::Comment { value }) => {
+                for item in args {
+                    match item {
+                        ArgsItem::Comment { value } => {
                             ap.activate_multiline(w)?;
                             write!(w, "\n{indent}  #{value}")?;
                         }
-                        Some(ArgsItem::Regular {
+                        ArgsItem::Regular {
                             key,
                             value,
                             value_source: _,
-                        }) => {
+                        } => {
                             ap.print(w, key, value)?;
                         }
-                        Some(ArgsItem::List {
+                        ArgsItem::List {
                             key,
                             square_open: _,
                             tree,
-                        }) => {
+                        } => {
                             ap.activate_multiline(w)?;
                             write!(w, "\n{indent}  ")?;
                             if let Some(key) = key {
@@ -221,22 +221,17 @@ fn pretty_print_impl<'a, W: std::fmt::Write, T: TreeIter<'a>>(
                             pretty_print_impl(w, tree, depth + 4)?;
                             write!(w, "{indent}  ],")?;
                         }
-                        None => {
-                            ap.flush(w)?;
-                            writeln!(w, ")")?;
-                            break;
-                        }
                     }
                 }
+                ap.flush(w)?;
+                writeln!(w, ")")?;
             }
-            Some(TreeItem::Comment { value }) => {
+            TreeItem::Comment { value } => {
                 writeln!(w, "{indent}#{value}").unwrap();
-            }
-            None => {
-                break Ok(());
             }
         };
     }
+    Ok(())
 }
 
 /// Explicit representation of a CST.
@@ -252,17 +247,16 @@ impl<'a> Tree<'a> {
         Self::build_impl(tree)
     }
 
-    fn build_impl<I: TreeIter<'a>>(mut tree: I) -> Self {
+    fn build_impl<I: TreeIter<'a>>(tree: I) -> Self {
         let mut comments = vec![];
         let take_comments = |comments: &mut Vec<&'a str>| {
             let mut v = vec![];
             std::mem::swap(&mut v, comments);
             v
         };
-        let mut calls = vec![];
-        loop {
-            match tree.next() {
-                Some(TreeItem::FuncCall { func_name, args }) => {
+        let calls = tree
+            .filter_map(|item| match item {
+                TreeItem::FuncCall { func_name, args } => {
                     let func_comments = take_comments(&mut comments);
                     let args: Vec<Arg<'a>> = args
                         .filter_map(|item| match item {
@@ -296,19 +290,19 @@ impl<'a> Tree<'a> {
                             }
                         })
                         .collect();
-                    calls.push(FuncCall {
+                    Some(FuncCall {
                         comments: func_comments,
                         func_name,
                         args,
                         trailing_comments: take_comments(&mut comments),
-                    });
+                    })
                 }
-                Some(TreeItem::Comment { value }) => {
+                TreeItem::Comment { value } => {
                     comments.push(value);
+                    None
                 }
-                None => break,
-            };
-        }
+            })
+            .collect();
         Self {
             calls,
             trailing_comments: comments,

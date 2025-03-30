@@ -1,5 +1,6 @@
 //! Box language abstract syntax tree
 //!
+
 use crate::cst::TreeIter;
 use crate::ErrorAccumulator;
 
@@ -17,15 +18,79 @@ pub enum Horizontal<'a> {
     Hlist(Hlist<'a>),
 }
 
+/// Lower a horizontal list to a CST tree.
+pub fn lower<'a, 'b>(list: &'b [Horizontal<'a>]) -> impl cst::TreeIter<'a> + 'b {
+    lower_impl(list)
+}
+
+fn lower_impl<'a, 'b>(list: &'b [Horizontal<'a>]) -> HlistTreeIter<'a, 'b> {
+    HlistTreeIter { list, next: 0 }
+}
+
 impl<'a> Horizontal<'a> {
-    pub fn lower(&self) -> cst::FuncCall<'a> {
-        lower_horizontal(self)
+    /// Lower this element to a CST tree.
+    pub fn lower<'b>(&'b self) -> impl cst::TreeIter<'a> + 'b {
+        lower(std::slice::from_ref(self))
     }
+    /// Lower the arguments of this element to a CST args iterator.
+    pub fn lower_args<'b>(&'b self) -> impl cst::ArgsIter<'a> + 'b {
+        self.lower_args_impl()
+    }
+    fn lower_args_impl<'b>(&'b self) -> HlistArgsIter<'a, 'b> {
+        HlistArgsIter {
+            elem: self,
+            next: 0,
+        }
+    }
+}
+
+struct HlistTreeIter<'a, 'b> {
+    list: &'b [Horizontal<'a>],
+    next: usize,
+}
+
+struct HlistArgsIter<'a, 'b> {
+    elem: &'b Horizontal<'a>,
+    next: usize,
+}
+
+impl<'a, 'b> Iterator for HlistTreeIter<'a, 'b> {
+    type Item = cst::TreeItem<'a, HlistArgsIter<'a, 'b>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let h = self.list.get(self.next)?;
+        self.next += 1;
+        Some(cst::TreeItem::FuncCall {
+            func_name: h.func_name().into(),
+            args: h.lower_args_impl(),
+        })
+    }
+}
+
+impl<'a, 'b> cst::TreeIter<'a> for HlistTreeIter<'a, 'b> {
+    type ArgsIter = HlistArgsIter<'a, 'b>;
+    fn remaining_source(&self) -> Str<'a> {
+        "".into()
+    }
+}
+
+impl<'a, 'b> Iterator for HlistArgsIter<'a, 'b> {
+    type Item = cst::ArgsItem<'a, HlistTreeIter<'a, 'b>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let l = self.elem.lower_arg(self.next)?;
+        self.next += 1;
+        Some(l)
+    }
+}
+
+impl<'a, 'b> cst::ArgsIter<'a> for HlistArgsIter<'a, 'b> {
+    type TreeIter = HlistTreeIter<'a, 'b>;
 }
 
 impl<'a> std::fmt::Display for Horizontal<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.lower())
+        cst::pretty_print(f, self.lower())
     }
 }
 
@@ -93,16 +158,42 @@ macro_rules! functions {
                     }
                 }
             }
-            fn lower(&self) -> Vec<cst::Arg<$lifetime>> {
-                vec![
-                    $(
-                        self.$field_name.lower(Some(stringify!($field_name).into())),
-                    )+
-                ]
+            fn lower_arg<'b>(&'b self, i: usize) -> Option<cst::ArgsItem<'a, HlistTreeIter<'a, 'b>>> {
+                let field_name = *Self::FIELD_NAMES.get(i)?;
+                match field_name {
+                $(
+                    stringify!($field_name) => {
+                        Some(self.$field_name.lower(Some(field_name.into())))
+                    }
+                )+
+                    _ => None,
+                }
             }
         }
         )+
-
+        impl<'a> Horizontal<'a> {
+            pub fn func_name(&self) -> &'static str {
+                match self {
+                    $( $(
+                        Horizontal::$variant(_) => $func_name,
+                    )? )+
+                }
+            }
+            pub fn field_names(&self) -> &'static [&'static str ] {
+                match self {
+                    $( $(
+                        Horizontal::$variant(_) => $name::FIELD_NAMES,
+                    )? )+
+                }
+            }
+            fn lower_arg<'b>(&'b self, u: usize) -> Option<cst::ArgsItem<'a, HlistTreeIter<'a, 'b>>> {
+                match self {
+                    $( $(
+                        Horizontal::$variant(args) => args.lower_arg(u),
+                    )? )+
+                }
+            }
+        }
         fn convert_call<'a>(
             func_name: Str<'a>,
             call: impl cst::ArgsIter<'a>,
@@ -120,18 +211,6 @@ macro_rules! functions {
                 }
             };
             Some(h)
-        }
-        fn lower_horizontal<'a>(h: &Horizontal<'a>) -> cst::FuncCall<'a> {
-            match h {
-                $( $(
-                    Horizontal::$variant(args) => cst::FuncCall {
-                        comments: vec![],
-                        func_name: $func_name.into(),
-                        args: args.lower(),
-                        trailing_comments: vec![],
-                    },
-                )? )+
-            }
         }
     };
 }
@@ -209,7 +288,8 @@ trait Args<'a>: Default {
         }
     }
 
-    fn lower(&self) -> Vec<cst::Arg<'a>>;
+    /// Lower the ith argument.
+    fn lower_arg<'b>(&'b self, i: usize) -> Option<cst::ArgsItem<'a, HlistTreeIter<'a, 'b>>>;
 }
 
 functions!(
@@ -328,13 +408,8 @@ where
             }),
         }
     }
-    fn lower(&self, key: Option<Str<'a>>) -> cst::Arg<'a> {
-        cst::Arg {
-            comments: vec![],
-            key,
-            value: self.value.lower(),
-            value_source: self.source.clone().unwrap_or("".into()),
-        }
+    fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, HlistTreeIter<'a, 'b>> {
+        self.value.lower(key)
     }
 }
 
@@ -364,8 +439,7 @@ trait Value<'a>: Sized {
         None
     }
 
-    /// Lower this value to a [`cst::Value`].
-    fn lower(&self) -> cst::Value<'a>;
+    fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, HlistTreeIter<'a, 'b>>;
 }
 
 impl<'a> Value<'a> for Cow<'a, str> {
@@ -373,8 +447,12 @@ impl<'a> Value<'a> for Cow<'a, str> {
     fn try_cast_string(s: Cow<'a, str>) -> Option<Self> {
         Some(s)
     }
-    fn lower(&self) -> cst::Value<'a> {
-        cst::Value::String(self.clone())
+    fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, HlistTreeIter<'a, 'b>> {
+        cst::ArgsItem::Regular {
+            key,
+            value: cst::Value::String(self.clone()),
+            value_source: "".into(),
+        }
     }
 }
 
@@ -383,8 +461,12 @@ impl<'a> Value<'a> for i32 {
     fn try_cast_integer(i: i32) -> Option<Self> {
         Some(i)
     }
-    fn lower(&self) -> cst::Value<'a> {
-        cst::Value::Integer(*self)
+    fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, HlistTreeIter<'a, 'b>> {
+        cst::ArgsItem::Regular {
+            key,
+            value: cst::Value::Integer(*self),
+            value_source: "".into(),
+        }
     }
 }
 
@@ -393,8 +475,12 @@ impl<'a> Value<'a> for core::Scaled {
     fn try_cast_scaled(s: core::Scaled) -> Option<Self> {
         Some(s)
     }
-    fn lower(&self) -> cst::Value<'a> {
-        cst::Value::Scaled(*self)
+    fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, HlistTreeIter<'a, 'b>> {
+        cst::ArgsItem::Regular {
+            key,
+            value: cst::Value::Scaled(*self),
+            value_source: "".into(),
+        }
     }
 }
 
@@ -406,8 +492,12 @@ impl<'a> Value<'a> for (core::Scaled, core::GlueOrder) {
     fn try_cast_infinite_glue(s: core::Scaled, o: core::GlueOrder) -> Option<Self> {
         Some((s, o))
     }
-    fn lower(&self) -> cst::Value<'a> {
-        cst::Value::InfiniteGlue(self.0, self.1)
+    fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, HlistTreeIter<'a, 'b>> {
+        cst::ArgsItem::Regular {
+            key,
+            value: cst::Value::InfiniteGlue(self.0, self.1),
+            value_source: "".into(),
+        }
     }
 }
 
@@ -416,17 +506,19 @@ impl<'a> Value<'a> for Vec<Horizontal<'a>> {
     fn try_cast_list<F: cst::TreeIter<'a>>(value: F, errs: &ErrorAccumulator<'a>) -> Option<Self> {
         Some(parse_hlist_using_cst(value, errs))
     }
-    fn lower(&self) -> cst::Value<'a> {
-        cst::Value::List(cst::Tree {
-            calls: self.iter().map(|e| e.lower()).collect(),
-            trailing_comments: vec![],
-        })
+    fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, HlistTreeIter<'a, 'b>> {
+        cst::ArgsItem::List {
+            key,
+            square_open: "".into(),
+            tree: lower_impl(self),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// FYI: most of the tests are doc tests.
     #[test]
     fn hlist() {
         let input = r#"
