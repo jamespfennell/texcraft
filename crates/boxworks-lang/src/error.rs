@@ -69,6 +69,15 @@ pub enum Error<'a> {
 
     /// Input ended while parsing a function keyword argument
     IncompleteKeywordArg { keyword: Str<'a> },
+
+    /// A number has multiple decimal points.
+    MultipleDecimalPoints { point: Str<'a> },
+
+    /// No units were specified for a number.
+    NumberWithoutUnits { number: Str<'a> },
+
+    /// Input contains an invalid character (like a non-ASCII character)
+    InvalidCharacter { char: Str<'a> },
 }
 
 impl<'a> Error<'a> {
@@ -93,148 +102,171 @@ impl<'a> Error<'a> {
                 format!["Dimension has an invalid unit '{unit}'"]
             }
             UnexpectedToken { want, .. } => {
-                format!["unexpected token while looking for {want}"]
+                format!["Unexpected token while looking for {want}"]
             }
             MissingArgsForFunction { function_name } => {
-                format!["no arguments provided for '{function_name}'"]
+                format!["No arguments provided for '{function_name}'"]
             }
-            MismatchedBraces { open, close } => format!["mismatched braces '{open}' and '{close}'"],
-            IncompleteKeywordArg { .. } => "incomplete keyword argument".into(),
+            MismatchedBraces { open, close } => format!["Mismatched braces '{open}' and '{close}'"],
+            IncompleteKeywordArg { .. } => "Incomplete keyword argument".into(),
+            MultipleDecimalPoints { .. } => "A number has multiple decimal points".into(),
+            NumberWithoutUnits { .. } => "No units were provided for this number".into(),
+            InvalidCharacter { .. } => "Invalid character in the input".into(),
         }
     }
     pub fn labels(&self) -> Vec<ErrorLabel> {
         use Error::*;
         match self {
             PositionalArgAfterKeywordArg {
-                positional_arg,
-                keyword_arg,
-            } => {
-                vec![
-                    ErrorLabel {
-                        span: positional_arg.span(),
-                        text: "The positional argument appears here".into(),
-                    },
-                    ErrorLabel {
-                        span: keyword_arg.span(),
-                        text: "The keyword argument appears here".into(),
-                    },
-                ]
-            }
+                        positional_arg,
+                        keyword_arg,
+                    } => {
+                        vec![
+                            ErrorLabel {
+                                span: positional_arg.span(),
+                                text: "The positional argument appears here".into(),
+                            },
+                            ErrorLabel {
+                                span: keyword_arg.span(),
+                                text: "The keyword argument appears here".into(),
+                            },
+                        ]
+                    }
             IncorrectType {
-                wanted_type,
-                got_type: got,
-                got_raw_value,
-                function_name,
-                parameter_name,
-            } => vec![
-                ErrorLabel {
-                    span: got_raw_value.span(),
-                    text: format!["The provided argument is {got}"],
-                },
-                ErrorLabel {
-                    span: function_name.span(),
-                    text: format![
-                        "The `{parameter_name}` parameter of the `{}` function requires {wanted_type}",
-                        function_name.str()
+                        wanted_type,
+                        got_type: got,
+                        got_raw_value,
+                        function_name,
+                        parameter_name,
+                    } => vec![
+                        ErrorLabel {
+                            span: got_raw_value.span(),
+                            text: format!["The provided argument is {got}"],
+                        },
+                        ErrorLabel {
+                            span: function_name.span(),
+                            text: format![
+                                "The `{parameter_name}` parameter of the `{}` function requires {wanted_type}",
+                                function_name.str()
+                            ],
+                        },
                     ],
-                },
-            ],
             TooManyPositionalArgs { extra_positional_arg, function_name, max_positional_args } => vec![
-                ErrorLabel {
-                    span: extra_positional_arg.span(),
-                    text: "an extra positional arguments was provided".to_string(),
-                },
-                ErrorLabel {
-                    span: function_name.span(),
-                    text: format![
-                        "The `{}` function accepts up to {max_positional_args} positional arguments",
-                        function_name.str()
+                        ErrorLabel {
+                            span: extra_positional_arg.span(),
+                            text: "an extra positional arguments was provided".to_string(),
+                        },
+                        ErrorLabel {
+                            span: function_name.span(),
+                            text: format![
+                                "The `{}` function accepts up to {max_positional_args} positional arguments",
+                                function_name.str()
+                            ],
+                        },
                     ],
-                },
-            ],
             NoSuchArgument { function_name, argument } => vec![
-                ErrorLabel {
-                    span: argument.span(),
-                    text: format![
-                        "an argument with name `{}` appears here",
-                        argument.str(),
+                        ErrorLabel {
+                            span: argument.span(),
+                            text: format![
+                                "an argument with name `{}` appears here",
+                                argument.str(),
+                            ],
+                        },
+                        ErrorLabel {
+                            span: function_name.span(),
+                            text: format![
+                                "The `{}` function does not have a parameter with name `{}`",
+                                function_name.str(),
+                                argument.str(),
+                            ],
+                        },
                     ],
-                },
-                ErrorLabel {
-                    span: function_name.span(),
-                    text: format![
-                        "The `{}` function does not have a parameter with name `{}`",
-                        function_name.str(),
-                        argument.str(),
-                    ],
-                },
-            ],
             DuplicateArgument { parameter_name: _, first_assignment, second_assignment } => vec![
-                ErrorLabel {
-                    span: first_assignment.span(),
-                    text: "the first value appears here".to_string(),
-                },
-                ErrorLabel {
-                    span: second_assignment.span(),
-                    text: "the second value appear here".to_string(),
-                },
-            ],
+                        ErrorLabel {
+                            span: first_assignment.span(),
+                            text: "the first value appears here".to_string(),
+                        },
+                        ErrorLabel {
+                            span: second_assignment.span(),
+                            text: "the second value appear here".to_string(),
+                        },
+                    ],
             NoSuchFunction { function_name } => vec![
-                ErrorLabel {
-                    span: function_name.span(),
-                    text: "there is no function with this name".to_string(),
-                },
-            ],
+                        ErrorLabel {
+                            span: function_name.span(),
+                            text: "there is no function with this name".to_string(),
+                        },
+                    ],
             UnmatchedOpeningBracket{ open: close } => vec![
-                ErrorLabel {
-                    span: close.span(),
-                    text: "this bracket does not correspond to any subsequent closing bracket".to_string(),
-                },
-            ],
+                        ErrorLabel {
+                            span: close.span(),
+                            text: "this bracket does not correspond to any subsequent closing bracket".to_string(),
+                        },
+                    ],
             UnmatchedClosingBracket{ close } => vec![
-                ErrorLabel {
-                    span: close.span(),
-                    text: "this bracket does not correspond to any preceding opening bracket".to_string(),
-                },
-            ],
+                        ErrorLabel {
+                            span: close.span(),
+                            text: "this bracket does not correspond to any preceding opening bracket".to_string(),
+                        },
+                    ],
             InvalidDimensionUnit { dimension: _, unit } => vec![
-                ErrorLabel {
-                    span: unit.span(),
-                    text: "valid units are the same as TeX".to_string(),
-                },
-            ],
+                        ErrorLabel {
+                            span: unit.span(),
+                            text: "valid units are the same as TeX".to_string(),
+                        },
+                    ],
             UnexpectedToken { want: _, got, skipped } => vec![
-                ErrorLabel {
-                    span: got.span(),
-                    text: "this token was not expected".to_string(),
-                },
-                ErrorLabel {
-                    span: skipped.span(),
-                    text: "this source code will be skipped".to_string(),
-                },
-            ],
+                        ErrorLabel {
+                            span: got.span(),
+                            text: "this token was not expected".to_string(),
+                        },
+                        ErrorLabel {
+                            span: skipped.span(),
+                            text: "this source code will be skipped".to_string(),
+                        },
+                    ],
             MissingArgsForFunction { function_name } => vec![
-                ErrorLabel {
-                    span: function_name.span(),
-                    text: "a function name must be followed by arguments".to_string(),
-                },
-            ],
+                        ErrorLabel {
+                            span: function_name.span(),
+                            text: "a function name must be followed by arguments".to_string(),
+                        },
+                    ],
             MismatchedBraces { open, close } => vec![
-                ErrorLabel {
-                    span: open.span(),
-                    text: format!["the opening brace is '{open}'"],
-                },
-                ErrorLabel {
-                    span: close.span(),
-                    text: format!["the closing brace is '{close}'"],
-                },
-            ],
+                        ErrorLabel {
+                            span: open.span(),
+                            text: format!["the opening brace is '{open}'"],
+                        },
+                        ErrorLabel {
+                            span: close.span(),
+                            text: format!["the closing brace is '{close}'"],
+                        },
+                    ],
             IncompleteKeywordArg { keyword  } => vec![
-                ErrorLabel {
-                    span: keyword.span(),
-                    text: "a value was not provided for this keyword".into(),
-                },
-            ]
+                        ErrorLabel {
+                            span: keyword.span(),
+                            text: "a value was not provided for this keyword".into(),
+                        },
+                    ],
+MultipleDecimalPoints { point } => vec![
+    ErrorLabel {
+        span: point.span(),
+        text: "this is the second or subsequent decimal point".into(),
+    },
+],
+            NumberWithoutUnits { number } =>vec![
+    ErrorLabel {
+        span: number.span(),
+                            text: "valid units are the same as TeX".to_string(),
+    },
+
+            ],
+            InvalidCharacter { char } => vec![
+    ErrorLabel {
+        span: char.span(),
+        text: "this character is not allowed here".into(),
+    },
+
+            ],
         }
     }
     pub fn notes(&self) -> Vec<String> {
@@ -263,7 +295,10 @@ impl<'a> Error<'a> {
             | DuplicateArgument { .. }
             | NoSuchFunction { .. }
             | IncompleteKeywordArg { .. }
-            | InvalidDimensionUnit { .. } => vec![],
+            | InvalidDimensionUnit { .. }
+            | MultipleDecimalPoints { .. }
+            | NumberWithoutUnits { .. }
+            | InvalidCharacter { .. } => vec![],
         }
     }
 }
@@ -432,5 +467,13 @@ mod tests {
         (unexpected_token_in_args_4, "glue(,1pt)", UnexpectedToken,),
         (end_of_input_in_args_1, "glue(width)", IncompleteKeywordArg,),
         (end_of_input_in_args_2, "glue(width=)", IncompleteKeywordArg,),
+        (
+            two_decimal_points,
+            "glue(width=1.1.1pt)",
+            MultipleDecimalPoints,
+        ),
+        (number_no_unit, "glue(width=1.1)", NumberWithoutUnits,),
+        (random_character, "/", InvalidCharacter,),
+        (non_ascii_character, "ä", InvalidCharacter,),
     );
 }

@@ -105,7 +105,7 @@ impl<'a> Lexer<'a> {
                 (')' | ']', State::Regular) => {
                     if let Some(s) = stack.pop() {
                         v[s.i] = Some(ClosingParen {
-                            source_idx: i.try_into().unwrap(),
+                            source_idx: i.try_into().expect("i>0 because this character is preceded by a [ or ( that pushed to the stack"),
                             op_i: v.len(),
                         });
                     }
@@ -264,7 +264,16 @@ impl<'a> Iterator for Lexer<'a> {
                 self.parse_number(false, initial_value, start)
             }
             '-' => self.parse_number(true, 0, start),
-            c => todo!("{c:?}"),
+            _ => {
+                self.errs.add(Error::InvalidCharacter {
+                    char: Str {
+                        value: self.s,
+                        start,
+                        end: self.l,
+                    },
+                });
+                return self.next();
+            }
         };
         Some(Token {
             value,
@@ -306,7 +315,13 @@ impl<'a> Lexer<'a> {
                 }
                 Some(d @ '.') => {
                     if !parsing_n {
-                        panic!("two decimal points")
+                        self.errs.add(Error::MultipleDecimalPoints {
+                            point: Str {
+                                value: self.s,
+                                start: self.l,
+                                end: self.l + d.len_utf8(),
+                            },
+                        });
                     }
                     parsing_n = false;
                     self.l += d.len_utf8();
@@ -349,9 +364,16 @@ impl<'a> Lexer<'a> {
                     });
                     return TokenValue::Scaled(core::Scaled::ZERO);
                 }
-                _ => {
+                d => {
                     if !parsing_n {
-                        panic!("decimal number provided, but not unit like pt or fil");
+                        self.errs.add(Error::NumberWithoutUnits {
+                            number: Str {
+                                value: self.s,
+                                start: self.l,
+                                end: self.l + d.map(|c| c.len_utf8()).unwrap_or(0),
+                            },
+                        });
+                        return TokenValue::Scaled(core::Scaled::ZERO);
                     }
                     if negative {
                         n *= -1;

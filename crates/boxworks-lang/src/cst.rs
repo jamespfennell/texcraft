@@ -507,7 +507,7 @@ impl<'a> ParseIterCommon<'a> {
     fn parse_optional<F: Fn(&lexer::Token<'a>) -> bool>(&mut self, f: F) {
         self.refill();
         if let Some(token) = &self.next_token {
-            if f(&token) {
+            if f(token) {
                 self.next_token = None;
             }
         }
