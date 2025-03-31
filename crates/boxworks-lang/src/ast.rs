@@ -129,9 +129,12 @@ macro_rules! functions {
                 $field_name: ident : $field_type: ty,
             )+
         }
+        impl Func {
+            func_name: $func_name: expr,
+            default_num_pos_arg: $default_num_pos_arg: expr,
+        }
         $(
             impl Horizontal {
-                func_name: $func_name: expr,
                 variant: $variant: ident,
             }
         )?
@@ -143,8 +146,12 @@ macro_rules! functions {
                 pub $field_name : Arg<$lifetime, $field_type>,
             )+
         }
-        impl<$lifetime> Args<$lifetime> for $name <$lifetime> {
+        impl<$lifetime> Func for $name <$lifetime> {
+            const NAME: &'static str = "todo";
             const FIELD_NAMES: &'static[&'static str] = &[ $( stringify!($field_name), )+];
+            const DEFAULT_NUM_POS_ARG: usize = $default_num_pos_arg;
+        }
+        impl<$lifetime> Args<$lifetime> for $name <$lifetime> {
             fn assign_to_field<T: cst::TreeIter<$lifetime>>(&mut self, field_name: Str<$lifetime>, arg: cst::ArgsItem<$lifetime, T>, func_name: Str<$lifetime>, value_source: Str<$lifetime>,  errs: &ErrorAccumulator<$lifetime>)
             {
                 match field_name.str() {
@@ -158,12 +165,17 @@ macro_rules! functions {
                     }
                 }
             }
-            fn lower_arg<'b>(&'b self, i: usize) -> Option<cst::ArgsItem<'a, HlistTreeIter<'a, 'b>>> {
-                let field_name = *Self::FIELD_NAMES.get(i)?;
+            fn lower_arg<'b>(&'b self, u: usize) -> Option<cst::ArgsItem<'a, HlistTreeIter<'a, 'b>>> {
+                let field_name = *Self::FIELD_NAMES.get(u)?;
                 match field_name {
                 $(
                     stringify!($field_name) => {
-                        Some(self.$field_name.lower(Some(field_name.into())))
+                        let key = if u < Self::DEFAULT_NUM_POS_ARG {
+                            None
+                        } else {
+                            Some(field_name.into())
+                        };
+                        Some(value_to_cst(&self.$field_name.value, key))
                     }
                 )+
                     _ => None,
@@ -215,9 +227,18 @@ macro_rules! functions {
     };
 }
 
-/// Concrete strongly-type arguments to a function.
-trait Args<'a>: Default {
+/// A function like `text` or `glue`.
+pub trait Func {
+    /// Name of the function.
+    const NAME: &'static str;
+    /// Ordered list of field names.
     const FIELD_NAMES: &'static [&'static str];
+    /// When printing, the number of arguments to print positionally.
+    const DEFAULT_NUM_POS_ARG: usize = 0;
+}
+
+/// Concrete strongly-type arguments to a function.
+trait Args<'a>: Func + Default {
     fn assign_to_field<T: cst::TreeIter<'a>>(
         &mut self,
         field_name: Str<'a>,
@@ -298,8 +319,11 @@ functions!(
             content: Cow<'a, str>,
             font: i32,
         }
-        impl Horizontal {
+        impl Func {
             func_name: "text",
+            default_num_pos_arg: 1,
+        }
+        impl Horizontal {
             variant: Text,
         }
     ),
@@ -309,8 +333,11 @@ functions!(
             stretch: (core::Scaled, core::GlueOrder),
             shrink: (core::Scaled, core::GlueOrder),
         }
-        impl Horizontal {
+        impl Func {
             func_name: "glue",
+            default_num_pos_arg: 3,
+        }
+        impl Horizontal {
             variant: Glue,
         }
     ),
@@ -318,8 +345,11 @@ functions!(
         struct Kern<'a> {
             width: core::Scaled,
         }
-        impl Horizontal {
+        impl Func {
             func_name: "kern",
+            default_num_pos_arg: 1,
+        }
+        impl Horizontal {
             variant: Kern,
         }
     ),
@@ -328,8 +358,11 @@ functions!(
             width: core::Scaled,
             content: Vec<Horizontal<'a>>,
         }
-        impl Horizontal {
+        impl Func {
             func_name: "hlist",
+            default_num_pos_arg: 0,
+        }
+        impl Horizontal {
             variant: Hlist,
         }
     ),
@@ -407,9 +440,6 @@ where
                 parameter_name: field_name,
             }),
         }
-    }
-    fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, HlistTreeIter<'a, 'b>> {
-        self.value.lower(key)
     }
 }
 
@@ -513,6 +543,15 @@ impl<'a> Value<'a> for Vec<Horizontal<'a>> {
             tree: lower_impl(self),
         }
     }
+}
+
+fn value_to_cst<'a, 'b, V: Value<'a>>(
+    value: &'b V,
+    key: Option<Str<'a>>,
+) -> cst::ArgsItem<'a, HlistTreeIter<'a, 'b>> {
+    // TODO: if the argument is positional and has its default value,
+    // don't return anything.
+    value.lower(key)
 }
 
 #[cfg(test)]
