@@ -189,7 +189,7 @@ pub fn build_horizontal_lists(
                                 included_right_boundary: false,
                                 char,
                                 font,
-                                original_chars: og_chars.to_string(),
+                                original_chars: og_chars.into(),
                             }
                             .into(),
                         );

@@ -11,6 +11,7 @@
 use core;
 use core::GlueOrder;
 use core::Scaled as Number;
+use std::rc::Rc;
 
 /// Element of a horizontal list.
 #[derive(Debug)]
@@ -295,11 +296,7 @@ pub struct Ligature {
     /// The original characters that were replaced by the ligature.
     /// This is used if the engine needs to break apart the ligature
     /// in order to perform hyphenation.
-    ///
-    /// For the moment this is a string, but we probably should avoid allocating
-    /// per-ligature-node as they may be common.
-    /// Maybe we can use an `Rc<str>`, where all the rcs are in a pool in the font.
-    pub original_chars: String,
+    pub original_chars: Rc<str>, // TODO: why not (char, char)
 }
 
 // Two constructors for ligature nodes are provided in TeX.2021.144

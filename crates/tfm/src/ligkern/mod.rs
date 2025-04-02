@@ -99,6 +99,38 @@ struct RawReplacement {
     last_char: Char,
 }
 
+/// Lig/kern operation on two characters.
+#[derive(Debug, Clone)]
+pub enum Op {
+    /// Do nothing.
+    None,
+    /// Insert a kern between the two characters.
+    ///
+    /// TODO: should return core::Scaled.
+    Kern(FixWord),
+    /// Replace the two characters with the specified ligature character.
+    SimpleLig(Char),
+    /// Replace the two characters with the specified sequence of characters and kerns.
+    ///
+    /// TODO: change the vec to a reference.
+    ComplexLig(Vec<(Char, FixWord)>, Char),
+}
+
+impl Op {
+    pub fn build_sequence(&self, left_char: Char, right_char: Char) -> Vec<(Char, FixWord)> {
+        match self {
+            Op::None => vec![(left_char, FixWord::ZERO), (right_char, FixWord::ZERO)],
+            Op::Kern(fix_word) => vec![(left_char, *fix_word), (right_char, FixWord::ZERO)],
+            Op::SimpleLig(char) => vec![(*char, FixWord::ZERO)],
+            Op::ComplexLig(items, char) => {
+                let mut v = items.clone();
+                v.push((*char, FixWord::ZERO));
+                v
+            }
+        }
+    }
+}
+
 impl CompiledProgram {
     /// Compile a lig/kern program.
     pub fn compile(
@@ -109,44 +141,45 @@ impl CompiledProgram {
         compiler::compile(program, kerns, &entrypoints)
     }
 
-    /// Get an iterator over the full lig/kern replacement for a pair of characters.
-    pub fn get_replacement_iter(&self, left_char: Char, right_char: Char) -> ReplacementIter {
-        self.get_replacement(left_char, right_char)
-            .into_iter(left_char)
-    }
-
-    /// Get the full lig/kern replacement for a pair of characters.
-    pub fn get_replacement(&self, left_char: Char, right_char: Char) -> Replacement {
-        if let Some((lower, upper)) = self.left_to_pairs.get(&left_char) {
-            for (candidate_right_char, replacement) in
-                &self.pairs[(*lower as usize)..(*upper as usize)]
-            {
-                if *candidate_right_char != right_char {
-                    continue;
-                }
-                return if replacement.middle_char_bounds.end == 0 {
-                    Replacement {
-                        left_char_operation: replacement.left_char_operation,
-                        middle_chars: &[],
-                        last_char: replacement.last_char,
-                    }
-                } else {
-                    Replacement {
-                        left_char_operation: replacement.left_char_operation,
-                        middle_chars: &self.middle_chars[replacement.middle_char_bounds.start
-                            as usize
-                            ..replacement.middle_char_bounds.end as usize],
-                        last_char: replacement.last_char,
-                    }
-                };
+    /// Get an operation between two characters.
+    ///
+    /// TODO: what about boundaries?
+    pub fn get_op(&self, left_char: Char, right_char: Char) -> Op {
+        let Some((lower, upper)) = self.left_to_pairs.get(&left_char) else {
+            return Op::None;
+        };
+        for (candidate_right_char, r) in &self.pairs[(*lower as usize)..(*upper as usize)] {
+            if *candidate_right_char != right_char {
+                continue;
             }
+            let first_or = match (
+                r.left_char_operation,
+                r.middle_char_bounds.end == 0,
+                r.last_char == right_char,
+            ) {
+                (LeftCharOperation::Retain, true, true) => return Op::None,
+                (LeftCharOperation::AppendKern(fix_word), true, true) => return Op::Kern(fix_word),
+                (LeftCharOperation::Delete, true, _) => return Op::SimpleLig(r.last_char),
+                (LeftCharOperation::Retain, _, _) => Some((left_char, FixWord::ZERO)),
+                (LeftCharOperation::AppendKern(fix_word), _, _) => Some((left_char, fix_word)),
+                (LeftCharOperation::Delete, false, _) => None,
+            };
+            let mut vc = vec![];
+            if let Some(first) = first_or {
+                vc.push(first);
+            }
+            vc.extend_from_slice(
+                &self.middle_chars
+                    [r.middle_char_bounds.start as usize..r.middle_char_bounds.end as usize],
+            );
+            return Op::ComplexLig(vc, r.last_char);
         }
-        Replacement::no_op(right_char)
+        Op::None
     }
 
-    /// Returns an iterator over all pairs `(char,char)` that have a replacement
+    /// Returns an iterator over all pairs `(char,char)` that have an operation
     ///     specified in the lig/kern program.
-    pub fn all_pairs_having_replacement(&self) -> impl '_ + Iterator<Item = (Char, Char)> {
+    pub fn all_pairs_having_ops(&self) -> impl '_ + Iterator<Item = (Char, Char)> {
         PairsIter {
             current_left: Char(0),
             left_iter: self.left_to_pairs.iter(),
@@ -164,10 +197,17 @@ impl CompiledProgram {
     ///     pair of seven-bit characters whose replacement
     ///     contains a non-seven-bit character.
     pub fn is_seven_bit_safe(&self) -> bool {
-        self.all_pairs_having_replacement()
+        self.all_pairs_having_ops()
             .filter(|(l, r)| l.is_seven_bit() && r.is_seven_bit())
-            .flat_map(|(l, r)| self.get_replacement_iter(l, r))
-            .all(|(c, _kern)| c.is_seven_bit())
+            .map(|(l, r)| self.get_op(l, r))
+            .all(|op| match op {
+                Op::None => true,
+                Op::Kern(_) => true,
+                Op::SimpleLig(char) => char.is_seven_bit(),
+                Op::ComplexLig(items, char) => {
+                    items.into_iter().all(|(c, _)| c.is_seven_bit()) && char.is_seven_bit()
+                }
+            })
     }
 }
 
@@ -212,99 +252,15 @@ pub struct InfiniteLoopStep {
     pub post_cursor_position: usize,
 }
 
-/// Data structure describing the replacement of a character pair in a lig/kern program.
-pub struct Replacement<'a> {
-    /// Operation to perform on the left character.
-    pub left_char_operation: LeftCharOperation,
-    /// Slice of characters and kerns to insert after the left character.
-    pub middle_chars: &'a [(Char, FixWord)],
-    /// Last character to insert.
-    pub last_char: Char,
-}
-
-impl<'a> Replacement<'a> {
-    fn no_op(right_char: Char) -> Replacement<'a> {
-        Replacement {
-            left_char_operation: LeftCharOperation::Retain,
-            middle_chars: &[],
-            last_char: right_char,
-        }
-    }
-}
-
-impl<'a> Replacement<'a> {
-    pub fn into_iter(self, left_char: Char) -> ReplacementIter<'a> {
-        ReplacementIter {
-            left_char,
-            full_operation: self,
-            state: IterState::LeftChar,
-        }
-    }
-}
-
 /// Operation to perform on the left character of a lig/kern pair.
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
-pub enum LeftCharOperation {
+enum LeftCharOperation {
     /// Retain the left character and do not add a kern.
     Retain,
     /// Delete the left character.
     Delete,
     /// Retain the left character and append the specified kern.
     AppendKern(FixWord),
-}
-
-/// Iterator over the replacement of a character pair in a lig/kern program.
-pub struct ReplacementIter<'a> {
-    left_char: Char,
-    full_operation: Replacement<'a>,
-    state: IterState,
-}
-
-enum IterState {
-    LeftChar,
-    MiddleChar(usize),
-    LastChar,
-    Exhausted,
-}
-
-impl<'a> ReplacementIter<'a> {
-    fn i(&self) -> (IterState, Option<(Char, FixWord)>) {
-        match self.state {
-            IterState::LeftChar => (
-                IterState::MiddleChar(0),
-                match self.full_operation.left_char_operation {
-                    LeftCharOperation::Retain => Some((self.left_char, FixWord::ZERO)),
-                    LeftCharOperation::Delete => None,
-                    LeftCharOperation::AppendKern(kern) => Some((self.left_char, kern)),
-                },
-            ),
-            IterState::MiddleChar(i) => match self.full_operation.middle_chars.get(i).copied() {
-                None => (IterState::LastChar, None),
-                Some(t) => (IterState::MiddleChar(i + 1), Some(t)),
-            },
-            IterState::LastChar => (
-                IterState::Exhausted,
-                Some((self.full_operation.last_char, FixWord::ZERO)),
-            ),
-            IterState::Exhausted => (IterState::Exhausted, None),
-        }
-    }
-}
-
-impl<'a> Iterator for ReplacementIter<'a> {
-    type Item = (Char, FixWord);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let (state, r) = self.i();
-            self.state = state;
-            match (&self.state, r) {
-                (_, Some(t)) => return Some(t),
-                (IterState::Exhausted, _) => return None,
-                (_, _) => {}
-            }
-        }
-    }
 }
 
 /// An iterator over all pairs of characters that have a lig/kern replacement in a program.

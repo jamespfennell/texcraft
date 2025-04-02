@@ -319,7 +319,7 @@ fn calculate_replacements(
     // What we want to do, though, is report the same node that Knuth does in tftopl
     // and pltotf. Thus the algorithm here replicates what Knuth does.
     //
-    // Knuth iterates over all nodes in the following order: in lexigraphical order
+    // Knuth iterates over all nodes in the following order: in lexicographical order
     // for the left pair (with the boundary char last), and in the instruction order
     // for the right pair. I.e, if we have pairs (A,R) and (B,R) the pair whose
     // instruction comes first in the lig/kern program will come first.
@@ -503,10 +503,9 @@ mod tests {
         assert!(infinite_loop_error_or.is_empty(), "no infinite loop errors");
 
         let mut got: HashMap<(Char, Char), Vec<(Char, FixWord)>> = Default::default();
-        for pair in compiled_program.all_pairs_having_replacement() {
-            let replacement: Vec<(Char, FixWord)> = compiled_program
-                .get_replacement_iter(pair.0, pair.1)
-                .collect();
+        for pair in compiled_program.all_pairs_having_ops() {
+            let op = compiled_program.get_op(pair.0, pair.1);
+            let replacement: Vec<(Char, FixWord)> = op.build_sequence(pair.0, pair.1);
             got.insert(pair, replacement);
         }
 

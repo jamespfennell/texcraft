@@ -7,3 +7,8 @@
 
 pub mod ds;
 pub mod tex;
+
+pub trait TextPreprocessor {
+    fn add_text(&mut self, text: &str, list: &mut Vec<ds::Horizontal>);
+    fn add_space(&mut self, list: &mut Vec<ds::Horizontal>);
+}

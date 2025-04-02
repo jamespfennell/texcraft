@@ -19,9 +19,7 @@ use crate::FixWord;
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Program {
     pub instructions: Vec<Instruction>,
-    // TODO: rename left_boundary_char_entrypoint everywhere
     pub left_boundary_char_entrypoint: Option<u16>,
-    // TODO: rename right_boundary_char everywhere
     pub right_boundary_char: Option<Char>,
     pub passthrough: HashSet<u16>,
 }
