@@ -1,0 +1,15 @@
+[package]
+name = "boxworks-text"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "The Knuth/TeX typesetting engine"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+
+[dependencies]
+boxworks = { path = "../boxworks", features=[] }
+
+[dev-dependencies]
+boxworks-lang = {path="../boxworks-lang" , features = ["ariadne"]}

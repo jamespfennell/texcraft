@@ -139,12 +139,37 @@ impl TexHlists {
 
         use bwl::convert::ToBoxLang;
         let lang: Vec<bwl::ast::Hlist<'static>> = hlists.to_box_lang();
-        for (i, hlist) in lang.into_iter().enumerate() {
+        for (i, mut hlist) in lang.into_iter().enumerate() {
+            terse(&mut hlist.content.value);
             println!("#");
             println!("# hlist {}", i + 1);
             println!("{}", bwl::ast::Horizontal::Hlist(hlist));
-            // print!("{}", boxworks_lang::write_horizontal_list(&hlist));
         }
         Ok(())
     }
+}
+
+fn terse(v: &mut Vec<bwl::ast::Horizontal<'static>>) {
+    let mut src: usize = 0;
+    let mut dest = 0;
+    let mut buf: String = Default::default();
+    while let Some(elem) = v.get_mut(src) {
+        match elem {
+            bwl::ast::Horizontal::Text(text) => {
+                let first_text = buf.is_empty();
+                buf.push_str(&text.content.value);
+                text.content.value = buf.clone().into();
+                if !first_text {
+                    dest -= 1;
+                }
+            }
+            _ => {
+                buf.clear();
+            }
+        }
+        v.swap(src, dest);
+        src += 1;
+        dest += 1;
+    }
+    v.truncate(dest);
 }

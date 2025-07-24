@@ -192,6 +192,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "boxworks-text"
+version = "0.1.0"
+dependencies = [
+ "boxworks",
+ "boxworks-lang",
+]
+
+[[package]]
 name = "boxworlds-bin"
 version = "0.2.0"
 dependencies = [
