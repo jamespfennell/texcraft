@@ -73,7 +73,7 @@ There is a lot of low hanging fruit that is intentionally left unpicked so
     This project turned out be to non-viable for some reasons like performance, but the source code is an excellent
     reference for those who are writing their own TeX implementations.
     
-- [KeenType](https://github.com/DaveJarvis/KeenType):
+- [KeenType](https://gitlab.com/DaveJarvis/KeenType):
     a modernized version of the New Typesetting System
     than can be used for typesetting math formulae.
 
