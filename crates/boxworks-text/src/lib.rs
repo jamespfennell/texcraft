@@ -7,9 +7,13 @@
 
 use boxworks::ds;
 
+pub struct Font {
+    pub default_space: core::Glue,
+}
+
 #[derive(Default)]
 pub struct TextPreprocessorImpl {
-    fonts: Vec<usize>,
+    fonts: Vec<Font>,
     // TODO: should be initialized to the null font
     // TODO: should current_font be some kind of specific font identifier type.
     current_font: u32,
@@ -18,6 +22,7 @@ pub struct TextPreprocessorImpl {
 impl boxworks::TextPreprocessor for TextPreprocessorImpl {
     fn add_text(&mut self, text: &str, list: &mut Vec<ds::Horizontal>) {
         // TODO: kerns
+        // TODO: ligatures
         for c in text.chars() {
             list.push(ds::Horizontal::Char(ds::Char {
                 char: c,
@@ -27,15 +32,18 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
     }
 
     fn add_space(&mut self, list: &mut Vec<ds::Horizontal>) {
-        // TODO: glues, space factor, etc.
-        _ = list;
-        todo!()
+        // TeX.2021.1041
+        // TODO: space factor, etc.
+        list.push(ds::Horizontal::Glue(
+            self.fonts[self.current_font as usize].default_space.into(),
+        ));
     }
 }
 
 impl TextPreprocessorImpl {
-    pub fn register_font(&mut self, id: u32) {
+    pub fn register_font(&mut self, id: u32, font: Font) {
         assert_eq!(id as usize, self.fonts.len());
+        self.fonts.push(font);
     }
     pub fn activate_font(&mut self, id: u32) {
         self.current_font = id;
@@ -47,19 +55,63 @@ mod tests {
     use super::*;
     use boxworks::TextPreprocessor;
     use boxworks_lang as bwl;
-    #[test]
-    fn test_basic() {
-        let input = "second";
-        let want = r#"
-            text("second", font=0)
-        "#;
+
+    macro_rules! preprocessor_tests {
+        ( $( ( $name: ident, $input: expr, $want: expr, ), )+ ) => {
+            $(
+                #[test]
+                fn $name() {
+                    let input = $input;
+                    let want = $want;
+                    run_preprocessor_test(input, want)
+                }
+            )+
+        };
+    }
+
+    preprocessor_tests!(
+        (
+            cmr10_basic,
+            "second",
+            r#"
+                text("second", font=0)
+            "#,
+        ),
+        (
+            cmr10_basic_with_space,
+            "sec ond",
+            r#"
+                text("sec", font=0)
+                glue(3.33333pt, 1.66666pt, 1.11111pt)
+                text("ond", font=0)
+            "#,
+        ),
+    );
+
+    fn run_preprocessor_test(input: &str, want: &str) {
         let want = bwl::parse_horizontal_list(want).unwrap();
 
         let mut tp: TextPreprocessorImpl = Default::default();
-        tp.register_font(0);
+        tp.register_font(
+            0,
+            Font {
+                default_space: core::Glue {
+                    width: core::Scaled::ONE * 10 / 3,
+                    stretch: core::Scaled::ONE * 5 / 3,
+                    stretch_order: core::GlueOrder::Normal,
+                    shrink: core::Scaled::ONE * 10 / 9 + core::Scaled(1),
+                    shrink_order: core::GlueOrder::Normal,
+                },
+            },
+        );
         tp.activate_font(0);
         let mut got = vec![];
-        tp.add_text(input, &mut got);
+        for word in input.split_inclusive(' ') {
+            tp.add_text(word.trim_matches(' '), &mut got);
+            if word.ends_with(" ") {
+                tp.add_space(&mut got);
+            }
+        }
 
         assert_eq!(got, want);
     }

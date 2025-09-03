@@ -10,6 +10,7 @@ keywords = ["tex", "texcraft"]
 
 [dependencies]
 boxworks = { path = "../boxworks", features=[] }
+core = { path = "../core", features=[] }
 
 [dev-dependencies]
 boxworks-lang = {path="../boxworks-lang" , features = ["ariadne"]}
