@@ -171,7 +171,10 @@ impl Scaled {
         }
         impl std::fmt::Display for D {
             fn fmt(&self, fm: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(fm, "{}.", self.s.integer_part())?;
+                if self.s.0 < 0 {
+                    write!(fm, "-")?;
+                }
+                write!(fm, "{}.", self.s.integer_part().abs())?;
                 // Fractional part
                 let mut f = self.s.abs().fractional_part() * 10 + Scaled(5);
                 let mut delta = Scaled(10);

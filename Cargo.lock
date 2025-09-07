@@ -197,6 +197,7 @@ version = "0.1.0"
 dependencies = [
  "boxworks",
  "boxworks-lang",
+ "core",
 ]
 
 [[package]]

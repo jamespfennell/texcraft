@@ -225,6 +225,10 @@ fn parse_char(s: &str) -> char {
 }
 
 fn parse_scaled(s: &str) -> core::Scaled {
+    let (neg, s) = match s.strip_prefix('-') {
+        Some(s) => (true, s),
+        None => (false, s),
+    };
     let mut parts = s.split('.');
     let i: i32 = parts
         .next()
@@ -245,10 +249,11 @@ fn parse_scaled(s: &str) -> core::Scaled {
             .expect("digits are in the range [0,10) and always fit in u8");
     }
     let f = core::Scaled::from_decimal_digits(&f);
-    if i < 0 {
-        -core::Scaled::new(-i, f, core::ScaledUnit::Point).expect("scaled is in bounds")
+    let sc = core::Scaled::new(i, f, core::ScaledUnit::Point).expect("scaled is in bounds");
+    if neg {
+        -sc
     } else {
-        core::Scaled::new(i, f, core::ScaledUnit::Point).expect("scaled is in bounds")
+        sc
     }
 }
 
