@@ -137,6 +137,8 @@ impl CompiledProgram {
     /// Compile a lig/kern program.
     pub fn compile(
         program: &lang::Program,
+        // TODO: should accept the kerns as a list of Scaled that incorporate the
+        // design size
         kerns: &[FixWord],
         entrypoints: HashMap<Char, u16>,
     ) -> (CompiledProgram, Vec<InfiniteLoopError>) {
@@ -239,6 +241,38 @@ impl CompiledProgram {
                 }
             })
     }
+
+    /// Run this lig/kern program.
+    pub fn run<T: Emitter>(&self, text: &str, emitter: &mut T) {
+        let Some(mut left) = text.chars().next() else {
+            return;
+        };
+        let text = &text[left.len_utf8()..];
+        for right in text.chars() {
+            match self.get_op_utf8(left, right) {
+                Op::None => {
+                    emitter.emit_character(left);
+                    left = right;
+                }
+                Op::Kern(fix_word) => {
+                    emitter.emit_character(left);
+                    emitter.emit_kern(fix_word.to_scaled(FixWord::ONE * 10));
+                    left = right;
+                }
+                Op::SimpleLig(_char) => todo!("simple lig"),
+                Op::ComplexLig(_items, _char) => todo!("complex lig"),
+            }
+        }
+        emitter.emit_character(left);
+    }
+}
+
+/// Implementations of this trait determine how characters, kerns and ligatures
+/// are handled when running a lig/kern program.
+pub trait Emitter {
+    fn emit_character(&mut self, c: char);
+    fn emit_kern(&mut self, kern: core::Scaled);
+    fn emit_ligature(&mut self);
 }
 
 /// An error returned from lig/kern compilation.

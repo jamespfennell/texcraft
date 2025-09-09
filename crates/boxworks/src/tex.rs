@@ -93,7 +93,7 @@ pub fn build_horizontal_lists(
     let macro_calls: Vec<String> = contents.map(|s| format!(r#"\printBox{{{s}}}"#)).collect();
     let tex_source_code = CONVERT_TEXT_TEMPLATE.replace("<print_calls>", &macro_calls.join("\n\n"));
     let output = tex_engine.run_and_return_stdout(&tex_source_code);
-    
+
     enum Expect {
         Begin,
         Dimension,

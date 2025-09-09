@@ -6,7 +6,7 @@
 //! TeX (starting in TeX.2021.1029).
 
 use boxworks::ds;
-use tfm::FixWord;
+use tfm::ligkern;
 
 #[derive(Debug)]
 pub struct Font {
@@ -25,40 +25,28 @@ pub struct TextPreprocessorImpl {
 impl boxworks::TextPreprocessor for TextPreprocessorImpl {
     fn add_text(&mut self, text: &str, list: &mut Vec<ds::Horizontal>) {
         let font = &self.fonts[self.current_font as usize];
-        let Some(mut left) = text.chars().next() else {
-            return;
-        };
-        let text = &text[left.len_utf8()..];
-        for right in text.chars() {
-            use tfm::ligkern::Op;
-            match font.lig_kern_program.get_op_utf8(left, right) {
-                Op::None => {
-                    list.push(ds::Horizontal::Char(ds::Char {
-                        char: left,
-                        font: self.current_font,
-                    }));
-                    left = right;
-                }
-                Op::Kern(fix_word) => {
-                    list.push(ds::Horizontal::Char(ds::Char {
-                        char: left,
-                        font: self.current_font,
-                    }));
-                    list.push(ds::Horizontal::Kern(ds::Kern {
-                        // TODO: design size
-                        width: fix_word.to_scaled(FixWord::ONE * 10),
-                        kind: ds::KernKind::Normal,
-                    }));
-                    left = right;
-                }
-                Op::SimpleLig(_char) => todo!("simple lig"),
-                Op::ComplexLig(_items, _char) => todo!("complex lig"),
+
+        struct Emitter<'a>(&'a mut Vec<ds::Horizontal>, u32);
+        impl<'a> ligkern::Emitter for Emitter<'a> {
+            fn emit_character(&mut self, c: char) {
+                self.0.push(ds::Horizontal::Char(ds::Char {
+                    char: c,
+                    font: self.1,
+                }));
+            }
+            fn emit_kern(&mut self, kern: core::Scaled) {
+                self.0.push(ds::Horizontal::Kern(ds::Kern {
+                    width: kern,
+                    kind: ds::KernKind::Normal,
+                }));
+            }
+            fn emit_ligature(&mut self) {
+                todo!("emit ligatures")
             }
         }
-        list.push(ds::Horizontal::Char(ds::Char {
-            char: left,
-            font: self.current_font,
-        }));
+
+        let mut e = Emitter(list, self.current_font);
+        font.lig_kern_program.run(text, &mut e);
     }
 
     fn add_space(&mut self, list: &mut Vec<ds::Horizontal>) {
