@@ -85,7 +85,9 @@ use std::collections::HashMap;
 pub mod lang;
 
 /// A compiled lig/kern program.
-#[derive(Clone, Debug)]
+///
+/// The default value is an empty program with no kerns or ligatures.
+#[derive(Clone, Debug, Default)]
 pub struct CompiledProgram {
     left_to_pairs: BTreeMap<Char, (u16, u16)>,
     pairs: Vec<(Char, RawReplacement)>,
@@ -139,6 +141,34 @@ impl CompiledProgram {
         entrypoints: HashMap<Char, u16>,
     ) -> (CompiledProgram, Vec<InfiniteLoopError>) {
         compiler::compile(program, kerns, &entrypoints)
+    }
+
+    /// Compile a lig/kern program from a TFM file.
+    pub fn compile_from_tfm_file(
+        tfm_file: &mut super::File,
+    ) -> (CompiledProgram, Vec<InfiniteLoopError>) {
+        let entrypoints: HashMap<Char, u16> = tfm_file
+            .lig_kern_entrypoints()
+            .into_iter()
+            .filter_map(|(c, e)| {
+                tfm_file
+                    .lig_kern_program
+                    .unpack_entrypoint(e)
+                    .ok()
+                    .map(|e| (c, e))
+            })
+            .collect();
+        CompiledProgram::compile(&tfm_file.lig_kern_program, &tfm_file.kerns, entrypoints)
+    }
+
+    pub fn get_op_utf8(&self, left_char: char, right_char: char) -> Op {
+        let Ok(left_char) = left_char.try_into() else {
+            return Op::None;
+        };
+        let Ok(right_char) = right_char.try_into() else {
+            return Op::None;
+        };
+        self.get_op(left_char, right_char)
     }
 
     /// Get an operation between two characters.

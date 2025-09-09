@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use clap::Parser;
 
@@ -113,7 +113,7 @@ enum Command {
     ///        you can use this command to create invalid or otherwise unusual .tfm files
     ///        for testing.
     ///
-    /// When modifying the debug output it may be useful to some of the parsing rules:
+    /// When modifying the debug output it may be useful to know some of the parsing rules:
     ///
     /// 1.
     ///        Any of the .tfm sections can be omitted.
@@ -366,23 +366,7 @@ impl LigKern {
         let lig_kern_program = match &self.path {
             TfOrPlPath::Tf(tfm_path) => {
                 let mut tfm_file = tfm_path.read(false)?.file;
-                let entrypoints: HashMap<tfm::Char, u16> = tfm_file
-                    .lig_kern_entrypoints()
-                    .into_iter()
-                    .filter_map(|(c, e)| {
-                        tfm_file
-                            .lig_kern_program
-                            .unpack_entrypoint(e)
-                            .ok()
-                            .map(|e| (c, e))
-                    })
-                    .collect();
-                tfm::ligkern::CompiledProgram::compile(
-                    &tfm_file.lig_kern_program,
-                    &tfm_file.kerns,
-                    entrypoints,
-                )
-                .0
+                tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0
             }
             TfOrPlPath::Pl(pl_path) => {
                 let (pl_file, _) = pl_path.read()?;

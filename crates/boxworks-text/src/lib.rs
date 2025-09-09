@@ -6,9 +6,12 @@
 //! TeX (starting in TeX.2021.1029).
 
 use boxworks::ds;
+use tfm::FixWord;
 
+#[derive(Debug)]
 pub struct Font {
     pub default_space: core::Glue,
+    pub lig_kern_program: tfm::ligkern::CompiledProgram,
 }
 
 #[derive(Default)]
@@ -21,14 +24,41 @@ pub struct TextPreprocessorImpl {
 
 impl boxworks::TextPreprocessor for TextPreprocessorImpl {
     fn add_text(&mut self, text: &str, list: &mut Vec<ds::Horizontal>) {
-        // TODO: kerns
-        // TODO: ligatures
-        for c in text.chars() {
-            list.push(ds::Horizontal::Char(ds::Char {
-                char: c,
-                font: self.current_font,
-            }));
+        let font = &self.fonts[self.current_font as usize];
+        let Some(mut left) = text.chars().next() else {
+            return;
+        };
+        let text = &text[left.len_utf8()..];
+        for right in text.chars() {
+            use tfm::ligkern::Op;
+            match font.lig_kern_program.get_op_utf8(left, right) {
+                Op::None => {
+                    list.push(ds::Horizontal::Char(ds::Char {
+                        char: left,
+                        font: self.current_font,
+                    }));
+                    left = right;
+                }
+                Op::Kern(fix_word) => {
+                    list.push(ds::Horizontal::Char(ds::Char {
+                        char: left,
+                        font: self.current_font,
+                    }));
+                    list.push(ds::Horizontal::Kern(ds::Kern {
+                        // TODO: design size
+                        width: fix_word.to_scaled(FixWord::ONE * 10),
+                        kind: ds::KernKind::Normal,
+                    }));
+                    left = right;
+                }
+                Op::SimpleLig(_char) => todo!("simple lig"),
+                Op::ComplexLig(_items, _char) => todo!("complex lig"),
+            }
         }
+        list.push(ds::Horizontal::Char(ds::Char {
+            char: left,
+            font: self.current_font,
+        }));
     }
 
     fn add_space(&mut self, list: &mut Vec<ds::Horizontal>) {
@@ -86,9 +116,32 @@ mod tests {
                 text("ond", font=0)
             "#,
         ),
+        (
+            cmr10_kern_ao,
+            "AO",
+            r#"
+                text("A", font=0)
+                kern(-0.27779pt)
+                text("O", font=0)
+            "#,
+        ),
+        (
+            cmr10_kern_av,
+            "AV",
+            r#"
+                text("A", font=0)
+                kern(-1.11113pt)
+                text("V", font=0)
+            "#,
+        ),
     );
 
     fn run_preprocessor_test(input: &str, want: &str) {
+        let mut tfm_file = {
+            let raw = include_bytes!("../../tfm/corpus/computer-modern/cmr10.tfm");
+            tfm::File::deserialize(raw).0.unwrap()
+        };
+
         let want = bwl::parse_horizontal_list(want).unwrap();
 
         let mut tp: TextPreprocessorImpl = Default::default();
@@ -96,12 +149,22 @@ mod tests {
             0,
             Font {
                 default_space: core::Glue {
+                    // TODO: read these from the tfm file params
+                    // We need to convert FixWord to Scaled
+                    // and then adjust by the design size...
+                    // So the following line is not good enough - it's off
+                    // by the design size of ~10
+                    // width: tfm_file.params[1].to_scaled(),
                     width: core::Scaled::ONE * 10 / 3,
                     stretch: core::Scaled::ONE * 5 / 3,
                     stretch_order: core::GlueOrder::Normal,
                     shrink: core::Scaled::ONE * 10 / 9 + core::Scaled(1),
                     shrink_order: core::GlueOrder::Normal,
                 },
+                lig_kern_program: tfm::ligkern::CompiledProgram::compile_from_tfm_file(
+                    &mut tfm_file,
+                )
+                .0,
             },
         );
         tp.activate_font(0);

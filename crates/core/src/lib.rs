@@ -113,7 +113,7 @@ impl Scaled {
         if b < -(Scaled::MAX_DIMEN.0 as i64) || b > Scaled::MAX_DIMEN.0 as i64 {
             return Err(OverflowError {});
         }
-        let b: i32 = b.try_into().expect("b in (-2^30, +2^30");
+        let b: i32 = b.try_into().expect("b in (-2^30, +2^30)");
         Ok((Scaled(b), Scaled(remainder)))
     }
 
@@ -236,6 +236,12 @@ impl std::ops::Div<i32> for Scaled {
     type Output = Scaled;
     fn div(self, rhs: i32) -> Self::Output {
         Scaled(self.0 / rhs)
+    }
+}
+
+impl std::ops::DivAssign<i32> for Scaled {
+    fn div_assign(&mut self, rhs: i32) {
+        self.0 = self.0 / rhs
     }
 }
 

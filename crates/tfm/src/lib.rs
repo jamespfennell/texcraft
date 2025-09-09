@@ -1564,6 +1564,53 @@ impl FixWord {
     pub fn is_abs_less_than_16(&self) -> bool {
         *self >= FixWord::ONE * -16 && *self < FixWord::ONE * 16
     }
+
+    /// Calculates the scaled value of this number at the specified design size.
+    ///
+    /// All dimensions in a TFM file are specified as multiples of the design size
+    /// (with the exception of the design size itself).
+    /// The scaled value (i.e. the value is scaled points) is the TFM value multiplied
+    /// by the design size.
+    ///
+    /// The raw value and the design size both have 20 binary fractional bits,
+    /// so the product has 40 fractional bits.
+    /// A scaled value has only 16 fractional bits, and how the truncation is performed
+    /// can effect the result.
+    /// The specific multiplication algorithm Knuth wrote (TeX.2021.571-572)
+    /// truncates the design size first and then performs the multiplication
+    /// and then truncates again.
+    /// Additionally, the integer division in that algorithm rounds towards zero
+    /// even for negative numbers (e.g. -1.25 rounds to -1 instead of -2).
+    ///
+    /// In order to ensure the result here matched Knuth's algorithm, we reimplement
+    /// Knuth's algorithm.
+    pub fn to_scaled(self, design_size: FixWord) -> core::Scaled {
+        // TeX.2021.568
+        let mut z = core::Scaled(design_size.0 / 16);
+        // TeX.2021.572
+        let mut alpha = 16;
+        // Ensure that z < 2^23 sp
+        while z.0 >= 0o40000000 {
+            z /= 2;
+            alpha *= 2;
+        }
+        let beta = 256 / alpha; // beta = 16 * z / design_size
+        let alpha = z * alpha; // alpha = 16 * design_size
+
+        // TeX.2021.571 (store_scaled)
+        let [a, b, c, d] = self.0.to_be_bytes();
+        assert!(a == 0 || a == 255);
+        let sw = (((z * (d as i32)) / 0o400 + (z * (c as i32))) / 0o400 + z * (b as i32)) / beta;
+        if a == 255 {
+            // In this case self < 0.
+            // We have calculated sw using only the 3 least significant bytes of self,
+            // which is equivalent to setting self=16+self at the start. We then undo
+            // this by setting sw = sw - 16 * design_size.
+            sw - alpha
+        } else {
+            sw
+        }
+    }
 }
 
 impl std::fmt::Display for FixWord {
@@ -1624,6 +1671,12 @@ impl std::ops::Div<i32> for FixWord {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn to_scaled_test() {
+        assert_eq!(core::Scaled::ZERO, FixWord::ZERO.to_scaled(FixWord::ONE));
+        assert_eq!(core::Scaled::ONE, FixWord::ONE.to_scaled(FixWord::ONE));
+    }
 
     fn run_compress_test(
         values: Vec<FixWord>,

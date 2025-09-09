@@ -29,7 +29,7 @@ impl ToBoxLang for ds::Horizontal {
             Mark(_mark) => todo!(),
             Insertion(_insertion) => todo!(),
             Adjust(_adjust) => todo!(),
-            Ligature(_ligature) => todo!(),
+            Ligature(ligature) => todo!("ligature {ligature:?}"),
             Discretionary(_discretionary) => todo!(),
             Whatsit(_whatsit) => todo!(),
             Math(_math) => todo!(),

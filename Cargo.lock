@@ -198,6 +198,7 @@ dependencies = [
  "boxworks",
  "boxworks-lang",
  "core",
+ "tfm",
 ]
 
 [[package]]
