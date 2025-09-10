@@ -29,7 +29,7 @@ impl ToBoxLang for ds::Horizontal {
             Mark(_mark) => todo!(),
             Insertion(_insertion) => todo!(),
             Adjust(_adjust) => todo!(),
-            Ligature(ligature) => todo!("ligature {ligature:?}"),
+            Ligature(ligature) => ast::Horizontal::Ligature(ligature.to_box_lang()),
             Discretionary(_discretionary) => todo!(),
             Whatsit(_whatsit) => todo!(),
             Math(_math) => todo!(),
@@ -64,6 +64,7 @@ impl<'a> ToBoxworks for ast::Horizontal<'a> {
             Glue(glue_args) => vec![ds::Horizontal::Glue(glue_args.to_boxworks())],
             Kern(kern_args) => vec![ds::Horizontal::Kern(kern_args.to_boxworks())],
             Hlist(hlist_args) => vec![ds::Horizontal::HList(hlist_args.to_boxworks())],
+            Ligature(lig_args) => vec![ds::Horizontal::Ligature(lig_args.to_boxworks())],
         }
     }
 }
@@ -86,6 +87,32 @@ impl<'a> ToBoxworks for ast::Hlist<'a> {
             list: self.content.value.to_boxworks(),
             // TODO: all the other stuff
             ..Default::default()
+        }
+    }
+}
+
+impl<'a> ToBoxworks for ast::Ligature<'a> {
+    type Output = ds::Ligature;
+
+    fn to_boxworks(&self) -> Self::Output {
+        ds::Ligature {
+            included_left_boundary: false,  // TODO
+            included_right_boundary: false, // TODO,
+            char: self.char.value,
+            font: self.font.value as u32,
+            original_chars: self.original_chars.value.clone().into(),
+        }
+    }
+}
+
+impl ToBoxLang for ds::Ligature {
+    type Output = ast::Ligature<'static>;
+
+    fn to_box_lang(&self) -> Self::Output {
+        ast::Ligature {
+            char: self.char.into(),
+            original_chars: Cow::<'static, str>::Owned(format!["{}", self.original_chars]).into(),
+            font: (self.font as i32).into(),
         }
     }
 }

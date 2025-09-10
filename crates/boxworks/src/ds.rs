@@ -296,7 +296,11 @@ pub struct Ligature {
     /// The original characters that were replaced by the ligature.
     /// This is used if the engine needs to break apart the ligature
     /// in order to perform hyphenation.
-    pub original_chars: Rc<str>, // TODO: why not (char, char)
+    ///
+    /// While most ligatures come from 2 characters (e.g. ff), TeX's
+    /// lig/kern programming language allows for a single ligature to come
+    /// from arbitrarily many characters.
+    pub original_chars: Rc<str>,
 }
 
 // Two constructors for ligature nodes are provided in TeX.2021.144

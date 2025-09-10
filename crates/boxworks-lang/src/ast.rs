@@ -16,6 +16,7 @@ pub enum Horizontal<'a> {
     Glue(Glue<'a>),
     Kern(Kern<'a>),
     Hlist(Hlist<'a>),
+    Ligature(Ligature<'a>),
 }
 
 /// Lower a horizontal list to a CST tree.
@@ -366,6 +367,20 @@ functions!(
             variant: Hlist,
         }
     ),
+        (
+        struct Ligature<'a> {
+            char: char,
+            original_chars: Cow<'a, str>,
+            font: i32,
+        }
+        impl Func {
+            func_name: "lig",
+            default_num_pos_arg: 2,
+        }
+        impl Horizontal {
+            variant: Ligature,
+        }
+    ),
 );
 
 /// An argument of type `T` to a function.
@@ -470,6 +485,26 @@ trait Value<'a>: Sized {
     }
 
     fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, HlistTreeIter<'a, 'b>>;
+}
+
+impl<'a> Value<'a> for char {
+    const DESCRIPTION: &'static str = "a character";
+    fn try_cast_string(s: Cow<'a, str>) -> Option<Self> {
+        let mut iter = s.chars();
+        let Some(c) = iter.next() else { return None };
+        match iter.next() {
+            Some(_) => None,
+            None => Some(c),
+        }
+    }
+    fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, HlistTreeIter<'a, 'b>> {
+        let s = format!("{self}");
+        cst::ArgsItem::Regular {
+            key,
+            value: cst::Value::String(s.into()),
+            value_source: "".into(),
+        }
+    }
 }
 
 impl<'a> Value<'a> for Cow<'a, str> {

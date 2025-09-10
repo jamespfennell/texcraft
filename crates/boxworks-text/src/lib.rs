@@ -122,6 +122,15 @@ mod tests {
                 text("V", font=0)
             "#,
         ),
+        /*
+        (
+            cmr10_ligature,
+            "ff",
+            r#"
+                lig("f", "ff", font=0)
+            "#,
+        ),
+         */
     );
 
     fn run_preprocessor_test(input: &str, want: &str) {

@@ -1,3 +1,6 @@
+# String instead of single character
+lig("aa", "b")
+
 # Invalid unit
 glue(30plx)
 
