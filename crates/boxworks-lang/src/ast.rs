@@ -491,7 +491,7 @@ impl<'a> Value<'a> for char {
     const DESCRIPTION: &'static str = "a character";
     fn try_cast_string(s: Cow<'a, str>) -> Option<Self> {
         let mut iter = s.chars();
-        let Some(c) = iter.next() else { return None };
+        let c = iter.next()?;
         match iter.next() {
             Some(_) => None,
             None => Some(c),

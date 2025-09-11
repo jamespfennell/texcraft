@@ -826,7 +826,13 @@ impl<'a> std::fmt::Display for Value<'a> {
             InfiniteGlue(scaled, glue_order) => {
                 write!(f, "{}{glue_order}", scaled.display_no_units())
             }
-            String(str) => write!(f, r#""{str}""#),
+            String(str) => {
+                write!(f, r#"""#)?;
+                for c in str.chars() {
+                    write!(f, "{}", c.escape_debug())?;
+                }
+                write!(f, r#"""#)
+            }
             List(tree) => write!(f, "{tree}"),
         }
     }

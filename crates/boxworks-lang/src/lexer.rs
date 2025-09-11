@@ -245,19 +245,86 @@ impl<'a> Iterator for Lexer<'a> {
                 Keyword
             }
             '"' => {
+                // TODO: only allocate a buffer if we're going to use it
+                let mut buf: std::string::String = Default::default();
                 loop {
-                    match iter.next() {
-                        None => return None,
-                        Some(n @ '"') => {
-                            self.l += n.len_utf8();
+                    let Some(n) = iter.next() else {
+                        // TODO: error in this case?
+                        return None;
+                    };
+                    self.l += n.len_utf8();
+                    match n {
+                        '"' => {
                             break;
                         }
-                        Some(n) => {
+                        // Escape character
+                        //
+                        // We support a subset of Rust escape characters, which are documented
+                        // here: https://doc.rust-lang.org/reference/expressions/literal-expr.html.
+                        '\\' => {
+                            let Some(n) = iter.next() else {
+                                // TODO: error in this case?
+                                return None;
+                            };
                             self.l += n.len_utf8();
+                            match n {
+                                '\"' | '\\' => {
+                                    buf.push(n);
+                                }
+                                'u' => {
+                                    if iter.next() != Some('{') {
+                                        // TODO error
+                                        continue;
+                                    }
+                                    let mut i = 0;
+                                    let mut valid = true;
+                                    loop {
+                                        let Some(n) = iter.next() else {
+                                            // TODO: error in this case?
+                                            return None;
+                                        };
+                                        self.l += n.len_utf8();
+                                        if n == '}' {
+                                            break;
+                                        }
+                                        match n.to_digit(16) {
+                                            None => {
+                                                valid = false;
+                                            }
+                                            Some(d) => {
+                                                i = i * 16 + d;
+                                            }
+                                        }
+                                    }
+                                    if !valid {
+                                        // TODO: error
+                                        continue;
+                                    }
+                                    let Some(c) = char::from_u32(i) else {
+                                        // TODO: error
+                                        continue;
+                                    };
+                                    buf.push(c);
+                                }
+                                _ => {
+                                    // TODO: error for unexpected special character
+                                }
+                            }
+                        }
+                        _ => {
+                            buf.push(n);
                         }
                     }
                 }
-                String(Cow::Borrowed(&self.s[start + 1..self.l - 1]))
+                // If the string is exactly in this source (e.g. no special control sequences)
+                // then we can avoid an allocation.
+                let source = &self.s[start + 1..self.l - 1];
+                dbg!(source, &buf);
+                String(if buf.len() == source.len() {
+                    Cow::Borrowed(source)
+                } else {
+                    Cow::Owned(buf.into())
+                })
             }
             '0'..='9' => {
                 let initial_value = (c as i32) - ('0' as i32);
@@ -383,4 +450,60 @@ impl<'a> Lexer<'a> {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ErrorAccumulator;
+
+    use super::*;
+    fn run_lexer_test(input: &str, want: Vec<TokenValue>) {
+        let errs: ErrorAccumulator = Default::default();
+        let lexer = Lexer::new(&input, errs);
+
+        let got: Vec<TokenValue> = lexer.into_iter().map(|t| t.value).collect();
+
+        assert_eq!(got, want);
+    }
+
+    macro_rules! lexer_tests {
+        ( $( ($name: ident, $input: expr, $want: expr, ), )+ ) => {
+            $(
+                #[test]
+                fn $name() {
+                    let input = $input;
+                    let want = $want;
+                    run_lexer_test(input, want);
+                }
+            )+
+        };
+    }
+
+    lexer_tests!(
+        (
+            string_simple,
+            r#" "string" "#,
+            vec![TokenValue::String("string".into())],
+        ),
+        (
+            string_with_special_char_1,
+            r#" "\"" "#,
+            vec![TokenValue::String("\"".into())],
+        ),
+        (
+            string_with_special_char_2,
+            r#" "\\" "#,
+            vec![TokenValue::String("\\".into())],
+        ),
+        (
+            string_with_invalid_special_char,
+            r#" "\a" "#,
+            vec![TokenValue::String("".into())],
+        ),
+        (
+            string_with_unicode,
+            r#" "\u{100}" "#,
+            vec![TokenValue::String("\u{100}".into())],
+        ),
+    );
 }
