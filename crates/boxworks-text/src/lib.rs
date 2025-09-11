@@ -5,6 +5,8 @@
 //! It is implemented in the Chief Executive chapter in Knuth's
 //! TeX (starting in TeX.2021.1029).
 
+use std::rc::Rc;
+
 use boxworks::ds;
 use tfm::ligkern;
 
@@ -40,8 +42,14 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
                     kind: ds::KernKind::Normal,
                 }));
             }
-            fn emit_ligature(&mut self) {
-                todo!("emit ligatures")
+            fn emit_ligature(&mut self, c: char, original: Rc<str>) {
+                self.0.push(ds::Horizontal::Ligature(ds::Ligature {
+                    included_left_boundary: false,
+                    included_right_boundary: false,
+                    char: c,
+                    font: self.1,
+                    original_chars: original,
+                }));
             }
         }
 
@@ -122,15 +130,13 @@ mod tests {
                 text("V", font=0)
             "#,
         ),
-        /*
         (
             cmr10_ligature,
             "ff",
             r#"
-                lig("f", "ff", font=0)
+                lig("\u{b}", "ff", font=0)
             "#,
         ),
-         */
     );
 
     fn run_preprocessor_test(input: &str, want: &str) {

@@ -82,6 +82,7 @@ use crate::Char;
 use crate::FixWord;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::rc::Rc;
 pub mod lang;
 
 /// A compiled lig/kern program.
@@ -248,7 +249,9 @@ impl CompiledProgram {
             return;
         };
         let text = &text[left.len_utf8()..];
-        for right in text.chars() {
+        let mut iter = text.chars();
+        loop {
+            let Some(right) = iter.next() else { break };
             match self.get_op_utf8(left, right) {
                 Op::None => {
                     emitter.emit_character(left);
@@ -259,7 +262,15 @@ impl CompiledProgram {
                     emitter.emit_kern(fix_word.to_scaled(FixWord::ONE * 10));
                     left = right;
                 }
-                Op::SimpleLig(_char) => todo!("simple lig"),
+                Op::SimpleLig(char) => {
+                    emitter.emit_ligature(char.into(), format!("{left}{right}").into());
+                    match iter.next() {
+                        None => return,
+                        Some(new_left) => {
+                            left = new_left;
+                        }
+                    }
+                }
                 Op::ComplexLig(_items, _char) => todo!("complex lig"),
             }
         }
@@ -272,7 +283,7 @@ impl CompiledProgram {
 pub trait Emitter {
     fn emit_character(&mut self, c: char);
     fn emit_kern(&mut self, kern: core::Scaled);
-    fn emit_ligature(&mut self);
+    fn emit_ligature(&mut self, c: char, original: Rc<str>);
 }
 
 /// An error returned from lig/kern compilation.

@@ -276,6 +276,7 @@ impl<'a> Iterator for Lexer<'a> {
                                         // TODO error
                                         continue;
                                     }
+                                    self.l += '{'.len_utf8();
                                     let mut i = 0;
                                     let mut valid = true;
                                     loop {
@@ -285,6 +286,7 @@ impl<'a> Iterator for Lexer<'a> {
                                         };
                                         self.l += n.len_utf8();
                                         if n == '}' {
+                                            // TODO: error if no number was provided.
                                             break;
                                         }
                                         match n.to_digit(16) {
@@ -319,11 +321,10 @@ impl<'a> Iterator for Lexer<'a> {
                 // If the string is exactly in this source (e.g. no special control sequences)
                 // then we can avoid an allocation.
                 let source = &self.s[start + 1..self.l - 1];
-                dbg!(source, &buf);
                 String(if buf.len() == source.len() {
                     Cow::Borrowed(source)
                 } else {
-                    Cow::Owned(buf.into())
+                    Cow::Owned(buf)
                 })
             }
             '0'..='9' => {
@@ -502,8 +503,12 @@ mod tests {
         ),
         (
             string_with_unicode,
-            r#" "\u{100}" "#,
-            vec![TokenValue::String("\u{100}".into())],
+            r#" "\u{100}", "second" "#,
+            vec![
+                TokenValue::String("\u{100}".into()),
+                TokenValue::Comma,
+                TokenValue::String("second".into()),
+            ],
         ),
     );
 }
