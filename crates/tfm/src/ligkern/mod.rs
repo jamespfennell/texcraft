@@ -248,13 +248,21 @@ impl CompiledProgram {
         let Some(mut left) = text.chars().next() else {
             return;
         };
+        let mut lig_pieces: Option<String> = None;
         let text = &text[left.len_utf8()..];
         let mut iter = text.chars();
         loop {
             let Some(right) = iter.next() else { break };
             match self.get_op_utf8(left, right) {
                 Op::None => {
-                    emitter.emit_character(left);
+                    match lig_pieces.take() {
+                        Some(l) => {
+                            emitter.emit_ligature(left, l.into());
+                        }
+                        None => {
+                            emitter.emit_character(left);
+                        }
+                    }
                     left = right;
                 }
                 Op::Kern(fix_word) => {
@@ -263,18 +271,23 @@ impl CompiledProgram {
                     left = right;
                 }
                 Op::SimpleLig(char) => {
-                    emitter.emit_ligature(char.into(), format!("{left}{right}").into());
-                    match iter.next() {
-                        None => return,
-                        Some(new_left) => {
-                            left = new_left;
-                        }
-                    }
+                    lig_pieces = Some(match lig_pieces {
+                        Some(l) => format!("{l}{right}"),
+                        None => format!("{left}{right}"),
+                    });
+                    left = char.into();
                 }
                 Op::ComplexLig(_items, _char) => todo!("complex lig"),
             }
         }
-        emitter.emit_character(left);
+        match lig_pieces.take() {
+            Some(l) => {
+                emitter.emit_ligature(left, l.into());
+            }
+            None => {
+                emitter.emit_character(left);
+            }
+        }
     }
 }
 

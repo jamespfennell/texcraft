@@ -14,12 +14,12 @@
 //!     because they ultimately invoke TeX to generate the right diagnostic information.
 
 use crate::ds;
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 /// Implementations of this trait can run TeX source code and return stdout.
 pub trait TexEngine {
     /// Run the provided TeX source code and return stdout.
-    fn run_and_return_stdout(&self, tex_source_code: &str) -> String;
+    fn run(&self, tex_source_code: &str, auxiliary_files: &HashMap<PathBuf, Vec<u8>>) -> String;
 }
 
 /// Error return when a binary on the host computer was not found.
@@ -62,17 +62,30 @@ pub fn new_tex_engine_binary(binary_name: String) -> Result<Box<dyn TexEngine>, 
 struct TexEngineBinary(String);
 
 impl TexEngine for TexEngineBinary {
-    fn run_and_return_stdout(&self, tex_source_code: &str) -> String {
-        let mut input_path = std::env::temp_dir();
+    fn run(&self, tex_source_code: &str, auxiliary_files: &HashMap<PathBuf, Vec<u8>>) -> String {
+        let dir = std::env::temp_dir();
+
+        for (file_name, content) in auxiliary_files {
+            let mut path = dir.clone();
+            path.push(file_name);
+            std::fs::write(&path, content).unwrap_or_else(|_| {
+                panic![
+                    "Unable to write auxiliary file {}",
+                    file_name.to_string_lossy()
+                ]
+            });
+        }
+
+        let mut input_path = dir.clone();
         input_path.push("tex-input");
         input_path.set_extension("tex");
         std::fs::write(&input_path, tex_source_code).expect("Unable to write file");
 
         let output = std::process::Command::new(&self.0)
+            .current_dir(&dir)
             .arg(&input_path)
             .output()
             .expect("failed to run tex command");
-
         String::from_utf8(output.stdout).expect("stdout output of TeX is utf-8")
     }
 }
@@ -86,14 +99,18 @@ impl TexEngine for TexEngineBinary {
 /// (part 12 of TeX: displaying boxes).
 pub fn build_horizontal_lists(
     tex_engine: &dyn TexEngine,
+    auxiliary_files: &HashMap<PathBuf, Vec<u8>>,
+    preamble: &str,
     contents: &mut dyn Iterator<Item = &String>,
 ) -> (HashMap<String, u32>, Vec<ds::HList>) {
     let mut fonts: HashMap<String, u32> = Default::default();
     let mut hlists = vec![];
     let macro_calls: Vec<String> = contents.map(|s| format!(r#"\printBox{{{s}}}"#)).collect();
-    let tex_source_code = CONVERT_TEXT_TEMPLATE.replace("<print_calls>", &macro_calls.join("\n\n"));
-    let output = tex_engine.run_and_return_stdout(&tex_source_code);
+    let tex_source_code = CONVERT_TEXT_TEMPLATE
+        .replace("<preamble>", preamble)
+        .replace("<print_calls>", &macro_calls.join("\n\n"));
 
+    let output = tex_engine.run(&tex_source_code, auxiliary_files);
     enum Expect {
         Begin,
         Dimension,
@@ -258,6 +275,10 @@ fn parse_scaled(s: &str) -> core::Scaled {
 }
 
 const CONVERT_TEXT_TEMPLATE: &str = r"
+
+% User provided preamble.
+<preamble>
+
 % After showing a box, TeX stops and waits for user input.
 % The following command suppresses that behavior.
 \nonstopmode
@@ -300,7 +321,7 @@ mod tests {
     struct MockTexEngine(String);
 
     impl TexEngine for MockTexEngine {
-        fn run_and_return_stdout(&self, _: &str) -> String {
+        fn run(&self, _: &str, _: &HashMap<PathBuf, Vec<u8>>) -> String {
             self.0.clone()
         }
     }
@@ -340,8 +361,12 @@ Transcript written on test.log.
 "#;
 
         let tex_engine = MockTexEngine(log.to_string());
-        let (got_fonts, got_list) =
-            build_horizontal_lists(&tex_engine, &mut vec!["".to_string()].iter());
+        let (got_fonts, got_list) = build_horizontal_lists(
+            &tex_engine,
+            &Default::default(),
+            &"",
+            &mut vec!["".to_string()].iter(),
+        );
 
         let want_list = ds::HList {
             height: parse_scaled("6.94444"),

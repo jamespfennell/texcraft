@@ -131,10 +131,17 @@ mod tests {
             "#,
         ),
         (
-            cmr10_ligature,
+            cmr10_ligature_1,
             "ff",
             r#"
                 lig("\u{b}", "ff", font=0)
+            "#,
+        ),
+        (
+            cmr10_ligature_2,
+            "ffi",
+            r#"
+                lig("\u{e}", "ffi", font=0)
             "#,
         ),
     );

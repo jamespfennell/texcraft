@@ -209,6 +209,7 @@ dependencies = [
  "boxworks",
  "boxworks-lang",
  "clap 4.4.8",
+ "tfm",
 ]
 
 [[package]]

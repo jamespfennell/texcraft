@@ -1,5 +1,6 @@
 use boxworks_lang as bwl;
 use clap::Parser;
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -126,12 +127,61 @@ struct TexHlists {
     ///
     /// Each element of contents is used to build a separate horizontal list.
     contents: Vec<String>,
+
+    /// Font metrics file to use.
+    ///
+    /// If not provided, the command uses the metrics for the default font for TeX
+    /// (or whatever engine is being used).
+    #[clap(short, long)]
+    font_metrics: Option<PathBuf>,
 }
 
 impl TexHlists {
     fn run(self, tex_engine: &dyn boxworks::tex::TexEngine) -> Result<(), String> {
-        let (fonts, hlists) =
-            boxworks::tex::build_horizontal_lists(tex_engine, &mut self.contents.iter());
+        let mut auxiliary_files: HashMap<PathBuf, Vec<u8>> = Default::default();
+        let mut preamble: String = Default::default();
+        if let Some(font_metrics) = self.font_metrics {
+            let source = match font_metrics.extension().and_then(|s| s.to_str()) {
+                Some("pl" | "plst") => {
+                    let pl_data = match fs::read_to_string(&font_metrics) {
+                        Ok(source) => source,
+                        Err(err) => {
+                            return Err(format!["failed to open file {:?}: {err}", &font_metrics]);
+                        }
+                    };
+                    tfm::algorithms::pl_to_tfm(&pl_data).0
+                }
+                Some("tfm") => match fs::read(&font_metrics) {
+                    Ok(source) => source,
+                    Err(err) => {
+                        return Err(format!["failed to open file {:?}: {err}", &font_metrics]);
+                    }
+                },
+                _ => {
+                    return Err(format![
+                        "unsupported font metrics file extension: must be pl, plst or tfm, is {:?}",
+                        font_metrics.extension()
+                    ])
+                }
+            };
+            let file_name: PathBuf = font_metrics.file_name().unwrap().into();
+            let file_stem = file_name.file_stem().unwrap().to_string_lossy();
+            preamble.push_str(&format![
+                r"
+
+                    \font \customFont {file_stem}
+
+                    \customFont
+                    "
+            ]);
+            auxiliary_files.insert(file_name, source);
+        }
+        let (fonts, hlists) = boxworks::tex::build_horizontal_lists(
+            tex_engine,
+            &auxiliary_files,
+            &preamble,
+            &mut self.contents.iter(),
+        );
         println!("# fonts:");
         for (font_name, font_number) in fonts.into_iter() {
             println!("# - {font_name}={font_number}");

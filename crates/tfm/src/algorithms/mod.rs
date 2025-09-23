@@ -23,6 +23,15 @@ impl TfmToPlErrorMessage {
         }
     }
 }
+/// The pltotf algorithm.
+///
+/// This algorithm converts a .pl string to .tfm bytes.
+pub fn pl_to_tfm(pl_data: &str) -> (Vec<u8>, Vec<crate::pl::ParseWarning>) {
+    let (pl_file, warnings) = crate::pl::File::from_pl_source_code(pl_data);
+    let tfm_file: crate::File = pl_file.into();
+    let tfm_output: Vec<u8> = tfm_file.serialize();
+    (tfm_output, warnings)
+}
 
 /// The tftopl algorithm.
 ///
