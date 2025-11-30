@@ -43,7 +43,7 @@ struct OngoingCalculation {
     // is to apply the ligature rule for (tuple.0.1, tuple.1).
     // pending_new: (LigOrChar, LigOrChar, Option<LigOrChar>),
     // Invariant: either 2 or 3 elements in size?
-    new_pending: Vec<C>,
+    pending: Vec<C>,
 }
 
 #[derive(Clone, Debug)]
@@ -54,7 +54,7 @@ struct C {
 
 impl OngoingCalculation {
     fn child(&self) -> Node {
-        Node(self.new_pending[0].c.into(), self.new_pending[1].c.into())
+        Node(self.pending[0].c.into(), self.pending[1].c.into())
     }
 }
 
@@ -295,7 +295,7 @@ fn calculate_replacements(
             actionable.push(OngoingCalculation {
                 node: pair,
                 finalized: finalized_new,
-                new_pending,
+                pending: new_pending,
             });
             node_to_parents.insert(pair, vec![]);
         }
@@ -311,8 +311,8 @@ fn calculate_replacements(
         let last_1 = match new_result.get(&child) {
             None => {
                 // There is no lig/kern rule for this pair.
-                let left = calc.new_pending[0].clone();
-                let right = calc.new_pending[1].clone();
+                let left = calc.pending[0].clone();
+                let right = calc.pending[1].clone();
                 calc.finalized.push(match left.o {
                     Some(o) => IntermediateOp::Lig(left.c, o),
                     None => IntermediateOp::Char(left.c),
@@ -324,7 +324,7 @@ fn calculate_replacements(
             }
             Some(replacement) => {
                 println!("FINALIZING FOR node={:?}", calc.node);
-                println!("FINALIZING FOR pending={:?}", calc.new_pending);
+                println!("FINALIZING FOR pending={:?}", calc.pending);
                 // TODO: this is not good enough :( <- this is where the test is failing!
                 // We may need to modify some ligature nodes
                 // we need to iterate over the Replacement value and replace char or lig originals
@@ -338,7 +338,7 @@ fn calculate_replacements(
                 }
             }
         };
-        match calc.new_pending.get(2) {
+        match calc.pending.get(2) {
             None => {
                 if let Some(blocking) = node_to_parents.remove(&calc.node) {
                     actionable.extend(blocking);
@@ -355,10 +355,10 @@ fn calculate_replacements(
                 );
             }
             Some(_) => {
-                calc.new_pending = if calc.new_pending.len() <= 2 {
+                calc.pending = if calc.pending.len() <= 2 {
                     unreachable!("can't hit this");
                 } else {
-                    vec![calc.new_pending[1].clone(), calc.new_pending[2].clone()]
+                    vec![calc.pending[1].clone(), calc.pending[2].clone()]
                 };
                 actionable.push(calc);
             }
