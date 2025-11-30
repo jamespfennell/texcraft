@@ -41,8 +41,8 @@ struct OngoingCalculation {
     // Characters that are still pending replacement. The next step is to apply the ligature
     // rule for the node. After that, if the second element is not empty, the next step
     // is to apply the ligature rule for (tuple.0.1, tuple.1).
-
     // pending_new: (LigOrChar, LigOrChar, Option<LigOrChar>),
+    // Invariant: either 2 or 3 elements in size?
     new_pending: Vec<C>,
 }
 
@@ -332,7 +332,7 @@ fn calculate_replacements(
                 // or the content of the ligature
                 calc.finalized_new.extend_from_slice(&replacement.0);
                 match &replacement.1 {
-                    TerminalOp::RightChar => LigOrChar::Char(child.1),
+                    // TerminalOp::RightChar => LigOrChar::Char(child.1),
                     TerminalOp::Char(char) => LigOrChar::Char(*char),
                     TerminalOp::Lig(char, s) => LigOrChar::Lig(*char, s.clone()),
                 }

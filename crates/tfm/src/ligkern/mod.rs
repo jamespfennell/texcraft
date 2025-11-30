@@ -102,12 +102,11 @@ enum IntermediateOp {
     LeftChar,
     // Emit the char in the payload.
     Char(Char),
-    Lig(Char, Rc<str>),
+    Lig(Char, Rc<str>), // should have consumes_left, consumes_right ?
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum TerminalOp {
-    RightChar,
     Char(Char),
     Lig(Char, Rc<str>),
 }
@@ -281,9 +280,9 @@ impl CompiledProgram {
                         }
                     }
                     match &replacement.1 {
-                        TerminalOp::RightChar => {
-                            left = right;
-                        }
+                        //TerminalOp::RightChar => {
+                          //  left = right;
+                        //}
                         TerminalOp::Char(char) => {
                             left = (*char).into();
                         }
