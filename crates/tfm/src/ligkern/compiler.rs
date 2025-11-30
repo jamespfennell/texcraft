@@ -37,7 +37,7 @@ struct OngoingCalculation {
     // TODO: rename root?
     node: Node,
 
-    finalized_new: Vec<IntermediateOp>,
+    finalized: Vec<IntermediateOp>,
     // Characters that are still pending replacement. The next step is to apply the ligature
     // rule for the node. After that, if the second element is not empty, the next step
     // is to apply the ligature rule for (tuple.0.1, tuple.1).
@@ -294,7 +294,7 @@ fn calculate_replacements(
         if !new_pending.is_empty() {
             actionable.push(OngoingCalculation {
                 node: pair,
-                finalized_new,
+                finalized: finalized_new,
                 new_pending,
             });
             node_to_parents.insert(pair, vec![]);
@@ -313,7 +313,7 @@ fn calculate_replacements(
                 // There is no lig/kern rule for this pair.
                 let left = calc.new_pending[0].clone();
                 let right = calc.new_pending[1].clone();
-                calc.finalized_new.push(match left.o {
+                calc.finalized.push(match left.o {
                     Some(o) => IntermediateOp::Lig(left.c, o),
                     None => IntermediateOp::Char(left.c),
                 });
@@ -330,7 +330,7 @@ fn calculate_replacements(
                 // we need to iterate over the Replacement value and replace char or lig originals
                 // with calc.new_pending[0] and calc.new_pending[1] - either the char
                 // or the content of the ligature
-                calc.finalized_new.extend_from_slice(&replacement.0);
+                calc.finalized.extend_from_slice(&replacement.0);
                 match &replacement.1 {
                     // TerminalOp::RightChar => LigOrChar::Char(child.1),
                     TerminalOp::Char(char) => LigOrChar::Char(*char),
@@ -346,7 +346,7 @@ fn calculate_replacements(
                 new_result.insert(
                     calc.node,
                     Replacement(
-                        calc.finalized_new,
+                        calc.finalized,
                         match last_1 {
                             LigOrChar::Lig(char, s) => TerminalOp::Lig(char, s),
                             LigOrChar::Char(char) => TerminalOp::Char(char),

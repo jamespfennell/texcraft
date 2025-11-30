@@ -281,7 +281,7 @@ impl CompiledProgram {
                     }
                     match &replacement.1 {
                         //TerminalOp::RightChar => {
-                          //  left = right;
+                        //  left = right;
                         //}
                         TerminalOp::Char(char) => {
                             left = (*char).into();
