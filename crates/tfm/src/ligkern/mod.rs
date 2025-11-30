@@ -126,13 +126,6 @@ enum TerminalOp {
 // Can special case simple kerns and simple ligatures
 // There is an invariant that one of the terminal ops has to come last
 
-#[derive(Debug, Clone)]
-struct RawReplacement {
-    left_char_operation: LeftCharOperation,
-    middle_char_bounds: Vec<(Char, FixWord)>,
-    last_char: Char,
-}
-
 /// Lig/kern operation on two characters.
 #[derive(Debug, Clone)]
 pub enum Op {
@@ -205,11 +198,7 @@ impl CompiledProgram {
         CompiledProgram::compile(&tfm_file.lig_kern_program, &tfm_file.kerns, entrypoints)
     }
 
-    pub fn get_replacement_utf8(
-        &self,
-        left_char: char,
-        right_char: char,
-    ) -> Option<&Replacement> {
+    pub fn get_replacement_utf8(&self, left_char: char, right_char: char) -> Option<&Replacement> {
         let Ok(left_char) = left_char.try_into() else {
             return None;
         };
@@ -378,17 +367,6 @@ pub struct InfiniteLoopStep {
     pub post_replacement: (bool, Vec<Char>),
     /// The position of the cursor after applying this step.
     pub post_cursor_position: usize,
-}
-
-/// Operation to perform on the left character of a lig/kern pair.
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
-enum LeftCharOperation {
-    /// Retain the left character and do not add a kern.
-    Retain,
-    /// Delete the left character.
-    Delete,
-    /// Retain the left character and append the specified kern.
-    AppendKern(FixWord),
 }
 
 #[cfg(test)]
