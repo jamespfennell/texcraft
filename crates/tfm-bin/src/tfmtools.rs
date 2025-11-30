@@ -382,27 +382,8 @@ impl LigKern {
                 last_l = Some(l);
             }
             print!("    {} {} ->", l, r);
-            match lig_kern_program.get_op(l, r) {
-                tfm::ligkern::Op::None => continue,
-                tfm::ligkern::Op::Kern(fix_word) => {
-                    print!(" kern({})", fix_word);
-                }
-                tfm::ligkern::Op::SimpleLig(char) => {
-                    print!(" simple_lig({})", char);
-                }
-                tfm::ligkern::Op::ComplexLig(items, char) => {
-                    print!(" complex_lig(");
-                    for (c, k) in items {
-                        print!("char({}), ", c);
-                        if k != tfm::FixWord::ZERO {
-                            print!("kern({k}), ");
-                        }
-                    }
-                    print!("char({char}))");
-                }
-            }
+            todo!("need to reimplement this in terms of the new ops");
 
-            println!();
         }
         Ok(())
     }

@@ -6,10 +6,26 @@ pub fn compile(
     kerns: &[FixWord],
     entry_points: &HashMap<Char, u16>,
 ) -> (CompiledProgram, Vec<InfiniteLoopError>) {
-    let pair_to_instruction = build_pair_to_instruction_map(program, entry_points);
-    let (pair_to_replacement, infinite_loop_errors) =
+    let pair_to_instruction = build_node_to_program_start_map(program, entry_points);
+    let (replacements, infinite_loop_errors) =
         calculate_replacements(program, kerns, pair_to_instruction);
-    let program = lower_and_optimize(pair_to_replacement);
+    let program = CompiledProgram {
+        replacements: replacements
+            .into_iter()
+            .filter_map(|(node, replacement)| {
+                match node.0 {
+                    LeftChar::Char(char) => Some(((char, node.1), replacement)),
+                    LeftChar::BoundaryChar => None, // TODO
+                }
+            })
+            .collect(),
+    };
+    println!(
+        "{:?}",
+        program
+            .replacements
+            .get(&('a'.try_into().unwrap(), 'c'.try_into().unwrap()))
+    );
     (program, infinite_loop_errors)
 }
 
@@ -18,19 +34,35 @@ struct Node(LeftChar, Char);
 
 struct OngoingCalculation {
     // Node this calculation is for.
+    // TODO: rename root?
     node: Node,
-    // Part of the ligature result that has been finalized and won't change.
-    finalized: Finalized,
+
+    finalized_new: Vec<IntermediateOp>,
     // Characters that are still pending replacement. The next step is to apply the ligature
     // rule for the node. After that, if the second element is not empty, the next step
     // is to apply the ligature rule for (tuple.0.1, tuple.1).
-    pending: (Node, Option<Char>),
+
+    // pending_new: (LigOrChar, LigOrChar, Option<LigOrChar>),
+    new_pending: Vec<C>,
+}
+
+#[derive(Clone, Debug)]
+struct C {
+    c: Char,
+    o: Option<Rc<str>>,
 }
 
 impl OngoingCalculation {
     fn child(&self) -> Node {
-        self.pending.0
+        Node(self.new_pending[0].c.into(), self.new_pending[1].c.into())
     }
+}
+
+// TODO: destroy this or C
+#[derive(Debug, Clone)]
+enum LigOrChar {
+    Lig(Char, Rc<str>),
+    Char(Char),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
@@ -65,7 +97,16 @@ impl TryFrom<LeftChar> for Char {
     }
 }
 
-fn build_pair_to_instruction_map(
+impl std::fmt::Display for LeftChar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LeftChar::Char(char) => write!(f, "{char}"),
+            LeftChar::BoundaryChar => Ok(()),
+        }
+    }
+}
+
+fn build_node_to_program_start_map(
     program: &lang::Program,
     entry_points: &HashMap<Char, u16>,
 ) -> HashMap<Node, usize> {
@@ -102,83 +143,15 @@ fn build_pair_to_instruction_map(
     result
 }
 
-// TODO: replace the first LeftChar with a bool indicating whether the
-// first character is deleted. Anytime we need the first char, get it from
-// the context. I think in this way we can remove all of the expect() calls
-// on boundary chars.
-struct Replacement(LeftChar, Vec<(FixWord, Char)>);
-
-enum Finalized {
-    Empty,
-    NonEmpty {
-        replacement: Replacement,
-        last_kern: FixWord,
-    },
-}
-
-impl Finalized {
-    fn new_single_char(c1: LeftChar) -> Self {
-        Finalized::NonEmpty {
-            replacement: Replacement(c1, vec![]),
-            last_kern: FixWord::ZERO,
-        }
-    }
-    fn new_double_char(c1: LeftChar, c2: Char) -> Self {
-        Finalized::NonEmpty {
-            replacement: Replacement(c1, vec![(FixWord::ZERO, c2)]),
-            last_kern: FixWord::ZERO,
-        }
-    }
-    fn finish(self, last_char: Char) -> Replacement {
-        match self {
-            Finalized::Empty => Replacement(last_char.into(), vec![]),
-            Finalized::NonEmpty {
-                mut replacement,
-                last_kern,
-            } => {
-                replacement.1.push((last_kern, last_char));
-                replacement
-            }
-        }
-    }
-    fn push(&mut self, c: LeftChar, kern: FixWord) {
-        match self {
-            Finalized::Empty => {
-                *self = Finalized::NonEmpty {
-                    replacement: Replacement(c, vec![]),
-                    last_kern: kern,
-                }
-            }
-            Finalized::NonEmpty {
-                replacement,
-                last_kern,
-            } => {
-                replacement.1.push((
-                    *last_kern,
-                    c.try_into()
-                        .expect("boundary char can't appear in the middle of a replacement"),
-                ));
-                *last_kern = kern;
-            }
-        }
-    }
-
-    fn extend(&mut self, replacement: &Replacement) -> LeftChar {
-        let mut c: LeftChar = replacement.0;
-        for (kern, next_c) in replacement.1.iter().copied() {
-            self.push(c, kern);
-            c = next_c.into();
-        }
-        c
-    }
-}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Replacement(pub Vec<IntermediateOp>, pub TerminalOp);
 
 fn calculate_replacements(
     program: &lang::Program,
     kerns: &[FixWord],
     pair_to_instruction: HashMap<Node, usize>,
 ) -> (HashMap<Node, Replacement>, Vec<InfiniteLoopError>) {
-    let mut result: HashMap<Node, Replacement> = Default::default();
+    let mut new_result: HashMap<Node, Replacement> = Default::default();
     let mut actionable: Vec<OngoingCalculation> = vec![];
     let mut node_to_parents: HashMap<Node, Vec<OngoingCalculation>> = Default::default();
     for (&pair, &index) in &pair_to_instruction {
@@ -193,25 +166,24 @@ fn calculate_replacements(
             }
             operation => operation,
         };
-        enum Pending {
-            None(Char),
-            One(Node),
-            Two(Node, Char),
-        }
-        let (finalized, pending): (Finalized, Pending) = match operation {
+        let (finalized_new, new_pending): (Vec<IntermediateOp>, Vec<C>) = match operation {
             lang::Operation::Kern(kern) => {
-                result.insert(pair, Replacement(left, vec![(kern, right)]));
+                new_result.insert(
+                    pair,
+                    Replacement(
+                        vec![IntermediateOp::LeftChar, IntermediateOp::Kern(kern)],
+                        TerminalOp::Char(right),
+                    ),
+                );
                 continue;
             }
             lang::Operation::KernAtIndex(index) => {
-                result.insert(
+                let kern = kerns.get(index as usize).copied().unwrap_or_default();
+                new_result.insert(
                     pair,
                     Replacement(
-                        left,
-                        vec![(
-                            kerns.get(index as usize).copied().unwrap_or_default(),
-                            right,
-                        )],
+                        vec![IntermediateOp::LeftChar, IntermediateOp::Kern(kern)],
+                        TerminalOp::Char(right),
                     ),
                 );
                 continue;
@@ -225,58 +197,108 @@ fn calculate_replacements(
                 post_lig_tag_invalid: _,
             } => match post_lig_operation {
                 lang::PostLigOperation::RetainBothMoveNowhere => (
-                    Finalized::Empty,
-                    Pending::Two(Node(left, char_to_insert), right),
+                    vec![],
+                    vec![
+                        C {
+                            c: left.try_into().unwrap(),
+                            o: None,
+                        },
+                        C {
+                            c: char_to_insert,
+                            o: Some("".into()),
+                        },
+                        C { c: right, o: None },
+                    ],
                 ),
                 lang::PostLigOperation::RetainBothMoveToInserted => (
-                    Finalized::new_single_char(left),
-                    Pending::One(Node(char_to_insert.into(), right)),
+                    vec![IntermediateOp::LeftChar],
+                    vec![
+                        C {
+                            c: char_to_insert,
+                            o: Some("".into()),
+                        },
+                        C { c: right, o: None },
+                    ],
                 ),
                 lang::PostLigOperation::RetainBothMoveToRight => (
-                    Finalized::new_double_char(left, char_to_insert),
-                    Pending::None(right),
+                    vec![
+                        IntermediateOp::LeftChar,
+                        IntermediateOp::Lig(char_to_insert, "".into()),
+                    ],
+                    vec![],
                 ),
                 lang::PostLigOperation::RetainRightMoveToInserted => (
-                    Finalized::Empty,
-                    Pending::One(Node(char_to_insert.into(), right)),
+                    vec![],
+                    vec![
+                        C {
+                            c: char_to_insert,
+                            o: Some(format!("{left}").into()),
+                        },
+                        C { c: right, o: None },
+                    ],
                 ),
-                lang::PostLigOperation::RetainRightMoveToRight => (
-                    Finalized::new_single_char(char_to_insert.into()),
-                    Pending::None(right),
-                ),
-                lang::PostLigOperation::RetainLeftMoveNowhere => {
-                    (Finalized::Empty, Pending::One(Node(left, char_to_insert)))
+                lang::PostLigOperation::RetainRightMoveToRight => {
+                    new_result.insert(
+                        pair,
+                        Replacement(
+                            vec![IntermediateOp::Lig(
+                                char_to_insert,
+                                format!("{left}").into(),
+                            )],
+                            TerminalOp::Char(right),
+                        ),
+                    );
+                    (
+                        vec![IntermediateOp::Lig(
+                            char_to_insert,
+                            format!("{left}").into(),
+                        )],
+                        vec![],
+                    )
                 }
-                lang::PostLigOperation::RetainLeftMoveToInserted => (
-                    Finalized::new_single_char(left),
-                    Pending::None(char_to_insert),
+                lang::PostLigOperation::RetainLeftMoveNowhere => (
+                    vec![],
+                    vec![
+                        C {
+                            c: left.try_into().unwrap(),
+                            o: None,
+                        },
+                        C {
+                            c: char_to_insert,
+                            o: Some(format!("{right}").into()),
+                        },
+                    ],
                 ),
+                lang::PostLigOperation::RetainLeftMoveToInserted => {
+                    new_result.insert(
+                        pair,
+                        Replacement(
+                            vec![IntermediateOp::LeftChar],
+                            TerminalOp::Lig(char_to_insert, format!("{right}").into()),
+                        ),
+                    );
+                    (vec![IntermediateOp::LeftChar], vec![])
+                }
                 lang::PostLigOperation::RetainNeitherMoveToInserted => {
-                    (Finalized::Empty, Pending::None(char_to_insert))
+                    new_result.insert(
+                        pair,
+                        Replacement(
+                            vec![],
+                            TerminalOp::Lig(char_to_insert, format!("{left}{right}").into()),
+                        ),
+                    );
+                    (vec![], vec![])
                 }
             },
         };
-        match pending {
-            Pending::None(cursor) => {
-                result.insert(pair, finalized.finish(cursor));
-            }
-            Pending::One(node) => {
-                actionable.push(OngoingCalculation {
-                    node: pair,
-                    finalized,
-                    pending: (node, None),
-                });
-                node_to_parents.insert(pair, vec![]);
-            }
-            Pending::Two(node, c3) => {
-                actionable.push(OngoingCalculation {
-                    node: pair,
-                    finalized,
-                    pending: (node, Some(c3)),
-                });
-                node_to_parents.insert(pair, vec![]);
-            }
-        };
+        if !new_pending.is_empty() {
+            actionable.push(OngoingCalculation {
+                node: pair,
+                finalized_new,
+                new_pending,
+            });
+            node_to_parents.insert(pair, vec![]);
+        }
     }
 
     while let Some(mut calc) = actionable.pop() {
@@ -285,26 +307,59 @@ fn calculate_replacements(
             blocking.push(calc);
             continue;
         }
-        let last = match result.get(&child) {
+
+        let last_1 = match new_result.get(&child) {
             None => {
-                calc.finalized.push(child.0, FixWord::ZERO);
-                child.1
+                // There is no lig/kern rule for this pair.
+                let left = calc.new_pending[0].clone();
+                let right = calc.new_pending[1].clone();
+                calc.finalized_new.push(match left.o {
+                    Some(o) => IntermediateOp::Lig(left.c, o),
+                    None => IntermediateOp::Char(left.c),
+                });
+                match right.o {
+                    Some(o) => LigOrChar::Lig(right.c, o),
+                    None => LigOrChar::Char(right.c),
+                }
             }
-            Some(replacement) => calc
-                .finalized
-                .extend(replacement)
-                .try_into()
-                .expect("boundary char can't be in the middle of a replacement"),
+            Some(replacement) => {
+                println!("FINALIZING FOR node={:?}", calc.node);
+                println!("FINALIZING FOR pending={:?}", calc.new_pending);
+                // TODO: this is not good enough :( <- this is where the test is failing!
+                // We may need to modify some ligature nodes
+                // we need to iterate over the Replacement value and replace char or lig originals
+                // with calc.new_pending[0] and calc.new_pending[1] - either the char
+                // or the content of the ligature
+                calc.finalized_new.extend_from_slice(&replacement.0);
+                match &replacement.1 {
+                    TerminalOp::RightChar => LigOrChar::Char(child.1),
+                    TerminalOp::Char(char) => LigOrChar::Char(*char),
+                    TerminalOp::Lig(char, s) => LigOrChar::Lig(*char, s.clone()),
+                }
+            }
         };
-        match calc.pending.1 {
+        match calc.new_pending.get(2) {
             None => {
                 if let Some(blocking) = node_to_parents.remove(&calc.node) {
                     actionable.extend(blocking);
                 }
-                result.insert(calc.node, calc.finalized.finish(last));
+                new_result.insert(
+                    calc.node,
+                    Replacement(
+                        calc.finalized_new,
+                        match last_1 {
+                            LigOrChar::Lig(char, s) => TerminalOp::Lig(char, s),
+                            LigOrChar::Char(char) => TerminalOp::Char(char),
+                        },
+                    ),
+                );
             }
-            Some(other) => {
-                calc.pending = (Node(last.into(), other), None);
+            Some(_) => {
+                calc.new_pending = if calc.new_pending.len() <= 2 {
+                    unreachable!("can't hit this");
+                } else {
+                    vec![calc.new_pending[1].clone(), calc.new_pending[2].clone()]
+                };
                 actionable.push(calc);
             }
         }
@@ -371,74 +426,7 @@ fn calculate_replacements(
             });
         }
     }
-
-    (result, infinite_loop_errors)
-}
-
-fn lower_and_optimize(pair_to_replacement: HashMap<Node, Replacement>) -> CompiledProgram {
-    let mut intermediate: HashMap<LeftChar, Vec<(Char, RawReplacement)>> = Default::default();
-    let mut middle_chars: Vec<(Char, FixWord)> = Default::default();
-
-    for (node, Replacement(head, tail)) in pair_to_replacement {
-        let start: u16 = middle_chars.len().try_into().unwrap();
-
-        let (left_char_operation, last_char) = match tail.first().copied() {
-            None => {
-                let head: Char = head.try_into().expect("boundary chars cannot appear as replacements (in this case for the deleted left char");
-                (LeftCharOperation::Delete, head)
-            }
-            Some((first_kern, mut last_char)) => {
-                let left_char_operation = if node.0 == head {
-                    if first_kern == FixWord::ZERO {
-                        LeftCharOperation::Retain
-                    } else {
-                        LeftCharOperation::AppendKern(first_kern)
-                    }
-                } else {
-                    let head: Char = head.try_into().expect("boundary chars cannot appear as replacements (in this case for the deleted left char");
-                    middle_chars.push((head, first_kern));
-                    LeftCharOperation::Delete
-                };
-                for (kern, c) in tail[1..].iter().copied() {
-                    middle_chars.push((last_char, kern));
-                    last_char = c;
-                }
-                (left_char_operation, last_char)
-            }
-        };
-
-        let end: u16 = middle_chars.len().try_into().unwrap();
-        intermediate.entry(node.0).or_default().push((
-            node.1,
-            RawReplacement {
-                left_char_operation,
-                middle_char_bounds: start..end,
-                last_char,
-            },
-        ));
-    }
-
-    let mut left_to_pairs: BTreeMap<Char, (u16, u16)> = Default::default();
-    let mut pairs: Vec<(Char, RawReplacement)> = Default::default();
-
-    for (left, replacements) in intermediate {
-        let start: u16 = pairs.len().try_into().unwrap();
-        pairs.extend(replacements);
-        let end: u16 = pairs.len().try_into().unwrap();
-        match left {
-            LeftChar::Char(left) => {
-                left_to_pairs.insert(left, (start, end));
-            }
-            LeftChar::BoundaryChar => {
-                // TODO
-            }
-        }
-    }
-    CompiledProgram {
-        left_to_pairs,
-        pairs,
-        middle_chars,
-    }
+    (new_result, infinite_loop_errors)
 }
 
 #[cfg(test)]
@@ -478,20 +466,18 @@ mod tests {
     fn run_success_test(
         instructions: Vec<lang::Instruction>,
         entry_points: Vec<(char, u16)>,
-        want: Vec<(char, char, Vec<(char, FixWord)>)>,
+        want_new: Vec<(char, char, Vec<IntermediateOp>, TerminalOp)>,
     ) {
         let entry_points: HashMap<Char, u16> = entry_points
             .into_iter()
             .map(|(c, u)| (c.try_into().unwrap(), u))
             .collect();
-        let want: HashMap<(Char, Char), Vec<(Char, FixWord)>> = want
+        let want_new: HashMap<(Char, Char), Replacement> = want_new
             .into_iter()
             .map(|t| {
                 (
                     (t.0.try_into().unwrap(), t.1.try_into().unwrap()),
-                    t.2.into_iter()
-                        .map(|(c, n)| (c.try_into().unwrap(), n))
-                        .collect(),
+                    Replacement(t.2, t.3),
                 )
             })
             .collect();
@@ -502,25 +488,26 @@ mod tests {
         let (compiled_program, infinite_loop_error_or) = compile(&program, &vec![], &entry_points);
         assert!(infinite_loop_error_or.is_empty(), "no infinite loop errors");
 
-        let mut got: HashMap<(Char, Char), Vec<(Char, FixWord)>> = Default::default();
+        let mut got_new: HashMap<(Char, Char), Replacement> = Default::default();
         for pair in compiled_program.all_pairs_having_ops() {
-            let op = compiled_program.get_op(pair.0, pair.1);
-            let replacement: Vec<(Char, FixWord)> = op.build_sequence(pair.0, pair.1);
-            got.insert(pair, replacement);
+            let replacement = compiled_program
+                .get_replacement_utf8(pair.0.into(), pair.1.into())
+                .unwrap();
+            got_new.insert(pair, replacement.clone());
         }
 
-        assert_eq!(got, want);
+        assert_eq!(got_new, want_new);
     }
 
     macro_rules! success_tests {
-        ( $( ($name: ident, $instructions: expr, $entry_points: expr, $want: expr, ), )+ ) => {
+        ( $( ($name: ident, $instructions: expr, $entry_points: expr, $want_new: expr, ), )+ ) => {
             $(
                 #[test]
                 fn $name() {
                     let instructions = $instructions;
                     let entry_points = $entry_points;
-                    let want = $want;
-                    run_success_test(instructions, entry_points, want);
+                    let want_new = $want_new;
+                    run_success_test(instructions, entry_points, want_new);
                 }
             )+
         };
@@ -532,15 +519,30 @@ mod tests {
             kern,
             vec![new_kern(None, 'V', FixWord::ONE)],
             vec![('A', 0)],
-            vec![('A', 'V', vec![('A', FixWord::ONE), ('V', FixWord::ZERO)]),],
+            vec![(
+                'A',
+                'V',
+                vec![IntermediateOp::LeftChar, IntermediateOp::Kern(FixWord::ONE)],
+                TerminalOp::Char(Char::V),
+            )],
         ),
         (
             same_kern_for_multiple_left_characters,
             vec![new_kern(None, 'V', FixWord::ONE)],
             vec![('A', 0), ('B', 0)],
             vec![
-                ('A', 'V', vec![('A', FixWord::ONE), ('V', FixWord::ZERO)]),
-                ('B', 'V', vec![('B', FixWord::ONE), ('V', FixWord::ZERO)]),
+                (
+                    'A',
+                    'V',
+                    vec![IntermediateOp::LeftChar, IntermediateOp::Kern(FixWord::ONE)],
+                    TerminalOp::Char(Char::V),
+                ),
+                (
+                    'B',
+                    'V',
+                    vec![IntermediateOp::LeftChar, IntermediateOp::Kern(FixWord::ONE)],
+                    TerminalOp::Char(Char::V),
+                ),
             ],
         ),
         (
@@ -553,7 +555,11 @@ mod tests {
             vec![(
                 'A',
                 'V',
-                vec![('A', FixWord::ONE * 2), ('V', FixWord::ZERO)]
+                vec![
+                    IntermediateOp::LeftChar,
+                    IntermediateOp::Kern(FixWord::ONE * 2)
+                ],
+                TerminalOp::Char(Char::V),
             ),],
         ),
         (
@@ -568,22 +574,38 @@ mod tests {
                 (
                     'A',
                     'V',
-                    vec![('A', FixWord::ONE * 2), ('V', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::LeftChar,
+                        IntermediateOp::Kern(FixWord::ONE * 2)
+                    ],
+                    TerminalOp::Char(Char::V),
                 ),
                 (
                     'A',
                     'W',
-                    vec![('A', FixWord::ONE * 3), ('W', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::LeftChar,
+                        IntermediateOp::Kern(FixWord::ONE * 3)
+                    ],
+                    TerminalOp::Char(Char::W),
                 ),
                 (
                     'B',
                     'W',
-                    vec![('B', FixWord::ONE * 3), ('W', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::LeftChar,
+                        IntermediateOp::Kern(FixWord::ONE * 3)
+                    ],
+                    TerminalOp::Char(Char::W),
                 ),
                 (
                     'C',
                     'X',
-                    vec![('C', FixWord::ONE * 4), ('X', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::LeftChar,
+                        IntermediateOp::Kern(FixWord::ONE * 4)
+                    ],
+                    TerminalOp::Char(Char::X),
                 ),
             ],
         ),
@@ -591,7 +613,7 @@ mod tests {
             single_lig_1,
             vec![new_lig(None, 'B', 'Z', RetainNeitherMoveToInserted)],
             vec![('A', 0)],
-            vec![('A', 'B', vec![('Z', FixWord::ZERO)])],
+            vec![('A', 'B', vec![], TerminalOp::Lig(Char::Z, "AB".into())),],
         ),
         (
             single_lig_2,
@@ -601,8 +623,18 @@ mod tests {
             ],
             vec![('A', 0)],
             vec![
-                ('A', 'B', vec![('A', FixWord::ZERO), ('Z', FixWord::ZERO)]),
-                ('A', 'Z', vec![('A', FixWord::ONE), ('Z', FixWord::ZERO)]),
+                (
+                    'A',
+                    'B',
+                    vec![IntermediateOp::LeftChar,],
+                    TerminalOp::Lig(Char::Z, "B".into()),
+                ),
+                (
+                    'A',
+                    'Z',
+                    vec![IntermediateOp::LeftChar, IntermediateOp::Kern(FixWord::ONE)],
+                    TerminalOp::Char(Char::Z),
+                ),
             ],
         ),
         (
@@ -613,15 +645,26 @@ mod tests {
             ],
             vec![('A', 0)],
             vec![
-                ('A', 'B', vec![('A', FixWord::ONE), ('Z', FixWord::ZERO)]),
-                ('A', 'Z', vec![('A', FixWord::ONE), ('Z', FixWord::ZERO)]),
+                (
+                    'A',
+                    'B',
+                    vec![IntermediateOp::LeftChar, IntermediateOp::Kern(FixWord::ONE),],
+                    TerminalOp::Lig(Char::Z, "B".into())
+                ),
+                (
+                    'A',
+                    'Z',
+                    vec![IntermediateOp::LeftChar, IntermediateOp::Kern(FixWord::ONE),],
+                    TerminalOp::Char(Char::Z),
+                ),
             ],
         ),
         (
             retain_left_move_nowhere_2,
             vec![new_lig(None, 'B', 'Z', RetainLeftMoveNowhere),],
             vec![('A', 0)],
-            vec![('A', 'B', vec![('A', FixWord::ZERO), ('Z', FixWord::ZERO)]),],
+            // vec![('A', 'B', vec![('A', FixWord::ZERO), ('Z', FixWord::ZERO)]),],
+            vec![],
         ),
         (
             single_lig_4,
@@ -630,10 +673,13 @@ mod tests {
                 new_kern(None, 'B', FixWord::ONE),
             ],
             vec![('A', 0), ('Z', 1)],
+            /*
             vec![
                 ('A', 'B', vec![('Z', FixWord::ONE), ('B', FixWord::ZERO)]),
                 ('Z', 'B', vec![('Z', FixWord::ONE), ('B', FixWord::ZERO)]),
             ],
+             */
+            vec![],
         ),
         (
             single_lig_5,
@@ -642,10 +688,13 @@ mod tests {
                 new_kern(None, 'B', FixWord::ONE),
             ],
             vec![('A', 0), ('Z', 1)],
+            /*
             vec![
                 ('A', 'B', vec![('Z', FixWord::ZERO), ('B', FixWord::ZERO)]),
                 ('Z', 'B', vec![('Z', FixWord::ONE), ('B', FixWord::ZERO)]),
             ],
+             */
+            vec![],
         ),
         (
             retain_both_move_nowhere_1,
@@ -655,6 +704,7 @@ mod tests {
                 new_kern(None, 'B', FixWord::ONE * 3),
             ],
             vec![('A', 0), ('Z', 2)],
+            /*
             vec![
                 (
                     'A',
@@ -676,11 +726,14 @@ mod tests {
                     vec![('Z', FixWord::ONE * 3), ('B', FixWord::ZERO)]
                 ),
             ],
+             */
+            vec![],
         ),
         (
             retain_both_move_nowhere_2,
             vec![new_lig(None, 'B', 'Z', RetainBothMoveNowhere),],
             vec![('A', 0)],
+            /*
             vec![(
                 'A',
                 'B',
@@ -690,6 +743,8 @@ mod tests {
                     ('B', FixWord::ZERO)
                 ]
             ),],
+             */
+            vec![],
         ),
         (
             retain_both_move_nowhere_3,
@@ -698,6 +753,7 @@ mod tests {
                 new_lig(None, 'B', 'Y', RetainRightMoveToRight),
             ],
             vec![('A', 0), ('Z', 1)],
+            /*
             vec![
                 (
                     'A',
@@ -710,6 +766,8 @@ mod tests {
                 ),
                 ('Z', 'B', vec![('Y', FixWord::ZERO), ('B', FixWord::ZERO),]),
             ],
+             */
+            vec![],
         ),
         (
             retain_both_move_nowhere_4,
@@ -718,6 +776,7 @@ mod tests {
                 new_lig(None, 'Z', 'Y', RetainBothMoveToRight),
             ],
             vec![('A', 0)],
+            /*
             vec![
                 (
                     'A',
@@ -739,6 +798,8 @@ mod tests {
                     ]
                 ),
             ],
+             */
+            vec![],
         ),
         (
             retain_both_move_to_inserted_1,
@@ -748,6 +809,7 @@ mod tests {
                 new_kern(None, 'B', FixWord::ONE * 3),
             ],
             vec![('A', 0), ('Z', 2)],
+            /*
             vec![
                 (
                     'A',
@@ -769,6 +831,8 @@ mod tests {
                     vec![('Z', FixWord::ONE * 3), ('B', FixWord::ZERO)]
                 ),
             ],
+             */
+            vec![],
         ),
         (
             retain_both_move_to_inserted_2,
@@ -777,6 +841,7 @@ mod tests {
                 new_lig(None, 'B', 'Y', RetainRightMoveToInserted),
             ],
             vec![('A', 0), ('Z', 1)],
+            /*
             vec![
                 (
                     'A',
@@ -793,11 +858,14 @@ mod tests {
                     vec![('Y', FixWord::ZERO * 3), ('B', FixWord::ZERO)]
                 ),
             ],
+             */
+            vec![],
         ),
         (
             retain_both_move_to_inserted_3,
             vec![new_lig(None, 'B', 'Z', RetainBothMoveToInserted),],
             vec![('A', 0)],
+            /*
             vec![(
                 'A',
                 'B',
@@ -807,6 +875,8 @@ mod tests {
                     ('B', FixWord::ZERO)
                 ]
             ),],
+             */
+            vec![],
         ),
         (
             retain_both_move_to_inserted_4,
@@ -815,6 +885,7 @@ mod tests {
                 new_lig(None, 'B', 'Y', RetainRightMoveToRight),
             ],
             vec![('A', 0), ('Z', 1)],
+            /*
             vec![
                 (
                     'A',
@@ -831,6 +902,8 @@ mod tests {
                     vec![('Y', FixWord::ZERO * 3), ('B', FixWord::ZERO)]
                 ),
             ],
+             */
+            vec![],
         ),
         (
             retain_both_move_to_right_1,
@@ -840,6 +913,7 @@ mod tests {
                 new_kern(None, 'B', FixWord::ONE * 3),
             ],
             vec![('A', 0), ('Z', 2)],
+            /*
             vec![
                 (
                     'A',
@@ -861,6 +935,8 @@ mod tests {
                     vec![('Z', FixWord::ONE * 3), ('B', FixWord::ZERO)]
                 ),
             ],
+             */
+            vec![],
         ),
     );
 }
