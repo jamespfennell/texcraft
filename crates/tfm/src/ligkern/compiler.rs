@@ -49,7 +49,7 @@ struct OngoingCalculation {
 #[derive(Clone, Debug)]
 struct C {
     c: Char,
-    o: Option<Rc<str>>,  // TODO: is_lig, consumers_left, consumes_right
+    o: Option<Rc<str>>, // TODO: is_lig, consumers_left, consumes_right
 }
 
 impl OngoingCalculation {
@@ -58,12 +58,14 @@ impl OngoingCalculation {
     }
 }
 
+/*
 // TODO: destroy this in favor of C
 #[derive(Debug, Clone)]
 enum LigOrChar {
     Lig(Char, Rc<str>),
     Char(Char),
 }
+ */
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
 enum LeftChar {
@@ -318,8 +320,14 @@ fn calculate_replacements(
                     None => IntermediateOp::Char(left.c),
                 });
                 match right.o {
-                    Some(o) => LigOrChar::Lig(right.c, o),
-                    None => LigOrChar::Char(right.c),
+                    Some(o) => C {
+                        c: right.c,
+                        o: Some(o),
+                    },
+                    None => C {
+                        c: right.c,
+                        o: None,
+                    },
                 }
             }
             Some(replacement) => {
@@ -333,8 +341,13 @@ fn calculate_replacements(
                 calc.finalized.extend_from_slice(&replacement.0);
                 match &replacement.1 {
                     // TerminalOp::RightChar => LigOrChar::Char(child.1),
-                    TerminalOp::Char(char) => LigOrChar::Char(*char),
-                    TerminalOp::Lig(char, s) => LigOrChar::Lig(*char, s.clone()),
+                    TerminalOp::Char(char) => C { c: *char, o: None },
+                    // LigOrChar::Char(*char),
+                    TerminalOp::Lig(char, s) => C {
+                        c: *char,
+                        o: Some(s.clone()),
+                    },
+                    //LigOrChar::Lig(*char, s.clone()),
                 }
             }
         };
@@ -347,9 +360,9 @@ fn calculate_replacements(
                     calc.node,
                     Replacement(
                         calc.finalized,
-                        match last_1 {
-                            LigOrChar::Lig(char, s) => TerminalOp::Lig(char, s),
-                            LigOrChar::Char(char) => TerminalOp::Char(char),
+                        match last_1.o {
+                            Some(s) => TerminalOp::Lig(last_1.c, s),
+                            None => TerminalOp::Char(last_1.c),
                         },
                     ),
                 );

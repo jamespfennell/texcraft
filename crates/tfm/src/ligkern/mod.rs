@@ -102,7 +102,7 @@ enum IntermediateOp {
     // Emit the char in the payload.
     Char(Char),
     Lig(Char, Rc<str>), // should have consumes_left, consumes_right ?
-    // Just embed compiler::C?
+                        // Just embed compiler::C?
 }
 
 // TODO? replace with compiler::C
