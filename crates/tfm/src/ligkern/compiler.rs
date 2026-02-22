@@ -49,7 +49,7 @@ struct OngoingCalculation {
 #[derive(Clone, Debug)]
 struct C {
     c: Char,
-    o: Option<Rc<str>>,
+    o: Option<Rc<str>>,  // TODO: is_lig, consumers_left, consumes_right
 }
 
 impl OngoingCalculation {
@@ -58,7 +58,7 @@ impl OngoingCalculation {
     }
 }
 
-// TODO: destroy this or C
+// TODO: destroy this in favor of C
 #[derive(Debug, Clone)]
 enum LigOrChar {
     Lig(Char, Rc<str>),
@@ -166,7 +166,7 @@ fn calculate_replacements(
             }
             operation => operation,
         };
-        let (finalized_new, new_pending): (Vec<IntermediateOp>, Vec<C>) = match operation {
+        let (finalized, pending): (Vec<IntermediateOp>, Vec<C>) = match operation {
             lang::Operation::Kern(kern) => {
                 new_result.insert(
                     pair,
@@ -291,11 +291,11 @@ fn calculate_replacements(
                 }
             },
         };
-        if !new_pending.is_empty() {
+        if !pending.is_empty() {
             actionable.push(OngoingCalculation {
                 node: pair,
-                finalized: finalized_new,
-                pending: new_pending,
+                finalized,
+                pending,
             });
             node_to_parents.insert(pair, vec![]);
         }

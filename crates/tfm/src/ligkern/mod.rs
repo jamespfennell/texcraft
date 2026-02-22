@@ -81,7 +81,6 @@ mod compiler;
 use crate::ligkern::compiler::Replacement;
 use crate::Char;
 use crate::FixWord;
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::rc::Rc;
 pub mod lang;
@@ -103,8 +102,10 @@ enum IntermediateOp {
     // Emit the char in the payload.
     Char(Char),
     Lig(Char, Rc<str>), // should have consumes_left, consumes_right ?
+    // Just embed compiler::C?
 }
 
+// TODO? replace with compiler::C
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum TerminalOp {
     Char(Char),
