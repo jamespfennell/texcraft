@@ -50,6 +50,8 @@ struct OngoingCalculation {
 struct C {
     c: Char,
     is_lig: bool,
+    consumes_left: bool,
+    consumes_right: bool,
     o: Option<Rc<str>>, // TODO: is_lig, consumers_left, consumes_right
 }
 
@@ -205,16 +207,22 @@ fn calculate_replacements(
                         C {
                             c: left.try_into().unwrap(),
                             is_lig: false,
+                            consumes_left: false,
+                            consumes_right: false,
                             o: None,
                         },
                         C {
                             c: char_to_insert,
                             is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
                             o: Some("".into()),
                         },
                         C {
                             c: right,
                             is_lig: false,
+                            consumes_left: false,
+                            consumes_right: false,
                             o: None,
                         },
                     ],
@@ -225,11 +233,15 @@ fn calculate_replacements(
                         C {
                             c: char_to_insert,
                             is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
                             o: Some("".into()),
                         },
                         C {
                             c: right,
                             is_lig: false,
+                            consumes_left: false,
+                            consumes_right: false,
                             o: None,
                         },
                     ],
@@ -247,11 +259,15 @@ fn calculate_replacements(
                         C {
                             c: char_to_insert,
                             is_lig: true,
+                            consumes_left: true,
+                            consumes_right: false,
                             o: Some(format!("{left}").into()),
                         },
                         C {
                             c: right,
                             is_lig: false,
+                            consumes_left: false,
+                            consumes_right: false,
                             o: None,
                         },
                     ],
@@ -281,11 +297,15 @@ fn calculate_replacements(
                         C {
                             c: left.try_into().unwrap(),
                             is_lig: false,
+                            consumes_left: false,
+                            consumes_right: false,
                             o: None,
                         },
                         C {
                             c: char_to_insert,
                             is_lig: true,
+                            consumes_left: false,
+                            consumes_right: true,
                             o: Some(format!("{right}").into()),
                         },
                     ],
@@ -338,19 +358,24 @@ fn calculate_replacements(
                     Some(o) => IntermediateOp::Lig(left.c, o),
                     None => IntermediateOp::Char(left.c),
                 });
+                right
+                /*
                 // TODO: can replace the match with `right`
                 match right.o {
                     Some(o) => C {
                         c: right.c,
                         is_lig: true,
+                        consumes_left: right.consumes_left,
                         o: Some(o),
                     },
                     None => C {
                         c: right.c,
                         is_lig: false,
+                        consumes_left: right.consumes_left,
                         o: None,
                     },
                 }
+                 */
             }
             Some(replacement) => {
                 println!("FINALIZING FOR node={:?}", calc.node);
@@ -366,12 +391,16 @@ fn calculate_replacements(
                     TerminalOp::Char(char) => C {
                         c: *char,
                         is_lig: false,
+                        consumes_left: false,
+                        consumes_right: false,
                         o: None,
                     },
                     // LigOrChar::Char(*char),
                     TerminalOp::Lig(char, s) => C {
                         c: *char,
                         is_lig: true,
+                        consumes_left: false, // TODO!
+                        consumes_right: false,  // TODO!
                         o: Some(s.clone()),
                     },
                     //LigOrChar::Lig(*char, s.clone()),
