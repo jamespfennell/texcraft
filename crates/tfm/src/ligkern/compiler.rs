@@ -49,6 +49,7 @@ struct OngoingCalculation {
 #[derive(Clone, Debug)]
 struct C {
     c: Char,
+    is_lig: bool,
     o: Option<Rc<str>>, // TODO: is_lig, consumers_left, consumes_right
 }
 
@@ -203,13 +204,19 @@ fn calculate_replacements(
                     vec![
                         C {
                             c: left.try_into().unwrap(),
+                            is_lig: false,
                             o: None,
                         },
                         C {
                             c: char_to_insert,
+                            is_lig: true,
                             o: Some("".into()),
                         },
-                        C { c: right, o: None },
+                        C {
+                            c: right,
+                            is_lig: false,
+                            o: None,
+                        },
                     ],
                 ),
                 lang::PostLigOperation::RetainBothMoveToInserted => (
@@ -217,9 +224,14 @@ fn calculate_replacements(
                     vec![
                         C {
                             c: char_to_insert,
+                            is_lig: true,
                             o: Some("".into()),
                         },
-                        C { c: right, o: None },
+                        C {
+                            c: right,
+                            is_lig: false,
+                            o: None,
+                        },
                     ],
                 ),
                 lang::PostLigOperation::RetainBothMoveToRight => (
@@ -234,9 +246,14 @@ fn calculate_replacements(
                     vec![
                         C {
                             c: char_to_insert,
+                            is_lig: true,
                             o: Some(format!("{left}").into()),
                         },
-                        C { c: right, o: None },
+                        C {
+                            c: right,
+                            is_lig: false,
+                            o: None,
+                        },
                     ],
                 ),
                 lang::PostLigOperation::RetainRightMoveToRight => {
@@ -263,10 +280,12 @@ fn calculate_replacements(
                     vec![
                         C {
                             c: left.try_into().unwrap(),
+                            is_lig: false,
                             o: None,
                         },
                         C {
                             c: char_to_insert,
+                            is_lig: true,
                             o: Some(format!("{right}").into()),
                         },
                     ],
@@ -319,13 +338,16 @@ fn calculate_replacements(
                     Some(o) => IntermediateOp::Lig(left.c, o),
                     None => IntermediateOp::Char(left.c),
                 });
+                // TODO: can replace the match with `right`
                 match right.o {
                     Some(o) => C {
                         c: right.c,
+                        is_lig: true,
                         o: Some(o),
                     },
                     None => C {
                         c: right.c,
+                        is_lig: false,
                         o: None,
                     },
                 }
@@ -341,10 +363,15 @@ fn calculate_replacements(
                 calc.finalized.extend_from_slice(&replacement.0);
                 match &replacement.1 {
                     // TerminalOp::RightChar => LigOrChar::Char(child.1),
-                    TerminalOp::Char(char) => C { c: *char, o: None },
+                    TerminalOp::Char(char) => C {
+                        c: *char,
+                        is_lig: false,
+                        o: None,
+                    },
                     // LigOrChar::Char(*char),
                     TerminalOp::Lig(char, s) => C {
                         c: *char,
+                        is_lig: true,
                         o: Some(s.clone()),
                     },
                     //LigOrChar::Lig(*char, s.clone()),
