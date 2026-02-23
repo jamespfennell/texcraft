@@ -100,9 +100,7 @@ enum IntermediateOp {
     // Emit the left char.
     LeftChar,
     // Emit the char in the payload.
-    Char(Char),
-    Lig(Char, Rc<str>), // should have consumes_left, consumes_right ?
-                        // Just embed compiler::C?
+    C(compiler::C),
 }
 
 /*
@@ -271,7 +269,13 @@ impl CompiledProgram {
                                     emitter.emit_character(left);
                                 }
                             },
-                            IntermediateOp::Char(char) => match lig_pieces.take() {
+                            IntermediateOp::C(compiler::C {
+                                c: char,
+                                is_lig,
+                                consumes_left,
+                                consumes_right,
+                                o: None,
+                            }) => match lig_pieces.take() {
                                 Some(l) => {
                                     emitter.emit_ligature((*char).into(), l.into());
                                 }
@@ -279,7 +283,13 @@ impl CompiledProgram {
                                     emitter.emit_character((*char).into());
                                 }
                             },
-                            IntermediateOp::Lig(char, a) => {
+                            IntermediateOp::C(compiler::C {
+                                c: char,
+                                is_lig,
+                                consumes_left,
+                                consumes_right,
+                                o: Some(a),
+                            }) => {
                                 let mut s = lig_pieces.take().unwrap_or_default();
                                 s.push_str(&a);
                                 emitter.emit_ligature((*char).into(), s.into());
@@ -287,9 +297,6 @@ impl CompiledProgram {
                         }
                     }
                     match &replacement.1.o {
-                        //TerminalOp::RightChar => {
-                        //  left = right;
-                        //}
                         None => {
                             left = (replacement.1.c).into();
                         }

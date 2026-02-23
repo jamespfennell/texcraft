@@ -252,7 +252,13 @@ fn calculate_replacements(
                 lang::PostLigOperation::RetainBothMoveToRight => (
                     vec![
                         IntermediateOp::LeftChar,
-                        IntermediateOp::Lig(char_to_insert, "".into()),
+                        IntermediateOp::C(C {
+                            c: char_to_insert,
+                            is_lig: false,
+                            consumes_left: false,
+                            consumes_right: false,
+                            o: Some("".into()),
+                        }),
                     ],
                     vec![],
                 ),
@@ -279,18 +285,30 @@ fn calculate_replacements(
                     new_result.insert(
                         pair,
                         Replacement(
-                            vec![IntermediateOp::Lig(
-                                char_to_insert,
-                                format!("{left}").into(),
-                            )],
+                            vec![
+                                IntermediateOp::C(C {
+                                    c: char_to_insert,
+                                    is_lig: true,
+                                    consumes_left: true,
+                                    consumes_right: false,
+                                    o: Some(format!("{left}").into()),
+                                }),
+                                //      IntermediateOp::Lig(
+                                // char_to_insert,
+                                //   format!("{left}").into(),
+                                // )
+                            ],
                             C::char(right),
                         ),
                     );
                     (
-                        vec![IntermediateOp::Lig(
-                            char_to_insert,
-                            format!("{left}").into(),
-                        )],
+                        vec![IntermediateOp::C(C {
+                            c: char_to_insert,
+                            is_lig: true,
+                            consumes_left: true,
+                            consumes_right: false,
+                            o: Some(format!("{left}").into()),
+                        })],
                         vec![],
                     )
                 }
@@ -371,28 +389,8 @@ fn calculate_replacements(
                 // There is no lig/kern rule for this pair.
                 let left = calc.pending[0].clone();
                 let right = calc.pending[1].clone();
-                calc.finalized.push(match left.o {
-                    Some(o) => IntermediateOp::Lig(left.c, o),
-                    None => IntermediateOp::Char(left.c),
-                });
+                calc.finalized.push(IntermediateOp::C(left));
                 right
-                /*
-                // TODO: can replace the match with `right`
-                match right.o {
-                    Some(o) => C {
-                        c: right.c,
-                        is_lig: true,
-                        consumes_left: right.consumes_left,
-                        o: Some(o),
-                    },
-                    None => C {
-                        c: right.c,
-                        is_lig: false,
-                        consumes_left: right.consumes_left,
-                        o: None,
-                    },
-                }
-                 */
             }
             Some(replacement) => {
                 println!("FINALIZING FOR node={:?}", calc.node);
