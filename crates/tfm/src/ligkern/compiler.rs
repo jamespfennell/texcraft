@@ -46,13 +46,25 @@ struct OngoingCalculation {
     pending: Vec<C>,
 }
 
-#[derive(Clone, Debug)]
-struct C {
-    c: Char,
-    is_lig: bool,
-    consumes_left: bool,
-    consumes_right: bool,
-    o: Option<Rc<str>>, // TODO: is_lig, consumers_left, consumes_right
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct C {
+    pub c: Char,
+    pub is_lig: bool,
+    pub consumes_left: bool,
+    pub consumes_right: bool,
+    pub o: Option<Rc<str>>,
+}
+
+impl C {
+    fn char(c: Char) -> Self {
+        Self {
+            c,
+            is_lig: false,
+            consumes_left: false,
+            consumes_right: false,
+            o: None,
+        }
+    }
 }
 
 impl OngoingCalculation {
@@ -60,15 +72,6 @@ impl OngoingCalculation {
         Node(self.pending[0].c.into(), self.pending[1].c.into())
     }
 }
-
-/*
-// TODO: destroy this in favor of C
-#[derive(Debug, Clone)]
-enum LigOrChar {
-    Lig(Char, Rc<str>),
-    Char(Char),
-}
- */
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
 enum LeftChar {
@@ -149,7 +152,7 @@ fn build_node_to_program_start_map(
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Replacement(pub Vec<IntermediateOp>, pub TerminalOp);
+pub(crate) struct Replacement(pub(crate) Vec<IntermediateOp>, pub C);
 
 fn calculate_replacements(
     program: &lang::Program,
@@ -177,7 +180,7 @@ fn calculate_replacements(
                     pair,
                     Replacement(
                         vec![IntermediateOp::LeftChar, IntermediateOp::Kern(kern)],
-                        TerminalOp::Char(right),
+                        C::char(right),
                     ),
                 );
                 continue;
@@ -188,7 +191,7 @@ fn calculate_replacements(
                     pair,
                     Replacement(
                         vec![IntermediateOp::LeftChar, IntermediateOp::Kern(kern)],
-                        TerminalOp::Char(right),
+                        C::char(right),
                     ),
                 );
                 continue;
@@ -280,7 +283,7 @@ fn calculate_replacements(
                                 char_to_insert,
                                 format!("{left}").into(),
                             )],
-                            TerminalOp::Char(right),
+                            C::char(right),
                         ),
                     );
                     (
@@ -315,7 +318,14 @@ fn calculate_replacements(
                         pair,
                         Replacement(
                             vec![IntermediateOp::LeftChar],
-                            TerminalOp::Lig(char_to_insert, format!("{right}").into()),
+                            C {
+                                c: char_to_insert,
+                                is_lig: true,
+                                consumes_left: false,
+                                consumes_right: true,
+                                o: Some(format!("{right}").into()),
+                            },
+                            // TerminalOp::Lig(, ),
                         ),
                     );
                     (vec![IntermediateOp::LeftChar], vec![])
@@ -325,7 +335,14 @@ fn calculate_replacements(
                         pair,
                         Replacement(
                             vec![],
-                            TerminalOp::Lig(char_to_insert, format!("{left}{right}").into()),
+                            C {
+                                c: char_to_insert,
+                                is_lig: true,
+                                consumes_left: true,
+                                consumes_right: true,
+                                o: Some(format!("{left}{right}").into()),
+                            },
+                            // TerminalOp::Lig(char_to_insert, format!("{left}{right}").into()),
                         ),
                     );
                     (vec![], vec![])
@@ -386,9 +403,11 @@ fn calculate_replacements(
                 // with calc.new_pending[0] and calc.new_pending[1] - either the char
                 // or the content of the ligature
                 calc.finalized.extend_from_slice(&replacement.0);
+                replacement.1.clone()
+                /*
                 match &replacement.1 {
                     // TerminalOp::RightChar => LigOrChar::Char(child.1),
-                    TerminalOp::Char(char) => C {
+                    C::char(char) => C {
                         c: *char,
                         is_lig: false,
                         consumes_left: false,
@@ -405,6 +424,7 @@ fn calculate_replacements(
                     },
                     //LigOrChar::Lig(*char, s.clone()),
                 }
+                 */
             }
         };
         match calc.pending.get(2) {
@@ -416,10 +436,13 @@ fn calculate_replacements(
                     calc.node,
                     Replacement(
                         calc.finalized,
+                        last_1,
+                        /*
                         match last_1.o {
                             Some(s) => TerminalOp::Lig(last_1.c, s),
-                            None => TerminalOp::Char(last_1.c),
+                            None => C::char(last_1.c),
                         },
+                         */
                     ),
                 );
             }
@@ -535,7 +558,7 @@ mod tests {
     fn run_success_test(
         instructions: Vec<lang::Instruction>,
         entry_points: Vec<(char, u16)>,
-        want_new: Vec<(char, char, Vec<IntermediateOp>, TerminalOp)>,
+        want_new: Vec<(char, char, Vec<IntermediateOp>, C)>,
     ) {
         let entry_points: HashMap<Char, u16> = entry_points
             .into_iter()
@@ -592,7 +615,7 @@ mod tests {
                 'A',
                 'V',
                 vec![IntermediateOp::LeftChar, IntermediateOp::Kern(FixWord::ONE)],
-                TerminalOp::Char(Char::V),
+                C::char(Char::V),
             )],
         ),
         (
@@ -604,13 +627,13 @@ mod tests {
                     'A',
                     'V',
                     vec![IntermediateOp::LeftChar, IntermediateOp::Kern(FixWord::ONE)],
-                    TerminalOp::Char(Char::V),
+                    C::char(Char::V),
                 ),
                 (
                     'B',
                     'V',
                     vec![IntermediateOp::LeftChar, IntermediateOp::Kern(FixWord::ONE)],
-                    TerminalOp::Char(Char::V),
+                    C::char(Char::V),
                 ),
             ],
         ),
@@ -628,7 +651,7 @@ mod tests {
                     IntermediateOp::LeftChar,
                     IntermediateOp::Kern(FixWord::ONE * 2)
                 ],
-                TerminalOp::Char(Char::V),
+                C::char(Char::V),
             ),],
         ),
         (
@@ -647,7 +670,7 @@ mod tests {
                         IntermediateOp::LeftChar,
                         IntermediateOp::Kern(FixWord::ONE * 2)
                     ],
-                    TerminalOp::Char(Char::V),
+                    C::char(Char::V),
                 ),
                 (
                     'A',
@@ -656,7 +679,7 @@ mod tests {
                         IntermediateOp::LeftChar,
                         IntermediateOp::Kern(FixWord::ONE * 3)
                     ],
-                    TerminalOp::Char(Char::W),
+                    C::char(Char::W),
                 ),
                 (
                     'B',
@@ -665,7 +688,7 @@ mod tests {
                         IntermediateOp::LeftChar,
                         IntermediateOp::Kern(FixWord::ONE * 3)
                     ],
-                    TerminalOp::Char(Char::W),
+                    C::char(Char::W),
                 ),
                 (
                     'C',
@@ -674,7 +697,7 @@ mod tests {
                         IntermediateOp::LeftChar,
                         IntermediateOp::Kern(FixWord::ONE * 4)
                     ],
-                    TerminalOp::Char(Char::X),
+                    C::char(Char::X),
                 ),
             ],
         ),
@@ -682,7 +705,21 @@ mod tests {
             single_lig_1,
             vec![new_lig(None, 'B', 'Z', RetainNeitherMoveToInserted)],
             vec![('A', 0)],
-            vec![('A', 'B', vec![], TerminalOp::Lig(Char::Z, "AB".into())),],
+            vec![
+                (
+                    'A',
+                    'B',
+                    vec![],
+                    C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: true,
+                        consumes_right: true,
+                        o: Some("AB".into())
+                    }
+                ),
+                //TerminalOp::Lig(Char::Z,),
+            ],
         ),
         (
             single_lig_2,
@@ -696,13 +733,19 @@ mod tests {
                     'A',
                     'B',
                     vec![IntermediateOp::LeftChar,],
-                    TerminalOp::Lig(Char::Z, "B".into()),
+                    C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: false,
+                        consumes_right: true,
+                        o: Some("B".into())
+                    }
                 ),
                 (
                     'A',
                     'Z',
                     vec![IntermediateOp::LeftChar, IntermediateOp::Kern(FixWord::ONE)],
-                    TerminalOp::Char(Char::Z),
+                    C::char(Char::Z),
                 ),
             ],
         ),
@@ -718,13 +761,19 @@ mod tests {
                     'A',
                     'B',
                     vec![IntermediateOp::LeftChar, IntermediateOp::Kern(FixWord::ONE),],
-                    TerminalOp::Lig(Char::Z, "B".into())
+                    C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: false,
+                        consumes_right: true,
+                        o: Some("B".into())
+                    }
                 ),
                 (
                     'A',
                     'Z',
                     vec![IntermediateOp::LeftChar, IntermediateOp::Kern(FixWord::ONE),],
-                    TerminalOp::Char(Char::Z),
+                    C::char(Char::Z),
                 ),
             ],
         ),

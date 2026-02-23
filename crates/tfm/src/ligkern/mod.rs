@@ -105,12 +105,14 @@ enum IntermediateOp {
                         // Just embed compiler::C?
 }
 
+/*
 // TODO? replace with compiler::C
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum TerminalOp {
     Char(Char),
     Lig(Char, Rc<str>),
 }
+ */
 
 // replacement is a series of IntermediateOps and a TerminalOp
 
@@ -198,7 +200,11 @@ impl CompiledProgram {
         CompiledProgram::compile(&tfm_file.lig_kern_program, &tfm_file.kerns, entrypoints)
     }
 
-    pub fn get_replacement_utf8(&self, left_char: char, right_char: char) -> Option<&Replacement> {
+    pub(crate) fn get_replacement_utf8(
+        &self,
+        left_char: char,
+        right_char: char,
+    ) -> Option<&Replacement> {
         let Ok(left_char) = left_char.try_into() else {
             return None;
         };
@@ -280,15 +286,15 @@ impl CompiledProgram {
                             }
                         }
                     }
-                    match &replacement.1 {
+                    match &replacement.1.o {
                         //TerminalOp::RightChar => {
                         //  left = right;
                         //}
-                        TerminalOp::Char(char) => {
-                            left = (*char).into();
+                        None => {
+                            left = (replacement.1.c).into();
                         }
-                        TerminalOp::Lig(char, a) => {
-                            left = (*char).into();
+                        Some(a) => {
+                            left = (replacement.1.c).into();
                             let mut s = lig_pieces.take().unwrap_or_default();
                             s.push_str(&a);
                             lig_pieces = Some(s);
