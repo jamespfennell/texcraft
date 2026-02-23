@@ -400,6 +400,7 @@ fn calculate_replacements(
                 // we need to iterate over the Replacement value and replace char or lig originals
                 // with calc.new_pending[0] and calc.new_pending[1] - either the char
                 // or the content of the ligature
+                
                 calc.finalized.extend_from_slice(&replacement.0);
                 replacement.1.clone()
                 /*
@@ -789,13 +790,36 @@ mod tests {
                 new_kern(None, 'B', FixWord::ONE),
             ],
             vec![('A', 0), ('Z', 1)],
-            /*
             vec![
-                ('A', 'B', vec![('Z', FixWord::ONE), ('B', FixWord::ZERO)]),
-                ('Z', 'B', vec![('Z', FixWord::ONE), ('B', FixWord::ZERO)]),
+                (
+                    'A',
+                    'B',
+                    vec![
+                        IntermediateOp::C(C {
+                            c: Char::Z,
+                            is_lig: true,
+                            consumes_left: true,
+                            consumes_right: false,
+                            o: Some("A".into())
+                        }),
+                        IntermediateOp::Kern(FixWord::ONE),
+                    ],
+                    // C{},
+                    C::char(Char::B),
+                    //    vec![('Z', FixWord::ONE), ('B', FixWord::ZERO)]
+                    //   left: {(Char(65), Char(66)): Replacement([LeftChar, Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None }), 
+                    //  right: {(Char(65), Char(66)): Replacement([C(C { c: Char(90), is_lig: true, consumes_left: true, consumes_right: false, o: Some("A") }), Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None }), 
+                    // (Char(90), Char(66)): Replacement([LeftChar, Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None })}
+                    // (Char(90), Char(66)): Replacement([LeftChar, Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None })}
+                ),
+                (
+                    'Z',
+                    'B',
+                    vec![IntermediateOp::LeftChar, IntermediateOp::Kern(FixWord::ONE),],
+                    C::char(Char::B),
+                    // vec![('Z', FixWord::ONE), ('B', FixWord::ZERO)]
+                ),
             ],
-             */
-            vec![],
         ),
         (
             single_lig_5,
