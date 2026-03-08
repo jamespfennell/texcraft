@@ -1135,25 +1135,33 @@ mod tests {
                 new_lig(None, 'B', 'Y', RetainRightMoveToRight),
             ],
             vec![('A', 0), ('Z', 1)],
-            /*
             vec![
                 (
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Y', FixWord::ZERO),
-                        ('B', FixWord::ZERO)
-                    ]
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Y,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                    ],
+                    C::char(Char::B, false),
                 ),
                 (
                     'Z',
                     'B',
-                    vec![('Y', FixWord::ZERO * 3), ('B', FixWord::ZERO)]
+                    vec![IntermediateOp::C(C {
+                        c: Char::Y,
+                        is_lig: true,
+                        consumes_left: true,
+                        consumes_right: false,
+                    }),],
+                    C::char(Char::B, false),
                 ),
             ],
-             */
-            vec![],
         ),
         (
             retain_both_move_to_right_1,
