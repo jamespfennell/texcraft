@@ -809,8 +809,17 @@ mod tests {
             retain_left_move_nowhere_2,
             vec![new_lig(None, 'B', 'Z', RetainLeftMoveNowhere),],
             vec![('A', 0)],
-            // vec![('A', 'B', vec![('A', FixWord::ZERO), ('Z', FixWord::ZERO)]),],
-            vec![],
+            vec![(
+                'A',
+                'B',
+                vec![IntermediateOp::C(C::char(Char::A, true)),],
+                C {
+                    c: Char::Z,
+                    is_lig: true,
+                    consumes_left: false,
+                    consumes_right: true,
+                }
+            ),],
         ),
         (
             single_lig_4,
