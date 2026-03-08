@@ -97,8 +97,6 @@ pub struct CompiledProgram {
 enum IntermediateOp {
     // Emit the kern.
     Kern(FixWord),
-    // Emit the left char.
-    LeftChar,
     // Emit the char in the payload.
     C(compiler::C),
 }
@@ -261,6 +259,7 @@ impl CompiledProgram {
                             IntermediateOp::Kern(fix_word) => {
                                 emitter.emit_kern(fix_word.to_scaled(FixWord::ONE * 10))
                             }
+                            /*
                             IntermediateOp::LeftChar => match lig_pieces.take() {
                                 Some(l) => {
                                     emitter.emit_ligature(left, l.into());
@@ -269,6 +268,7 @@ impl CompiledProgram {
                                     emitter.emit_character(left);
                                 }
                             },
+                             */
                             IntermediateOp::C(compiler::C {
                                 c: char,
                                 is_lig,
