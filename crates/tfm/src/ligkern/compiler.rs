@@ -68,6 +68,7 @@ impl C {
         match (self.consumes_left, self.consumes_right) {
             (true, true) => C {
                 c: self.c,
+                // TODO: should we have the self.is_lig here?
                 is_lig: self.is_lig || left.is_lig || right.is_lig,
                 consumes_left: left.consumes_left || right.consumes_left,
                 consumes_right: left.consumes_right || right.consumes_right,
@@ -976,20 +977,6 @@ mod tests {
                     C::char(Char::B, false),
                 ),
             ],
-            /*
-            vec![
-                (
-                    'A',
-                    'B',
-                    vec![
-                        ('A', FixWord::ZERO),
-                        ('Y', FixWord::ZERO),
-                        ('B', FixWord::ZERO)
-                    ]
-                ),
-                ('Z', 'B', vec![('Y', FixWord::ZERO), ('B', FixWord::ZERO),]),
-            ],
-             */
         ),
         (
             retain_both_move_nowhere_4,
@@ -998,7 +985,51 @@ mod tests {
                 new_lig(None, 'Z', 'Y', RetainBothMoveToRight),
             ],
             vec![('A', 0)],
+            vec![
+                (
+                    'A',
+                    'B',
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Y,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                        IntermediateOp::C(C {
+                            c: Char::Z,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                    ],
+                    C::char(Char::B, false),
+                ),
+                (
+                    'A',
+                    'Z',
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Y,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                    ],
+                    C {
+                        c: Char::Z,
+                        is_lig: false,
+                        consumes_left: false,
+                        consumes_right: true,
+                    }
+                ),
+            ],
             /*
+              left:
+                (Char(65), Char(90)): Replacement([C(C { c: Char(65), is_lig: false, consumes_left: true, consumes_right: false }), C(C { c: Char(89), is_lig: true, consumes_left: false, consumes_right: false })], C { c: Char(90), is_lig: false, consumes_left: false, consumes_right: true })}
+                (Char(65), Char(90)): Replacement([C(C { c: Char(65), is_lig: false, consumes_left: true, consumes_right: false }), C(C { c: Char(89), is_lig: true, consumes_left: false, consumes_right: false })], C { c: Char(90), is_lig: true, consumes_left: false, consumes_right: true })}
             vec![
                 (
                     'A',
@@ -1021,7 +1052,6 @@ mod tests {
                 ),
             ],
              */
-            vec![],
         ),
         (
             retain_both_move_to_inserted_1,
