@@ -69,20 +69,20 @@ impl C {
             (true, true) => C {
                 c: self.c,
                 is_lig: self.is_lig || left.is_lig || right.is_lig,
-                consumes_left: self.consumes_left || left.consumes_left || right.consumes_left,
-                consumes_right: self.consumes_right || left.consumes_right || right.consumes_right,
+                consumes_left: left.consumes_left || right.consumes_left,
+                consumes_right: left.consumes_right || right.consumes_right,
             },
             (true, false) => C {
                 c: self.c,
                 is_lig: self.is_lig || left.is_lig,
-                consumes_left: self.consumes_left || left.consumes_left,
-                consumes_right: self.consumes_right || left.consumes_right,
+                consumes_left: left.consumes_left,
+                consumes_right: left.consumes_right,
             },
             (false, true) => C {
                 c: self.c,
                 is_lig: self.is_lig || right.is_lig,
-                consumes_left: self.consumes_left || right.consumes_left,
-                consumes_right: self.consumes_right || right.consumes_right,
+                consumes_left: right.consumes_left,
+                consumes_right: right.consumes_right,
             },
             (false, false) => self.clone(),
         }
@@ -886,31 +886,53 @@ mod tests {
                 new_kern(None, 'B', FixWord::ONE * 3),
             ],
             vec![('A', 0), ('Z', 2)],
-            /*
             vec![
                 (
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ONE * 2),
-                        ('Z', FixWord::ONE * 3),
-                        ('B', FixWord::ZERO)
-                    ]
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 2),
+                        IntermediateOp::C(C {
+                            c: Char::Z,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                        IntermediateOp::Kern(FixWord::ONE * 3),
+                    ],
+                    C::char(Char::B, false),
                 ),
                 (
                     'A',
                     'Z',
-                    vec![('A', FixWord::ONE * 2), ('Z', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 2),
+                    ],
+                    C::char(Char::Z, false),
                 ),
                 (
                     'Z',
                     'B',
-                    vec![('Z', FixWord::ONE * 3), ('B', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::Z, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 3),
+                    ],
+                    C::char(Char::B, false),
                 ),
             ],
-             */
-            vec![],
         ),
+        /*
+          left: 
+          {
+            (Char(90), Char(66)): Replacement([C(C { c: Char(90), is_lig: false, consumes_left: true, consumes_right: false }), Kern(FixWord(3145728))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: true }), 
+            (Char(90), Char(66)): Replacement([C(C { c: Char(90), is_lig: false, consumes_left: true, consumes_right: false }), Kern(FixWord(3145728))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: true })}
+
+            (Char(65), Char(66)): Replacement([C(C { c: Char(65), is_lig: false, consumes_left: true, consumes_right: false }), Kern(FixWord(2097152)), C(C { c: Char(90), is_lig: true, consumes_left: true, consumes_right: false }), Kern(FixWord(3145728))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: true })}
+ right: {
+            (Char(65), Char(66)): Replacement([C(C { c: Char(65), is_lig: false, consumes_left: true, consumes_right: false }), Kern(FixWord(2097152)), C(C { c: Char(90), is_lig: true, consumes_left: false, consumes_right: false }), Kern(FixWord(3145728))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: true }),
+         */
         (
             retain_both_move_nowhere_2,
             vec![new_lig(None, 'B', 'Z', RetainBothMoveNowhere),],
