@@ -1171,30 +1171,40 @@ mod tests {
                 new_kern(None, 'B', FixWord::ONE * 3),
             ],
             vec![('A', 0), ('Z', 2)],
-            /*
             vec![
                 (
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Z', FixWord::ZERO),
-                        ('B', FixWord::ZERO)
-                    ]
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Z,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                    ],
+                    C::char(Char::B, false),
                 ),
                 (
                     'A',
                     'Z',
-                    vec![('A', FixWord::ONE * 2), ('Z', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 2),
+                    ],
+                    C::char(Char::Z, false),
                 ),
                 (
                     'Z',
                     'B',
-                    vec![('Z', FixWord::ONE * 3), ('B', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::Z, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 3),
+                    ],
+                    C::char(Char::B, false),
                 ),
             ],
-             */
-            vec![],
         ),
     );
 }
