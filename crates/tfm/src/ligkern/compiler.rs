@@ -69,6 +69,9 @@ impl C {
             (true, true) => C {
                 c: self.c,
                 // TODO: should we have the self.is_lig here?
+                // I think it's correct: if any node in the provenance chain is a lig,
+                // then the result should be a lig.
+                // Test this by removing it and seeing if unit tests pass.
                 is_lig: self.is_lig || left.is_lig || right.is_lig,
                 consumes_left: left.consumes_left || right.consumes_left,
                 consumes_right: left.consumes_right || right.consumes_right,
@@ -1026,32 +1029,6 @@ mod tests {
                     }
                 ),
             ],
-            /*
-              left:
-                (Char(65), Char(90)): Replacement([C(C { c: Char(65), is_lig: false, consumes_left: true, consumes_right: false }), C(C { c: Char(89), is_lig: true, consumes_left: false, consumes_right: false })], C { c: Char(90), is_lig: false, consumes_left: false, consumes_right: true })}
-                (Char(65), Char(90)): Replacement([C(C { c: Char(65), is_lig: false, consumes_left: true, consumes_right: false }), C(C { c: Char(89), is_lig: true, consumes_left: false, consumes_right: false })], C { c: Char(90), is_lig: true, consumes_left: false, consumes_right: true })}
-            vec![
-                (
-                    'A',
-                    'B',
-                    vec![
-                        ('A', FixWord::ZERO),
-                        ('Y', FixWord::ZERO),
-                        ('Z', FixWord::ZERO),
-                        ('B', FixWord::ZERO)
-                    ]
-                ),
-                (
-                    'A',
-                    'Z',
-                    vec![
-                        ('A', FixWord::ZERO),
-                        ('Y', FixWord::ZERO),
-                        ('Z', FixWord::ZERO)
-                    ]
-                ),
-            ],
-             */
         ),
         (
             retain_both_move_to_inserted_1,
@@ -1061,30 +1038,41 @@ mod tests {
                 new_kern(None, 'B', FixWord::ONE * 3),
             ],
             vec![('A', 0), ('Z', 2)],
-            /*
             vec![
                 (
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Z', FixWord::ONE * 3),
-                        ('B', FixWord::ZERO)
-                    ]
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Z,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                        IntermediateOp::Kern(FixWord::ONE * 3),
+                    ],
+                    C::char(Char::B, false),
                 ),
                 (
                     'A',
                     'Z',
-                    vec![('A', FixWord::ONE * 2), ('Z', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 2),
+                    ],
+                    C::char(Char::Z, false),
                 ),
                 (
                     'Z',
                     'B',
-                    vec![('Z', FixWord::ONE * 3), ('B', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::Z, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 3),
+                    ],
+                    C::char(Char::B, false),
                 ),
             ],
-             */
-            vec![],
         ),
         (
             retain_both_move_to_inserted_2,
