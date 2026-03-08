@@ -57,12 +57,12 @@ pub struct C {
 }
 
 impl C {
-    fn char(c: Char) -> Self {
+    fn char(c: Char, is_left_char: bool) -> Self {
         Self {
             c,
             is_lig: false,
-            consumes_left: false,
-            consumes_right: false,
+            consumes_left: is_left_char,
+            consumes_right: !is_left_char,
             o: None,
         }
     }
@@ -181,10 +181,10 @@ fn calculate_replacements(
                     pair,
                     Replacement(
                         vec![
-                            IntermediateOp::C(C::char(left.try_into().unwrap())),
+                            IntermediateOp::C(C::char(left.try_into().unwrap(), true)),
                             IntermediateOp::Kern(kern),
                         ],
-                        C::char(right),
+                        C::char(right, false),
                     ),
                 );
                 continue;
@@ -195,10 +195,10 @@ fn calculate_replacements(
                     pair,
                     Replacement(
                         vec![
-                            IntermediateOp::C(C::char(left.try_into().unwrap())),
+                            IntermediateOp::C(C::char(left.try_into().unwrap(), true)),
                             IntermediateOp::Kern(kern),
                         ],
-                        C::char(right),
+                        C::char(right, false),
                     ),
                 );
                 continue;
@@ -216,13 +216,7 @@ fn calculate_replacements(
                     vec![],
                     // pending
                     vec![
-                        C {
-                            c: left.try_into().unwrap(),
-                            is_lig: false,
-                            consumes_left: false,
-                            consumes_right: false,
-                            o: None,
-                        },
+                        C::char(left.try_into().unwrap(), true),
                         C {
                             c: char_to_insert,
                             is_lig: true,
@@ -230,24 +224,12 @@ fn calculate_replacements(
                             consumes_right: false,
                             o: Some("".into()),
                         },
-                        C {
-                            c: right,
-                            is_lig: false,
-                            consumes_left: false,
-                            consumes_right: false,
-                            o: None,
-                        },
+                        C::char(right.try_into().unwrap(), false),
                     ],
                 ),
                 lang::PostLigOperation::RetainBothMoveToInserted => (
                     // finalized
-                    vec![C {
-                        c: left.try_into().unwrap(),
-                        is_lig: false,
-                        consumes_left: false,
-                        consumes_right: false,
-                        o: None,
-                    }],
+                    vec![C::char(left.try_into().unwrap(), true)],
                     // pending
                     vec![
                         C {
@@ -257,19 +239,13 @@ fn calculate_replacements(
                             consumes_right: false,
                             o: Some("".into()),
                         },
-                        C {
-                            c: right,
-                            is_lig: false,
-                            consumes_left: false,
-                            consumes_right: false,
-                            o: None,
-                        },
+                        C::char(right.try_into().unwrap(), false),
                     ],
                 ),
                 lang::PostLigOperation::RetainBothMoveToRight => (
                     // finalized
                     vec![
-                        C::char(left.try_into().unwrap()),
+                        C::char(left.try_into().unwrap(), true),
                         C {
                             c: char_to_insert,
                             is_lig: true,
@@ -277,13 +253,7 @@ fn calculate_replacements(
                             consumes_right: false,
                             o: Some("".into()),
                         },
-                        C {
-                            c: right,
-                            is_lig: false,
-                            consumes_left: false,
-                            consumes_right: false,
-                            o: None,
-                        },
+                        C::char(right.try_into().unwrap(), false),
                     ],
                     // pending
                     vec![],
@@ -300,13 +270,7 @@ fn calculate_replacements(
                             consumes_right: false,
                             o: Some(format!("{left}").into()),
                         },
-                        C {
-                            c: right,
-                            is_lig: false,
-                            consumes_left: false,
-                            consumes_right: false,
-                            o: None,
-                        },
+                        C::char(right.try_into().unwrap(), false),
                     ],
                 ),
                 lang::PostLigOperation::RetainRightMoveToRight => (
@@ -319,7 +283,7 @@ fn calculate_replacements(
                             consumes_right: false,
                             o: Some(format!("{left}").into()),
                         },
-                        C::char(right),
+                        C::char(right.try_into().unwrap(), false),
                     ],
                     // pending
                     vec![],
@@ -329,13 +293,7 @@ fn calculate_replacements(
                     vec![],
                     // pending
                     vec![
-                        C {
-                            c: left.try_into().unwrap(),
-                            is_lig: false,
-                            consumes_left: false,
-                            consumes_right: false,
-                            o: None,
-                        },
+                        C::char(left.try_into().unwrap(), true),
                         C {
                             c: char_to_insert,
                             is_lig: true,
@@ -348,7 +306,7 @@ fn calculate_replacements(
                 lang::PostLigOperation::RetainLeftMoveToInserted => (
                     // finalized
                     vec![
-                        C::char(left.try_into().unwrap()),
+                        C::char(left.try_into().unwrap(), true),
                         C {
                             c: char_to_insert,
                             is_lig: true,
@@ -442,7 +400,7 @@ fn calculate_replacements(
                   left: {(Char(65), Char(66)): Replacement([C(C { c: Char(90), is_lig: false, consumes_left: false, consumes_right: false, o: None }), Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None }),
                          (Char(65), Char(66)): Replacement([C(C { c: Char(90), is_lig: true, consumes_left: true, consumes_right: false, o: Some("A") }), Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None })}
                         (Char(90), Char(66)): Replacement([C(C { c: Char(90), is_lig: false, consumes_left: false, consumes_right: false, o: None }), Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None })}
-                right: {(Char(90), Char(66)): Replacement([C(C { c: Char(90), is_lig: false, consumes_left: false, consumes_right: false, o: None }), Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None }), 
+                right: {(Char(90), Char(66)): Replacement([C(C { c: Char(90), is_lig: false, consumes_left: false, consumes_right: false, o: None }), Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None }),
                 match &replacement.1 {
                     // TerminalOp::RightChar => LigOrChar::Char(child.1),
                     C::char(char) => C {
@@ -653,10 +611,10 @@ mod tests {
                 'A',
                 'V',
                 vec![
-                    IntermediateOp::C(C::char(Char::A)),
+                    IntermediateOp::C(C::char(Char::A, true)),
                     IntermediateOp::Kern(FixWord::ONE)
                 ],
-                C::char(Char::V),
+                C::char(Char::V, false),
             )],
         ),
         (
@@ -668,19 +626,19 @@ mod tests {
                     'A',
                     'V',
                     vec![
-                        IntermediateOp::C(C::char(Char::A)),
+                        IntermediateOp::C(C::char(Char::A, true)),
                         IntermediateOp::Kern(FixWord::ONE)
                     ],
-                    C::char(Char::V),
+                    C::char(Char::V, false),
                 ),
                 (
                     'B',
                     'V',
                     vec![
-                        IntermediateOp::C(C::char(Char::B)),
+                        IntermediateOp::C(C::char(Char::B, true)),
                         IntermediateOp::Kern(FixWord::ONE)
                     ],
-                    C::char(Char::V),
+                    C::char(Char::V, false),
                 ),
             ],
         ),
@@ -695,10 +653,10 @@ mod tests {
                 'A',
                 'V',
                 vec![
-                    IntermediateOp::C(C::char(Char::A)),
+                    IntermediateOp::C(C::char(Char::A, true)),
                     IntermediateOp::Kern(FixWord::ONE * 2)
                 ],
-                C::char(Char::V),
+                C::char(Char::V, false),
             ),],
         ),
         (
@@ -714,37 +672,37 @@ mod tests {
                     'A',
                     'V',
                     vec![
-                        IntermediateOp::C(C::char(Char::A)),
+                        IntermediateOp::C(C::char(Char::A, true)),
                         IntermediateOp::Kern(FixWord::ONE * 2)
                     ],
-                    C::char(Char::V),
+                    C::char(Char::V, false),
                 ),
                 (
                     'A',
                     'W',
                     vec![
-                        IntermediateOp::C(C::char(Char::A)),
+                        IntermediateOp::C(C::char(Char::A, true)),
                         IntermediateOp::Kern(FixWord::ONE * 3)
                     ],
-                    C::char(Char::W),
+                    C::char(Char::W, false),
                 ),
                 (
                     'B',
                     'W',
                     vec![
-                        IntermediateOp::C(C::char(Char::B)),
+                        IntermediateOp::C(C::char(Char::B, true)),
                         IntermediateOp::Kern(FixWord::ONE * 3)
                     ],
-                    C::char(Char::W),
+                    C::char(Char::W, false),
                 ),
                 (
                     'C',
                     'X',
                     vec![
-                        IntermediateOp::C(C::char(Char::C)),
+                        IntermediateOp::C(C::char(Char::C, true)),
                         IntermediateOp::Kern(FixWord::ONE * 4)
                     ],
-                    C::char(Char::X),
+                    C::char(Char::X, false),
                 ),
             ],
         ),
@@ -779,7 +737,7 @@ mod tests {
                 (
                     'A',
                     'B',
-                    vec![IntermediateOp::C(C::char(Char::A)),],
+                    vec![IntermediateOp::C(C::char(Char::A, true)),],
                     C {
                         c: Char::Z,
                         is_lig: true,
@@ -792,10 +750,10 @@ mod tests {
                     'A',
                     'Z',
                     vec![
-                        IntermediateOp::C(C::char(Char::A)),
+                        IntermediateOp::C(C::char(Char::A, true)),
                         IntermediateOp::Kern(FixWord::ONE)
                     ],
-                    C::char(Char::Z),
+                    C::char(Char::Z, false),
                 ),
             ],
         ),
@@ -811,7 +769,7 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::A)),
+                        IntermediateOp::C(C::char(Char::A, true)),
                         IntermediateOp::Kern(FixWord::ONE),
                     ],
                     C {
@@ -826,10 +784,10 @@ mod tests {
                     'A',
                     'Z',
                     vec![
-                        IntermediateOp::C(C::char(Char::A)),
+                        IntermediateOp::C(C::char(Char::A, true)),
                         IntermediateOp::Kern(FixWord::ONE),
                     ],
-                    C::char(Char::Z),
+                    C::char(Char::Z, false),
                 ),
             ],
         ),
@@ -862,7 +820,7 @@ mod tests {
                         IntermediateOp::Kern(FixWord::ONE),
                     ],
                     // C{},
-                    C::char(Char::B),
+                    C::char(Char::B, false),
                     //    vec![('Z', FixWord::ONE), ('B', FixWord::ZERO)]
                     //   left: {(Char(65), Char(66)): Replacement([LeftChar, Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None }),
                     //  right: {(Char(65), Char(66)): Replacement([C(C { c: Char(90), is_lig: true, consumes_left: true, consumes_right: false, o: Some("A") }), Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None }),
@@ -873,10 +831,10 @@ mod tests {
                     'Z',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::Z)),
+                        IntermediateOp::C(C::char(Char::Z, true)),
                         IntermediateOp::Kern(FixWord::ONE),
                     ],
-                    C::char(Char::B),
+                    C::char(Char::B, false),
                     // vec![('Z', FixWord::ONE), ('B', FixWord::ZERO)]
                 ),
             ],
