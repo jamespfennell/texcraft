@@ -941,18 +941,6 @@ mod tests {
                 ],
                 C::char(Char::B, false),
             ),],
-            /*
-            vec![(
-                'A',
-                'B',
-                vec![
-                    ('A', FixWord::ZERO),
-                    ('Z', FixWord::ZERO),
-                    ('B', FixWord::ZERO)
-                ]
-            ),],
-             */
-            // vec![],
         ),
         (
             retain_both_move_nowhere_3,
@@ -961,6 +949,33 @@ mod tests {
                 new_lig(None, 'B', 'Y', RetainRightMoveToRight),
             ],
             vec![('A', 0), ('Z', 1)],
+            vec![
+                (
+                    'A',
+                    'B',
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Y,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                    ],
+                    C::char(Char::B, false),
+                ),
+                (
+                    'Z',
+                    'B',
+                    vec![IntermediateOp::C(C {
+                        c: Char::Y,
+                        is_lig: true,
+                        consumes_left: true,
+                        consumes_right: false,
+                    }),],
+                    C::char(Char::B, false),
+                ),
+            ],
             /*
             vec![
                 (
@@ -975,7 +990,6 @@ mod tests {
                 ('Z', 'B', vec![('Y', FixWord::ZERO), ('B', FixWord::ZERO),]),
             ],
              */
-            vec![],
         ),
         (
             retain_both_move_nowhere_4,
