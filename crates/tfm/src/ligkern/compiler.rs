@@ -1081,7 +1081,42 @@ mod tests {
                 new_lig(None, 'B', 'Y', RetainRightMoveToInserted),
             ],
             vec![('A', 0), ('Z', 1)],
+            vec![
+                (
+                    'A',
+                    'B',
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Y,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                    ],
+                    C::char(Char::B, false),
+                ),
+                (
+                    'Z',
+                    'B',
+                    vec![
+                        IntermediateOp::C(C {
+                            c: Char::Y,
+                            is_lig: true,
+                            consumes_left: true,
+                            consumes_right: false,
+                        }),
+                    ],
+                    C::char(Char::B, false),
+                ),
+            ],
             /*
+              left: {
+              (Char(90), Char(66)): Replacement([C(C { c: Char(89), is_lig: true, consumes_left: true, consumes_right: false })],                         C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: true }),
+              (Char(90), Char(66)): Replacement([C(C { c: Char(89), is_lig: true, consumes_left: true, consumes_right: false }), Kern(FixWord(3145728))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: true })}
+
+              (Char(65), Char(66)): Replacement([C(C { c: Char(65), is_lig: false, consumes_left: true, consumes_right: false }), C(C { c: Char(89), is_lig: true, consumes_left: false, consumes_right: false })], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: true })}
+              (Char(65), Char(66)): Replacement([C(C { c: Char(65), is_lig: false, consumes_left: true, consumes_right: false }), C(C { c: Char(89), is_lig: true, consumes_left: false, consumes_right: false })], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: true }), 
             vec![
                 (
                     'A',
@@ -1099,7 +1134,6 @@ mod tests {
                 ),
             ],
              */
-            vec![],
         ),
         (
             retain_both_move_to_inserted_3,
