@@ -66,6 +66,32 @@ impl C {
             o: None,
         }
     }
+    fn merge(&self, left: &C, right: &C) -> Self {
+        match (self.consumes_left, self.consumes_right) {
+            (true, true) => C {
+                c: self.c,
+                is_lig: self.is_lig || left.is_lig || right.is_lig,
+                consumes_left: self.consumes_left || left.consumes_left || right.consumes_left,
+                consumes_right: self.consumes_right || left.consumes_right || right.consumes_right,
+                o: None,
+            },
+            (true, false) => C {
+                c: self.c,
+                is_lig: self.is_lig || left.is_lig,
+                consumes_left: self.consumes_left || left.consumes_left,
+                consumes_right: self.consumes_right || left.consumes_right,
+                o: None,
+            },
+            (false, true) => C {
+                c: self.c,
+                is_lig: self.is_lig || right.is_lig,
+                consumes_left: self.consumes_left || right.consumes_left,
+                consumes_right: self.consumes_right || right.consumes_right,
+                o: None,
+            },
+            (false, false) => self.clone(),
+        }
+    }
 }
 
 impl OngoingCalculation {
@@ -394,33 +420,33 @@ fn calculate_replacements(
                 // merging means we overwrite the replacement with side-channel data in
                 // the original
 
-                calc.finalized.extend_from_slice(&replacement.0);
-                replacement.1.clone()
-                /*
-                  left: {(Char(65), Char(66)): Replacement([C(C { c: Char(90), is_lig: false, consumes_left: false, consumes_right: false, o: None }), Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None }),
-                         (Char(65), Char(66)): Replacement([C(C { c: Char(90), is_lig: true, consumes_left: true, consumes_right: false, o: Some("A") }), Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None })}
-                        (Char(90), Char(66)): Replacement([C(C { c: Char(90), is_lig: false, consumes_left: false, consumes_right: false, o: None }), Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None })}
-                right: {(Char(90), Char(66)): Replacement([C(C { c: Char(90), is_lig: false, consumes_left: false, consumes_right: false, o: None }), Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None }),
-                match &replacement.1 {
-                    // TerminalOp::RightChar => LigOrChar::Char(child.1),
-                    C::char(char) => C {
-                        c: *char,
-                        is_lig: false,
-                        consumes_left: false,
-                        consumes_right: false,
-                        o: None,
-                    },
-                    // LigOrChar::Char(*char),
-                    TerminalOp::Lig(char, s) => C {
-                        c: *char,
-                        is_lig: true,
-                        consumes_left: false, // TODO!
-                        consumes_right: false,  // TODO!
-                        o: Some(s.clone()),
-                    },
-                    //LigOrChar::Lig(*char, s.clone()),
+                // let left = calc.pending[0].clone();
+                // let right = calc.pending[1].clone();
+                let mut has_left = replacement.1.consumes_left;
+                let mut has_right = replacement.1.consumes_right;
+                for elem in &replacement.0 {
+                    if let IntermediateOp::C(c) = elem {
+                        assert!(!has_left || !c.consumes_left);
+                        assert!(!has_right || !c.consumes_right);
+                        has_left = has_left || c.consumes_left;
+                        has_right = has_right || c.consumes_right;
+                    }
                 }
-                 */
+                assert!(has_left);
+                assert!(has_right);
+
+                let left = calc.pending[0].clone();
+                let right = calc.pending[1].clone();
+
+                for elem in &replacement.0 {
+                    let elem = match elem {
+                        IntermediateOp::Kern(_) => elem.clone(),
+                        IntermediateOp::C(c) => IntermediateOp::C(c.merge(&left, &right)),
+                    };
+                    calc.finalized.push(elem);
+                }
+                // calc.finalized.extend_from_slice(&replacement.0);
+                replacement.1.merge(&left, &right)
             }
         };
         match calc.pending.get(2) {
