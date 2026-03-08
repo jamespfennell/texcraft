@@ -923,20 +923,24 @@ mod tests {
                 ),
             ],
         ),
-        /*
-          left: 
-          {
-            (Char(90), Char(66)): Replacement([C(C { c: Char(90), is_lig: false, consumes_left: true, consumes_right: false }), Kern(FixWord(3145728))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: true }), 
-            (Char(90), Char(66)): Replacement([C(C { c: Char(90), is_lig: false, consumes_left: true, consumes_right: false }), Kern(FixWord(3145728))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: true })}
-
-            (Char(65), Char(66)): Replacement([C(C { c: Char(65), is_lig: false, consumes_left: true, consumes_right: false }), Kern(FixWord(2097152)), C(C { c: Char(90), is_lig: true, consumes_left: true, consumes_right: false }), Kern(FixWord(3145728))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: true })}
- right: {
-            (Char(65), Char(66)): Replacement([C(C { c: Char(65), is_lig: false, consumes_left: true, consumes_right: false }), Kern(FixWord(2097152)), C(C { c: Char(90), is_lig: true, consumes_left: false, consumes_right: false }), Kern(FixWord(3145728))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: true }),
-         */
         (
             retain_both_move_nowhere_2,
             vec![new_lig(None, 'B', 'Z', RetainBothMoveNowhere),],
             vec![('A', 0)],
+            vec![(
+                'A',
+                'B',
+                vec![
+                    IntermediateOp::C(C::char(Char::A, true)),
+                    IntermediateOp::C(C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: false,
+                        consumes_right: false,
+                    }),
+                ],
+                C::char(Char::B, false),
+            ),],
             /*
             vec![(
                 'A',
@@ -948,7 +952,7 @@ mod tests {
                 ]
             ),],
              */
-            vec![],
+            // vec![],
         ),
         (
             retain_both_move_nowhere_3,
