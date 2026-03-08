@@ -259,22 +259,11 @@ impl CompiledProgram {
                             IntermediateOp::Kern(fix_word) => {
                                 emitter.emit_kern(fix_word.to_scaled(FixWord::ONE * 10))
                             }
-                            /*
-                            IntermediateOp::LeftChar => match lig_pieces.take() {
-                                Some(l) => {
-                                    emitter.emit_ligature(left, l.into());
-                                }
-                                None => {
-                                    emitter.emit_character(left);
-                                }
-                            },
-                             */
                             IntermediateOp::C(compiler::C {
                                 c: char,
-                                is_lig,
-                                consumes_left,
-                                consumes_right,
-                                o: None,
+                                is_lig: false,
+                                consumes_left: _,
+                                consumes_right: _,
                             }) => match lig_pieces.take() {
                                 Some(l) => {
                                     emitter.emit_ligature((*char).into(), l.into());
@@ -285,28 +274,34 @@ impl CompiledProgram {
                             },
                             IntermediateOp::C(compiler::C {
                                 c: char,
-                                is_lig,
+                                is_lig: true,
                                 consumes_left,
                                 consumes_right,
-                                o: Some(a),
                             }) => {
                                 let mut s = lig_pieces.take().unwrap_or_default();
-                                s.push_str(&a);
+                                if *consumes_left {
+                                    s.push(left);
+                                }
+                                if *consumes_right {
+                                    s.push(right);
+                                }
                                 emitter.emit_ligature((*char).into(), s.into());
                             }
                         }
                     }
-                    match &replacement.1.o {
-                        None => {
-                            left = (replacement.1.c).into();
+                    if !replacement.1.is_lig {
+                        left = (replacement.1.c).into();
+                    } else {
+                        left = (replacement.1.c).into();
+                        let mut s = lig_pieces.take().unwrap_or_default();
+                        if replacement.1.consumes_left {
+                            s.push(left);
                         }
-                        Some(a) => {
-                            left = (replacement.1.c).into();
-                            let mut s = lig_pieces.take().unwrap_or_default();
-                            s.push_str(&a);
-                            lig_pieces = Some(s);
-                            println!("SET lig_pieces={lig_pieces:?}");
+                        if replacement.1.consumes_right {
+                            s.push(right);
                         }
+                        lig_pieces = Some(s);
+                        println!("SET lig_pieces={lig_pieces:?}");
                     }
                 }
                 None => {

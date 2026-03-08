@@ -53,7 +53,6 @@ pub struct C {
     pub is_lig: bool,
     pub consumes_left: bool,
     pub consumes_right: bool,
-    pub o: Option<Rc<str>>,
 }
 
 impl C {
@@ -63,7 +62,6 @@ impl C {
             is_lig: false,
             consumes_left: is_left_char,
             consumes_right: !is_left_char,
-            o: None,
         }
     }
     fn merge(&self, left: &C, right: &C) -> Self {
@@ -73,21 +71,18 @@ impl C {
                 is_lig: self.is_lig || left.is_lig || right.is_lig,
                 consumes_left: self.consumes_left || left.consumes_left || right.consumes_left,
                 consumes_right: self.consumes_right || left.consumes_right || right.consumes_right,
-                o: None,
             },
             (true, false) => C {
                 c: self.c,
                 is_lig: self.is_lig || left.is_lig,
                 consumes_left: self.consumes_left || left.consumes_left,
                 consumes_right: self.consumes_right || left.consumes_right,
-                o: None,
             },
             (false, true) => C {
                 c: self.c,
                 is_lig: self.is_lig || right.is_lig,
                 consumes_left: self.consumes_left || right.consumes_left,
                 consumes_right: self.consumes_right || right.consumes_right,
-                o: None,
             },
             (false, false) => self.clone(),
         }
@@ -248,7 +243,6 @@ fn calculate_replacements(
                             is_lig: true,
                             consumes_left: false,
                             consumes_right: false,
-                            o: Some("".into()),
                         },
                         C::char(right.try_into().unwrap(), false),
                     ],
@@ -263,7 +257,6 @@ fn calculate_replacements(
                             is_lig: true,
                             consumes_left: false,
                             consumes_right: false,
-                            o: Some("".into()),
                         },
                         C::char(right.try_into().unwrap(), false),
                     ],
@@ -277,7 +270,6 @@ fn calculate_replacements(
                             is_lig: true,
                             consumes_left: false,
                             consumes_right: false,
-                            o: Some("".into()),
                         },
                         C::char(right.try_into().unwrap(), false),
                     ],
@@ -294,7 +286,6 @@ fn calculate_replacements(
                             is_lig: true,
                             consumes_left: true,
                             consumes_right: false,
-                            o: Some(format!("{left}").into()),
                         },
                         C::char(right.try_into().unwrap(), false),
                     ],
@@ -307,7 +298,6 @@ fn calculate_replacements(
                             is_lig: true,
                             consumes_left: true,
                             consumes_right: false,
-                            o: Some(format!("{left}").into()),
                         },
                         C::char(right.try_into().unwrap(), false),
                     ],
@@ -325,7 +315,6 @@ fn calculate_replacements(
                             is_lig: true,
                             consumes_left: false,
                             consumes_right: true,
-                            o: Some(format!("{right}").into()),
                         },
                     ],
                 ),
@@ -338,7 +327,6 @@ fn calculate_replacements(
                             is_lig: true,
                             consumes_left: false,
                             consumes_right: true,
-                            o: Some(format!("{right}").into()),
                         },
                     ],
                     // pending
@@ -351,7 +339,6 @@ fn calculate_replacements(
                         is_lig: true,
                         consumes_left: true,
                         consumes_right: true,
-                        o: Some(format!("{left}{right}").into()),
                     }],
                     //pending
                     vec![],
@@ -746,7 +733,6 @@ mod tests {
                         is_lig: true,
                         consumes_left: true,
                         consumes_right: true,
-                        o: Some("AB".into())
                     }
                 ),
                 //TerminalOp::Lig(Char::Z,),
@@ -769,7 +755,6 @@ mod tests {
                         is_lig: true,
                         consumes_left: false,
                         consumes_right: true,
-                        o: Some("B".into())
                     }
                 ),
                 (
@@ -803,7 +788,6 @@ mod tests {
                         is_lig: true,
                         consumes_left: false,
                         consumes_right: true,
-                        o: Some("B".into())
                     }
                 ),
                 (
@@ -841,7 +825,6 @@ mod tests {
                             is_lig: true,
                             consumes_left: true,
                             consumes_right: false,
-                            o: Some("A".into())
                         }),
                         IntermediateOp::Kern(FixWord::ONE),
                     ],
@@ -872,13 +855,28 @@ mod tests {
                 new_kern(None, 'B', FixWord::ONE),
             ],
             vec![('A', 0), ('Z', 1)],
-            /*
             vec![
-                ('A', 'B', vec![('Z', FixWord::ZERO), ('B', FixWord::ZERO)]),
-                ('Z', 'B', vec![('Z', FixWord::ONE), ('B', FixWord::ZERO)]),
+                (
+                    'A',
+                    'B',
+                    vec![IntermediateOp::C(C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: true,
+                        consumes_right: false,
+                    })],
+                    C::char(Char::B, false),
+                ),
+                (
+                    'Z',
+                    'B',
+                    vec![
+                        IntermediateOp::C(C::char(Char::Z, true)),
+                        IntermediateOp::Kern(FixWord::ONE),
+                    ],
+                    C::char(Char::B, false),
+                ),
             ],
-             */
-            vec![],
         ),
         (
             retain_both_move_nowhere_1,
