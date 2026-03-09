@@ -191,6 +191,7 @@ impl CompiledProgram {
         let Some(mut left) = text.chars().next() else {
             return;
         };
+        let mut left_in_original = true;
         let mut lig_pieces: Option<String> = None;
         let text = &text[left.len_utf8()..];
         let mut iter = text.chars();
@@ -223,8 +224,9 @@ impl CompiledProgram {
                                 consumes_left,
                                 consumes_right,
                             }) => {
+                                dbg!(left_in_original);
                                 let mut s = lig_pieces.take().unwrap_or_default();
-                                if *consumes_left {
+                                if *consumes_left && left_in_original {
                                     s.push(left);
                                 }
                                 if *consumes_right {
@@ -236,17 +238,18 @@ impl CompiledProgram {
                     }
                     if !replacement.1.is_lig {
                         left = (replacement.1.c).into();
+                        left_in_original = replacement.1.consumes_right;
                     } else {
                         let mut s = lig_pieces.take().unwrap_or_default();
-                        if replacement.1.consumes_left {
+                        if replacement.1.consumes_left && left_in_original {
                             s.push(left);
                         }
                         if replacement.1.consumes_right {
                             s.push(right);
                         }
                         lig_pieces = Some(s);
-                        println!("SET lig_pieces={lig_pieces:?}");
                         left = (replacement.1.c).into();
+                        left_in_original = false;
                     }
                 }
                 None => {
@@ -259,6 +262,7 @@ impl CompiledProgram {
                         }
                     }
                     left = right;
+                    left_in_original = true;
                 }
             }
         }
