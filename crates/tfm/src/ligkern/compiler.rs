@@ -78,12 +78,7 @@ impl C {
             },
             (true, false) => C {
                 c: self.c,
-                // TODO: test removing self.is_lig, there should be test that fails.
-                //                   v---- merge runs here. validate that Z is a lig
-                // (A,B) -> (A,C,B) -> (A,C,Z)
-                // (C,B) -> (C,Z)
                 is_lig: self.is_lig || left.is_lig,
-                // is_lig: left.is_lig,
                 consumes_left: left.consumes_left,
                 consumes_right: left.consumes_right,
             },
@@ -1254,6 +1249,43 @@ mod tests {
                         consumes_left: false,
                         consumes_right: true,
                     }
+                ),
+            ],
+        ),
+        (
+            is_lig_propagated_2,
+            vec![
+                new_lig(Some(0), 'B', 'Y', RetainLeftMoveNowhere,),
+                new_lig(None, 'Y', 'Z', RetainRightMoveToRight,),
+            ],
+            vec![('A', 0)],
+            vec![
+                (
+                    'A',
+                    'B',
+                    vec![IntermediateOp::C(C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: true,
+                        consumes_right: false,
+                    }),],
+                    C {
+                        c: Char::Y,
+                        is_lig: true,
+                        consumes_left: false,
+                        consumes_right: true,
+                    },
+                ),
+                (
+                    'A',
+                    'Y',
+                    vec![IntermediateOp::C(C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: true,
+                        consumes_right: false,
+                    }),],
+                    C::char(Char::Y, false)
                 ),
             ],
         ),
