@@ -101,61 +101,6 @@ enum IntermediateOp {
     C(compiler::C),
 }
 
-/*
-// TODO? replace with compiler::C
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum TerminalOp {
-    Char(Char),
-    Lig(Char, Rc<str>),
-}
- */
-
-// replacement is a series of IntermediateOps and a TerminalOp
-
-// intermediate ops:
-// Emit kern
-// Emit character
-// Emit ligature
-
-// terminal ops:
-// Finish with character
-// Finish with ligature
-
-// Can special case simple kerns and simple ligatures
-// There is an invariant that one of the terminal ops has to come last
-
-/// Lig/kern operation on two characters.
-#[derive(Debug, Clone)]
-pub enum Op {
-    /// Do nothing.
-    None,
-    /// Insert a kern between the two characters.
-    ///
-    /// TODO: should return core::Scaled.
-    Kern(FixWord),
-    /// Replace the two characters with the specified ligature character.
-    SimpleLig(Char),
-    /// Replace the two characters with the specified sequence of characters and kerns.
-    ///
-    /// TODO: change the vec to a reference.
-    ComplexLig(Vec<(Char, FixWord)>, Char),
-}
-
-impl Op {
-    pub fn build_sequence(&self, left_char: Char, right_char: Char) -> Vec<(Char, FixWord)> {
-        match self {
-            Op::None => vec![(left_char, FixWord::ZERO), (right_char, FixWord::ZERO)],
-            Op::Kern(fix_word) => vec![(left_char, *fix_word), (right_char, FixWord::ZERO)],
-            Op::SimpleLig(char) => vec![(*char, FixWord::ZERO)],
-            Op::ComplexLig(items, char) => {
-                let mut v = items.clone();
-                v.push((*char, FixWord::ZERO));
-                v
-            }
-        }
-    }
-}
-
 impl CompiledProgram {
     /// Compile a lig/kern program.
     pub fn compile(
@@ -292,7 +237,6 @@ impl CompiledProgram {
                     if !replacement.1.is_lig {
                         left = (replacement.1.c).into();
                     } else {
-                        left = (replacement.1.c).into();
                         let mut s = lig_pieces.take().unwrap_or_default();
                         if replacement.1.consumes_left {
                             s.push(left);
@@ -302,6 +246,7 @@ impl CompiledProgram {
                         }
                         lig_pieces = Some(s);
                         println!("SET lig_pieces={lig_pieces:?}");
+                        left = (replacement.1.c).into();
                     }
                 }
                 None => {
