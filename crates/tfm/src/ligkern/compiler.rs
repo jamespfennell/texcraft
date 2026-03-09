@@ -20,12 +20,6 @@ pub fn compile(
             })
             .collect(),
     };
-    println!(
-        "{:?}",
-        program
-            .replacements
-            .get(&('a'.try_into().unwrap(), 'c'.try_into().unwrap()))
-    );
     (program, infinite_loop_errors)
 }
 
