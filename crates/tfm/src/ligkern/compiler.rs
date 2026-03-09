@@ -65,7 +65,7 @@ impl C {
         }
     }
     fn merge(&self, left: &C, right: &C) -> Self {
-        return C {
+        C {
             c: self.c,
             is_lig: self.is_lig
                 || (self.consumes_left && left.is_lig)
@@ -74,7 +74,7 @@ impl C {
                 || (self.consumes_right && right.consumes_left),
             consumes_right: (self.consumes_left && left.consumes_right)
                 || (self.consumes_right && right.consumes_right),
-        };
+        }
     }
 }
 
@@ -372,48 +372,8 @@ fn calculate_replacements(
                 right
             }
             Some(replacement) => {
-                println!("FINALIZING FOR node={:?}", calc.node);
-                println!("FINALIZING FOR pending={:?}", calc.pending);
-                println!("FINALIZING FOR replacement={:?}", replacement);
-                // TODO: this is not good enough :( <- this is where the test is failing!
-                // We may need to modify some ligature nodes
-                // we need to iterate over the Replacement value and replace char or lig originals
-                // with calc.new_pending[0] and calc.new_pending[1] - either the char
-                // or the content of the ligature
-
-                // maybe we need to track the provenance of nodes so that we
-                // can convert the char nodes in the replacement into the potential lig
-                // nodes in the child pair
-                // e.g. child = ((Z, lig), (B, char))
-                // replacement for ZB is (Z, char)<kern>(B, char)
-                // what we actually need to do is: (z, lig)<kern>(B, char)
-                // maybe C should have LeftChar variants RightChar?
-
-                // we find out where the left and right chars map to
-                // either using lig consumes_left/right
-                // or a new provenance field for char
-                // then we merge the left and right char into the replacement
-                // merging means we overwrite the replacement with side-channel data in
-                // the original
-
-                // let left = calc.pending[0].clone();
-                // let right = calc.pending[1].clone();
-                let mut has_left = replacement.1.consumes_left;
-                let mut has_right = replacement.1.consumes_right;
-                for elem in &replacement.0 {
-                    if let IntermediateOp::C(c) = elem {
-                        assert!(!has_left || !c.consumes_left);
-                        assert!(!has_right || !c.consumes_right);
-                        has_left = has_left || c.consumes_left;
-                        has_right = has_right || c.consumes_right;
-                    }
-                }
-                assert!(has_left);
-                assert!(has_right);
-
                 let left = calc.pending[0].clone();
                 let right = calc.pending[1].clone();
-
                 for elem in &replacement.0 {
                     let elem = match elem {
                         IntermediateOp::Kern(_) => elem.clone(),
@@ -421,7 +381,6 @@ fn calculate_replacements(
                     };
                     calc.finalized.push(elem);
                 }
-                // calc.finalized.extend_from_slice(&replacement.0);
                 replacement.1.merge(&left, &right)
             }
         };
