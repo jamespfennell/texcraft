@@ -65,31 +65,16 @@ impl C {
         }
     }
     fn merge(&self, left: &C, right: &C) -> Self {
-        match (self.consumes_left, self.consumes_right) {
-            (true, true) => C {
-                c: self.c,
-                // Left and right are consecutive elements of some pending array.
-                // One of them is always a lig: two chars cannot be consecutive because
-                // the lig element is always inserted in between. Thus the following line
-                // is equivalent to (self.is_lig || left.is_lig || right.is_lig).
-                is_lig: true,
-                consumes_left: left.consumes_left || right.consumes_left,
-                consumes_right: left.consumes_right || right.consumes_right,
-            },
-            (true, false) => C {
-                c: self.c,
-                is_lig: self.is_lig || left.is_lig,
-                consumes_left: left.consumes_left,
-                consumes_right: left.consumes_right,
-            },
-            (false, true) => C {
-                c: self.c,
-                is_lig: self.is_lig || right.is_lig,
-                consumes_left: right.consumes_left,
-                consumes_right: right.consumes_right,
-            },
-            (false, false) => self.clone(),
-        }
+        return C {
+            c: self.c,
+            is_lig: self.is_lig
+                || (self.consumes_left && left.is_lig)
+                || (self.consumes_right && right.is_lig),
+            consumes_left: (self.consumes_left && left.consumes_left)
+                || (self.consumes_right && right.consumes_left),
+            consumes_right: (self.consumes_left && left.consumes_right)
+                || (self.consumes_right && right.consumes_right),
+        };
     }
 }
 
