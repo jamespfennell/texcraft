@@ -68,17 +68,22 @@ impl C {
         match (self.consumes_left, self.consumes_right) {
             (true, true) => C {
                 c: self.c,
-                // TODO: should we have the self.is_lig here?
-                // I think it's correct: if any node in the provenance chain is a lig,
-                // then the result should be a lig.
-                // Test this by removing it and seeing if unit tests pass.
-                is_lig: self.is_lig || left.is_lig || right.is_lig,
+                // Left and right are consecutive elements of some pending array.
+                // One of them is always a lig: two chars cannot be consecutive because
+                // the lig element is always inserted in between. Thus the following line
+                // is equivalent to (self.is_lig || left.is_lig || right.is_lig).
+                is_lig: true,
                 consumes_left: left.consumes_left || right.consumes_left,
                 consumes_right: left.consumes_right || right.consumes_right,
             },
             (true, false) => C {
                 c: self.c,
+                // TODO: test removing self.is_lig, there should be test that fails.
+                //                   v---- merge runs here. validate that Z is a lig
+                // (A,B) -> (A,C,B) -> (A,C,Z)
+                // (C,B) -> (C,Z)
                 is_lig: self.is_lig || left.is_lig,
+                // is_lig: left.is_lig,
                 consumes_left: left.consumes_left,
                 consumes_right: left.consumes_right,
             },
@@ -727,20 +732,17 @@ mod tests {
             single_lig_1,
             vec![new_lig(None, 'B', 'Z', RetainNeitherMoveToInserted)],
             vec![('A', 0)],
-            vec![
-                (
-                    'A',
-                    'B',
-                    vec![],
-                    C {
-                        c: Char::Z,
-                        is_lig: true,
-                        consumes_left: true,
-                        consumes_right: true,
-                    }
-                ),
-                //TerminalOp::Lig(Char::Z,),
-            ],
+            vec![(
+                'A',
+                'B',
+                vec![],
+                C {
+                    c: Char::Z,
+                    is_lig: true,
+                    consumes_left: true,
+                    consumes_right: true,
+                }
+            ),],
         ),
         (
             single_lig_2,
@@ -1212,6 +1214,46 @@ mod tests {
                         IntermediateOp::Kern(FixWord::ONE * 3),
                     ],
                     C::char(Char::B, false),
+                ),
+            ],
+        ),
+        (
+            is_lig_propagated_1,
+            vec![
+                new_lig(None, 'B', 'Y', RetainBothMoveToInserted,),
+                new_lig(None, 'B', 'Z', RetainLeftMoveToInserted,),
+            ],
+            vec![('A', 0), ('Y', 1)],
+            vec![
+                (
+                    'A',
+                    'B',
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Y,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                    ],
+                    C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: false,
+                        consumes_right: true,
+                    },
+                ),
+                (
+                    'Y',
+                    'B',
+                    vec![IntermediateOp::C(C::char(Char::Y, true)),],
+                    C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: false,
+                        consumes_right: true,
+                    }
                 ),
             ],
         ),
