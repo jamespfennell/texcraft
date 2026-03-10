@@ -362,10 +362,7 @@ fn calculate_replacements(
             },
         };
         if let Some(pending) = pending {
-            let finalized = finalized
-                .into_iter()
-                .map(IntermediateOp::C)
-                .collect();
+            let finalized = finalized.into_iter().map(IntermediateOp::C).collect();
             actionable.push(OngoingCalculation {
                 node: pair,
                 finalized,
@@ -375,10 +372,7 @@ fn calculate_replacements(
         } else {
             let mut finalized = finalized;
             let last = finalized.pop().unwrap();
-            let finalized = finalized
-                .into_iter()
-                .map(IntermediateOp::C)
-                .collect();
+            let finalized = finalized.into_iter().map(IntermediateOp::C).collect();
             new_result.insert(pair, Replacement(finalized, last));
         }
     }

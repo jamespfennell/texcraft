@@ -375,12 +375,14 @@ impl LigKern {
                     .0
             }
         };
-        let mut last_l: Option<tfm::Char> = None;
+        // let mut last_l: Option<tfm::Char> = None;
         for (l, r) in lig_kern_program.all_pairs_having_ops() {
+            /*
             if Some(l) != last_l {
                 println!("{}", l);
                 last_l = Some(l);
             }
+             */
             print!("    {} {} ->", l, r);
             todo!("need to reimplement this in terms of the new ops");
         }
