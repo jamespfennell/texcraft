@@ -94,7 +94,7 @@ impl OngoingCalculation {
                 Some(c) => LeftChar::Char(c.c),
                 None => LeftChar::BoundaryChar,
             },
-            self.pending.1.c.into(),
+            self.pending.1.c,
         )
     }
 }
@@ -364,7 +364,7 @@ fn calculate_replacements(
         if let Some(pending) = pending {
             let finalized = finalized
                 .into_iter()
-                .map(|c| IntermediateOp::C(c))
+                .map(IntermediateOp::C)
                 .collect();
             actionable.push(OngoingCalculation {
                 node: pair,
@@ -377,7 +377,7 @@ fn calculate_replacements(
             let last = finalized.pop().unwrap();
             let finalized = finalized
                 .into_iter()
-                .map(|c| IntermediateOp::C(c))
+                .map(IntermediateOp::C)
                 .collect();
             new_result.insert(pair, Replacement(finalized, last));
         }
