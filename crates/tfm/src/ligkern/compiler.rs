@@ -384,7 +384,7 @@ fn calculate_replacements(
             continue;
         }
 
-        let last_1 = match new_result.get(&child) {
+        let last = match new_result.get(&child) {
             None => {
                 // There is no lig/kern rule for this pair.
                 if let Some(left) = calc.pending.0.clone() {
@@ -410,10 +410,10 @@ fn calculate_replacements(
                 if let Some(blocking) = node_to_parents.remove(&calc.node) {
                     actionable.extend(blocking);
                 }
-                new_result.insert(calc.node, Replacement(calc.finalized, last_1));
+                new_result.insert(calc.node, Replacement(calc.finalized, last));
             }
             Some(new_right) => {
-                calc.pending = Pending(Some(calc.pending.1), new_right, None);
+                calc.pending = Pending(Some(last), new_right, None);
                 actionable.push(calc);
             }
         }
