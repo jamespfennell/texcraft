@@ -22,12 +22,77 @@
    (EXTRASPACE R 0.111112)
    )
 (LIGTABLE
+   (COMMENT
+      Single ligature cases.
+
+      We add kerns to verify that the cursor is in the correct position after
+      applying the ligature replacement. In this program after applying a
+      ligature kerns are put between every character pair after the cursor.
+   )
+   (LABEL C a)
+   (LIG     C b C j)
+   (/LIG    C c C k) (KRN C k R 1)
+   (/LIG>   C d C l) (KRN C l R 1)
+   (LIG/    C e C m)
+   (LIG/>   C f C n)
+   (/LIG/   C g C o) (KRN C o R 1)
+   (/LIG/>  C h C p) (KRN C p R 1)
+   (/LIG/>> C i C q) (KRN C q R 1)
+   (STOP)
+   (LABEL C m) (KRN C e R 1) (STOP)
+   (LABEL C n) (KRN C f R 1) (STOP)
+   (LABEL C o) (KRN C g R 1) (STOP)
+   (LABEL C p) (KRN C h R 1) (STOP)
+   (LABEL C q) (KRN C i R 1) (STOP)
+
+   (COMMENT
+      Kern after ligature
+   )
+   (LABEL C j)
+   (KRN C a R 1.0)
+   (KRN C k R 1.0)
+   (STOP)
+
+   (COMMENT
+      No-op lig
+   )
+   (LABEL C x)
+   (LIG/> C y C x)
+   (STOP)
+
+   (COMMENT
+      Multiple ligature cases.
+   )
    (LABEL C A)
-   (LIG/ C B C C)
-   (STOP)
+   (LIG C C C B)
+   (LABEL C B)
+   (LIG C D C E)
+
    (LABEL C C)
-   (LIG C B C D)
-   (STOP)
+   (/LIG/ C E C D)
+   (LABEL C D)
+   (LIG C E C G)
+
+   (LABEL C E)
+   (LIG/ C E C F)
+
+   (LABEL C F)
+   (LIG C F C F)
+
+   (LABEL C G)
+   (/LIG C H C I)
+   (LIG/ C I C J)
+
+   (LABEL C H)
+   (/LIG C A C B)
+   (LIG/ C B C I)
+   (LABEL C I)
+   (LIG C B C C)
+
+   (LABEL C J)
+   (LIG C A C K)
+   (LABEL C K)
+   (/LIG/>> C C C B)
    )
 (CHARACTER O 0
    (CHARWD R 0.625002)

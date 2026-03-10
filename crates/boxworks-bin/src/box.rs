@@ -164,7 +164,8 @@ impl TexHlists {
                     ])
                 }
             };
-            let file_name: PathBuf = font_metrics.file_name().unwrap().into();
+            let mut file_name: PathBuf = font_metrics.file_name().unwrap().into();
+            file_name.set_extension("tfm");
             let file_stem = file_name.file_stem().unwrap().to_string_lossy();
             preamble.push_str(&format![
                 r"

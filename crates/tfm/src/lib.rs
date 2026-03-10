@@ -916,6 +916,8 @@ impl Char {
         (B, b'B'),
         (C, b'C'),
         (D, b'D'),
+        (V, b'V'),
+        (W, b'W'),
         (X, b'X'),
         (Y, b'Y'),
         (Z, b'Z'),

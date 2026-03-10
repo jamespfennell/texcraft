@@ -68,6 +68,7 @@ impl TexEngine for TexEngineBinary {
         for (file_name, content) in auxiliary_files {
             let mut path = dir.clone();
             path.push(file_name);
+            eprintln!("writing to {}", path.as_os_str().to_string_lossy());
             std::fs::write(&path, content).unwrap_or_else(|_| {
                 panic![
                     "Unable to write auxiliary file {}",
@@ -86,6 +87,8 @@ impl TexEngine for TexEngineBinary {
             .arg(&input_path)
             .output()
             .expect("failed to run tex command");
+        eprintln!("{}", String::from_utf8(output.stderr).unwrap());
+
         String::from_utf8(output.stdout).expect("stdout output of TeX is utf-8")
     }
 }

@@ -375,34 +375,16 @@ impl LigKern {
                     .0
             }
         };
-        let mut last_l: Option<tfm::Char> = None;
-        for (l, r) in lig_kern_program.all_pairs_having_ops() {
+        // let mut last_l: Option<tfm::Char> = None;
+        for (l, r) in lig_kern_program.all_pairs_with_replacements() {
+            /*
             if Some(l) != last_l {
                 println!("{}", l);
                 last_l = Some(l);
             }
+             */
             print!("    {} {} ->", l, r);
-            match lig_kern_program.get_op(l, r) {
-                tfm::ligkern::Op::None => continue,
-                tfm::ligkern::Op::Kern(fix_word) => {
-                    print!(" kern({})", fix_word);
-                }
-                tfm::ligkern::Op::SimpleLig(char) => {
-                    print!(" simple_lig({})", char);
-                }
-                tfm::ligkern::Op::ComplexLig(items, char) => {
-                    print!(" complex_lig(");
-                    for (c, k) in items {
-                        print!("char({}), ", c);
-                        if k != tfm::FixWord::ZERO {
-                            print!("kern({k}), ");
-                        }
-                    }
-                    print!("char({char}))");
-                }
-            }
-
-            println!();
+            todo!("need to reimplement this in terms of the new ops");
         }
         Ok(())
     }

@@ -78,9 +78,9 @@
 //!     and so it may be slower if TeX is memory bound.
 
 mod compiler;
+use crate::ligkern::compiler::Replacement;
 use crate::Char;
 use crate::FixWord;
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::rc::Rc;
 pub mod lang;
@@ -90,48 +90,15 @@ pub mod lang;
 /// The default value is an empty program with no kerns or ligatures.
 #[derive(Clone, Debug, Default)]
 pub struct CompiledProgram {
-    left_to_pairs: BTreeMap<Char, (u16, u16)>,
-    pairs: Vec<(Char, RawReplacement)>,
-    middle_chars: Vec<(Char, FixWord)>,
+    replacements: HashMap<(Char, Char), compiler::Replacement>,
 }
 
-#[derive(Debug, Clone)]
-struct RawReplacement {
-    left_char_operation: LeftCharOperation,
-    middle_char_bounds: std::ops::Range<u16>,
-    last_char: Char,
-}
-
-/// Lig/kern operation on two characters.
-#[derive(Debug, Clone)]
-pub enum Op {
-    /// Do nothing.
-    None,
-    /// Insert a kern between the two characters.
-    ///
-    /// TODO: should return core::Scaled.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum IntermediateOp {
+    // Emit the kern.
     Kern(FixWord),
-    /// Replace the two characters with the specified ligature character.
-    SimpleLig(Char),
-    /// Replace the two characters with the specified sequence of characters and kerns.
-    ///
-    /// TODO: change the vec to a reference.
-    ComplexLig(Vec<(Char, FixWord)>, Char),
-}
-
-impl Op {
-    pub fn build_sequence(&self, left_char: Char, right_char: Char) -> Vec<(Char, FixWord)> {
-        match self {
-            Op::None => vec![(left_char, FixWord::ZERO), (right_char, FixWord::ZERO)],
-            Op::Kern(fix_word) => vec![(left_char, *fix_word), (right_char, FixWord::ZERO)],
-            Op::SimpleLig(char) => vec![(*char, FixWord::ZERO)],
-            Op::ComplexLig(items, char) => {
-                let mut v = items.clone();
-                v.push((*char, FixWord::ZERO));
-                v
-            }
-        }
-    }
+    // Emit the char in the payload.
+    C(compiler::C),
 }
 
 impl CompiledProgram {
@@ -144,6 +111,16 @@ impl CompiledProgram {
         entrypoints: HashMap<Char, u16>,
     ) -> (CompiledProgram, Vec<InfiniteLoopError>) {
         compiler::compile(program, kerns, &entrypoints)
+    }
+
+    /// Compile a lig/kern program from a PL file.
+    pub fn compile_from_pl_file(
+        pl_file: &super::pl::File,
+    ) -> (CompiledProgram, Vec<InfiniteLoopError>) {
+        let entrypoints = pl_file.lig_kern_entrypoints(false);
+        // The kerns array, which is used for KernAtIndex operations, is empty
+        // because PL files do not have such operations.
+        CompiledProgram::compile(&pl_file.lig_kern_program, &[], entrypoints)
     }
 
     /// Compile a lig/kern program from a TFM file.
@@ -164,61 +141,24 @@ impl CompiledProgram {
         CompiledProgram::compile(&tfm_file.lig_kern_program, &tfm_file.kerns, entrypoints)
     }
 
-    pub fn get_op_utf8(&self, left_char: char, right_char: char) -> Op {
+    pub(crate) fn get_replacement_utf8(
+        &self,
+        left_char: char,
+        right_char: char,
+    ) -> Option<&Replacement> {
         let Ok(left_char) = left_char.try_into() else {
-            return Op::None;
+            return None;
         };
         let Ok(right_char) = right_char.try_into() else {
-            return Op::None;
+            return None;
         };
-        self.get_op(left_char, right_char)
+        self.replacements.get(&(left_char, right_char))
     }
 
-    /// Get an operation between two characters.
-    ///
-    /// TODO: what about boundaries?
-    pub fn get_op(&self, left_char: Char, right_char: Char) -> Op {
-        let Some((lower, upper)) = self.left_to_pairs.get(&left_char) else {
-            return Op::None;
-        };
-        for (candidate_right_char, r) in &self.pairs[(*lower as usize)..(*upper as usize)] {
-            if *candidate_right_char != right_char {
-                continue;
-            }
-            let first_or = match (
-                r.left_char_operation,
-                r.middle_char_bounds.end == 0,
-                r.last_char == right_char,
-            ) {
-                (LeftCharOperation::Retain, true, true) => return Op::None,
-                (LeftCharOperation::AppendKern(fix_word), true, true) => return Op::Kern(fix_word),
-                (LeftCharOperation::Delete, true, _) => return Op::SimpleLig(r.last_char),
-                (LeftCharOperation::Retain, _, _) => Some((left_char, FixWord::ZERO)),
-                (LeftCharOperation::AppendKern(fix_word), _, _) => Some((left_char, fix_word)),
-                (LeftCharOperation::Delete, false, _) => None,
-            };
-            let mut vc = vec![];
-            if let Some(first) = first_or {
-                vc.push(first);
-            }
-            vc.extend_from_slice(
-                &self.middle_chars
-                    [r.middle_char_bounds.start as usize..r.middle_char_bounds.end as usize],
-            );
-            return Op::ComplexLig(vc, r.last_char);
-        }
-        Op::None
-    }
-
-    /// Returns an iterator over all pairs `(char,char)` that have an operation
+    /// Returns an iterator over all pairs `(char,char)` that have a replacement
     ///     specified in the lig/kern program.
-    pub fn all_pairs_having_ops(&self) -> impl '_ + Iterator<Item = (Char, Char)> {
-        PairsIter {
-            current_left: Char(0),
-            left_iter: self.left_to_pairs.iter(),
-            right_chars: vec![],
-            program: self,
-        }
+    pub fn all_pairs_with_replacements(&self) -> impl '_ + Iterator<Item = (Char, Char)> {
+        self.replacements.keys().copied()
     }
 
     /// Returns whether this program is seven-bit safe.
@@ -230,16 +170,14 @@ impl CompiledProgram {
     ///     pair of seven-bit characters whose replacement
     ///     contains a non-seven-bit character.
     pub fn is_seven_bit_safe(&self) -> bool {
-        self.all_pairs_having_ops()
+        self.all_pairs_with_replacements()
             .filter(|(l, r)| l.is_seven_bit() && r.is_seven_bit())
-            .map(|(l, r)| self.get_op(l, r))
-            .all(|op| match op {
-                Op::None => true,
-                Op::Kern(_) => true,
-                Op::SimpleLig(char) => char.is_seven_bit(),
-                Op::ComplexLig(items, char) => {
-                    items.into_iter().all(|(c, _)| c.is_seven_bit()) && char.is_seven_bit()
-                }
+            .flat_map(|(l, r)| self.get_replacement_utf8(l.into(), r.into()))
+            .all(|rep| {
+                rep.0.iter().all(|op| match op {
+                    IntermediateOp::Kern(_) => true,
+                    IntermediateOp::C(c) => c.c.is_seven_bit(),
+                }) && rep.1.c.is_seven_bit()
             })
     }
 
@@ -248,13 +186,68 @@ impl CompiledProgram {
         let Some(mut left) = text.chars().next() else {
             return;
         };
+        let mut left_in_original = true;
         let mut lig_pieces: Option<String> = None;
         let text = &text[left.len_utf8()..];
         let mut iter = text.chars();
         loop {
             let Some(right) = iter.next() else { break };
-            match self.get_op_utf8(left, right) {
-                Op::None => {
+
+            match self.get_replacement_utf8(left, right) {
+                Some(replacement) => {
+                    for op in &replacement.0 {
+                        match op {
+                            IntermediateOp::Kern(fix_word) => {
+                                emitter.emit_kern(fix_word.to_scaled(FixWord::ONE * 10))
+                            }
+                            IntermediateOp::C(compiler::C {
+                                c: char,
+                                is_lig: false,
+                                consumes_left: _,
+                                consumes_right: _,
+                            }) => match lig_pieces.take() {
+                                Some(l) => {
+                                    emitter.emit_ligature((*char).into(), l.into());
+                                }
+                                None => {
+                                    emitter.emit_character((*char).into());
+                                }
+                            },
+                            IntermediateOp::C(compiler::C {
+                                c: char,
+                                is_lig: true,
+                                consumes_left,
+                                consumes_right,
+                            }) => {
+                                dbg!(left_in_original);
+                                let mut s = lig_pieces.take().unwrap_or_default();
+                                if *consumes_left && left_in_original {
+                                    s.push(left);
+                                }
+                                if *consumes_right {
+                                    s.push(right);
+                                }
+                                emitter.emit_ligature((*char).into(), s.into());
+                            }
+                        }
+                    }
+                    if !replacement.1.is_lig {
+                        left = (replacement.1.c).into();
+                        left_in_original = replacement.1.consumes_right;
+                    } else {
+                        let mut s = lig_pieces.take().unwrap_or_default();
+                        if replacement.1.consumes_left && left_in_original {
+                            s.push(left);
+                        }
+                        if replacement.1.consumes_right {
+                            s.push(right);
+                        }
+                        lig_pieces = Some(s);
+                        left = (replacement.1.c).into();
+                        left_in_original = false;
+                    }
+                }
+                None => {
                     match lig_pieces.take() {
                         Some(l) => {
                             emitter.emit_ligature(left, l.into());
@@ -264,20 +257,8 @@ impl CompiledProgram {
                         }
                     }
                     left = right;
+                    left_in_original = true;
                 }
-                Op::Kern(fix_word) => {
-                    emitter.emit_character(left);
-                    emitter.emit_kern(fix_word.to_scaled(FixWord::ONE * 10));
-                    left = right;
-                }
-                Op::SimpleLig(char) => {
-                    lig_pieces = Some(match lig_pieces {
-                        Some(l) => format!("{l}{right}"),
-                        None => format!("{left}{right}"),
-                    });
-                    left = char.into();
-                }
-                Op::ComplexLig(_items, _char) => todo!("complex lig"),
             }
         }
         match lig_pieces.take() {
@@ -340,41 +321,183 @@ pub struct InfiniteLoopStep {
     pub post_cursor_position: usize,
 }
 
-/// Operation to perform on the left character of a lig/kern pair.
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
-enum LeftCharOperation {
-    /// Retain the left character and do not add a kern.
-    Retain,
-    /// Delete the left character.
-    Delete,
-    /// Retain the left character and append the specified kern.
-    AppendKern(FixWord),
-}
+#[cfg(test)]
+mod tests {
+    use core::Scaled;
 
-/// An iterator over all pairs of characters that have a lig/kern replacement in a program.
-struct PairsIter<'a, L> {
-    current_left: Char,
-    left_iter: L,
-    right_chars: Vec<Char>,
-    program: &'a CompiledProgram,
-}
+    use super::*;
 
-impl<'a, L: 'a + Iterator<Item = (&'a Char, &'a (u16, u16))>> Iterator for PairsIter<'a, L> {
-    type Item = (Char, Char);
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.right_chars.pop() {
-            Some(right_char) => Some((self.current_left, right_char)),
-            None => match self.left_iter.next() {
-                None => None,
-                Some((&new_left, (lower, upper))) => {
-                    self.current_left = new_left;
-                    self.right_chars = self.program.pairs[*lower as usize..*upper as usize]
-                        .iter()
-                        .map(|t| t.0)
-                        .collect();
-                    Some((new_left, self.right_chars.pop().unwrap()))
-                }
-            },
+    const LIGAROO: &'static str = include_str!["../../corpus/ligaroo.plst"];
+
+    #[derive(PartialEq, Eq, Debug)]
+    enum Element {
+        Char(char),
+        Kern(core::Scaled),
+        Ligature(char, Rc<str>),
+    }
+
+    #[derive(Default)]
+    struct ElementEmitter(Vec<Element>);
+
+    impl Emitter for ElementEmitter {
+        fn emit_character(&mut self, c: char) {
+            self.0.push(Element::Char(c))
+        }
+
+        fn emit_kern(&mut self, kern: core::Scaled) {
+            self.0.push(Element::Kern(kern))
+        }
+
+        fn emit_ligature(&mut self, c: char, original: Rc<str>) {
+            self.0.push(Element::Ligature(c, original))
         }
     }
+
+    fn run_test(input: &str, want: Vec<Element>) {
+        let pl_file = crate::pl::File::from_pl_source_code(&LIGAROO).0;
+        let program = CompiledProgram::compile_from_pl_file(&pl_file).0;
+        let mut emitter: ElementEmitter = Default::default();
+        program.run(input, &mut emitter);
+        assert_eq!(emitter.0, want);
+    }
+
+    macro_rules! tests {
+        ( $(
+            ($name: ident, $input: expr, $want: expr, ),
+        )+ ) => { $(
+            #[test]
+            fn $name() {
+                use Element::*;
+                let input = $input;
+                let want = $want;
+                run_test(input, want);
+            }
+        )+ };
+    }
+
+    tests!(
+        (single_char, "A", vec![Char('A')],),
+        // ab -> ^j
+        (single_lig_1, "ab", vec![Ligature('j', "ab".into())],),
+        // ac -> ^ak
+        (
+            single_lig_2,
+            "ac",
+            vec![Char('a'), Kern(Scaled::ONE * 10), Ligature('k', "c".into())],
+        ),
+        // ad -> a^l
+        (
+            single_lig_3,
+            "ad",
+            vec![Char('a'), Ligature('l', "d".into()),],
+        ),
+        // ae -> ^me
+        (
+            single_lig_4,
+            "ae",
+            vec![Ligature('m', "a".into()), Kern(Scaled::ONE * 10), Char('e'),],
+        ),
+        // af -> n^f
+        (
+            single_lig_5,
+            "af",
+            vec![Ligature('n', "a".into()), Char('f'),],
+        ),
+        // ag -> ^aog
+        (
+            single_lig_6,
+            "ag",
+            vec![
+                Char('a'),
+                Kern(Scaled::ONE * 10),
+                Ligature('o', "".into()),
+                Kern(Scaled::ONE * 10),
+                Char('g'),
+            ],
+        ),
+        // ah -> a^ph
+        (
+            single_lig_7,
+            "ah",
+            vec![
+                Char('a'),
+                Ligature('p', "".into()),
+                Kern(Scaled::ONE * 10),
+                Char('h'),
+            ],
+        ),
+        // ai -> aq^i
+        (
+            single_lig_8,
+            "ai",
+            vec![Char('a'), Ligature('q', "".into()), Char('i'),],
+        ),
+        // xy -> x^y
+        // This is the same as single_lig_3, but the replacement character
+        // is the same as the character that is removed. In theory lig(x, x)
+        // could be replaced by char(x), and this test verifies that it is not.
+        (no_op_lig, "xy", vec![Ligature('x', "x".into()), Char('y'),],),
+        // AC -> ^B, BD -> ^E
+        (multiple_lig_1, "ACD", vec![Ligature('E', "ACD".into()),],),
+        // CE -> ^CDE, DE -> G
+        (
+            multiple_lig_2,
+            "CE",
+            vec![Char('C'), Ligature('G', "E".into()),],
+        ),
+        // EE -> F^E multiple times
+        (
+            multiple_lig_3,
+            "EEEEE",
+            vec![
+                Ligature('F', "E".into()),
+                Ligature('F', "E".into()),
+                Ligature('F', "E".into()),
+                Ligature('F', "E".into()),
+                Char('E'),
+            ],
+        ),
+        // FF -> ^F multiple times
+        (
+            multiple_lig_4,
+            "FFFFFF",
+            vec![Ligature('F', "FFFFFF".into()),],
+        ),
+        // GH -> ^GI, GI -> ^JI
+        (
+            multiple_lig_5,
+            "GH",
+            vec![Ligature('J', "G".into()), Ligature('I', "H".into()),],
+        ),
+        // HA -> ^HB, HB -> ^IB, IB -> C
+        (multiple_lig_6, "HA", vec![Ligature('C', "HA".into())],),
+        // JA -> ^K, KB -> ^KBC
+        (
+            multiple_lig_7,
+            "JAC",
+            vec![
+                Ligature('K', "JA".into()),
+                Ligature('B', "".into()),
+                Char('C'),
+            ],
+        ),
+        (
+            kern_after_lig_1,
+            "abk",
+            vec![
+                Ligature('j', "ab".into()),
+                Kern(Scaled::ONE * 10),
+                Char('k'),
+            ],
+        ),
+        (
+            kern_after_lig_2,
+            "abab",
+            vec![
+                Ligature('j', "ab".into()),
+                Kern(Scaled::ONE * 10),
+                Ligature('j', "ab".into()),
+            ],
+        ),
+    );
 }

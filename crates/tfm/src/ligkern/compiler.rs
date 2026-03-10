@@ -6,10 +6,20 @@ pub fn compile(
     kerns: &[FixWord],
     entry_points: &HashMap<Char, u16>,
 ) -> (CompiledProgram, Vec<InfiniteLoopError>) {
-    let pair_to_instruction = build_pair_to_instruction_map(program, entry_points);
-    let (pair_to_replacement, infinite_loop_errors) =
+    let pair_to_instruction = build_node_to_program_start_map(program, entry_points);
+    let (replacements, infinite_loop_errors) =
         calculate_replacements(program, kerns, pair_to_instruction);
-    let program = lower_and_optimize(pair_to_replacement);
+    let program = CompiledProgram {
+        replacements: replacements
+            .into_iter()
+            .filter_map(|(node, replacement)| {
+                match node.0 {
+                    LeftChar::Char(char) => Some(((char, node.1), replacement)),
+                    LeftChar::BoundaryChar => None, // TODO
+                }
+            })
+            .collect(),
+    };
     (program, infinite_loop_errors)
 }
 
@@ -18,18 +28,74 @@ struct Node(LeftChar, Char);
 
 struct OngoingCalculation {
     // Node this calculation is for.
+    // TODO: rename root?
     node: Node,
-    // Part of the ligature result that has been finalized and won't change.
-    finalized: Finalized,
+
+    finalized: Vec<IntermediateOp>,
     // Characters that are still pending replacement. The next step is to apply the ligature
     // rule for the node. After that, if the second element is not empty, the next step
-    // is to apply the ligature rule for (tuple.0.1, tuple.1).
-    pending: (Node, Option<Char>),
+    // is to apply the ligature rule for (pending.1, pending.2).
+    pending: Pending,
+}
+
+struct Pending(Option<C>, C, Option<C>);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct C {
+    pub c: Char,
+    pub is_lig: bool,
+    pub consumes_left: bool,
+    pub consumes_right: bool,
+}
+
+impl C {
+    fn left_char(c: LeftChar) -> Option<Self> {
+        match c {
+            LeftChar::Char(c) => Some(Self {
+                c,
+                is_lig: false,
+                consumes_left: true,
+                consumes_right: false,
+            }),
+            LeftChar::BoundaryChar => None,
+        }
+    }
+
+    fn char(c: Char, is_left_char: bool) -> Self {
+        Self {
+            c,
+            is_lig: false,
+            consumes_left: is_left_char,
+            consumes_right: !is_left_char,
+        }
+    }
+    fn merge(&self, left: &Option<C>, right: &C) -> Self {
+        let (left_is_lig, left_consumes_left, left_consumes_right) = match left {
+            None => (false, true, false),
+            Some(left) => (left.is_lig, left.consumes_left, left.consumes_right),
+        };
+        C {
+            c: self.c,
+            is_lig: self.is_lig
+                || (self.consumes_left && left_is_lig)
+                || (self.consumes_right && right.is_lig),
+            consumes_left: (self.consumes_left && left_consumes_left)
+                || (self.consumes_right && right.consumes_left),
+            consumes_right: (self.consumes_left && left_consumes_right)
+                || (self.consumes_right && right.consumes_right),
+        }
+    }
 }
 
 impl OngoingCalculation {
     fn child(&self) -> Node {
-        self.pending.0
+        Node(
+            match &self.pending.0 {
+                Some(c) => LeftChar::Char(c.c),
+                None => LeftChar::BoundaryChar,
+            },
+            self.pending.1.c,
+        )
     }
 }
 
@@ -65,7 +131,16 @@ impl TryFrom<LeftChar> for Char {
     }
 }
 
-fn build_pair_to_instruction_map(
+impl std::fmt::Display for LeftChar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LeftChar::Char(char) => write!(f, "{char}"),
+            LeftChar::BoundaryChar => Ok(()),
+        }
+    }
+}
+
+fn build_node_to_program_start_map(
     program: &lang::Program,
     entry_points: &HashMap<Char, u16>,
 ) -> HashMap<Node, usize> {
@@ -102,75 +177,16 @@ fn build_pair_to_instruction_map(
     result
 }
 
-// TODO: replace the first LeftChar with a bool indicating whether the
-// first character is deleted. Anytime we need the first char, get it from
-// the context. I think in this way we can remove all of the expect() calls
-// on boundary chars.
-struct Replacement(LeftChar, Vec<(FixWord, Char)>);
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Replacement(pub(super) Vec<IntermediateOp>, pub C);
 
-enum Finalized {
-    Empty,
-    NonEmpty {
-        replacement: Replacement,
-        last_kern: FixWord,
-    },
-}
-
-impl Finalized {
-    fn new_single_char(c1: LeftChar) -> Self {
-        Finalized::NonEmpty {
-            replacement: Replacement(c1, vec![]),
-            last_kern: FixWord::ZERO,
+macro_rules! vecc {
+    ($head:expr, $($tail:expr,)*) => (
+        match $head {
+            None => vec![$($tail),*],
+            Some(head) => vec![head, $($tail),*],
         }
-    }
-    fn new_double_char(c1: LeftChar, c2: Char) -> Self {
-        Finalized::NonEmpty {
-            replacement: Replacement(c1, vec![(FixWord::ZERO, c2)]),
-            last_kern: FixWord::ZERO,
-        }
-    }
-    fn finish(self, last_char: Char) -> Replacement {
-        match self {
-            Finalized::Empty => Replacement(last_char.into(), vec![]),
-            Finalized::NonEmpty {
-                mut replacement,
-                last_kern,
-            } => {
-                replacement.1.push((last_kern, last_char));
-                replacement
-            }
-        }
-    }
-    fn push(&mut self, c: LeftChar, kern: FixWord) {
-        match self {
-            Finalized::Empty => {
-                *self = Finalized::NonEmpty {
-                    replacement: Replacement(c, vec![]),
-                    last_kern: kern,
-                }
-            }
-            Finalized::NonEmpty {
-                replacement,
-                last_kern,
-            } => {
-                replacement.1.push((
-                    *last_kern,
-                    c.try_into()
-                        .expect("boundary char can't appear in the middle of a replacement"),
-                ));
-                *last_kern = kern;
-            }
-        }
-    }
-
-    fn extend(&mut self, replacement: &Replacement) -> LeftChar {
-        let mut c: LeftChar = replacement.0;
-        for (kern, next_c) in replacement.1.iter().copied() {
-            self.push(c, kern);
-            c = next_c.into();
-        }
-        c
-    }
+    );
 }
 
 fn calculate_replacements(
@@ -178,7 +194,7 @@ fn calculate_replacements(
     kerns: &[FixWord],
     pair_to_instruction: HashMap<Node, usize>,
 ) -> (HashMap<Node, Replacement>, Vec<InfiniteLoopError>) {
-    let mut result: HashMap<Node, Replacement> = Default::default();
+    let mut new_result: HashMap<Node, Replacement> = Default::default();
     let mut actionable: Vec<OngoingCalculation> = vec![];
     let mut node_to_parents: HashMap<Node, Vec<OngoingCalculation>> = Default::default();
     for (&pair, &index) in &pair_to_instruction {
@@ -193,25 +209,30 @@ fn calculate_replacements(
             }
             operation => operation,
         };
-        enum Pending {
-            None(Char),
-            One(Node),
-            Two(Node, Char),
-        }
-        let (finalized, pending): (Finalized, Pending) = match operation {
+        let (finalized, pending): (Vec<C>, Option<Pending>) = match operation {
             lang::Operation::Kern(kern) => {
-                result.insert(pair, Replacement(left, vec![(kern, right)]));
+                new_result.insert(
+                    pair,
+                    Replacement(
+                        match C::left_char(left) {
+                            None => vec![IntermediateOp::Kern(kern)],
+                            Some(left) => vec![IntermediateOp::C(left), IntermediateOp::Kern(kern)],
+                        },
+                        C::char(right, false),
+                    ),
+                );
                 continue;
             }
             lang::Operation::KernAtIndex(index) => {
-                result.insert(
+                let kern = kerns.get(index as usize).copied().unwrap_or_default();
+                new_result.insert(
                     pair,
                     Replacement(
-                        left,
-                        vec![(
-                            kerns.get(index as usize).copied().unwrap_or_default(),
-                            right,
-                        )],
+                        match C::left_char(left) {
+                            None => vec![IntermediateOp::Kern(kern)],
+                            Some(left) => vec![IntermediateOp::C(left), IntermediateOp::Kern(kern)],
+                        },
+                        C::char(right, false),
                     ),
                 );
                 continue;
@@ -225,58 +246,135 @@ fn calculate_replacements(
                 post_lig_tag_invalid: _,
             } => match post_lig_operation {
                 lang::PostLigOperation::RetainBothMoveNowhere => (
-                    Finalized::Empty,
-                    Pending::Two(Node(left, char_to_insert), right),
+                    // finalized
+                    vec![],
+                    // pending
+                    Some(Pending(
+                        C::left_char(left),
+                        C {
+                            c: char_to_insert,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        },
+                        Some(C::char(right, false)),
+                    )),
                 ),
                 lang::PostLigOperation::RetainBothMoveToInserted => (
-                    Finalized::new_single_char(left),
-                    Pending::One(Node(char_to_insert.into(), right)),
+                    // finalized
+                    vecc![C::left_char(left),],
+                    // pending
+                    Some(Pending(
+                        Some(C {
+                            c: char_to_insert,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                        C::char(right, false),
+                        None,
+                    )),
                 ),
                 lang::PostLigOperation::RetainBothMoveToRight => (
-                    Finalized::new_double_char(left, char_to_insert),
-                    Pending::None(right),
+                    // finalized
+                    vecc![
+                        C::left_char(left),
+                        C {
+                            c: char_to_insert,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        },
+                        C::char(right, false),
+                    ],
+                    // pending
+                    None,
                 ),
                 lang::PostLigOperation::RetainRightMoveToInserted => (
-                    Finalized::Empty,
-                    Pending::One(Node(char_to_insert.into(), right)),
+                    // finalized
+                    vec![],
+                    // pending
+                    Some(Pending(
+                        Some(C {
+                            c: char_to_insert,
+                            is_lig: true,
+                            consumes_left: true,
+                            consumes_right: false,
+                        }),
+                        C::char(right, false),
+                        None,
+                    )),
                 ),
                 lang::PostLigOperation::RetainRightMoveToRight => (
-                    Finalized::new_single_char(char_to_insert.into()),
-                    Pending::None(right),
+                    // finalized
+                    vec![
+                        C {
+                            c: char_to_insert,
+                            is_lig: true,
+                            consumes_left: true,
+                            consumes_right: false,
+                        },
+                        C::char(right, false),
+                    ],
+                    // pending
+                    None,
                 ),
-                lang::PostLigOperation::RetainLeftMoveNowhere => {
-                    (Finalized::Empty, Pending::One(Node(left, char_to_insert)))
-                }
+                lang::PostLigOperation::RetainLeftMoveNowhere => (
+                    // finalized
+                    vec![],
+                    // pending
+                    Some(Pending(
+                        C::left_char(left),
+                        C {
+                            c: char_to_insert,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: true,
+                        },
+                        None,
+                    )),
+                ),
                 lang::PostLigOperation::RetainLeftMoveToInserted => (
-                    Finalized::new_single_char(left),
-                    Pending::None(char_to_insert),
+                    // finalized
+                    vecc![
+                        C::left_char(left),
+                        C {
+                            c: char_to_insert,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: true,
+                        },
+                    ],
+                    // pending
+                    None,
                 ),
-                lang::PostLigOperation::RetainNeitherMoveToInserted => {
-                    (Finalized::Empty, Pending::None(char_to_insert))
-                }
+                lang::PostLigOperation::RetainNeitherMoveToInserted => (
+                    // finalized
+                    vec![C {
+                        c: char_to_insert,
+                        is_lig: true,
+                        consumes_left: true,
+                        consumes_right: true,
+                    }],
+                    //pending
+                    None,
+                ),
             },
         };
-        match pending {
-            Pending::None(cursor) => {
-                result.insert(pair, finalized.finish(cursor));
-            }
-            Pending::One(node) => {
-                actionable.push(OngoingCalculation {
-                    node: pair,
-                    finalized,
-                    pending: (node, None),
-                });
-                node_to_parents.insert(pair, vec![]);
-            }
-            Pending::Two(node, c3) => {
-                actionable.push(OngoingCalculation {
-                    node: pair,
-                    finalized,
-                    pending: (node, Some(c3)),
-                });
-                node_to_parents.insert(pair, vec![]);
-            }
-        };
+        if let Some(pending) = pending {
+            let finalized = finalized.into_iter().map(IntermediateOp::C).collect();
+            actionable.push(OngoingCalculation {
+                node: pair,
+                finalized,
+                pending,
+            });
+            node_to_parents.insert(pair, vec![]);
+        } else {
+            let mut finalized = finalized;
+            let last = finalized.pop().unwrap();
+            let finalized = finalized.into_iter().map(IntermediateOp::C).collect();
+            new_result.insert(pair, Replacement(finalized, last));
+        }
     }
 
     while let Some(mut calc) = actionable.pop() {
@@ -285,26 +383,37 @@ fn calculate_replacements(
             blocking.push(calc);
             continue;
         }
-        let last = match result.get(&child) {
+
+        let last = match new_result.get(&child) {
             None => {
-                calc.finalized.push(child.0, FixWord::ZERO);
-                child.1
+                // There is no lig/kern rule for this pair.
+                if let Some(left) = calc.pending.0.clone() {
+                    calc.finalized.push(IntermediateOp::C(left));
+                }
+                calc.pending.1.clone()
             }
-            Some(replacement) => calc
-                .finalized
-                .extend(replacement)
-                .try_into()
-                .expect("boundary char can't be in the middle of a replacement"),
+            Some(replacement) => {
+                let left = calc.pending.0.clone();
+                let right = calc.pending.1.clone();
+                for elem in &replacement.0 {
+                    let elem = match elem {
+                        IntermediateOp::Kern(_) => elem.clone(),
+                        IntermediateOp::C(c) => IntermediateOp::C(c.merge(&left, &right)),
+                    };
+                    calc.finalized.push(elem);
+                }
+                replacement.1.merge(&left, &right)
+            }
         };
-        match calc.pending.1 {
+        match calc.pending.2 {
             None => {
                 if let Some(blocking) = node_to_parents.remove(&calc.node) {
                     actionable.extend(blocking);
                 }
-                result.insert(calc.node, calc.finalized.finish(last));
+                new_result.insert(calc.node, Replacement(calc.finalized, last));
             }
-            Some(other) => {
-                calc.pending = (Node(last.into(), other), None);
+            Some(new_right) => {
+                calc.pending = Pending(Some(last), new_right, None);
                 actionable.push(calc);
             }
         }
@@ -371,74 +480,7 @@ fn calculate_replacements(
             });
         }
     }
-
-    (result, infinite_loop_errors)
-}
-
-fn lower_and_optimize(pair_to_replacement: HashMap<Node, Replacement>) -> CompiledProgram {
-    let mut intermediate: HashMap<LeftChar, Vec<(Char, RawReplacement)>> = Default::default();
-    let mut middle_chars: Vec<(Char, FixWord)> = Default::default();
-
-    for (node, Replacement(head, tail)) in pair_to_replacement {
-        let start: u16 = middle_chars.len().try_into().unwrap();
-
-        let (left_char_operation, last_char) = match tail.first().copied() {
-            None => {
-                let head: Char = head.try_into().expect("boundary chars cannot appear as replacements (in this case for the deleted left char");
-                (LeftCharOperation::Delete, head)
-            }
-            Some((first_kern, mut last_char)) => {
-                let left_char_operation = if node.0 == head {
-                    if first_kern == FixWord::ZERO {
-                        LeftCharOperation::Retain
-                    } else {
-                        LeftCharOperation::AppendKern(first_kern)
-                    }
-                } else {
-                    let head: Char = head.try_into().expect("boundary chars cannot appear as replacements (in this case for the deleted left char");
-                    middle_chars.push((head, first_kern));
-                    LeftCharOperation::Delete
-                };
-                for (kern, c) in tail[1..].iter().copied() {
-                    middle_chars.push((last_char, kern));
-                    last_char = c;
-                }
-                (left_char_operation, last_char)
-            }
-        };
-
-        let end: u16 = middle_chars.len().try_into().unwrap();
-        intermediate.entry(node.0).or_default().push((
-            node.1,
-            RawReplacement {
-                left_char_operation,
-                middle_char_bounds: start..end,
-                last_char,
-            },
-        ));
-    }
-
-    let mut left_to_pairs: BTreeMap<Char, (u16, u16)> = Default::default();
-    let mut pairs: Vec<(Char, RawReplacement)> = Default::default();
-
-    for (left, replacements) in intermediate {
-        let start: u16 = pairs.len().try_into().unwrap();
-        pairs.extend(replacements);
-        let end: u16 = pairs.len().try_into().unwrap();
-        match left {
-            LeftChar::Char(left) => {
-                left_to_pairs.insert(left, (start, end));
-            }
-            LeftChar::BoundaryChar => {
-                // TODO
-            }
-        }
-    }
-    CompiledProgram {
-        left_to_pairs,
-        pairs,
-        middle_chars,
-    }
+    (new_result, infinite_loop_errors)
 }
 
 #[cfg(test)]
@@ -478,20 +520,18 @@ mod tests {
     fn run_success_test(
         instructions: Vec<lang::Instruction>,
         entry_points: Vec<(char, u16)>,
-        want: Vec<(char, char, Vec<(char, FixWord)>)>,
+        want_new: Vec<(char, char, Vec<IntermediateOp>, C)>,
     ) {
         let entry_points: HashMap<Char, u16> = entry_points
             .into_iter()
             .map(|(c, u)| (c.try_into().unwrap(), u))
             .collect();
-        let want: HashMap<(Char, Char), Vec<(Char, FixWord)>> = want
+        let want_new: HashMap<(Char, Char), Replacement> = want_new
             .into_iter()
             .map(|t| {
                 (
                     (t.0.try_into().unwrap(), t.1.try_into().unwrap()),
-                    t.2.into_iter()
-                        .map(|(c, n)| (c.try_into().unwrap(), n))
-                        .collect(),
+                    Replacement(t.2, t.3),
                 )
             })
             .collect();
@@ -502,25 +542,26 @@ mod tests {
         let (compiled_program, infinite_loop_error_or) = compile(&program, &vec![], &entry_points);
         assert!(infinite_loop_error_or.is_empty(), "no infinite loop errors");
 
-        let mut got: HashMap<(Char, Char), Vec<(Char, FixWord)>> = Default::default();
-        for pair in compiled_program.all_pairs_having_ops() {
-            let op = compiled_program.get_op(pair.0, pair.1);
-            let replacement: Vec<(Char, FixWord)> = op.build_sequence(pair.0, pair.1);
-            got.insert(pair, replacement);
+        let mut got_new: HashMap<(Char, Char), Replacement> = Default::default();
+        for pair in compiled_program.all_pairs_with_replacements() {
+            let replacement = compiled_program
+                .get_replacement_utf8(pair.0.into(), pair.1.into())
+                .unwrap();
+            got_new.insert(pair, replacement.clone());
         }
 
-        assert_eq!(got, want);
+        assert_eq!(got_new, want_new);
     }
 
     macro_rules! success_tests {
-        ( $( ($name: ident, $instructions: expr, $entry_points: expr, $want: expr, ), )+ ) => {
+        ( $( ($name: ident, $instructions: expr, $entry_points: expr, $want_new: expr, ), )+ ) => {
             $(
                 #[test]
                 fn $name() {
                     let instructions = $instructions;
                     let entry_points = $entry_points;
-                    let want = $want;
-                    run_success_test(instructions, entry_points, want);
+                    let want_new = $want_new;
+                    run_success_test(instructions, entry_points, want_new);
                 }
             )+
         };
@@ -532,15 +573,39 @@ mod tests {
             kern,
             vec![new_kern(None, 'V', FixWord::ONE)],
             vec![('A', 0)],
-            vec![('A', 'V', vec![('A', FixWord::ONE), ('V', FixWord::ZERO)]),],
+            vec![(
+                'A',
+                'V',
+                vec![
+                    IntermediateOp::C(C::char(Char::A, true)),
+                    IntermediateOp::Kern(FixWord::ONE)
+                ],
+                C::char(Char::V, false),
+            )],
         ),
         (
             same_kern_for_multiple_left_characters,
             vec![new_kern(None, 'V', FixWord::ONE)],
             vec![('A', 0), ('B', 0)],
             vec![
-                ('A', 'V', vec![('A', FixWord::ONE), ('V', FixWord::ZERO)]),
-                ('B', 'V', vec![('B', FixWord::ONE), ('V', FixWord::ZERO)]),
+                (
+                    'A',
+                    'V',
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::Kern(FixWord::ONE)
+                    ],
+                    C::char(Char::V, false),
+                ),
+                (
+                    'B',
+                    'V',
+                    vec![
+                        IntermediateOp::C(C::char(Char::B, true)),
+                        IntermediateOp::Kern(FixWord::ONE)
+                    ],
+                    C::char(Char::V, false),
+                ),
             ],
         ),
         (
@@ -553,7 +618,11 @@ mod tests {
             vec![(
                 'A',
                 'V',
-                vec![('A', FixWord::ONE * 2), ('V', FixWord::ZERO)]
+                vec![
+                    IntermediateOp::C(C::char(Char::A, true)),
+                    IntermediateOp::Kern(FixWord::ONE * 2)
+                ],
+                C::char(Char::V, false),
             ),],
         ),
         (
@@ -568,22 +637,38 @@ mod tests {
                 (
                     'A',
                     'V',
-                    vec![('A', FixWord::ONE * 2), ('V', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 2)
+                    ],
+                    C::char(Char::V, false),
                 ),
                 (
                     'A',
                     'W',
-                    vec![('A', FixWord::ONE * 3), ('W', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 3)
+                    ],
+                    C::char(Char::W, false),
                 ),
                 (
                     'B',
                     'W',
-                    vec![('B', FixWord::ONE * 3), ('W', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::B, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 3)
+                    ],
+                    C::char(Char::W, false),
                 ),
                 (
                     'C',
                     'X',
-                    vec![('C', FixWord::ONE * 4), ('X', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::C, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 4)
+                    ],
+                    C::char(Char::X, false),
                 ),
             ],
         ),
@@ -591,7 +676,17 @@ mod tests {
             single_lig_1,
             vec![new_lig(None, 'B', 'Z', RetainNeitherMoveToInserted)],
             vec![('A', 0)],
-            vec![('A', 'B', vec![('Z', FixWord::ZERO)])],
+            vec![(
+                'A',
+                'B',
+                vec![],
+                C {
+                    c: Char::Z,
+                    is_lig: true,
+                    consumes_left: true,
+                    consumes_right: true,
+                }
+            ),],
         ),
         (
             single_lig_2,
@@ -601,8 +696,26 @@ mod tests {
             ],
             vec![('A', 0)],
             vec![
-                ('A', 'B', vec![('A', FixWord::ZERO), ('Z', FixWord::ZERO)]),
-                ('A', 'Z', vec![('A', FixWord::ONE), ('Z', FixWord::ZERO)]),
+                (
+                    'A',
+                    'B',
+                    vec![IntermediateOp::C(C::char(Char::A, true)),],
+                    C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: false,
+                        consumes_right: true,
+                    }
+                ),
+                (
+                    'A',
+                    'Z',
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::Kern(FixWord::ONE)
+                    ],
+                    C::char(Char::Z, false),
+                ),
             ],
         ),
         (
@@ -613,15 +726,46 @@ mod tests {
             ],
             vec![('A', 0)],
             vec![
-                ('A', 'B', vec![('A', FixWord::ONE), ('Z', FixWord::ZERO)]),
-                ('A', 'Z', vec![('A', FixWord::ONE), ('Z', FixWord::ZERO)]),
+                (
+                    'A',
+                    'B',
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::Kern(FixWord::ONE),
+                    ],
+                    C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: false,
+                        consumes_right: true,
+                    }
+                ),
+                (
+                    'A',
+                    'Z',
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::Kern(FixWord::ONE),
+                    ],
+                    C::char(Char::Z, false),
+                ),
             ],
         ),
         (
             retain_left_move_nowhere_2,
             vec![new_lig(None, 'B', 'Z', RetainLeftMoveNowhere),],
             vec![('A', 0)],
-            vec![('A', 'B', vec![('A', FixWord::ZERO), ('Z', FixWord::ZERO)]),],
+            vec![(
+                'A',
+                'B',
+                vec![IntermediateOp::C(C::char(Char::A, true)),],
+                C {
+                    c: Char::Z,
+                    is_lig: true,
+                    consumes_left: false,
+                    consumes_right: true,
+                }
+            ),],
         ),
         (
             single_lig_4,
@@ -631,8 +775,29 @@ mod tests {
             ],
             vec![('A', 0), ('Z', 1)],
             vec![
-                ('A', 'B', vec![('Z', FixWord::ONE), ('B', FixWord::ZERO)]),
-                ('Z', 'B', vec![('Z', FixWord::ONE), ('B', FixWord::ZERO)]),
+                (
+                    'A',
+                    'B',
+                    vec![
+                        IntermediateOp::C(C {
+                            c: Char::Z,
+                            is_lig: true,
+                            consumes_left: true,
+                            consumes_right: false,
+                        }),
+                        IntermediateOp::Kern(FixWord::ONE),
+                    ],
+                    C::char(Char::B, false),
+                ),
+                (
+                    'Z',
+                    'B',
+                    vec![
+                        IntermediateOp::C(C::char(Char::Z, true)),
+                        IntermediateOp::Kern(FixWord::ONE),
+                    ],
+                    C::char(Char::B, false),
+                ),
             ],
         ),
         (
@@ -643,8 +808,26 @@ mod tests {
             ],
             vec![('A', 0), ('Z', 1)],
             vec![
-                ('A', 'B', vec![('Z', FixWord::ZERO), ('B', FixWord::ZERO)]),
-                ('Z', 'B', vec![('Z', FixWord::ONE), ('B', FixWord::ZERO)]),
+                (
+                    'A',
+                    'B',
+                    vec![IntermediateOp::C(C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: true,
+                        consumes_right: false,
+                    })],
+                    C::char(Char::B, false),
+                ),
+                (
+                    'Z',
+                    'B',
+                    vec![
+                        IntermediateOp::C(C::char(Char::Z, true)),
+                        IntermediateOp::Kern(FixWord::ONE),
+                    ],
+                    C::char(Char::B, false),
+                ),
             ],
         ),
         (
@@ -660,20 +843,35 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ONE * 2),
-                        ('Z', FixWord::ONE * 3),
-                        ('B', FixWord::ZERO)
-                    ]
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 2),
+                        IntermediateOp::C(C {
+                            c: Char::Z,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                        IntermediateOp::Kern(FixWord::ONE * 3),
+                    ],
+                    C::char(Char::B, false),
                 ),
                 (
                     'A',
                     'Z',
-                    vec![('A', FixWord::ONE * 2), ('Z', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 2),
+                    ],
+                    C::char(Char::Z, false),
                 ),
                 (
                     'Z',
                     'B',
-                    vec![('Z', FixWord::ONE * 3), ('B', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::Z, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 3),
+                    ],
+                    C::char(Char::B, false),
                 ),
             ],
         ),
@@ -685,10 +883,15 @@ mod tests {
                 'A',
                 'B',
                 vec![
-                    ('A', FixWord::ZERO),
-                    ('Z', FixWord::ZERO),
-                    ('B', FixWord::ZERO)
-                ]
+                    IntermediateOp::C(C::char(Char::A, true)),
+                    IntermediateOp::C(C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: false,
+                        consumes_right: false,
+                    }),
+                ],
+                C::char(Char::B, false),
             ),],
         ),
         (
@@ -703,12 +906,27 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Y', FixWord::ZERO),
-                        ('B', FixWord::ZERO)
-                    ]
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Y,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                    ],
+                    C::char(Char::B, false),
                 ),
-                ('Z', 'B', vec![('Y', FixWord::ZERO), ('B', FixWord::ZERO),]),
+                (
+                    'Z',
+                    'B',
+                    vec![IntermediateOp::C(C {
+                        c: Char::Y,
+                        is_lig: true,
+                        consumes_left: true,
+                        consumes_right: false,
+                    }),],
+                    C::char(Char::B, false),
+                ),
             ],
         ),
         (
@@ -723,20 +941,40 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Y', FixWord::ZERO),
-                        ('Z', FixWord::ZERO),
-                        ('B', FixWord::ZERO)
-                    ]
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Y,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                        IntermediateOp::C(C {
+                            c: Char::Z,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                    ],
+                    C::char(Char::B, false),
                 ),
                 (
                     'A',
                     'Z',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Y', FixWord::ZERO),
-                        ('Z', FixWord::ZERO)
-                    ]
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Y,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                    ],
+                    C {
+                        c: Char::Z,
+                        is_lig: false,
+                        consumes_left: false,
+                        consumes_right: true,
+                    }
                 ),
             ],
         ),
@@ -753,20 +991,34 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Z', FixWord::ONE * 3),
-                        ('B', FixWord::ZERO)
-                    ]
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Z,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                        IntermediateOp::Kern(FixWord::ONE * 3),
+                    ],
+                    C::char(Char::B, false),
                 ),
                 (
                     'A',
                     'Z',
-                    vec![('A', FixWord::ONE * 2), ('Z', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 2),
+                    ],
+                    C::char(Char::Z, false),
                 ),
                 (
                     'Z',
                     'B',
-                    vec![('Z', FixWord::ONE * 3), ('B', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::Z, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 3),
+                    ],
+                    C::char(Char::B, false),
                 ),
             ],
         ),
@@ -782,15 +1034,26 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Y', FixWord::ZERO),
-                        ('B', FixWord::ZERO)
-                    ]
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Y,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                    ],
+                    C::char(Char::B, false),
                 ),
                 (
                     'Z',
                     'B',
-                    vec![('Y', FixWord::ZERO * 3), ('B', FixWord::ZERO)]
+                    vec![IntermediateOp::C(C {
+                        c: Char::Y,
+                        is_lig: true,
+                        consumes_left: true,
+                        consumes_right: false,
+                    }),],
+                    C::char(Char::B, false),
                 ),
             ],
         ),
@@ -802,10 +1065,15 @@ mod tests {
                 'A',
                 'B',
                 vec![
-                    ('A', FixWord::ZERO),
-                    ('Z', FixWord::ZERO),
-                    ('B', FixWord::ZERO)
-                ]
+                    IntermediateOp::C(C::char(Char::A, true)),
+                    IntermediateOp::C(C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: false,
+                        consumes_right: false,
+                    }),
+                ],
+                C::char(Char::B, false),
             ),],
         ),
         (
@@ -820,15 +1088,26 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Y', FixWord::ZERO),
-                        ('B', FixWord::ZERO)
-                    ]
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Y,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                    ],
+                    C::char(Char::B, false),
                 ),
                 (
                     'Z',
                     'B',
-                    vec![('Y', FixWord::ZERO * 3), ('B', FixWord::ZERO)]
+                    vec![IntermediateOp::C(C {
+                        c: Char::Y,
+                        is_lig: true,
+                        consumes_left: true,
+                        consumes_right: false,
+                    }),],
+                    C::char(Char::B, false),
                 ),
             ],
         ),
@@ -845,20 +1124,110 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        ('A', FixWord::ZERO),
-                        ('Z', FixWord::ZERO),
-                        ('B', FixWord::ZERO)
-                    ]
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Z,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                    ],
+                    C::char(Char::B, false),
                 ),
                 (
                     'A',
                     'Z',
-                    vec![('A', FixWord::ONE * 2), ('Z', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 2),
+                    ],
+                    C::char(Char::Z, false),
                 ),
                 (
                     'Z',
                     'B',
-                    vec![('Z', FixWord::ONE * 3), ('B', FixWord::ZERO)]
+                    vec![
+                        IntermediateOp::C(C::char(Char::Z, true)),
+                        IntermediateOp::Kern(FixWord::ONE * 3),
+                    ],
+                    C::char(Char::B, false),
+                ),
+            ],
+        ),
+        (
+            is_lig_propagated_1,
+            vec![
+                new_lig(None, 'B', 'Y', RetainBothMoveToInserted,),
+                new_lig(None, 'B', 'Z', RetainLeftMoveToInserted,),
+            ],
+            vec![('A', 0), ('Y', 1)],
+            vec![
+                (
+                    'A',
+                    'B',
+                    vec![
+                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C {
+                            c: Char::Y,
+                            is_lig: true,
+                            consumes_left: false,
+                            consumes_right: false,
+                        }),
+                    ],
+                    C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: false,
+                        consumes_right: true,
+                    },
+                ),
+                (
+                    'Y',
+                    'B',
+                    vec![IntermediateOp::C(C::char(Char::Y, true)),],
+                    C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: false,
+                        consumes_right: true,
+                    }
+                ),
+            ],
+        ),
+        (
+            is_lig_propagated_2,
+            vec![
+                new_lig(Some(0), 'B', 'Y', RetainLeftMoveNowhere,),
+                new_lig(None, 'Y', 'Z', RetainRightMoveToRight,),
+            ],
+            vec![('A', 0)],
+            vec![
+                (
+                    'A',
+                    'B',
+                    vec![IntermediateOp::C(C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: true,
+                        consumes_right: false,
+                    }),],
+                    C {
+                        c: Char::Y,
+                        is_lig: true,
+                        consumes_left: false,
+                        consumes_right: true,
+                    },
+                ),
+                (
+                    'A',
+                    'Y',
+                    vec![IntermediateOp::C(C {
+                        c: Char::Z,
+                        is_lig: true,
+                        consumes_left: true,
+                        consumes_right: false,
+                    }),],
+                    C::char(Char::Y, false)
                 ),
             ],
         ),
