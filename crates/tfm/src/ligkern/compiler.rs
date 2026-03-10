@@ -35,11 +35,10 @@ struct OngoingCalculation {
     // Characters that are still pending replacement. The next step is to apply the ligature
     // rule for the node. After that, if the second element is not empty, the next step
     // is to apply the ligature rule for (tuple.0.1, tuple.1).
-    // pending_new: (LigOrChar, LigOrChar, Option<LigOrChar>),
-    // Invariant: either 2 or 3 elements in size?
-    // Lets make a special type for this?
-    pending: Vec<C>,
+    pending: Pending,
 }
+
+struct Pending(C, C, Option<C>);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct C {
@@ -74,7 +73,7 @@ impl C {
 
 impl OngoingCalculation {
     fn child(&self) -> Node {
-        Node(self.pending[0].c.into(), self.pending[1].c.into())
+        Node(self.pending.0.c.into(), self.pending.1.c.into())
     }
 }
 
@@ -179,12 +178,13 @@ fn calculate_replacements(
             }
             operation => operation,
         };
-        let (finalized, pending): (Vec<C>, Vec<C>) = match operation {
+        let (finalized, pending): (Vec<C>, Option<Pending>) = match operation {
             lang::Operation::Kern(kern) => {
                 new_result.insert(
                     pair,
                     Replacement(
                         vec![
+                            // omit the ::C if left is boundary
                             IntermediateOp::C(C::char(left.try_into().unwrap(), true)),
                             IntermediateOp::Kern(kern),
                         ],
@@ -199,6 +199,7 @@ fn calculate_replacements(
                     pair,
                     Replacement(
                         vec![
+                            // omit the ::C if left is boundary
                             IntermediateOp::C(C::char(left.try_into().unwrap(), true)),
                             IntermediateOp::Kern(kern),
                         ],
@@ -219,7 +220,8 @@ fn calculate_replacements(
                     // finalized
                     vec![],
                     // pending
-                    vec![
+                    Some(Pending(
+                        // handle left=boundary probably using an enum
                         C::char(left.try_into().unwrap(), true),
                         C {
                             c: char_to_insert,
@@ -227,26 +229,29 @@ fn calculate_replacements(
                             consumes_left: false,
                             consumes_right: false,
                         },
-                        C::char(right.try_into().unwrap(), false),
-                    ],
+                        Some(C::char(right, false)),
+                    )),
                 ),
                 lang::PostLigOperation::RetainBothMoveToInserted => (
                     // finalized
+                    // omit the ::C if left is boundary
                     vec![C::char(left.try_into().unwrap(), true)],
                     // pending
-                    vec![
+                    Some(Pending(
                         C {
                             c: char_to_insert,
                             is_lig: true,
                             consumes_left: false,
                             consumes_right: false,
                         },
-                        C::char(right.try_into().unwrap(), false),
-                    ],
+                        C::char(right, false),
+                        None,
+                    )),
                 ),
                 lang::PostLigOperation::RetainBothMoveToRight => (
                     // finalized
                     vec![
+                        // omit the ::C if left is boundary
                         C::char(left.try_into().unwrap(), true),
                         C {
                             c: char_to_insert,
@@ -254,24 +259,25 @@ fn calculate_replacements(
                             consumes_left: false,
                             consumes_right: false,
                         },
-                        C::char(right.try_into().unwrap(), false),
+                        C::char(right, false),
                     ],
                     // pending
-                    vec![],
+                    None,
                 ),
                 lang::PostLigOperation::RetainRightMoveToInserted => (
                     // finalized
                     vec![],
                     // pending
-                    vec![
+                    Some(Pending(
                         C {
                             c: char_to_insert,
                             is_lig: true,
                             consumes_left: true,
                             consumes_right: false,
                         },
-                        C::char(right.try_into().unwrap(), false),
-                    ],
+                        C::char(right, false),
+                        None,
+                    )),
                 ),
                 lang::PostLigOperation::RetainRightMoveToRight => (
                     // finalized
@@ -282,16 +288,17 @@ fn calculate_replacements(
                             consumes_left: true,
                             consumes_right: false,
                         },
-                        C::char(right.try_into().unwrap(), false),
+                        C::char(right, false),
                     ],
                     // pending
-                    vec![],
+                    None,
                 ),
                 lang::PostLigOperation::RetainLeftMoveNowhere => (
                     // finalized
                     vec![],
                     // pending
-                    vec![
+                    Some(Pending(
+                        // handle left=boundary probably using an enum
                         C::char(left.try_into().unwrap(), true),
                         C {
                             c: char_to_insert,
@@ -299,11 +306,13 @@ fn calculate_replacements(
                             consumes_left: false,
                             consumes_right: true,
                         },
-                    ],
+                        None,
+                    )),
                 ),
                 lang::PostLigOperation::RetainLeftMoveToInserted => (
                     // finalized
                     vec![
+                        // omit the ::C if left is boundary
                         C::char(left.try_into().unwrap(), true),
                         C {
                             c: char_to_insert,
@@ -313,7 +322,7 @@ fn calculate_replacements(
                         },
                     ],
                     // pending
-                    vec![],
+                    None,
                 ),
                 lang::PostLigOperation::RetainNeitherMoveToInserted => (
                     // finalized
@@ -324,11 +333,11 @@ fn calculate_replacements(
                         consumes_right: true,
                     }],
                     //pending
-                    vec![],
+                    None,
                 ),
             },
         };
-        if !pending.is_empty() {
+        if let Some(pending) = pending {
             let finalized = finalized
                 .into_iter()
                 .map(|c| IntermediateOp::C(c))
@@ -360,14 +369,14 @@ fn calculate_replacements(
         let last_1 = match new_result.get(&child) {
             None => {
                 // There is no lig/kern rule for this pair.
-                let left = calc.pending[0].clone();
-                let right = calc.pending[1].clone();
+                let left = calc.pending.0.clone();
+                let right = calc.pending.1.clone();
                 calc.finalized.push(IntermediateOp::C(left));
                 right
             }
             Some(replacement) => {
-                let left = calc.pending[0].clone();
-                let right = calc.pending[1].clone();
+                let left = calc.pending.0.clone();
+                let right = calc.pending.1.clone();
                 for elem in &replacement.0 {
                     let elem = match elem {
                         IntermediateOp::Kern(_) => elem.clone(),
@@ -378,31 +387,15 @@ fn calculate_replacements(
                 replacement.1.merge(&left, &right)
             }
         };
-        match calc.pending.get(2) {
+        match calc.pending.2 {
             None => {
                 if let Some(blocking) = node_to_parents.remove(&calc.node) {
                     actionable.extend(blocking);
                 }
-                new_result.insert(
-                    calc.node,
-                    Replacement(
-                        calc.finalized,
-                        last_1,
-                        /*
-                        match last_1.o {
-                            Some(s) => TerminalOp::Lig(last_1.c, s),
-                            None => C::char(last_1.c),
-                        },
-                         */
-                    ),
-                );
+                new_result.insert(calc.node, Replacement(calc.finalized, last_1));
             }
-            Some(_) => {
-                calc.pending = if calc.pending.len() <= 2 {
-                    unreachable!("can't hit this");
-                } else {
-                    vec![calc.pending[1].clone(), calc.pending[2].clone()]
-                };
+            Some(new_right) => {
+                calc.pending = Pending(calc.pending.1, new_right, None);
                 actionable.push(calc);
             }
         }
@@ -776,13 +769,7 @@ mod tests {
                         }),
                         IntermediateOp::Kern(FixWord::ONE),
                     ],
-                    // C{},
                     C::char(Char::B, false),
-                    //    vec![('Z', FixWord::ONE), ('B', FixWord::ZERO)]
-                    //   left: {(Char(65), Char(66)): Replacement([LeftChar, Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None }),
-                    //  right: {(Char(65), Char(66)): Replacement([C(C { c: Char(90), is_lig: true, consumes_left: true, consumes_right: false, o: Some("A") }), Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None }),
-                    // (Char(90), Char(66)): Replacement([LeftChar, Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None })}
-                    // (Char(90), Char(66)): Replacement([LeftChar, Kern(FixWord(1048576))], C { c: Char(66), is_lig: false, consumes_left: false, consumes_right: false, o: None })}
                 ),
                 (
                     'Z',
@@ -792,7 +779,6 @@ mod tests {
                         IntermediateOp::Kern(FixWord::ONE),
                     ],
                     C::char(Char::B, false),
-                    // vec![('Z', FixWord::ONE), ('B', FixWord::ZERO)]
                 ),
             ],
         ),
