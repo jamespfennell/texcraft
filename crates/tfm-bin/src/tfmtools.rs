@@ -383,7 +383,6 @@ impl LigKern {
             }
             print!("    {} {} ->", l, r);
             todo!("need to reimplement this in terms of the new ops");
-
         }
         Ok(())
     }

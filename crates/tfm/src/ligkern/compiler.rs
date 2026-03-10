@@ -178,7 +178,16 @@ fn build_node_to_program_start_map(
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Replacement(pub(crate) Vec<IntermediateOp>, pub C);
+pub(crate) struct Replacement(pub(super) Vec<IntermediateOp>, pub C);
+
+macro_rules! vecc {
+    ($head:expr, $($tail:expr,)*) => (
+        match $head {
+            None => vec![$($tail),*],
+            Some(head) => vec![head, $($tail),*],
+        }
+    );
+}
 
 fn calculate_replacements(
     program: &lang::Program,
@@ -253,8 +262,7 @@ fn calculate_replacements(
                 ),
                 lang::PostLigOperation::RetainBothMoveToInserted => (
                     // finalized
-                    // omit the ::C if left is boundary
-                    vec![C::left_char(left).unwrap()],
+                    vecc![C::left_char(left),],
                     // pending
                     Some(Pending(
                         Some(C {
@@ -269,9 +277,8 @@ fn calculate_replacements(
                 ),
                 lang::PostLigOperation::RetainBothMoveToRight => (
                     // finalized
-                    vec![
-                        // omit the ::C if left is boundary
-                        C::left_char(left).unwrap(),
+                    vecc![
+                        C::left_char(left),
                         C {
                             c: char_to_insert,
                             is_lig: true,
@@ -329,9 +336,8 @@ fn calculate_replacements(
                 ),
                 lang::PostLigOperation::RetainLeftMoveToInserted => (
                     // finalized
-                    vec![
-                        // omit the ::C if left is boundary
-                        C::left_char(left).unwrap(),
+                    vecc![
+                        C::left_char(left),
                         C {
                             c: char_to_insert,
                             is_lig: true,
