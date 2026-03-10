@@ -543,7 +543,7 @@ mod tests {
         assert!(infinite_loop_error_or.is_empty(), "no infinite loop errors");
 
         let mut got_new: HashMap<(Char, Char), Replacement> = Default::default();
-        for pair in compiled_program.all_pairs_having_ops() {
+        for pair in compiled_program.all_pairs_with_replacements() {
             let replacement = compiled_program
                 .get_replacement_utf8(pair.0.into(), pair.1.into())
                 .unwrap();

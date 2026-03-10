@@ -376,7 +376,7 @@ impl LigKern {
             }
         };
         // let mut last_l: Option<tfm::Char> = None;
-        for (l, r) in lig_kern_program.all_pairs_having_ops() {
+        for (l, r) in lig_kern_program.all_pairs_with_replacements() {
             /*
             if Some(l) != last_l {
                 println!("{}", l);

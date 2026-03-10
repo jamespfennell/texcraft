@@ -155,9 +155,9 @@ impl CompiledProgram {
         self.replacements.get(&(left_char, right_char))
     }
 
-    /// Returns an iterator over all pairs `(char,char)` that have an operation
+    /// Returns an iterator over all pairs `(char,char)` that have a replacement
     ///     specified in the lig/kern program.
-    pub fn all_pairs_having_ops(&self) -> impl '_ + Iterator<Item = (Char, Char)> {
+    pub fn all_pairs_with_replacements(&self) -> impl '_ + Iterator<Item = (Char, Char)> {
         self.replacements.keys().copied()
     }
 
@@ -170,20 +170,15 @@ impl CompiledProgram {
     ///     pair of seven-bit characters whose replacement
     ///     contains a non-seven-bit character.
     pub fn is_seven_bit_safe(&self) -> bool {
-        todo!("need to reimplement this in terms of new ops")
-        /*
-        self.all_pairs_having_ops()
+        self.all_pairs_with_replacements()
             .filter(|(l, r)| l.is_seven_bit() && r.is_seven_bit())
-            .map(|(l, r)| self.get_op(l, r))
-            .all(|op| match op {
-                Op::None => true,
-                Op::Kern(_) => true,
-                Op::SimpleLig(char) => char.is_seven_bit(),
-                Op::ComplexLig(items, char) => {
-                    items.into_iter().all(|(c, _)| c.is_seven_bit()) && char.is_seven_bit()
-                }
+            .flat_map(|(l, r)| self.get_replacement_utf8(l.into(), r.into()))
+            .all(|rep| {
+                rep.0.iter().all(|op| match op {
+                    IntermediateOp::Kern(_) => true,
+                    IntermediateOp::C(c) => c.c.is_seven_bit(),
+                }) && rep.1.c.is_seven_bit()
             })
-         */
     }
 
     /// Run this lig/kern program.
