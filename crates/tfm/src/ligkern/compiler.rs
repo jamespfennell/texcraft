@@ -34,11 +34,11 @@ struct OngoingCalculation {
     finalized: Vec<IntermediateOp>,
     // Characters that are still pending replacement. The next step is to apply the ligature
     // rule for the node. After that, if the second element is not empty, the next step
-    // is to apply the ligature rule for (tuple.0.1, tuple.1).
+    // is to apply the ligature rule for (pending.1, pending.2).
     pending: Pending,
 }
 
-struct Pending(C, C, Option<C>);
+struct Pending(Option<C>, C, Option<C>);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct C {
@@ -49,6 +49,18 @@ pub struct C {
 }
 
 impl C {
+    fn left_char(c: LeftChar) -> Option<Self> {
+        match c {
+            LeftChar::Char(c) => Some(Self {
+                c,
+                is_lig: false,
+                consumes_left: true,
+                consumes_right: false,
+            }),
+            LeftChar::BoundaryChar => None,
+        }
+    }
+
     fn char(c: Char, is_left_char: bool) -> Self {
         Self {
             c,
@@ -57,15 +69,19 @@ impl C {
             consumes_right: !is_left_char,
         }
     }
-    fn merge(&self, left: &C, right: &C) -> Self {
+    fn merge(&self, left: &Option<C>, right: &C) -> Self {
+        let (left_is_lig, left_consumes_left, left_consumes_right) = match left {
+            None => (false, true, false),
+            Some(left) => (left.is_lig, left.consumes_left, left.consumes_right),
+        };
         C {
             c: self.c,
             is_lig: self.is_lig
-                || (self.consumes_left && left.is_lig)
+                || (self.consumes_left && left_is_lig)
                 || (self.consumes_right && right.is_lig),
-            consumes_left: (self.consumes_left && left.consumes_left)
+            consumes_left: (self.consumes_left && left_consumes_left)
                 || (self.consumes_right && right.consumes_left),
-            consumes_right: (self.consumes_left && left.consumes_right)
+            consumes_right: (self.consumes_left && left_consumes_right)
                 || (self.consumes_right && right.consumes_right),
         }
     }
@@ -73,7 +89,13 @@ impl C {
 
 impl OngoingCalculation {
     fn child(&self) -> Node {
-        Node(self.pending.0.c.into(), self.pending.1.c.into())
+        Node(
+            match &self.pending.0 {
+                Some(c) => LeftChar::Char(c.c),
+                None => LeftChar::BoundaryChar,
+            },
+            self.pending.1.c.into(),
+        )
     }
 }
 
@@ -183,11 +205,10 @@ fn calculate_replacements(
                 new_result.insert(
                     pair,
                     Replacement(
-                        vec![
-                            // omit the ::C if left is boundary
-                            IntermediateOp::C(C::char(left.try_into().unwrap(), true)),
-                            IntermediateOp::Kern(kern),
-                        ],
+                        match C::left_char(left) {
+                            None => vec![IntermediateOp::Kern(kern)],
+                            Some(left) => vec![IntermediateOp::C(left), IntermediateOp::Kern(kern)],
+                        },
                         C::char(right, false),
                     ),
                 );
@@ -198,11 +219,10 @@ fn calculate_replacements(
                 new_result.insert(
                     pair,
                     Replacement(
-                        vec![
-                            // omit the ::C if left is boundary
-                            IntermediateOp::C(C::char(left.try_into().unwrap(), true)),
-                            IntermediateOp::Kern(kern),
-                        ],
+                        match C::left_char(left) {
+                            None => vec![IntermediateOp::Kern(kern)],
+                            Some(left) => vec![IntermediateOp::C(left), IntermediateOp::Kern(kern)],
+                        },
                         C::char(right, false),
                     ),
                 );
@@ -221,8 +241,7 @@ fn calculate_replacements(
                     vec![],
                     // pending
                     Some(Pending(
-                        // handle left=boundary probably using an enum
-                        C::char(left.try_into().unwrap(), true),
+                        C::left_char(left),
                         C {
                             c: char_to_insert,
                             is_lig: true,
@@ -235,15 +254,15 @@ fn calculate_replacements(
                 lang::PostLigOperation::RetainBothMoveToInserted => (
                     // finalized
                     // omit the ::C if left is boundary
-                    vec![C::char(left.try_into().unwrap(), true)],
+                    vec![C::left_char(left).unwrap()],
                     // pending
                     Some(Pending(
-                        C {
+                        Some(C {
                             c: char_to_insert,
                             is_lig: true,
                             consumes_left: false,
                             consumes_right: false,
-                        },
+                        }),
                         C::char(right, false),
                         None,
                     )),
@@ -252,7 +271,7 @@ fn calculate_replacements(
                     // finalized
                     vec![
                         // omit the ::C if left is boundary
-                        C::char(left.try_into().unwrap(), true),
+                        C::left_char(left).unwrap(),
                         C {
                             c: char_to_insert,
                             is_lig: true,
@@ -269,12 +288,12 @@ fn calculate_replacements(
                     vec![],
                     // pending
                     Some(Pending(
-                        C {
+                        Some(C {
                             c: char_to_insert,
                             is_lig: true,
                             consumes_left: true,
                             consumes_right: false,
-                        },
+                        }),
                         C::char(right, false),
                         None,
                     )),
@@ -298,8 +317,7 @@ fn calculate_replacements(
                     vec![],
                     // pending
                     Some(Pending(
-                        // handle left=boundary probably using an enum
-                        C::char(left.try_into().unwrap(), true),
+                        C::left_char(left),
                         C {
                             c: char_to_insert,
                             is_lig: true,
@@ -313,7 +331,7 @@ fn calculate_replacements(
                     // finalized
                     vec![
                         // omit the ::C if left is boundary
-                        C::char(left.try_into().unwrap(), true),
+                        C::left_char(left).unwrap(),
                         C {
                             c: char_to_insert,
                             is_lig: true,
@@ -369,10 +387,10 @@ fn calculate_replacements(
         let last_1 = match new_result.get(&child) {
             None => {
                 // There is no lig/kern rule for this pair.
-                let left = calc.pending.0.clone();
-                let right = calc.pending.1.clone();
-                calc.finalized.push(IntermediateOp::C(left));
-                right
+                if let Some(left) = calc.pending.0.clone() {
+                    calc.finalized.push(IntermediateOp::C(left));
+                }
+                calc.pending.1.clone()
             }
             Some(replacement) => {
                 let left = calc.pending.0.clone();
@@ -395,7 +413,7 @@ fn calculate_replacements(
                 new_result.insert(calc.node, Replacement(calc.finalized, last_1));
             }
             Some(new_right) => {
-                calc.pending = Pending(calc.pending.1, new_right, None);
+                calc.pending = Pending(Some(calc.pending.1), new_right, None);
                 actionable.push(calc);
             }
         }
