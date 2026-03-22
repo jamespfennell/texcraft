@@ -176,8 +176,10 @@ impl CompiledProgram {
 
     /// Returns an iterator over all pairs `(char,char)` that have a replacement
     ///     specified in the lig/kern program.
-    pub fn all_pairs_with_replacements(&self) -> impl '_ + Iterator<Item = (Option<Char>, Char)> {
-        self.replacements.keys().copied()
+    pub fn all_pairs_with_replacements(&self) -> Vec<(Option<Char>, Char)> {
+        let mut v: Vec<(Option<Char>, Char)> = self.replacements.keys().copied().collect();
+        v.sort();
+        v
     }
 
     /// Returns whether this program is seven-bit safe.
@@ -189,7 +191,7 @@ impl CompiledProgram {
     ///     pair of seven-bit characters whose replacement
     ///     contains a non-seven-bit character.
     pub fn is_seven_bit_safe(&self) -> bool {
-        self.all_pairs_with_replacements()
+        self.all_pairs_with_replacements().into_iter()
             .filter(|(l, r)| l.map(|c| c.is_seven_bit()).unwrap_or(true) && r.is_seven_bit())
             .flat_map(|(l, r)| self.get_replacement(l, r))
             .all(|rep| {

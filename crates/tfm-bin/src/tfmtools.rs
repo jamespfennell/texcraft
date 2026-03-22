@@ -380,16 +380,34 @@ impl LigKern {
                 .0
             }
         };
-        // let mut last_l: Option<tfm::Char> = None;
         for (l, r) in lig_kern_program.all_pairs_with_replacements() {
-            /*
-            if Some(l) != last_l {
-                println!("{}", l);
-                last_l = Some(l);
+            let s = match l {
+                None => {
+                    print!("     {r} ->");
+                    format!["{r}"]
+                }
+                Some(l) => {
+                    print!("   {l} {r} ->");
+                    format!["{l}{r}"]
+                }
+            };
+            struct Emitter;
+            impl tfm::ligkern::Emitter for Emitter {
+                fn emit_character(&mut self, c: char) {
+                    print!(" char({c})")
+                }
+
+                fn emit_kern(&mut self, kern: core::Scaled) {
+                    print!(" kern({kern})");
+                }
+
+                fn emit_ligature(&mut self, c: char, original: std::rc::Rc<str>) {
+                    print!(" lig({c}, {original})");
+                }
             }
-             */
-            print!("    {:?} {} ->", l, r);
-            todo!("need to reimplement this in terms of the new ops");
+            let mut emitter = Emitter {};
+            lig_kern_program.run(&s, &mut emitter);
+            println!();
         }
         Ok(())
     }

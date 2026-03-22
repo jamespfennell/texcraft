@@ -1429,6 +1429,7 @@ dependencies = [
  "ariadne",
  "assert_cmd",
  "clap 4.4.8",
+ "core",
  "predicates",
  "similar-asserts",
  "tempfile",
