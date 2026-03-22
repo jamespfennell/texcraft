@@ -21,6 +21,7 @@
    (QUAD R 1.000003)
    (EXTRASPACE R 0.111112)
    )
+(BOUNDARYCHAR C L)
 (LIGTABLE
    (COMMENT
       Single ligature cases.
@@ -67,32 +68,61 @@
    (LIG C C C B)
    (LABEL C B)
    (LIG C D C E)
+   (STOP)
 
    (LABEL C C)
    (/LIG/ C E C D)
    (LABEL C D)
    (LIG C E C G)
+   (STOP)
 
    (LABEL C E)
    (LIG/ C E C F)
+   (STOP)
 
    (LABEL C F)
    (LIG C F C F)
+   (STOP)
 
    (LABEL C G)
    (/LIG C H C I)
    (LIG/ C I C J)
+   (STOP)
 
    (LABEL C H)
    (/LIG C A C B)
    (LIG/ C B C I)
    (LABEL C I)
    (LIG C B C C)
+   (STOP)
 
    (LABEL C J)
    (LIG C A C K)
    (LABEL C K)
    (/LIG/>> C C C B)
+   (STOP)
+
+   (COMMENT
+       Right boundary char
+   )
+   (LABEL C M)
+   (/LIG/ C L C N)
+   (STOP)
+   (LABEL C N)
+   (/LIG/ C L C Q)
+   (STOP)
+   (LABEL C O)
+   (LIG C L C P)
+   (STOP)
+
+   (COMMENT
+       Left boundary char
+   )
+   (LABEL BOUNDARYCHAR)
+   (LIG C W C V)
+   (/LIG/ C X C Y)
+   (/LIG/ C Y C Z)
+
    )
 (CHARACTER O 0
    (CHARWD R 0.625002)

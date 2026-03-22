@@ -80,6 +80,7 @@ impl TexEngine for TexEngineBinary {
         let mut input_path = dir.clone();
         input_path.push("tex-input");
         input_path.set_extension("tex");
+        eprintln!("writing to {}", input_path.as_os_str().to_string_lossy());
         std::fs::write(&input_path, tex_source_code).expect("Unable to write file");
 
         let output = std::process::Command::new(&self.0)
@@ -89,7 +90,11 @@ impl TexEngine for TexEngineBinary {
             .expect("failed to run tex command");
         eprintln!("{}", String::from_utf8(output.stderr).unwrap());
 
-        String::from_utf8(output.stdout).expect("stdout output of TeX is utf-8")
+        let stdout = String::from_utf8(output.stdout).expect("stdout output of TeX is utf-8");
+        if !output.status.success() {
+            eprintln!("Warning: TeX command seems to have failed: {stdout}");
+        }
+        stdout
     }
 }
 
@@ -313,6 +318,8 @@ const CONVERT_TEXT_TEMPLATE: &str = r"
 }
 
 <print_calls>
+
+We add some text at the end.
 
 \end
 ";

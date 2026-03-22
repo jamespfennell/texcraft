@@ -22,6 +22,7 @@ pub fn compile(
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, PartialOrd, Ord)]
 struct Node(LeftChar, Char);
 
+#[derive(Debug)]
 struct OngoingCalculation {
     // Node this calculation is for.
     // TODO: rename root?
@@ -34,6 +35,7 @@ struct OngoingCalculation {
     pending: Pending,
 }
 
+#[derive(Debug)]
 struct Pending(Option<C>, C, Option<C>);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -108,6 +110,12 @@ impl LeftChar {
             LeftChar::BoundaryChar => None,
         }
     }
+    fn is_boundary(&self) -> bool {
+        match self {
+            LeftChar::Char(_) => false,
+            LeftChar::BoundaryChar => true,
+        }
+    }
 }
 
 impl From<Char> for LeftChar {
@@ -176,7 +184,7 @@ fn build_node_to_program_start_map(
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Replacement(pub(super) Vec<IntermediateOp>, pub C);
 
-macro_rules! vecc {
+macro_rules! filter_left_boundary {
     ($head:expr, $($tail:expr,)*) => (
         match $head {
             None => vec![$($tail),*],
@@ -191,7 +199,7 @@ fn calculate_replacements(
     kerns: &[FixWord],
     pair_to_instruction: HashMap<Node, usize>,
 ) -> (HashMap<Node, Replacement>, Vec<InfiniteLoopError>) {
-    let mut new_result: HashMap<Node, Replacement> = Default::default();
+    let mut result: HashMap<Node, Replacement> = Default::default();
     let mut actionable: Vec<OngoingCalculation> = vec![];
     let mut node_to_parents: HashMap<Node, Vec<OngoingCalculation>> = Default::default();
     for (&pair, &index) in &pair_to_instruction {
@@ -208,7 +216,7 @@ fn calculate_replacements(
         };
         let (finalized, pending): (Vec<C>, Option<Pending>) = match operation {
             lang::Operation::Kern(kern) => {
-                new_result.insert(
+                result.insert(
                     pair,
                     Replacement(
                         match C::left_char(left) {
@@ -225,7 +233,7 @@ fn calculate_replacements(
             }
             lang::Operation::KernAtIndex(index) => {
                 let kern = kerns.get(index as usize).copied().unwrap_or_default();
-                new_result.insert(
+                result.insert(
                     pair,
                     Replacement(
                         match C::left_char(left) {
@@ -265,13 +273,13 @@ fn calculate_replacements(
                 ),
                 lang::PostLigOperation::RetainBothMoveToInserted => (
                     // finalized
-                    vecc![C::left_char(left),],
+                    filter_left_boundary![C::left_char(left),],
                     // pending
                     Some(Pending(
                         Some(C {
                             c: char_to_insert,
                             is_lig: true,
-                            consumes_left: false,
+                            consumes_left: left.is_boundary(),
                             consumes_right: false,
                         }),
                         C::char(right, false),
@@ -280,12 +288,12 @@ fn calculate_replacements(
                 ),
                 lang::PostLigOperation::RetainBothMoveToRight => (
                     // finalized
-                    vecc![
+                    filter_left_boundary![
                         C::left_char(left),
                         C {
                             c: char_to_insert,
                             is_lig: true,
-                            consumes_left: false,
+                            consumes_left: left.is_boundary(),
                             consumes_right: false,
                         },
                         C::char(right, false),
@@ -339,12 +347,12 @@ fn calculate_replacements(
                 ),
                 lang::PostLigOperation::RetainLeftMoveToInserted => (
                     // finalized
-                    vecc![
+                    filter_left_boundary![
                         C::left_char(left),
                         C {
                             c: char_to_insert,
                             is_lig: true,
-                            consumes_left: false,
+                            consumes_left: left.is_boundary(),
                             consumes_right: true,
                         },
                     ],
@@ -359,7 +367,7 @@ fn calculate_replacements(
                         consumes_left: true,
                         consumes_right: true,
                     }],
-                    //pending
+                    // pending
                     None,
                 ),
             },
@@ -376,7 +384,7 @@ fn calculate_replacements(
             let mut finalized = finalized;
             let last = finalized.pop().unwrap();
             let finalized = finalized.into_iter().map(IntermediateOp::C).collect();
-            new_result.insert(pair, Replacement(finalized, last));
+            result.insert(pair, Replacement(finalized, last));
         }
     }
 
@@ -386,14 +394,20 @@ fn calculate_replacements(
             blocking.push(calc);
             continue;
         }
-
-        let last = match new_result.get(&child) {
+        let last = match result.get(&child) {
             None => {
                 // There is no lig/kern rule for this pair.
-                if let Some(left) = calc.pending.0.clone() {
-                    calc.finalized.push(IntermediateOp::C(left));
+                let mut last = calc.pending.1.clone();
+                match calc.pending.0.clone() {
+                    None => {
+                        // We are dropping the left node on the floor.
+                        last.consumes_left = true;
+                    }
+                    Some(left) => {
+                        calc.finalized.push(IntermediateOp::C(left));
+                    }
                 }
-                calc.pending.1.clone()
+                last
             }
             Some(replacement) => {
                 let left = calc.pending.0.clone();
@@ -413,7 +427,7 @@ fn calculate_replacements(
                 if let Some(blocking) = node_to_parents.remove(&calc.node) {
                     actionable.extend(blocking);
                 }
-                new_result.insert(calc.node, Replacement(calc.finalized, last));
+                result.insert(calc.node, Replacement(calc.finalized, last));
             }
             Some(new_right) => {
                 calc.pending = Pending(Some(last), new_right, None);
@@ -483,7 +497,7 @@ fn calculate_replacements(
             });
         }
     }
-    (new_result, infinite_loop_errors)
+    (result, infinite_loop_errors)
 }
 
 #[cfg(test)]

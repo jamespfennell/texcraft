@@ -206,9 +206,24 @@ mod tests {
                 text("B", font=0)
             "##,
         ),
+        /*
+        TODO: right boundary char
+        (
+            numbers_end_of_word,
+            "A123",
+            r##"
+                text("A", font=0)
+                lig("$", "", font=0)
+                text("123", font=0)
+                lig("#", "|", font=0)
+            "##,
+        ),
+        */
     );
 
     fn run_preprocessor_test(tfm_bytes: &[u8], input: &str, want: &str) {
+        let c: char = 65_u32.try_into().unwrap();
+        println!("----> \"{c}\"");
         let mut tfm_file = tfm::File::deserialize(tfm_bytes).0.unwrap();
         let lig_kern_program =
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;

@@ -191,7 +191,8 @@ impl CompiledProgram {
     ///     pair of seven-bit characters whose replacement
     ///     contains a non-seven-bit character.
     pub fn is_seven_bit_safe(&self) -> bool {
-        self.all_pairs_with_replacements().into_iter()
+        self.all_pairs_with_replacements()
+            .into_iter()
             .filter(|(l, r)| l.map(|c| c.is_seven_bit()).unwrap_or(true) && r.is_seven_bit())
             .flat_map(|(l, r)| self.get_replacement(l, r))
             .all(|rep| {
@@ -236,14 +237,9 @@ impl CompiledProgram {
                                 consumes_right,
                             }) => {
                                 let mut s = lig_pieces.take().unwrap_or_default();
-                                match left {
+                                if *consumes_left && left_in_original {
                                     // TODO: figure out where in TeX the '|' comes from!
-                                    None => s.push('|'),
-                                    Some(left) => {
-                                        if *consumes_left && left_in_original {
-                                            s.push(left);
-                                        }
-                                    }
+                                    s.push(left.unwrap_or('|'));
                                 }
                                 if *consumes_right {
                                     s.push(right);
@@ -258,9 +254,7 @@ impl CompiledProgram {
                     } else {
                         let mut s = lig_pieces.take().unwrap_or_default();
                         if replacement.1.consumes_left && left_in_original {
-                            if let Some(left) = left {
-                                s.push(left);
-                            }
+                            s.push(left.unwrap_or('|'));
                         }
                         if replacement.1.consumes_right {
                             s.push(right);
@@ -402,6 +396,9 @@ mod tests {
         )+ };
     }
 
+    // TODO: consider moving these tests into boxworks-test.
+    // The tests there are the same except written nicer because they use
+    // boxlang.
     tests!(
         (single_char, "A", vec![Char('A')],),
         // ab -> ^j
@@ -526,5 +523,28 @@ mod tests {
                 Ligature('j', "ab".into()),
             ],
         ),
+        (left_boundary_char_1, "W", vec![Ligature('V', "|W".into()),],),
+        (
+            left_boundary_char_2,
+            "X",
+            vec![
+                Ligature('Z', "|".into()),
+                Ligature('Y', "".into()),
+                Char('X'),
+            ],
+        ),
+        (
+            left_boundary_char_3,
+            "Y",
+            vec![Ligature('Z', "|".into()), Char('Y'),],
+        ),
+        /*
+        TODO: right boundary char
+        (
+            right_boundary_char,
+            "M",
+            vec![],
+        ),
+         */
     );
 }
