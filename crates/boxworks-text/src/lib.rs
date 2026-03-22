@@ -105,7 +105,7 @@ mod tests {
     macro_rules! preprocessor_tests {
         ( $namespace: ident, $tfm_path: expr, $( ( $name: ident, $input: expr, $want: expr, ), )+ ) => {
             mod $namespace {
-                const TFM: &'static [u8] = include_bytes!("../../tfm/corpus/computer-modern/cmr10.tfm");
+                const TFM: &'static [u8] = include_bytes!($tfm_path);
                 $(
                     #[test]
                     fn $name() {
@@ -179,8 +179,10 @@ mod tests {
             "sec ond",
             r#"
                 text("sec", font=0)
-                glue(3.33333pt, 1.66666pt, 1.11111pt)
-                text("ond", font=0)
+                glue(4.78204pt, 2.39102pt, 1.19551pt)
+                text("on", font=0)
+                kern(-0.49814pt)
+                text("d", font=0)
             "#,
         ),
     );

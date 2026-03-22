@@ -96,7 +96,7 @@ pub struct CompiledProgram {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum IntermediateOp {
     // Emit the kern.
-    Kern(FixWord),
+    Kern(core::Scaled),
     // Emit the char in the payload.
     C(compiler::C),
 }
@@ -105,12 +105,11 @@ impl CompiledProgram {
     /// Compile a lig/kern program.
     pub fn compile(
         program: &lang::Program,
-        // TODO: should accept the kerns as a list of Scaled that incorporate the
-        // design size
+        design_size: FixWord,
         kerns: &[FixWord],
         entrypoints: HashMap<Char, u16>,
     ) -> (CompiledProgram, Vec<InfiniteLoopError>) {
-        compiler::compile(program, kerns, &entrypoints)
+        compiler::compile(program, design_size, kerns, &entrypoints)
     }
 
     /// Compile a lig/kern program from a PL file.
@@ -120,7 +119,12 @@ impl CompiledProgram {
         let entrypoints = pl_file.lig_kern_entrypoints(false);
         // The kerns array, which is used for KernAtIndex operations, is empty
         // because PL files do not have such operations.
-        CompiledProgram::compile(&pl_file.lig_kern_program, &[], entrypoints)
+        CompiledProgram::compile(
+            &pl_file.lig_kern_program,
+            pl_file.header.design_size,
+            &[],
+            entrypoints,
+        )
     }
 
     /// Compile a lig/kern program from a TFM file.
@@ -138,7 +142,12 @@ impl CompiledProgram {
                     .map(|e| (c, e))
             })
             .collect();
-        CompiledProgram::compile(&tfm_file.lig_kern_program, &tfm_file.kerns, entrypoints)
+        CompiledProgram::compile(
+            &tfm_file.lig_kern_program,
+            tfm_file.header.design_size,
+            &tfm_file.kerns,
+            entrypoints,
+        )
     }
 
     pub(crate) fn get_replacement_utf8(
@@ -197,9 +206,7 @@ impl CompiledProgram {
                 Some(replacement) => {
                     for op in &replacement.0 {
                         match op {
-                            IntermediateOp::Kern(fix_word) => {
-                                emitter.emit_kern(fix_word.to_scaled(FixWord::ONE * 10))
-                            }
+                            IntermediateOp::Kern(kern) => emitter.emit_kern(*kern),
                             IntermediateOp::C(compiler::C {
                                 c: char,
                                 is_lig: false,

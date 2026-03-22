@@ -447,7 +447,12 @@ impl Program {
         }
 
         let entrypoints: HashMap<Char, u16> = unpacked_entrypoints.into_iter().collect();
-        let (_, errors) = super::CompiledProgram::compile(self, kerns, entrypoints);
+        // We are only running the compiler to find errors and are disregarding the actual
+        // result. Thus the true design size is not needed. Using this dummy avoids having
+        // to plumb in the real design size into this function.
+        let dummy_design_size = FixWord::ONE * 10;
+        let (_, errors) =
+            super::CompiledProgram::compile(self, dummy_design_size, kerns, entrypoints);
         for err in errors {
             warnings.push(ValidationWarning::InfiniteLoop(err));
         }

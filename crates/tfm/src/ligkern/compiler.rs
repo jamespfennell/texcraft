@@ -3,12 +3,13 @@ use std::collections::HashSet;
 
 pub fn compile(
     program: &lang::Program,
+    design_size: FixWord,
     kerns: &[FixWord],
     entry_points: &HashMap<Char, u16>,
 ) -> (CompiledProgram, Vec<InfiniteLoopError>) {
     let pair_to_instruction = build_node_to_program_start_map(program, entry_points);
     let (replacements, infinite_loop_errors) =
-        calculate_replacements(program, kerns, pair_to_instruction);
+        calculate_replacements(program, design_size, kerns, pair_to_instruction);
     let program = CompiledProgram {
         replacements: replacements
             .into_iter()
@@ -191,6 +192,7 @@ macro_rules! vecc {
 
 fn calculate_replacements(
     program: &lang::Program,
+    design_size: FixWord,
     kerns: &[FixWord],
     pair_to_instruction: HashMap<Node, usize>,
 ) -> (HashMap<Node, Replacement>, Vec<InfiniteLoopError>) {
@@ -215,8 +217,11 @@ fn calculate_replacements(
                     pair,
                     Replacement(
                         match C::left_char(left) {
-                            None => vec![IntermediateOp::Kern(kern)],
-                            Some(left) => vec![IntermediateOp::C(left), IntermediateOp::Kern(kern)],
+                            None => vec![IntermediateOp::Kern(kern.to_scaled(design_size))],
+                            Some(left) => vec![
+                                IntermediateOp::C(left),
+                                IntermediateOp::Kern(kern.to_scaled(design_size)),
+                            ],
                         },
                         C::char(right, false),
                     ),
@@ -229,8 +234,11 @@ fn calculate_replacements(
                     pair,
                     Replacement(
                         match C::left_char(left) {
-                            None => vec![IntermediateOp::Kern(kern)],
-                            Some(left) => vec![IntermediateOp::C(left), IntermediateOp::Kern(kern)],
+                            None => vec![IntermediateOp::Kern(kern.to_scaled(design_size))],
+                            Some(left) => vec![
+                                IntermediateOp::C(left),
+                                IntermediateOp::Kern(kern.to_scaled(design_size)),
+                            ],
                         },
                         C::char(right, false),
                     ),
@@ -539,7 +547,8 @@ mod tests {
             instructions,
             ..Default::default()
         };
-        let (compiled_program, infinite_loop_error_or) = compile(&program, &vec![], &entry_points);
+        let (compiled_program, infinite_loop_error_or) =
+            compile(&program, FixWord::ONE, &vec![], &entry_points);
         assert!(infinite_loop_error_or.is_empty(), "no infinite loop errors");
 
         let mut got_new: HashMap<(Char, Char), Replacement> = Default::default();
@@ -578,7 +587,7 @@ mod tests {
                 'V',
                 vec![
                     IntermediateOp::C(C::char(Char::A, true)),
-                    IntermediateOp::Kern(FixWord::ONE)
+                    IntermediateOp::Kern(core::Scaled::ONE)
                 ],
                 C::char(Char::V, false),
             )],
@@ -593,7 +602,7 @@ mod tests {
                     'V',
                     vec![
                         IntermediateOp::C(C::char(Char::A, true)),
-                        IntermediateOp::Kern(FixWord::ONE)
+                        IntermediateOp::Kern(core::Scaled::ONE)
                     ],
                     C::char(Char::V, false),
                 ),
@@ -602,7 +611,7 @@ mod tests {
                     'V',
                     vec![
                         IntermediateOp::C(C::char(Char::B, true)),
-                        IntermediateOp::Kern(FixWord::ONE)
+                        IntermediateOp::Kern(core::Scaled::ONE)
                     ],
                     C::char(Char::V, false),
                 ),
@@ -620,7 +629,7 @@ mod tests {
                 'V',
                 vec![
                     IntermediateOp::C(C::char(Char::A, true)),
-                    IntermediateOp::Kern(FixWord::ONE * 2)
+                    IntermediateOp::Kern(core::Scaled::ONE * 2)
                 ],
                 C::char(Char::V, false),
             ),],
@@ -639,7 +648,7 @@ mod tests {
                     'V',
                     vec![
                         IntermediateOp::C(C::char(Char::A, true)),
-                        IntermediateOp::Kern(FixWord::ONE * 2)
+                        IntermediateOp::Kern(core::Scaled::ONE * 2)
                     ],
                     C::char(Char::V, false),
                 ),
@@ -648,7 +657,7 @@ mod tests {
                     'W',
                     vec![
                         IntermediateOp::C(C::char(Char::A, true)),
-                        IntermediateOp::Kern(FixWord::ONE * 3)
+                        IntermediateOp::Kern(core::Scaled::ONE * 3)
                     ],
                     C::char(Char::W, false),
                 ),
@@ -657,7 +666,7 @@ mod tests {
                     'W',
                     vec![
                         IntermediateOp::C(C::char(Char::B, true)),
-                        IntermediateOp::Kern(FixWord::ONE * 3)
+                        IntermediateOp::Kern(core::Scaled::ONE * 3)
                     ],
                     C::char(Char::W, false),
                 ),
@@ -666,7 +675,7 @@ mod tests {
                     'X',
                     vec![
                         IntermediateOp::C(C::char(Char::C, true)),
-                        IntermediateOp::Kern(FixWord::ONE * 4)
+                        IntermediateOp::Kern(core::Scaled::ONE * 4)
                     ],
                     C::char(Char::X, false),
                 ),
@@ -712,7 +721,7 @@ mod tests {
                     'Z',
                     vec![
                         IntermediateOp::C(C::char(Char::A, true)),
-                        IntermediateOp::Kern(FixWord::ONE)
+                        IntermediateOp::Kern(core::Scaled::ONE)
                     ],
                     C::char(Char::Z, false),
                 ),
@@ -731,7 +740,7 @@ mod tests {
                     'B',
                     vec![
                         IntermediateOp::C(C::char(Char::A, true)),
-                        IntermediateOp::Kern(FixWord::ONE),
+                        IntermediateOp::Kern(core::Scaled::ONE),
                     ],
                     C {
                         c: Char::Z,
@@ -745,7 +754,7 @@ mod tests {
                     'Z',
                     vec![
                         IntermediateOp::C(C::char(Char::A, true)),
-                        IntermediateOp::Kern(FixWord::ONE),
+                        IntermediateOp::Kern(core::Scaled::ONE),
                     ],
                     C::char(Char::Z, false),
                 ),
@@ -785,7 +794,7 @@ mod tests {
                             consumes_left: true,
                             consumes_right: false,
                         }),
-                        IntermediateOp::Kern(FixWord::ONE),
+                        IntermediateOp::Kern(core::Scaled::ONE),
                     ],
                     C::char(Char::B, false),
                 ),
@@ -794,7 +803,7 @@ mod tests {
                     'B',
                     vec![
                         IntermediateOp::C(C::char(Char::Z, true)),
-                        IntermediateOp::Kern(FixWord::ONE),
+                        IntermediateOp::Kern(core::Scaled::ONE),
                     ],
                     C::char(Char::B, false),
                 ),
@@ -824,7 +833,7 @@ mod tests {
                     'B',
                     vec![
                         IntermediateOp::C(C::char(Char::Z, true)),
-                        IntermediateOp::Kern(FixWord::ONE),
+                        IntermediateOp::Kern(core::Scaled::ONE),
                     ],
                     C::char(Char::B, false),
                 ),
@@ -844,14 +853,14 @@ mod tests {
                     'B',
                     vec![
                         IntermediateOp::C(C::char(Char::A, true)),
-                        IntermediateOp::Kern(FixWord::ONE * 2),
+                        IntermediateOp::Kern(core::Scaled::ONE * 2),
                         IntermediateOp::C(C {
                             c: Char::Z,
                             is_lig: true,
                             consumes_left: false,
                             consumes_right: false,
                         }),
-                        IntermediateOp::Kern(FixWord::ONE * 3),
+                        IntermediateOp::Kern(core::Scaled::ONE * 3),
                     ],
                     C::char(Char::B, false),
                 ),
@@ -860,7 +869,7 @@ mod tests {
                     'Z',
                     vec![
                         IntermediateOp::C(C::char(Char::A, true)),
-                        IntermediateOp::Kern(FixWord::ONE * 2),
+                        IntermediateOp::Kern(core::Scaled::ONE * 2),
                     ],
                     C::char(Char::Z, false),
                 ),
@@ -869,7 +878,7 @@ mod tests {
                     'B',
                     vec![
                         IntermediateOp::C(C::char(Char::Z, true)),
-                        IntermediateOp::Kern(FixWord::ONE * 3),
+                        IntermediateOp::Kern(core::Scaled::ONE * 3),
                     ],
                     C::char(Char::B, false),
                 ),
@@ -998,7 +1007,7 @@ mod tests {
                             consumes_left: false,
                             consumes_right: false,
                         }),
-                        IntermediateOp::Kern(FixWord::ONE * 3),
+                        IntermediateOp::Kern(core::Scaled::ONE * 3),
                     ],
                     C::char(Char::B, false),
                 ),
@@ -1007,7 +1016,7 @@ mod tests {
                     'Z',
                     vec![
                         IntermediateOp::C(C::char(Char::A, true)),
-                        IntermediateOp::Kern(FixWord::ONE * 2),
+                        IntermediateOp::Kern(core::Scaled::ONE * 2),
                     ],
                     C::char(Char::Z, false),
                 ),
@@ -1016,7 +1025,7 @@ mod tests {
                     'B',
                     vec![
                         IntermediateOp::C(C::char(Char::Z, true)),
-                        IntermediateOp::Kern(FixWord::ONE * 3),
+                        IntermediateOp::Kern(core::Scaled::ONE * 3),
                     ],
                     C::char(Char::B, false),
                 ),
@@ -1139,7 +1148,7 @@ mod tests {
                     'Z',
                     vec![
                         IntermediateOp::C(C::char(Char::A, true)),
-                        IntermediateOp::Kern(FixWord::ONE * 2),
+                        IntermediateOp::Kern(core::Scaled::ONE * 2),
                     ],
                     C::char(Char::Z, false),
                 ),
@@ -1148,7 +1157,7 @@ mod tests {
                     'B',
                     vec![
                         IntermediateOp::C(C::char(Char::Z, true)),
-                        IntermediateOp::Kern(FixWord::ONE * 3),
+                        IntermediateOp::Kern(core::Scaled::ONE * 3),
                     ],
                     C::char(Char::B, false),
                 ),

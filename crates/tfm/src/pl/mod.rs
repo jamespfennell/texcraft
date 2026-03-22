@@ -404,6 +404,7 @@ impl File {
         let lig_kern_seven_bit_safe = {
             for err in crate::ligkern::CompiledProgram::compile(
                 &file.lig_kern_program,
+                file.header.design_size,
                 &[],
                 file.lig_kern_entrypoints(true), // todo include orphans?
             )

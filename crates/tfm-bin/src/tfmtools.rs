@@ -371,8 +371,13 @@ impl LigKern {
             TfOrPlPath::Pl(pl_path) => {
                 let (pl_file, _) = pl_path.read()?;
                 let entrypoints = pl_file.lig_kern_entrypoints(true);
-                tfm::ligkern::CompiledProgram::compile(&pl_file.lig_kern_program, &[], entrypoints)
-                    .0
+                tfm::ligkern::CompiledProgram::compile(
+                    &pl_file.lig_kern_program,
+                    pl_file.header.design_size,
+                    &[],
+                    entrypoints,
+                )
+                .0
             }
         };
         // let mut last_l: Option<tfm::Char> = None;
