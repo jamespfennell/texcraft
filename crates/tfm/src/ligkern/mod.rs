@@ -90,7 +90,7 @@ pub mod lang;
 /// The default value is an empty program with no kerns or ligatures.
 #[derive(Clone, Debug, Default)]
 pub struct CompiledProgram {
-    replacements: HashMap<(Char, Char), compiler::Replacement>,
+    replacements: HashMap<(Option<Char>, Char), compiler::Replacement>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -150,23 +150,33 @@ impl CompiledProgram {
         )
     }
 
-    pub(crate) fn get_replacement_utf8(
+    fn get_replacement(&self, left_char: Option<Char>, right_char: Char) -> Option<&Replacement> {
+        self.replacements.get(&(left_char, right_char))
+    }
+
+    fn get_replacement_utf8(
         &self,
-        left_char: char,
+        left_char: Option<char>,
         right_char: char,
     ) -> Option<&Replacement> {
-        let Ok(left_char) = left_char.try_into() else {
-            return None;
+        let left_char = match left_char {
+            None => None,
+            Some(left_char) => {
+                let Ok(c) = left_char.try_into() else {
+                    return None;
+                };
+                Some(c)
+            }
         };
         let Ok(right_char) = right_char.try_into() else {
             return None;
         };
-        self.replacements.get(&(left_char, right_char))
+        self.get_replacement(left_char, right_char)
     }
 
     /// Returns an iterator over all pairs `(char,char)` that have a replacement
     ///     specified in the lig/kern program.
-    pub fn all_pairs_with_replacements(&self) -> impl '_ + Iterator<Item = (Char, Char)> {
+    pub fn all_pairs_with_replacements(&self) -> impl '_ + Iterator<Item = (Option<Char>, Char)> {
         self.replacements.keys().copied()
     }
 
@@ -180,8 +190,8 @@ impl CompiledProgram {
     ///     contains a non-seven-bit character.
     pub fn is_seven_bit_safe(&self) -> bool {
         self.all_pairs_with_replacements()
-            .filter(|(l, r)| l.is_seven_bit() && r.is_seven_bit())
-            .flat_map(|(l, r)| self.get_replacement_utf8(l.into(), r.into()))
+            .filter(|(l, r)| l.map(|c| c.is_seven_bit()).unwrap_or(true) && r.is_seven_bit())
+            .flat_map(|(l, r)| self.get_replacement(l, r))
             .all(|rep| {
                 rep.0.iter().all(|op| match op {
                     IntermediateOp::Kern(_) => true,
@@ -192,12 +202,9 @@ impl CompiledProgram {
 
     /// Run this lig/kern program.
     pub fn run<T: Emitter>(&self, text: &str, emitter: &mut T) {
-        let Some(mut left) = text.chars().next() else {
-            return;
-        };
+        let mut left: Option<char> = None;
         let mut left_in_original = true;
         let mut lig_pieces: Option<String> = None;
-        let text = &text[left.len_utf8()..];
         let mut iter = text.chars();
         loop {
             let Some(right) = iter.next() else { break };
@@ -208,72 +215,83 @@ impl CompiledProgram {
                         match op {
                             IntermediateOp::Kern(kern) => emitter.emit_kern(*kern),
                             IntermediateOp::C(compiler::C {
-                                c: char,
+                                c,
                                 is_lig: false,
                                 consumes_left: _,
                                 consumes_right: _,
                             }) => match lig_pieces.take() {
                                 Some(l) => {
-                                    emitter.emit_ligature((*char).into(), l.into());
+                                    emitter.emit_ligature((*c).into(), l.into());
                                 }
                                 None => {
-                                    emitter.emit_character((*char).into());
+                                    emitter.emit_character((*c).into());
                                 }
                             },
                             IntermediateOp::C(compiler::C {
-                                c: char,
+                                c,
                                 is_lig: true,
                                 consumes_left,
                                 consumes_right,
                             }) => {
-                                dbg!(left_in_original);
                                 let mut s = lig_pieces.take().unwrap_or_default();
-                                if *consumes_left && left_in_original {
-                                    s.push(left);
+                                match left {
+                                    // TODO: figure out where in TeX the '|' comes from!
+                                    None => s.push('|'),
+                                    Some(left) => {
+                                        if *consumes_left && left_in_original {
+                                            s.push(left);
+                                        }
+                                    }
                                 }
                                 if *consumes_right {
                                     s.push(right);
                                 }
-                                emitter.emit_ligature((*char).into(), s.into());
+                                emitter.emit_ligature((*c).into(), s.into());
                             }
                         }
                     }
                     if !replacement.1.is_lig {
-                        left = (replacement.1.c).into();
+                        left = Some((replacement.1.c).into());
                         left_in_original = replacement.1.consumes_right;
                     } else {
                         let mut s = lig_pieces.take().unwrap_or_default();
                         if replacement.1.consumes_left && left_in_original {
-                            s.push(left);
+                            if let Some(left) = left {
+                                s.push(left);
+                            }
                         }
                         if replacement.1.consumes_right {
                             s.push(right);
                         }
                         lig_pieces = Some(s);
-                        left = (replacement.1.c).into();
+                        left = Some((replacement.1.c).into());
                         left_in_original = false;
                     }
                 }
                 None => {
-                    match lig_pieces.take() {
-                        Some(l) => {
-                            emitter.emit_ligature(left, l.into());
-                        }
-                        None => {
-                            emitter.emit_character(left);
+                    if let Some(left) = left {
+                        match lig_pieces.take() {
+                            Some(l) => {
+                                emitter.emit_ligature(left, l.into());
+                            }
+                            None => {
+                                emitter.emit_character(left);
+                            }
                         }
                     }
-                    left = right;
+                    left = Some(right);
                     left_in_original = true;
                 }
             }
         }
-        match lig_pieces.take() {
-            Some(l) => {
-                emitter.emit_ligature(left, l.into());
-            }
-            None => {
-                emitter.emit_character(left);
+        if let Some(left) = left {
+            match lig_pieces.take() {
+                Some(l) => {
+                    emitter.emit_ligature(left, l.into());
+                }
+                None => {
+                    emitter.emit_character(left);
+                }
             }
         }
     }

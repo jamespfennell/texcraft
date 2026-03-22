@@ -13,12 +13,7 @@ pub fn compile(
     let program = CompiledProgram {
         replacements: replacements
             .into_iter()
-            .filter_map(|(node, replacement)| {
-                match node.0 {
-                    LeftChar::Char(char) => Some(((char, node.1), replacement)),
-                    LeftChar::BoundaryChar => None, // TODO
-                }
-            })
+            .map(|(node, replacement)| ((node.0.char_or(), node.1), replacement))
             .collect(),
     };
     (program, infinite_loop_errors)
@@ -534,11 +529,11 @@ mod tests {
             .into_iter()
             .map(|(c, u)| (c.try_into().unwrap(), u))
             .collect();
-        let want_new: HashMap<(Char, Char), Replacement> = want_new
+        let want: HashMap<(Option<Char>, Char), Replacement> = want_new
             .into_iter()
             .map(|t| {
                 (
-                    (t.0.try_into().unwrap(), t.1.try_into().unwrap()),
+                    (Some(t.0.try_into().unwrap()), t.1.try_into().unwrap()),
                     Replacement(t.2, t.3),
                 )
             })
@@ -551,15 +546,13 @@ mod tests {
             compile(&program, FixWord::ONE, &vec![], &entry_points);
         assert!(infinite_loop_error_or.is_empty(), "no infinite loop errors");
 
-        let mut got_new: HashMap<(Char, Char), Replacement> = Default::default();
+        let mut got: HashMap<(Option<Char>, Char), Replacement> = Default::default();
         for pair in compiled_program.all_pairs_with_replacements() {
-            let replacement = compiled_program
-                .get_replacement_utf8(pair.0.into(), pair.1.into())
-                .unwrap();
-            got_new.insert(pair, replacement.clone());
+            let replacement = compiled_program.get_replacement(pair.0, pair.1).unwrap();
+            got.insert(pair, replacement.clone());
         }
 
-        assert_eq!(got_new, want_new);
+        assert_eq!(got, want);
     }
 
     macro_rules! success_tests {

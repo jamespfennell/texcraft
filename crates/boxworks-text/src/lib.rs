@@ -186,6 +186,16 @@ mod tests {
             "#,
         ),
         (
+            numbers_start_of_word,
+            "123B",
+            r##"
+                lig("$", "|", font=0)
+                text("123", font=0)
+                lig("#", "", font=0)
+                text("B", font=0)
+            "##,
+        ),
+        (
             numbers_mid_word,
             "A123B",
             r##"

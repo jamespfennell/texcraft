@@ -388,7 +388,7 @@ impl LigKern {
                 last_l = Some(l);
             }
              */
-            print!("    {} {} ->", l, r);
+            print!("    {:?} {} ->", l, r);
             todo!("need to reimplement this in terms of the new ops");
         }
         Ok(())
