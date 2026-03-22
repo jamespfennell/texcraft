@@ -422,6 +422,15 @@ impl File {
         }
         u32::from_be_bytes(b)
     }
+
+    pub fn named_param(&self, param: NamedParameter) -> Option<FixWord> {
+        self.params.get((param.number() - 1) as usize).copied()
+    }
+
+    pub fn named_param_scaled(&self, param: NamedParameter) -> Option<core::Scaled> {
+        self.named_param(param)
+            .map(|p| p.to_scaled(self.header.design_size))
+    }
 }
 
 impl From<crate::pl::File> for File {

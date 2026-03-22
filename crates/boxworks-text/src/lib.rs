@@ -11,9 +11,9 @@ use boxworks::ds;
 use tfm::ligkern;
 
 #[derive(Debug)]
-pub struct Font {
-    pub default_space: core::Glue,
-    pub lig_kern_program: tfm::ligkern::CompiledProgram,
+struct Font {
+    default_space: core::Glue,
+    lig_kern_program: tfm::ligkern::CompiledProgram,
 }
 
 #[derive(Default)]
@@ -67,9 +67,29 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
 }
 
 impl TextPreprocessorImpl {
-    pub fn register_font(&mut self, id: u32, font: Font) {
+    pub fn register_font(
+        &mut self,
+        id: u32,
+        tfm_file: &tfm::File,
+        lig_kern_program: tfm::ligkern::CompiledProgram,
+    ) {
         assert_eq!(id as usize, self.fonts.len());
-        self.fonts.push(font);
+        self.fonts.push(Font {
+            default_space: core::Glue {
+                width: tfm_file
+                    .named_param_scaled(tfm::NamedParameter::Space)
+                    .unwrap(),
+                stretch: tfm_file
+                    .named_param_scaled(tfm::NamedParameter::Stretch)
+                    .unwrap(),
+                stretch_order: core::GlueOrder::Normal,
+                shrink: tfm_file
+                    .named_param_scaled(tfm::NamedParameter::Shrink)
+                    .unwrap(),
+                shrink_order: core::GlueOrder::Normal,
+            },
+            lig_kern_program,
+        });
     }
     pub fn activate_font(&mut self, id: u32) {
         self.current_font = id;
@@ -83,28 +103,33 @@ mod tests {
     use boxworks_lang as bwl;
 
     macro_rules! preprocessor_tests {
-        ( $( ( $name: ident, $input: expr, $want: expr, ), )+ ) => {
-            $(
-                #[test]
-                fn $name() {
-                    let input = $input;
-                    let want = $want;
-                    run_preprocessor_test(input, want)
-                }
-            )+
+        ( $namespace: ident, $tfm_path: expr, $( ( $name: ident, $input: expr, $want: expr, ), )+ ) => {
+            mod $namespace {
+                const TFM: &'static [u8] = include_bytes!("../../tfm/corpus/computer-modern/cmr10.tfm");
+                $(
+                    #[test]
+                    fn $name() {
+                        let input = $input;
+                        let want = $want;
+                        super::run_preprocessor_test(TFM, input, want)
+                    }
+                )+
+            }
         };
     }
 
     preprocessor_tests!(
+        cmr10,
+        "../../tfm/corpus/computer-modern/cmr10.tfm",
         (
-            cmr10_basic,
+            basic,
             "second",
             r#"
                 text("second", font=0)
             "#,
         ),
         (
-            cmr10_basic_with_space,
+            basic_with_space,
             "sec ond",
             r#"
                 text("sec", font=0)
@@ -113,7 +138,7 @@ mod tests {
             "#,
         ),
         (
-            cmr10_kern_ao,
+            kern_ao,
             "AO",
             r#"
                 text("A", font=0)
@@ -122,7 +147,7 @@ mod tests {
             "#,
         ),
         (
-            cmr10_kern_av,
+            kern_av,
             "AV",
             r#"
                 text("A", font=0)
@@ -131,14 +156,14 @@ mod tests {
             "#,
         ),
         (
-            cmr10_ligature_1,
+            ligature_1,
             "ff",
             r#"
                 lig("\u{b}", "ff", font=0)
             "#,
         ),
         (
-            cmr10_ligature_2,
+            ligature_2,
             "ffi",
             r#"
                 lig("\u{e}", "ffi", font=0)
@@ -146,37 +171,29 @@ mod tests {
         ),
     );
 
-    fn run_preprocessor_test(input: &str, want: &str) {
-        let mut tfm_file = {
-            let raw = include_bytes!("../../tfm/corpus/computer-modern/cmr10.tfm");
-            tfm::File::deserialize(raw).0.unwrap()
-        };
+    preprocessor_tests!(
+        smfebsl,
+        "../../tfm/corpus/ctan/smfebsl10-3.tfm",
+        (
+            basic_with_space,
+            "sec ond",
+            r#"
+                text("sec", font=0)
+                glue(3.33333pt, 1.66666pt, 1.11111pt)
+                text("ond", font=0)
+            "#,
+        ),
+    );
+
+    fn run_preprocessor_test(tfm_bytes: &[u8], input: &str, want: &str) {
+        let mut tfm_file = tfm::File::deserialize(tfm_bytes).0.unwrap();
+        let lig_kern_program =
+            tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
 
         let want = bwl::parse_horizontal_list(want).unwrap();
 
         let mut tp: TextPreprocessorImpl = Default::default();
-        tp.register_font(
-            0,
-            Font {
-                default_space: core::Glue {
-                    // TODO: read these from the tfm file params
-                    // We need to convert FixWord to Scaled
-                    // and then adjust by the design size...
-                    // So the following line is not good enough - it's off
-                    // by the design size of ~10
-                    // width: tfm_file.params[1].to_scaled(),
-                    width: core::Scaled::ONE * 10 / 3,
-                    stretch: core::Scaled::ONE * 5 / 3,
-                    stretch_order: core::GlueOrder::Normal,
-                    shrink: core::Scaled::ONE * 10 / 9 + core::Scaled(1),
-                    shrink_order: core::GlueOrder::Normal,
-                },
-                lig_kern_program: tfm::ligkern::CompiledProgram::compile_from_tfm_file(
-                    &mut tfm_file,
-                )
-                .0,
-            },
-        );
+        tp.register_font(0, &tfm_file, lig_kern_program);
         tp.activate_font(0);
         let mut got = vec![];
         for word in input.split_inclusive(' ') {
