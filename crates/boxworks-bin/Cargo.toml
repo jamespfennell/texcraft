@@ -11,6 +11,7 @@ keywords = ["tex", "texcraft"]
 [dependencies]
 boxworks = {path="../boxworks" }
 boxworks-lang = {path="../boxworks-lang" , features = ["ariadne"]}
+boxworks-text = {path="../boxworks-text" }
 tfm = { path="../tfm" }
 
 clap = {version="4.3.3", default-features=false, features=["std", "derive"]}

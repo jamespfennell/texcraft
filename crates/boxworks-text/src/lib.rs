@@ -185,6 +185,17 @@ mod tests {
                 text("d", font=0)
             "#,
         ),
+        (
+            numbers_mid_word,
+            "A123B",
+            r##"
+                text("A", font=0)
+                lig("$", "", font=0)
+                text("123", font=0)
+                lig("#", "", font=0)
+                text("B", font=0)
+            "##,
+        ),
     );
 
     fn run_preprocessor_test(tfm_bytes: &[u8], input: &str, want: &str) {

@@ -1,3 +1,4 @@
+use boxworks::TextPreprocessor;
 use boxworks_lang as bwl;
 use clap::Parser;
 use std::collections::HashMap;
@@ -16,6 +17,7 @@ struct Cli {
 enum SubCommand {
     Check(Check),
     Fmt(Fmt),
+    Hlists(Hlists),
     Tex(Tex),
 }
 
@@ -24,6 +26,7 @@ fn main() {
     let result = match args.sub_command {
         SubCommand::Check(check) => check.run(),
         SubCommand::Fmt(fmt) => fmt.run(),
+        SubCommand::Hlists(hlists) => hlists.run(),
         SubCommand::Tex(tex) => tex.run(),
     };
     if let Err(err) = result {
@@ -89,6 +92,82 @@ impl Fmt {
     }
 }
 
+/// Print the horizontal lists that Box builds for some text.
+///
+/// To use TeX of pdfTeX to build the lists use `box tex hlists`instead.
+#[derive(Parser)]
+struct Hlists {
+    /// The texts for which to build the lists.
+    ///
+    /// Each element of texts is used to build a separate horizontal list.
+    texts: Vec<String>,
+
+    /// Font metrics file to use.
+    ///
+    /// If not provided, the command uses CMR10.
+    #[clap(short, long)]
+    font_metrics: Option<PathBuf>,
+}
+
+impl Hlists {
+    fn run(self) -> Result<(), String> {
+        let tfm_bytes: Vec<u8> = match self.font_metrics {
+            None => include_bytes!("../../tfm/corpus/computer-modern/cmr10.tfm").into(),
+            Some(font_metrics) => match font_metrics.extension().and_then(|s| s.to_str()) {
+                Some("pl" | "plst") => {
+                    let pl_data = match fs::read_to_string(&font_metrics) {
+                        Ok(source) => source,
+                        Err(err) => {
+                            return Err(format!["failed to open file {:?}: {err}", &font_metrics]);
+                        }
+                    };
+                    tfm::algorithms::pl_to_tfm(&pl_data).0
+                }
+                Some("tfm") => match fs::read(&font_metrics) {
+                    Ok(source) => source,
+                    Err(err) => {
+                        return Err(format!["failed to open file {:?}: {err}", &font_metrics]);
+                    }
+                },
+                _ => {
+                    return Err(format![
+                        "unsupported font metrics file extension: must be pl, plst or tfm, is {:?}",
+                        font_metrics.extension()
+                    ])
+                }
+            },
+        };
+        let mut tfm_file = tfm::File::deserialize(&tfm_bytes).0.unwrap();
+        let lig_kern_program =
+            tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
+        let mut tp: boxworks_text::TextPreprocessorImpl = Default::default();
+        tp.register_font(0, &tfm_file, lig_kern_program);
+        tp.activate_font(0);
+        for (i, text) in self.texts.into_iter().enumerate() {
+            let mut got = vec![];
+            for word in text.split_inclusive(' ') {
+                tp.add_text(word.trim_matches(' '), &mut got);
+                if word.ends_with(" ") {
+                    tp.add_space(&mut got);
+                }
+            }
+            use bwl::convert::ToBoxLang;
+            let mut lang: Vec<bwl::ast::Horizontal<'static>> = got.to_box_lang();
+            terse(&mut lang);
+            println!("#");
+            println!("# hlist {}", i + 1);
+            println!(
+                "{}",
+                bwl::ast::Horizontal::Hlist(bwl::ast::Hlist {
+                    width: Default::default(),
+                    content: lang.into(),
+                })
+            );
+        }
+        Ok(())
+    }
+}
+
 /// Perform operations related to TeX.
 #[derive(Parser)]
 struct Tex {
@@ -120,13 +199,15 @@ enum TexSubCommand {
     Hlists(TexHlists),
 }
 
-/// Print the horizontal lists that TeX builds for some contents.
+/// Print the horizontal lists that TeX builds for some text.
+///
+/// To use Box to build the lists use `box hlists` instead.
 #[derive(Parser)]
 struct TexHlists {
-    /// The contents used to build the lists.
+    /// The texts for which to build the lists.
     ///
-    /// Each element of contents is used to build a separate horizontal list.
-    contents: Vec<String>,
+    /// Each element of texts is used to build a separate horizontal list.
+    texts: Vec<String>,
 
     /// Font metrics file to use.
     ///
@@ -181,7 +262,7 @@ impl TexHlists {
             tex_engine,
             &auxiliary_files,
             &preamble,
-            &mut self.contents.iter(),
+            &mut self.texts.iter(),
         );
         println!("# fonts:");
         for (font_name, font_number) in fonts.into_iter() {

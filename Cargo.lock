@@ -208,6 +208,7 @@ dependencies = [
  "ariadne",
  "boxworks",
  "boxworks-lang",
+ "boxworks-text",
  "clap 4.4.8",
  "tfm",
 ]
