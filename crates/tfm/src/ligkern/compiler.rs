@@ -11,6 +11,7 @@ pub fn compile(
     let (replacements, infinite_loop_errors) =
         calculate_replacements(program, design_size, kerns, pair_to_instruction);
     let program = CompiledProgram {
+        right_boundary_char: program.right_boundary_char,
         replacements: replacements
             .into_iter()
             .map(|(node, replacement)| ((node.0.char_or(), node.1), replacement))
@@ -562,7 +563,9 @@ mod tests {
 
         let mut got: HashMap<(Option<Char>, Char), Replacement> = Default::default();
         for pair in compiled_program.all_pairs_with_replacements() {
-            let replacement = compiled_program.get_replacement(pair.0, pair.1).unwrap();
+            let replacement = compiled_program
+                .get_replacement(pair.0, Some(pair.1))
+                .unwrap();
             got.insert(pair, replacement.clone());
         }
 
