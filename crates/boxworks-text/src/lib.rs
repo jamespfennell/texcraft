@@ -25,7 +25,7 @@ pub struct TextPreprocessorImpl {
 }
 
 impl boxworks::TextPreprocessor for TextPreprocessorImpl {
-    fn add_text(&mut self, text: &str, list: &mut Vec<ds::Horizontal>) {
+    fn add_word(&mut self, word: &str, list: &mut Vec<ds::Horizontal>) {
         let font = &self.fonts[self.current_font as usize];
 
         struct Emitter<'a>(&'a mut Vec<ds::Horizontal>, u32);
@@ -54,7 +54,7 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
         }
 
         let mut e = Emitter(list, self.current_font);
-        font.lig_kern_program.run(text, &mut e);
+        font.lig_kern_program.run(word, &mut e);
     }
 
     fn add_space(&mut self, list: &mut Vec<ds::Horizontal>) {
@@ -235,7 +235,7 @@ mod tests {
         tp.activate_font(0);
         let mut got = vec![];
         for word in input.split_inclusive(' ') {
-            tp.add_text(word.trim_matches(' '), &mut got);
+            tp.add_word(word.trim_matches(' '), &mut got);
             if word.ends_with(" ") {
                 tp.add_space(&mut got);
             }

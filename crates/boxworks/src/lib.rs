@@ -9,6 +9,16 @@ pub mod ds;
 pub mod tex;
 
 pub trait TextPreprocessor {
-    fn add_text(&mut self, text: &str, list: &mut Vec<ds::Horizontal>);
+    fn add_word(&mut self, word: &str, list: &mut Vec<ds::Horizontal>);
+
     fn add_space(&mut self, list: &mut Vec<ds::Horizontal>);
+
+    fn add_text(&mut self, text: &str, list: &mut Vec<ds::Horizontal>) {
+        for word in text.split_inclusive(' ') {
+            self.add_word(word.trim_matches(' '), list);
+            if word.ends_with(" ") {
+                self.add_space(list);
+            }
+        }
+    }
 }

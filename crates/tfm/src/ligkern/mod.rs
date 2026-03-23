@@ -222,11 +222,11 @@ impl CompiledProgram {
     }
 
     /// Run this lig/kern program.
-    pub fn run<T: Emitter>(&self, text: &str, emitter: &mut T) {
+    pub fn run<T: Emitter>(&self, word: &str, emitter: &mut T) {
         let mut left: Option<char> = None;
         let mut left_in_original = true;
         let mut lig_pieces: Option<String> = None;
-        let mut iter = text.chars();
+        let mut iter = word.chars();
         loop {
             let right = iter.next();
             if left.is_none() && right.is_none() {

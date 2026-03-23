@@ -18,7 +18,6 @@ enum SubCommand {
     Check(Check),
     Fmt(Fmt),
     Hlists(Hlists),
-    Tex(Tex),
 }
 
 fn main() {
@@ -27,7 +26,6 @@ fn main() {
         SubCommand::Check(check) => check.run(),
         SubCommand::Fmt(fmt) => fmt.run(),
         SubCommand::Hlists(hlists) => hlists.run(),
-        SubCommand::Tex(tex) => tex.run(),
     };
     if let Err(err) = result {
         println!["Error: {err}"];
@@ -92,9 +90,9 @@ impl Fmt {
     }
 }
 
-/// Print the horizontal lists that Box builds for some text.
+/// Print the horizontal lists built for some text.
 ///
-/// To use TeX of pdfTeX to build the lists use `box tex hlists`instead.
+/// By default, Box builds the lists. If --tex_engine is specified, the given TeX engine is used instead.
 #[derive(Parser)]
 struct Hlists {
     /// The texts for which to build the lists.
@@ -103,161 +101,88 @@ struct Hlists {
     texts: Vec<String>,
 
     /// Font metrics file to use.
-    ///
-    /// If not provided, the command uses CMR10.
     #[clap(short, long)]
     font_metrics: Option<PathBuf>,
+
+    /// Use a TeX engine to build the lists (e.g. `tex`, `pdftex`).
+    ///
+    /// If not specified, Box builds the lists using CMR10 as the default font.
+    #[clap(long)]
+    tex_engine: Option<String>,
+
+    /// Path to a file containing texts to convert, one per line.
+    ///
+    /// Empty lines are ignored. Each non-empty line is converted into a separate horizontal list.
+    #[clap(long)]
+    texts_file: Option<PathBuf>,
 }
 
 impl Hlists {
-    fn run(self) -> Result<(), String> {
-        let tfm_bytes: Vec<u8> = match self.font_metrics {
-            None => include_bytes!("../../tfm/corpus/computer-modern/cmr10.tfm").into(),
-            Some(font_metrics) => match font_metrics.extension().and_then(|s| s.to_str()) {
-                Some("pl" | "plst") => {
-                    let pl_data = match fs::read_to_string(&font_metrics) {
-                        Ok(source) => source,
-                        Err(err) => {
-                            return Err(format!["failed to open file {:?}: {err}", &font_metrics]);
-                        }
-                    };
-                    tfm::algorithms::pl_to_tfm(&pl_data).0
-                }
-                Some("tfm") => match fs::read(&font_metrics) {
-                    Ok(source) => source,
-                    Err(err) => {
-                        return Err(format!["failed to open file {:?}: {err}", &font_metrics]);
-                    }
-                },
-                _ => {
-                    return Err(format![
-                        "unsupported font metrics file extension: must be pl, plst or tfm, is {:?}",
-                        font_metrics.extension()
-                    ])
-                }
-            },
+    fn run(mut self) -> Result<(), String> {
+        if let Some(ref path) = self.texts_file.clone() {
+            let content = match fs::read_to_string(path) {
+                Ok(s) => s,
+                Err(err) => return Err(format!["failed to open file {:?}: {err}", path]),
+            };
+            self.texts
+                .extend(content.lines().filter(|l| !l.is_empty()).map(str::to_owned));
+        }
+        let hlists = if let Some(ref tex_engine_name) = self.tex_engine {
+            match boxworks::tex::new_tex_engine_binary(tex_engine_name.clone()) {
+                Ok(tex_engine) => self.run_tex(tex_engine.as_ref())?,
+                Err(err) => return Err(format!["{err}"]),
+            }
+        } else {
+            self.run_box()?
         };
+        print_hlists(hlists);
+        Ok(())
+    }
+
+    fn run_box(self) -> Result<Vec<bwl::ast::Hlist<'static>>, String> {
+        let (tfm_bytes, _) = load_font_metrics(self.font_metrics)?;
         let mut tfm_file = tfm::File::deserialize(&tfm_bytes).0.unwrap();
         let lig_kern_program =
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
         let mut tp: boxworks_text::TextPreprocessorImpl = Default::default();
         tp.register_font(0, &tfm_file, lig_kern_program);
         tp.activate_font(0);
-        for (i, text) in self.texts.into_iter().enumerate() {
-            let mut got = vec![];
-            for word in text.split_inclusive(' ') {
-                tp.add_text(word.trim_matches(' '), &mut got);
-                if word.ends_with(" ") {
-                    tp.add_space(&mut got);
-                }
-            }
-            use bwl::convert::ToBoxLang;
-            let mut lang: Vec<bwl::ast::Horizontal<'static>> = got.to_box_lang();
-            terse(&mut lang);
-            println!("#");
-            println!("# hlist {}", i + 1);
-            println!(
-                "{}",
-                bwl::ast::Horizontal::Hlist(bwl::ast::Hlist {
-                    width: Default::default(),
-                    content: lang.into(),
-                })
-            );
-        }
-        Ok(())
+        let raw: Vec<Vec<_>> = self
+            .texts
+            .into_iter()
+            .map(|text| {
+                let mut got = vec![];
+                tp.add_text(&text, &mut got);
+                got
+            })
+            .collect();
+        use bwl::convert::ToBoxLang;
+        Ok(raw
+            .into_iter()
+            .map(|got| bwl::ast::Hlist {
+                width: Default::default(),
+                content: got.to_box_lang().into(),
+            })
+            .collect())
     }
-}
 
-/// Perform operations related to TeX.
-#[derive(Parser)]
-struct Tex {
-    #[clap(subcommand)]
-    sub_command: TexSubCommand,
-
-    /// The TeX engine to use (e.g. `tex`, `pdftex`).
-    ///
-    /// Defaults to `tex`.
-    #[clap(short, long)]
-    tex_engine: Option<String>,
-}
-
-impl Tex {
-    fn run(self) -> Result<(), String> {
-        match boxworks::tex::new_tex_engine_binary(self.tex_engine.unwrap_or("tex".to_string())) {
-            Ok(tex_engine) => match self.sub_command {
-                TexSubCommand::Hlists(tex_convert_text) => {
-                    tex_convert_text.run(tex_engine.as_ref())
-                }
-            },
-            Err(err) => Err(format!["{err}"]),
-        }
-    }
-}
-
-#[derive(Parser)]
-enum TexSubCommand {
-    Hlists(TexHlists),
-}
-
-/// Print the horizontal lists that TeX builds for some text.
-///
-/// To use Box to build the lists use `box hlists` instead.
-#[derive(Parser)]
-struct TexHlists {
-    /// The texts for which to build the lists.
-    ///
-    /// Each element of texts is used to build a separate horizontal list.
-    texts: Vec<String>,
-
-    /// Font metrics file to use.
-    ///
-    /// If not provided, the command uses the metrics for the default font for TeX
-    /// (or whatever engine is being used).
-    #[clap(short, long)]
-    font_metrics: Option<PathBuf>,
-}
-
-impl TexHlists {
-    fn run(self, tex_engine: &dyn boxworks::tex::TexEngine) -> Result<(), String> {
+    fn run_tex(
+        self,
+        tex_engine: &dyn boxworks::tex::TexEngine,
+    ) -> Result<Vec<bwl::ast::Hlist<'static>>, String> {
         let mut auxiliary_files: HashMap<PathBuf, Vec<u8>> = Default::default();
         let mut preamble: String = Default::default();
-        if let Some(font_metrics) = self.font_metrics {
-            let source = match font_metrics.extension().and_then(|s| s.to_str()) {
-                Some("pl" | "plst") => {
-                    let pl_data = match fs::read_to_string(&font_metrics) {
-                        Ok(source) => source,
-                        Err(err) => {
-                            return Err(format!["failed to open file {:?}: {err}", &font_metrics]);
-                        }
-                    };
-                    tfm::algorithms::pl_to_tfm(&pl_data).0
-                }
-                Some("tfm") => match fs::read(&font_metrics) {
-                    Ok(source) => source,
-                    Err(err) => {
-                        return Err(format!["failed to open file {:?}: {err}", &font_metrics]);
-                    }
-                },
-                _ => {
-                    return Err(format![
-                        "unsupported font metrics file extension: must be pl, plst or tfm, is {:?}",
-                        font_metrics.extension()
-                    ])
-                }
-            };
-            let mut file_name: PathBuf = font_metrics.file_name().unwrap().into();
-            file_name.set_extension("tfm");
-            let file_stem = file_name.file_stem().unwrap().to_string_lossy();
-            preamble.push_str(&format![
-                r"
+        let (source, file_name) = load_font_metrics(self.font_metrics)?;
+        let file_stem = file_name.file_stem().unwrap().to_string_lossy();
+        preamble.push_str(&format![
+            r"
 
-                    \font \customFont {file_stem}
+                \font \customFont {file_stem}
 
-                    \customFont
-                    "
-            ]);
-            auxiliary_files.insert(file_name, source);
-        }
+                \customFont
+                "
+        ]);
+        auxiliary_files.insert(file_name, source);
         let (fonts, hlists) = boxworks::tex::build_horizontal_lists(
             tex_engine,
             &auxiliary_files,
@@ -268,17 +193,47 @@ impl TexHlists {
         for (font_name, font_number) in fonts.into_iter() {
             println!("# - {font_name}={font_number}");
         }
-
         use bwl::convert::ToBoxLang;
-        let lang: Vec<bwl::ast::Hlist<'static>> = hlists.to_box_lang();
-        for (i, mut hlist) in lang.into_iter().enumerate() {
-            terse(&mut hlist.content.value);
-            println!("#");
-            println!("# hlist {}", i + 1);
-            println!("{}", bwl::ast::Horizontal::Hlist(hlist));
-        }
-        Ok(())
+        Ok(hlists.to_box_lang())
     }
+}
+
+fn print_hlists(hlists: Vec<bwl::ast::Hlist<'static>>) {
+    for (i, mut hlist) in hlists.into_iter().enumerate() {
+        terse(&mut hlist.content.value);
+        println!("#");
+        println!("# hlist {}", i + 1);
+        println!("{}", bwl::ast::Horizontal::Hlist(hlist));
+    }
+}
+
+fn load_font_metrics(font_metrics: Option<PathBuf>) -> Result<(Vec<u8>, PathBuf), String> {
+    let Some(path) = font_metrics else {
+        let bytes = include_bytes!("../../tfm/corpus/computer-modern/cmr10.tfm").to_vec();
+        return Ok((bytes, PathBuf::from("cmr10.tfm")));
+    };
+    let bytes = match path.extension().and_then(|s| s.to_str()) {
+        Some("pl" | "plst") => {
+            let pl_data = match fs::read_to_string(&path) {
+                Ok(source) => source,
+                Err(err) => return Err(format!["failed to open file {:?}: {err}", &path]),
+            };
+            tfm::algorithms::pl_to_tfm(&pl_data).0
+        }
+        Some("tfm") => match fs::read(&path) {
+            Ok(source) => source,
+            Err(err) => return Err(format!["failed to open file {:?}: {err}", &path]),
+        },
+        _ => {
+            return Err(format![
+                "unsupported font metrics file extension: must be pl, plst or tfm, is {:?}",
+                path.extension()
+            ])
+        }
+    };
+    let mut file_name: PathBuf = path.file_name().unwrap().into();
+    file_name.set_extension("tfm");
+    Ok((bytes, file_name))
 }
 
 fn terse(v: &mut Vec<bwl::ast::Horizontal<'static>>) {
