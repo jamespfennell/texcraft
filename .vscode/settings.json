@@ -89,6 +89,7 @@
         "Seedable",
         "serde",
         "SEVENBITSAFEFLAG",
+        "SMFEBSL",
         "stdext",
         "stdlib",
         "substringsearch",

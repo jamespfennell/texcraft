@@ -92,7 +92,7 @@ impl TexEngine for TexEngineBinary {
 
         let stdout = String::from_utf8(output.stdout).expect("stdout output of TeX is utf-8");
         if !output.status.success() {
-            eprintln!("Warning: TeX command seems to have failed: {stdout}");
+            eprintln!("Warning: TeX command seems to have failed. Consult the logs in the log file (replace .tex input file with .log)");
         }
         stdout
     }
@@ -274,7 +274,13 @@ fn parse_scaled(s: &str) -> core::Scaled {
             .expect("digits are in the range [0,10) and always fit in u8");
     }
     let f = core::Scaled::from_decimal_digits(&f);
-    let sc = core::Scaled::new(i, f, core::ScaledUnit::Point).expect("scaled is in bounds");
+    let sc = core::Scaled::new(i, f, core::ScaledUnit::Point).unwrap_or_else(|_| {
+        eprintln!(
+            "scaled number '{s}pt' is too big to parse; replacing with the largest scaled value {}",
+            core::Scaled::MAX_DIMEN
+        );
+        core::Scaled::MAX_DIMEN
+    });
     if neg {
         -sc
     } else {
