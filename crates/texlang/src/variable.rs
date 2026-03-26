@@ -446,19 +446,19 @@ macro_rules! supported_type_impl {
         /// Operations on this value (like reading or setting the value) can be done in two ways:
         ///
         /// 1. (Easy, less flexible) Use the methods directly on this type like [Variable::value]
-        ///     to read the value.
-        ///     These methods are really ergonomic.
-        ///     The problem with the value method specifically is that the result
-        ///     is a reference which keeps the borrow of the state alive.
-        ///     Thus, while holding onto the result of the value, you can't do anything this the
-        ///     input stream like reading an argument.
-        ///     This is especially a problem when you need to perform a different action depending on the concrete type of the variable.
+        ///    to read the value.
+        ///    These methods are really ergonomic.
+        ///    The problem with the value method specifically is that the result
+        ///    is a reference which keeps the borrow of the state alive.
+        ///    Thus, while holding onto the result of the value, you can't do anything this the
+        ///    input stream like reading an argument.
+        ///    This is especially a problem when you need to perform a different action depending on the concrete type of the variable.
         ///
         /// 2. (Trickier, more flexible) Match on the type's enum variants to determine the
-        ///     concrete type of the variable.
-        ///     The [TypedVariable] value obtained in this way can be used to perform operations on the value.
-        ///     The main benefit of this approach is that after matching on the type, you can still use the input
-        ///     stream to do things because there is not borrow alive.
+        ///    concrete type of the variable.
+        ///    The [TypedVariable] value obtained in this way can be used to perform operations on the value.
+        ///    The main benefit of this approach is that after matching on the type, you can still use the input
+        ///    stream to do things because there is not borrow alive.
         ///
         pub enum Variable<S> {
             $(

@@ -67,8 +67,7 @@ pub fn tfm_to_pl(
     let warnings = filter_lig_kern_warnings(warnings);
     let tfm_modified = warnings
         .iter()
-        .map(crate::ValidationWarning::tfm_file_modified)
-        .any(|t| t);
+        .any(crate::ValidationWarning::tfm_file_modified);
     for warning in warnings {
         error_messages.push(TfmToPlErrorMessage::ValidationWarning(warning));
     }

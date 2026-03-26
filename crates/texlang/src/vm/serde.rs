@@ -25,7 +25,7 @@
 //! 1. Deserialize the bytes to a [`DeserializedVM`] type.
 //!
 //! 2. Invoke [`finish_deserialization`] with the deserialized VM
-//!     and a map of built-in commands in order to recover the regular Texlang VM.
+//!    and a map of built-in commands in order to recover the regular Texlang VM.
 //!
 //! The Texlang VM has a [`deserialize_with_built_in_commands` convenience method](super::VM::deserialize_with_built_in_commands)
 //!     which performs both of these steps at once.

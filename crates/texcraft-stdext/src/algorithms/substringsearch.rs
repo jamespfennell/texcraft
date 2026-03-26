@@ -10,7 +10,7 @@
 //! - There may be multiple searches for the same substring in different strings.
 //!
 //! - The elements of the string may be generated on the demand as the search progresses.
-//!    That is, the full string is not necessarily known at the start.
+//!   That is, the full string is not necessarily known at the start.
 //!
 //! ## Example
 //!
@@ -78,7 +78,7 @@ impl<T: PartialEq> Matcher<T> {
     }
 
     /// Start a new substring search.
-    pub fn start(&self) -> Search<T> {
+    pub fn start(&self) -> Search<'_, T> {
         Search {
             factory: self,
             q: 0,

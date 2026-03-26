@@ -153,7 +153,7 @@ struct PrintLineBuilder<'a> {
 }
 
 impl Printer {
-    fn new_line(&self) -> PrintLineBuilder {
+    fn new_line(&self) -> PrintLineBuilder<'_> {
         PrintLineBuilder {
             printer: self,
             margin_content: "".into(),

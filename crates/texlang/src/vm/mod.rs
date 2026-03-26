@@ -941,20 +941,20 @@ impl ShutdownStatus {
 /// Notes:
 ///
 /// - In general state is shared by multiple commands. Such commands must be defined in the
-///     same Rust module to support this.
-///     For example, `\countdef` shares state with `\count`,
-///     and they are implemented together.
+///   same Rust module to support this.
+///   For example, `\countdef` shares state with `\count`,
+///   and they are implemented together.
 ///
 /// - Commands don't necessarily have state: for example, `\def`, `\advance` and `\the`.
-///     These commands
-///     are defined without trait bounds on the state, and work automatically with any TeX
-///     software built with Texlang.
+///   These commands
+///   are defined without trait bounds on the state, and work automatically with any TeX
+///   software built with Texlang.
 ///
 /// - The easiest way to include a component in the state is to make it a direct field
-///     of the state.
-///     In this case the [implement_has_component] macro can be used to easily implement the
-///     trait.
-///     The Texlang standard library uses this approach.
+///   of the state.
+///   In this case the [implement_has_component] macro can be used to easily implement the
+///   trait.
+///   The Texlang standard library uses this approach.
 ///
 /// ## The [TexlangState] requirement
 ///

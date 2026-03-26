@@ -251,7 +251,6 @@ pub fn generate_random_cs_names(
         let cs_name: String = rng
             .sample_iter(rand::distributions::Uniform::new_inclusive('a', 'z'))
             .take(len)
-            .map(char::from)
             .collect();
         names.push(cs_name);
     }

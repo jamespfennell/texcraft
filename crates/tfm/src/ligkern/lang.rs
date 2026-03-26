@@ -97,9 +97,9 @@ impl Operation {
             Some(r) => Self::KernAtIndex(u16::from_be_bytes([r, remainder])),
             None => {
                 // TFtoPL.2014.77
-                let delete_next_char = (op_byte % 2) == 0;
+                let delete_next_char = op_byte.is_multiple_of(2);
                 let op_byte = op_byte / 2;
-                let delete_current_char = (op_byte % 2) == 0;
+                let delete_current_char = op_byte.is_multiple_of(2);
                 let skip = op_byte / 2;
                 use PostLigOperation::*;
                 let (post_lig_operation, post_lig_tag_invalid) =
@@ -300,7 +300,10 @@ impl Program {
         }
     }
 
-    pub fn reachable_iter<I: Iterator<Item = (Char, u16)>>(&self, entrypoints: I) -> ReachableIter {
+    pub fn reachable_iter<I: Iterator<Item = (Char, u16)>>(
+        &self,
+        entrypoints: I,
+    ) -> ReachableIter<'_> {
         ReachableIter {
             next: 0,
             reachable: self.reachable_array(entrypoints),
@@ -309,7 +312,10 @@ impl Program {
     }
 
     /// Iterate over the lig/kern instructions for a specific entrypoint.
-    pub fn instructions_for_entrypoint(&self, entrypoint: u16) -> InstructionsForEntrypointIter {
+    pub fn instructions_for_entrypoint(
+        &self,
+        entrypoint: u16,
+    ) -> InstructionsForEntrypointIter<'_> {
         InstructionsForEntrypointIter {
             next: entrypoint as usize,
             instructions: &self.instructions,
@@ -611,10 +617,7 @@ impl<'a> Iterator for ReachableIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let this = self.next;
-        let instruction = match self.program.instructions.get(this as usize) {
-            None => return None,
-            Some(instruction) => instruction,
-        };
+        let instruction = self.program.instructions.get(this as usize)?;
         self.next += 1;
         Some(if self.reachable[this as usize] {
             let adjusted_skip = match instruction.next_instruction {

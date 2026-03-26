@@ -190,7 +190,7 @@ fn serialize_string(s: &Option<String>, size: u8, b: &mut Vec<u8>) {
     match len_padding_or {
         None => {
             b.push(size);
-            b.extend(s[0..size as usize].as_bytes())
+            b.extend(&s.as_bytes()[0..size as usize])
         }
         Some((len, padding)) => {
             b.push(len);

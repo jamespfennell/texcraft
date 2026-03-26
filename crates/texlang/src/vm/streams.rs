@@ -219,18 +219,18 @@ impl<S: TexlangState> TokenStream for UnexpandedStream<S> {
 /// This type provides:
 ///
 /// - Access to the input stream (with or without expansion). Its implementation of the [TokenStream]
-///     trait returns expanded tokens.
-///     To read the input stream without performing expansion, use the
-///     [unexpanded](ExpandedStream::unexpanded) method.
+///   trait returns expanded tokens.
+///   To read the input stream without performing expansion, use the
+///   [unexpanded](ExpandedStream::unexpanded) method.
 ///
 /// - Read only access to the VM.
 ///
 /// - The ability to push source code or token expansions to the front of the input stream.
-///     For source code use [ExpansionInput::push_source];
-///     for tokens use [ExpansionInput::push_expansion] or [ExpansionInput::expansions_mut].
+///   For source code use [ExpansionInput::push_source];
+///   for tokens use [ExpansionInput::push_expansion] or [ExpansionInput::expansions_mut].
 ///
 /// - Access to token buffers using the [ExpansionInput::checkout_token_buffer] and
-///     [ExpansionInput::return_token_buffer] methods.
+///   [ExpansionInput::return_token_buffer] methods.
 ///
 /// This type is also used in the parsing code for situations where both an
 /// [ExpansionInput] or [ExecutionInput] is accepted. We use this type because
@@ -400,13 +400,13 @@ impl<S> ExpansionInput<S> {
 /// This type provides:
 ///
 /// - Access to the input stream (with or without expansion). Its implementation of the [TokenStream]
-///     trait returns expanded tokens.
-///     To read the input stream without performing expansion, use the
-///     [unexpanded](ExpandedStream::unexpanded) method.
+///   trait returns expanded tokens.
+///   To read the input stream without performing expansion, use the
+///   [unexpanded](ExpandedStream::unexpanded) method.
 ///
 /// - Mutable access to the state and the commands map
-///     the [ExecutionInput::state_mut]
-///     and [ExecutionInput::commands_map_mut] methods.
+///   the [ExecutionInput::state_mut]
+///   and [ExecutionInput::commands_map_mut] methods.
 #[repr(transparent)]
 pub struct ExecutionInput<S>(ExpandedStream<S>);
 

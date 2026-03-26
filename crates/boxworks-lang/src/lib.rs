@@ -217,10 +217,10 @@
 //! It iterates over all characters in the string and:
 //!
 //! - For space characters, adds a glue node corresponding
-//!     to the glue `10pt plus 4pt minus 4pt`.
+//!   to the glue `10pt plus 4pt minus 4pt`.
 //!
 //! - For all other characters, adds a value of the Rust type
-//!     [`boxworks::ds::Char`].
+//!   [`boxworks::ds::Char`].
 //!
 //! Parameters:
 //!
@@ -291,7 +291,7 @@ impl<'a> PartialEq for Str<'a> {
 impl<'a> Eq for Str<'a> {}
 
 /// Pretty-format Box source code.
-pub fn format(source: &str) -> Result<String, Vec<error::Error>> {
+pub fn format(source: &str) -> Result<String, Vec<error::Error<'_>>> {
     let errs: ErrorAccumulator = Default::default();
     let l = lexer::Lexer::new(source, errs.clone());
     let func_calls = cst::parse_using_lexer(l, errs.clone());
@@ -302,7 +302,7 @@ pub fn format(source: &str) -> Result<String, Vec<error::Error>> {
 }
 
 /// Parse Box language source code into a horizontal list.
-pub fn parse_horizontal_list(source: &str) -> Result<Vec<ds::Horizontal>, Vec<Error>> {
+pub fn parse_horizontal_list(source: &str) -> Result<Vec<ds::Horizontal>, Vec<Error<'_>>> {
     let ast_nodes = ast::parse_hlist(source)?;
     Ok(ast_nodes.to_boxworks())
 }

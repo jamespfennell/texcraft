@@ -191,10 +191,7 @@ impl<D: TryParse> ToFromCstNode for SingleValue<D> {
 impl<D: TryParse, E: Parse> ToFromCstNode for TupleValue<D, E> {
     fn from_cst_node(p: cst::RegularNode, errors: &mut Vec<ParseWarning>) -> Option<Self> {
         let (mut input, _) = Input::new(p, errors);
-        let (left, left_span) = match D::try_parse(&mut input) {
-            None => return None,
-            Some(first) => first,
-        };
+        let (left, left_span) = D::try_parse(&mut input)?;
         let (right, right_span) = E::parse(&mut input);
         input.find_junk(false);
         Some(Self {

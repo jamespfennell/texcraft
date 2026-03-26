@@ -9,13 +9,13 @@
 //! In particular, TeX has the following primitives which can change the lexing rules:
 //!
 //! - The `\catcode` primitive is used to change the category code
-//!     that is applied to each character in the input, and thus the kind
-//!     of token that each character gets converted to.
+//!   that is applied to each character in the input, and thus the kind
+//!   of token that each character gets converted to.
 //!
 //! - The `\endlinechar` primitive is used to change the character
-//!     that TeX appends to each line in the input file.
-//!     TeX appends this character after stripping the new line characters (`\n` or `\r\n`)
-//!     and any trailing space characters (` `, ASCII code 32) from the end of the line.
+//!   that TeX appends to each line in the input file.
+//!   TeX appends this character after stripping the new line characters (`\n` or `\r\n`)
+//!   and any trailing space characters (` `, ASCII code 32) from the end of the line.
 //!
 //! The most important implication of TeX having dynamic lexing rules is that
 //!     the lexer is lazy, or "just in time".
@@ -56,22 +56,22 @@
 //! The exact order of operations here is:
 //!
 //! 1. The `\endlinechar` control sequence is returned from the lexer, and the
-//!     primitive starts running.
+//!    primitive starts running.
 //! 1. The optional `=` is parsed from the input.
 //! 1. TeX starts parsing a number.
-//!     The first character from the lexer is `` ` ``, which indicates that
-//!     the number will be provided via a single character control sequence.
+//!    The first character from the lexer is `` ` ``, which indicates that
+//!    the number will be provided via a single character control sequence.
 //! 1. The control sequence `\A` is then returned from the lexer.
-//!     At this point the lexer is at the end of line 1, and hasn't started the new line.
+//!    At this point the lexer is at the end of line 1, and hasn't started the new line.
 //! 1. Next, following TeX's rules for scanning numbers of the form `` `\A ``,
-//!     an optional space is parsed from the input.
-//!     See e.g. section 442 in TeX The Program.
-//!     Parsing this optional space triggers the lexer to return another token.
-//!     Because the current line is over, the lexer loads the next line and -- crucially -
-//!     uses the _current_ definition of the end of line character, which is `\r`.
+//!    an optional space is parsed from the input.
+//!    See e.g. section 442 in TeX The Program.
+//!    Parsing this optional space triggers the lexer to return another token.
+//!    Because the current line is over, the lexer loads the next line and -- crucially -
+//!    uses the _current_ definition of the end of line character, which is `\r`.
 //! 1. In this case it happens that there is no optional space.
-//!     So at this point the end of line character is changed to `X`.
-//!     At the end of the second line, this will be used when loading the third line.
+//!    So at this point the end of line character is changed to `X`.
+//!    At the end of the second line, this will be used when loading the third line.
 //!
 //! The lesson from this example is that the output of TeX source code
 //!     is dependent on the precise order of lexing operations.

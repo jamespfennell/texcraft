@@ -54,7 +54,7 @@
 //!
 //! - `X[i-1][j]` was calculated in the previous iteration of the `i` loop, so `1` iteration before.
 //! - `X[i][j-1]` was calculated in the previous iteration of the `j` loop with the same `i` index, so `m+1` iterations before
-//!        because the `i` variable takes `m+1` values.
+//!   because the `i` variable takes `m+1` values.
 //! - `X[i-1][j-1]` was calculated `m+2` iterations before.
 //!
 //! So, we don't need to store the full `X` matrix at all: we just need to store the last `m+2` elements that were calculated.

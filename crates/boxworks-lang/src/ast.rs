@@ -96,7 +96,7 @@ impl<'a> std::fmt::Display for Horizontal<'a> {
 }
 
 /// Parse Box language source code into a horizontal list.
-pub fn parse_hlist(source: &str) -> Result<Vec<Horizontal>, Vec<Error>> {
+pub fn parse_hlist(source: &str) -> Result<Vec<Horizontal<'_>>, Vec<Error<'_>>> {
     let errs: ErrorAccumulator = Default::default();
     let calls = cst::parse(source, errs.clone());
     let v = parse_hlist_using_cst(calls, &errs);

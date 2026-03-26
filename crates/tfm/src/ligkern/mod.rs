@@ -157,10 +157,7 @@ impl CompiledProgram {
         right_char: Option<Char>,
     ) -> Option<&Replacement> {
         let right_char = match right_char {
-            None => match self.right_boundary_char {
-                None => return None,
-                Some(c) => c,
-            },
+            None => self.right_boundary_char?,
             Some(c) => c,
         };
         self.replacements.get(&(left_char, right_char))

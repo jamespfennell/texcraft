@@ -228,7 +228,7 @@ impl<'a> Writer<'a> {
         self.str_content(s, l);
     }
     fn str_len(&mut self, s: &str) -> u8 {
-        let l: u8 = s.as_bytes().len().try_into().unwrap_or(u8::MAX);
+        let l: u8 = s.len().try_into().unwrap_or(u8::MAX);
         self.b.push(l);
         l
     }

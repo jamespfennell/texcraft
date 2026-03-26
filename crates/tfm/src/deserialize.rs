@@ -180,11 +180,11 @@ pub(super) fn from_raw_file(raw_file: &RawFile) -> File {
         smallest_char: raw_file.begin_char,
         char_dimens: (raw_file.begin_char.0..=raw_file.end_char.0)
             .zip(char_infos.iter())
-            .filter_map(|(c, (d, _))| (d.clone().map(|d| (Char(c), d))))
+            .filter_map(|(c, (d, _))| d.clone().map(|d| (Char(c), d)))
             .collect(),
         char_tags: (raw_file.begin_char.0..=raw_file.end_char.0)
             .zip(char_infos.iter())
-            .filter_map(|(c, (_, d))| (d.clone().map(|d| (Char(c), d))))
+            .filter_map(|(c, (_, d))| d.clone().map(|d| (Char(c), d)))
             .collect(),
         unset_char_tags: Default::default(),
         widths: deserialize_array(raw_file.widths),
@@ -454,7 +454,12 @@ impl<'a> RawFile<'a> {
         (Ok(Self::finish_deserialization(b, s, bc, ec)), warnings)
     }
 
-    pub(crate) fn finish_deserialization(b: &[u8], s: SubFileSizes, bc: Char, ec: Char) -> RawFile {
+    pub(crate) fn finish_deserialization(
+        b: &[u8],
+        s: SubFileSizes,
+        bc: Char,
+        ec: Char,
+    ) -> RawFile<'_> {
         let mut b = b;
         let mut get = |u: i16| {
             let u = (u as usize) * 4;

@@ -874,7 +874,7 @@ impl File {
     ///
     /// This function returns a helper type that implements the [std::fmt::Display]
     /// trait and can be used in `print!` and similar macros.
-    pub fn display(&self, indent: usize, char_display_format: CharDisplayFormat) -> Display {
+    pub fn display(&self, indent: usize, char_display_format: CharDisplayFormat) -> Display<'_> {
         Display {
             pl_file: self,
             indent,

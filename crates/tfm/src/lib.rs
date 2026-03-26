@@ -4,15 +4,15 @@
 //! It includes:
 //!
 //! - Functions to read and write TeX font metric (.tfm) files
-//!     to and from a value of type [`File`]
-//!     ([`deserialize`](File::deserialize), [`serialize`](File::serialize)).
+//!   to and from a value of type [`File`]
+//!   ([`deserialize`](File::deserialize), [`serialize`](File::serialize)).
 //!
 //! - Functions to read and write property list (.pl) files
-//!     to and from a value of type [`pl::File`]
-//!     ([`from_pl_source_code`](pl::File::from_pl_source_code), [`display`](pl::File::display)).
+//!   to and from a value of type [`pl::File`]
+//!   ([`from_pl_source_code`](pl::File::from_pl_source_code), [`display`](pl::File::display)).
 //!
 //! - Converters from .tfm to .pl files and vice-versa
-//!     (using Rust's [`From`] trait to go between [`File`] and [`pl::File`]).
+//!   (using Rust's [`From`] trait to go between [`File`] and [`pl::File`]).
 //!
 //! ## Background
 //!
@@ -80,13 +80,13 @@
 //! But here are 3 highlights we think are interesting:
 //!
 //! - **Language analysis of .pl files**:
-//!     In `pltotf`, Knuth parses .pl files in a single pass.
-//!     This crate takes a common approach nowadays of parsing in multiple passes:
-//!     first constructing a [concrete syntax tree](pl::cst::Cst) (or parse tree),
-//!     next constructing a [fully typed and checked abstract syntax tree](pl::ast::Ast),
-//!     and finally building the [`pl::File`] itself.
-//!     Each of the passes is exposed, so you can e.g. just build the AST for the .pl file and
-//!         do some analysis on it.
+//!   In `pltotf`, Knuth parses .pl files in a single pass.
+//!   This crate takes a common approach nowadays of parsing in multiple passes:
+//!   first constructing a [concrete syntax tree](pl::cst::Cst) (or parse tree),
+//!   next constructing a [fully typed and checked abstract syntax tree](pl::ast::Ast),
+//!   and finally building the [`pl::File`] itself.
+//!   Each of the passes is exposed, so you can e.g. just build the AST for the .pl file and
+//!   do some analysis on it.
 //!
 //! - **Debug output for .tfm files**:
 //!     
@@ -99,8 +99,8 @@
 //!
 //! - `tftopl` and `pltotf`: re-implementations of Knuth's programs.
 //! - `tfmtools`: a new binary that has a bunch of different tools
-//!         for working with TeX font metric data.
-//!         Run `tfmtools help` to list all of the available tools.
+//!   for working with TeX font metric data.
+//!   Run `tfmtools help` to list all of the available tools.
 //!
 //! In the root of [the Texcraft repository](https://github.com/jamespfennell/texcraft)
 //!     these tools can be run with `cargo run --bin $NAME`
@@ -119,16 +119,16 @@
 //! This diff testing has been performed in a few different ways:
 //!
 //! - We have run diff tests over all ~100,000 .tfm files in CTAN.
-//!     These tests verify that `tftopl` gives the correct result,
-//!     and that running `pltotf` on the output .pl file gives the correct result too.
-//!     Unfortunately running `pltotf` on the .pl files in CTAN is infeasible
-//!     because most of these files are Perl scripts, not property list files.
+//!   These tests verify that `tftopl` gives the correct result,
+//!   and that running `pltotf` on the output .pl file gives the correct result too.
+//!   Unfortunately running `pltotf` on the .pl files in CTAN is infeasible
+//!   because most of these files are Perl scripts, not property list files.
 //!
 //! - We have developed a fuzz testing harness (so far just for `tftopl`)
-//!     that generates highly heterogenous .tfm files and verifies that `tftopl` gives the correct result.
-//!     This fuzz testing has uncovered many issues in the Texcraft implementation,
-//!     and has even identified [a 30-year old bug](https://tug.org/pipermail/tex-k/2024-March/004031.html)
-//!     in Knuth's implementation of `tftopl`.
+//!   that generates highly heterogenous .tfm files and verifies that `tftopl` gives the correct result.
+//!   This fuzz testing has uncovered many issues in the Texcraft implementation,
+//!   and has even identified [a 30-year old bug](https://tug.org/pipermail/tex-k/2024-March/004031.html)
+//!   in Knuth's implementation of `tftopl`.
 //!
 //! Any .tfm or .pl file that exposes a bug in this library is added to
 //!     [our automated testing corpus](https://github.com/jamespfennell/texcraft/tree/main/crates/tfm/bin/tests/data).
@@ -591,15 +591,15 @@ impl From<crate::pl::File> for File {
 /// There are some important features of this algorithm to note:
 ///
 /// - For a given delta value there may be multiple possible partitions.
-///     The algorithm uses a greedy approach in which it maximizes the size of the first partition,
-///     then the size of the second partition, and so on.
+///   The algorithm uses a greedy approach in which it maximizes the size of the first partition,
+///   then the size of the second partition, and so on.
 ///
 /// - Distinct delta values can yield the same partition.
-///     For example, if the initial values are `[1, 4, 5]` then any delta in the range `[1, 3)`
-///     gives the same result (`[[1], [4, 5]]`)
-///     Whenever we check a delta, we are really checking the _interval of deltas_  that gives the same result.
-///     Both Knuth's and our implementations use this fact to speed up the search by reducing the search space.
-///     E.g. in the example above, after checking `delta=1` we _don't_ check `delta=2`.
+///   For example, if the initial values are `[1, 4, 5]` then any delta in the range `[1, 3)`
+///   gives the same result (`[[1], [4, 5]]`)
+///   Whenever we check a delta, we are really checking the _interval of deltas_  that gives the same result.
+///   Both Knuth's and our implementations use this fact to speed up the search by reducing the search space.
+///   E.g. in the example above, after checking `delta=1` we _don't_ check `delta=2`.
 ///
 /// ## This re-implementation
 ///

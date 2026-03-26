@@ -20,20 +20,20 @@ use texcraft_stdext::collections::groupingmap::GroupingVec;
 ///
 ///
 /// - Insert built in commands at the start
-///     insert_built_in(cs_name, cmd),
+///   insert_built_in(cs_name, cmd),
 /// - Insert variable commands that aren't there at the start, but will be in the future. E.g., \countdef
-///     register_built_in(cmd) <- must have a unique ID. Is type ID stable across binary builds? Maybe need to
-///          use a string ID instead? But then need to feed that the library using this registered
+///   register_built_in(cmd) <- must have a unique ID. Is type ID stable across binary builds? Maybe need to
+///   use a string ID instead? But then need to feed that the library using this registered
 /// - Should we enforce that the previous two steps can only be done at creation time? Probably
 ///   Maybe initialize the map using Map<cs_name, cmd> and `Vec<cmd>`. Can provide cs_name<->str wrapper at
 ///   the VM level
 ///
 /// - While running, insert macros
-///     insert_macro(&str, macro)
+///   insert_macro(&str, macro)
 /// - While running, alias commands by current name or using the special ID inserts
-///     alias_control_sequence(cs_name, cs_name) -> undefined control sequence error
-///     alias_registered_built_in(cs_name, cmd_id, variable_addr)
-///     alias_character(cs_name, token::Token)
+///   alias_control_sequence(cs_name, cs_name) -> undefined control sequence error
+///   alias_registered_built_in(cs_name, cmd_id, variable_addr)
+///   alias_character(cs_name, token::Token)
 pub struct Map<S> {
     commands: GroupingVec<Command<S>>,
     active_char: GroupingHashMap<char, Command<S>>,
@@ -78,10 +78,7 @@ impl<S> Map<S> {
     }
 
     pub fn get_command_slow(&self, command_ref: &token::CommandRef) -> Option<BuiltIn<S>> {
-        let command = match self.get_command(command_ref) {
-            None => return None,
-            Some(t) => t,
-        };
+        let command = self.get_command(command_ref)?;
         if let Some(ref key) = PrimitiveKey::new(command) {
             if let Some(built_in) = self.primitive_key_to_built_in().get(key) {
                 return self.built_in_commands.get(built_in).cloned();
@@ -227,6 +224,7 @@ impl<S> Map<S> {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct InvalidAlias;
 
 impl fmt::Display for InvalidAlias {

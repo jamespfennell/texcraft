@@ -15,10 +15,10 @@ This state type is provided by the unit test writer.
 In addition to implementing the [`TexlangState`] trait, this state must also:
 
 1. Include the [`TestingComponent`] type as a component.
-    I.e., the state must implement the [`HasComponent<TestingComponent>`](texlang::traits::HasComponent<TestingComponent>) trait.
+   I.e., the state must implement the [`HasComponent<TestingComponent>`](texlang::traits::HasComponent<TestingComponent>) trait.
 
 1. Configure the `recoverable_error_hook` method on the [`TexlangState`]
-    trait to invoke [`TestingComponent::recoverable_error_hook`].
+   trait to invoke [`TestingComponent::recoverable_error_hook`].
 
 1. Implement [`Default`].
 
@@ -579,21 +579,21 @@ impl<S: HasComponent<TestingComponent>, H: vm::Handlers<S>> vm::Handlers<S> for 
 /// The arguments to the macro are:
 ///
 /// - `state(State)`: defines which Rust type to use as the VM state in the tests.
-///     This can be omitted, in which case it defaults to the type name `State` in the current scope.
+///   This can be omitted, in which case it defaults to the type name `State` in the current scope.
 ///
 /// - `options(option_1, option_2, ..., option_n)`: options to pass to the test runner.
-///     This is a list of values of type [TestOption].
-///     The options can be omitted, in which case they default to `options(TestOptions::InitialCommands(built_in_commands))`.
-///     In this case `built_in_commands` is a static function that returns a list of built-in primitives
-///     to initialize the VM with.
+///   This is a list of values of type [TestOption].
+///   The options can be omitted, in which case they default to `options(TestOptions::InitialCommands(built_in_commands))`.
+///   In this case `built_in_commands` is a static function that returns a list of built-in primitives
+///   to initialize the VM with.
 ///
 /// - `expansion_equality_tests(cases...)`: a list of expansion equality test cases.
-///     Each case is of the form (case name, left hand side, right hand side).
-///     The data here is fed into the [run_expansion_equality_test] test runner.
+///   Each case is of the form (case name, left hand side, right hand side).
+///   The data here is fed into the [run_expansion_equality_test] test runner.
 ///     
 /// - `failure_tests(cases...)`: a list of failure test cases.
-///     Each case is of the form (case name, input).
-///     The data here is fed into the [run_fatal_error_test] test runner.
+///   Each case is of the form (case name, input).
+///   The data here is fed into the [run_fatal_error_test] test runner.
 ///
 /// Only one `state()` argument may be provided, and if provided it must be in the first position.
 /// Only one `options()` argument may be provided, and if provided it must be in the first position

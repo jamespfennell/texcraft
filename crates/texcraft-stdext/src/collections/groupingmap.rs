@@ -121,10 +121,14 @@ impl<K: Eq + Hash + Clone, V> BackingContainer<K, V> for HashMap<K, V> {
     fn remove(&mut self, k: &K) {
         HashMap::remove(self, k);
     }
-    type Iter<'a> = std::iter::Map<
+    type Iter<'a>
+        = std::iter::Map<
         std::collections::hash_map::Iter<'a, K, V>,
-        fn(i: (&'a K, &'a V)) -> (K, &'a V)
-    > where K:'a, V: 'a;
+        fn(i: (&'a K, &'a V)) -> (K, &'a V),
+    >
+    where
+        K: 'a,
+        V: 'a;
     fn iter(&self) -> Self::Iter<'_> {
         HashMap::iter(self).map(map_func)
     }
@@ -174,12 +178,13 @@ impl<V> BackingContainer<usize, V> for Vec<Option<V>> {
         }
     }
 
-    type Iter<'a>  = std::iter::FilterMap<
-        std::iter::Enumerate<
-            std::slice::Iter<'a, Option<V>>
-        >,
-        fn(i: (usize, &'a Option<V>)) -> Option<(usize, &'a V)>
-    > where V: 'a;
+    type Iter<'a>
+        = std::iter::FilterMap<
+        std::iter::Enumerate<std::slice::Iter<'a, Option<V>>>,
+        fn(i: (usize, &'a Option<V>)) -> Option<(usize, &'a V)>,
+    >
+    where
+        V: 'a;
     fn iter(&self) -> Self::Iter<'_> {
         <[Option<V>]>::iter(self)
             .enumerate()

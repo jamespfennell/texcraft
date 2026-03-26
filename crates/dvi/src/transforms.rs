@@ -29,11 +29,11 @@
 //! There are at least two reasons why one would want to perform a DVI transform:
 //!
 //! 1. To **optimize** the DVI in some way; for example, to reduce
-//!     the size of the DVI file.
-//!     Knuth performs an optmization of this type in TeX.2021.604-615.
+//!    the size of the DVI file.
+//!    Knuth performs an optmization of this type in TeX.2021.604-615.
 //!
 //! 2. To **normalize** the DVI file so that a DVI produced by one program
-//!     will match the DVI produced by another program.
+//!    will match the DVI produced by another program.
 use super::*;
 
 /// Transform that removes uses of the [`Var`] variables.

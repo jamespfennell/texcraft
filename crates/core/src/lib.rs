@@ -181,7 +181,7 @@ impl Scaled {
                 loop {
                     if delta > Scaled::ONE {
                         // round the last digit
-                        f = f + Scaled(0o100000 - 50000);
+                        f += Scaled(0o100000 - 50000);
                     }
                     fm.write_char(
                         char::from_digit(f.integer_part().try_into().unwrap(), 10).unwrap(),
