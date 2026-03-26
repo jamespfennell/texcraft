@@ -367,7 +367,7 @@ impl<'a> ErrorAccumulator<'a> {
 mod tests {
     use super::*;
 
-    pub fn get_unique_err(source: &str) -> Error {
+    pub fn get_unique_err(source: &'_ str) -> Error<'_> {
         let mut errs = super::super::parse_horizontal_list(source).unwrap_err();
         assert_eq!(errs.len(), 1, "{:?}", errs);
         errs.pop().unwrap()

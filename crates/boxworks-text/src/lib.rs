@@ -65,6 +65,10 @@ impl SpaceFactor {
 }
 
 impl boxworks::TextPreprocessor for TextPreprocessorImpl {
+    fn new_paragraph(&mut self) {
+        self.space_factor = Default::default();
+    }
+
     fn add_word(&mut self, word: &str, list: &mut Vec<ds::Horizontal>) {
         let font = &self.fonts[self.current_font as usize];
 

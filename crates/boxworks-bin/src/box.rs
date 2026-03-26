@@ -119,13 +119,19 @@ struct Hlists {
 
 impl Hlists {
     fn run(mut self) -> Result<(), String> {
+        let num_direct = self.texts.len();
+        let mut file_line_numbers: Vec<usize> = vec![];
         if let Some(ref path) = self.texts_file.clone() {
             let content = match fs::read_to_string(path) {
                 Ok(s) => s,
                 Err(err) => return Err(format!["failed to open file {:?}: {err}", path]),
             };
-            self.texts
-                .extend(content.lines().filter(|l| !l.is_empty()).map(str::to_owned));
+            for (i, line) in content.lines().enumerate() {
+                if !line.is_empty() {
+                    self.texts.push(line.to_owned());
+                    file_line_numbers.push(i + 1);
+                }
+            }
         }
         let hlists = if let Some(ref tex_engine_name) = self.tex_engine {
             match boxworks::tex::new_tex_engine_binary(tex_engine_name.clone()) {
@@ -135,7 +141,16 @@ impl Hlists {
         } else {
             self.run_box()?
         };
-        print_hlists(hlists);
+        let labels: Vec<Option<usize>> = (0..hlists.len())
+            .map(|i| {
+                if i >= num_direct {
+                    Some(file_line_numbers[i - num_direct])
+                } else {
+                    None
+                }
+            })
+            .collect();
+        print_hlists(hlists, labels);
         Ok(())
     }
 
@@ -189,20 +204,27 @@ impl Hlists {
             &preamble,
             &mut self.texts.iter(),
         );
+        _ = fonts;
+        /*
         println!("# fonts:");
         for (font_name, font_number) in fonts.into_iter() {
             println!("# - {font_name}={font_number}");
         }
+         */
         use bwl::convert::ToBoxLang;
         Ok(hlists.to_box_lang())
     }
 }
 
-fn print_hlists(hlists: Vec<bwl::ast::Hlist<'static>>) {
-    for (i, mut hlist) in hlists.into_iter().enumerate() {
+fn print_hlists(hlists: Vec<bwl::ast::Hlist<'static>>, labels: Vec<Option<usize>>) {
+    for (i, (mut hlist, label)) in hlists.into_iter().zip(labels).enumerate() {
+        hlist.width = core::Scaled::ZERO.into();
         terse(&mut hlist.content.value);
         println!("#");
-        println!("# hlist {}", i + 1);
+        match label {
+            Some(line_num) => println!("# hlist {} (line {})", i + 1, line_num),
+            None => println!("# hlist {}", i + 1),
+        }
         println!("{}", bwl::ast::Horizontal::Hlist(hlist));
     }
 }
