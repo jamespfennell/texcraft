@@ -15,10 +15,14 @@ use std::borrow::Cow;
 #[derive(Debug, PartialEq, Eq)]
 pub enum Vertical<'a> {
     Hlist(Hlist<'a>),
+    Vlist(Vlist<'a>),
     Glue(Glue<'a>),
     Kern(Kern<'a>),
     Penalty(Penalty<'a>),
     Rule(Rule<'a>),
+    Mark(Mark<'a>),
+    Insertion(Insertion<'a>),
+    Math(Math<'a>),
 }
 
 /// Element of a horizontal list.
@@ -35,6 +39,10 @@ pub enum Horizontal<'a> {
     Ligature(Ligature<'a>),
     Discretionary(Discretionary<'a>),
     Rule(Rule<'a>),
+    Mark(Mark<'a>),
+    Adjust(Adjust<'a>),
+    Insertion(Insertion<'a>),
+    Math(Math<'a>),
 }
 
 /// Lower a horizontal list to a CST tree.
@@ -558,6 +566,9 @@ functions!(
         impl Horizontal {
             variant: Vlist,
         }
+        impl Vertical {
+            variant: Vlist,
+        }
     ),
     (
         struct Discretionary<'a> {
@@ -588,6 +599,70 @@ functions!(
         }
         impl Vertical {
             variant: Rule,
+        }
+    ),
+    (
+        struct Mark<'a> {
+            dummy: i32,
+        }
+        impl Func {
+            func_name: "mark",
+            default_num_pos_arg: 0,
+        }
+        impl Horizontal {
+            variant: Mark,
+        }
+        impl Vertical {
+            variant: Mark,
+        }
+    ),
+    (
+        struct Adjust<'a> {
+            content: Vec<Vertical<'a>>,
+        }
+        impl Func {
+            func_name: "adjust",
+            default_num_pos_arg: 0,
+        }
+        impl Horizontal {
+            variant: Adjust,
+        }
+    ),
+    (
+        struct Insertion<'a> {
+            box_number: i32,
+            height: core::Scaled,
+            split_max_depth: core::Scaled,
+            split_top_skip_width: core::Scaled,
+            split_top_skip_stretch: (core::Scaled, core::GlueOrder),
+            split_top_skip_shrink: (core::Scaled, core::GlueOrder),
+            float_penalty: i32,
+            vlist: Vec<Vertical<'a>>,
+        }
+        impl Func {
+            func_name: "insertion",
+            default_num_pos_arg: 1,
+        }
+        impl Horizontal {
+            variant: Insertion,
+        }
+        impl Vertical {
+            variant: Insertion,
+        }
+    ),
+    (
+        struct Math<'a> {
+            kind: Cow<'a, str>,
+        }
+        impl Func {
+            func_name: "math",
+            default_num_pos_arg: 1,
+        }
+        impl Horizontal {
+            variant: Math,
+        }
+        impl Vertical {
+            variant: Math,
         }
     ),
 );
@@ -840,9 +915,11 @@ mod tests {
                         value: 0,
                         source: None,
                     },
+                    ..Default::default()
                 })],
                 source: Some(r#"[text("Hello")]"#.into()),
             },
+            ..Default::default()
         })];
 
         let got = parse_hlist(&input).expect("parsing succeeds");
