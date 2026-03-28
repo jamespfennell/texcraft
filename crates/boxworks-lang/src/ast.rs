@@ -13,6 +13,7 @@ use std::borrow::Cow;
 ///
 /// Corresponds to the [`boxworks::ds::Vertical`] type.
 #[derive(Debug, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
 pub enum Vertical<'a> {
     Hlist(Hlist<'a>),
     Vlist(Vlist<'a>),

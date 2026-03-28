@@ -133,7 +133,6 @@ impl ToBoxLang for ds::VList {
     fn to_box_lang(&self) -> Self::Output {
         ast::Vlist {
             content: self.list.to_box_lang().into(),
-            ..Default::default()
         }
     }
 }
@@ -144,7 +143,6 @@ impl ToBoxLang for ds::HList {
         ast::Hlist {
             width: self.width.into(),
             content: self.list.to_box_lang().into(),
-            ..Default::default()
         }
     }
 }
@@ -194,7 +192,6 @@ impl ToBoxLang for ds::Ligature {
             char: self.char.into(),
             original_chars: Cow::<'static, str>::Owned(format!["{}", self.original_chars]).into(),
             font: (self.font as i32).into(),
-            ..Default::default()
         }
     }
 }
@@ -205,7 +202,6 @@ impl ToBoxLang for ds::Char {
         ast::Text {
             content: Cow::<'static, str>::Owned(format!["{}", self.char]).into(),
             font: (self.font as i32).into(),
-            ..Default::default()
         }
     }
 }
@@ -247,7 +243,6 @@ impl ToBoxLang for ds::Penalty {
     fn to_box_lang(&self) -> Self::Output {
         ast::Penalty {
             value: self.value.into(),
-            ..Default::default()
         }
     }
 }
@@ -268,7 +263,6 @@ impl ToBoxLang for ds::Glue {
             width: self.value.width.into(),
             stretch: (self.value.stretch, self.value.stretch_order).into(),
             shrink: (self.value.shrink, self.value.shrink_order).into(),
-            ..Default::default()
         }
     }
 }
@@ -294,7 +288,6 @@ impl ToBoxLang for ds::Kern {
     fn to_box_lang(&self) -> Self::Output {
         ast::Kern {
             width: self.width.into(),
-            ..Default::default()
         }
     }
 }
@@ -316,7 +309,6 @@ impl ToBoxLang for ds::Discretionary {
             pre_break: self.pre_break.to_box_lang().into(),
             post_break: self.post_break.to_box_lang().into(),
             replace_count: (self.replace_count as i32).into(),
-            ..Default::default()
         }
     }
 }
@@ -339,7 +331,6 @@ impl ToBoxLang for ds::Rule {
             height: self.height.into(),
             width: self.width.into(),
             depth: self.depth.into(),
-            ..Default::default()
         }
     }
 }
@@ -374,7 +365,6 @@ impl ToBoxLang for ds::Adjust {
     fn to_box_lang(&self) -> Self::Output {
         ast::Adjust {
             content: self.list.to_box_lang().into(),
-            ..Default::default()
         }
     }
 }
@@ -396,11 +386,15 @@ impl ToBoxLang for ds::Insertion {
             height: self.height.into(),
             split_max_depth: self.split_max_depth.into(),
             split_top_skip_width: self.split_top_skip.width.into(),
-            split_top_skip_stretch: (self.split_top_skip.stretch, self.split_top_skip.stretch_order).into(),
-            split_top_skip_shrink: (self.split_top_skip.shrink, self.split_top_skip.shrink_order).into(),
+            split_top_skip_stretch: (
+                self.split_top_skip.stretch,
+                self.split_top_skip.stretch_order,
+            )
+                .into(),
+            split_top_skip_shrink: (self.split_top_skip.shrink, self.split_top_skip.shrink_order)
+                .into(),
             float_penalty: (self.float_penalty as i32).into(),
             vlist: self.vlist.to_box_lang().into(),
-            ..Default::default()
         }
     }
 }
@@ -434,7 +428,6 @@ impl ToBoxLang for ds::Math {
                 ds::Math::After => Cow::Borrowed("after"),
             }
             .into(),
-            ..Default::default()
         }
     }
 }

@@ -120,7 +120,7 @@ pub fn build_horizontal_lists(
     let segments = extract_texcraft_segments(&output);
     let mut fonts: HashMap<String, u32> = Default::default();
     let hlists = segments
-        .filter_map(|s| parse_hlist(s, "", &mut fonts))
+        .map(|s| parse_hlist(&mut TexOutputIter::new(s), &mut fonts))
         .collect();
     (fonts, hlists)
 }
@@ -148,49 +148,100 @@ pub fn build_vertical_lists(
     let segments = extract_texcraft_segments(&output);
     let mut fonts: HashMap<String, u32> = Default::default();
     let vlists = segments
-        .filter_map(|s| parse_vlist(s, &mut fonts))
+        .map(|s| parse_vlist(&mut TexOutputIter::new(s), &mut fonts))
         .collect();
     (fonts, vlists)
+}
+
+struct TexOutputIter<'tex> {
+    s: &'tex str,
+    depth: usize,
+}
+
+impl<'tex> Iterator for TexOutputIter<'tex> {
+    type Item = &'tex str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (line, n) = self.peek_impl()?;
+        self.s = &self.s[n..];
+        Some(line)
+    }
+}
+
+impl<'tex> TexOutputIter<'tex> {
+    fn new(mut s: &'tex str) -> Self {
+        loop {
+            let line = s
+                .split_inclusive('\n')
+                .next()
+                .expect("still searching for start of output");
+            s = &s[line.len()..];
+            if !line.starts_with(r"> \box0=") {
+                continue;
+            }
+            return Self { s, depth: 0 };
+        }
+    }
+    fn inner(&self) -> Self {
+        Self {
+            s: self.s,
+            depth: self.depth + 1,
+        }
+    }
+    fn peek(&mut self) -> Option<&'tex str> {
+        let (line, _) = self.peek_impl()?;
+        Some(line)
+    }
+    fn peek_impl(&mut self) -> Option<(&'tex str, usize)> {
+        loop {
+            let line = self.s.split_inclusive('\n').next()?;
+            let n = line.len();
+            let line = line.trim_end();
+            if line.is_empty() {
+                self.s = "";
+                return None;
+            }
+            let line_depth = line.chars().take_while(|&c| c == '.').count();
+            use std::cmp::Ordering::*;
+            match line_depth.cmp(&self.depth) {
+                Less => {
+                    self.s = "";
+                    return None;
+                }
+                Equal => {
+                    return Some((&line[line_depth..], n));
+                }
+                Greater => {
+                    // skip this line
+                    self.s = &self.s[n..];
+                }
+            }
+        }
+    }
 }
 
 /// Extract the raw content between each pair of "Texcraft: begin" / "Texcraft: end" markers.
 ///
 /// Yields one `&str` slice per begin/end pair, borrowing directly from `output`.
-fn extract_texcraft_segments(output: &str) -> impl Iterator<Item = &str> {
-    let base = output.as_ptr() as usize;
-    let bytes = output.as_bytes();
-    let mut lines = output.lines();
+fn extract_texcraft_segments(mut s: &str) -> impl Iterator<Item = &str> {
     std::iter::from_fn(move || {
         // Scan forward to the next "Texcraft: begin" line and record the segment start.
-        let segment_start = loop {
-            let line = lines.next()?;
+        loop {
+            let line = s.split_inclusive('\n').next()?;
+            s = &s[line.len()..];
             if line.starts_with("Texcraft: begin") {
-                let after_line = line.as_ptr() as usize - base + line.len();
-                let after_newline = if bytes.get(after_line) == Some(&b'\r') {
-                    after_line + 2
-                } else if bytes.get(after_line) == Some(&b'\n') {
-                    after_line + 1
-                } else {
-                    after_line
-                };
-                break after_newline;
+                break;
             }
-        };
+        }
+        let next = s;
+        let mut next_len = 0_usize;
         // Scan forward to the next "Texcraft: end" line and record the segment end.
         loop {
-            let line = lines.next()?;
+            let line = s.split_inclusive('\n').next()?;
+            s = &s[line.len()..];
+            next_len += line.len();
             if line.starts_with("Texcraft: end") {
-                let line_offset = line.as_ptr() as usize - base;
-                let end = if line_offset > 0 && bytes.get(line_offset - 1) == Some(&b'\n') {
-                    if line_offset > 1 && bytes.get(line_offset - 2) == Some(&b'\r') {
-                        line_offset - 2
-                    } else {
-                        line_offset - 1
-                    }
-                } else {
-                    line_offset
-                };
-                return Some(&output[segment_start..end]);
+                return Some(&next[0..next_len]);
             }
         }
     })
@@ -198,19 +249,13 @@ fn extract_texcraft_segments(output: &str) -> impl Iterator<Item = &str> {
 
 /// Parse a single raw hlist segment (as produced by [`extract_hlist_segments`]) into an hlist.
 ///
-/// `prefix` is stripped from the start of every line before processing — use `""` when the
-/// hlist is at the top level and `"."` when it is nested one level inside a vlist.
-///
 /// The `fonts` map is updated in place as new fonts are encountered.
-fn parse_hlist(segment: &str, prefix: &str, fonts: &mut HashMap<String, u32>) -> Option<ds::HList> {
-    let mut iter = segment.lines();
-    let mut hlist = loop {
-        let raw_line = iter.next()?;
-        let line = raw_line.strip_prefix(prefix).unwrap_or(raw_line);
-        // We want \hbox(height+depth)xwidth[, glue set N[order]]
-        let Some(s) = line.strip_prefix(r"\hbox(") else {
-            continue;
-        };
+fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds::HList {
+    let mut hlist = {
+        let line = iter.next().expect("hlist must be non-empty");
+        let s = line
+            .strip_prefix(r"\hbox(")
+            .expect("first line must be a hlist spec");
         let i = s
             .find('+')
             .expect("hbox dimension spec has a + between height and depth");
@@ -232,7 +277,7 @@ fn parse_hlist(segment: &str, prefix: &str, fonts: &mut HashMap<String, u32>) ->
             ds::GlueSign::Normal,
             core::GlueOrder::Normal,
         ));
-        break ds::HList {
+        ds::HList {
             height,
             width,
             depth,
@@ -240,15 +285,11 @@ fn parse_hlist(segment: &str, prefix: &str, fonts: &mut HashMap<String, u32>) ->
             glue_sign,
             glue_order,
             ..Default::default()
-        };
-    };
-    for raw_line in iter {
-        let line = raw_line.strip_prefix(prefix).unwrap_or(raw_line);
-        // TODO: handle further nested stuff
-        if line.starts_with("...") {
-            continue;
         }
-        if let Some(glue_spec) = line.strip_prefix(r".\glue") {
+    };
+    let iter = iter.inner();
+    for line in iter {
+        if let Some(glue_spec) = line.strip_prefix(r"\glue") {
             hlist.list.push(
                 ds::Glue {
                     kind: ds::GlueKind::Normal,
@@ -256,7 +297,7 @@ fn parse_hlist(segment: &str, prefix: &str, fonts: &mut HashMap<String, u32>) ->
                 }
                 .into(),
             );
-        } else if let Some(kern_spec) = line.strip_prefix(r".\kern") {
+        } else if let Some(kern_spec) = line.strip_prefix(r"\kern") {
             let mut words = kern_spec.split_ascii_whitespace();
             let width = parse_scaled(words.next().expect("kern has 1 word"));
             hlist.list.push(
@@ -266,7 +307,7 @@ fn parse_hlist(segment: &str, prefix: &str, fonts: &mut HashMap<String, u32>) ->
                 }
                 .into(),
             );
-        } else if let Some(penalty_spec) = line.strip_prefix(r".\penalty ") {
+        } else if let Some(penalty_spec) = line.strip_prefix(r"\penalty ") {
             let value: i32 = penalty_spec.trim().parse().expect("penalty value is i32");
             hlist.list.push(ds::Penalty { value }.into());
         } else if let Some(rule_spec) = line.strip_prefix(r".\rule") {
@@ -280,7 +321,7 @@ fn parse_hlist(segment: &str, prefix: &str, fonts: &mut HashMap<String, u32>) ->
                 }
                 .into(),
             );
-        } else if let Some(replacing_spec) = line.strip_prefix(r".\discretionary") {
+        } else if let Some(replacing_spec) = line.strip_prefix(r"\discretionary") {
             // TODO: handle replacing_spec
             _ = replacing_spec;
             hlist.list.push(
@@ -291,7 +332,7 @@ fn parse_hlist(segment: &str, prefix: &str, fonts: &mut HashMap<String, u32>) ->
                 }
                 .into(),
             );
-        } else if let Some(char_spec) = line.strip_prefix(r".\") {
+        } else if let Some(char_spec) = line.strip_prefix(r"\") {
             let mut words = char_spec.split_ascii_whitespace();
             let font_name = words.next().expect("char has 2 words");
             use std::collections::hash_map::Entry;
@@ -326,21 +367,16 @@ fn parse_hlist(segment: &str, prefix: &str, fonts: &mut HashMap<String, u32>) ->
             }
         }
     }
-    Some(hlist)
+    hlist
 }
 
 /// Parse a single raw vlist segment into a vlist.
-///
-/// Depth-1 lines (starting with `.`) become direct vlist elements.
-/// Depth-2 lines (starting with `..`) belong to the nearest preceding `.\hbox` and are
-/// parsed by [`parse_hlist`] with prefix `"."`.
-fn parse_vlist(segment: &str, fonts: &mut HashMap<String, u32>) -> Option<ds::VList> {
-    let mut iter = segment.lines();
-    let mut vlist = loop {
-        let line = iter.next()?;
-        let Some(s) = line.strip_prefix(r"\vbox(") else {
-            continue;
-        };
+fn parse_vlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds::VList {
+    let mut vlist = {
+        let line = iter.next().expect("vlist must be non-empty");
+        let s = line
+            .strip_prefix(r"\vbox(")
+            .expect("first line must be a vlist spec");
         let i = s
             .find('+')
             .expect("vbox dimension spec has a + between height and depth");
@@ -351,7 +387,7 @@ fn parse_vlist(segment: &str, fonts: &mut HashMap<String, u32>) -> Option<ds::VL
             .expect("vbox dimension spec has a )x between depth and width");
         let depth = parse_scaled(&s[..i]);
         let width = parse_scaled(&s[i + 2..]);
-        break ds::VList {
+        ds::VList {
             height,
             width,
             depth,
@@ -360,47 +396,30 @@ fn parse_vlist(segment: &str, fonts: &mut HashMap<String, u32>) -> Option<ds::VL
             glue_ratio: ds::GlueRatio(0.0),
             glue_sign: ds::GlueSign::Normal,
             glue_order: core::GlueOrder::Normal,
-        };
+        }
     };
-    let mut hbox_buf: Option<String> = None;
-    for line in iter {
-        if line.starts_with("..") {
-            // Depth-2: belongs to the current hbox buffer.
-            if let Some(ref mut buf) = hbox_buf {
-                buf.push('\n');
-                buf.push_str(line);
-            }
-        } else if let Some(rest) = line.strip_prefix('.') {
-            // Depth-1: flush any pending hbox first.
-            if let Some(buf) = hbox_buf.take() {
-                if let Some(hlist) = parse_hlist(&buf, ".", fonts) {
-                    vlist.list.push(ds::Vertical::HList(hlist));
-                }
-            }
-            if rest.starts_with(r"\hbox(") {
-                // Start accumulating a new hbox; keep the full line so
-                // parse_hlist (prefix ".") can strip the leading dot.
-                hbox_buf = Some(line.to_string());
-            } else if let Some(penalty_spec) = rest.strip_prefix(r"\penalty ") {
-                let value: i32 = penalty_spec.trim().parse().expect("penalty value is i32");
-                vlist
-                    .list
-                    .push(ds::Vertical::Penalty(ds::Penalty { value }));
-            } else if let Some(glue_spec) = rest.strip_prefix(r"\glue") {
-                vlist.list.push(ds::Vertical::Glue(ds::Glue {
-                    kind: ds::GlueKind::Normal,
-                    value: parse_glue_value(glue_spec),
-                }));
-            }
+    let mut iter = iter.inner();
+    while let Some(line) = iter.peek() {
+        if line.starts_with(r"\hbox(") {
+            vlist
+                .list
+                .push(ds::Vertical::HList(parse_hlist(&mut iter, fonts)));
+            continue;
         }
-    }
-
-    if let Some(buf) = hbox_buf {
-        if let Some(hlist) = parse_hlist(&buf, ".", fonts) {
-            vlist.list.push(ds::Vertical::HList(hlist));
+        if let Some(penalty_spec) = line.strip_prefix(r"\penalty ") {
+            let value: i32 = penalty_spec.trim().parse().expect("penalty value is i32");
+            vlist
+                .list
+                .push(ds::Vertical::Penalty(ds::Penalty { value }));
+        } else if let Some(glue_spec) = line.strip_prefix(r"\glue") {
+            vlist.list.push(ds::Vertical::Glue(ds::Glue {
+                kind: ds::GlueKind::Normal,
+                value: parse_glue_value(glue_spec),
+            }));
         }
+        iter.next();
     }
-    Some(vlist)
+    vlist
 }
 
 /// Parse the glue value from the text following `\glue` in TeX's box display.
