@@ -17,7 +17,7 @@ struct Cli {
 enum SubCommand {
     Check(Check),
     Fmt(Fmt),
-    Hlists(Hlists),
+    Build(Build),
 }
 
 fn main() {
@@ -25,7 +25,7 @@ fn main() {
     let result = match args.sub_command {
         SubCommand::Check(check) => check.run(),
         SubCommand::Fmt(fmt) => fmt.run(),
-        SubCommand::Hlists(hlists) => hlists.run(),
+        SubCommand::Build(hlists) => hlists.run(),
     };
     if let Err(err) = result {
         println!["Error: {err}"];
@@ -90,11 +90,21 @@ impl Fmt {
     }
 }
 
+/// What kind of output to produce.
+#[derive(clap::ValueEnum, Clone, Default)]
+enum Mode {
+    /// Build horizontal lists.
+    #[default]
+    Hlists,
+    /// Build vertical lists. Requires --tex-engine.
+    Vlists,
+}
+
 /// Print the horizontal lists built for some text.
 ///
 /// By default, Box builds the lists. If --tex_engine is specified, the given TeX engine is used instead.
 #[derive(Parser)]
-struct Hlists {
+struct Build {
     /// The texts for which to build the lists.
     ///
     /// Each element of texts is used to build a separate horizontal list.
@@ -115,9 +125,13 @@ struct Hlists {
     /// Empty lines are ignored. Each non-empty line is converted into a separate horizontal list.
     #[clap(long)]
     texts_file: Option<PathBuf>,
+
+    /// What kind of output to produce.
+    #[clap(long, default_value_t, value_enum)]
+    mode: Mode,
 }
 
-impl Hlists {
+impl Build {
     fn run(mut self) -> Result<(), String> {
         let num_direct = self.texts.len();
         let mut file_line_numbers: Vec<usize> = vec![];
@@ -133,87 +147,125 @@ impl Hlists {
                 }
             }
         }
-        let hlists = if let Some(ref tex_engine_name) = self.tex_engine {
-            match boxworks::tex::new_tex_engine_binary(tex_engine_name.clone()) {
-                Ok(tex_engine) => self.run_tex(tex_engine.as_ref())?,
-                Err(err) => return Err(format!["{err}"]),
+        let tex_engine: Option<Box<dyn boxworks::tex::TexEngine>> =
+            if let Some(ref name) = self.tex_engine {
+                Some(
+                    boxworks::tex::new_tex_engine_binary(name.clone())
+                        .map_err(|err| format!["{err}"])?,
+                )
+            } else {
+                None
+            };
+        let labels = make_labels(self.texts.len(), num_direct, &file_line_numbers);
+        match self.mode {
+            Mode::Hlists => {
+                let hlists = match tex_engine {
+                    Some(engine) => run_tex_hlists(engine.as_ref(), self.texts, self.font_metrics)?,
+                    None => run_box_hlists(self.texts, self.font_metrics)?,
+                };
+                print_hlists(hlists, labels);
             }
-        } else {
-            self.run_box()?
-        };
-        let labels: Vec<Option<usize>> = (0..hlists.len())
-            .map(|i| {
-                if i >= num_direct {
-                    Some(file_line_numbers[i - num_direct])
-                } else {
-                    None
-                }
-            })
-            .collect();
-        print_hlists(hlists, labels);
+            Mode::Vlists => {
+                let engine =
+                    tex_engine.ok_or_else(|| "--mode=vlists requires --tex-engine".to_string())?;
+                let vlists = run_tex_vlists(engine.as_ref(), self.texts, self.font_metrics)?;
+                print_vlists(vlists, labels);
+            }
+        }
         Ok(())
     }
+}
 
-    fn run_box(self) -> Result<Vec<bwl::ast::Hlist<'static>>, String> {
-        let (tfm_bytes, _) = load_font_metrics(self.font_metrics)?;
-        let mut tfm_file = tfm::File::deserialize(&tfm_bytes).0.unwrap();
-        let lig_kern_program =
-            tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
-        let mut tp: boxworks_text::TextPreprocessorImpl = Default::default();
-        tp.register_font(0, &tfm_file, lig_kern_program);
-        tp.activate_font(0);
-        let raw: Vec<Vec<_>> = self
-            .texts
-            .into_iter()
-            .map(|text| {
-                let mut got = vec![];
-                tp.add_text(&text, &mut got);
-                got
-            })
-            .collect();
-        use bwl::convert::ToBoxLang;
-        Ok(raw
-            .into_iter()
-            .map(|got| bwl::ast::Hlist {
-                width: Default::default(),
-                content: got.to_box_lang().into(),
-            })
-            .collect())
-    }
+fn make_labels(n: usize, num_direct: usize, file_line_numbers: &[usize]) -> Vec<Option<usize>> {
+    (0..n)
+        .map(|i| {
+            if i >= num_direct {
+                Some(file_line_numbers[i - num_direct])
+            } else {
+                None
+            }
+        })
+        .collect()
+}
 
-    fn run_tex(
-        self,
-        tex_engine: &dyn boxworks::tex::TexEngine,
-    ) -> Result<Vec<bwl::ast::Hlist<'static>>, String> {
-        let mut auxiliary_files: HashMap<PathBuf, Vec<u8>> = Default::default();
-        let mut preamble: String = Default::default();
-        let (source, file_name) = load_font_metrics(self.font_metrics)?;
-        let file_stem = file_name.file_stem().unwrap().to_string_lossy();
-        preamble.push_str(&format![
-            r"
+fn build_tex_context(
+    font_metrics: Option<PathBuf>,
+) -> Result<(HashMap<PathBuf, Vec<u8>>, String), String> {
+    let mut auxiliary_files: HashMap<PathBuf, Vec<u8>> = Default::default();
+    let mut preamble: String = Default::default();
+    let (source, file_name) = load_font_metrics(font_metrics)?;
+    let file_stem = file_name.file_stem().unwrap().to_string_lossy();
+    preamble.push_str(&format![
+        r"
 
-                \font \customFont {file_stem}
+            \font \customFont {file_stem}
 
-                \customFont
-                "
-        ]);
-        auxiliary_files.insert(file_name, source);
-        let (fonts, hlists) = boxworks::tex::build_horizontal_lists(
-            tex_engine,
-            &auxiliary_files,
-            &preamble,
-            &mut self.texts.iter(),
-        );
-        _ = fonts;
-        /*
-        println!("# fonts:");
-        for (font_name, font_number) in fonts.into_iter() {
-            println!("# - {font_name}={font_number}");
-        }
-         */
-        use bwl::convert::ToBoxLang;
-        Ok(hlists.to_box_lang())
-    }
+            \customFont
+            "
+    ]);
+    auxiliary_files.insert(file_name, source);
+    Ok((auxiliary_files, preamble))
+}
+
+fn run_box_hlists(
+    texts: Vec<String>,
+    font_metrics: Option<PathBuf>,
+) -> Result<Vec<bwl::ast::Hlist<'static>>, String> {
+    let (tfm_bytes, _) = load_font_metrics(font_metrics)?;
+    let mut tfm_file = tfm::File::deserialize(&tfm_bytes).0.unwrap();
+    let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
+    let mut tp: boxworks_text::TextPreprocessorImpl = Default::default();
+    tp.register_font(0, &tfm_file, lig_kern_program);
+    tp.activate_font(0);
+    let raw: Vec<Vec<_>> = texts
+        .into_iter()
+        .map(|text| {
+            let mut got = vec![];
+            tp.add_text(&text, &mut got);
+            got
+        })
+        .collect();
+    use bwl::convert::ToBoxLang;
+    Ok(raw
+        .into_iter()
+        .map(|got| bwl::ast::Hlist {
+            width: Default::default(),
+            content: got.to_box_lang().into(),
+        })
+        .collect())
+}
+
+fn run_tex_hlists(
+    tex_engine: &dyn boxworks::tex::TexEngine,
+    texts: Vec<String>,
+    font_metrics: Option<PathBuf>,
+) -> Result<Vec<bwl::ast::Hlist<'static>>, String> {
+    let (auxiliary_files, preamble) = build_tex_context(font_metrics)?;
+    let (fonts, hlists) = boxworks::tex::build_horizontal_lists(
+        tex_engine,
+        &auxiliary_files,
+        &preamble,
+        &mut texts.iter(),
+    );
+    _ = fonts;
+    use bwl::convert::ToBoxLang;
+    Ok(hlists.to_box_lang())
+}
+
+fn run_tex_vlists(
+    tex_engine: &dyn boxworks::tex::TexEngine,
+    texts: Vec<String>,
+    font_metrics: Option<PathBuf>,
+) -> Result<Vec<bwl::ast::Vlist<'static>>, String> {
+    let (auxiliary_files, preamble) = build_tex_context(font_metrics)?;
+    let (_, vlists) = boxworks::tex::build_vertical_lists(
+        tex_engine,
+        &auxiliary_files,
+        &preamble,
+        &mut texts.iter(),
+    );
+    use bwl::convert::ToBoxLang;
+    Ok(vlists.to_box_lang())
 }
 
 fn print_hlists(hlists: Vec<bwl::ast::Hlist<'static>>, labels: Vec<Option<usize>>) {
@@ -226,6 +278,17 @@ fn print_hlists(hlists: Vec<bwl::ast::Hlist<'static>>, labels: Vec<Option<usize>
             None => println!("# hlist {}", i + 1),
         }
         println!("{}", bwl::ast::Horizontal::Hlist(hlist));
+    }
+}
+
+fn print_vlists(vlists: Vec<bwl::ast::Vlist<'static>>, labels: Vec<Option<usize>>) {
+    for (i, (vlist, label)) in vlists.into_iter().zip(labels).enumerate() {
+        println!("#");
+        match label {
+            Some(line_num) => println!("# vlist {} (line {})", i + 1, line_num),
+            None => println!("# vlist {}", i + 1),
+        }
+        println!("{}", bwl::ast::Horizontal::Vlist(vlist));
     }
 }
 

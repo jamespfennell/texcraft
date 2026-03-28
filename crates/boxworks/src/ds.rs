@@ -146,17 +146,18 @@ pub struct HList {
 /// using a float is okay.
 ///
 /// Described in TeX.2021.109.
-#[derive(Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq)]
 pub struct GlueRatio(pub f32);
 
 // TODO: ensure that glue ratio cannot be NaN
 impl Eq for GlueRatio {}
 
 /// Description of whether the glue should stretch, shrink, or remain rigid.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum GlueSign {
     Stretching,
     Shrinking,
+    #[default]
     Normal,
 }
 
@@ -190,7 +191,7 @@ impl Default for HList {
 /// instead of [Horizontal] nodes.
 ///
 /// Described in TeX.2021.137.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct VList {
     pub height: Number,
     pub width: Number,

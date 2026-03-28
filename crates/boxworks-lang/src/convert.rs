@@ -17,6 +17,40 @@ pub trait ToBoxworks {
     fn to_boxworks(&self) -> Self::Output;
 }
 
+impl ToBoxLang for ds::Vertical {
+    type Output = ast::Vertical<'static>;
+    fn to_box_lang(&self) -> Self::Output {
+        use boxworks::ds::Vertical::*;
+        match self {
+            HList(hlist) => ast::Vertical::Hlist(hlist.to_box_lang()),
+            VList(_vlist) => todo!(),
+            Rule(rule) => ast::Vertical::Rule(rule.to_box_lang()),
+            Mark(_mark) => todo!(),
+            Insertion(_insertion) => todo!(),
+            Whatsit(_whatsit) => todo!(),
+            Math(_math) => todo!(),
+            Glue(glue) => ast::Vertical::Glue(glue.to_box_lang()),
+            Kern(kern) => ast::Vertical::Kern(kern.to_box_lang()),
+            Penalty(penalty) => ast::Vertical::Penalty(penalty.to_box_lang()),
+        }
+    }
+}
+
+impl<'a> ToBoxworks for ast::Vertical<'a> {
+    type Output = ds::Vertical;
+
+    fn to_boxworks(&self) -> Self::Output {
+        use ast::Vertical::*;
+        match self {
+            Hlist(hlist_args) => ds::Vertical::HList(hlist_args.to_boxworks()),
+            Glue(glue_args) => ds::Vertical::Glue(glue_args.to_boxworks()),
+            Kern(kern_args) => ds::Vertical::Kern(kern_args.to_boxworks()),
+            Penalty(penalty_args) => ds::Vertical::Penalty(penalty_args.to_boxworks()),
+            Rule(rule_args) => ds::Vertical::Rule(rule_args.to_boxworks()),
+        }
+    }
+}
+
 impl ToBoxLang for ds::Horizontal {
     type Output = ast::Horizontal<'static>;
     fn to_box_lang(&self) -> Self::Output {
@@ -24,18 +58,20 @@ impl ToBoxLang for ds::Horizontal {
         match self {
             Char(char) => ast::Horizontal::Text(char.to_box_lang()),
             HList(hlist) => ast::Horizontal::Hlist(hlist.to_box_lang()),
-            VList(_vlist) => todo!(),
-            Rule(_rule) => todo!(),
+            VList(vlist) => ast::Horizontal::Vlist(vlist.to_box_lang()),
+            Rule(rule) => ast::Horizontal::Rule(rule.to_box_lang()),
             Mark(_mark) => todo!(),
             Insertion(_insertion) => todo!(),
             Adjust(_adjust) => todo!(),
             Ligature(ligature) => ast::Horizontal::Ligature(ligature.to_box_lang()),
-            Discretionary(_discretionary) => todo!(),
+            Discretionary(discretionary) => {
+                ast::Horizontal::Discretionary(discretionary.to_box_lang())
+            }
             Whatsit(_whatsit) => todo!(),
             Math(_math) => todo!(),
             Glue(glue) => ast::Horizontal::Glue(glue.to_box_lang()),
             Kern(kern) => ast::Horizontal::Kern(kern.to_box_lang()),
-            Penalty(_penalty) => todo!(),
+            Penalty(penalty) => ast::Horizontal::Penalty(penalty.to_box_lang()),
         }
     }
 }
@@ -54,6 +90,13 @@ impl<'a> ToBoxworks for Vec<ast::Horizontal<'a>> {
     }
 }
 
+impl<'a> ToBoxworks for Vec<ast::Vertical<'a>> {
+    type Output = Vec<ds::Vertical>;
+    fn to_boxworks(&self) -> Self::Output {
+        self.iter().map(|b| b.to_boxworks()).collect()
+    }
+}
+
 impl<'a> ToBoxworks for ast::Horizontal<'a> {
     type Output = Vec<ds::Horizontal>;
 
@@ -64,7 +107,22 @@ impl<'a> ToBoxworks for ast::Horizontal<'a> {
             Glue(glue_args) => vec![ds::Horizontal::Glue(glue_args.to_boxworks())],
             Kern(kern_args) => vec![ds::Horizontal::Kern(kern_args.to_boxworks())],
             Hlist(hlist_args) => vec![ds::Horizontal::HList(hlist_args.to_boxworks())],
+            Vlist(vlist_args) => vec![ds::Horizontal::VList(vlist_args.to_boxworks())],
             Ligature(lig_args) => vec![ds::Horizontal::Ligature(lig_args.to_boxworks())],
+            Discretionary(disc_args) => {
+                vec![ds::Horizontal::Discretionary(disc_args.to_boxworks())]
+            }
+            Rule(rule_args) => vec![ds::Horizontal::Rule(rule_args.to_boxworks())],
+            Penalty(penalty_args) => vec![ds::Horizontal::Penalty(penalty_args.to_boxworks())],
+        }
+    }
+}
+
+impl ToBoxLang for ds::VList {
+    type Output = ast::Vlist<'static>;
+    fn to_box_lang(&self) -> Self::Output {
+        ast::Vlist {
+            content: self.list.to_box_lang().into(),
         }
     }
 }
@@ -84,6 +142,17 @@ impl<'a> ToBoxworks for ast::Hlist<'a> {
     fn to_boxworks(&self) -> Self::Output {
         ds::HList {
             width: self.width.value,
+            list: self.content.value.to_boxworks(),
+            // TODO: all the other stuff
+            ..Default::default()
+        }
+    }
+}
+
+impl<'a> ToBoxworks for ast::Vlist<'a> {
+    type Output = ds::VList;
+    fn to_boxworks(&self) -> Self::Output {
+        ds::VList {
             list: self.content.value.to_boxworks(),
             // TODO: all the other stuff
             ..Default::default()
@@ -159,6 +228,24 @@ impl<'a> ToBoxworks for ast::Text<'a> {
     }
 }
 
+impl ToBoxLang for ds::Penalty {
+    type Output = ast::Penalty<'static>;
+    fn to_box_lang(&self) -> Self::Output {
+        ast::Penalty {
+            value: self.value.into(),
+        }
+    }
+}
+
+impl<'a> ToBoxworks for ast::Penalty<'a> {
+    type Output = ds::Penalty;
+    fn to_boxworks(&self) -> Self::Output {
+        ds::Penalty {
+            value: self.value.value,
+        }
+    }
+}
+
 impl ToBoxLang for ds::Glue {
     type Output = ast::Glue<'static>;
     fn to_box_lang(&self) -> Self::Output {
@@ -201,6 +288,50 @@ impl<'a> ToBoxworks for ast::Kern<'a> {
         ds::Kern {
             width: self.width.value,
             kind: ds::KernKind::Normal,
+        }
+    }
+}
+
+impl ToBoxLang for ds::Discretionary {
+    type Output = ast::Discretionary<'static>;
+    fn to_box_lang(&self) -> Self::Output {
+        ast::Discretionary {
+            pre_break: self.pre_break.to_box_lang().into(),
+            post_break: self.post_break.to_box_lang().into(),
+            replace_count: (self.replace_count as i32).into(),
+        }
+    }
+}
+
+impl<'a> ToBoxworks for ast::Discretionary<'a> {
+    type Output = ds::Discretionary;
+    fn to_boxworks(&self) -> Self::Output {
+        ds::Discretionary {
+            pre_break: self.pre_break.value.to_boxworks(),
+            post_break: self.post_break.value.to_boxworks(),
+            replace_count: self.replace_count.value as u32,
+        }
+    }
+}
+
+impl ToBoxLang for ds::Rule {
+    type Output = ast::Rule<'static>;
+    fn to_box_lang(&self) -> Self::Output {
+        ast::Rule {
+            height: self.height.into(),
+            width: self.width.into(),
+            depth: self.depth.into(),
+        }
+    }
+}
+
+impl<'a> ToBoxworks for ast::Rule<'a> {
+    type Output = ds::Rule;
+    fn to_boxworks(&self) -> Self::Output {
+        ds::Rule {
+            height: self.height.value,
+            width: self.width.value,
+            depth: self.depth.value,
         }
     }
 }

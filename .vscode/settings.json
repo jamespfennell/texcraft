@@ -108,6 +108,8 @@
         "unexpandable",
         "usize",
         "VARCHAR",
+        "Vlist",
+        "vlists",
         "VM's",
         "XHEIGHT"
     ],    

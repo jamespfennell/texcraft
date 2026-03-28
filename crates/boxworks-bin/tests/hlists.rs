@@ -8,7 +8,7 @@ fn run_hlists(texts_file: &str) -> String {
         .join(texts_file);
 
     let mut cmd = Command::cargo_bin("box").unwrap();
-    cmd.arg("hlists");
+    cmd.arg("build");
     cmd.arg(format!("--texts-file={}", texts_file_path.display()));
     let output = cmd.output().unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();

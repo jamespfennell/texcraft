@@ -98,7 +98,7 @@ impl TexEngine for TexEngineBinary {
     }
 }
 
-/// Build a horizontal list from some text.
+/// Build horizontal lists from some text.
 ///
 /// This function works by putting the text inside a TeX `\hbox{}`,
 ///     and then instructing TeX to describe the contents of the box.
@@ -111,124 +111,361 @@ pub fn build_horizontal_lists(
     preamble: &str,
     contents: &mut dyn Iterator<Item = &String>,
 ) -> (HashMap<String, u32>, Vec<ds::HList>) {
-    let mut fonts: HashMap<String, u32> = Default::default();
-    let mut hlists = vec![];
     let macro_calls: Vec<String> = contents.map(|s| format!(r#"\printBox{{{s}}}"#)).collect();
     let tex_source_code = CONVERT_TEXT_TEMPLATE
         .replace("<preamble>", preamble)
+        .replace("<box_template>", r"\hbox{#1}")
         .replace("<print_calls>", &macro_calls.join("\n\n"));
-
     let output = tex_engine.run(&tex_source_code, auxiliary_files);
-    enum Expect {
-        Begin,
-        Dimension,
-        Content(ds::HList),
-    }
-    let mut expect = Expect::Begin;
-    for line in output.lines() {
-        expect = match expect {
-            Expect::Begin => {
-                if !line.starts_with("Texcraft: begin") {
-                    Expect::Begin
+    let segments = extract_texcraft_segments(&output);
+    let mut fonts: HashMap<String, u32> = Default::default();
+    let hlists = segments
+        .filter_map(|s| parse_hlist(s, "", &mut fonts))
+        .collect();
+    (fonts, hlists)
+}
+
+/// Build verticals list from some text.
+///
+/// This function works by putting the text inside a TeX
+///     `\vbox{\noindent \hsize=41pt}`
+///     and then instructing TeX to describe the contents of the box.
+///
+/// This function is the inverse of TeX.2021.173 and onwards
+/// (part 12 of TeX: displaying boxes).
+pub fn build_vertical_lists(
+    tex_engine: &dyn TexEngine,
+    auxiliary_files: &HashMap<PathBuf, Vec<u8>>,
+    preamble: &str,
+    contents: &mut dyn Iterator<Item = &String>,
+) -> (HashMap<String, u32>, Vec<ds::VList>) {
+    let macro_calls: Vec<String> = contents.map(|s| format!(r#"\printBox{{{s}}}"#)).collect();
+    let tex_source_code = CONVERT_TEXT_TEMPLATE
+        .replace("<preamble>", preamble)
+        .replace("<box_template>", r"\vbox{\noindent \hsize=41pt #1}")
+        .replace("<print_calls>", &macro_calls.join("\n\n"));
+    let output = tex_engine.run(&tex_source_code, auxiliary_files);
+    let segments = extract_texcraft_segments(&output);
+    let mut fonts: HashMap<String, u32> = Default::default();
+    let vlists = segments
+        .filter_map(|s| parse_vlist(s, &mut fonts))
+        .collect();
+    (fonts, vlists)
+}
+
+/// Extract the raw content between each pair of "Texcraft: begin" / "Texcraft: end" markers.
+///
+/// Yields one `&str` slice per begin/end pair, borrowing directly from `output`.
+fn extract_texcraft_segments(output: &str) -> impl Iterator<Item = &str> {
+    let base = output.as_ptr() as usize;
+    let bytes = output.as_bytes();
+    let mut lines = output.lines();
+    std::iter::from_fn(move || {
+        // Scan forward to the next "Texcraft: begin" line and record the segment start.
+        let segment_start = loop {
+            let line = lines.next()?;
+            if line.starts_with("Texcraft: begin") {
+                let after_line = line.as_ptr() as usize - base + line.len();
+                let after_newline = if bytes.get(after_line) == Some(&b'\r') {
+                    after_line + 2
+                } else if bytes.get(after_line) == Some(&b'\n') {
+                    after_line + 1
                 } else {
-                    Expect::Dimension
-                }
-            }
-            Expect::Dimension => {
-                // We want \hbox(height+depth)xwidth
-                if let Some(s) = line.strip_prefix(r"\hbox(") {
-                    let i = s
-                        .find('+')
-                        .expect("hbox dimension spec has a + between height and depth");
-                    let height = parse_scaled(&s[..i]);
-                    let s = &s[i + 1..];
-                    let i = s
-                        .find(")x")
-                        .expect("hbox dimension spec has a )x between depth and width");
-                    let depth = parse_scaled(&s[..i]);
-                    let width = parse_scaled(&s[i + 2..]);
-                    Expect::Content(ds::HList {
-                        height,
-                        width,
-                        depth,
-                        ..Default::default()
-                    })
-                } else {
-                    Expect::Dimension
-                }
-            }
-            Expect::Content(mut hlist) => {
-                if line.starts_with("Texcraft: end") {
-                    hlists.push(hlist);
-                    Expect::Begin
-                } else if let Some(glue_spec) = line.strip_prefix(r".\glue") {
-                    let mut words = glue_spec.split_ascii_whitespace();
-                    let width = parse_scaled(words.next().expect("glue has 5 words"));
-                    assert_eq!(words.next(), Some("plus"));
-                    let stretch = parse_scaled(words.next().expect("glue has 5 words"));
-                    assert_eq!(words.next(), Some("minus"));
-                    let shrink = parse_scaled(words.next().expect("glue has 5 words"));
-                    hlist.list.push(
-                        ds::Glue {
-                            kind: ds::GlueKind::Normal,
-                            value: core::Glue {
-                                width,
-                                stretch,
-                                shrink,
-                                ..Default::default()
-                            },
-                        }
-                        .into(),
-                    );
-                    Expect::Content(hlist)
-                } else if let Some(kern_spec) = line.strip_prefix(r".\kern") {
-                    let mut words = kern_spec.split_ascii_whitespace();
-                    let width = parse_scaled(words.next().expect("glue has 1 word"));
-                    hlist.list.push(
-                        ds::Kern {
-                            kind: ds::KernKind::Normal,
-                            width,
-                        }
-                        .into(),
-                    );
-                    Expect::Content(hlist)
-                } else if let Some(char_spec) = line.strip_prefix(r".\") {
-                    let mut words = char_spec.split_ascii_whitespace();
-                    let font_name = words.next().expect("char has 2 words");
-                    use std::collections::hash_map::Entry;
-                    let num_fonts: u32 = fonts.len().try_into().expect("no more than 2^32 fonts");
-                    let font = match fonts.entry(font_name.to_string()) {
-                        Entry::Occupied(occupied_entry) => *occupied_entry.get(),
-                        Entry::Vacant(vacant_entry) => {
-                            vacant_entry.insert(num_fonts);
-                            num_fonts
-                        }
-                    };
-                    let char = parse_char(words.next().expect("char has 2 words"));
-                    if words.next() == Some("(ligature") {
-                        let og_chars = words.next().expect("lig has 4 words");
-                        let og_chars = og_chars.strip_suffix(")").expect("lig ends with ')'");
-                        hlist.list.push(
-                            ds::Ligature {
-                                included_left_boundary: false,
-                                included_right_boundary: false,
-                                char,
-                                font,
-                                original_chars: og_chars.into(),
-                            }
-                            .into(),
-                        );
-                    } else {
-                        hlist.list.push(ds::Char { char, font }.into());
-                    }
-                    Expect::Content(hlist)
-                } else {
-                    Expect::Content(hlist)
-                }
+                    after_line
+                };
+                break after_newline;
             }
         };
+        // Scan forward to the next "Texcraft: end" line and record the segment end.
+        loop {
+            let line = lines.next()?;
+            if line.starts_with("Texcraft: end") {
+                let line_offset = line.as_ptr() as usize - base;
+                let end = if line_offset > 0 && bytes.get(line_offset - 1) == Some(&b'\n') {
+                    if line_offset > 1 && bytes.get(line_offset - 2) == Some(&b'\r') {
+                        line_offset - 2
+                    } else {
+                        line_offset - 1
+                    }
+                } else {
+                    line_offset
+                };
+                return Some(&output[segment_start..end]);
+            }
+        }
+    })
+}
+
+/// Parse a single raw hlist segment (as produced by [`extract_hlist_segments`]) into an hlist.
+///
+/// `prefix` is stripped from the start of every line before processing — use `""` when the
+/// hlist is at the top level and `"."` when it is nested one level inside a vlist.
+///
+/// The `fonts` map is updated in place as new fonts are encountered.
+fn parse_hlist(segment: &str, prefix: &str, fonts: &mut HashMap<String, u32>) -> Option<ds::HList> {
+    let mut iter = segment.lines();
+    let mut hlist = loop {
+        let raw_line = iter.next()?;
+        let line = raw_line.strip_prefix(prefix).unwrap_or(raw_line);
+        // We want \hbox(height+depth)xwidth[, glue set N[order]]
+        let Some(s) = line.strip_prefix(r"\hbox(") else {
+            continue;
+        };
+        let i = s
+            .find('+')
+            .expect("hbox dimension spec has a + between height and depth");
+        let height = parse_scaled(&s[..i]);
+        let s = &s[i + 1..];
+        let i = s
+            .find(")x")
+            .expect("hbox dimension spec has a )x between depth and width");
+        let depth = parse_scaled(&s[..i]);
+        let rest = &s[i + 2..];
+        let (width_str, glue_set_str) = if let Some(j) = rest.find(", glue set ") {
+            (&rest[..j], Some(&rest[j + 11..]))
+        } else {
+            (rest, None)
+        };
+        let width = parse_scaled(width_str);
+        let (glue_ratio, glue_sign, glue_order) = glue_set_str.map(parse_glue_set).unwrap_or((
+            ds::GlueRatio(0.0),
+            ds::GlueSign::Normal,
+            core::GlueOrder::Normal,
+        ));
+        break ds::HList {
+            height,
+            width,
+            depth,
+            glue_ratio,
+            glue_sign,
+            glue_order,
+            ..Default::default()
+        };
+    };
+    for raw_line in iter {
+        let line = raw_line.strip_prefix(prefix).unwrap_or(raw_line);
+        // TODO: handle further nested stuff
+        if line.starts_with("...") {
+            continue;
+        }
+        if let Some(glue_spec) = line.strip_prefix(r".\glue") {
+            hlist.list.push(
+                ds::Glue {
+                    kind: ds::GlueKind::Normal,
+                    value: parse_glue_value(glue_spec),
+                }
+                .into(),
+            );
+        } else if let Some(kern_spec) = line.strip_prefix(r".\kern") {
+            let mut words = kern_spec.split_ascii_whitespace();
+            let width = parse_scaled(words.next().expect("kern has 1 word"));
+            hlist.list.push(
+                ds::Kern {
+                    kind: ds::KernKind::Normal,
+                    width,
+                }
+                .into(),
+            );
+        } else if let Some(penalty_spec) = line.strip_prefix(r".\penalty ") {
+            let value: i32 = penalty_spec.trim().parse().expect("penalty value is i32");
+            hlist.list.push(ds::Penalty { value }.into());
+        } else if let Some(rule_spec) = line.strip_prefix(r".\rule") {
+            // TODO: handle rule_spec
+            _ = rule_spec;
+            hlist.list.push(
+                ds::Rule {
+                    height: Default::default(),
+                    width: Default::default(),
+                    depth: Default::default(),
+                }
+                .into(),
+            );
+        } else if let Some(replacing_spec) = line.strip_prefix(r".\discretionary") {
+            // TODO: handle replacing_spec
+            _ = replacing_spec;
+            hlist.list.push(
+                ds::Discretionary {
+                    pre_break: vec![],
+                    post_break: vec![],
+                    replace_count: 1,
+                }
+                .into(),
+            );
+        } else if let Some(char_spec) = line.strip_prefix(r".\") {
+            let mut words = char_spec.split_ascii_whitespace();
+            let font_name = words.next().expect("char has 2 words");
+            use std::collections::hash_map::Entry;
+            let num_fonts: u32 = fonts.len().try_into().expect("no more than 2^32 fonts");
+            let font = match fonts.entry(font_name.to_string()) {
+                Entry::Occupied(occupied_entry) => *occupied_entry.get(),
+                Entry::Vacant(vacant_entry) => {
+                    vacant_entry.insert(num_fonts);
+                    num_fonts
+                }
+            };
+            let char = parse_char(
+                words
+                    .next()
+                    .unwrap_or_else(|| panic!("expected char after font command \\{font_name}")),
+            );
+            if words.next() == Some("(ligature") {
+                let og_chars = words.next().expect("lig has 4 words");
+                let og_chars = og_chars.strip_suffix(")").expect("lig ends with ')'");
+                hlist.list.push(
+                    ds::Ligature {
+                        included_left_boundary: false,
+                        included_right_boundary: false,
+                        char,
+                        font,
+                        original_chars: og_chars.into(),
+                    }
+                    .into(),
+                );
+            } else {
+                hlist.list.push(ds::Char { char, font }.into());
+            }
+        }
     }
-    (fonts, hlists)
+    Some(hlist)
+}
+
+/// Parse a single raw vlist segment into a vlist.
+///
+/// Depth-1 lines (starting with `.`) become direct vlist elements.
+/// Depth-2 lines (starting with `..`) belong to the nearest preceding `.\hbox` and are
+/// parsed by [`parse_hlist`] with prefix `"."`.
+fn parse_vlist(segment: &str, fonts: &mut HashMap<String, u32>) -> Option<ds::VList> {
+    let mut iter = segment.lines();
+    let mut vlist = loop {
+        let line = iter.next()?;
+        let Some(s) = line.strip_prefix(r"\vbox(") else {
+            continue;
+        };
+        let i = s
+            .find('+')
+            .expect("vbox dimension spec has a + between height and depth");
+        let height = parse_scaled(&s[..i]);
+        let s = &s[i + 1..];
+        let i = s
+            .find(")x")
+            .expect("vbox dimension spec has a )x between depth and width");
+        let depth = parse_scaled(&s[..i]);
+        let width = parse_scaled(&s[i + 2..]);
+        break ds::VList {
+            height,
+            width,
+            depth,
+            shift_amount: core::Scaled::ZERO,
+            list: vec![],
+            glue_ratio: ds::GlueRatio(0.0),
+            glue_sign: ds::GlueSign::Normal,
+            glue_order: core::GlueOrder::Normal,
+        };
+    };
+    let mut hbox_buf: Option<String> = None;
+    for line in iter {
+        if line.starts_with("..") {
+            // Depth-2: belongs to the current hbox buffer.
+            if let Some(ref mut buf) = hbox_buf {
+                buf.push('\n');
+                buf.push_str(line);
+            }
+        } else if let Some(rest) = line.strip_prefix('.') {
+            // Depth-1: flush any pending hbox first.
+            if let Some(buf) = hbox_buf.take() {
+                if let Some(hlist) = parse_hlist(&buf, ".", fonts) {
+                    vlist.list.push(ds::Vertical::HList(hlist));
+                }
+            }
+            if rest.starts_with(r"\hbox(") {
+                // Start accumulating a new hbox; keep the full line so
+                // parse_hlist (prefix ".") can strip the leading dot.
+                hbox_buf = Some(line.to_string());
+            } else if let Some(penalty_spec) = rest.strip_prefix(r"\penalty ") {
+                let value: i32 = penalty_spec.trim().parse().expect("penalty value is i32");
+                vlist
+                    .list
+                    .push(ds::Vertical::Penalty(ds::Penalty { value }));
+            } else if let Some(glue_spec) = rest.strip_prefix(r"\glue") {
+                vlist.list.push(ds::Vertical::Glue(ds::Glue {
+                    kind: ds::GlueKind::Normal,
+                    value: parse_glue_value(glue_spec),
+                }));
+            }
+        }
+    }
+
+    if let Some(buf) = hbox_buf {
+        if let Some(hlist) = parse_hlist(&buf, ".", fonts) {
+            vlist.list.push(ds::Vertical::HList(hlist));
+        }
+    }
+    Some(vlist)
+}
+
+/// Parse the glue value from the text following `\glue` in TeX's box display.
+///
+/// `spec` may start with a parenthesised name (named glue, e.g. `(\rightskip) 0.0`)
+/// or directly with a space followed by the width (e.g. ` 3.33333 plus 1.66666 minus 1.11111`).
+fn parse_glue_value(spec: &str) -> core::Glue {
+    let spec = if spec.starts_with('(') {
+        let close = spec.find(')').expect("named glue has ')'");
+        spec[close + 1..].trim_start()
+    } else {
+        spec.trim_start()
+    };
+    let mut words = spec.split_ascii_whitespace();
+    let width = parse_scaled(words.next().expect("glue has a width"));
+    let (stretch, stretch_order) = if words.next() == Some("plus") {
+        parse_glue_amount(words.next().expect("glue has stretch after plus"))
+    } else {
+        (core::Scaled::ZERO, core::GlueOrder::Normal)
+    };
+    let (shrink, shrink_order) = if words.next() == Some("minus") {
+        parse_glue_amount(words.next().expect("glue has shrink after minus"))
+    } else {
+        (core::Scaled::ZERO, core::GlueOrder::Normal)
+    };
+    core::Glue {
+        width,
+        stretch,
+        stretch_order,
+        shrink,
+        shrink_order,
+    }
+}
+
+/// Parse a glue component like `"1.66666"`, `"1.0fil"`, `"0.0fill"`.
+fn parse_glue_amount(s: &str) -> (core::Scaled, core::GlueOrder) {
+    if let Some(s) = s.strip_suffix("filll") {
+        (parse_scaled(s), core::GlueOrder::Filll)
+    } else if let Some(s) = s.strip_suffix("fill") {
+        (parse_scaled(s), core::GlueOrder::Fill)
+    } else if let Some(s) = s.strip_suffix("fil") {
+        (parse_scaled(s), core::GlueOrder::Fil)
+    } else {
+        (parse_scaled(s), core::GlueOrder::Normal)
+    }
+}
+
+/// Parse the `"N[order]"` text that follows `", glue set "` on an hbox line.
+fn parse_glue_set(s: &str) -> (ds::GlueRatio, ds::GlueSign, core::GlueOrder) {
+    let (sign, s) = if let Some(s) = s.strip_prefix("- ") {
+        (ds::GlueSign::Shrinking, s)
+    } else {
+        (ds::GlueSign::Stretching, s)
+    };
+    let (s, order) = if let Some(s) = s.strip_suffix("filll") {
+        (s, core::GlueOrder::Filll)
+    } else if let Some(s) = s.strip_suffix("fill") {
+        (s, core::GlueOrder::Fill)
+    } else if let Some(s) = s.strip_suffix("fil") {
+        (s, core::GlueOrder::Fil)
+    } else {
+        (s, core::GlueOrder::Normal)
+    };
+    let ratio: f32 = s.parse().expect("glue set ratio is a float");
+    (ds::GlueRatio(ratio), sign, order)
 }
 
 fn parse_char(s: &str) -> char {
@@ -313,7 +550,7 @@ const CONVERT_TEXT_TEMPLATE: &str = r"
 
 \def\printBox#1{
     % Put the content we want to see in box 0.
-    \setbox0=\hbox{#1}
+    \setbox0=<box_template>
     % Add a start marker so we know where to begin in the log
     \fullLineMessage{Texcraft: begin}
     % Show the box!
@@ -427,6 +664,169 @@ Transcript written on test.log.
                 ds::Char { char: 'e', font: 0 }.into(),
             ],
             ..Default::default()
+        };
+        let want_fonts = {
+            let mut m = HashMap::new();
+            m.insert("tenrm".to_string(), 0);
+            m
+        };
+
+        assert_eq!(got_list, vec![want_list]);
+        assert_eq!(got_fonts, want_fonts);
+    }
+
+    #[test]
+    fn test_build_vertical_lists() {
+        let log = r#"
+This is TeX, Version 3.141592653 (TeX Live 2024) (preloaded format=tex)
+(./test.tex
+
+Texcraft: begin
+> \box0=
+\vbox(18.94444+0.0)x41.0
+.\hbox(6.94444+0.0)x41.0, glue set 0.26662
+..\tenrm M
+..\tenrm i
+..\tenrm n
+..\kern-0.27779
+..\tenrm t
+..\glue 3.33333 plus 1.66666 minus 1.11111
+..\tenrm a
+..\tenrm n
+..\tenrm d
+..\glue(\rightskip) 0.0
+.\penalty 300
+.\glue(\baselineskip) 7.69446
+.\hbox(4.30554+0.0)x41.0, glue set 28.2222fil
+..\tenrm m
+..\tenrm e
+..\penalty 10000
+..\glue(\parfillskip) 0.0 plus 1.0fil
+..\glue(\rightskip) 0.0
+
+! OK.
+\printBox ...Message {Texcraft: begin} \showbox 0 
+                                                  \par \fullLineMessage {Tex...
+l.31 \printBox{Mint and me}
+                           
+
+Texcraft: end
+ )
+(see the transcript file for additional information)
+No pages of output.
+Transcript written on test.log.
+"#;
+
+        let tex_engine = MockTexEngine(log.to_string());
+        let (got_fonts, got_list) = build_vertical_lists(
+            &tex_engine,
+            &Default::default(),
+            &"",
+            &mut vec!["".to_string()].iter(),
+        );
+
+        let want_list = ds::VList {
+            height: parse_scaled("18.94444"),
+            width: parse_scaled("41.0"),
+            depth: core::Scaled::ZERO,
+            shift_amount: core::Scaled::ZERO,
+            glue_ratio: ds::GlueRatio(0.0),
+            glue_sign: ds::GlueSign::Normal,
+            glue_order: core::GlueOrder::Normal,
+            list: vec![
+                ds::Vertical::HList(ds::HList {
+                    height: parse_scaled("6.94444"),
+                    width: parse_scaled("41.0"),
+                    depth: core::Scaled::ZERO,
+                    glue_ratio: ds::GlueRatio(0.26662),
+                    glue_sign: ds::GlueSign::Stretching,
+                    glue_order: core::GlueOrder::Normal,
+                    list: vec![
+                        ds::Char { char: 'M', font: 0 }.into(),
+                        ds::Char { char: 'i', font: 0 }.into(),
+                        ds::Char { char: 'n', font: 0 }.into(),
+                        ds::Kern {
+                            kind: ds::KernKind::Normal,
+                            width: parse_scaled("-0.27779"),
+                        }
+                        .into(),
+                        ds::Char { char: 't', font: 0 }.into(),
+                        ds::Glue {
+                            kind: ds::GlueKind::Normal,
+                            value: core::Glue {
+                                width: parse_scaled("3.33333"),
+                                stretch: parse_scaled("1.66666"),
+                                stretch_order: core::GlueOrder::Normal,
+                                shrink: parse_scaled("1.11111"),
+                                shrink_order: core::GlueOrder::Normal,
+                            },
+                        }
+                        .into(),
+                        ds::Char { char: 'a', font: 0 }.into(),
+                        ds::Char { char: 'n', font: 0 }.into(),
+                        ds::Char { char: 'd', font: 0 }.into(),
+                        ds::Glue {
+                            kind: ds::GlueKind::Normal,
+                            value: core::Glue {
+                                width: core::Scaled::ZERO,
+                                stretch: core::Scaled::ZERO,
+                                stretch_order: core::GlueOrder::Normal,
+                                shrink: core::Scaled::ZERO,
+                                shrink_order: core::GlueOrder::Normal,
+                            },
+                        }
+                        .into(),
+                    ],
+                    ..Default::default()
+                }),
+                ds::Vertical::Penalty(ds::Penalty { value: 300 }),
+                ds::Vertical::Glue(ds::Glue {
+                    kind: ds::GlueKind::Normal,
+                    value: core::Glue {
+                        width: parse_scaled("7.69446"),
+                        stretch: core::Scaled::ZERO,
+                        stretch_order: core::GlueOrder::Normal,
+                        shrink: core::Scaled::ZERO,
+                        shrink_order: core::GlueOrder::Normal,
+                    },
+                }),
+                ds::Vertical::HList(ds::HList {
+                    height: parse_scaled("4.30554"),
+                    width: parse_scaled("41.0"),
+                    depth: core::Scaled::ZERO,
+                    glue_ratio: ds::GlueRatio(28.2222),
+                    glue_sign: ds::GlueSign::Stretching,
+                    glue_order: core::GlueOrder::Fil,
+                    list: vec![
+                        ds::Char { char: 'm', font: 0 }.into(),
+                        ds::Char { char: 'e', font: 0 }.into(),
+                        ds::Penalty { value: 10000 }.into(),
+                        ds::Glue {
+                            kind: ds::GlueKind::Normal,
+                            value: core::Glue {
+                                width: core::Scaled::ZERO,
+                                stretch: parse_scaled("1.0"),
+                                stretch_order: core::GlueOrder::Fil,
+                                shrink: core::Scaled::ZERO,
+                                shrink_order: core::GlueOrder::Normal,
+                            },
+                        }
+                        .into(),
+                        ds::Glue {
+                            kind: ds::GlueKind::Normal,
+                            value: core::Glue {
+                                width: core::Scaled::ZERO,
+                                stretch: core::Scaled::ZERO,
+                                stretch_order: core::GlueOrder::Normal,
+                                shrink: core::Scaled::ZERO,
+                                shrink_order: core::GlueOrder::Normal,
+                            },
+                        }
+                        .into(),
+                    ],
+                    ..Default::default()
+                }),
+            ],
         };
         let want_fonts = {
             let mut m = HashMap::new();
