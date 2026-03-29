@@ -32,8 +32,6 @@ pub enum Horizontal {
     Penalty(Penalty),
 }
 
-impl Eq for Horizontal {}
-
 macro_rules! horizontal_impl {
     ( $( $variant: ident , )+ ) => {
         impl PartialEq for Horizontal {
@@ -42,7 +40,7 @@ macro_rules! horizontal_impl {
                     $(
                     (Self::$variant(l), Self::$variant(r)) => l == r,
                     )+
-                    _ =>false,
+                    _ => false,
                 }
             }
         }
@@ -87,25 +85,29 @@ pub enum Vertical {
     Penalty(Penalty),
 }
 
-impl PartialEq for Vertical {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::HList(l0), Self::HList(r0)) => l0 == r0,
-            (Self::VList(l0), Self::VList(r0)) => l0 == r0,
-            (Self::Rule(l0), Self::Rule(r0)) => l0 == r0,
-            (Self::Mark(l0), Self::Mark(r0)) => l0 == r0,
-            (Self::Insertion(l0), Self::Insertion(r0)) => l0 == r0,
-            (Self::Whatsit(_), Self::Whatsit(_)) => false,
-            (Self::Math(l0), Self::Math(r0)) => l0 == r0,
-            (Self::Glue(l0), Self::Glue(r0)) => l0 == r0,
-            (Self::Kern(l0), Self::Kern(r0)) => l0 == r0,
-            (Self::Penalty(l0), Self::Penalty(r0)) => l0 == r0,
-            _ => false,
+macro_rules! vertical_impl {
+    ( $( $variant: ident , )+ ) => {
+        impl PartialEq for Vertical {
+            fn eq(&self, other: &Self) -> bool {
+                match (self, other) {
+                    $(
+                    (Self::$variant(l), Self::$variant(r)) => l == r,
+                    )+
+                    _ => false,
+                }
+            }
         }
-    }
+        $(
+        impl From<$variant> for Vertical {
+            fn from(value: $variant) -> Self {
+                Vertical::$variant(value)
+            }
+        }
+        )+
+    };
 }
 
-impl Eq for Vertical {}
+vertical_impl!(HList, VList, Rule, Mark, Insertion, Math, Glue, Kern, Penalty,);
 
 /// A character in a specific font.
 ///
@@ -121,7 +123,7 @@ pub struct Char {
 /// A box made from a horizontal list.
 ///
 /// Described in TeX.2021.135.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub struct HList {
     pub height: Number,
     pub width: Number,
@@ -191,7 +193,7 @@ impl Default for HList {
 /// instead of [Horizontal] nodes.
 ///
 /// Described in TeX.2021.137.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct VList {
     pub height: Number,
     pub width: Number,
@@ -248,7 +250,7 @@ impl Default for Rule {
 /// This node is related to the TeX primitive `\insert`.
 ///
 /// Described in TeX.2021.140.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub struct Insertion {
     pub box_number: u8,
     /// Slightly misnamed: it actually holds the natural height plus depth
@@ -280,7 +282,7 @@ pub struct Mark {
 /// E.g., used to implement the TeX primitive `\vadjust`.
 ///
 /// Described in TeX.2021.142.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub struct Adjust {
     pub list: Vec<Vertical>,
 }
@@ -315,7 +317,7 @@ pub struct Ligature {
 /// we just piggy back on the hlist type.
 ///
 /// Described in TeX.2021.145.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub struct Discretionary {
     /// Material to insert before this node, if the break occurs here.
     pub pre_break: Vec<Horizontal>,

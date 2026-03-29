@@ -287,72 +287,73 @@ fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
             ..Default::default()
         }
     };
-    let iter = iter.inner();
-    for line in iter {
-        if let Some(glue_spec) = line.strip_prefix(r"\glue") {
-            hlist.list.push(
-                ds::Glue {
-                    kind: ds::GlueKind::Normal,
-                    value: parse_glue_value(glue_spec),
-                }
-                .into(),
-            );
-        } else if let Some(kern_spec) = line.strip_prefix(r"\kern") {
-            let mut words = kern_spec.split_ascii_whitespace();
-            let width = parse_scaled(words.next().expect("kern has 1 word"));
-            hlist.list.push(
+    let mut iter = iter.inner();
+    while let Some(line) = iter.peek() {
+        let (keyword, tail) = keyword_and_tail(line);
+        let mut consume_line = true;
+        let elem: ds::Horizontal = match keyword {
+            "glue" => ds::Glue {
+                kind: ds::GlueKind::Normal,
+                value: parse_glue_value(tail),
+            }
+            .into(),
+            "kern" => {
+                let mut words = tail.split_ascii_whitespace();
+                let width = parse_scaled(words.next().expect("kern has 1 word"));
                 ds::Kern {
                     kind: ds::KernKind::Normal,
                     width,
                 }
-                .into(),
-            );
-        } else if let Some(penalty_spec) = line.strip_prefix(r"\penalty ") {
-            let value: i32 = penalty_spec.trim().parse().expect("penalty value is i32");
-            hlist.list.push(ds::Penalty { value }.into());
-        } else if let Some(rule_spec) = line.strip_prefix(r".\rule") {
-            // TODO: handle rule_spec
-            _ = rule_spec;
-            hlist.list.push(
+                .into()
+            }
+            "penalty" => {
+                let value: i32 = tail.trim().parse().expect("penalty value is i32");
+                ds::Penalty { value }.into()
+            }
+            "rule" => {
+                let i = tail.find('x').expect("rule has a width");
                 ds::Rule {
-                    height: Default::default(),
-                    width: Default::default(),
-                    depth: Default::default(),
+                    width: parse_scaled(&tail[i + 1..]),
+                    ..Default::default()
                 }
-                .into(),
-            );
-        } else if let Some(replacing_spec) = line.strip_prefix(r"\discretionary") {
-            // TODO: handle replacing_spec
-            _ = replacing_spec;
-            hlist.list.push(
+                .into()
+            }
+            "discretionary" => {
+                // TODO: handle replacing_spec
+                _ = tail;
                 ds::Discretionary {
                     pre_break: vec![],
                     post_break: vec![],
                     replace_count: 1,
                 }
-                .into(),
-            );
-        } else if let Some(char_spec) = line.strip_prefix(r"\") {
-            let mut words = char_spec.split_ascii_whitespace();
-            let font_name = words.next().expect("char has 2 words");
-            use std::collections::hash_map::Entry;
-            let num_fonts: u32 = fonts.len().try_into().expect("no more than 2^32 fonts");
-            let font = match fonts.entry(font_name.to_string()) {
-                Entry::Occupied(occupied_entry) => *occupied_entry.get(),
-                Entry::Vacant(vacant_entry) => {
-                    vacant_entry.insert(num_fonts);
-                    num_fonts
-                }
-            };
-            let char = parse_char(
-                words
-                    .next()
-                    .unwrap_or_else(|| panic!("expected char after font command \\{font_name}")),
-            );
-            if words.next() == Some("(ligature") {
-                let og_chars = words.next().expect("lig has 4 words");
-                let og_chars = og_chars.strip_suffix(")").expect("lig ends with ')'");
-                hlist.list.push(
+                .into()
+            }
+            "hbox" => {
+                consume_line = false;
+                parse_hlist(&mut iter, fonts).into()
+            }
+            "vbox" => {
+                consume_line = false;
+                parse_vlist(&mut iter, fonts).into()
+            }
+            font_name => {
+                use std::collections::hash_map::Entry;
+                let num_fonts: u32 = fonts.len().try_into().expect("no more than 2^32 fonts");
+                let font = match fonts.entry(font_name.to_string()) {
+                    Entry::Occupied(occupied_entry) => *occupied_entry.get(),
+                    Entry::Vacant(vacant_entry) => {
+                        vacant_entry.insert(num_fonts);
+                        num_fonts
+                    }
+                };
+                let mut words = tail.split_ascii_whitespace();
+                let char =
+                    parse_char(words.next().unwrap_or_else(|| {
+                        panic!("expected char after font command \\{font_name}")
+                    }));
+                if words.next() == Some("(ligature") {
+                    let og_chars = words.next().expect("lig has 4 words");
+                    let og_chars = og_chars.strip_suffix(")").expect("lig ends with ')'");
                     ds::Ligature {
                         included_left_boundary: false,
                         included_right_boundary: false,
@@ -360,11 +361,15 @@ fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
                         font,
                         original_chars: og_chars.into(),
                     }
-                    .into(),
-                );
-            } else {
-                hlist.list.push(ds::Char { char, font }.into());
+                    .into()
+                } else {
+                    ds::Char { char, font }.into()
+                }
             }
+        };
+        hlist.list.push(elem);
+        if consume_line {
+            iter.next();
         }
     }
     hlist
@@ -400,26 +405,43 @@ fn parse_vlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
     };
     let mut iter = iter.inner();
     while let Some(line) = iter.peek() {
-        if line.starts_with(r"\hbox(") {
-            vlist
-                .list
-                .push(ds::Vertical::HList(parse_hlist(&mut iter, fonts)));
-            continue;
-        }
-        if let Some(penalty_spec) = line.strip_prefix(r"\penalty ") {
-            let value: i32 = penalty_spec.trim().parse().expect("penalty value is i32");
-            vlist
-                .list
-                .push(ds::Vertical::Penalty(ds::Penalty { value }));
-        } else if let Some(glue_spec) = line.strip_prefix(r"\glue") {
-            vlist.list.push(ds::Vertical::Glue(ds::Glue {
+        let (keyword, tail) = keyword_and_tail(line);
+        let mut consume_line = true;
+        let elem: ds::Vertical = match keyword {
+            "hbox" => {
+                consume_line = false;
+                parse_hlist(&mut iter, fonts).into()
+            }
+            "penalty" => {
+                let value: i32 = tail.trim().parse().expect("penalty value is i32");
+                ds::Penalty { value }.into()
+            }
+            "glue" => ds::Vertical::Glue(ds::Glue {
                 kind: ds::GlueKind::Normal,
-                value: parse_glue_value(glue_spec),
-            }));
+                value: parse_glue_value(tail),
+            }),
+            _ => unimplemented!("vlist keyword {keyword} is not implemented"),
+        };
+        vlist.list.push(elem);
+        if consume_line {
+            iter.next();
         }
-        iter.next();
     }
     vlist
+}
+
+fn keyword_and_tail(s: &str) -> (&str, &str) {
+    let mut c = s.chars();
+    assert_eq!(c.next(), Some('\\'), "line expected to begin with \\");
+    let mut keyword_len = 0_usize;
+    for next in c {
+        if next.is_alphabetic() {
+            keyword_len += next.len_utf8();
+        } else {
+            break;
+        }
+    }
+    (&s[1..1 + keyword_len], s[1 + keyword_len..].trim())
 }
 
 /// Parse the glue value from the text following `\glue` in TeX's box display.
@@ -558,6 +580,8 @@ const CONVERT_TEXT_TEMPLATE: &str = r"
 
 % Output up to 1 million nodes.
 \showboxbreadth=1000000
+% Output up to 100 nested boxes.
+\showboxdepth=100
 
 % Prints the contents on its own line in the terminal.
 \def\fullLineMessage#1{
@@ -855,5 +879,172 @@ Transcript written on test.log.
 
         assert_eq!(got_list, vec![want_list]);
         assert_eq!(got_fonts, want_fonts);
+    }
+    #[test]
+    fn test_build_vertical_lists_2() {
+        let log = r#"
+This is TeX, Version 3.141592653 (TeX Live 2024) (preloaded format=tex)
+(./test.tex
+
+Texcraft: begin
+> \box0=
+\vbox(6.83331+0.0)x41.0
+.\hbox(6.83331+0.0)x41.0
+..\tenrm A
+..\hbox(6.83331+0.0)x48.08336
+...\tenrm B
+...\vbox(6.83331+0.0)x41.0
+....\hbox(6.83331+0.0)x41.0, glue set 6.13887fil
+.....\hbox(0.0+0.0)x20.0
+.....\tenrm C
+.....\hbox(6.83331+0.0)x7.6389
+......\tenrm D
+.....\penalty 10000
+.....\glue(\parfillskip) 0.0 plus 1.0fil
+.....\glue(\rightskip) 0.0
+..\penalty 10000
+..\glue(\parfillskip) 0.0 plus 1.0fil
+..\glue(\rightskip) 0.0
+..\rule(*+*)x5.0
+
+! OK.
+\printBox ...Message {Texcraft: begin} \showbox 0 
+                                                  \par \fullLineMessage {Tex...
+l.31 \printBox{Mint and me}
+                           
+
+Texcraft: end
+ )
+(see the transcript file for additional information)
+No pages of output.
+Transcript written on test.log.
+"#;
+
+        let tex_engine = MockTexEngine(log.to_string());
+        let (got_fonts, got_list) = build_vertical_lists(
+            &tex_engine,
+            &Default::default(),
+            &"",
+            &mut vec!["".to_string()].iter(),
+        );
+
+        let want_list = ds::VList {
+            height: parse_scaled("6.83331"),
+            width: parse_scaled("41.0"),
+            depth: core::Scaled::ZERO,
+            shift_amount: core::Scaled::ZERO,
+            glue_ratio: ds::GlueRatio(0.0),
+            glue_sign: ds::GlueSign::Normal,
+            glue_order: core::GlueOrder::Normal,
+            list: vec![ds::Vertical::HList(ds::HList {
+                height: parse_scaled("6.83331"),
+                width: parse_scaled("41.0"),
+                depth: core::Scaled::ZERO,
+                list: vec![
+                    ds::Char { char: 'A', font: 0 }.into(),
+                    ds::Horizontal::HList(ds::HList {
+                        height: parse_scaled("6.83331"),
+                        width: parse_scaled("48.08336"),
+                        depth: core::Scaled::ZERO,
+                        list: vec![
+                            ds::Char { char: 'B', font: 0 }.into(),
+                            ds::Horizontal::VList(ds::VList {
+                                height: parse_scaled("6.83331"),
+                                width: parse_scaled("41.0"),
+                                depth: core::Scaled::ZERO,
+                                list: vec![ds::Vertical::HList(ds::HList {
+                                    height: parse_scaled("6.83331"),
+                                    width: parse_scaled("41.0"),
+                                    depth: core::Scaled::ZERO,
+                                    glue_ratio: ds::GlueRatio(6.13887),
+                                    glue_sign: ds::GlueSign::Stretching,
+                                    glue_order: core::GlueOrder::Fil,
+                                    list: vec![
+                                        ds::Horizontal::HList(ds::HList {
+                                            height: core::Scaled::ZERO,
+                                            width: parse_scaled("20.0"),
+                                            depth: core::Scaled::ZERO,
+                                            ..Default::default()
+                                        }),
+                                        ds::Char { char: 'C', font: 0 }.into(),
+                                        ds::Horizontal::HList(ds::HList {
+                                            height: parse_scaled("6.83331"),
+                                            width: parse_scaled("7.6389"),
+                                            depth: core::Scaled::ZERO,
+                                            list: vec![ds::Char { char: 'D', font: 0 }.into()],
+                                            ..Default::default()
+                                        }),
+                                        ds::Penalty { value: 10000 }.into(),
+                                        ds::Glue {
+                                            kind: ds::GlueKind::Normal,
+                                            value: core::Glue {
+                                                width: core::Scaled::ZERO,
+                                                stretch: parse_scaled("1.0"),
+                                                stretch_order: core::GlueOrder::Fil,
+                                                shrink: core::Scaled::ZERO,
+                                                shrink_order: core::GlueOrder::Normal,
+                                            },
+                                        }
+                                        .into(),
+                                        ds::Glue {
+                                            kind: ds::GlueKind::Normal,
+                                            value: core::Glue {
+                                                width: core::Scaled::ZERO,
+                                                stretch: core::Scaled::ZERO,
+                                                stretch_order: core::GlueOrder::Normal,
+                                                shrink: core::Scaled::ZERO,
+                                                shrink_order: core::GlueOrder::Normal,
+                                            },
+                                        }
+                                        .into(),
+                                    ],
+                                    ..Default::default()
+                                })],
+                                ..Default::default()
+                            }),
+                        ],
+                        ..Default::default()
+                    }),
+                    ds::Penalty { value: 10000 }.into(),
+                    ds::Glue {
+                        kind: ds::GlueKind::Normal,
+                        value: core::Glue {
+                            width: core::Scaled::ZERO,
+                            stretch: parse_scaled("1.0"),
+                            stretch_order: core::GlueOrder::Fil,
+                            shrink: core::Scaled::ZERO,
+                            shrink_order: core::GlueOrder::Normal,
+                        },
+                    }
+                    .into(),
+                    ds::Glue {
+                        kind: ds::GlueKind::Normal,
+                        value: core::Glue {
+                            width: core::Scaled::ZERO,
+                            stretch: core::Scaled::ZERO,
+                            stretch_order: core::GlueOrder::Normal,
+                            shrink: core::Scaled::ZERO,
+                            shrink_order: core::GlueOrder::Normal,
+                        },
+                    }
+                    .into(),
+                    ds::Rule {
+                        height: ds::Rule::RUNNING,
+                        depth: ds::Rule::RUNNING,
+                        width: parse_scaled("5.0"),
+                    }
+                    .into(),
+                ],
+                ..Default::default()
+            })],
+        };
+        let want_fonts = {
+            let mut m = HashMap::new();
+            m.insert("tenrm".to_string(), 0);
+            m
+        };
+
+        assert_eq!(got_fonts, want_fonts);
+        assert_eq!(got_list, vec![want_list]);
     }
 }
