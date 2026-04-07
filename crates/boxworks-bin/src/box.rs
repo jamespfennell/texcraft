@@ -111,12 +111,12 @@ struct Build {
     texts: Vec<String>,
 
     /// Font metrics file to use.
+    ///
+    /// If not specified, Box builds the lists using CMR10 as the default font.
     #[clap(short, long)]
     font_metrics: Option<PathBuf>,
 
     /// Use a TeX engine to build the lists (e.g. `tex`, `pdftex`).
-    ///
-    /// If not specified, Box builds the lists using CMR10 as the default font.
     #[clap(long)]
     tex_engine: Option<String>,
 
