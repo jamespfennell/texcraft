@@ -9,6 +9,8 @@ pub mod ds;
 pub mod tex;
 
 pub trait TextPreprocessor {
+    fn activate_font(&mut self, font: u32);
+
     fn new_paragraph(&mut self);
 
     fn add_word(&mut self, word: &str, list: &mut Vec<ds::Horizontal>);
@@ -26,5 +28,43 @@ pub trait TextPreprocessor {
             self.add_word(word.trim_matches(' '), list);
             pending_space = true;
         }
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct SimpleTextPreprocessor {
+    font: u32,
+}
+
+impl TextPreprocessor for SimpleTextPreprocessor {
+    fn activate_font(&mut self, font: u32) {
+        self.font = font;
+    }
+    fn new_paragraph(&mut self) {}
+
+    fn add_word(&mut self, word: &str, list: &mut Vec<ds::Horizontal>) {
+        for char in word.chars() {
+            list.push(
+                ds::Char {
+                    char,
+                    font: self.font,
+                }
+                .into(),
+            );
+        }
+    }
+    fn add_space(&mut self, list: &mut Vec<ds::Horizontal>) {
+        list.push(
+            ds::Glue {
+                kind: ds::GlueKind::Normal,
+                value: core::Glue {
+                    width: core::Scaled::ONE * 10,
+                    stretch: core::Scaled::ONE * 4,
+                    shrink: core::Scaled::ONE * 4,
+                    ..Default::default()
+                },
+            }
+            .into(),
+        );
     }
 }

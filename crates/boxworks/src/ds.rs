@@ -311,18 +311,13 @@ pub struct Ligature {
 
 /// A discretionary break.
 ///
-/// The pre-break and post-break lists must only contain nodes
-/// of type char, kern, box, rule or ligature.
-/// We could have a specific node type for this, but for the moment
-/// we just piggy back on the hlist type.
-///
 /// Described in TeX.2021.145.
 #[derive(Debug, PartialEq)]
 pub struct Discretionary {
     /// Material to insert before this node, if the break occurs here.
-    pub pre_break: Vec<Horizontal>,
+    pub pre_break: Vec<DiscretionaryElem>,
     /// Material to insert after this node, if the break occurs here.
-    pub post_break: Vec<Horizontal>,
+    pub post_break: Vec<DiscretionaryElem>,
     /// Number of subsequent nodes to skip if the break occurs here.
     pub replace_count: u32,
 }
@@ -343,6 +338,50 @@ impl Default for Discretionary {
     }
 }
 
+/// Element of a discretionary list.
+#[derive(Debug, PartialEq)]
+pub enum DiscretionaryElem {
+    Char(Char),
+    HList(HList),
+    VList(VList),
+    Rule(Rule),
+    Ligature(Ligature),
+    Kern(Kern),
+}
+
+impl DiscretionaryElem {
+    pub fn width<F: Fn(char, u32) -> Number>(&self, font_width: F) -> Number {
+        use DiscretionaryElem::*;
+        match self {
+            Char(char) => font_width(char.char, char.font),
+            HList(hlist) => hlist.width,
+            VList(vlist) => vlist.width,
+            Rule(rule) => rule.width,
+            Ligature(ligature) => font_width(ligature.char, ligature.font),
+            Kern(kern) => kern.width,
+        }
+    }
+}
+
+impl TryFrom<Horizontal> for DiscretionaryElem {
+    type Error = ();
+
+    fn try_from(value: Horizontal) -> Result<Self, Self::Error> {
+        use DiscretionaryElem as Out;
+        use Horizontal::*;
+        let out = match value {
+            Char(char) => Out::Char(char),
+            HList(hlist) => Out::HList(hlist),
+            VList(vlist) => Out::VList(vlist),
+            Rule(rule) => Out::Rule(rule),
+            Ligature(ligature) => Out::Ligature(ligature),
+            Kern(kern) => Out::Kern(kern),
+            _ => return Err(()),
+        };
+        Ok(out)
+    }
+}
+
 /// A whatsit node
 ///
 /// This is used to facilitate extensions to TeX.
@@ -359,7 +398,7 @@ pub trait Whatsit: std::fmt::Debug {}
 /// A marker placed before or after math mode.
 ///
 /// Described in TeX.2021.147.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Math {
     Before,
     After,
@@ -387,19 +426,12 @@ impl Horizontal {
     /// This function is defined in TeX.2021.148.
     pub fn precedes_break(&self) -> bool {
         use Horizontal::*;
-        matches!(
-            self,
-            Char(_)
-                | HList(_)
-                | VList(_)
-                | Rule(_)
-                | Mark(_)
-                | Insertion(_)
-                | Adjust(_)
-                | Ligature(_)
-                | Discretionary(_)
-                | Whatsit(_)
-        )
+        match self {
+            Char(_) | HList(_) | VList(_) | Rule(_) | Mark(_) | Insertion(_) | Adjust(_)
+            | Ligature(_) | Discretionary(_) | Whatsit(_) => true,
+            Kern(kern) => kern.kind != KernKind::Explicit,
+            Math(_) | Glue(_) | Penalty(_) => false,
+        }
     }
 
     /// Whether this node is discarded after a break.
@@ -479,7 +511,7 @@ pub struct Kern {
 /// The kind of a kern node.
 ///
 /// Described in TeX.2021.155.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KernKind {
     /// Inserted from font information or math mode calculations.
     Normal,
@@ -498,17 +530,15 @@ pub enum KernKind {
 ///
 /// Described in TeX.2021.157.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Penalty {
-    pub value: i32,
-}
+pub struct Penalty(pub i32);
 
 impl Penalty {
     /// Any penalty bigger than this is considered infinite and no
     /// break will be allowed for such high values.
-    pub const INFINITE: i32 = 10000;
+    pub const INFINITE: Penalty = Penalty(10000);
 
     /// Any penalty smaller than this will result in a forced break.
-    pub const EJECT: i32 = -10000;
+    pub const EJECT: Penalty = Penalty(-10000);
 }
 
 // A constructor for penalty nodes is provided in TeX.2021.157,

@@ -46,6 +46,19 @@ pub enum Horizontal<'a> {
     Math(Math<'a>),
 }
 
+/// Element of a discretionary pre- or post-break list.
+///
+/// Corresponds to the [`boxworks::ds::DiscretionaryElem`] type.
+#[derive(Debug, PartialEq, Eq)]
+pub enum DiscretionaryElem<'a> {
+    Text(Text<'a>),
+    Kern(Kern<'a>),
+    Hlist(Hlist<'a>),
+    Vlist(Vlist<'a>),
+    Ligature(Ligature<'a>),
+    Rule(Rule<'a>),
+}
+
 /// Lower a horizontal list to a CST tree.
 pub fn lower_hlist<'a, 'b>(list: &'b [Horizontal<'a>]) -> impl cst::TreeIter<'a> + 'b {
     lower_hlist_impl(list)
@@ -62,6 +75,10 @@ pub fn lower_vlist<'a, 'b>(list: &'b [Vertical<'a>]) -> impl cst::TreeIter<'a> +
 
 fn lower_vlist_impl<'a, 'b>(list: &'b [Vertical<'a>]) -> CstTreeIter<'a, 'b> {
     CstTreeIter::Vlist { list, next: 0 }
+}
+
+fn lower_dlist_impl<'a, 'b>(list: &'b [DiscretionaryElem<'a>]) -> CstTreeIter<'a, 'b> {
+    CstTreeIter::Dlist { list, next: 0 }
 }
 
 impl<'a> Horizontal<'a> {
@@ -98,6 +115,23 @@ impl<'a> Vertical<'a> {
     }
 }
 
+impl<'a> DiscretionaryElem<'a> {
+    /// Lower this element to a CST tree.
+    pub fn lower<'b>(&'b self) -> impl cst::TreeIter<'a> + 'b {
+        lower_dlist_impl(std::slice::from_ref(self))
+    }
+    /// Lower the arguments of this element to a CST args iterator.
+    pub fn lower_args<'b>(&'b self) -> impl cst::ArgsIter<'a> + 'b {
+        self.lower_args_impl()
+    }
+    fn lower_args_impl<'b>(&'b self) -> CstArgsIter<'a, 'b> {
+        CstArgsIter::Dlist {
+            elem: self,
+            next: 0,
+        }
+    }
+}
+
 enum CstTreeIter<'a, 'b> {
     Hlist {
         list: &'b [Horizontal<'a>],
@@ -105,6 +139,10 @@ enum CstTreeIter<'a, 'b> {
     },
     Vlist {
         list: &'b [Vertical<'a>],
+        next: usize,
+    },
+    Dlist {
+        list: &'b [DiscretionaryElem<'a>],
         next: usize,
     },
 }
@@ -116,6 +154,10 @@ enum CstArgsIter<'a, 'b> {
     },
     Vlist {
         elem: &'b Vertical<'a>,
+        next: usize,
+    },
+    Dlist {
+        elem: &'b DiscretionaryElem<'a>,
         next: usize,
     },
 }
@@ -134,6 +176,14 @@ impl<'a, 'b> Iterator for CstTreeIter<'a, 'b> {
                 })
             }
             CstTreeIter::Vlist { list, next } => {
+                let h = list.get(*next)?;
+                *next += 1;
+                Some(cst::TreeItem::FuncCall {
+                    func_name: h.func_name().into(),
+                    args: h.lower_args_impl(),
+                })
+            }
+            CstTreeIter::Dlist { list, next } => {
                 let h = list.get(*next)?;
                 *next += 1;
                 Some(cst::TreeItem::FuncCall {
@@ -163,6 +213,11 @@ impl<'a, 'b> Iterator for CstArgsIter<'a, 'b> {
                 Some(l)
             }
             CstArgsIter::Vlist { elem, next } => {
+                let l = elem.lower_arg(*next)?;
+                *next += 1;
+                Some(l)
+            }
+            CstArgsIter::Dlist { elem, next } => {
                 let l = elem.lower_arg(*next)?;
                 *next += 1;
                 Some(l)
@@ -228,6 +283,25 @@ pub fn parse_vlist_using_cst<'a>(
     v
 }
 
+/// Parse a dlist using an explicitly provided CST.
+fn parse_dlist_using_cst<'a>(
+    cst: impl cst::TreeIter<'a>,
+    errs: &ErrorAccumulator<'a>,
+) -> Vec<DiscretionaryElem<'a>> {
+    let mut v: Vec<DiscretionaryElem> = vec![];
+    for call in cst {
+        match call {
+            cst::TreeItem::FuncCall { func_name, args } => {
+                if let Some(elem) = convert_call_to_dlist_elem(func_name, args, errs) {
+                    v.push(elem);
+                }
+            }
+            cst::TreeItem::Comment { value: _ } => continue,
+        }
+    }
+    v
+}
+
 macro_rules! functions {
     ( $( (
         struct $name: ident <$lifetime: lifetime>  {
@@ -247,6 +321,11 @@ macro_rules! functions {
         $(
             impl Vertical {
                 variant: $vertical_variant: ident,
+            }
+        )?
+        $(
+            impl DiscretionaryElem {
+                variant: $discretionary_variant: ident,
             }
         )?
     ), )+ ) => {
@@ -334,6 +413,47 @@ macro_rules! functions {
                 }
             };
             Some(h)
+        }
+        impl<'a> DiscretionaryElem<'a> {
+            pub fn func_name(&self) -> &'static str {
+                match self {
+                    $( $(
+                        DiscretionaryElem::$discretionary_variant(_) => $func_name,
+                    )? )+
+                }
+            }
+            pub fn field_names(&self) -> &'static [&'static str ] {
+                match self {
+                    $( $(
+                        DiscretionaryElem::$discretionary_variant(_) => $name::FIELD_NAMES,
+                    )? )+
+                }
+            }
+            fn lower_arg<'b>(&'b self, u: usize) -> Option<cst::ArgsItem<'a, CstTreeIter<'a, 'b>>> {
+                match self {
+                    $( $(
+                        DiscretionaryElem::$discretionary_variant(args) => args.lower_arg(u),
+                    )? )+
+                }
+            }
+        }
+        fn convert_call_to_dlist_elem<'a>(
+            func_name: Str<'a>,
+            call: impl cst::ArgsIter<'a>,
+            errs: &ErrorAccumulator<'a>,
+        ) -> Option<DiscretionaryElem<'a>> {
+            let d = match func_name.str() {
+                $( $(
+                    $func_name => DiscretionaryElem::$discretionary_variant($name::build(func_name, call, errs)?),
+                )? )+
+                _ => {
+                    errs.add(Error::NoSuchFunction {
+                        function_name: func_name,
+                    });
+                    return None;
+                }
+            };
+            Some(d)
         }
         impl<'a> Vertical<'a> {
             pub fn func_name(&self) -> &'static str {
@@ -478,6 +598,9 @@ functions!(
         impl Horizontal {
             variant: Text,
         }
+        impl DiscretionaryElem {
+            variant: Text,
+        }
     ),
     (
         struct Glue<'a> {
@@ -525,6 +648,9 @@ functions!(
         impl Vertical {
             variant: Kern,
         }
+        impl DiscretionaryElem {
+            variant: Kern,
+        }
     ),
     (
         struct Hlist<'a> {
@@ -541,6 +667,9 @@ functions!(
         impl Vertical {
             variant: Hlist,
         }
+        impl DiscretionaryElem {
+            variant: Hlist,
+        }
     ),
     (
         struct Ligature<'a> {
@@ -553,6 +682,9 @@ functions!(
             default_num_pos_arg: 2,
         }
         impl Horizontal {
+            variant: Ligature,
+        }
+        impl DiscretionaryElem {
             variant: Ligature,
         }
     ),
@@ -570,11 +702,14 @@ functions!(
         impl Vertical {
             variant: Vlist,
         }
+        impl DiscretionaryElem {
+            variant: Vlist,
+        }
     ),
     (
         struct Discretionary<'a> {
-            pre_break: Vec<Horizontal<'a>>,
-            post_break: Vec<Horizontal<'a>>,
+            pre_break: Vec<DiscretionaryElem<'a>>,
+            post_break: Vec<DiscretionaryElem<'a>>,
             replace_count: i32,
         }
         impl Func {
@@ -599,6 +734,9 @@ functions!(
             variant: Rule,
         }
         impl Vertical {
+            variant: Rule,
+        }
+        impl DiscretionaryElem {
             variant: Rule,
         }
     ),
@@ -875,6 +1013,20 @@ impl<'a> Value<'a> for Vec<Horizontal<'a>> {
             key,
             square_open: "".into(),
             tree: lower_hlist_impl(self),
+        }
+    }
+}
+
+impl<'a> Value<'a> for Vec<DiscretionaryElem<'a>> {
+    const DESCRIPTION: &'static str = "a dlist";
+    fn try_cast_list<F: cst::TreeIter<'a>>(value: F, errs: &ErrorAccumulator<'a>) -> Option<Self> {
+        Some(parse_dlist_using_cst(value, errs))
+    }
+    fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>> {
+        cst::ArgsItem::List {
+            key,
+            square_open: "".into(),
+            tree: lower_dlist_impl(self),
         }
     }
 }

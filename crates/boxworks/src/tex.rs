@@ -308,7 +308,7 @@ fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
             }
             "penalty" => {
                 let value: i32 = tail.trim().parse().expect("penalty value is i32");
-                ds::Penalty { value }.into()
+                ds::Penalty(value).into()
             }
             "rule" => {
                 let i = tail.find('x').expect("rule has a width");
@@ -414,7 +414,7 @@ fn parse_vlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
             }
             "penalty" => {
                 let value: i32 = tail.trim().parse().expect("penalty value is i32");
-                ds::Penalty { value }.into()
+                ds::Penalty(value).into()
             }
             "glue" => ds::Vertical::Glue(ds::Glue {
                 kind: ds::GlueKind::Normal,
@@ -822,7 +822,7 @@ Transcript written on test.log.
                     ],
                     ..Default::default()
                 }),
-                ds::Vertical::Penalty(ds::Penalty { value: 300 }),
+                ds::Vertical::Penalty(ds::Penalty(300)),
                 ds::Vertical::Glue(ds::Glue {
                     kind: ds::GlueKind::Normal,
                     value: core::Glue {
@@ -843,7 +843,7 @@ Transcript written on test.log.
                     list: vec![
                         ds::Char { char: 'm', font: 0 }.into(),
                         ds::Char { char: 'e', font: 0 }.into(),
-                        ds::Penalty { value: 10000 }.into(),
+                        ds::Penalty(10000).into(),
                         ds::Glue {
                             kind: ds::GlueKind::Normal,
                             value: core::Glue {
@@ -974,7 +974,7 @@ Transcript written on test.log.
                                             list: vec![ds::Char { char: 'D', font: 0 }.into()],
                                             ..Default::default()
                                         }),
-                                        ds::Penalty { value: 10000 }.into(),
+                                        ds::Penalty(10000).into(),
                                         ds::Glue {
                                             kind: ds::GlueKind::Normal,
                                             value: core::Glue {
@@ -1005,7 +1005,7 @@ Transcript written on test.log.
                         ],
                         ..Default::default()
                     }),
-                    ds::Penalty { value: 10000 }.into(),
+                    ds::Penalty(10000).into(),
                     ds::Glue {
                         kind: ds::GlueKind::Normal,
                         value: core::Glue {

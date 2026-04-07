@@ -212,6 +212,12 @@ impl std::fmt::Display for Scaled {
     }
 }
 
+impl std::iter::Sum for Scaled {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        Self(iter.map(|s| s.0).sum())
+    }
+}
+
 impl std::ops::Add<Scaled> for Scaled {
     type Output = Scaled;
     fn add(self, rhs: Scaled) -> Self::Output {

@@ -65,6 +65,10 @@ impl SpaceFactor {
 }
 
 impl boxworks::TextPreprocessor for TextPreprocessorImpl {
+    fn activate_font(&mut self, font: u32) {
+        self.current_font = font;
+    }
+
     fn new_paragraph(&mut self) {
         self.space_factor = Default::default();
     }
@@ -162,9 +166,6 @@ impl TextPreprocessorImpl {
                 .unwrap(),
             lig_kern_program,
         });
-    }
-    pub fn activate_font(&mut self, id: u32) {
-        self.current_font = id;
     }
 }
 
