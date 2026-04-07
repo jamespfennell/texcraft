@@ -29,6 +29,7 @@ impl Cli {
         match self.command {
             Command::Inspect(inspect) => inspect.run(),
             Command::Normalize(normalize) => normalize.run(),
+            Command::Text(text) => text.run(),
         }
     }
 }
@@ -39,6 +40,8 @@ enum Command {
     Inspect(Inspect),
     /// Normalize a DVI file.
     Normalize(Normalize),
+    /// Convert a DVI file to plain text.
+    Text(Text),
 }
 
 #[derive(Clone, Debug, Parser)]
@@ -97,5 +100,67 @@ impl Normalize {
         result.map_err(|err| format!("{}", err))?;
         std::fs::write(&self.output, b)
             .map_err(|err| format!("failed to write `{}`: {}", self.output.display(), err))
+    }
+}
+
+#[derive(Clone, Debug, Parser)]
+struct Text {
+    /// Path to the DVI file.
+    path: std::path::PathBuf,
+}
+
+impl Text {
+    fn run(self) -> Result<(), String> {
+        let b = match std::fs::read(&self.path) {
+            Ok(b) => b,
+            Err(err) => return Err(format!("failed to read `{}`: {}", self.path.display(), err)),
+        };
+        let mut s = String::new();
+        let mut result = Ok(());
+        let mut i1 =  dvi::Deserializer::new(&b, &mut result);
+        let i2 = dvi::transforms::VarRemover::new(&mut i1);
+        for op in i2 {
+            match op {
+                dvi::Op::TypesetChar { char, move_h: _ } => {
+                    match char.try_into() {
+                        Ok(c @ '!'..='Z' | c @ 'a'..='z') => {
+                            s.push(c);
+                        },
+                        _ => {
+                            s.push_str(&format!("<{}>", char));
+                        }
+                    }
+                }
+                dvi::Op::Right(d)
+                => {
+                    // assume a kern
+                    if d < 30_000 {
+                        continue;
+                    }
+                    s.push(' ');
+                }
+                dvi::Op::Down(_)
+                => {
+                    s.push('\n');
+                }
+                dvi::Op::TypesetRule { .. }
+                | dvi::Op::Move(_)
+                | dvi::Op::SetVar(_, _)
+                | dvi::Op::NoOp
+                | dvi::Op::BeginPage { .. }
+                | dvi::Op::EndPage
+                | dvi::Op::Push
+                | dvi::Op::Pop => {}
+                dvi::Op::EnableFont(_)
+                | dvi::Op::Extension(_)
+                | dvi::Op::DefineFont { .. }
+                | dvi::Op::Preamble { .. }
+                | dvi::Op::BeginPostamble { .. }
+                | dvi::Op::EndPostamble { .. } => {}
+            }
+        }
+        result.map_err(|err| format!("{}", err))?;
+        println!("{s}");
+        Ok(())
     }
 }
