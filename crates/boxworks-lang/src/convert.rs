@@ -3,10 +3,7 @@
 use std::borrow::Cow;
 
 use crate::ast;
-use boxworks::{
-    ds::{self, DiscretionaryElem},
-    TextPreprocessor,
-};
+use boxworks::ds;
 
 /// Convert a Boxworks data structure to a Box language data structure.
 pub trait ToBoxLang {
@@ -58,8 +55,55 @@ impl<'a> ToBoxworks for ast::Vertical<'a> {
     }
 }
 
-impl<T: ToBoxLang> ToBoxLang for Vec<T> {
-    type Output = Vec<<T as ToBoxLang>::Output>;
+impl ToBoxLang for Vec<ds::Horizontal> {
+    type Output = Vec<ast::Horizontal<'static>>;
+    fn to_box_lang(&self) -> Self::Output {
+        let mut out = vec![];
+        let mut current_font: Option<u32> = None;
+        let mut buf: String = Default::default();
+        let flush_chars = |out: &mut Vec<ast::Horizontal<'static>>,
+                           current_font: &mut Option<u32>,
+                           buf: &mut String| {
+            let Some(current_font) = current_font.take() else {
+                // Nothing to flush.
+                return;
+            };
+            let current_font: i32 = current_font.try_into().unwrap();
+            out.push(ast::Horizontal::Chars(ast::Chars {
+                content: Cow::<str>::Owned(buf.clone()).into(),
+                font: current_font.into(),
+            }));
+            buf.clear();
+        };
+        for elem in self {
+            match elem {
+                ds::Horizontal::Char(ds::Char { char, font }) => {
+                    if Some(*font) != current_font {
+                        flush_chars(&mut out, &mut current_font, &mut buf);
+                    }
+                    current_font = Some(*font);
+                    buf.push(*char);
+                }
+                _ => {
+                    flush_chars(&mut out, &mut current_font, &mut buf);
+                    out.push(elem.to_box_lang());
+                }
+            }
+        }
+        flush_chars(&mut out, &mut current_font, &mut buf);
+        out
+    }
+}
+
+impl ToBoxLang for Vec<ds::Vertical> {
+    type Output = Vec<ast::Vertical<'static>>;
+    fn to_box_lang(&self) -> Self::Output {
+        self.iter().map(|b| b.to_box_lang()).collect()
+    }
+}
+
+impl ToBoxLang for Vec<ds::DiscretionaryElem> {
+    type Output = Vec<ast::DiscretionaryElem<'static>>;
     fn to_box_lang(&self) -> Self::Output {
         self.iter().map(|b| b.to_box_lang()).collect()
     }
@@ -92,7 +136,7 @@ impl<'a> ToBoxworks for ast::Horizontal<'a> {
     fn to_boxworks(&self) -> Self::Output {
         use ast::Horizontal::*;
         match self {
-            Text(text_args) => text_args.to_boxworks(),
+            Chars(chars_args) => chars_args.to_boxworks(),
             Glue(glue_args) => vec![ds::Horizontal::Glue(glue_args.to_boxworks())],
             Kern(kern_args) => vec![ds::Horizontal::Kern(kern_args.to_boxworks())],
             Hlist(hlist_args) => vec![ds::Horizontal::HList(hlist_args.to_boxworks())],
@@ -118,7 +162,7 @@ impl ToBoxLang for ds::Horizontal {
     fn to_box_lang(&self) -> Self::Output {
         use boxworks::ds::Horizontal::*;
         match self {
-            Char(char) => ast::Horizontal::Text(char.to_box_lang()),
+            Char(char) => ast::Horizontal::Chars(char.to_box_lang()),
             HList(hlist) => ast::Horizontal::Hlist(hlist.to_box_lang()),
             VList(vlist) => ast::Horizontal::Vlist(vlist.to_box_lang()),
             Rule(rule) => ast::Horizontal::Rule(rule.to_box_lang()),
@@ -145,7 +189,7 @@ impl<'a> ToBoxworks for ast::DiscretionaryElem<'a> {
         use ast::DiscretionaryElem::*;
         use ds::DiscretionaryElem as Out;
         match self {
-            Text(text_args) => text_to_discretionary_elems(text_args),
+            Chars(chars_args) => chars_to_discretionary_elems(chars_args),
             Kern(kern_args) => vec![Out::Kern(kern_args.to_boxworks())],
             Hlist(hlist_args) => vec![Out::HList(hlist_args.to_boxworks())],
             Vlist(vlist_args) => vec![Out::VList(vlist_args.to_boxworks())],
@@ -161,7 +205,7 @@ impl ToBoxLang for ds::DiscretionaryElem {
         use ast::DiscretionaryElem as Out;
         use boxworks::ds::DiscretionaryElem::*;
         match self {
-            Char(char) => Out::Text(char.to_box_lang()),
+            Char(char) => Out::Chars(char.to_box_lang()),
             HList(hlist) => Out::Hlist(hlist.to_box_lang()),
             VList(vlist) => Out::Vlist(vlist.to_box_lang()),
             Rule(rule) => Out::Rule(rule.to_box_lang()),
@@ -240,33 +284,41 @@ impl ToBoxLang for ds::Ligature {
 }
 
 impl ToBoxLang for ds::Char {
-    type Output = ast::Text<'static>;
+    type Output = ast::Chars<'static>;
     fn to_box_lang(&self) -> Self::Output {
-        ast::Text {
+        ast::Chars {
             content: Cow::<'static, str>::Owned(format!["{}", self.char]).into(),
             font: (self.font as i32).into(),
         }
     }
 }
 
-impl<'a> ToBoxworks for ast::Text<'a> {
+impl<'a> ToBoxworks for ast::Chars<'a> {
     type Output = Vec<ds::Horizontal>;
     fn to_boxworks(&self) -> Self::Output {
-        // TODO: accept a text preprocessor
-        let mut tp: boxworks::SimpleTextPreprocessor = Default::default();
-        tp.activate_font(self.font.value as u32);
-        let mut v = vec![];
-        tp.add_text(&self.content.value, &mut v);
-        v
+        self.content
+            .value
+            .chars()
+            .map(|c| {
+                ds::Horizontal::Char(ds::Char {
+                    char: c,
+                    font: self.font.value as u32,
+                })
+            })
+            .collect()
     }
 }
 
-fn text_to_discretionary_elems<'a>(text: &ast::Text<'a>) -> Vec<ds::DiscretionaryElem> {
-    let v = text.to_boxworks();
-    v.into_iter()
-        .map(|e| {
-            let e: DiscretionaryElem = e.try_into().unwrap();
-            e
+fn chars_to_discretionary_elems<'a>(chars: &ast::Chars<'a>) -> Vec<ds::DiscretionaryElem> {
+    chars
+        .content
+        .value
+        .chars()
+        .map(|c| {
+            ds::DiscretionaryElem::Char(ds::Char {
+                char: c,
+                font: chars.font.value as u32,
+            })
         })
         .collect()
 }
@@ -471,4 +523,61 @@ impl<'a> ToBoxworks for ast::Math<'a> {
             _ => ds::Math::Before,
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    macro_rules! tests {
+        ( $( ($name: ident, $input: expr, $want: expr,), )+ ) => {
+            $(
+                #[test]
+                fn $name() {
+                    let input: Vec<ds::Horizontal> = $input;
+                    let want: Vec<ast::Horizontal<'static>> = $want;
+                    let got = input.to_box_lang();
+                    assert_eq!(got, want);
+                }
+            )+
+        };
+    }
+
+    tests!(
+        (
+            chars_same_font,
+            vec![
+                ds::Char { char: 'B', font: 0 }.into(),
+                ds::Char { char: 'o', font: 0 }.into(),
+                ds::Char { char: 'x', font: 0 }.into(),
+            ],
+            vec![ast::Chars {
+                content: Cow::Borrowed("Box").into(),
+                font: 0_i32.into(),
+            }
+            .into()],
+        ),
+        (
+            chars_different_font,
+            vec![
+                ds::Char { char: 'B', font: 0 }.into(),
+                ds::Char { char: 'o', font: 0 }.into(),
+                ds::Char { char: 'x', font: 0 }.into(),
+                ds::Char { char: 'e', font: 1 }.into(),
+                ds::Char { char: 'd', font: 1 }.into(),
+            ],
+            vec![
+                ast::Chars {
+                    content: Cow::Borrowed("Box").into(),
+                    font: 0_i32.into(),
+                }
+                .into(),
+                ast::Chars {
+                    content: Cow::Borrowed("ed").into(),
+                    font: 1_i32.into(),
+                }
+                .into(),
+            ],
+        ),
+    );
 }

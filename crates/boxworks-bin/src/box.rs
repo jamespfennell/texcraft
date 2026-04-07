@@ -249,7 +249,7 @@ fn run_tex_hlists(
     );
     _ = fonts;
     use bwl::convert::ToBoxLang;
-    Ok(hlists.to_box_lang())
+    Ok(hlists.into_iter().map(|l| l.to_box_lang()).collect())
 }
 
 fn run_tex_vlists(
@@ -265,13 +265,12 @@ fn run_tex_vlists(
         &mut texts.iter(),
     );
     use bwl::convert::ToBoxLang;
-    Ok(vlists.to_box_lang())
+    Ok(vlists.into_iter().map(|l| l.to_box_lang()).collect())
 }
 
 fn print_hlists(hlists: Vec<bwl::ast::Hlist<'static>>, labels: Vec<Option<usize>>) {
     for (i, (mut hlist, label)) in hlists.into_iter().zip(labels).enumerate() {
         hlist.width = core::Scaled::ZERO.into();
-        terse(&mut hlist.content.value);
         println!("#");
         match label {
             Some(line_num) => println!("# hlist {} (line {})", i + 1, line_num),
@@ -319,29 +318,4 @@ fn load_font_metrics(font_metrics: Option<PathBuf>) -> Result<(Vec<u8>, PathBuf)
     let mut file_name: PathBuf = path.file_name().unwrap().into();
     file_name.set_extension("tfm");
     Ok((bytes, file_name))
-}
-
-fn terse(v: &mut Vec<bwl::ast::Horizontal<'static>>) {
-    let mut src: usize = 0;
-    let mut dest = 0;
-    let mut buf: String = Default::default();
-    while let Some(elem) = v.get_mut(src) {
-        match elem {
-            bwl::ast::Horizontal::Text(text) => {
-                let first_text = buf.is_empty();
-                buf.push_str(&text.content.value);
-                text.content.value = buf.clone().into();
-                if !first_text {
-                    dest -= 1;
-                }
-            }
-            _ => {
-                buf.clear();
-            }
-        }
-        v.swap(src, dest);
-        src += 1;
-        dest += 1;
-    }
-    v.truncate(dest);
 }

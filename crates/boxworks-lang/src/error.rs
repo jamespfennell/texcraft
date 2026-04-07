@@ -390,55 +390,59 @@ mod tests {
     }
     error_tests!(
         (invalid_dimension_unit, "glue(0plx)", InvalidDimensionUnit,),
-        (invalid_type_positional, r#"text(1pc)"#, IncorrectType,),
-        (invalid_type_keyword, r#"text(content=1pc)"#, IncorrectType,),
+        (invalid_type_positional, r#"chars(1pc)"#, IncorrectType,),
+        (invalid_type_keyword, r#"chars(content=1pc)"#, IncorrectType,),
         (
             too_many_positional_args_1,
-            r#"text("Hello", 3, "Mundo")"#,
+            r#"chars("Hello", 3, "Mundo")"#,
             TooManyPositionalArgs,
         ),
         (
             too_many_positional_args_2,
-            r#"text("Hello", font=3, "Mundo")"#,
+            r#"chars("Hello", font=3, "Mundo")"#,
             PositionalArgAfterKeywordArg,
         ),
         (
             positional_arg_after_keyword_arg,
-            r#"text(font=3, "Hello")"#,
+            r#"chars(font=3, "Hello")"#,
             PositionalArgAfterKeywordArg,
         ),
         (
             duplicate_keyword_args,
-            r#"text(content="Hello", content="World")"#,
+            r#"chars(content="Hello", content="World")"#,
             DuplicateArgument,
         ),
         (
             duplicate_positional_and_keyword_args,
-            r#"text("Hello", content="Mundo")"#,
+            r#"chars("Hello", content="Mundo")"#,
             DuplicateArgument,
         ),
         (
             invalid_keyword_arg,
-            r#"text(random="Hello")"#,
+            r#"chars(random="Hello")"#,
             NoSuchArgument,
         ),
         (invalid_func_name, r#"random()"#, NoSuchFunction,),
-        (trailing_closed_square, "text()]", UnmatchedClosingBracket,),
-        (trailing_open_square, "text())", UnmatchedClosingBracket,),
+        (trailing_closed_square, "chars()]", UnmatchedClosingBracket,),
+        (trailing_open_square, "chars())", UnmatchedClosingBracket,),
         (
             unexpected_token_before_func_name,
-            ",text()",
+            ",chars()",
             UnexpectedToken,
         ),
-        (unexpected_token_after_func_name, "text,()", UnexpectedToken,),
+        (
+            unexpected_token_after_func_name,
+            "chars,()",
+            UnexpectedToken,
+        ),
         (missing_func_name, "()", UnexpectedToken,),
         (
             missing_paren_after_func_name,
             "text",
             MissingArgsForFunction,
         ),
-        (incorrect_func_braces, "text[]()", UnexpectedToken,),
-        (incorrect_closing_brace_round, "text(]", MismatchedBraces,),
+        (incorrect_func_braces, "chars[]()", UnexpectedToken,),
+        (incorrect_closing_brace_round, "chars(]", MismatchedBraces,),
         (
             incorrect_closing_brace_square,
             "hlist(content=[))",
@@ -446,7 +450,7 @@ mod tests {
         ),
         (
             unmatched_opening_brace_round,
-            r#"text("Hello""#,
+            r#"chars("Hello""#,
             UnmatchedOpeningBracket,
         ),
         (

@@ -12,7 +12,7 @@ use std::borrow::Cow;
 /// Element of a vertical list.
 ///
 /// Corresponds to the [`boxworks::ds::Vertical`] type.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum Vertical<'a> {
     Hlist(Hlist<'a>),
@@ -29,9 +29,9 @@ pub enum Vertical<'a> {
 /// Element of a horizontal list.
 ///
 /// Corresponds to the [`boxworks::ds::Horizontal`] type.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Horizontal<'a> {
-    Text(Text<'a>),
+    Chars(Chars<'a>),
     Glue(Glue<'a>),
     Penalty(Penalty<'a>),
     Kern(Kern<'a>),
@@ -46,12 +46,18 @@ pub enum Horizontal<'a> {
     Math(Math<'a>),
 }
 
+impl<'a> From<Chars<'a>> for Horizontal<'a> {
+    fn from(value: Chars<'a>) -> Self {
+        Horizontal::Chars(value)
+    }
+}
+
 /// Element of a discretionary pre- or post-break list.
 ///
 /// Corresponds to the [`boxworks::ds::DiscretionaryElem`] type.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum DiscretionaryElem<'a> {
-    Text(Text<'a>),
+    Chars(Chars<'a>),
     Kern(Kern<'a>),
     Hlist(Hlist<'a>),
     Vlist(Vlist<'a>),
@@ -330,7 +336,7 @@ macro_rules! functions {
         )?
     ), )+ ) => {
         $(
-        #[derive(Debug, Default, PartialEq, Eq)]
+        #[derive(Debug, Default, PartialEq, Eq, Clone)]
         pub struct $name <$lifetime> {
             $(
                 pub $field_name : Arg<$lifetime, $field_type>,
@@ -587,19 +593,19 @@ trait Args<'a>: Func + Default {
 
 functions!(
     (
-        struct Text<'a> {
+        struct Chars<'a> {
             content: Cow<'a, str>,
             font: i32,
         }
         impl Func {
-            func_name: "text",
+            func_name: "chars",
             default_num_pos_arg: 1,
         }
         impl Horizontal {
-            variant: Text,
+            variant: Chars,
         }
         impl DiscretionaryElem {
-            variant: Text,
+            variant: Chars,
         }
     ),
     (
@@ -807,7 +813,7 @@ functions!(
 );
 
 /// An argument of type `T` to a function.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct Arg<'a, T> {
     /// Value of the argument.
     pub value: T,
@@ -1049,7 +1055,7 @@ mod tests {
         let input = r#"
             hlist(
                 width=1pt,
-                content=[text("Hello")],
+                content=[chars("Hello")],
             )
         "#;
 
@@ -1059,7 +1065,7 @@ mod tests {
                 source: Some("1pt".into()),
             },
             content: Arg {
-                value: vec![Horizontal::Text(Text {
+                value: vec![Horizontal::Chars(Chars {
                     content: Arg {
                         value: "Hello".into(),
                         source: Some(r#""Hello""#.into()),
@@ -1070,7 +1076,7 @@ mod tests {
                     },
                     ..Default::default()
                 })],
-                source: Some(r#"[text("Hello")]"#.into()),
+                source: Some(r#"[chars("Hello")]"#.into()),
             },
             ..Default::default()
         })];

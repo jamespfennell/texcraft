@@ -5,41 +5,41 @@ lig("aa", "b")
 glue(30plx)
 
 # Invalid type (positional arg)
-text(1pc)
+chars(1pc)
 
 # Invalid type (keyword arg)
-text(font="45")
+chars(font="45")
 
 # Positional args after keyword args
-text(font=3, "Hello")
+chars(font=3, "Hello")
 
 # Too many positional args
-text("Hello", 3, 3, "World", "Mundo")
+chars("Hello", 3, 3, "World", "Mundo")
 
 # Duplicate keyword args
-text(content="Hello", content="World")
+chars(content="Hello", content="World")
 
 # Duplicate positional and keyword args
-text("Hello", content="World")
+chars("Hello", content="World")
 
 # Invalid function name
 random()
 
 # Invalid keyword arg
-text(random="Hello")
+chars(random="Hello")
 
 # Unmatched closing bracket
 ]
 
 # Junk while parsing a function name
-, text()
+, chars()
 text, ()
 
 # Missing function name
 (ignored)
 
 # Mismatched braces
-text(]
+chars(]
 hlist(content=[))
 
 # Incomplete keyword arg

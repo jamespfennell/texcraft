@@ -117,30 +117,26 @@ impl Text {
         };
         let mut s = String::new();
         let mut result = Ok(());
-        let mut i1 =  dvi::Deserializer::new(&b, &mut result);
+        let mut i1 = dvi::Deserializer::new(&b, &mut result);
         let i2 = dvi::transforms::VarRemover::new(&mut i1);
         for op in i2 {
             match op {
-                dvi::Op::TypesetChar { char, move_h: _ } => {
-                    match char.try_into() {
-                        Ok(c @ '!'..='Z' | c @ 'a'..='z') => {
-                            s.push(c);
-                        },
-                        _ => {
-                            s.push_str(&format!("<{}>", char));
-                        }
+                dvi::Op::TypesetChar { char, move_h: _ } => match char.try_into() {
+                    Ok(c @ '!'..='Z' | c @ 'a'..='z') => {
+                        s.push(c);
                     }
-                }
-                dvi::Op::Right(d)
-                => {
+                    _ => {
+                        s.push_str(&format!("<{}>", char));
+                    }
+                },
+                dvi::Op::Right(d) => {
                     // assume a kern
                     if d < 30_000 {
                         continue;
                     }
                     s.push(' ');
                 }
-                dvi::Op::Down(_)
-                => {
+                dvi::Op::Down(_) => {
                     s.push('\n');
                 }
                 dvi::Op::TypesetRule { .. }

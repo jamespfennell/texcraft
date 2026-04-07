@@ -21,37 +21,20 @@
 //! use boxworks_lang as bwl;
 //!
 //! let source = r#"
-//!     ## The text() function typesets some text.
-//!     ## The language automatically converts spaces into glue.
-//!     text("Box Lang")
-//!     ## Or glue can be added manually.
+//!     ## The chars() function typesets characters.
+//!     chars("Box")
+//!     ## Glue can be added manually.
 //!     glue(1pt, 5fil, 0.075in)
 //!     ## The following elements illustrate the prototypical example of a kern.
-//!     text("A")
+//!     chars("A")
 //!     kern(-0.1pt)
-//!     text("V")
+//!     chars("V")
 //! "#;
 //! let got = bwl::parse_horizontal_list(&source);
 //! let want: Vec<ds::Horizontal> = vec![
 //!     ds::Char{char: 'B', font: 0}.into(),
 //!     ds::Char{char: 'o', font: 0}.into(),
 //!     ds::Char{char: 'x', font: 0}.into(),
-//!     ds::Glue{
-//!         kind: ds::GlueKind::Normal,
-//!         // Right now spaces are converted to the glue 10pt plus 4pt minus 4pt.
-//!         // We will eventually support customizing this.
-//!         value: core::Glue{
-//!             width: core::Scaled::ONE * 10,
-//!             stretch: core::Scaled::ONE * 4,
-//!             stretch_order: core::GlueOrder::Normal,
-//!             shrink: core::Scaled::ONE * 4,
-//!             shrink_order: core::GlueOrder::Normal,
-//!         }
-//!     }.into(),
-//!     ds::Char{char: 'L', font: 0}.into(),
-//!     ds::Char{char: 'a', font: 0}.into(),
-//!     ds::Char{char: 'n', font: 0}.into(),
-//!     ds::Char{char: 'g', font: 0}.into(),
 //!     ds::Glue{
 //!         kind: ds::GlueKind::Normal,
 //!         value: core::Glue{
@@ -95,7 +78,7 @@
 //! ## Language specification
 //!
 //! A Boxworks language program is a sequence of a function calls
-//! like `text("ABC")` or `glue(10pt, 3pt, 2pt)`.
+//! like `chars("ABC")` or `glue(10pt, 3pt, 2pt)`.
 //! Most function calls add an item or items to the current
 //! box-and-glue list.
 //!
@@ -110,7 +93,7 @@
 //! # use boxworks_lang as bwl;
 //! # use boxworks::ds;
 //! let source = r#"
-//!     text("A", 1)
+//!     chars("A", 1)
 //! "#;
 //! assert_eq![
 //!     bwl::parse_horizontal_list(&source),
@@ -124,7 +107,7 @@
 //! # use boxworks_lang as bwl;
 //! # use boxworks::ds;
 //! let source = r#"
-//!     text(font=2, content="B")
+//!     chars(font=2, content="B")
 //! "#;
 //! assert_eq![
 //!     bwl::parse_horizontal_list(&source),
@@ -138,7 +121,7 @@
 //! # use boxworks_lang as bwl;
 //! # use boxworks::ds;
 //! let source = r#"
-//!     text("C", font=3)
+//!     chars("C", font=3)
 //! "#;
 //! assert_eq![
 //!     bwl::parse_horizontal_list(&source),
@@ -153,7 +136,7 @@
 //! # use boxworks_lang as bwl;
 //! # use boxworks::ds;
 //! let source = r#"
-//!     text(content="C", 3)
+//!     chars(content="C", 3)
 //! "#;
 //! let errs = bwl::parse_horizontal_list(&source).unwrap_err();
 //! assert![matches![
@@ -323,14 +306,14 @@ hlist
     contents = [ # glue is good
         glue(  ) 
     
-text("Hello", font = 
+chars("Hello", font = 
 # we use an unusual font here
 1)
 
-    text("Hello", font =  
+    chars("Hello", font =  
 
 
-    0) text("World")] ,
+    0) chars("World")] ,
         # Infinite glue
     other=3.0fill,
     # there are no more arguments
@@ -344,13 +327,13 @@ hlist(
   contents=[
     # glue is good
     glue()
-    text(
+    chars(
       "Hello",
       # we use an unusual font here
       font=1,
     )
-    text("Hello", font=0)
-    text("World")
+    chars("Hello", font=0)
+    chars("World")
   ],
   # Infinite glue
   other=3.0fill,

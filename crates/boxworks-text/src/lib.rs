@@ -200,34 +200,34 @@ mod tests {
             basic,
             "second",
             r#"
-                text("second", font=0)
+                chars("second", font=0)
             "#,
         ),
         (
             basic_with_space,
             "sec ond",
             r#"
-                text("sec", font=0)
+                chars("sec", font=0)
                 glue(3.33333pt, 1.66666pt, 1.11111pt)
-                text("ond", font=0)
+                chars("ond", font=0)
             "#,
         ),
         (
             kern_ao,
             "AO",
             r#"
-                text("A", font=0)
+                chars("A", font=0)
                 kern(-0.27779pt)
-                text("O", font=0)
+                chars("O", font=0)
             "#,
         ),
         (
             kern_av,
             "AV",
             r#"
-                text("A", font=0)
+                chars("A", font=0)
                 kern(-1.11113pt)
-                text("V", font=0)
+                chars("V", font=0)
             "#,
         ),
         (
@@ -255,9 +255,9 @@ mod tests {
                         let tfm = super::TFM_CMR10;
                         let input = format!["{} a", $input];
                         let want =  format![r#"
-                            text("{}", font=0)
+                            chars("{}", font=0)
                             {}
-                            text("a", font=0)
+                            chars("a", font=0)
                         "#, $input, $want];
                         super::run_preprocessor_test(tfm, &input, &want)
                     }
@@ -368,11 +368,11 @@ mod tests {
             basic_with_space,
             "sec ond",
             r#"
-                text("sec", font=0)
+                chars("sec", font=0)
                 glue(4.78204pt, 2.39102pt, 1.19551pt)
-                text("on", font=0)
+                chars("on", font=0)
                 kern(-0.49814pt)
-                text("d", font=0)
+                chars("d", font=0)
             "#,
         ),
         (
@@ -380,20 +380,20 @@ mod tests {
             "123B",
             r##"
                 lig("$", "|", font=0)
-                text("123", font=0)
+                chars("123", font=0)
                 lig("#", "", font=0)
-                text("B", font=0)
+                chars("B", font=0)
             "##,
         ),
         (
             numbers_mid_word,
             "A123B",
             r##"
-                text("A", font=0)
+                chars("A", font=0)
                 lig("$", "", font=0)
-                text("123", font=0)
+                chars("123", font=0)
                 lig("#", "", font=0)
-                text("B", font=0)
+                chars("B", font=0)
             "##,
         ),
         /*
@@ -402,9 +402,9 @@ mod tests {
             numbers_end_of_word,
             "A123",
             r##"
-                text("A", font=0)
+                chars("A", font=0)
                 lig("$", "", font=0)
-                text("123", font=0)
+                chars("123", font=0)
                 lig("#", "|", font=0)
             "##,
         ),
