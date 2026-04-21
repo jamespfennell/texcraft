@@ -128,7 +128,7 @@ pub fn build_horizontal_lists(
 /// Build verticals list from some text.
 ///
 /// This function works by putting the text inside a TeX
-///     `\vbox{\noindent \hsize=41pt}`
+///     `\vbox{\noindent \hsize=<>pt}`
 ///     and then instructing TeX to describe the contents of the box.
 ///
 /// This function is the inverse of TeX.2021.173 and onwards
@@ -137,12 +137,16 @@ pub fn build_vertical_lists(
     tex_engine: &dyn TexEngine,
     auxiliary_files: &HashMap<PathBuf, Vec<u8>>,
     preamble: &str,
+    width: core::Scaled,
     contents: &mut dyn Iterator<Item = &String>,
 ) -> (HashMap<String, u32>, Vec<ds::VList>) {
     let macro_calls: Vec<String> = contents.map(|s| format!(r#"\printBox{{{s}}}"#)).collect();
     let tex_source_code = CONVERT_TEXT_TEMPLATE
         .replace("<preamble>", preamble)
-        .replace("<box_template>", r"\vbox{\noindent \hsize=41pt #1}")
+        .replace(
+            "<box_template>",
+            &format![r"\vbox{{\noindent \hsize={} #1}}", width],
+        )
         .replace("<print_calls>", &macro_calls.join("\n\n"));
     let output = tex_engine.run(&tex_source_code, auxiliary_files);
     let segments = extract_texcraft_segments(&output);
@@ -765,6 +769,7 @@ Transcript written on test.log.
             &tex_engine,
             &Default::default(),
             &"",
+            core::Scaled::ONE * 41,
             &mut vec!["".to_string()].iter(),
         );
 
@@ -925,6 +930,7 @@ Transcript written on test.log.
             &tex_engine,
             &Default::default(),
             &"",
+            core::Scaled::ONE * 41,
             &mut vec!["".to_string()].iter(),
         );
 

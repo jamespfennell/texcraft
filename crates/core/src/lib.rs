@@ -135,6 +135,37 @@ impl Scaled {
         }
     }
 
+    /// Parses a scaled number from a string of the form `<integer>[.<fraction>]<unit>`.
+    ///
+    /// The unit must be one of the two-character abbreviations recognized by [`ScaledUnit::parse`]
+    /// (e.g. `"pt"`, `"in"`, `"cm"`). The fractional part is optional.
+    pub fn parse_from_string(s: &str) -> Result<Scaled, String> {
+        if s.len() < 3 {
+            return Err(format!(
+                "invalid dimension {s:?}: expected <number><unit> (e.g. 100pt)"
+            ));
+        }
+        let (value_str, unit_str) = s.split_at(s.len() - 2);
+        let unit = ScaledUnit::parse(unit_str)
+            .ok_or_else(|| format!("invalid unit {unit_str:?} in dimension {s:?}"))?;
+        let (int_str, frac_str) = match value_str.find('.') {
+            Some(pos) => (&value_str[..pos], &value_str[pos + 1..]),
+            None => (value_str, ""),
+        };
+        let integer_part: i32 = int_str
+            .parse()
+            .map_err(|_| format!("invalid number {int_str:?} in dimension {s:?}"))?;
+        let frac_digits: Vec<u8> = frac_str.chars().map(|c| c as u8 - b'0').collect();
+        if frac_digits.iter().any(|&d| d > 9) {
+            return Err(format!(
+                "invalid fractional part {frac_str:?} in dimension {s:?}"
+            ));
+        }
+        let fractional_part = Scaled::from_decimal_digits(&frac_digits);
+        Scaled::new(integer_part, fractional_part, unit)
+            .map_err(|_| format!("dimension {s:?} is out of range"))
+    }
+
     pub fn integer_part(self) -> i32 {
         self.0 / Scaled::ONE.0
     }
@@ -516,5 +547,39 @@ mod tests {
     #[test]
     fn type_sizes() {
         assert_eq!(16, std::mem::size_of::<Glue>());
+    }
+
+    macro_rules! parse_from_string_tests {
+        ( $( $name:ident : $input:expr => $expected:expr, )* ) => {
+            $(
+                #[test]
+                fn $name() {
+                    assert_eq!(Scaled::parse_from_string($input), $expected);
+                }
+            )*
+        };
+    }
+
+    parse_from_string_tests! {
+        // Basic unit types
+        integer_pt:    "100pt"  => Ok(Scaled::new(100, Scaled::ZERO, ScaledUnit::Point).unwrap()),
+        integer_pc:    "6pc"    => Ok(Scaled::new(6,   Scaled::ZERO, ScaledUnit::Pica).unwrap()),
+        integer_in:    "2in"    => Ok(Scaled::new(2,   Scaled::ZERO, ScaledUnit::Inch).unwrap()),
+        integer_bp:    "72bp"   => Ok(Scaled::new(72,  Scaled::ZERO, ScaledUnit::BigPoint).unwrap()),
+        integer_cm:    "10cm"   => Ok(Scaled::new(10,  Scaled::ZERO, ScaledUnit::Centimeter).unwrap()),
+        integer_mm:    "25mm"   => Ok(Scaled::new(25,  Scaled::ZERO, ScaledUnit::Millimeter).unwrap()),
+        integer_dd:    "10dd"   => Ok(Scaled::new(10,  Scaled::ZERO, ScaledUnit::DidotPoint).unwrap()),
+        integer_cc:    "3cc"    => Ok(Scaled::new(3,   Scaled::ZERO, ScaledUnit::Cicero).unwrap()),
+        integer_sp:    "65536sp" => Ok(Scaled(65536)),
+        // Fractional part
+        fractional_pt: "72.27pt" => Ok(Scaled::new(72, Scaled::from_decimal_digits(&[2, 7]), ScaledUnit::Point).unwrap()),
+        fractional_in: "6.5in"  => Ok(Scaled::new(6,  Scaled::from_decimal_digits(&[5]),    ScaledUnit::Inch).unwrap()),
+        // Zero
+        zero_pt:       "0pt"    => Ok(Scaled::ZERO),
+        // Error cases
+        empty:         ""       => Err("invalid dimension \"\": expected <number><unit> (e.g. 100pt)".to_string()),
+        bad_unit:      "10xx"   => Err("invalid unit \"xx\" in dimension \"10xx\"".to_string()),
+        bad_number:    "abpt"   => Err("invalid number \"ab\" in dimension \"abpt\"".to_string()),
+        bad_fraction:  "1.xpt"  => Err("invalid fractional part \"x\" in dimension \"1.xpt\"".to_string()),
     }
 }

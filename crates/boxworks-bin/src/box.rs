@@ -18,6 +18,7 @@ enum SubCommand {
     Check(Check),
     Fmt(Fmt),
     Build(Build),
+    Linebreak(Linebreak),
 }
 
 fn main() {
@@ -26,6 +27,7 @@ fn main() {
         SubCommand::Check(check) => check.run(),
         SubCommand::Fmt(fmt) => fmt.run(),
         SubCommand::Build(hlists) => hlists.run(),
+        SubCommand::Linebreak(linebreak) => linebreak.run(),
     };
     if let Err(err) = result {
         println!["Error: {err}"];
@@ -129,6 +131,10 @@ struct Build {
     /// What kind of output to produce.
     #[clap(long, default_value_t, value_enum)]
     mode: Mode,
+
+    /// Width of the vertical list (used with --mode=vlists), e.g. "100pt" or "6.5in".
+    #[clap(long, default_value = "41pt")]
+    width: String,
 }
 
 impl Build {
@@ -168,11 +174,69 @@ impl Build {
             Mode::Vlists => {
                 let engine =
                     tex_engine.ok_or_else(|| "--mode=vlists requires --tex-engine".to_string())?;
-                let vlists = run_tex_vlists(engine.as_ref(), self.texts, self.font_metrics)?;
+                let vlists = run_tex_vlists(
+                    engine.as_ref(),
+                    self.texts,
+                    self.font_metrics,
+                    core::Scaled::parse_from_string(&self.width)?,
+                )?;
                 print_vlists(vlists, labels);
             }
         }
         Ok(())
+    }
+}
+
+/// Break text into lines using a TeX engine and print the result.
+#[derive(Parser)]
+struct Linebreak {
+    /// The texts to break into lines.
+    texts: Vec<String>,
+
+    /// Font metrics file to use.
+    #[clap(short, long)]
+    font_metrics: Option<PathBuf>,
+
+    /// Use a TeX engine to build the lists (e.g. `tex`, `pdftex`).
+    #[clap(long)]
+    tex_engine: String,
+
+    /// Width of the vertical list, e.g. "100pt" or "6.5in".
+    #[clap(long, default_value = "100pt")]
+    width: String,
+}
+
+impl Linebreak {
+    fn run(self) -> Result<(), String> {
+        let engine = boxworks::tex::new_tex_engine_binary(self.tex_engine)
+            .map_err(|err| format!["{err}"])?;
+        let vlists = run_tex_vlists(
+            engine.as_ref(),
+            self.texts,
+            self.font_metrics,
+            core::Scaled::parse_from_string(&self.width)?,
+        )?;
+        for vlist in vlists {
+            print_vlist_text(&vlist);
+        }
+        Ok(())
+    }
+}
+
+fn print_vlist_text(vlist: &bwl::ast::Vlist<'_>) {
+    for elem in &vlist.content.value {
+        if let bwl::ast::Vertical::Hlist(hlist) = elem {
+            let mut line = String::new();
+            for h in &hlist.content.value {
+                match h {
+                    bwl::ast::Horizontal::Chars(c) => line.push_str(&c.content.value),
+                    bwl::ast::Horizontal::Ligature(l) => line.push(l.char.value),
+                    bwl::ast::Horizontal::Glue(_) => line.push(' '),
+                    _ => {}
+                }
+            }
+            println!("{line}");
+        }
     }
 }
 
@@ -256,12 +320,14 @@ fn run_tex_vlists(
     tex_engine: &dyn boxworks::tex::TexEngine,
     texts: Vec<String>,
     font_metrics: Option<PathBuf>,
+    width: core::Scaled,
 ) -> Result<Vec<bwl::ast::Vlist<'static>>, String> {
     let (auxiliary_files, preamble) = build_tex_context(font_metrics)?;
     let (_, vlists) = boxworks::tex::build_vertical_lists(
         tex_engine,
         &auxiliary_files,
         &preamble,
+        width,
         &mut texts.iter(),
     );
     use bwl::convert::ToBoxLang;
