@@ -1,6 +1,6 @@
 use clap::Parser;
 
-mod common;
+mod shared;
 
 fn main() {
     if let Err(err) = Cli::parse().run() {
@@ -49,7 +49,7 @@ struct Cli {
 
     /// Specification for how to output characters.
     #[arg(short, long, default_value = "default")]
-    charcode_format: common::CharcodeFormat,
+    charcode_format: shared::CharcodeFormat,
 }
 
 impl Cli {

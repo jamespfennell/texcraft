@@ -610,9 +610,9 @@ functions!(
     ),
     (
         struct Glue<'a> {
-            width: core::Scaled,
-            stretch: (core::Scaled, core::GlueOrder),
-            shrink: (core::Scaled, core::GlueOrder),
+            width: common::Scaled,
+            stretch: (common::Scaled, common::GlueOrder),
+            shrink: (common::Scaled, common::GlueOrder),
         }
         impl Func {
             func_name: "glue",
@@ -642,7 +642,7 @@ functions!(
     ),
     (
         struct Kern<'a> {
-            width: core::Scaled,
+            width: common::Scaled,
         }
         impl Func {
             func_name: "kern",
@@ -660,7 +660,7 @@ functions!(
     ),
     (
         struct Hlist<'a> {
-            width: core::Scaled,
+            width: common::Scaled,
             content: Vec<Horizontal<'a>>,
         }
         impl Func {
@@ -728,9 +728,9 @@ functions!(
     ),
     (
         struct Rule<'a> {
-            height: core::Scaled,
-            width: core::Scaled,
-            depth: core::Scaled,
+            height: common::Scaled,
+            width: common::Scaled,
+            depth: common::Scaled,
         }
         impl Func {
             func_name: "rule",
@@ -776,11 +776,11 @@ functions!(
     (
         struct Insertion<'a> {
             box_number: i32,
-            height: core::Scaled,
-            split_max_depth: core::Scaled,
-            split_top_skip_width: core::Scaled,
-            split_top_skip_stretch: (core::Scaled, core::GlueOrder),
-            split_top_skip_shrink: (core::Scaled, core::GlueOrder),
+            height: common::Scaled,
+            split_max_depth: common::Scaled,
+            split_top_skip_width: common::Scaled,
+            split_top_skip_stretch: (common::Scaled, common::GlueOrder),
+            split_top_skip_shrink: (common::Scaled, common::GlueOrder),
             float_penalty: i32,
             vlist: Vec<Vertical<'a>>,
         }
@@ -900,10 +900,10 @@ trait Value<'a>: Sized {
     fn try_cast_string(_s: Cow<'a, str>) -> Option<Self> {
         None
     }
-    fn try_cast_scaled(_s: core::Scaled) -> Option<Self> {
+    fn try_cast_scaled(_s: common::Scaled) -> Option<Self> {
         None
     }
-    fn try_cast_infinite_glue(_s: core::Scaled, _o: core::GlueOrder) -> Option<Self> {
+    fn try_cast_infinite_glue(_s: common::Scaled, _o: common::GlueOrder) -> Option<Self> {
         None
     }
     fn try_cast_list<F: cst::TreeIter<'a>>(
@@ -964,9 +964,9 @@ impl<'a> Value<'a> for i32 {
     }
 }
 
-impl<'a> Value<'a> for core::Scaled {
+impl<'a> Value<'a> for common::Scaled {
     const DESCRIPTION: &'static str = "a number";
-    fn try_cast_scaled(s: core::Scaled) -> Option<Self> {
+    fn try_cast_scaled(s: common::Scaled) -> Option<Self> {
         Some(s)
     }
     fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>> {
@@ -978,12 +978,12 @@ impl<'a> Value<'a> for core::Scaled {
     }
 }
 
-impl<'a> Value<'a> for (core::Scaled, core::GlueOrder) {
+impl<'a> Value<'a> for (common::Scaled, common::GlueOrder) {
     const DESCRIPTION: &'static str = "a stretch or shrink glue component";
-    fn try_cast_scaled(s: core::Scaled) -> Option<Self> {
-        Some((s, core::GlueOrder::Normal))
+    fn try_cast_scaled(s: common::Scaled) -> Option<Self> {
+        Some((s, common::GlueOrder::Normal))
     }
-    fn try_cast_infinite_glue(s: core::Scaled, o: core::GlueOrder) -> Option<Self> {
+    fn try_cast_infinite_glue(s: common::Scaled, o: common::GlueOrder) -> Option<Self> {
         Some((s, o))
     }
     fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>> {
@@ -1061,7 +1061,7 @@ mod tests {
 
         let want = vec![Horizontal::Hlist(Hlist {
             width: Arg {
-                value: core::Scaled::ONE.into(),
+                value: common::Scaled::ONE.into(),
                 source: Some("1pt".into()),
             },
             content: Arg {

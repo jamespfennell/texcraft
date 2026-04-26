@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # Texcraft
-core = {path = "../core" }
+common = {path = "../common" }
 tfm = { path = "../tfm", features = ["ariadne"] }
 
 # Third-party

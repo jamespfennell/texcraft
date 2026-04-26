@@ -10,7 +10,7 @@ keywords = ["tex", "texcraft"]
 
 [dependencies]
 # Texcraft
-core = { path = "../core" }
+common = { path = "../common" }
 texlang = { path = "../texlang" }
 texlang-common = { path = "../texlang-common" }
 texlang-stdlib = { path = "../texlang-stdlib", default-features=false, features=[] }

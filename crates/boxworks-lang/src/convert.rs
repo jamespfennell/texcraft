@@ -354,7 +354,7 @@ impl<'a> ToBoxworks for ast::Glue<'a> {
     type Output = ds::Glue;
     fn to_boxworks(&self) -> Self::Output {
         ds::Glue {
-            value: core::Glue {
+            value: common::Glue {
                 width: self.width.value,
                 stretch: self.stretch.value.0,
                 stretch_order: self.stretch.value.1,
@@ -489,7 +489,7 @@ impl<'a> ToBoxworks for ast::Insertion<'a> {
             box_number: self.box_number.value as u8,
             height: self.height.value,
             split_max_depth: self.split_max_depth.value,
-            split_top_skip: core::Glue {
+            split_top_skip: common::Glue {
                 width: self.split_top_skip_width.value,
                 stretch: self.split_top_skip_stretch.value.0,
                 stretch_order: self.split_top_skip_stretch.value.1,

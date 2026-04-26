@@ -70,7 +70,7 @@ impl Number for i32 {
     }
 }
 
-impl Number for core::Scaled {
+impl Number for common::Scaled {
     fn wrapping_add(lhs: Self, rhs: Self) -> Self {
         lhs.wrapping_add(rhs)
     }
@@ -88,7 +88,7 @@ impl Number for core::Scaled {
     }
 }
 
-impl Number for core::Glue {
+impl Number for common::Glue {
     fn wrapping_add(lhs: Self, rhs: Self) -> Self {
         lhs.wrapping_add(rhs)
     }
@@ -350,8 +350,8 @@ mod tests {
         catcode: codes::Component<CatCode>,
         prefix: prefix::Component,
         registers: registers::Component<i32, 256>,
-        registers_dimen: registers::Component<core::Scaled, 256>,
-        registers_skip: registers::Component<core::Glue, 256>,
+        registers_dimen: registers::Component<common::Scaled, 256>,
+        registers_skip: registers::Component<common::Glue, 256>,
         testing: TestingComponent,
     }
 
@@ -374,8 +374,8 @@ mod tests {
         catcode: codes::Component<CatCode>,
         prefix: prefix::Component,
         registers: registers::Component<i32, 256>,
-        registers_dimen: registers::Component<core::Scaled, 256>,
-        registers_skip: registers::Component<core::Glue, 256>,
+        registers_dimen: registers::Component<common::Scaled, 256>,
+        registers_skip: registers::Component<common::Glue, 256>,
         testing: TestingComponent,
     }];
 

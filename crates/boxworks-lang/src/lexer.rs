@@ -162,8 +162,8 @@ pub enum TokenValue<'a> {
     Keyword,
     String(Cow<'a, str>),
     Integer(i32),
-    Scaled(core::Scaled),
-    InfiniteGlue(core::Scaled, core::GlueOrder),
+    Scaled(common::Scaled),
+    InfiniteGlue(common::Scaled, common::GlueOrder),
     Comment,
 }
 
@@ -401,21 +401,21 @@ impl<'a> Lexer<'a> {
                         self.l += n.len_utf8();
                     }
 
-                    let mut s = core::Scaled::from_decimal_digits(&d) + core::Scaled::ONE * n;
+                    let mut s = common::Scaled::from_decimal_digits(&d) + common::Scaled::ONE * n;
                     if negative {
                         s.0 *= -1;
                     }
                     let raw_unit = &self.s[u..self.l];
-                    if let Some(unit) = core::ScaledUnit::parse(raw_unit) {
+                    if let Some(unit) = common::ScaledUnit::parse(raw_unit) {
                         let mut s =
-                            core::Scaled::new(n, core::Scaled::from_decimal_digits(&d), unit)
+                            common::Scaled::new(n, common::Scaled::from_decimal_digits(&d), unit)
                                 .unwrap();
                         if negative {
                             s = -s;
                         }
                         return TokenValue::Scaled(s);
                     }
-                    if let Some(glue_order) = core::GlueOrder::parse(raw_unit) {
+                    if let Some(glue_order) = common::GlueOrder::parse(raw_unit) {
                         return TokenValue::InfiniteGlue(s, glue_order);
                     }
                     self.errs.add(Error::InvalidDimensionUnit {
@@ -430,7 +430,7 @@ impl<'a> Lexer<'a> {
                             end: self.l,
                         },
                     });
-                    return TokenValue::Scaled(core::Scaled::ZERO);
+                    return TokenValue::Scaled(common::Scaled::ZERO);
                 }
                 d => {
                     if !parsing_n {
@@ -441,7 +441,7 @@ impl<'a> Lexer<'a> {
                                 end: self.l + d.map(|c| c.len_utf8()).unwrap_or(0),
                             },
                         });
-                        return TokenValue::Scaled(core::Scaled::ZERO);
+                        return TokenValue::Scaled(common::Scaled::ZERO);
                     }
                     if negative {
                         n *= -1;

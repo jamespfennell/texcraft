@@ -8,9 +8,8 @@
 //! This module implements the entirety of TeX.2021 part 10, "data structures
 //! for boxes and their friends".
 
-use core;
-use core::GlueOrder;
-use core::Scaled as Number;
+use common::GlueOrder;
+use common::Scaled as Number;
 use std::rc::Rc;
 
 /// Element of a horizontal list.
@@ -258,7 +257,7 @@ pub struct Insertion {
     pub height: Number,
     /// Used in case this insertion is split.
     pub split_max_depth: Number,
-    pub split_top_skip: core::Glue,
+    pub split_top_skip: common::Glue,
     /// Penalty to be used if this insertion floats to a subsequent
     /// page after a split insertion of the same class.
     pub float_penalty: u32,
@@ -465,12 +464,12 @@ impl Vertical {
 /// Described in TeX.2021.149.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Glue {
-    pub value: core::Glue,
+    pub value: common::Glue,
     pub kind: GlueKind,
 }
 
-impl From<core::Glue> for Glue {
-    fn from(value: core::Glue) -> Self {
+impl From<common::Glue> for Glue {
+    fn from(value: common::Glue) -> Self {
         Self {
             value,
             kind: Default::default(),

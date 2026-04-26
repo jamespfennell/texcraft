@@ -15,7 +15,7 @@ rmp-serde = {version="^1.0"}
 serde_json = {version="1.0"} 
 serde = {version="1.0"} 
 
-core = { path = "../core" }
+common = { path = "../common" }
 texlang = { path = "../texlang", features=["serde"] }
 tfm = { path = "../tfm" }
 texlang-common = { path = "../texlang-common" }

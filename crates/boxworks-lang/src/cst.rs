@@ -781,8 +781,8 @@ impl<'a> PartialEq for Arg<'a> {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value<'a> {
     Integer(i32),
-    Scaled(core::Scaled),
-    InfiniteGlue(core::Scaled, core::GlueOrder),
+    Scaled(common::Scaled),
+    InfiniteGlue(common::Scaled, common::GlueOrder),
     String(Cow<'a, str>),
     List(Tree<'a>),
 }

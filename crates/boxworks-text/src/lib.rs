@@ -12,8 +12,8 @@ use tfm::ligkern;
 
 #[derive(Debug)]
 struct Font {
-    default_space: core::Glue,
-    extra_space: core::Scaled,
+    default_space: common::Glue,
+    extra_space: common::Scaled,
     lig_kern_program: tfm::ligkern::CompiledProgram,
 }
 
@@ -84,7 +84,7 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
                     font: self.1,
                 }));
             }
-            fn emit_kern(&mut self, kern: core::Scaled) {
+            fn emit_kern(&mut self, kern: common::Scaled) {
                 self.0.push(ds::Horizontal::Kern(ds::Kern {
                     width: kern,
                     kind: ds::KernKind::Normal,
@@ -148,18 +148,18 @@ impl TextPreprocessorImpl {
     ) {
         assert_eq!(id as usize, self.fonts.len());
         self.fonts.push(Font {
-            default_space: core::Glue {
+            default_space: common::Glue {
                 width: tfm_file
                     .named_param_scaled(tfm::NamedParameter::Space)
                     .unwrap(),
                 stretch: tfm_file
                     .named_param_scaled(tfm::NamedParameter::Stretch)
                     .unwrap(),
-                stretch_order: core::GlueOrder::Normal,
+                stretch_order: common::GlueOrder::Normal,
                 shrink: tfm_file
                     .named_param_scaled(tfm::NamedParameter::Shrink)
                     .unwrap(),
-                shrink_order: core::GlueOrder::Normal,
+                shrink_order: common::GlueOrder::Normal,
             },
             extra_space: tfm_file
                 .named_param_scaled(tfm::NamedParameter::ExtraSpace)

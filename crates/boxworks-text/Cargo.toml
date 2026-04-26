@@ -10,7 +10,7 @@ keywords = ["tex", "texcraft"]
 
 [dependencies]
 boxworks = { path = "../boxworks", features=[] }
-core = { path = "../core", features=[] }
+common = { path = "../common", features=[] }
 tfm = { path = "../tfm", features=[] }
 
 

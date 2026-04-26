@@ -356,15 +356,15 @@ pub trait TexlangState: Sized {
     /// Get the em width for the current font.
     ///
     /// The default implementation returns `12pt`.
-    fn em_width(&self) -> core::Scaled {
-        core::Scaled::ONE * 12
+    fn em_width(&self) -> common::Scaled {
+        common::Scaled::ONE * 12
     }
 
     /// Get the ex height for the current font.
     ///
     /// The default implementation returns `12pt`.
-    fn ex_height(&self) -> core::Scaled {
-        core::Scaled::ONE * 12
+    fn ex_height(&self) -> common::Scaled {
+        common::Scaled::ONE * 12
     }
 
     /// Get the current magnification ratio (e.g. value of \mag).

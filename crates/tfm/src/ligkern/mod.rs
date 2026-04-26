@@ -97,7 +97,7 @@ pub struct CompiledProgram {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum IntermediateOp {
     // Emit the kern.
-    Kern(core::Scaled),
+    Kern(common::Scaled),
     // Emit the char in the payload.
     C(compiler::C),
 }
@@ -327,7 +327,7 @@ impl CompiledProgram {
 /// are handled when running a lig/kern program.
 pub trait Emitter {
     fn emit_character(&mut self, c: char);
-    fn emit_kern(&mut self, kern: core::Scaled);
+    fn emit_kern(&mut self, kern: common::Scaled);
     fn emit_ligature(&mut self, c: char, original: Rc<str>);
 }
 
@@ -374,7 +374,7 @@ pub struct InfiniteLoopStep {
 
 #[cfg(test)]
 mod tests {
-    use core::Scaled;
+    use common::Scaled;
 
     use super::*;
 
@@ -383,7 +383,7 @@ mod tests {
     #[derive(PartialEq, Eq, Debug)]
     enum Element {
         Char(char),
-        Kern(core::Scaled),
+        Kern(common::Scaled),
         Ligature(char, Rc<str>),
     }
 
@@ -395,7 +395,7 @@ mod tests {
             self.0.push(Element::Char(c))
         }
 
-        fn emit_kern(&mut self, kern: core::Scaled) {
+        fn emit_kern(&mut self, kern: common::Scaled) {
             self.0.push(Element::Kern(kern))
         }
 

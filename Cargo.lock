@@ -179,7 +179,7 @@ dependencies = [
 name = "boxworks"
 version = "0.1.0"
 dependencies = [
- "core",
+ "common",
 ]
 
 [[package]]
@@ -192,7 +192,7 @@ dependencies = [
  "boxworks-lang",
  "boxworks-text",
  "clap 4.4.8",
- "core",
+ "common",
  "similar-asserts",
  "tfm",
 ]
@@ -203,7 +203,7 @@ version = "0.1.0"
 dependencies = [
  "ariadne",
  "boxworks",
- "core",
+ "common",
 ]
 
 [[package]]
@@ -212,7 +212,7 @@ version = "0.1.0"
 dependencies = [
  "boxworks",
  "boxworks-lang",
- "core",
+ "common",
  "tfm",
 ]
 
@@ -352,6 +352,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "console"
 version = "0.15.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -378,13 +385,6 @@ name = "constant_time_eq"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
-
-[[package]]
-name = "core"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "core-foundation-sys"
@@ -1314,7 +1314,7 @@ name = "texcraft"
 version = "0.2.0"
 dependencies = [
  "clap 4.4.8",
- "core",
+ "common",
  "performance",
  "rand",
  "rmp-serde",
@@ -1332,8 +1332,8 @@ dependencies = [
 name = "texcraft-playground"
 version = "0.0.0"
 dependencies = [
+ "common",
  "console_error_panic_hook",
- "core",
  "texcraft-stdext",
  "texlang",
  "texlang-stdlib",
@@ -1354,7 +1354,7 @@ dependencies = [
 name = "texlang"
 version = "0.1.0"
 dependencies = [
- "core",
+ "common",
  "serde",
  "texcraft-stdext",
 ]
@@ -1370,7 +1370,7 @@ dependencies = [
 name = "texlang-font"
 version = "0.1.0"
 dependencies = [
- "core",
+ "common",
  "serde",
  "texcraft-stdext",
  "texlang",
@@ -1385,7 +1385,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "chrono",
- "core",
+ "common",
  "linefeed",
  "rmp-serde",
  "serde",
@@ -1422,7 +1422,7 @@ version = "0.1.0"
 dependencies = [
  "arbitrary",
  "ariadne",
- "core",
+ "common",
 ]
 
 [[package]]
@@ -1432,7 +1432,7 @@ dependencies = [
  "ariadne",
  "assert_cmd",
  "clap 4.4.8",
- "core",
+ "common",
  "predicates",
  "similar-asserts",
  "tempfile",

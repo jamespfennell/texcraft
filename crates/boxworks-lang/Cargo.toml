@@ -10,7 +10,7 @@ keywords = ["tex", "texcraft"]
 
 [dependencies]
 boxworks = { path = "../boxworks", version="0.1.0"}
-core = { path = "../core" }
+common = { path = "../common" }
 ariadne = {version="0.5.0", default-features = false, optional = true}
 
 [features]

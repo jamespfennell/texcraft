@@ -11,7 +11,7 @@ categories = ["parser-implementations"]
 
 [dependencies]
 # Texcraft
-core = { path = "../core" }
+common = { path = "../common" }
 
 # Third-party
 arbitrary = { version = "1", features = ["derive"], optional = true }

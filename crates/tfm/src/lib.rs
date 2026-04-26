@@ -427,7 +427,7 @@ impl File {
         self.params.get((param.number() - 1) as usize).copied()
     }
 
-    pub fn named_param_scaled(&self, param: NamedParameter) -> Option<core::Scaled> {
+    pub fn named_param_scaled(&self, param: NamedParameter) -> Option<common::Scaled> {
         self.named_param(param)
             .map(|p| p.to_scaled(self.header.design_size))
     }
@@ -1536,7 +1536,7 @@ impl<'a> Iterator for NextLargerProgramIter<'a> {
     }
 }
 
-impl core::FontFormat for File {
+impl common::FontFormat for File {
     const DEFAULT_FILE_EXTENSION: &'static str = "tfm";
     type Error = DeserializationError;
 
@@ -1595,9 +1595,9 @@ impl FixWord {
     ///
     /// In order to ensure the result here matched Knuth's algorithm, we reimplement
     /// Knuth's algorithm.
-    pub fn to_scaled(self, design_size: FixWord) -> core::Scaled {
+    pub fn to_scaled(self, design_size: FixWord) -> common::Scaled {
         // TeX.2021.568
-        let mut z = core::Scaled(design_size.0 / 16);
+        let mut z = common::Scaled(design_size.0 / 16);
         // TeX.2021.572
         let mut alpha = 16;
         // Ensure that z < 2^23 sp
@@ -1685,8 +1685,8 @@ mod tests {
 
     #[test]
     fn to_scaled_test() {
-        assert_eq!(core::Scaled::ZERO, FixWord::ZERO.to_scaled(FixWord::ONE));
-        assert_eq!(core::Scaled::ONE, FixWord::ONE.to_scaled(FixWord::ONE));
+        assert_eq!(common::Scaled::ZERO, FixWord::ZERO.to_scaled(FixWord::ONE));
+        assert_eq!(common::Scaled::ONE, FixWord::ONE.to_scaled(FixWord::ONE));
     }
 
     fn run_compress_test(

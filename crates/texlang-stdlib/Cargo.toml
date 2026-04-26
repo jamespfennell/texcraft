@@ -14,7 +14,7 @@ path = "bin/errors.rs"
 
 [dependencies]
 # Texcraft
-core = { path = "../core" }
+common = { path = "../common" }
 texcraft-stdext = { path = "../texcraft-stdext", version = "0.1.0" }
 texlang = { path = "../texlang", version="0.1.0" }
 texlang-common = { path = "../texlang-common", version = "0.1.0" }

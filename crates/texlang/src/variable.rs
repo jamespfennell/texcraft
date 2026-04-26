@@ -636,12 +636,12 @@ supported_type_impl!(
         save_stack_field: i32,
     },
     {
-        rust_type: core::Scaled,
+        rust_type: common::Scaled,
         enum_variant: Dimen,
         save_stack_field: dimen,
     },
     {
-        rust_type: core::Glue,
+        rust_type: common::Glue,
         enum_variant: Glue,
         save_stack_field: glue,
     },

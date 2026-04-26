@@ -37,33 +37,33 @@
 //!     ds::Char{char: 'x', font: 0}.into(),
 //!     ds::Glue{
 //!         kind: ds::GlueKind::Normal,
-//!         value: core::Glue{
-//!             width: core::Scaled::new(
+//!         value: common::Glue{
+//!             width: common::Scaled::new(
 //!                 1,  // integer part
-//!                 core::Scaled::ZERO,  // fractional part
-//!                 core::ScaledUnit::Point,  // units
+//!                 common::Scaled::ZERO,  // fractional part
+//!                 common::ScaledUnit::Point,  // units
 //!             ).unwrap(),
-//!             stretch: core::Scaled::new(
+//!             stretch: common::Scaled::new(
 //!                 5,  // integer part
-//!                 core::Scaled::ZERO,  // fractional part
-//!                 core::ScaledUnit::Point,  // units
+//!                 common::Scaled::ZERO,  // fractional part
+//!                 common::ScaledUnit::Point,  // units
 //!             ).unwrap(),
-//!             stretch_order: core::GlueOrder::Fil,
-//!             shrink: core::Scaled::new(
+//!             stretch_order: common::GlueOrder::Fil,
+//!             shrink: common::Scaled::new(
 //!                 0,  // integer part
-//!                 core::Scaled::from_decimal_digits(&[0, 7, 5]),  // fractional part
-//!                 core::ScaledUnit::Inch,  // units
+//!                 common::Scaled::from_decimal_digits(&[0, 7, 5]),  // fractional part
+//!                 common::ScaledUnit::Inch,  // units
 //!             ).unwrap(),
-//!             shrink_order: core::GlueOrder::Normal,
+//!             shrink_order: common::GlueOrder::Normal,
 //!         }
 //!     }.into(),
 //!     ds::Char{char: 'A', font: 0}.into(),
 //!     ds::Kern{
 //!         kind: ds::KernKind::Normal,
-//!         width: -core::Scaled::new(
+//!         width: -common::Scaled::new(
 //!                 0,  // integer part
-//!                 core::Scaled::from_decimal_digits(&[1]),  // fractional part
-//!                 core::ScaledUnit::Point,  // units
+//!                 common::Scaled::from_decimal_digits(&[1]),  // fractional part
+//!                 common::ScaledUnit::Point,  // units
 //!             ).unwrap(),
 //!     }.into(),
 //!     ds::Char{char: 'V', font: 0}.into(),

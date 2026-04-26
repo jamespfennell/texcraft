@@ -74,13 +74,13 @@ pub fn get_count<S: HasComponent<Component<i32, N>>, const N: usize>() -> comman
 }
 
 /// Get the `\dimen` command.
-pub fn get_dimen<S: HasComponent<Component<core::Scaled, N>>, const N: usize>(
+pub fn get_dimen<S: HasComponent<Component<common::Scaled, N>>, const N: usize>(
 ) -> command::BuiltIn<S> {
     new_registers_command()
 }
 
 /// Get the `\skip` command.
-pub fn get_skip<S: HasComponent<Component<core::Glue, N>>, const N: usize>() -> command::BuiltIn<S>
+pub fn get_skip<S: HasComponent<Component<common::Glue, N>>, const N: usize>() -> command::BuiltIn<S>
 {
     new_registers_command()
 }
@@ -168,17 +168,17 @@ mod tests {
     #[derive(Default)]
     struct State {
         registers_i32: Component<i32, 256>,
-        registers_dimen: Component<core::Scaled, 256>,
+        registers_dimen: Component<common::Scaled, 256>,
         registers_token_list: Component<Vec<token::Token>, 256>,
         prefix: prefix::Component,
         testing: TestingComponent,
     }
 
     impl TexlangState for State {
-        fn em_width(&self) -> core::Scaled {
+        fn em_width(&self) -> common::Scaled {
             self.registers_dimen.0[254]
         }
-        fn ex_height(&self) -> core::Scaled {
+        fn ex_height(&self) -> common::Scaled {
             self.registers_dimen.0[255]
         }
         fn recoverable_error_hook(
@@ -197,7 +197,7 @@ mod tests {
 
     implement_has_component![State{
         registers_i32: Component<i32, 256>,
-        registers_dimen: Component<core::Scaled, 256>,
+        registers_dimen: Component<common::Scaled, 256>,
         registers_token_list: Component<Vec<token::Token>, 256>,
         prefix: prefix::Component,
         testing: TestingComponent,

@@ -1,4 +1,4 @@
-use core::Scaled;
+use common::Scaled;
 
 use super::keyword::parse_keyword;
 use crate::prelude as txl;
@@ -18,8 +18,8 @@ impl Parsable for Scaled {
 // - the inf parameter is replaced by an optional pointer to a glue order
 pub(crate) fn scan_dimen<S: TexlangState>(
     input: &mut vm::ExpandedStream<S>,
-    glue_order: Option<&mut core::GlueOrder>,
-) -> txl::Result<core::Scaled> {
+    glue_order: Option<&mut common::GlueOrder>,
+) -> txl::Result<common::Scaled> {
     let negative = match super::integer::parse_optional_signs(input)? {
         None => 1,
         Some(_) => -1,
@@ -57,7 +57,7 @@ pub(crate) fn scan_dimen<S: TexlangState>(
 pub(crate) fn scan_constant_dimen<S: TexlangState>(
     input: &mut vm::ExpandedStream<S>,
     first_token: token::Token,
-) -> txl::Result<(i32, core::Scaled)> {
+) -> txl::Result<(i32, common::Scaled)> {
     Ok(match first_token.value() {
         Value::Other(',' | '.') => (0, scan_decimal_fraction(input)?),
         _ => {
@@ -90,15 +90,15 @@ pub(crate) fn scan_and_apply_units<S: TexlangState>(
     first_token: token::Token,
     integer_part: i32,
     fractional_part: Scaled,
-    glue_order: Option<&mut core::GlueOrder>,
-) -> txl::Result<core::Scaled> {
+    glue_order: Option<&mut common::GlueOrder>,
+) -> txl::Result<common::Scaled> {
     // todo: scan spaces and non-call tokens
 
     // First try to scan for infinite units, if this is the stretch
     // or shrink of a glue.
     if let Some(glue_order) = glue_order {
         if parse_keyword(input, "fil")? {
-            *glue_order = core::GlueOrder::Fil;
+            *glue_order = common::GlueOrder::Fil;
             while let Some(token) = input.next()? {
                 match token.value() {
                     token::Value::Letter('l' | 'L') => match glue_order.next() {
@@ -166,7 +166,7 @@ pub(crate) fn scan_and_apply_units<S: TexlangState>(
     }
 
     // Finally try to scan unit constants.
-    let scaled_unit = <core::ScaledUnit as Parsable>::parse(input)?;
+    let scaled_unit = <common::ScaledUnit as Parsable>::parse(input)?;
     super::OptionalSpace::parse(input)?;
     match Scaled::new(integer_part, fractional_part, scaled_unit) {
         Ok(s) => Ok(s),
@@ -178,7 +178,7 @@ fn handle_overflow<S: TexlangState>(
     input: &mut vm::ExpandedStream<S>,
     first_token: token::Token,
     neg: bool,
-) -> txl::Result<core::Scaled> {
+) -> txl::Result<common::Scaled> {
     input.error(
         parse::Error::new(
             "a dimension in the range (-2^14pt,2^14pt)",
@@ -188,9 +188,9 @@ fn handle_overflow<S: TexlangState>(
         .with_got_override("a dimension that's too large"),
     )?;
     Ok(if neg {
-        -core::Scaled::MAX_DIMEN
+        -common::Scaled::MAX_DIMEN
     } else {
-        core::Scaled::MAX_DIMEN
+        common::Scaled::MAX_DIMEN
     })
 }
 
@@ -199,9 +199,9 @@ fn fillll_error(token: token::Token) -> parse::Error {
         .with_got_override("too many l characters")
 }
 
-impl Parsable for core::ScaledUnit {
+impl Parsable for common::ScaledUnit {
     fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
-        use core::ScaledUnit;
+        use common::ScaledUnit;
         for (keyword, unit) in [
             ("pt", ScaledUnit::Point),
             ("in", ScaledUnit::Inch),
@@ -218,7 +218,7 @@ impl Parsable for core::ScaledUnit {
             }
         }
         input.error(error::TODO())?;
-        Ok(core::ScaledUnit::Point)
+        Ok(common::ScaledUnit::Point)
     }
 }
 

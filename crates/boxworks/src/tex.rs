@@ -137,7 +137,7 @@ pub fn build_vertical_lists(
     tex_engine: &dyn TexEngine,
     auxiliary_files: &HashMap<PathBuf, Vec<u8>>,
     preamble: &str,
-    width: core::Scaled,
+    width: common::Scaled,
     contents: &mut dyn Iterator<Item = &String>,
 ) -> (HashMap<String, u32>, Vec<ds::VList>) {
     let macro_calls: Vec<String> = contents.map(|s| format!(r#"\printBox{{{s}}}"#)).collect();
@@ -279,7 +279,7 @@ fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
         let (glue_ratio, glue_sign, glue_order) = glue_set_str.map(parse_glue_set).unwrap_or((
             ds::GlueRatio(0.0),
             ds::GlueSign::Normal,
-            core::GlueOrder::Normal,
+            common::GlueOrder::Normal,
         ));
         ds::HList {
             height,
@@ -400,11 +400,11 @@ fn parse_vlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
             height,
             width,
             depth,
-            shift_amount: core::Scaled::ZERO,
+            shift_amount: common::Scaled::ZERO,
             list: vec![],
             glue_ratio: ds::GlueRatio(0.0),
             glue_sign: ds::GlueSign::Normal,
-            glue_order: core::GlueOrder::Normal,
+            glue_order: common::GlueOrder::Normal,
         }
     };
     let mut iter = iter.inner();
@@ -452,7 +452,7 @@ fn keyword_and_tail(s: &str) -> (&str, &str) {
 ///
 /// `spec` may start with a parenthesised name (named glue, e.g. `(\rightskip) 0.0`)
 /// or directly with a space followed by the width (e.g. ` 3.33333 plus 1.66666 minus 1.11111`).
-fn parse_glue_value(spec: &str) -> core::Glue {
+fn parse_glue_value(spec: &str) -> common::Glue {
     let spec = if spec.starts_with('(') {
         let close = spec.find(')').expect("named glue has ')'");
         spec[close + 1..].trim_start()
@@ -464,14 +464,14 @@ fn parse_glue_value(spec: &str) -> core::Glue {
     let (stretch, stretch_order) = if words.next() == Some("plus") {
         parse_glue_amount(words.next().expect("glue has stretch after plus"))
     } else {
-        (core::Scaled::ZERO, core::GlueOrder::Normal)
+        (common::Scaled::ZERO, common::GlueOrder::Normal)
     };
     let (shrink, shrink_order) = if words.next() == Some("minus") {
         parse_glue_amount(words.next().expect("glue has shrink after minus"))
     } else {
-        (core::Scaled::ZERO, core::GlueOrder::Normal)
+        (common::Scaled::ZERO, common::GlueOrder::Normal)
     };
-    core::Glue {
+    common::Glue {
         width,
         stretch,
         stretch_order,
@@ -481,33 +481,33 @@ fn parse_glue_value(spec: &str) -> core::Glue {
 }
 
 /// Parse a glue component like `"1.66666"`, `"1.0fil"`, `"0.0fill"`.
-fn parse_glue_amount(s: &str) -> (core::Scaled, core::GlueOrder) {
+fn parse_glue_amount(s: &str) -> (common::Scaled, common::GlueOrder) {
     if let Some(s) = s.strip_suffix("filll") {
-        (parse_scaled(s), core::GlueOrder::Filll)
+        (parse_scaled(s), common::GlueOrder::Filll)
     } else if let Some(s) = s.strip_suffix("fill") {
-        (parse_scaled(s), core::GlueOrder::Fill)
+        (parse_scaled(s), common::GlueOrder::Fill)
     } else if let Some(s) = s.strip_suffix("fil") {
-        (parse_scaled(s), core::GlueOrder::Fil)
+        (parse_scaled(s), common::GlueOrder::Fil)
     } else {
-        (parse_scaled(s), core::GlueOrder::Normal)
+        (parse_scaled(s), common::GlueOrder::Normal)
     }
 }
 
 /// Parse the `"N[order]"` text that follows `", glue set "` on an hbox line.
-fn parse_glue_set(s: &str) -> (ds::GlueRatio, ds::GlueSign, core::GlueOrder) {
+fn parse_glue_set(s: &str) -> (ds::GlueRatio, ds::GlueSign, common::GlueOrder) {
     let (sign, s) = if let Some(s) = s.strip_prefix("- ") {
         (ds::GlueSign::Shrinking, s)
     } else {
         (ds::GlueSign::Stretching, s)
     };
     let (s, order) = if let Some(s) = s.strip_suffix("filll") {
-        (s, core::GlueOrder::Filll)
+        (s, common::GlueOrder::Filll)
     } else if let Some(s) = s.strip_suffix("fill") {
-        (s, core::GlueOrder::Fill)
+        (s, common::GlueOrder::Fill)
     } else if let Some(s) = s.strip_suffix("fil") {
-        (s, core::GlueOrder::Fil)
+        (s, common::GlueOrder::Fil)
     } else {
-        (s, core::GlueOrder::Normal)
+        (s, common::GlueOrder::Normal)
     };
     let ratio: f32 = s.parse().expect("glue set ratio is a float");
     (ds::GlueRatio(ratio), sign, order)
@@ -531,7 +531,7 @@ fn parse_char(s: &str) -> char {
     }
 }
 
-fn parse_scaled(s: &str) -> core::Scaled {
+fn parse_scaled(s: &str) -> common::Scaled {
     let (neg, s) = match s.strip_prefix('-') {
         Some(s) => (true, s),
         None => (false, s),
@@ -555,13 +555,13 @@ fn parse_scaled(s: &str) -> core::Scaled {
             .try_into()
             .expect("digits are in the range [0,10) and always fit in u8");
     }
-    let f = core::Scaled::from_decimal_digits(&f);
-    let sc = core::Scaled::new(i, f, core::ScaledUnit::Point).unwrap_or_else(|_| {
+    let f = common::Scaled::from_decimal_digits(&f);
+    let sc = common::Scaled::new(i, f, common::ScaledUnit::Point).unwrap_or_else(|_| {
         eprintln!(
             "scaled number '{s}pt' is too big to parse; replacing with the largest scaled value {}",
-            core::Scaled::MAX_DIMEN
+            common::Scaled::MAX_DIMEN
         );
-        core::Scaled::MAX_DIMEN
+        common::Scaled::MAX_DIMEN
     });
     if neg {
         -sc
@@ -671,7 +671,7 @@ Transcript written on test.log.
         let want_list = ds::HList {
             height: parse_scaled("6.94444"),
             width: parse_scaled("56.66678"),
-            depth: core::Scaled::ZERO,
+            depth: common::Scaled::ZERO,
             list: vec![
                 ds::Char { char: 'M', font: 0 }.into(),
                 ds::Char { char: 'i', font: 0 }.into(),
@@ -684,12 +684,12 @@ Transcript written on test.log.
                 ds::Char { char: 't', font: 0 }.into(),
                 ds::Glue {
                     kind: ds::GlueKind::Normal,
-                    value: core::Glue {
+                    value: common::Glue {
                         width: parse_scaled("3.33333"),
                         stretch: parse_scaled("1.66666"),
-                        stretch_order: core::GlueOrder::Normal,
+                        stretch_order: common::GlueOrder::Normal,
                         shrink: parse_scaled("1.11111"),
-                        shrink_order: core::GlueOrder::Normal,
+                        shrink_order: common::GlueOrder::Normal,
                     },
                 }
                 .into(),
@@ -698,12 +698,12 @@ Transcript written on test.log.
                 ds::Char { char: 'd', font: 0 }.into(),
                 ds::Glue {
                     kind: ds::GlueKind::Normal,
-                    value: core::Glue {
+                    value: common::Glue {
                         width: parse_scaled("3.33333"),
                         stretch: parse_scaled("1.66666"),
-                        stretch_order: core::GlueOrder::Normal,
+                        stretch_order: common::GlueOrder::Normal,
                         shrink: parse_scaled("1.11111"),
-                        shrink_order: core::GlueOrder::Normal,
+                        shrink_order: common::GlueOrder::Normal,
                     },
                 }
                 .into(),
@@ -769,26 +769,26 @@ Transcript written on test.log.
             &tex_engine,
             &Default::default(),
             &"",
-            core::Scaled::ONE * 41,
+            common::Scaled::ONE * 41,
             &mut vec!["".to_string()].iter(),
         );
 
         let want_list = ds::VList {
             height: parse_scaled("18.94444"),
             width: parse_scaled("41.0"),
-            depth: core::Scaled::ZERO,
-            shift_amount: core::Scaled::ZERO,
+            depth: common::Scaled::ZERO,
+            shift_amount: common::Scaled::ZERO,
             glue_ratio: ds::GlueRatio(0.0),
             glue_sign: ds::GlueSign::Normal,
-            glue_order: core::GlueOrder::Normal,
+            glue_order: common::GlueOrder::Normal,
             list: vec![
                 ds::Vertical::HList(ds::HList {
                     height: parse_scaled("6.94444"),
                     width: parse_scaled("41.0"),
-                    depth: core::Scaled::ZERO,
+                    depth: common::Scaled::ZERO,
                     glue_ratio: ds::GlueRatio(0.26662),
                     glue_sign: ds::GlueSign::Stretching,
-                    glue_order: core::GlueOrder::Normal,
+                    glue_order: common::GlueOrder::Normal,
                     list: vec![
                         ds::Char { char: 'M', font: 0 }.into(),
                         ds::Char { char: 'i', font: 0 }.into(),
@@ -801,12 +801,12 @@ Transcript written on test.log.
                         ds::Char { char: 't', font: 0 }.into(),
                         ds::Glue {
                             kind: ds::GlueKind::Normal,
-                            value: core::Glue {
+                            value: common::Glue {
                                 width: parse_scaled("3.33333"),
                                 stretch: parse_scaled("1.66666"),
-                                stretch_order: core::GlueOrder::Normal,
+                                stretch_order: common::GlueOrder::Normal,
                                 shrink: parse_scaled("1.11111"),
-                                shrink_order: core::GlueOrder::Normal,
+                                shrink_order: common::GlueOrder::Normal,
                             },
                         }
                         .into(),
@@ -815,12 +815,12 @@ Transcript written on test.log.
                         ds::Char { char: 'd', font: 0 }.into(),
                         ds::Glue {
                             kind: ds::GlueKind::Normal,
-                            value: core::Glue {
-                                width: core::Scaled::ZERO,
-                                stretch: core::Scaled::ZERO,
-                                stretch_order: core::GlueOrder::Normal,
-                                shrink: core::Scaled::ZERO,
-                                shrink_order: core::GlueOrder::Normal,
+                            value: common::Glue {
+                                width: common::Scaled::ZERO,
+                                stretch: common::Scaled::ZERO,
+                                stretch_order: common::GlueOrder::Normal,
+                                shrink: common::Scaled::ZERO,
+                                shrink_order: common::GlueOrder::Normal,
                             },
                         }
                         .into(),
@@ -830,44 +830,44 @@ Transcript written on test.log.
                 ds::Vertical::Penalty(ds::Penalty(300)),
                 ds::Vertical::Glue(ds::Glue {
                     kind: ds::GlueKind::Normal,
-                    value: core::Glue {
+                    value: common::Glue {
                         width: parse_scaled("7.69446"),
-                        stretch: core::Scaled::ZERO,
-                        stretch_order: core::GlueOrder::Normal,
-                        shrink: core::Scaled::ZERO,
-                        shrink_order: core::GlueOrder::Normal,
+                        stretch: common::Scaled::ZERO,
+                        stretch_order: common::GlueOrder::Normal,
+                        shrink: common::Scaled::ZERO,
+                        shrink_order: common::GlueOrder::Normal,
                     },
                 }),
                 ds::Vertical::HList(ds::HList {
                     height: parse_scaled("4.30554"),
                     width: parse_scaled("41.0"),
-                    depth: core::Scaled::ZERO,
+                    depth: common::Scaled::ZERO,
                     glue_ratio: ds::GlueRatio(28.2222),
                     glue_sign: ds::GlueSign::Stretching,
-                    glue_order: core::GlueOrder::Fil,
+                    glue_order: common::GlueOrder::Fil,
                     list: vec![
                         ds::Char { char: 'm', font: 0 }.into(),
                         ds::Char { char: 'e', font: 0 }.into(),
                         ds::Penalty(10000).into(),
                         ds::Glue {
                             kind: ds::GlueKind::Normal,
-                            value: core::Glue {
-                                width: core::Scaled::ZERO,
+                            value: common::Glue {
+                                width: common::Scaled::ZERO,
                                 stretch: parse_scaled("1.0"),
-                                stretch_order: core::GlueOrder::Fil,
-                                shrink: core::Scaled::ZERO,
-                                shrink_order: core::GlueOrder::Normal,
+                                stretch_order: common::GlueOrder::Fil,
+                                shrink: common::Scaled::ZERO,
+                                shrink_order: common::GlueOrder::Normal,
                             },
                         }
                         .into(),
                         ds::Glue {
                             kind: ds::GlueKind::Normal,
-                            value: core::Glue {
-                                width: core::Scaled::ZERO,
-                                stretch: core::Scaled::ZERO,
-                                stretch_order: core::GlueOrder::Normal,
-                                shrink: core::Scaled::ZERO,
-                                shrink_order: core::GlueOrder::Normal,
+                            value: common::Glue {
+                                width: common::Scaled::ZERO,
+                                stretch: common::Scaled::ZERO,
+                                stretch_order: common::GlueOrder::Normal,
+                                shrink: common::Scaled::ZERO,
+                                shrink_order: common::GlueOrder::Normal,
                             },
                         }
                         .into(),
@@ -930,76 +930,76 @@ Transcript written on test.log.
             &tex_engine,
             &Default::default(),
             &"",
-            core::Scaled::ONE * 41,
+            common::Scaled::ONE * 41,
             &mut vec!["".to_string()].iter(),
         );
 
         let want_list = ds::VList {
             height: parse_scaled("6.83331"),
             width: parse_scaled("41.0"),
-            depth: core::Scaled::ZERO,
-            shift_amount: core::Scaled::ZERO,
+            depth: common::Scaled::ZERO,
+            shift_amount: common::Scaled::ZERO,
             glue_ratio: ds::GlueRatio(0.0),
             glue_sign: ds::GlueSign::Normal,
-            glue_order: core::GlueOrder::Normal,
+            glue_order: common::GlueOrder::Normal,
             list: vec![ds::Vertical::HList(ds::HList {
                 height: parse_scaled("6.83331"),
                 width: parse_scaled("41.0"),
-                depth: core::Scaled::ZERO,
+                depth: common::Scaled::ZERO,
                 list: vec![
                     ds::Char { char: 'A', font: 0 }.into(),
                     ds::Horizontal::HList(ds::HList {
                         height: parse_scaled("6.83331"),
                         width: parse_scaled("48.08336"),
-                        depth: core::Scaled::ZERO,
+                        depth: common::Scaled::ZERO,
                         list: vec![
                             ds::Char { char: 'B', font: 0 }.into(),
                             ds::Horizontal::VList(ds::VList {
                                 height: parse_scaled("6.83331"),
                                 width: parse_scaled("41.0"),
-                                depth: core::Scaled::ZERO,
+                                depth: common::Scaled::ZERO,
                                 list: vec![ds::Vertical::HList(ds::HList {
                                     height: parse_scaled("6.83331"),
                                     width: parse_scaled("41.0"),
-                                    depth: core::Scaled::ZERO,
+                                    depth: common::Scaled::ZERO,
                                     glue_ratio: ds::GlueRatio(6.13887),
                                     glue_sign: ds::GlueSign::Stretching,
-                                    glue_order: core::GlueOrder::Fil,
+                                    glue_order: common::GlueOrder::Fil,
                                     list: vec![
                                         ds::Horizontal::HList(ds::HList {
-                                            height: core::Scaled::ZERO,
+                                            height: common::Scaled::ZERO,
                                             width: parse_scaled("20.0"),
-                                            depth: core::Scaled::ZERO,
+                                            depth: common::Scaled::ZERO,
                                             ..Default::default()
                                         }),
                                         ds::Char { char: 'C', font: 0 }.into(),
                                         ds::Horizontal::HList(ds::HList {
                                             height: parse_scaled("6.83331"),
                                             width: parse_scaled("7.6389"),
-                                            depth: core::Scaled::ZERO,
+                                            depth: common::Scaled::ZERO,
                                             list: vec![ds::Char { char: 'D', font: 0 }.into()],
                                             ..Default::default()
                                         }),
                                         ds::Penalty(10000).into(),
                                         ds::Glue {
                                             kind: ds::GlueKind::Normal,
-                                            value: core::Glue {
-                                                width: core::Scaled::ZERO,
+                                            value: common::Glue {
+                                                width: common::Scaled::ZERO,
                                                 stretch: parse_scaled("1.0"),
-                                                stretch_order: core::GlueOrder::Fil,
-                                                shrink: core::Scaled::ZERO,
-                                                shrink_order: core::GlueOrder::Normal,
+                                                stretch_order: common::GlueOrder::Fil,
+                                                shrink: common::Scaled::ZERO,
+                                                shrink_order: common::GlueOrder::Normal,
                                             },
                                         }
                                         .into(),
                                         ds::Glue {
                                             kind: ds::GlueKind::Normal,
-                                            value: core::Glue {
-                                                width: core::Scaled::ZERO,
-                                                stretch: core::Scaled::ZERO,
-                                                stretch_order: core::GlueOrder::Normal,
-                                                shrink: core::Scaled::ZERO,
-                                                shrink_order: core::GlueOrder::Normal,
+                                            value: common::Glue {
+                                                width: common::Scaled::ZERO,
+                                                stretch: common::Scaled::ZERO,
+                                                stretch_order: common::GlueOrder::Normal,
+                                                shrink: common::Scaled::ZERO,
+                                                shrink_order: common::GlueOrder::Normal,
                                             },
                                         }
                                         .into(),
@@ -1014,23 +1014,23 @@ Transcript written on test.log.
                     ds::Penalty(10000).into(),
                     ds::Glue {
                         kind: ds::GlueKind::Normal,
-                        value: core::Glue {
-                            width: core::Scaled::ZERO,
+                        value: common::Glue {
+                            width: common::Scaled::ZERO,
                             stretch: parse_scaled("1.0"),
-                            stretch_order: core::GlueOrder::Fil,
-                            shrink: core::Scaled::ZERO,
-                            shrink_order: core::GlueOrder::Normal,
+                            stretch_order: common::GlueOrder::Fil,
+                            shrink: common::Scaled::ZERO,
+                            shrink_order: common::GlueOrder::Normal,
                         },
                     }
                     .into(),
                     ds::Glue {
                         kind: ds::GlueKind::Normal,
-                        value: core::Glue {
-                            width: core::Scaled::ZERO,
-                            stretch: core::Scaled::ZERO,
-                            stretch_order: core::GlueOrder::Normal,
-                            shrink: core::Scaled::ZERO,
-                            shrink_order: core::GlueOrder::Normal,
+                        value: common::Glue {
+                            width: common::Scaled::ZERO,
+                            stretch: common::Scaled::ZERO,
+                            stretch_order: common::GlueOrder::Normal,
+                            shrink: common::Scaled::ZERO,
+                            shrink_order: common::GlueOrder::Normal,
                         },
                     }
                     .into(),

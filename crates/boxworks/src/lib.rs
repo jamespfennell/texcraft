@@ -57,10 +57,10 @@ impl TextPreprocessor for SimpleTextPreprocessor {
         list.push(
             ds::Glue {
                 kind: ds::GlueKind::Normal,
-                value: core::Glue {
-                    width: core::Scaled::ONE * 10,
-                    stretch: core::Scaled::ONE * 4,
-                    shrink: core::Scaled::ONE * 4,
+                value: common::Glue {
+                    width: common::Scaled::ONE * 10,
+                    stretch: common::Scaled::ONE * 4,
+                    shrink: common::Scaled::ONE * 4,
                     ..Default::default()
                 },
             }

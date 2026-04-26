@@ -178,7 +178,7 @@ impl Build {
                     engine.as_ref(),
                     self.texts,
                     self.font_metrics,
-                    core::Scaled::parse_from_string(&self.width)?,
+                    common::Scaled::parse_from_string(&self.width)?,
                 )?;
                 print_vlists(vlists, labels);
             }
@@ -214,7 +214,7 @@ impl Linebreak {
             engine.as_ref(),
             self.texts,
             self.font_metrics,
-            core::Scaled::parse_from_string(&self.width)?,
+            common::Scaled::parse_from_string(&self.width)?,
         )?;
         for vlist in vlists {
             print_vlist_text(&vlist);
@@ -320,7 +320,7 @@ fn run_tex_vlists(
     tex_engine: &dyn boxworks::tex::TexEngine,
     texts: Vec<String>,
     font_metrics: Option<PathBuf>,
-    width: core::Scaled,
+    width: common::Scaled,
 ) -> Result<Vec<bwl::ast::Vlist<'static>>, String> {
     let (auxiliary_files, preamble) = build_tex_context(font_metrics)?;
     let (_, vlists) = boxworks::tex::build_vertical_lists(
@@ -336,7 +336,7 @@ fn run_tex_vlists(
 
 fn print_hlists(hlists: Vec<bwl::ast::Hlist<'static>>, labels: Vec<Option<usize>>) {
     for (i, (mut hlist, label)) in hlists.into_iter().zip(labels).enumerate() {
-        hlist.width = core::Scaled::ZERO.into();
+        hlist.width = common::Scaled::ZERO.into();
         println!("#");
         match label {
             Some(line_num) => println!("# hlist {} (line {})", i + 1, line_num),

@@ -2,8 +2,8 @@ use std::collections::HashSet;
 
 use clap::Parser;
 
-mod common;
-use common::*;
+mod shared;
+use shared::*;
 
 fn main() {
     if let Err(err) = Cli::parse().run() {
@@ -397,7 +397,7 @@ impl LigKern {
                     print!(" char({c})")
                 }
 
-                fn emit_kern(&mut self, kern: core::Scaled) {
+                fn emit_kern(&mut self, kern: common::Scaled) {
                     print!(" kern({kern})");
                 }
 

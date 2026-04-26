@@ -1,4 +1,4 @@
-use core::{Glue, Scaled};
+use common::{Glue, Scaled};
 
 use super::keyword::parse_keyword;
 use crate::prelude as txl;
@@ -36,7 +36,7 @@ impl Parsable for Glue {
             }
             _ => {
                 input.back(first_token);
-                core::Scaled::parse(input)? * negative
+                common::Scaled::parse(input)? * negative
             }
         };
 
@@ -67,7 +67,7 @@ impl error::EndOfInputError for GlueEndOfInputError {
 mod tests {
     use super::*;
     use crate::parse::testing::*;
-    use core::GlueOrder;
+    use common::GlueOrder;
 
     #[derive(Default)]
     struct State;

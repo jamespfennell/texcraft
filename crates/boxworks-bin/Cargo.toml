@@ -13,7 +13,7 @@ boxworks = {path="../boxworks" }
 boxworks-lang = {path="../boxworks-lang" , features = ["ariadne"]}
 boxworks-text = {path="../boxworks-text" }
 tfm = { path="../tfm" }
-core = { path="../core" }
+common = { path="../common" }
 
 clap = {version="4.3.3", default-features=false, features=["std", "derive"]}
 ariadne = {version="0.5.0", default-features = false }

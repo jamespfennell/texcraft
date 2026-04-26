@@ -152,8 +152,8 @@ pub(crate) fn parse_integer<S: TexlangState>(
 #[derive(Debug)]
 pub(crate) enum InternalNumber {
     Integer(i32),
-    Dimen(core::Scaled),
-    Glue(core::Glue),
+    Dimen(common::Scaled),
+    Glue(common::Glue),
 }
 
 impl InternalNumber {
