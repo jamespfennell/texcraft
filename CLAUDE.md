@@ -53,7 +53,7 @@ Intentionally **independent of Texlang** — the typesetting engine can be used 
 - **`boxworks-lang/`** — DSL for specifying typesetting operations
 
 ### Foundation
-- **`core/`** — Fundamental types: `Scaled` (fixed-point arithmetic), `Glue`, `FontFormat` trait
+- **`common/`** — Fundamental types: `Scaled` (fixed-point arithmetic), `Glue`, `FontFormat` trait
 - **`texcraft-stdext/`** — General Rust utilities used across crates
 - **`tfm/`** — Parser for TeX Font Metric (`.tfm`) and Property List (`.pl`) formats
 - **`dvi/`** — DVI document format support

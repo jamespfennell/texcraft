@@ -54,7 +54,7 @@ The output should only reference Texcraft libraries:
 ```sh
 cargo tree -e normal --features="" --no-default-features \
     -p "boxworks*" \
-    -p core \
+    -p common \
     -p dvi \
     -p texcraft-stdext \
     -p "texlang*" \
@@ -66,7 +66,7 @@ Conversely, this shows the dependency tree when all features are enabled:
 ```sh
 cargo tree -e normal --all-features \
     -p "boxworks*" \
-    -p core \
+    -p common \
     -p dvi \
     -p texcraft-stdext \
     -p "texlang*" \

@@ -2,7 +2,7 @@
 
 ## Common to the whole project
 
-- [`core`](/reference/core/)
+- [`common`](/reference/common/)
 - [`texcraft-stdext`](/reference/texcraft_stdext)
 
 ## Texlang

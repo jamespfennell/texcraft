@@ -16,7 +16,6 @@
 //! horizontal list:
 //!
 //! ```
-//! use core;
 //! use boxworks::ds;
 //! use boxworks_lang as bwl;
 //!

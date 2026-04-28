@@ -273,8 +273,8 @@ Not all variable types have been implemented yet.
 | TeX Type      | Rust type      | Register accessor command | Implemented in Texlang?
 |-----------|----------------|--------------------------|----------------
 | Integer   | `i32`          | `\count`                 | Yes
-| Dimension | [`core::Scaled`](https://texcraft.dev/reference/core/struct.Scaled.html)            | `\dimen`                 | Yes
-| Glue      | [`core::Glue`](https://texcraft.dev/reference/core/struct.Scaled.html)             | `\skip`                  | Yes
+| Dimension | [`common::Scaled`](https://texcraft.dev/reference/common/struct.Scaled.html)            | `\dimen`                 | Yes
+| Glue      | [`common::Glue`](https://texcraft.dev/reference/common/struct.Scaled.html)             | `\skip`                  | Yes
 | Muglue    | TBD            | `\muskip`                | No
 | Box       | TBD            | `\box` and `\setbox`     | No
 | Category code  | [`CatCode`](https://texcraft.dev/reference/texlang/types/enum.CatCode.html) | `\catcode` | Yes
