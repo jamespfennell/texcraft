@@ -382,6 +382,12 @@ pub struct Glue {
     pub shrink_order: GlueOrder,
 }
 
+impl Glue {
+    pub fn is_zero(&self) -> bool {
+        self.width == Scaled::ZERO && self.stretch == Scaled::ZERO && self.shrink == Scaled::ZERO
+    }
+}
+
 impl std::ops::Mul<i32> for Glue {
     type Output = Glue;
     fn mul(self, rhs: i32) -> Self::Output {

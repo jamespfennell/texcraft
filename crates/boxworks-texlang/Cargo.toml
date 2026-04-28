@@ -1,0 +1,14 @@
+[package]
+name = "boxworks-texlang"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Texlang integration for Boxworks"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+
+[dependencies]
+boxworks-knuthplass = { path = "../boxworks-knuthplass", version="0.1.0" }
+texlang = { path = "../texlang", version = "0.1.0" }
+common = { path = "../common" }

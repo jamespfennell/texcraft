@@ -230,7 +230,7 @@ fn print_vlist_text(vlist: &bwl::ast::Vlist<'_>) {
             for h in &hlist.content.value {
                 match h {
                     bwl::ast::Horizontal::Chars(c) => line.push_str(&c.content.value),
-                    bwl::ast::Horizontal::Ligature(l) => line.push(l.char.value),
+                    bwl::ast::Horizontal::Ligature(l) => line.push_str(&l.original_chars.value),
                     bwl::ast::Horizontal::Glue(_) => line.push(' '),
                     _ => {}
                 }
@@ -261,6 +261,8 @@ fn build_tex_context(
     let file_stem = file_name.file_stem().unwrap().to_string_lossy();
     preamble.push_str(&format![
         r"
+
+\tracingparagraphs=1
 
             \font \customFont {file_stem}
 

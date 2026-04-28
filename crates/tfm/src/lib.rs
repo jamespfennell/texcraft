@@ -252,6 +252,12 @@ pub enum WidthIndex {
 }
 
 impl WidthIndex {
+    pub fn valid(&self) -> Option<NonZeroU8> {
+        match self {
+            WidthIndex::Invalid => None,
+            WidthIndex::Valid(n) => Some(*n),
+        }
+    }
     pub fn get(&self) -> u8 {
         match self {
             WidthIndex::Invalid => 0,
@@ -430,6 +436,17 @@ impl File {
     pub fn named_param_scaled(&self, param: NamedParameter) -> Option<common::Scaled> {
         self.named_param(param)
             .map(|p| p.to_scaled(self.header.design_size))
+    }
+
+    pub fn width_utf8(&self, char: char) -> Option<common::Scaled> {
+        let char: Char = char.try_into().ok()?;
+        let dimens = self.char_dimens.get(&char)?;
+        let i = dimens.width_index.valid()?.get();
+        Some(
+            self.widths
+                .get(i as usize)?
+                .to_scaled(self.header.design_size),
+        )
     }
 }
 

@@ -544,3 +544,25 @@ impl Penalty {
 // but it doesn't seem useful.
 
 // TODO: Unset node(s) in TeX.2021.159
+
+pub fn short_display_hlist(w: &mut dyn std::fmt::Write, hlist: &[Horizontal]) -> std::fmt::Result {
+    // TeX.2021.174
+    for elem in hlist {
+        use Horizontal::*;
+        match elem {
+            Char(char) => write!(w, "{}", char.char)?,
+            HList(_) | VList(_) | Whatsit(_) | Mark(_) | Adjust(_) => write!(w, "[]")?,
+            Rule(_) => write!(w, "|")?,
+            Ligature(ligature) => write!(w, "{}", ligature.original_chars)?,
+            Discretionary(_discretionary) => todo!(),
+            Math(_) => write!(w, "$")?,
+            Glue(glue) => {
+                if !glue.value.is_zero() {
+                    write!(w, " ")?;
+                }
+            }
+            Kern(_) | Penalty(_) | Insertion(_) => {}
+        };
+    }
+    Ok(())
+}

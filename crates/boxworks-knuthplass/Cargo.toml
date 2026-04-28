@@ -1,0 +1,18 @@
+[package]
+name = "boxworks-knuthplass"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Knuth-Plass line breaking implementation for Boxworks"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+
+[dependencies]
+common = { path = "../common", version="0.1.0" }
+boxworks = { path = "../boxworks", version="0.1.0" }
+
+[dev-dependencies]
+tfm = { path = "../tfm" }
+boxworks-text = { path = "../boxworks-text" }
+pretty_assertions = {version = "1.4.1" }
