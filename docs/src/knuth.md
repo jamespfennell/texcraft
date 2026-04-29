@@ -30,16 +30,16 @@ Texcraft code is frequently annotated with the analogous TeX section
 17 | The table of equivalents | N/A. Texlang's doesn't have a global table of state. Instead, the [component pattern](texlang/04-stateful-primitives.md) is used for per-command state.
 18 | The hash table | Mostly N/A because Texcraft uses Rust's stdlib data structures. But `command/map.rs` in `texlang` is the equivalent thing. The hash table is related to string interning, which in Texcraft is in `collections/interner.rs` in `texcraft-stdext`.
 19 | Saving and restoring equivalents  | Implemented via `collections/groupingmap.rs` in `texcraft-stdext`.
-20 | Token lists 
+20 | Token lists | Generally N/A because Texcraft just uses Rust's vector type. But `texmacro.rs` in `texlang` is related.
 21 | Introduction to the syntactic routines | N/A. This section is essentially just documentation.
 22 | Input stacks and states | The stacks are in `Internal` in `vm/mod.rs` in `texlang`. Error context is provided using Texlang's token tracing system, `token/trace.rs` in `texlang`.
 23 | Maintaining the input stacks | The stacks are modified throughout the `vm` module in `texlang`.
 24 | Getting the next token | `token/lexer.rs` and `vm/streams.rs` (especially the function `next_unexpanded`) in `texlang`.
 25 | Expanding the next token | `vm/streams.rs` in `texlang`, especially the `next_expanded` function.
 26 | Basic scanning subroutines | The `parse` module in `texlang`. In particular the `Parsable` trait determines what can be "scanned" and implementations of this trait generally map to subroutines in this section.
-27 | Building token lists 
+27 | Building token lists | `parse.mod.rs` in `texlang` and `def.rs` in `texlang-stdlib`.
 28 | Conditional processing | `conditional.rs` in `texlang-stdlib`.
-29 | File names |
+29 | File names | Partly `parse/filelocation.rs` in `texlang`, but in general this section hasn't been figured out.
 30 | Font metric data | `tfm`.
 31 | Device-independent file format | `dvi`.
 32 | Shipping pages out | `boxworks-dvi` (planned).
@@ -56,11 +56,11 @@ Texcraft code is frequently annotated with the analogous TeX section
 43 | Initializing the hyphenation tables | `boxworks-hyphenation` (planned).
 44 | Breaking vertical lists into pages 
 45 | The page builder 
-46 | The chief executive 
+46 | The chief executive | The main switch is implemented in `vm/mod.rs` in `texlang`. But most of this section is text preprocessing which is done in the `boxworks-text` crate, and relies heavily on lig/kern code in the `tfm` crate.
 47 | Building boxes and lists 
 48 | Building math lists 
-49 | Mode-independent processing | Various modules in `texlang-stdlib`. E.g. `\advance` is implemented in `math.rs`.
+49 | Mode-independent processing | Various modules in `texlang-stdlib`. E.g. `\advance` is implemented in `math.rs`; `\def` in `def.rs`; etc.
 50 | Dumping and undumping the tables | Implemented by Texlang's serializable VMs feature which has [dedicated documentation](texlang/11-serde.md). The Texlang framework code for serding is in `vm/serde.rs` in `texlang`, but serialization code is spread throughout the project (e.g. `#[derive(Serialize)]` on any component type).
-51 | The main program 
-52 | Debugging 
+51 | The main program | This section does a simple few things. Basic program initialization/setup is implemented in Texcraft's binary crates. Errors on the input ending prematurely are implemented throughout Texlang - e.g. the error of a conditional ending prematurely is implemented in `conditional.rs` in `texlang-stdlib`.
+52 | Debugging | N/A. This section is about connecting TeX with a Pascal debugger.
 53 | Extensions

@@ -12,7 +12,7 @@ use texlang::vm::TexlangState;
 /// The filesystem is returned in a dynamic pointer to avoid complicating
 /// the trait with a generic parameter.
 /// File system operations are rate in TeX documents so the overhead
-/// of a vtable lookup is negligable.
+/// of a vtable lookup is negligible.
 pub trait HasFileSystem {
     fn file_system(&self) -> Rc<RefCell<dyn FileSystem>> {
         Rc::new(RefCell::new(RealFileSystem {}))
