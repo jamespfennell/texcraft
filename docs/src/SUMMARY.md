@@ -43,3 +43,5 @@
 # Texcraft Rust reference
 
 - [Index of Texcraft Rust crates](reference.md)
+
+- [Texcraft code by TeX section](knuth.md)
