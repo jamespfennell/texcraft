@@ -5,9 +5,8 @@
 //! It is implemented in the Chief Executive chapter in Knuth's
 //! TeX (starting in TeX.2021.1029).
 
-use std::rc::Rc;
-
 use boxworks::ds;
+use std::{collections::HashMap, rc::Rc};
 use tfm::ligkern;
 
 #[derive(Debug)]
@@ -24,10 +23,45 @@ pub struct TextPreprocessorImpl {
     // TODO: should current_font be some kind of specific font identifier type.
     current_font: u32,
     space_factor: SpaceFactor,
+    pub space_factor_codes: SpaceFactorCodes,
+}
+
+pub struct SpaceFactorCodes(pub [i32; 256]);
+
+impl Default for SpaceFactorCodes {
+    fn default() -> Self {
+        Self::plain_tex_defaults()
+    }
+}
+
+impl SpaceFactorCodes {
+    pub fn plain_tex_defaults() -> Self {
+        let mut a = [1000_i32; 256];
+        for (c, value) in [
+            // From plain.tex
+            (')', 0),
+            ('\'', 0),
+            (']', 0),
+            // From \nonfrenchspacing in plain.tex
+            ('.', 3000),
+            ('?', 3000),
+            ('!', 3000),
+            (':', 2000),
+            (';', 1500),
+            (',', 1250),
+        ] {
+            a[c as usize] = value;
+        }
+        for c in 'A'..='Z' {
+            // INITTEX
+            a[c as usize] = 999;
+        }
+        Self(a)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct SpaceFactor(pub u16);
+pub struct SpaceFactor(pub i32);
 
 impl Default for SpaceFactor {
     fn default() -> Self {
@@ -36,22 +70,9 @@ impl Default for SpaceFactor {
 }
 
 impl SpaceFactor {
-    fn adjust(&mut self, c: char) {
+    fn adjust(&mut self, c: char, codes: &SpaceFactorCodes) {
         // TeX.2021.1034
-        // TODO: implement \sfcode and make this mapping configurable.
-        let new: u16 = match c {
-            // From plain.tex
-            ')' | '\'' | ']' => 0,
-            // From \nonfrenchspacing in plain.tex
-            '.' | '?' | '!' => 3000,
-            ':' => 2000,
-            ';' => 1500,
-            ',' => 1250,
-            // INITTEX
-            'A'..='Z' => 999,
-            // Default for other chars.
-            _ => 1000,
-        };
+        let new: i32 = codes.0.get(c as usize).copied().unwrap_or(1000);
         if new > 0 && new <= 1000 {
             self.0 = new;
         } else if new > 1000 {
@@ -64,11 +85,13 @@ impl SpaceFactor {
     }
 }
 
-impl boxworks::TextPreprocessor for TextPreprocessorImpl {
-    fn activate_font(&mut self, font: u32) {
+impl TextPreprocessorImpl {
+    pub fn activate_font(&mut self, font: u32) {
         self.current_font = font;
     }
+}
 
+impl boxworks::TextPreprocessor for TextPreprocessorImpl {
     fn new_paragraph(&mut self) {
         self.space_factor = Default::default();
     }
@@ -107,7 +130,7 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
         // We can change the run method to accept a callback that is invoked for
         // each character.
         for c in word.chars() {
-            self.space_factor.adjust(c);
+            self.space_factor.adjust(c, &self.space_factor_codes);
         }
     }
 
@@ -123,16 +146,8 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
             if self.space_factor.0 >= 2000 {
                 g.width += self.fonts[self.current_font as usize].extra_space;
             }
-            g.stretch = g
-                .stretch
-                .xn_over_d(self.space_factor.0.into(), 1000)
-                .unwrap()
-                .0;
-            g.shrink = g
-                .shrink
-                .xn_over_d(1000, self.space_factor.0.into())
-                .unwrap()
-                .0;
+            g.stretch = g.stretch.xn_over_d(self.space_factor.0, 1000).unwrap().0;
+            g.shrink = g.shrink.xn_over_d(1000, self.space_factor.0).unwrap().0;
             g
         };
         list.push(ds::Horizontal::Glue(g.into()));
@@ -166,6 +181,24 @@ impl TextPreprocessorImpl {
                 .unwrap(),
             lig_kern_program,
         });
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct TfmFontRepo {
+    fonts: HashMap<u32, tfm::File>,
+}
+
+impl TfmFontRepo {
+    pub fn register_font(&mut self, id: u32, tfm_file: tfm::File) {
+        assert_eq!(id as usize, self.fonts.len());
+        self.fonts.insert(id, tfm_file);
+    }
+}
+
+impl boxworks::FontRepo for TfmFontRepo {
+    fn width(&self, c: char, font: u32) -> Option<common::Scaled> {
+        self.fonts[&font].width_utf8(c)
     }
 }
 

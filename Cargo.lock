@@ -222,6 +222,7 @@ name = "boxworks-texlang"
 version = "0.1.0"
 dependencies = [
  "boxworks-knuthplass",
+ "boxworks-text",
  "common",
  "texlang",
 ]

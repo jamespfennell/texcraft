@@ -383,6 +383,13 @@ pub struct Glue {
 }
 
 impl Glue {
+    pub const ZERO: Glue = Glue {
+        width: Scaled::ZERO,
+        stretch: Scaled::ZERO,
+        stretch_order: GlueOrder::Normal,
+        shrink: Scaled::ZERO,
+        shrink_order: GlueOrder::Normal,
+    };
     pub fn is_zero(&self) -> bool {
         self.width == Scaled::ZERO && self.stretch == Scaled::ZERO && self.shrink == Scaled::ZERO
     }

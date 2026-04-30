@@ -9,8 +9,6 @@ pub mod ds;
 pub mod tex;
 
 pub trait TextPreprocessor {
-    fn activate_font(&mut self, font: u32);
-
     fn new_paragraph(&mut self);
 
     fn add_word(&mut self, word: &str, list: &mut Vec<ds::Horizontal>);
@@ -37,9 +35,6 @@ pub struct SimpleTextPreprocessor {
 }
 
 impl TextPreprocessor for SimpleTextPreprocessor {
-    fn activate_font(&mut self, font: u32) {
-        self.font = font;
-    }
     fn new_paragraph(&mut self) {}
 
     fn add_word(&mut self, word: &str, list: &mut Vec<ds::Horizontal>) {
@@ -67,4 +62,17 @@ impl TextPreprocessor for SimpleTextPreprocessor {
             .into(),
         );
     }
+}
+
+pub trait FontRepo {
+    fn width(&self, c: char, font: u32) -> Option<common::Scaled>;
+}
+
+pub trait LineBreaker {
+    fn break_line<F: FontRepo>(
+        self,
+        font_repo: &F,
+        v_list: &mut Vec<ds::Vertical>,
+        h_list: &mut Vec<ds::Horizontal>,
+    );
 }

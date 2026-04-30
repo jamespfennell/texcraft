@@ -10,5 +10,6 @@ keywords = ["tex", "texcraft"]
 
 [dependencies]
 boxworks-knuthplass = { path = "../boxworks-knuthplass", version="0.1.0" }
+boxworks-text = { path = "../boxworks-text" }
 texlang = { path = "../texlang", version = "0.1.0" }
 common = { path = "../common" }

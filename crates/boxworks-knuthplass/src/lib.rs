@@ -6,24 +6,57 @@ use boxworks::ds::{self, KernKind};
 use common::{GlueOrder, Scaled};
 pub mod debug;
 
-#[derive(Default, Debug)]
-pub struct LineBreaker {
-    params: Params,
+pub struct LineBreaker<'a> {
+    pub params: &'a Params,
+    pub line_widths: &'a [common::Scaled],
+    pub debug_logger: Option<&'a mut dyn debug::Logger>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Params {
-    pub line_penalty: i32,
     pub adj_demerits: i32,
-    pub tracing_paragraphs: i32,
-    pub hyphen_penalty: i32,
+    pub double_hyphen_demerits: i32,
     pub ex_hyphen_penalty: i32,
+    pub final_hyphen_demerits: i32,
+    pub hyphen_penalty: i32,
+    pub left_skip: common::Glue,
+    pub line_penalty: i32,
+    pub looseness: i32,
     pub par_fill_skip: common::Glue,
     pub pre_tolerance: i32,
-    pub tolerance: i32,
-    pub emergency_stretch: i32,
-    pub left_skip: common::Glue,
     pub right_skip: common::Glue,
+    pub tolerance: i32,
+}
+
+impl Default for Params {
+    fn default() -> Self {
+        Self::plain_tex_defaults()
+    }
+}
+
+impl Params {
+    pub fn plain_tex_defaults() -> Self {
+        Self {
+            adj_demerits: 10000,
+            double_hyphen_demerits: 10000,
+            ex_hyphen_penalty: 50,
+            final_hyphen_demerits: 5000,
+            hyphen_penalty: 50,
+            left_skip: common::Glue::ZERO,
+            line_penalty: 10,
+            looseness: 0,
+            par_fill_skip: common::Glue {
+                width: common::Scaled::ZERO,
+                stretch: common::Scaled::ONE,
+                stretch_order: common::GlueOrder::Fil,
+                shrink: common::Scaled::ZERO,
+                shrink_order: Default::default(),
+            },
+            pre_tolerance: 100,
+            right_skip: common::Glue::ZERO,
+            tolerance: 200,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -114,55 +147,37 @@ enum LineClass {
     End,
 }
 
-impl LineBreaker {
-    pub fn break_line<F>(
-        &mut self,
-        list: &mut Vec<ds::Horizontal>,
-        font_width: &F,
-        line_widths: &[common::Scaled],
-        mut debug_logger: Option<&mut dyn debug::Logger>,
-    ) where
-        F: Fn(char, u32) -> Scaled,
-    {
-        self.params.par_fill_skip = common::Glue {
-            width: common::Scaled::ZERO,
-            stretch: common::Scaled::ONE,
-            stretch_order: common::GlueOrder::Fil,
-            shrink: common::Scaled::ZERO,
-            shrink_order: Default::default(),
-        };
-
+impl<'a> boxworks::LineBreaker for LineBreaker<'a> {
+    fn break_line<F: boxworks::FontRepo>(
+        mut self,
+        font_repo: &F,
+        _v_list: &mut Vec<ds::Vertical>,
+        h_list: &mut Vec<ds::Horizontal>,
+    ) {
         // TeX.2021.816
-        if matches!(list.last(), Some(ds::Horizontal::Glue(_))) {
-            list.pop();
+        if matches!(h_list.last(), Some(ds::Horizontal::Glue(_))) {
+            h_list.pop();
         }
-        list.push(ds::Horizontal::Penalty(ds::Penalty::INFINITE));
-        list.push(ds::Horizontal::Glue(ds::Glue {
+        h_list.push(ds::Horizontal::Penalty(ds::Penalty::INFINITE));
+        h_list.push(ds::Horizontal::Glue(ds::Glue {
             kind: ds::GlueKind::Normal,
             value: self.params.par_fill_skip,
         }));
 
-        if let Some(debug_logger) = debug_logger.as_deref_mut() {
+        if let Some(debug_logger) = self.debug_logger.as_deref_mut() {
             debug_logger.log_attempt(1);
         }
-        self.break_line_attempt(list, font_width, line_widths, debug_logger);
+        self.break_line_attempt(h_list, font_repo);
     }
+}
 
-    pub fn break_line_attempt<F>(
+impl<'a> LineBreaker<'a> {
+    pub fn break_line_attempt<F: boxworks::FontRepo>(
         &mut self,
         list: &[ds::Horizontal],
-        font_width: &F,
-        line_widths: &[common::Scaled],
-        mut debug_logger: Option<&mut dyn debug::Logger>,
-    ) where
-        F: Fn(char, u32) -> Scaled,
-    {
-        // TODO: for different runs this is different
-        let threshold = 100;
-        self.params.line_penalty = 10;
-        self.params.adj_demerits = 10_000;
-
-        // self.params.pre_tolerance as i64;
+        font_repo: &F,
+    ) {
+        let threshold = self.params.pre_tolerance;
 
         let force_solution = false;
 
@@ -213,7 +228,9 @@ impl LineBreaker {
                     Char(ds::Char { char, font }) | Ligature(ds::Ligature { char, font, .. }) => {
                         // TeX.2021.867 has an optimization in which subsequent chars are read
                         // here. I'm not convinced it's worth it.
-                        diffs.width += font_width(*char, *font);
+                        diffs.width += font_repo
+                            .width(*char, *font)
+                            .unwrap_or(common::Scaled::ZERO);
                         continue;
                     }
                     HList(ds::HList { width, .. })
@@ -231,7 +248,7 @@ impl LineBreaker {
                         disc_width = discretionary
                             .pre_break
                             .iter()
-                            .map(|e| e.width(font_width))
+                            .map(|e| e.width(font_repo))
                             .sum();
                         // If the break occurs here, the pre_break items will be added
                         // before the break. Thus the actual width of the line is the current
@@ -320,26 +337,26 @@ impl LineBreaker {
                 // The line width is calculated in TeX.2021.850. However in this implementation
                 // of Knuth-Plass, the line width calculator is passed as a parameter.
                 let (next_line_class, line_width) = match line_class {
-                    // todo: if len(line_widths) = 1 then we should return End
+                    // todo: if len(self.line_widths) = 1 then we should return End
                     LineClass::Beginning => {
-                        if line_widths.len() == 1 {
-                            (LineClass::End, *line_widths.first().unwrap())
+                        if self.line_widths.len() == 1 {
+                            (LineClass::End, *self.line_widths.first().unwrap())
                         } else {
-                            (LineClass::Numbered(0), *line_widths.first().unwrap())
+                            (LineClass::Numbered(0), *self.line_widths.first().unwrap())
                         }
                     }
-                    LineClass::Numbered(i) => match line_widths.get(i + 1) {
+                    LineClass::Numbered(i) => match self.line_widths.get(i + 1) {
                         Some(line_width) => {
                             // if index i+1 is the last element, meaning it has i+2 elements
-                            if line_widths.len() == i + 2 {
+                            if self.line_widths.len() == i + 2 {
                                 (LineClass::End, *line_width)
                             } else {
                                 (LineClass::Numbered(i + 1), *line_width)
                             }
                         }
-                        None => (LineClass::End, *line_widths.last().unwrap()),
+                        None => (LineClass::End, *self.line_widths.last().unwrap()),
                     },
-                    LineClass::End => (LineClass::End, *line_widths.last().unwrap()),
+                    LineClass::End => (LineClass::End, *self.line_widths.last().unwrap()),
                 };
 
                 // TeX.2021.833
@@ -426,14 +443,15 @@ impl LineBreaker {
                     if badness <= threshold || emergency_break {
                         // TeX.2021.855
                         let demerits = self.demerits(
-                            badness.try_into().unwrap_or(i32::MAX),
+                            self.params,
+                            badness,
                             penalty,
                             active_node.fitness_class,
                             fitness_class,
                         );
                         let total_demerits = demerits + active_node.total_demerits;
                         // The logging here is implemented in TeX.2021.856
-                        if let Some(debug_logger) = debug_logger.as_deref_mut() {
+                        if let Some(debug_logger) = self.debug_logger.as_deref_mut() {
                             debug_logger.log_feasible_breakpoint(
                                 list,
                                 debug::FeasibleBreakpoint {
@@ -499,7 +517,7 @@ impl LineBreaker {
                         };
 
                         // Logging here is TeX.2021.846
-                        if let Some(debug_logger) = debug_logger.as_deref_mut() {
+                        if let Some(debug_logger) = self.debug_logger.as_deref_mut() {
                             debug_logger.log_new_active_node(debug::NewActiveNode {
                                 node_index: active_node.node_index,
                                 line_number: active_node.line_number,
@@ -553,12 +571,13 @@ impl LineBreaker {
     /// TeX.2021.859
     fn demerits(
         &self,
+        params: &Params,
         badness: i32,
         penalty: i32,
         previous_fitness_class: FitnessClass,
         this_fitness_class: FitnessClass,
     ) -> i32 {
-        let mut d = self.params.line_penalty + badness;
+        let mut d = params.line_penalty + badness;
         if d.abs() >= 10_000 {
             d = 10_000;
         }
@@ -571,7 +590,7 @@ impl LineBreaker {
         // TODO: hyphenation adjustment.
         // \doublehyphendemerits and \finalhyphendemerits.
         if (previous_fitness_class as isize - this_fitness_class as isize).abs() > 1 {
-            d += self.params.adj_demerits;
+            d += params.adj_demerits;
         }
         d
     }
@@ -579,12 +598,12 @@ impl LineBreaker {
 
 // TeX.2021.833
 const AWFUL_BAD: i32 = 0o7_777_777_777;
-const INFINITE_BADNESS: i64 = 10000;
+const INFINITE_BADNESS: i32 = 10000;
 const INFINITE_PENALTY: i32 = 10000;
 const EJECT_PENALTY: i32 = -10000;
 
 /// TeX.2021.108
-fn badness(shortfall: Scaled64, stretchability: Scaled64) -> i64 {
+fn badness(shortfall: Scaled64, stretchability: Scaled64) -> i32 {
     let t = shortfall.0;
     let s = stretchability.0;
     if t == 0 {
@@ -603,7 +622,9 @@ fn badness(shortfall: Scaled64, stretchability: Scaled64) -> i64 {
     if r > 1290 {
         INFINITE_BADNESS
     } else {
-        (r * r * r + 0o400_000) / 0o1_000_000
+        ((r * r * r + 0o400_000) / 0o1_000_000)
+            .try_into()
+            .unwrap_or(INFINITE_BADNESS)
     }
 }
 
@@ -746,18 +767,22 @@ mod tests {
             tp.add_space(&mut list);
         }
 
-        let font_width = |c: char, _: u32| {
-            tfm_file
-                .width_utf8(c)
-                .expect(&format!("char {c} not in font"))
-        };
+        let mut font_repo: bwt::TfmFontRepo = Default::default();
+        font_repo.register_font(0, tfm_file);
         let width = common::Scaled::parse_from_string("5in").unwrap();
-        let mut line_breaker: LineBreaker = Default::default();
+        let params = Params::plain_tex_defaults();
 
         let log: Rc<RefCell<String>> = Default::default();
         let mut logger = debug::TexLogger::new(log.clone());
 
-        line_breaker.break_line(&mut list, &font_width, &[width], Some(&mut logger));
+        let line_breaker = super::LineBreaker {
+            params: &params,
+            line_widths: &[width],
+            debug_logger: Some(&mut logger),
+        };
+        let mut v_list = vec![];
+        use boxworks::LineBreaker;
+        line_breaker.break_line(&font_repo, &mut v_list, &mut list);
 
         let log = log.take();
         assert_eq!(normalize(want_log), normalize(&log));

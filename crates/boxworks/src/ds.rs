@@ -349,14 +349,18 @@ pub enum DiscretionaryElem {
 }
 
 impl DiscretionaryElem {
-    pub fn width<F: Fn(char, u32) -> Number>(&self, font_width: F) -> Number {
+    pub fn width<F: super::FontRepo>(&self, font_width: &F) -> Number {
         use DiscretionaryElem::*;
         match self {
-            Char(char) => font_width(char.char, char.font),
+            Char(char) => font_width
+                .width(char.char, char.font)
+                .unwrap_or(common::Scaled::ZERO),
             HList(hlist) => hlist.width,
             VList(vlist) => vlist.width,
             Rule(rule) => rule.width,
-            Ligature(ligature) => font_width(ligature.char, ligature.font),
+            Ligature(ligature) => font_width
+                .width(ligature.char, ligature.font)
+                .unwrap_or(common::Scaled::ZERO),
             Kern(kern) => kern.width,
         }
     }

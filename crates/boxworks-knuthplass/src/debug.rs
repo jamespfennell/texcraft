@@ -4,7 +4,7 @@ use boxworks::ds;
 
 pub struct FeasibleBreakpoint {
     pub elem_index: usize,
-    pub badness: i64,
+    pub badness: i32,
     pub penalty: i32,
     pub demerits: i32,
     pub previous_node_index: usize,
