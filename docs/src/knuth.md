@@ -50,10 +50,10 @@ Texcraft code is frequently annotated with the analogous TeX section
 37 | Alignment 
 38 | Breaking paragraphs into lines | `boxworks-knuthplass`.
 39 | Breaking paragraphs into lines, continued | `boxworks-knuthplass`.
-40 | Pre-hyphenation | `boxworks-hyphenation` (planned).
-41 | Post-hyphenation | `boxworks-hyphenation` (planned). 
-42 | Hyphenation | `boxworks-hyphenation` (planned).
-43 | Initializing the hyphenation tables | `boxworks-hyphenation` (planned).
+40 | Pre-hyphenation | `boxworks-hyphenate` (planned).
+41 | Post-hyphenation | `boxworks-hyphenate` (planned). 
+42 | Hyphenation | `hyphenate` and `texlang-hyphenate` (implementation of `\hyphenation`).
+43 | Initializing the hyphenation tables | `hyphenate` and `texlang-hyphenate` (implementation of `\patterns`).
 44 | Breaking vertical lists into pages 
 45 | The page builder 
 46 | The chief executive | The main switch is implemented in `vm/mod.rs` in `texlang`. But most of this section is text preprocessing which is done in the `boxworks-text` crate, and relies heavily on lig/kern code in the `tfm` crate.

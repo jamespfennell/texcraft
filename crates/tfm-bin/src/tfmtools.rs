@@ -185,13 +185,32 @@ struct Convert {
     /// writes the output to path/to/file.tfm.
     #[arg(short, long)]
     output: Option<TfOrPlPath>,
+
+    /// Remove the lig/kern program from the output file.
+    ///
+    /// This clears all lig/kern instructions and removes ligature tags from characters.
+    #[arg(long)]
+    remove_lig_kern_program: bool,
+}
+
+fn remove_lig_kern_program(file: &mut tfm::File) {
+    file.lig_kern_program = Default::default();
+    file.char_tags
+        .retain(|_, tag| !matches!(tag, tfm::CharTag::Ligature(_)));
 }
 
 impl Convert {
     fn run(&self, indent: usize, charcode_format: CharcodeFormat) -> Result<(), String> {
         match &self.path {
             TfOrPlPath::Tf(tf_path) => {
-                let bytes = tf_path.read_bytes()?;
+                let mut bytes = tf_path.read_bytes()?;
+                if self.remove_lig_kern_program {
+                    let (tfm_file_or, _) = tfm::File::deserialize(&bytes);
+                    if let Ok(mut tfm_file) = tfm_file_or {
+                        remove_lig_kern_program(&mut tfm_file);
+                        bytes = tfm_file.serialize();
+                    }
+                }
                 let output = tfm::algorithms::tfm_to_pl(&bytes, indent, &|pl_file| {
                     charcode_format.to_display_format(&pl_file.header.character_coding_scheme)
                 })
@@ -214,7 +233,10 @@ impl Convert {
             }
             TfOrPlPath::Pl(pl_path) => {
                 let (pl_file, _) = pl_path.read()?;
-                let tfm_file: tfm::File = pl_file.into();
+                let mut tfm_file: tfm::File = pl_file.into();
+                if self.remove_lig_kern_program {
+                    remove_lig_kern_program(&mut tfm_file);
+                }
                 let tfm_bytes = tfm_file.serialize();
                 let tfm_path: TfPath = match &self.output {
                     Some(TfOrPlPath::Pl(_pl_path)) => todo!(),

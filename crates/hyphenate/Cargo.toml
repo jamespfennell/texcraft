@@ -1,0 +1,19 @@
+[package]
+name = "hyphenate"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Implementation of hte hyphenation algorithm in TeX"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+
+[dependencies]
+clap = { version = "4.3.3", default-features = false, features = ["std", "derive"] }
+tempfile = "3"
+
+[[bin]]
+name = "hyphenate"
+path = "src/bin/hyphenate.rs"
+
+[features]

@@ -662,6 +662,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyphenate"
+version = "0.1.0"
+dependencies = [
+ "clap 4.4.8",
+ "tempfile",
+]
+
+[[package]]
 name = "iana-time-zone"
 version = "0.1.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
