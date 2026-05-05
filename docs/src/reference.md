@@ -31,5 +31,6 @@
 
 - [`boxworks-bin`](/reference/boxworks_bin/) — the `box` CLI
 - [`dvi-bin`](/reference/dvi_bin/) — the `dvitools` CLI
+- [`hyphenate-bin`](/reference/hyphenate_bin/) — the `hyphenate` CLI
 - [`texcraft`](/reference/texcraft/) — the main Texcraft CLI (`doc`, `repl`, `run` subcommands)
 - [`tfm-bin`](/reference/tfm_bin/) — the `tfmtools`, `tftopl`, and `pltotf` CLIs

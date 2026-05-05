@@ -12,56 +12,9 @@ use std::collections::HashMap;
 #[derive(Default)]
 pub struct Hyphenator {
     data: Vec<u8>,
-    patterns: Trie,
+    patterns: trie::Trie,
     exceptions: HashMap<String, Vec<u8>>,
 }
-
-#[derive(Debug, Default)]
-struct Trie {
-    m: HashMap<(TrieVertex, TrieEdge), (TrieVertex, Option<TrieValue>)>,
-    r: HashMap<TrieVertex, (TrieVertex, TrieEdge)>,
-    next_vertex: TrieVertex,
-}
-
-impl Trie {
-    fn root(&self) -> TrieVertex {
-        TrieVertex(u32::MAX)
-    }
-    fn next_or(
-        &self,
-        current: TrieVertex,
-        edge: TrieEdge,
-    ) -> Option<(TrieVertex, Option<TrieValue>)> {
-        self.m.get(&(current, edge)).copied()
-    }
-    fn next(&mut self, current: TrieVertex, edge: TrieEdge) -> TrieVertex {
-        self.m
-            .entry((current, edge))
-            .or_insert_with(|| {
-                let next = self.next_vertex;
-                self.next_vertex = TrieVertex(self.next_vertex.0 + 1);
-                self.r.insert(next, (current, edge));
-                (next, None)
-            })
-            .0
-    }
-    fn set_value(&mut self, vertex: TrieVertex, value: TrieValue) {
-        self.m.get_mut(&self.r[&vertex]).unwrap().1 = Some(value);
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Default, Clone, Copy)]
-struct TrieVertex(u32);
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-enum TrieEdge {
-    StartOfWord,
-    Char(char),
-    EndOfWord,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct TrieValue(usize);
 
 impl Hyphenator {
     /// Construct a hyphenator loaded with plain TeX's English (US) patterns and exceptions.
@@ -82,52 +35,64 @@ impl Hyphenator {
     /// Load hyphenation patterns from a whitespace-separated string in TeX pattern format.
     pub fn load_patterns(&mut self, patterns: &str) {
         // TeX.2021.961 and onwards.
-        // (bool, String, bool) -> Vec<u8>
+        let mut empty_value: Option<trie::Value> = None;
         for pattern in patterns.split_whitespace() {
             let mut vertex = self.patterns.root();
-            let start_of_word = pattern.starts_with('.');
-            if start_of_word {
-                vertex = self.patterns.next(vertex, TrieEdge::StartOfWord);
+            let mut value = &mut empty_value;
+            if pattern.starts_with('.') {
+                (vertex, value) = self.patterns.next(vertex, trie::Edge::StartOfWord);
             }
-            let end_of_word = pattern.ends_with('.');
-            let mut word = String::new();
-            let mut num_chars = 0_usize;
-            let mut scores = Vec::<u8>::new();
-            let mut num_scores = 0;
+            let data_start = self.data.len();
+            enum State {
+                // The payload is the number of characters before this character
+                // that were not assigned a score. If we write out a score for this
+                // character, we will first write out zero scores for the other
+                // characters. This is a serialization optimization.
+                AfterChar(usize),
+                AfterScore,
+            }
+            let mut state = State::AfterChar(0);
             for c in pattern.chars() {
                 match c {
                     '0'..='9' => {
-                        while let Some(missing) = num_chars.checked_sub(num_scores) {
-                            if missing == 0 {
-                                break;
+                        match state {
+                            State::AfterChar(mut n) => {
+                                while n > 0 {
+                                    let code = (n + 10).try_into().unwrap_or(u8::MAX);
+                                    self.data.push(code);
+                                    n -= (code - 10) as usize;
+                                }
                             }
-                            num_scores += missing;
-                            scores.push((missing + 10).try_into().unwrap_or(u8::MAX));
+                            State::AfterScore => {
+                                // In the case of two consecutive scores (e.g. a123b)
+                                // it seems the last one wins. See. TeX.2021.962.
+                                self.data.pop();
+                            }
                         }
-                        // TODO: set digit_sensed=true and hit the error path when the char is invalid
-                        scores.push((c as u32 - '0' as u32).try_into().expect("digits are <= 9"));
-                        num_scores += 1;
+                        self.data
+                            .push((c as u32 - '0' as u32).try_into().expect("digits are <= 9"));
+                        state = State::AfterScore;
                     }
                     '.' => {
                         // Already handled above.
                         continue;
                     }
                     _ => {
-                        // TODO: set to lower case and check for non-chars like #
-                        // This is all done using the lower case infra
-                        vertex = self.patterns.next(vertex, TrieEdge::Char(c));
-                        word.push(c);
-                        num_chars += 1;
+                        // TODO: we should error if it's not a valid pattern like
+                        // // the `help1` in TeX.2021.962.
+                        (vertex, value) = self.patterns.next(vertex, trie::Edge::Char(c));
+                        state = State::AfterChar(match state {
+                            State::AfterChar(n) => n + 1,
+                            State::AfterScore => 0,
+                        });
                     }
                 }
             }
-            if end_of_word {
-                vertex = self.patterns.next(vertex, TrieEdge::EndOfWord);
+            if pattern.ends_with('.') {
+                (vertex, value) = self.patterns.next(vertex, trie::Edge::EndOfWord);
             }
-            let index = self.data.len();
-            self.data.extend_from_slice(&scores);
             self.data.push(10);
-            self.patterns.set_value(vertex, TrieValue(index));
+            *value = Some(trie::Value(data_start));
         }
     }
     /// Add a hyphenation exception. The word is given with hyphens marking the allowed break points,
@@ -172,13 +137,13 @@ impl Hyphenator {
             None => {
                 let mut total_scores = vec![0_u8; word.len() + 1];
 
-                let mut process = |mut vertex: TrieVertex, lower: usize| {
+                let mut process = |mut vertex: trie::Vertex, lower: usize| {
                     let mut chars = word[lower..].chars();
                     loop {
                         let c = chars.next();
                         let edge = match c {
-                            None => TrieEdge::EndOfWord,
-                            Some(c) => TrieEdge::Char(c),
+                            None => trie::Edge::EndOfWord,
+                            Some(c) => trie::Edge::Char(c),
                         };
                         let pattern;
                         (vertex, pattern) = match self.patterns.next_or(vertex, edge) {
@@ -209,7 +174,7 @@ impl Hyphenator {
                 };
                 if let Some((vertex, _)) = self
                     .patterns
-                    .next_or(self.patterns.root(), TrieEdge::StartOfWord)
+                    .next_or(self.patterns.root(), trie::Edge::StartOfWord)
                 {
                     process(vertex, 0);
                 }
@@ -241,6 +206,48 @@ impl Hyphenator {
 /// Remove all `-` characters from a word.
 pub fn strip_hyphens(word: &str) -> String {
     word.chars().filter(|c| *c != '-').collect()
+}
+
+mod trie {
+    use std::collections::HashMap;
+
+    #[derive(Debug, Default)]
+    pub struct Trie {
+        m: HashMap<(Vertex, Edge), (Vertex, Option<Value>)>,
+        r: HashMap<Vertex, (Vertex, Edge)>,
+        next_vertex: Vertex,
+    }
+
+    impl Trie {
+        pub fn root(&self) -> Vertex {
+            Vertex(u32::MAX)
+        }
+        pub fn next_or(&self, current: Vertex, edge: Edge) -> Option<(Vertex, Option<Value>)> {
+            self.m.get(&(current, edge)).copied()
+        }
+        pub fn next(&mut self, current: Vertex, edge: Edge) -> (Vertex, &mut Option<Value>) {
+            let (a, b) = self.m.entry((current, edge)).or_insert_with(|| {
+                let next = self.next_vertex;
+                self.next_vertex = Vertex(self.next_vertex.0 + 1);
+                self.r.insert(next, (current, edge));
+                (next, None)
+            });
+            (*a, b)
+        }
+    }
+
+    #[derive(Debug, PartialEq, Eq, Hash, Default, Clone, Copy)]
+    pub struct Vertex(u32);
+
+    #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+    pub enum Edge {
+        StartOfWord,
+        Char(char),
+        EndOfWord,
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct Value(pub usize);
 }
 
 #[cfg(test)]

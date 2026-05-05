@@ -1,0 +1,18 @@
+[package]
+name = "hyphenate-bin"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Binary for hyphenating words using TeX's hyphenation algorithm"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+
+[dependencies]
+hyphenate = { path = "../hyphenate" }
+clap = { version = "4.3.3", default-features = false, features = ["std", "derive"] }
+tempfile = "3"
+
+[[bin]]
+name = "hyphenate"
+path = "src/main.rs"

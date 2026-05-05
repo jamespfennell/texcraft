@@ -664,8 +664,13 @@ dependencies = [
 [[package]]
 name = "hyphenate"
 version = "0.1.0"
+
+[[package]]
+name = "hyphenate-bin"
+version = "0.1.0"
 dependencies = [
  "clap 4.4.8",
+ "hyphenate",
  "tempfile",
 ]
 
