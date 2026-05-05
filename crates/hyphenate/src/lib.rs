@@ -3,7 +3,7 @@
 //! The main entry point is [`Hyphenator`], which can be constructed with
 //! plain TeX's built-in English patterns using [`Hyphenator::plain_tex_en_us`].
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// Hyphenates words using TeX's pattern-matching algorithm (Knuth-Liang).
 ///
@@ -11,9 +11,57 @@ use std::collections::{HashMap, HashSet};
 /// English patterns, or load custom patterns with [`Hyphenator::load_patterns`].
 #[derive(Default)]
 pub struct Hyphenator {
-    patterns: HashMap<(bool, String, bool), (Vec<u8>, String)>,
-    exceptions: HashMap<String, HashSet<usize>>,
+    data: Vec<u8>,
+    patterns: Trie,
+    exceptions: HashMap<String, Vec<u8>>,
 }
+
+#[derive(Debug, Default)]
+struct Trie {
+    m: HashMap<(TrieVertex, TrieEdge), (TrieVertex, Option<TrieValue>)>,
+    r: HashMap<TrieVertex, (TrieVertex, TrieEdge)>,
+    next_vertex: TrieVertex,
+}
+
+impl Trie {
+    fn root(&self) -> TrieVertex {
+        TrieVertex(u32::MAX)
+    }
+    fn next_or(
+        &self,
+        current: TrieVertex,
+        edge: TrieEdge,
+    ) -> Option<(TrieVertex, Option<TrieValue>)> {
+        self.m.get(&(current, edge)).copied()
+    }
+    fn next(&mut self, current: TrieVertex, edge: TrieEdge) -> TrieVertex {
+        self.m
+            .entry((current, edge))
+            .or_insert_with(|| {
+                let next = self.next_vertex;
+                self.next_vertex = TrieVertex(self.next_vertex.0 + 1);
+                self.r.insert(next, (current, edge));
+                (next, None)
+            })
+            .0
+    }
+    fn set_value(&mut self, vertex: TrieVertex, value: TrieValue) {
+        self.m.get_mut(&self.r[&vertex]).unwrap().1 = Some(value);
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Default, Clone, Copy)]
+struct TrieVertex(u32);
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+enum TrieEdge {
+    StartOfWord,
+    Char(char),
+    EndOfWord,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct TrieValue(usize);
 
 impl Hyphenator {
     /// Construct a hyphenator loaded with plain TeX's English (US) patterns and exceptions.
@@ -36,19 +84,29 @@ impl Hyphenator {
         // TeX.2021.961 and onwards.
         // (bool, String, bool) -> Vec<u8>
         for pattern in patterns.split_whitespace() {
+            let mut vertex = self.patterns.root();
             let start_of_word = pattern.starts_with('.');
+            if start_of_word {
+                vertex = self.patterns.next(vertex, TrieEdge::StartOfWord);
+            }
             let end_of_word = pattern.ends_with('.');
             let mut word = String::new();
             let mut num_chars = 0_usize;
             let mut scores = Vec::<u8>::new();
+            let mut num_scores = 0;
             for c in pattern.chars() {
                 match c {
                     '0'..='9' => {
-                        while scores.len() < num_chars {
-                            scores.push(0);
+                        while let Some(missing) = num_chars.checked_sub(num_scores) {
+                            if missing == 0 {
+                                break;
+                            }
+                            num_scores += missing;
+                            scores.push((missing + 10).try_into().unwrap_or(u8::MAX));
                         }
                         // TODO: set digit_sensed=true and hit the error path when the char is invalid
                         scores.push((c as u32 - '0' as u32).try_into().expect("digits are <= 9"));
+                        num_scores += 1;
                     }
                     '.' => {
                         // Already handled above.
@@ -57,87 +115,126 @@ impl Hyphenator {
                     _ => {
                         // TODO: set to lower case and check for non-chars like #
                         // This is all done using the lower case infra
+                        vertex = self.patterns.next(vertex, TrieEdge::Char(c));
                         word.push(c);
                         num_chars += 1;
                     }
                 }
             }
-            self.patterns
-                .insert((start_of_word, word, end_of_word), (scores, pattern.into()));
+            if end_of_word {
+                vertex = self.patterns.next(vertex, TrieEdge::EndOfWord);
+            }
+            let index = self.data.len();
+            self.data.extend_from_slice(&scores);
+            self.data.push(10);
+            self.patterns.set_value(vertex, TrieValue(index));
         }
     }
     /// Add a hyphenation exception. The word is given with hyphens marking the allowed break points,
     /// e.g. `"hy-phen-ation"`.
     pub fn insert_exception(&mut self, hyphenated_word: &str) {
         let mut word = String::new();
-        let mut indices = HashSet::new();
-        let mut n = 0_usize;
+        let mut indices = vec![0];
         for c in hyphenated_word.chars() {
             if c == '-' {
-                indices.insert(n);
+                indices.pop();
+                indices.push(1);
             } else {
                 word.push(c);
-                n += 1;
+                indices.push(0);
             }
         }
         self.exceptions.insert(word, indices);
     }
     /// Hyphenate a word, returning it with `-` inserted at each valid break point.
-    pub fn hypthenate(&self, word: &str) -> String {
-        let indices = self.calculate_indices(word);
-        let mut got = String::new();
+    pub fn hypthenate(&self, word: &str, target: &mut String) {
+        let mut indices = self.calculate_indices(word);
+        let mut next = indices.next();
         for (i, c) in word.chars().enumerate() {
-            if indices.contains(&i) {
-                got.push('-');
+            if next == Some(i) {
+                target.push('-');
+                next = indices.next();
             }
-            got.push(c);
+            target.push(c);
         }
-        got
     }
     /// Return the set of character indices before which a hyphen may be inserted.
-    pub fn calculate_indices(&self, word: &str) -> HashSet<usize> {
-        if let Some(s) = self.exceptions.get(word) {
-            return s.clone();
-        }
-        let chars: Vec<char> = word.chars().map(|c| c.to_ascii_lowercase()).collect();
-        let mut total_scores = vec![0_u8; chars.len() + 1];
-        for i in 1..=chars.len() {
-            for j in 0..=(chars.len() - i) {
-                // considering substrings of length i starting at index j
-                let s: String = chars[j..j + i].iter().collect();
-                let start_of_words = if j == 0 {
-                    vec![true, false]
-                } else {
-                    vec![false]
-                };
-                let end_of_words = if j + i == chars.len() {
-                    vec![true, false]
-                } else {
-                    vec![false]
-                };
-                for start_of_word in start_of_words.clone() {
-                    for end_of_word in end_of_words.clone() {
-                        let Some(pattern) =
-                            self.patterns.get(&(start_of_word, s.clone(), end_of_word))
-                        else {
+    pub fn calculate_indices(&self, word: &str) -> impl Iterator<Item = usize> {
+        let s: String;
+        let word = if word.chars().any(|c| c.is_ascii_uppercase()) {
+            s = word.chars().map(|c| c.to_ascii_lowercase()).collect();
+            &s
+        } else {
+            word
+        };
+        let total_scores = match self.exceptions.get(word) {
+            Some(s) => s.clone(),
+            None => {
+                let mut total_scores = vec![0_u8; word.len() + 1];
+
+                let mut process = |mut vertex: TrieVertex, lower: usize| {
+                    let mut chars = word[lower..].chars();
+                    loop {
+                        let c = chars.next();
+                        let edge = match c {
+                            None => TrieEdge::EndOfWord,
+                            Some(c) => TrieEdge::Char(c),
+                        };
+                        let pattern;
+                        (vertex, pattern) = match self.patterns.next_or(vertex, edge) {
+                            None => return,
+                            Some(entry) => entry,
+                        };
+                        let Some(pattern) = pattern else {
                             continue;
                         };
-                        for (k, score) in pattern.0.iter().copied().enumerate() {
-                            if total_scores[j + k] < score {
-                                total_scores[j + k] = score;
+                        let mut k = 0;
+                        for op in self.data[pattern.0..].iter() {
+                            match op {
+                                score @ ..10 => {
+                                    if total_scores[lower + k] < *score {
+                                        total_scores[lower + k] = *score;
+                                    }
+                                    k += 1;
+                                }
+                                10 => {
+                                    break;
+                                }
+                                _ => {
+                                    k += (op - 10) as usize;
+                                }
                             }
                         }
                     }
+                };
+                if let Some((vertex, _)) = self
+                    .patterns
+                    .next_or(self.patterns.root(), TrieEdge::StartOfWord)
+                {
+                    process(vertex, 0);
                 }
+                let mut lower = 0;
+                while let Some(c) = word[lower..].chars().next() {
+                    process(self.patterns.root(), lower);
+                    lower += c.len_utf8();
+                }
+                total_scores[0] = 0;
+                total_scores[1] = 0;
+                for j in 1..=3 {
+                    if let Some(i) = total_scores.len().checked_sub(j) {
+                        if let Some(total_score) = total_scores.get_mut(i) {
+                            *total_score = 0;
+                        };
+                    }
+                }
+                total_scores
             }
-        }
+        };
         total_scores
-            .iter()
+            .into_iter()
             .enumerate()
             .filter(|(_, score)| *score % 2 != 0)
             .map(|(i, _)| i)
-            .filter(|i| *i > 1 && i + 2 < chars.len())
-            .collect()
     }
 }
 
@@ -157,7 +254,8 @@ mod test {
                 #[allow(non_snake_case)]
                 fn $name() {
                     let hyphenator = Hyphenator::plain_tex_en_us();
-                    let got = hyphenator.hypthenate(stringify!($name));
+                    let mut got = String::new();
+                    hyphenator.hypthenate(stringify!($name), &mut got);
                     assert_eq!(got, $expected);
                 }
             )*
@@ -180,6 +278,7 @@ mod test {
         project => "project",
         present => "present",
         table => "ta-ble",
+        Table => "Ta-ble",
         // From running the hyphenator over /usr/share/dict/words on Mac
         ach => "ach",
         Aaronic => "Aa-ronic",

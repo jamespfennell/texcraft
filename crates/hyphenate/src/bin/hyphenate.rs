@@ -20,6 +20,10 @@ struct Args {
     #[arg(long)]
     /// Checks the output of the tool is the same as in TeX. Requires `tex` to be available.
     validate: bool,
+
+    #[arg(long)]
+    /// Prints the time it took per hyphenation.
+    time: bool,
 }
 
 fn main() {
@@ -43,13 +47,16 @@ fn main() {
     };
 
     let mut errors = 0_usize;
-    for word in words {
-        let hyphenated = hyphenator.hypthenate(&word);
+    let start = std::time::Instant::now();
+    let mut hyphenated = String::new();
+    for word in &words {
+        hyphenated.clear();
+        hyphenator.hypthenate(word, &mut hyphenated);
         if !args.no_output {
             println!("{}", hyphenated);
         }
         if let Some(tex_results) = &tex_results {
-            let Some(tex_result) = tex_results.get(&word) else {
+            let Some(tex_result) = tex_results.get(word) else {
                 eprintln!(
                     "Warning: failed to find {word} in TeX results, will skip validating this word"
                 );
@@ -60,6 +67,10 @@ fn main() {
                 errors += 1;
             }
         }
+    }
+    if args.time {
+        let elapsed: usize = start.elapsed().as_nanos().try_into().unwrap_or(usize::MAX);
+        eprintln!("Took {:?}ns/hyphenation", elapsed / words.len());
     }
     if errors > 0 {
         eprintln!("{errors} errors");
