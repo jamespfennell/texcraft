@@ -47,11 +47,12 @@ fn main() {
     };
 
     let mut errors = 0_usize;
+    let lower_caser: hyphenate::AsciiLowerCaser = Default::default();
     let start = std::time::Instant::now();
     let mut hyphenated = String::new();
     for word in &words {
         hyphenated.clear();
-        hyphenator.hypthenate(word, &mut hyphenated);
+        hyphenator.hypthenate(&lower_caser, word, &mut hyphenated);
         if !args.no_output {
             println!("{}", hyphenated);
         }
