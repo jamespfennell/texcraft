@@ -291,7 +291,8 @@ fn math_primitive_fn<S: TexlangState, O: Op>(
                         variable::Variable::Glue(variable) => {
                             O::apply_to_variable(variable, input, scope)
                         }
-                        variable::Variable::CatCode(_)
+                        variable::Variable::SmallInt(_)
+                        | variable::Variable::CatCode(_)
                         | variable::Variable::TokenList(_)
                         | variable::Variable::MathCode(_)
                         | variable::Variable::Font(_) => {

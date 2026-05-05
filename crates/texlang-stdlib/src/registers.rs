@@ -27,6 +27,12 @@ pub struct Component<T, const N: usize, Marker = DefaultMarker>(
     std::marker::PhantomData<Marker>,
 );
 
+impl<T, const N: usize, Marker> Component<T, N, Marker> {
+    pub fn values(&self) -> &[T; N] {
+        &self.0
+    }
+}
+
 static COUNTDEF_TAG: command::StaticTag = command::StaticTag::new();
 
 pub fn countdef_tag() -> command::Tag {

@@ -98,41 +98,31 @@ impl Value {
 
     /// TODO: should have a char_and_catcode function
     pub fn char(&self) -> Option<char> {
-        match *self {
-            Value::BeginGroup(c) => Some(c),
-            Value::EndGroup(c) => Some(c),
-            Value::MathShift(c) => Some(c),
-            Value::AlignmentTab(c) => Some(c),
-            Value::Parameter(c) => Some(c),
-            Value::Superscript(c) => Some(c),
-            Value::Subscript(c) => Some(c),
-            Value::Space(c) => Some(c),
-            Value::Letter(c) => Some(c),
-            Value::Other(c) => Some(c),
-            Value::CommandRef(command_ref) => match command_ref {
-                CommandRef::ControlSequence(_) => None,
-                CommandRef::ActiveCharacter(c) => Some(c),
-            },
-        }
+        Some(self.char_and_cat_code()?.0)
     }
 
     pub fn cat_code(&self) -> Option<CatCode> {
-        match self {
-            Value::BeginGroup(_) => Some(CatCode::BeginGroup),
-            Value::EndGroup(_) => Some(CatCode::EndGroup),
-            Value::MathShift(_) => Some(CatCode::MathShift),
-            Value::AlignmentTab(_) => Some(CatCode::AlignmentTab),
-            Value::Parameter(_) => Some(CatCode::Parameter),
-            Value::Superscript(_) => Some(CatCode::Superscript),
-            Value::Subscript(_) => Some(CatCode::Subscript),
-            Value::Space(_) => Some(CatCode::Space),
-            Value::Letter(_) => Some(CatCode::Letter),
-            Value::Other(_) => Some(CatCode::Other),
+        Some(self.char_and_cat_code()?.1)
+    }
+
+    pub fn char_and_cat_code(&self) -> Option<(char, CatCode)> {
+        let (c, code) = match self {
+            Value::BeginGroup(c) => (c, CatCode::BeginGroup),
+            Value::EndGroup(c) => (c, CatCode::EndGroup),
+            Value::MathShift(c) => (c, CatCode::MathShift),
+            Value::AlignmentTab(c) => (c, CatCode::AlignmentTab),
+            Value::Parameter(c) => (c, CatCode::Parameter),
+            Value::Superscript(c) => (c, CatCode::Superscript),
+            Value::Subscript(c) => (c, CatCode::Subscript),
+            Value::Space(c) => (c, CatCode::Space),
+            Value::Letter(c) => (c, CatCode::Letter),
+            Value::Other(c) => (c, CatCode::Other),
             Value::CommandRef(command_ref) => match command_ref {
-                CommandRef::ControlSequence(_) => None,
-                CommandRef::ActiveCharacter(_) => Some(CatCode::Active),
+                CommandRef::ControlSequence(_) => return None,
+                CommandRef::ActiveCharacter(c) => (c, CatCode::Active),
             },
-        }
+        };
+        Some((*c, code))
     }
 }
 
@@ -215,13 +205,15 @@ impl Token {
         self.trace_key
     }
 
-    /// TODO: should have a char_and_catcode function
     pub fn char(&self) -> Option<char> {
         self.value.char()
     }
 
     pub fn cat_code(&self) -> Option<CatCode> {
         self.value.cat_code()
+    }
+    pub fn char_and_cat_code(&self) -> Option<(char, CatCode)> {
+        self.value.char_and_cat_code()
     }
 }
 

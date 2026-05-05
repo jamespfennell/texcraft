@@ -16,6 +16,8 @@ pub struct MathCode(pub u16);
 
 impl MathCode {
     /// The maximum value of the inner value. This is 2^15-1.
+    ///
+    /// Defined in TeX.2021.1233 as 0o100000 which is different. TODO: figure this out.
     pub const MAX: usize = 32767;
 }
 

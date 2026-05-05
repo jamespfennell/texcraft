@@ -12,6 +12,7 @@
 - [`texlang-font`](/reference/texlang_font) — font integration for Texlang
 - [`texlang-stdlib`](/reference/texlang_stdlib) — the Texlang standard library of TeX primitives
 - [`texlang-testing`](/reference/texlang_testing) — unit testing framework for Texlang-based code
+- [`texlang-texttransform`](/reference/texlang_texttransform) — TeX primitives for text transformation (hyphenation, upper and lower casing)
 
 ## Boxworks
 

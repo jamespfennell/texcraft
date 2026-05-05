@@ -153,7 +153,10 @@ impl<S> Command<S> {
     /// TODO: we should just expose the type.
     pub fn is_arithmetic(&self) -> bool {
         match self.getters {
-            Getters::Int(_, _) | Getters::Dimen(_, _) | Getters::Glue(_, _) => true,
+            Getters::Int(_, _)
+            | Getters::SmallInt(_, _)
+            | Getters::Dimen(_, _)
+            | Getters::Glue(_, _) => true,
             Getters::CatCode(_, _)
             | Getters::MathCode(_, _)
             | Getters::TokenList(_, _)
@@ -634,6 +637,11 @@ supported_type_impl!(
         rust_type: i32,
         enum_variant: Int,
         save_stack_field: i32,
+    },
+    {
+        rust_type: u8,
+        enum_variant: SmallInt,
+        save_stack_field: u8,
     },
     {
         rust_type: common::Scaled,

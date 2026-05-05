@@ -16,6 +16,12 @@ impl Parsable for i32 {
     }
 }
 
+impl Parsable for u8 {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+        let u = Uint::<256>::parse_impl(input)?;
+        Ok(u.0.try_into().expect("smaller than 256 so in range"))
+    }
+}
 /// When parsed, this type returns a nonnegative integer with the provided upper bound.
 ///
 /// This type is used to implement the following parsing logic in TeX:
@@ -189,6 +195,7 @@ pub(crate) fn parse_internal_number<S: TexlangState>(
         Some(command::Command::Variable(cmd)) => {
             match cmd.clone().value(first_token, input)? {
                 variable::ValueRef::Int(i) => Ok(InternalNumber::Integer(*i)),
+                variable::ValueRef::SmallInt(c) => Ok(InternalNumber::Integer(*c as i32)),
                 variable::ValueRef::CatCode(c) => Ok(InternalNumber::Integer(*c as i32)),
                 variable::ValueRef::MathCode(c) => Ok(InternalNumber::Integer(c.0 as i32)),
                 variable::ValueRef::Dimen(d) => Ok(InternalNumber::Dimen(*d)),

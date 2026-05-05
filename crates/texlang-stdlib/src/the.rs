@@ -36,6 +36,9 @@ fn the_primitive_fn<S: TheCompatible>(
                         variable::ValueRef::Int(i) => {
                             write(expansions, the_token, *i);
                         }
+                        variable::ValueRef::SmallInt(i) => {
+                            write(expansions, the_token, *i);
+                        }
                         variable::ValueRef::CatCode(i) => {
                             write(expansions, the_token, (*i as u8) as i32);
                         }

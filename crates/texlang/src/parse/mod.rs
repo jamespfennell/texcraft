@@ -171,6 +171,32 @@ impl Parsable for Option<token::CommandRef> {
     }
 }
 
+pub struct LeftBrace;
+
+impl Parsable for LeftBrace {
+    // TeX.2021.403 scan_left_brace
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+        get_required_element![
+            input.unexpanded(),
+            "an opening brace",
+            "a balanced token list must start with an opening brace",
+            token::Value::BeginGroup(_) => (),
+        ];
+        Ok(LeftBrace {})
+    }
+}
+
+pub struct UnexpandedTokenList(pub Vec<token::Token>);
+
+impl Parsable for UnexpandedTokenList {
+    fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
+        let mut result = input.checkout_token_buffer();
+        LeftBrace::parse(input)?;
+        finish_parsing_balanced_tokens(input.unexpanded(), &mut result)?;
+        Ok(UnexpandedTokenList(result))
+    }
+}
+
 impl Parsable for Vec<token::Token> {
     fn parse_impl<S: TexlangState>(input: &mut vm::ExpandedStream<S>) -> txl::Result<Self> {
         let mut result = input.checkout_token_buffer();
@@ -224,7 +250,8 @@ impl error::EndOfInputError for TokenStreamEndOfInputError {
 /// This function assumes the the initial opening brace has ready been consumed.
 /// It returns false if the input ends before balanced tokens completed.
 ///
-/// This function is analogous to `scan_toks(true, true)` in Knuth's TeX.
+/// This function is somewhat analogous to `scan_toks` in Knuth's TeX.
+/// For us the `xpand` parameter can be controlled by providing a different token stream.
 pub fn finish_parsing_balanced_tokens<S: vm::TokenStream>(
     stream: &mut S,
     result: &mut Vec<token::Token>,

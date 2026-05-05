@@ -42,13 +42,7 @@ impl Hyphenator {
         let exceptions = include_str!("plain_tex_exceptions.txt");
         let mut h: Self = Default::default();
         h.load_patterns(patterns);
-        exceptions
-            .lines()
-            .map(|l| l.trim())
-            .filter(|l| !l.is_empty())
-            .for_each(|l| {
-                h.insert_exception(l);
-            });
+        h.insert_exceptions(exceptions);
         h
     }
     /// Load hyphenation patterns from a whitespace-separated string in TeX pattern format.
@@ -113,6 +107,17 @@ impl Hyphenator {
             self.data.push(10);
             *value = Some(trie::Value(data_start));
         }
+    }
+    /// Add multiple hyphenation exceptions. These are separate words separated by whitespace, with
+    /// each word satisfying the format in [`insert_exception`].
+    pub fn insert_exceptions(&mut self, hyphenated_words: &str) {
+        hyphenated_words
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .for_each(|l| {
+                self.insert_exception(l);
+            });
     }
     /// Add a hyphenation exception. The word is given with hyphens marking the allowed break points,
     /// e.g. `"hy-phen-ation"`.

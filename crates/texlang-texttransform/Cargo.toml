@@ -1,0 +1,19 @@
+[package]
+name = "texlang-texttransform"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Implementation of TeX primitives relating to text transforming (hyphenation, upper and lower casing)"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+
+[dependencies]
+# Texcraft
+hyphenate = { path = "../hyphenate" }
+texlang = { path = "../texlang" }
+texlang-stdlib = { path = "../texlang-stdlib", default-features = false, features = [] }
+
+[dev-dependencies]
+texcraft-stdext = { path = "../texcraft-stdext" }
+texlang-testing = { path = "../texlang-testing" }
