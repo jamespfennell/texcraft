@@ -13,7 +13,7 @@ use common::Scaled as Number;
 use std::rc::Rc;
 
 /// Element of a horizontal list.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Horizontal {
     Char(Char),
     HList(HList),
@@ -24,7 +24,7 @@ pub enum Horizontal {
     Adjust(Adjust),
     Ligature(Ligature),
     Discretionary(Discretionary),
-    Whatsit(Box<dyn Whatsit>),
+    Whatsit(Rc<dyn Whatsit>),
     Math(Math),
     Glue(Glue),
     Kern(Kern),
@@ -70,14 +70,14 @@ horizontal_impl!(
 );
 
 /// Element of a vertical list.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Vertical {
     HList(HList),
     VList(VList),
     Rule(Rule),
     Mark(Mark),
     Insertion(Insertion),
-    Whatsit(Box<dyn Whatsit>),
+    Whatsit(Rc<dyn Whatsit>),
     Math(Math),
     Glue(Glue),
     Kern(Kern),
@@ -113,7 +113,7 @@ vertical_impl!(HList, VList, Rule, Mark, Insertion, Math, Glue, Kern, Penalty,);
 /// This node can only appear in horizontal mode.
 ///
 /// Described in TeX.2021.134.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Char {
     pub char: char,
     pub font: u32,
@@ -122,7 +122,7 @@ pub struct Char {
 /// A box made from a horizontal list.
 ///
 /// Described in TeX.2021.135.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct HList {
     pub height: Number,
     pub width: Number,
@@ -147,14 +147,14 @@ pub struct HList {
 /// using a float is okay.
 ///
 /// Described in TeX.2021.109.
-#[derive(Default, Debug, PartialEq)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub struct GlueRatio(pub f32);
 
 // TODO: ensure that glue ratio cannot be NaN
 impl Eq for GlueRatio {}
 
 /// Description of whether the glue should stretch, shrink, or remain rigid.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum GlueSign {
     Stretching,
     Shrinking,
@@ -192,7 +192,7 @@ impl Default for HList {
 /// instead of [Horizontal] nodes.
 ///
 /// Described in TeX.2021.137.
-#[derive(Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct VList {
     pub height: Number,
     pub width: Number,
@@ -214,7 +214,7 @@ pub struct VList {
 /// in a vlist.
 ///
 /// Described in TeX.2021.138.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Rule {
     pub height: Number,
     pub width: Number,
@@ -249,7 +249,7 @@ impl Default for Rule {
 /// This node is related to the TeX primitive `\insert`.
 ///
 /// Described in TeX.2021.140.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Insertion {
     pub box_number: u8,
     /// Slightly misnamed: it actually holds the natural height plus depth
@@ -271,7 +271,7 @@ pub struct Insertion {
 /// to depend on Texlang. So for the moment just leaving a dummy list.
 ///
 /// Described in TeX.2021.141.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Mark {
     pub list: Vec<()>,
 }
@@ -281,7 +281,7 @@ pub struct Mark {
 /// E.g., used to implement the TeX primitive `\vadjust`.
 ///
 /// Described in TeX.2021.142.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Adjust {
     pub list: Vec<Vertical>,
 }
@@ -289,7 +289,7 @@ pub struct Adjust {
 /// A ligature.
 ///
 /// Described in TeX.2021.143.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ligature {
     pub included_left_boundary: bool,
     pub included_right_boundary: bool,
@@ -311,7 +311,7 @@ pub struct Ligature {
 /// A discretionary break.
 ///
 /// Described in TeX.2021.145.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Discretionary {
     /// Material to insert before this node, if the break occurs here.
     pub pre_break: Vec<DiscretionaryElem>,
@@ -338,7 +338,7 @@ impl Default for Discretionary {
 }
 
 /// Element of a discretionary list.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DiscretionaryElem {
     Char(Char),
     HList(HList),
@@ -396,11 +396,19 @@ impl TryFrom<Horizontal> for DiscretionaryElem {
 /// so we'll eventually find out.
 ///
 /// Described in TeX.2021.146.
-pub trait Whatsit: std::fmt::Debug {}
+pub trait Whatsit: std::fmt::Debug {
+    // Invoked when this node is invoked when hyphenating.
+    //
+    // This is TeX.2021.1363 but given how we've architected the code, the logic in TeX.2021.1382
+    // (which changes the current language) should run here for \language whatsits.
+    fn hyphenation_hook(&self) {}
+}
 
 /// A marker placed before or after math mode.
 ///
 /// Described in TeX.2021.147.
+///
+/// TODO: this also needs a width and so is wrong.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Math {
     Before,
@@ -466,7 +474,7 @@ impl Vertical {
 /// A piece of glue.
 ///
 /// Described in TeX.2021.149.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Glue {
     pub value: common::Glue,
     pub kind: GlueKind,
@@ -484,7 +492,7 @@ impl From<common::Glue> for Glue {
 /// The kind of a glue node.
 ///
 /// Described in TeX.2021.149.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum GlueKind {
     #[default]
     Normal,
@@ -505,7 +513,7 @@ pub enum GlueKind {
 /// A kern.
 ///
 /// Described in TeX.2021.155.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Kern {
     pub width: Number,
     pub kind: KernKind,
@@ -532,7 +540,7 @@ pub enum KernKind {
 /// A penalty.
 ///
 /// Described in TeX.2021.157.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Penalty(pub i32);
 
 impl Penalty {
@@ -551,14 +559,19 @@ impl Penalty {
 
 pub fn short_display_hlist(w: &mut dyn std::fmt::Write, hlist: &[Horizontal]) -> std::fmt::Result {
     // TeX.2021.174
-    for elem in hlist {
+    let mut i = 0;
+    while let Some(elem) = hlist.get(i) {
         use Horizontal::*;
         match elem {
             Char(char) => write!(w, "{}", char.char)?,
             HList(_) | VList(_) | Whatsit(_) | Mark(_) | Adjust(_) => write!(w, "[]")?,
             Rule(_) => write!(w, "|")?,
             Ligature(ligature) => write!(w, "{}", ligature.original_chars)?,
-            Discretionary(_discretionary) => todo!(),
+            Discretionary(discretionary) => {
+                short_display_dlist(w, &discretionary.pre_break)?;
+                short_display_dlist(w, &discretionary.post_break)?;
+                i += discretionary.replace_count as usize;
+            }
             Math(_) => write!(w, "$")?,
             Glue(glue) => {
                 if !glue.value.is_zero() {
@@ -567,6 +580,27 @@ pub fn short_display_hlist(w: &mut dyn std::fmt::Write, hlist: &[Horizontal]) ->
             }
             Kern(_) | Penalty(_) | Insertion(_) => {}
         };
+        i += 1;
+    }
+    Ok(())
+}
+
+fn short_display_dlist(
+    w: &mut dyn std::fmt::Write,
+    dlist: &[DiscretionaryElem],
+) -> std::fmt::Result {
+    // TeX.2021.174
+    let mut i = 0;
+    while let Some(elem) = dlist.get(i) {
+        use DiscretionaryElem::*;
+        match elem {
+            Char(char) => write!(w, "{}", char.char)?,
+            HList(_) | VList(_) => write!(w, "[]")?,
+            Rule(_) => write!(w, "|")?,
+            Ligature(ligature) => write!(w, "{}", ligature.original_chars)?,
+            Kern(_) => {}
+        };
+        i += 1;
     }
     Ok(())
 }

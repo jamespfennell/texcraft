@@ -198,10 +198,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "boxworks-hyphenate"
+version = "0.1.0"
+dependencies = [
+ "boxworks",
+ "hyphenate",
+]
+
+[[package]]
 name = "boxworks-knuthplass"
 version = "0.1.0"
 dependencies = [
  "boxworks",
+ "boxworks-hyphenate",
  "boxworks-text",
  "common",
  "pretty_assertions",

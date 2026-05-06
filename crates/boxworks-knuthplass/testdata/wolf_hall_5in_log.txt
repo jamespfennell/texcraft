@@ -1,0 +1,80 @@
+@firstpass
+\customFont He thinks, if you were born in Putney, you saw the river every day, and imagined 
+@ via @@0 b=1 p=0 d=121
+@@1: line 1.2 t=121 -> @@0
+it 
+@ via @@0 b=3 p=0 d=169
+@@2: line 1.2 t=169 -> @@0
+widening out to the sea. Even if you had never seen the ocean you had a picture
+
+@ via @@1 b=0 p=0 d=100
+@ via @@2 b=2 p=0 d=144
+@@3: line 2.2 t=221 -> @@1
+of 
+@ via @@1 b=35 p=0 d=2025
+@ via @@2 b=1 p=0 d=121
+@@4: line 2.2 t=290 -> @@2
+@@5: line 2.3 t=2146 -> @@1
+it 
+@ via @@2 b=35 p=0 d=2025
+@@6: line 2.3 t=2194 -> @@2
+in your head from what you had been told by foreign people who sometimes 
+@ via @@3 b=1 p=0 d=121
+@ via @@4 b=40 p=0 d=2500
+@ via @@5 b=40 p=0 d=12500
+@@7: line 3.1 t=2790 -> @@4
+@@8: line 3.2 t=342 -> @@3
+came 
+@ via @@4 b=12 p=0 d=484
+@ via @@5 b=12 p=0 d=484
+@ via @@6 b=0 p=0 d=100
+@@9: line 3.2 t=774 -> @@4
+upriver. You knew that one day you would go out into a world of marble 
+@ via @@7 b=16 p=0 d=676
+@ via @@8 b=16 p=0 d=676
+@@10: line 4.1 t=1018 -> @@8
+pavements 
+@ via @@9 b=12 p=0 d=484
+@@11: line 4.2 t=1258 -> @@9
+and peacocks, of hillsides buzzing with heat, the fragrance of crushed 
+@ via @@10 b=10 p=0 d=400
+@@12: line 5.2 t=1418 -> @@10
+herbs rising 
+@ via @@11 b=1 p=0 d=121
+@@13: line 5.2 t=1379 -> @@11
+around you as you walked. You planned for what your journeys would 
+@ via @@12 b=0 p=0 d=100
+@@14: line 6.2 t=1518 -> @@12
+bring you: 
+@ via @@13 b=1 p=0 d=121
+@@15: line 6.2 t=1500 -> @@13
+the 
+@ via @@13 b=77 p=0 d=7569
+@@16: line 6.3 t=8948 -> @@13
+touch of warm terracotta, the night sky of another climate, alien 
+@ via @@14 b=12 p=0 d=484
+@@17: line 7.2 t=2002 -> @@14
+flowers, the 
+@ via @@15 b=4 p=0 d=196
+@@18: line 7.2 t=1696 -> @@15
+stone 
+@ via @@16 b=0 p=0 d=100
+@@19: line 7.2 t=9048 -> @@16
+eyed gaze of other peoples saints. But if you were born in Aslockton, in 
+@ via @@18 b=47 p=0 d=3249
+@@20: line 8.1 t=4945 -> @@18
+flat 
+@ via @@18 b=0 p=0 d=100
+@@21: line 8.2 t=1796 -> @@18
+fields 
+@ via @@19 b=0 p=0 d=100
+@@22: line 8.2 t=9148 -> @@19
+under a wide sky, you might just be able to imagine Cambridge: no 
+@ via @@20 b=60 p=0 d=4900
+@@23: line 9.1 t=9845 -> @@20
+farther. 
+@\par via @@20 b=75 p=-10000 d=17225
+@\par via @@21 b=0 p=-10000 d=100
+@\par via @@22 b=0 p=-10000 d=100
+@\par via @@23 b=0 p=-10000 d=100
+@@24: line 9.2- t=1896 -> @@21

@@ -78,7 +78,13 @@ impl Logger for TexLogger {
             "@{} via @@{} b={} p={} d={}",
             match list.get(fb.elem_index) {
                 None => r"\par",
-                _ => "",
+                Some(elem) => {
+                    use ds::Horizontal::*;
+                    match elem {
+                        Discretionary(_) => r"\discretionary",
+                        _ => "",
+                    }
+                }
             },
             fb.previous_node_index,
             fb.badness,

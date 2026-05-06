@@ -11,6 +11,7 @@ keywords = ["tex", "texcraft"]
 [dependencies]
 common = { path = "../common", version="0.1.0" }
 boxworks = { path = "../boxworks", version="0.1.0" }
+boxworks-hyphenate = { path = "../boxworks-hyphenate" }
 
 [dev-dependencies]
 tfm = { path = "../tfm" }

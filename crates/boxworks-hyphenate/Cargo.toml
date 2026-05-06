@@ -1,0 +1,14 @@
+[package]
+name = "boxworks-hyphenate"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Hyphenation in the Boxworks engine"
+homepage = "https://texcraft.dev"
+repository = "https://github.com/jamespfennell/texcraft"
+keywords = ["tex", "texcraft"]
+
+[dependencies]
+# Texcraft
+hyphenate = { path = "../hyphenate" }
+boxworks = { path = "../boxworks" }

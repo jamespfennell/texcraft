@@ -62,6 +62,14 @@ impl Params {
 #[derive(Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Debug)]
 struct Scaled64(i64);
 
+impl std::ops::Add for Scaled64 {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
 impl std::ops::Sub for Scaled64 {
     type Output = Self;
 
@@ -81,6 +89,12 @@ impl std::ops::Neg for Scaled64 {
 impl AddAssign<common::Scaled> for Scaled64 {
     fn add_assign(&mut self, rhs: common::Scaled) {
         self.0 += rhs.0 as i64
+    }
+}
+
+impl std::ops::SubAssign<common::Scaled> for Scaled64 {
+    fn sub_assign(&mut self, rhs: common::Scaled) {
+        self.0 -= rhs.0 as i64
     }
 }
 
@@ -167,7 +181,17 @@ impl<'a> boxworks::LineBreaker for LineBreaker<'a> {
         if let Some(debug_logger) = self.debug_logger.as_deref_mut() {
             debug_logger.log_attempt(1);
         }
-        self.break_line_attempt(h_list, font_repo);
+        if self.break_line_attempt(h_list, font_repo, self.params.pre_tolerance) {
+            return;
+        }
+        if let Some(debug_logger) = self.debug_logger.as_deref_mut() {
+            debug_logger.log_attempt(2);
+        }
+        boxworks_hyphenate::hyphenate_list(h_list);
+        if self.break_line_attempt(h_list, font_repo, self.params.tolerance) {
+            return;
+        }
+        println!("need emergency attempt");
     }
 }
 
@@ -176,11 +200,8 @@ impl<'a> LineBreaker<'a> {
         &mut self,
         list: &[ds::Horizontal],
         font_repo: &F,
-    ) {
-        let threshold = self.params.pre_tolerance;
-
-        let force_solution = false;
-
+        tolerance: i32,
+    ) -> bool {
         let mut auto_breaking = true;
         let mut passive_nodes = vec![PassiveNode {
             _elem: 0,
@@ -250,11 +271,6 @@ impl<'a> LineBreaker<'a> {
                             .iter()
                             .map(|e| e.width(font_repo))
                             .sum();
-                        // If the break occurs here, the pre_break items will be added
-                        // before the break. Thus the actual width of the line is the current
-                        // width, plus the width of the pre_break items. This modification
-                        // to deltas.width is undone later in the function.
-                        diffs.width += disc_width;
                         (
                             if discretionary.pre_break.is_empty() {
                                 self.params.ex_hyphen_penalty
@@ -307,6 +323,7 @@ impl<'a> LineBreaker<'a> {
                             // and that it is not part of a math formula.
                             (0, false)
                         } else {
+                            println!("adding kern width {}", kern.width);
                             diffs.width += kern.width;
                             continue;
                         }
@@ -321,6 +338,7 @@ impl<'a> LineBreaker<'a> {
 
             // TeX.2021.831
             if penalty >= INFINITE_PENALTY {
+                // TODO: For discretionaty nodes we need to adjust the width here?
                 continue;
             }
             if penalty <= EJECT_PENALTY {
@@ -377,8 +395,11 @@ impl<'a> LineBreaker<'a> {
                 while m > 0 {
                     m -= 1;
                     let active_node = active_nodes.pop_front().expect("active nodes to consider");
+                    let ideal_line_width = Scaled64(line_width.0 as i64);
+                    let actual_line_width_no_stretching =
+                        diffs.width - active_node.diffs.width + Scaled64(disc_width.0 as i64);
                     let line_diffs = Diffs {
-                        width: diffs.width - active_node.diffs.width,
+                        width: ideal_line_width - actual_line_width_no_stretching,
                         shrinkability: diffs.shrinkability - active_node.diffs.shrinkability,
                         stretchabilities: [
                             diffs.stretchabilities[0] - active_node.diffs.stretchabilities[0],
@@ -389,7 +410,7 @@ impl<'a> LineBreaker<'a> {
                     };
 
                     // TeX.2021.851
-                    let shortfall = Scaled64(line_width.0 as i64) - line_diffs.width;
+                    let shortfall = line_diffs.width;
                     let (badness, fitness_class) = if shortfall.0 > 0 {
                         // Stretching the line
                         // TeX.2021.852
@@ -426,28 +447,26 @@ impl<'a> LineBreaker<'a> {
                         }
                     };
 
-                    let emergency_break = if badness == INFINITE_BADNESS + 1 || penalty >= 10000 {
-                        // Forced break
+                    // The conidition of the if statement is in TeX.2021.851
+                    let deactivate = if badness > INFINITE_BADNESS || penalty == EJECT_PENALTY {
                         // TeX.2021.854
-                        // TODO: I think the new_active_nodes check is wrong, it might also need
-                        // to incorporate non-deactivated nodes.
-                        // TODO: I think this is all wrong.
-                        let last_active_node = i == 0 && active_nodes.is_empty();
-                        force_solution && minimum_demerits == i32::MAX && last_active_node
+                        // TODO: finish TeX.2021.854 when we implement the final pass.
+                        true
                     } else {
                         false
                     };
 
                     // Allowable break.
                     // Add a candidate
-                    if badness <= threshold || emergency_break {
+                    if badness <= tolerance {
                         // TeX.2021.855
                         let demerits = self.demerits(
-                            self.params,
                             badness,
                             penalty,
                             active_node.fitness_class,
                             fitness_class,
+                            active_node.hyphenated && hyphenated,
+                            active_node.hyphenated && elem.is_none(),
                         );
                         let total_demerits = demerits + active_node.total_demerits;
                         // The logging here is implemented in TeX.2021.856
@@ -476,8 +495,9 @@ impl<'a> LineBreaker<'a> {
                             minimum_demerits = total_demerits;
                         }
                     }
-                    // TODO: Potentially deactivate the node
-                    active_nodes.push_back(active_node);
+                    if !deactivate {
+                        active_nodes.push_back(active_node);
+                    }
                 }
 
                 // TeX.2021.835
@@ -490,10 +510,47 @@ impl<'a> LineBreaker<'a> {
                         minimum_demerits += self.params.adj_demerits.abs();
                     }
                     let mut diffs = diffs.clone();
-                    // TeX.2021.837
-                    if let Some(Glue(glue)) = elem {
-                        diffs.update_from_glue(&glue.value);
-                        // TODO finish this section
+                    if let Some(elem) = elem {
+                        // TeX.2021.837
+                        match elem {
+                            Discretionary(discretionary) => {
+                                // TeX.2021.840
+                                // TODO: also need to factor in the post_break adjustment.
+                                let mut j = i + 1;
+                                while j < i + 1 + discretionary.replace_count as usize {
+                                    diffs.width += match &list[j] {
+                                        Char(ds::Char { char, font })
+                                        | Ligature(ds::Ligature { char, font, .. }) => font_repo
+                                            .width(*char, *font)
+                                            .unwrap_or(common::Scaled::ZERO),
+                                        HList(ds::HList { width, .. })
+                                        | VList(ds::VList { width, .. })
+                                        | Rule(ds::Rule { width, .. })
+                                        | Kern(ds::Kern { width, .. }) => *width,
+                                        _ => {
+                                            eprintln!(
+                                                "invalid node {:?} in discretionary replacement list",
+                                                &list[j]
+                                            );
+                                            common::Scaled::ZERO
+                                        }
+                                    };
+                                    j += 1;
+                                }
+                            }
+                            Math(_math) => {
+                                // TODO when math node is fixed in boxworks crate.
+                            }
+                            Glue(glue) => {
+                                diffs.update_from_glue(&glue.value);
+                            }
+                            Kern(kern) => {
+                                if kern.kind == ds::KernKind::Explicit {
+                                    diffs.width -= kern.width;
+                                }
+                            }
+                            _ => {}
+                        }
                     }
                     for fitness_class in [
                         FitnessClass::VeryLoose,
@@ -545,7 +602,7 @@ impl<'a> LineBreaker<'a> {
                     // the earlier switch and skipped the rest of the loop.
                 }
                 Discretionary(_) => {
-                    diffs.width += -disc_width;
+                    // diffs.width += -disc_width;
                 }
                 Whatsit(_whatsit) => todo!(),
                 Math(_) => {
@@ -563,6 +620,7 @@ impl<'a> LineBreaker<'a> {
             }
         }
 
+        !active_nodes.is_empty()
         // TODO:
         // Chose active nodes where i = list.len()-1 !
         // And then return the list of optimal breaks
@@ -571,13 +629,14 @@ impl<'a> LineBreaker<'a> {
     /// TeX.2021.859
     fn demerits(
         &self,
-        params: &Params,
         badness: i32,
         penalty: i32,
         previous_fitness_class: FitnessClass,
         this_fitness_class: FitnessClass,
+        consecutive_hyphens: bool,
+        end_after_hyphen: bool,
     ) -> i32 {
-        let mut d = params.line_penalty + badness;
+        let mut d = self.params.line_penalty + badness;
         if d.abs() >= 10_000 {
             d = 10_000;
         }
@@ -587,10 +646,13 @@ impl<'a> LineBreaker<'a> {
         } else if penalty > EJECT_PENALTY {
             d -= penalty * penalty;
         }
-        // TODO: hyphenation adjustment.
-        // \doublehyphendemerits and \finalhyphendemerits.
+        if end_after_hyphen {
+            d += self.params.final_hyphen_demerits;
+        } else if consecutive_hyphens {
+            d += self.params.double_hyphen_demerits;
+        }
         if (previous_fitness_class as isize - this_fitness_class as isize).abs() > 1 {
-            d += params.adj_demerits;
+            d += self.params.adj_demerits;
         }
         d
     }
@@ -648,113 +710,38 @@ fn get_next_line_class(active_nodes: &VecDeque<ActiveNode>, max: usize) -> (Line
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::assert_eq;
-    use std::{cell::RefCell, rc::Rc};
-
     use super::*;
     use boxworks::TextPreprocessor;
     use boxworks_text as bwt;
-    #[test]
-    fn wolf_hall_5in() {
-        const A: &'static str = "
-            He thinks, if you were born in Putney, you saw the river every day, and imagined it 
-            widening out to the sea. Even if you had never seen the ocean you had a picture of 
-            it in your head from what you had been told by foreign people who sometimes came 
-            upriver. You knew that one day you would go out into a world of marble pavements 
-            and peacocks, of hillsides buzzing with heat, the fragrance of crushed herbs rising 
-            around you as you walked. You planned for what your journeys would bring you: 
-            the touch of warm terracotta, the night sky of another climate, alien flowers, the 
-            stone eyed gaze of other peoples saints. But if you were born in Aslockton, in flat 
-            fields under a wide sky, you might just be able to imagine Cambridge: no farther.
-        ";
-        const LOG: &'static str = r"
-            @firstpass
-            He thinks, if you were born in Putney, you saw the river every day, and imagined 
-            @ via @@0 b=1 p=0 d=121
-            @@1: line 1.2 t=121 -> @@0
-            it 
-            @ via @@0 b=3 p=0 d=169
-            @@2: line 1.2 t=169 -> @@0
-            widening out to the sea. Even if you had never seen the ocean you had a picture
-            
-            @ via @@1 b=0 p=0 d=100
-            @ via @@2 b=2 p=0 d=144
-            @@3: line 2.2 t=221 -> @@1
-            of 
-            @ via @@1 b=35 p=0 d=2025
-            @ via @@2 b=1 p=0 d=121
-            @@4: line 2.2 t=290 -> @@2
-            @@5: line 2.3 t=2146 -> @@1
-            it 
-            @ via @@2 b=35 p=0 d=2025
-            @@6: line 2.3 t=2194 -> @@2
-            in your head from what you had been told by foreign people who sometimes 
-            @ via @@3 b=1 p=0 d=121
-            @ via @@4 b=40 p=0 d=2500
-            @ via @@5 b=40 p=0 d=12500
-            @@7: line 3.1 t=2790 -> @@4
-            @@8: line 3.2 t=342 -> @@3
-            came 
-            @ via @@4 b=12 p=0 d=484
-            @ via @@5 b=12 p=0 d=484
-            @ via @@6 b=0 p=0 d=100
-            @@9: line 3.2 t=774 -> @@4
-            upriver. You knew that one day you would go out into a world of marble 
-            @ via @@7 b=16 p=0 d=676
-            @ via @@8 b=16 p=0 d=676
-            @@10: line 4.1 t=1018 -> @@8
-            pavements 
-            @ via @@9 b=12 p=0 d=484
-            @@11: line 4.2 t=1258 -> @@9
-            and peacocks, of hillsides buzzing with heat, the fragrance of crushed 
-            @ via @@10 b=10 p=0 d=400
-            @@12: line 5.2 t=1418 -> @@10
-            herbs rising 
-            @ via @@11 b=1 p=0 d=121
-            @@13: line 5.2 t=1379 -> @@11
-            around you as you walked. You planned for what your journeys would 
-            @ via @@12 b=0 p=0 d=100
-            @@14: line 6.2 t=1518 -> @@12
-            bring you: 
-            @ via @@13 b=1 p=0 d=121
-            @@15: line 6.2 t=1500 -> @@13
-            the 
-            @ via @@13 b=77 p=0 d=7569
-            @@16: line 6.3 t=8948 -> @@13
-            touch of warm terracotta, the night sky of another climate, alien 
-            @ via @@14 b=12 p=0 d=484
-            @@17: line 7.2 t=2002 -> @@14
-            flowers, the 
-            @ via @@15 b=4 p=0 d=196
-            @@18: line 7.2 t=1696 -> @@15
-            stone 
-            @ via @@16 b=0 p=0 d=100
-            @@19: line 7.2 t=9048 -> @@16
-            eyed gaze of other peoples saints. But if you were born in Aslockton, in 
-            @ via @@18 b=47 p=0 d=3249
-            @@20: line 8.1 t=4945 -> @@18
-            flat 
-            @ via @@18 b=0 p=0 d=100
-            @@21: line 8.2 t=1796 -> @@18
-            fields 
-            @ via @@19 b=0 p=0 d=100
-            @@22: line 8.2 t=9148 -> @@19
-            under a wide sky, you might just be able to imagine Cambridge: no 
-            @ via @@20 b=60 p=0 d=4900
-            @@23: line 9.1 t=9845 -> @@20
-            farther. 
-            @\par via @@20 b=75 p=-10000 d=17225
-            @\par via @@21 b=0 p=-10000 d=100
-            @\par via @@22 b=0 p=-10000 d=100
-            @\par via @@23 b=0 p=-10000 d=100
-            @@24: line 9.2- t=1896 -> @@21
-        ";
-        run_test(TFM_CMR10, A, LOG);
-    }
+    use pretty_assertions::assert_eq;
+    use std::{cell::RefCell, rc::Rc};
 
+    const WOLF_HALL_5IN_TYPESET: &'static str = "
+        He thinks, if you were born in Putney, you saw the river every day, and imagined it 
+        widening out to the sea. Even if you had never seen the ocean you had a picture of 
+        it in your head from what you had been told by foreign people who sometimes came 
+        upriver. You knew that one day you would go out into a world of marble pavements 
+        and peacocks, of hillsides buzzing with heat, the fragrance of crushed herbs rising 
+        around you as you walked. You planned for what your journeys would bring you: 
+        the touch of warm terracotta, the night sky of another climate, alien flowers, the 
+        stone eyed gaze of other peoples saints. But if you were born in Aslockton, in flat 
+        fields under a wide sky, you might just be able to imagine Cambridge: no farther.
+    ";
+    const WOLF_HALL_5IN_LOG: &'static str = include_str!("../testdata/wolf_hall_5in_log.txt");
+    const WOLF_HALL_3IN_LOG: &'static str = include_str!("../testdata/wolf_hall_3in_log.txt");
     const TFM_CMR10: &'static [u8] = include_bytes!("../../tfm/corpus/computer-modern/cmr10.tfm");
 
-    fn run_test(tfm_bytes: &[u8], input: &str, want_log: &str) {
+    #[test]
+    fn wolf_hall_5in() {
+        run_log_test(TFM_CMR10, WOLF_HALL_5IN_TYPESET, WOLF_HALL_5IN_LOG, "5in");
+    }
+
+    #[test]
+    fn wolf_hall_3in() {
+        run_log_test(TFM_CMR10, WOLF_HALL_5IN_TYPESET, WOLF_HALL_3IN_LOG, "3in");
+    }
+
+    fn run_log_test(tfm_bytes: &[u8], input: &str, want_log: &str, width: &str) {
         let mut tfm_file = tfm::File::deserialize(tfm_bytes).0.unwrap();
         let lig_kern_program =
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
@@ -769,7 +756,7 @@ mod tests {
 
         let mut font_repo: bwt::TfmFontRepo = Default::default();
         font_repo.register_font(0, tfm_file);
-        let width = common::Scaled::parse_from_string("5in").unwrap();
+        let width = common::Scaled::parse_from_string(width).unwrap();
         let params = Params::plain_tex_defaults();
 
         let log: Rc<RefCell<String>> = Default::default();
@@ -792,6 +779,7 @@ mod tests {
         let v: Vec<&str> = s
             .split('\n')
             .map(|l| l.trim())
+            .map(|l| l.strip_prefix(r"\customFont ").unwrap_or(l))
             .filter(|l| !l.is_empty())
             .collect();
         v.join("\n")
