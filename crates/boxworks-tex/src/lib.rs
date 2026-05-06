@@ -795,7 +795,8 @@ Transcript written on test.log.
             &tex_engine,
             &Default::default(),
             &"",
-            common::Scaled::ONE * 41,
+            &[common::Scaled::ONE * 41],
+            &boxworks_knuthplass::Params::default(),
             &mut vec!["".to_string()].iter(),
         );
 
@@ -956,7 +957,8 @@ Transcript written on test.log.
             &tex_engine,
             &Default::default(),
             &"",
-            common::Scaled::ONE * 41,
+            &[common::Scaled::ONE * 41],
+            &boxworks_knuthplass::Params::default(),
             &mut vec!["".to_string()].iter(),
         );
 
