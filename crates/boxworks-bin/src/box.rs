@@ -1,5 +1,6 @@
 use boxworks::TextPreprocessor;
 use boxworks_lang as bwl;
+use boxworks_tex as bwt;
 use clap::Parser;
 use std::collections::HashMap;
 use std::fs;
@@ -17,7 +18,7 @@ struct Cli {
 enum SubCommand {
     Check(Check),
     Fmt(Fmt),
-    Build(Build),
+    Hbox(Hbox),
     Linebreak(Linebreak),
 }
 
@@ -26,7 +27,7 @@ fn main() {
     let result = match args.sub_command {
         SubCommand::Check(check) => check.run(),
         SubCommand::Fmt(fmt) => fmt.run(),
-        SubCommand::Build(hlists) => hlists.run(),
+        SubCommand::Hbox(hbox) => hbox.run(),
         SubCommand::Linebreak(linebreak) => linebreak.run(),
     };
     if let Err(err) = result {
@@ -92,21 +93,11 @@ impl Fmt {
     }
 }
 
-/// What kind of output to produce.
-#[derive(clap::ValueEnum, Clone, Default)]
-enum Mode {
-    /// Build horizontal lists.
-    #[default]
-    Hlists,
-    /// Build vertical lists. Requires --tex-engine.
-    Vlists,
-}
-
 /// Print the horizontal lists built for some text.
 ///
 /// By default, Box builds the lists. If --tex_engine is specified, the given TeX engine is used instead.
 #[derive(Parser)]
-struct Build {
+struct Hbox {
     /// The texts for which to build the lists.
     ///
     /// Each element of texts is used to build a separate horizontal list.
@@ -127,17 +118,9 @@ struct Build {
     /// Empty lines are ignored. Each non-empty line is converted into a separate horizontal list.
     #[clap(long)]
     texts_file: Option<PathBuf>,
-
-    /// What kind of output to produce.
-    #[clap(long, default_value_t, value_enum)]
-    mode: Mode,
-
-    /// Width of the vertical list (used with --mode=vlists), e.g. "100pt" or "6.5in".
-    #[clap(long, default_value = "41pt")]
-    width: String,
 }
 
-impl Build {
+impl Hbox {
     fn run(mut self) -> Result<(), String> {
         let num_direct = self.texts.len();
         let mut file_line_numbers: Vec<usize> = vec![];
@@ -153,36 +136,17 @@ impl Build {
                 }
             }
         }
-        let tex_engine: Option<Box<dyn boxworks::tex::TexEngine>> =
-            if let Some(ref name) = self.tex_engine {
-                Some(
-                    boxworks::tex::new_tex_engine_binary(name.clone())
-                        .map_err(|err| format!["{err}"])?,
-                )
-            } else {
-                None
-            };
+        let tex_engine: Option<Box<dyn bwt::TexEngine>> = if let Some(ref name) = self.tex_engine {
+            Some(bwt::new_tex_engine_binary(name.clone()).map_err(|err| format!["{err}"])?)
+        } else {
+            None
+        };
         let labels = make_labels(self.texts.len(), num_direct, &file_line_numbers);
-        match self.mode {
-            Mode::Hlists => {
-                let hlists = match tex_engine {
-                    Some(engine) => run_tex_hlists(engine.as_ref(), self.texts, self.font_metrics)?,
-                    None => run_box_hlists(self.texts, self.font_metrics)?,
-                };
-                print_hlists(hlists, labels);
-            }
-            Mode::Vlists => {
-                let engine =
-                    tex_engine.ok_or_else(|| "--mode=vlists requires --tex-engine".to_string())?;
-                let vlists = run_tex_vlists(
-                    engine.as_ref(),
-                    self.texts,
-                    self.font_metrics,
-                    common::Scaled::parse_from_string(&self.width)?,
-                )?;
-                print_vlists(vlists, labels);
-            }
-        }
+        let hlists = match tex_engine {
+            Some(engine) => run_tex_hlists(engine.as_ref(), self.texts, self.font_metrics)?,
+            None => run_box_hlists(self.texts, self.font_metrics)?,
+        };
+        print_hlists(hlists, labels);
         Ok(())
     }
 }
@@ -202,22 +166,131 @@ struct Linebreak {
     tex_engine: String,
 
     /// Width of the vertical list, e.g. "100pt" or "6.5in".
-    #[clap(long, default_value = "100pt")]
-    width: String,
+    #[clap(long)]
+    width: Option<String>,
+
+    /// Widths of successive lines as a comma-separated list, e.g. "100pt,200pt,300pt". The last value repeats for all remaining lines.
+    #[clap(long)]
+    widths: Option<String>,
+
+    /// Demerits for adjacent lines with incompatible fitness classes (default: 10000).
+    #[clap(long)]
+    adj_demerits: Option<i32>,
+
+    /// Demerits for two consecutive hyphenated lines (default: 10000).
+    #[clap(long)]
+    double_hyphen_demerits: Option<i32>,
+
+    /// Penalty for an explicit hyphen (default: 50).
+    #[clap(long)]
+    ex_hyphen_penalty: Option<i32>,
+
+    /// Demerits if the second-to-last line ends with a hyphen (default: 5000).
+    #[clap(long)]
+    final_hyphen_demerits: Option<i32>,
+
+    /// Penalty for a discretionary hyphen (default: 50).
+    #[clap(long)]
+    hyphen_penalty: Option<i32>,
+
+    /// Glue added to the left of every line, e.g. "6pt" or "0pt plus 1fil" (default: "0pt").
+    #[clap(long)]
+    left_skip: Option<String>,
+
+    /// Penalty added to each line's badness before squaring (default: 10).
+    #[clap(long)]
+    line_penalty: Option<i32>,
+
+    /// Desired number of extra lines relative to the optimum (default: 0).
+    #[clap(long)]
+    looseness: Option<i32>,
+
+    /// Glue appended to the last line of a paragraph (default: "0pt plus 1fil").
+    #[clap(long)]
+    par_fill_skip: Option<String>,
+
+    /// Badness tolerance for the first pass (no hyphenation) (default: 100).
+    #[clap(long)]
+    pre_tolerance: Option<i32>,
+
+    /// Glue added to the right of every line, e.g. "6pt" or "0pt plus 1fil" (default: "0pt").
+    #[clap(long)]
+    right_skip: Option<String>,
+
+    /// Badness tolerance for the second pass (with hyphenation) (default: 200).
+    #[clap(long)]
+    tolerance: Option<i32>,
+
+    /// Print the broken text instead of the box representation.
+    #[clap(long)]
+    output_text: bool,
 }
 
 impl Linebreak {
     fn run(self) -> Result<(), String> {
-        let engine = boxworks::tex::new_tex_engine_binary(self.tex_engine)
-            .map_err(|err| format!["{err}"])?;
+        let mut params = boxworks_knuthplass::Params::plain_tex_defaults();
+        if let Some(v) = self.adj_demerits {
+            params.adj_demerits = v;
+        }
+        if let Some(v) = self.double_hyphen_demerits {
+            params.double_hyphen_demerits = v;
+        }
+        if let Some(v) = self.ex_hyphen_penalty {
+            params.ex_hyphen_penalty = v;
+        }
+        if let Some(v) = self.final_hyphen_demerits {
+            params.final_hyphen_demerits = v;
+        }
+        if let Some(v) = self.hyphen_penalty {
+            params.hyphen_penalty = v;
+        }
+        if let Some(ref s) = self.left_skip {
+            params.left_skip = parse_glue(s)?;
+        }
+        if let Some(v) = self.line_penalty {
+            params.line_penalty = v;
+        }
+        if let Some(v) = self.looseness {
+            params.looseness = v;
+        }
+        if let Some(ref s) = self.par_fill_skip {
+            params.par_fill_skip = parse_glue(s)?;
+        }
+        if let Some(v) = self.pre_tolerance {
+            params.pre_tolerance = v;
+        }
+        if let Some(ref s) = self.right_skip {
+            params.right_skip = parse_glue(s)?;
+        }
+        if let Some(v) = self.tolerance {
+            params.tolerance = v;
+        }
+
+        let widths: Vec<common::Scaled> = match (self.width, self.widths) {
+            (Some(_), Some(_)) => return Err("--width and --widths are mutually exclusive".into()),
+            (None, None) => return Err("one of --width or --widths is required".into()),
+            (Some(w), None) => vec![common::Scaled::parse_from_string(&w)?],
+            (None, Some(s)) => s
+                .split(',')
+                .map(|s| common::Scaled::parse_from_string(s.trim()))
+                .collect::<Result<_, _>>()?,
+        };
+
+        let engine = bwt::new_tex_engine_binary(self.tex_engine).map_err(|err| format!["{err}"])?;
         let vlists = run_tex_vlists(
             engine.as_ref(),
             self.texts,
             self.font_metrics,
-            common::Scaled::parse_from_string(&self.width)?,
+            &widths,
+            &params,
         )?;
-        for vlist in vlists {
-            print_vlist_text(&vlist);
+        if self.output_text {
+            for vlist in vlists {
+                print_vlist_text(&vlist);
+            }
+        } else {
+            let labels = vec![None; vlists.len()];
+            print_vlists(vlists, labels);
         }
         Ok(())
     }
@@ -302,34 +375,32 @@ fn run_box_hlists(
 }
 
 fn run_tex_hlists(
-    tex_engine: &dyn boxworks::tex::TexEngine,
+    tex_engine: &dyn bwt::TexEngine,
     texts: Vec<String>,
     font_metrics: Option<PathBuf>,
 ) -> Result<Vec<bwl::ast::Hlist<'static>>, String> {
     let (auxiliary_files, preamble) = build_tex_context(font_metrics)?;
-    let (fonts, hlists) = boxworks::tex::build_horizontal_lists(
-        tex_engine,
-        &auxiliary_files,
-        &preamble,
-        &mut texts.iter(),
-    );
+    let (fonts, hlists) =
+        bwt::build_horizontal_lists(tex_engine, &auxiliary_files, &preamble, &mut texts.iter());
     _ = fonts;
     use bwl::convert::ToBoxLang;
     Ok(hlists.into_iter().map(|l| l.to_box_lang()).collect())
 }
 
 fn run_tex_vlists(
-    tex_engine: &dyn boxworks::tex::TexEngine,
+    tex_engine: &dyn bwt::TexEngine,
     texts: Vec<String>,
     font_metrics: Option<PathBuf>,
-    width: common::Scaled,
+    widths: &[common::Scaled],
+    params: &boxworks_knuthplass::Params,
 ) -> Result<Vec<bwl::ast::Vlist<'static>>, String> {
     let (auxiliary_files, preamble) = build_tex_context(font_metrics)?;
-    let (_, vlists) = boxworks::tex::build_vertical_lists(
+    let (_, vlists) = bwt::build_vertical_lists(
         tex_engine,
         &auxiliary_files,
         &preamble,
-        width,
+        widths,
+        params,
         &mut texts.iter(),
     );
     use bwl::convert::ToBoxLang;
@@ -357,6 +428,54 @@ fn print_vlists(vlists: Vec<bwl::ast::Vlist<'static>>, labels: Vec<Option<usize>
         }
         println!("{}", bwl::ast::Horizontal::Vlist(vlist));
     }
+}
+
+fn parse_glue(s: &str) -> Result<common::Glue, String> {
+    let mut glue = common::Glue::ZERO;
+    let (width_str, rest) = match s.find(" plus ").or_else(|| s.find(" minus ")) {
+        Some(pos) => (&s[..pos], s[pos..].trim()),
+        None => (s, ""),
+    };
+    glue.width = common::Scaled::parse_from_string(width_str.trim())?;
+    let rest = if let Some(r) = rest.strip_prefix("plus ") {
+        let (stretch_str, minus_rest) = match r.find(" minus ") {
+            Some(pos) => (&r[..pos], r[pos..].trim()),
+            None => (r, ""),
+        };
+        let (stretch, order) = parse_scaled_inf(stretch_str.trim())?;
+        glue.stretch = stretch;
+        glue.stretch_order = order;
+        minus_rest
+    } else {
+        rest
+    };
+    if let Some(shrink_str) = rest.strip_prefix("minus ") {
+        let (shrink, order) = parse_scaled_inf(shrink_str.trim())?;
+        glue.shrink = shrink;
+        glue.shrink_order = order;
+    } else if !rest.is_empty() {
+        return Err(format!("invalid glue {s:?}"));
+    }
+    Ok(glue)
+}
+
+fn parse_scaled_inf(s: &str) -> Result<(common::Scaled, common::GlueOrder), String> {
+    for (suffix, order) in [
+        ("filll", common::GlueOrder::Filll),
+        ("fill", common::GlueOrder::Fill),
+        ("fil", common::GlueOrder::Fil),
+    ] {
+        if let Some(num_str) = s.strip_suffix(suffix) {
+            return Ok((
+                common::Scaled::parse_from_string(&format!("{num_str}pt"))?,
+                order,
+            ));
+        }
+    }
+    Ok((
+        common::Scaled::parse_from_string(s)?,
+        common::GlueOrder::Normal,
+    ))
 }
 
 fn load_font_metrics(font_metrics: Option<PathBuf>) -> Result<(Vec<u8>, PathBuf), String> {

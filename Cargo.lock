@@ -189,7 +189,9 @@ dependencies = [
  "ariadne",
  "assert_cmd",
  "boxworks",
+ "boxworks-knuthplass",
  "boxworks-lang",
+ "boxworks-tex",
  "boxworks-text",
  "clap 4.4.8",
  "common",
@@ -223,6 +225,15 @@ version = "0.1.0"
 dependencies = [
  "ariadne",
  "boxworks",
+ "common",
+]
+
+[[package]]
+name = "boxworks-tex"
+version = "0.1.0"
+dependencies = [
+ "boxworks",
+ "boxworks-knuthplass",
  "common",
 ]
 

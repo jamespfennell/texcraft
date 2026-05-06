@@ -13,7 +13,7 @@
 //! These functions require that TeX is installed
 //!     because they ultimately invoke TeX to generate the right diagnostic information.
 
-use crate::ds;
+use boxworks::ds;
 use std::{collections::HashMap, path::PathBuf};
 
 /// Implementations of this trait can run TeX source code and return stdout.
@@ -137,16 +137,42 @@ pub fn build_vertical_lists(
     tex_engine: &dyn TexEngine,
     auxiliary_files: &HashMap<PathBuf, Vec<u8>>,
     preamble: &str,
-    width: common::Scaled,
+    widths: &[common::Scaled],
+    params: &boxworks_knuthplass::Params,
     contents: &mut dyn Iterator<Item = &String>,
 ) -> (HashMap<String, u32>, Vec<ds::VList>) {
+    let params_preamble = format!(
+        "\n\\adjdemerits={}\n\\doublehyphendemerits={}\n\\exhyphenpenalty={}\n\\finalhyphendemerits={}\n\\hyphenpenalty={}\n\\leftskip={}\n\\linepenalty={}\n\\looseness={}\n\\parfillskip={}\n\\pretolerance={}\n\\rightskip={}\n\\tolerance={}\n",
+        params.adj_demerits,
+        params.double_hyphen_demerits,
+        params.ex_hyphen_penalty,
+        params.final_hyphen_demerits,
+        params.hyphen_penalty,
+        params.left_skip,
+        params.line_penalty,
+        params.looseness,
+        params.par_fill_skip,
+        params.pre_tolerance,
+        params.right_skip,
+        params.tolerance,
+    );
+    let combined_preamble = format!("{preamble}{params_preamble}");
+    let last_width = *widths.last().expect("widths is non-empty");
+    let box_template = if widths.len() == 1 {
+        format!(r"\vbox{{\noindent \hsize={} #1}}", last_width)
+    } else {
+        let parshape_specs: String = widths.iter().map(|w| format!("0pt {w} ")).collect();
+        format!(
+            r"\vbox{{\noindent \hsize={} \parshape {} {}#1}}",
+            last_width,
+            widths.len(),
+            parshape_specs,
+        )
+    };
     let macro_calls: Vec<String> = contents.map(|s| format!(r#"\printBox{{{s}}}"#)).collect();
     let tex_source_code = CONVERT_TEXT_TEMPLATE
-        .replace("<preamble>", preamble)
-        .replace(
-            "<box_template>",
-            &format![r"\vbox{{\noindent \hsize={} #1}}", width],
-        )
+        .replace("<preamble>", &combined_preamble)
+        .replace("<box_template>", &box_template)
         .replace("<print_calls>", &macro_calls.join("\n\n"));
     let output = tex_engine.run(&tex_source_code, auxiliary_files);
     let segments = extract_texcraft_segments(&output);
