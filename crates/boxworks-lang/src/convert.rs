@@ -22,8 +22,8 @@ impl ToBoxLang for ds::Vertical {
     fn to_box_lang(&self) -> Self::Output {
         use boxworks::ds::Vertical::*;
         match self {
-            HList(hlist) => ast::Vertical::Hlist(hlist.to_box_lang()),
-            VList(vlist) => ast::Vertical::Vlist(vlist.to_box_lang()),
+            HBox(hbox) => ast::Vertical::HBox(hbox.to_box_lang()),
+            VBox(vbox) => ast::Vertical::VBox(vbox.to_box_lang()),
             Rule(rule) => ast::Vertical::Rule(rule.to_box_lang()),
             Mark(mark) => ast::Vertical::Mark(mark.to_box_lang()),
             Insertion(insertion) => ast::Vertical::Insertion(insertion.to_box_lang()),
@@ -42,8 +42,8 @@ impl<'a> ToBoxworks for ast::Vertical<'a> {
     fn to_boxworks(&self) -> Self::Output {
         use ast::Vertical::*;
         match self {
-            Hlist(hlist_args) => ds::Vertical::HList(hlist_args.to_boxworks()),
-            Vlist(vlist_args) => ds::Vertical::VList(vlist_args.to_boxworks()),
+            HBox(hbox_args) => ds::Vertical::HBox(hbox_args.to_boxworks()),
+            VBox(vbox_args) => ds::Vertical::VBox(vbox_args.to_boxworks()),
             Glue(glue_args) => ds::Vertical::Glue(glue_args.to_boxworks()),
             Kern(kern_args) => ds::Vertical::Kern(kern_args.to_boxworks()),
             Penalty(penalty_args) => ds::Vertical::Penalty(penalty_args.to_boxworks()),
@@ -139,8 +139,8 @@ impl<'a> ToBoxworks for ast::Horizontal<'a> {
             Chars(chars_args) => chars_args.to_boxworks(),
             Glue(glue_args) => vec![ds::Horizontal::Glue(glue_args.to_boxworks())],
             Kern(kern_args) => vec![ds::Horizontal::Kern(kern_args.to_boxworks())],
-            Hlist(hlist_args) => vec![ds::Horizontal::HList(hlist_args.to_boxworks())],
-            Vlist(vlist_args) => vec![ds::Horizontal::VList(vlist_args.to_boxworks())],
+            HBox(hbox_args) => vec![ds::Horizontal::HBox(hbox_args.to_boxworks())],
+            VBox(vbox_args) => vec![ds::Horizontal::VBox(vbox_args.to_boxworks())],
             Ligature(lig_args) => vec![ds::Horizontal::Ligature(lig_args.to_boxworks())],
             Discretionary(disc_args) => {
                 vec![ds::Horizontal::Discretionary(disc_args.to_boxworks())]
@@ -163,8 +163,8 @@ impl ToBoxLang for ds::Horizontal {
         use boxworks::ds::Horizontal::*;
         match self {
             Char(char) => ast::Horizontal::Chars(char.to_box_lang()),
-            HList(hlist) => ast::Horizontal::Hlist(hlist.to_box_lang()),
-            VList(vlist) => ast::Horizontal::Vlist(vlist.to_box_lang()),
+            HBox(hbox) => ast::Horizontal::HBox(hbox.to_box_lang()),
+            VBox(vbox) => ast::Horizontal::VBox(vbox.to_box_lang()),
             Rule(rule) => ast::Horizontal::Rule(rule.to_box_lang()),
             Mark(mark) => ast::Horizontal::Mark(mark.to_box_lang()),
             Insertion(insertion) => ast::Horizontal::Insertion(insertion.to_box_lang()),
@@ -191,8 +191,8 @@ impl<'a> ToBoxworks for ast::DiscretionaryElem<'a> {
         match self {
             Chars(chars_args) => chars_to_discretionary_elems(chars_args),
             Kern(kern_args) => vec![Out::Kern(kern_args.to_boxworks())],
-            Hlist(hlist_args) => vec![Out::HList(hlist_args.to_boxworks())],
-            Vlist(vlist_args) => vec![Out::VList(vlist_args.to_boxworks())],
+            HBox(hbox_args) => vec![Out::HBox(hbox_args.to_boxworks())],
+            VBox(vbox_args) => vec![Out::VBox(vbox_args.to_boxworks())],
             Ligature(lig_args) => vec![Out::Ligature(lig_args.to_boxworks())],
             Rule(rule_args) => vec![Out::Rule(rule_args.to_boxworks())],
         }
@@ -206,8 +206,8 @@ impl ToBoxLang for ds::DiscretionaryElem {
         use boxworks::ds::DiscretionaryElem::*;
         match self {
             Char(char) => Out::Chars(char.to_box_lang()),
-            HList(hlist) => Out::Hlist(hlist.to_box_lang()),
-            VList(vlist) => Out::Vlist(vlist.to_box_lang()),
+            HBox(hbox) => Out::HBox(hbox.to_box_lang()),
+            VBox(vbox) => Out::VBox(vbox.to_box_lang()),
             Rule(rule) => Out::Rule(rule.to_box_lang()),
             Ligature(ligature) => Out::Ligature(ligature.to_box_lang()),
             Kern(kern) => Out::Kern(kern.to_box_lang()),
@@ -215,29 +215,29 @@ impl ToBoxLang for ds::DiscretionaryElem {
     }
 }
 
-impl ToBoxLang for ds::VList {
-    type Output = ast::Vlist<'static>;
+impl ToBoxLang for ds::VBox {
+    type Output = ast::VBox<'static>;
     fn to_box_lang(&self) -> Self::Output {
-        ast::Vlist {
+        ast::VBox {
             content: self.list.to_box_lang().into(),
         }
     }
 }
 
-impl ToBoxLang for ds::HList {
-    type Output = ast::Hlist<'static>;
+impl ToBoxLang for ds::HBox {
+    type Output = ast::HBox<'static>;
     fn to_box_lang(&self) -> Self::Output {
-        ast::Hlist {
+        ast::HBox {
             width: self.width.into(),
             content: self.list.to_box_lang().into(),
         }
     }
 }
 
-impl<'a> ToBoxworks for ast::Hlist<'a> {
-    type Output = ds::HList;
+impl<'a> ToBoxworks for ast::HBox<'a> {
+    type Output = ds::HBox;
     fn to_boxworks(&self) -> Self::Output {
-        ds::HList {
+        ds::HBox {
             width: self.width.value,
             list: self.content.value.to_boxworks(),
             // TODO: all the other stuff
@@ -246,10 +246,10 @@ impl<'a> ToBoxworks for ast::Hlist<'a> {
     }
 }
 
-impl<'a> ToBoxworks for ast::Vlist<'a> {
-    type Output = ds::VList;
+impl<'a> ToBoxworks for ast::VBox<'a> {
+    type Output = ds::VBox;
     fn to_boxworks(&self) -> Self::Output {
-        ds::VList {
+        ds::VBox {
             list: self.content.value.to_boxworks(),
             // TODO: all the other stuff
             ..Default::default()
@@ -477,7 +477,7 @@ impl ToBoxLang for ds::Insertion {
             split_top_skip_shrink: (self.split_top_skip.shrink, self.split_top_skip.shrink_order)
                 .into(),
             float_penalty: (self.float_penalty as i32).into(),
-            vlist: self.vlist.to_box_lang().into(),
+            vbox: self.vbox.to_box_lang().into(),
         }
     }
 }
@@ -497,7 +497,7 @@ impl<'a> ToBoxworks for ast::Insertion<'a> {
                 shrink_order: self.split_top_skip_shrink.value.1,
             },
             float_penalty: self.float_penalty.value as u32,
-            vlist: self.vlist.value.to_boxworks(),
+            vbox: self.vbox.value.to_boxworks(),
         }
     }
 }

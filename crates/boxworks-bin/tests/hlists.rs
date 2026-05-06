@@ -21,6 +21,7 @@ fn run_hlists(texts_file: &str) -> String {
 }
 
 fn filter_width_lines(s: &str) -> String {
+    let s = s.trim();
     s.lines()
         .filter(|line| !line.contains("width"))
         .collect::<Vec<_>>()

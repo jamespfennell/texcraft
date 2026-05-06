@@ -254,8 +254,8 @@ impl<'a> LineBreaker<'a> {
                             .unwrap_or(common::Scaled::ZERO);
                         continue;
                     }
-                    HList(ds::HList { width, .. })
-                    | VList(ds::VList { width, .. })
+                    HBox(ds::HBox { width, .. })
+                    | VBox(ds::VBox { width, .. })
                     | Rule(ds::Rule { width, .. }) => {
                         diffs.width += *width;
                         continue;
@@ -523,8 +523,8 @@ impl<'a> LineBreaker<'a> {
                                         | Ligature(ds::Ligature { char, font, .. }) => font_repo
                                             .width(*char, *font)
                                             .unwrap_or(common::Scaled::ZERO),
-                                        HList(ds::HList { width, .. })
-                                        | VList(ds::VList { width, .. })
+                                        HBox(ds::HBox { width, .. })
+                                        | VBox(ds::VBox { width, .. })
                                         | Rule(ds::Rule { width, .. })
                                         | Kern(ds::Kern { width, .. }) => *width,
                                         _ => {
@@ -596,7 +596,7 @@ impl<'a> LineBreaker<'a> {
             // At the end we update the widths.
             let Some(elem) = elem else { break };
             match elem {
-                Char(_) | HList(_) | VList(_) | Rule(_) | Mark(_) | Insertion(_) | Adjust(_)
+                Char(_) | HBox(_) | VBox(_) | Rule(_) | Mark(_) | Insertion(_) | Adjust(_)
                 | Ligature(_) => {
                     // Unreachable because we've already handled these nodes in
                     // the earlier switch and skipped the rest of the loop.

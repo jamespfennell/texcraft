@@ -176,7 +176,7 @@ pub fn hyphenate_impl(list: &[ds::Horizontal]) -> Vec<ds::Horizontal> {
                 Whatsit(_) | Glue(_) | Penalty(_) | Insertion(_) | Adjust(_) | Mark(_) => {
                     break true;
                 }
-                HList(_) | VList(_) | Rule(_) | Discretionary(_) | Math(_) => {
+                HBox(_) | VBox(_) | Rule(_) | Discretionary(_) | Math(_) => {
                     // done1 in Knuth's TeX.
                     break false;
                 }

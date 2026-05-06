@@ -445,7 +445,7 @@ mod tests {
         (incorrect_closing_brace_round, "chars(]", MismatchedBraces,),
         (
             incorrect_closing_brace_square,
-            "hlist(content=[))",
+            "hbox(content=[))",
             MismatchedBraces,
         ),
         (

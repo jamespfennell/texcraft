@@ -15,8 +15,8 @@ use std::borrow::Cow;
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum Vertical<'a> {
-    Hlist(Hlist<'a>),
-    Vlist(Vlist<'a>),
+    HBox(HBox<'a>),
+    VBox(VBox<'a>),
     Glue(Glue<'a>),
     Kern(Kern<'a>),
     Penalty(Penalty<'a>),
@@ -35,8 +35,8 @@ pub enum Horizontal<'a> {
     Glue(Glue<'a>),
     Penalty(Penalty<'a>),
     Kern(Kern<'a>),
-    Hlist(Hlist<'a>),
-    Vlist(Vlist<'a>),
+    HBox(HBox<'a>),
+    VBox(VBox<'a>),
     Ligature(Ligature<'a>),
     Discretionary(Discretionary<'a>),
     Rule(Rule<'a>),
@@ -59,45 +59,45 @@ impl<'a> From<Chars<'a>> for Horizontal<'a> {
 pub enum DiscretionaryElem<'a> {
     Chars(Chars<'a>),
     Kern(Kern<'a>),
-    Hlist(Hlist<'a>),
-    Vlist(Vlist<'a>),
+    HBox(HBox<'a>),
+    VBox(VBox<'a>),
     Ligature(Ligature<'a>),
     Rule(Rule<'a>),
 }
 
 /// Lower a horizontal list to a CST tree.
-pub fn lower_hlist<'a, 'b>(list: &'b [Horizontal<'a>]) -> impl cst::TreeIter<'a> + 'b {
-    lower_hlist_impl(list)
+pub fn lower_hbox<'a, 'b>(list: &'b [Horizontal<'a>]) -> impl cst::TreeIter<'a> + 'b {
+    lower_hbox_impl(list)
 }
 
-fn lower_hlist_impl<'a, 'b>(list: &'b [Horizontal<'a>]) -> CstTreeIter<'a, 'b> {
-    CstTreeIter::Hlist { list, next: 0 }
+fn lower_hbox_impl<'a, 'b>(list: &'b [Horizontal<'a>]) -> CstTreeIter<'a, 'b> {
+    CstTreeIter::H { list, next: 0 }
 }
 
 /// Lower a vertical list to a CST tree.
-pub fn lower_vlist<'a, 'b>(list: &'b [Vertical<'a>]) -> impl cst::TreeIter<'a> + 'b {
-    lower_vlist_impl(list)
+pub fn lower_vbox<'a, 'b>(list: &'b [Vertical<'a>]) -> impl cst::TreeIter<'a> + 'b {
+    lower_vbox_impl(list)
 }
 
-fn lower_vlist_impl<'a, 'b>(list: &'b [Vertical<'a>]) -> CstTreeIter<'a, 'b> {
-    CstTreeIter::Vlist { list, next: 0 }
+fn lower_vbox_impl<'a, 'b>(list: &'b [Vertical<'a>]) -> CstTreeIter<'a, 'b> {
+    CstTreeIter::V { list, next: 0 }
 }
 
 fn lower_dlist_impl<'a, 'b>(list: &'b [DiscretionaryElem<'a>]) -> CstTreeIter<'a, 'b> {
-    CstTreeIter::Dlist { list, next: 0 }
+    CstTreeIter::D { list, next: 0 }
 }
 
 impl<'a> Horizontal<'a> {
     /// Lower this element to a CST tree.
     pub fn lower<'b>(&'b self) -> impl cst::TreeIter<'a> + 'b {
-        lower_hlist(std::slice::from_ref(self))
+        lower_hbox(std::slice::from_ref(self))
     }
     /// Lower the arguments of this element to a CST args iterator.
     pub fn lower_args<'b>(&'b self) -> impl cst::ArgsIter<'a> + 'b {
         self.lower_args_impl()
     }
     fn lower_args_impl<'b>(&'b self) -> CstArgsIter<'a, 'b> {
-        CstArgsIter::Hlist {
+        CstArgsIter::H {
             elem: self,
             next: 0,
         }
@@ -107,14 +107,14 @@ impl<'a> Horizontal<'a> {
 impl<'a> Vertical<'a> {
     /// Lower this element to a CST tree.
     pub fn lower<'b>(&'b self) -> impl cst::TreeIter<'a> + 'b {
-        lower_vlist(std::slice::from_ref(self))
+        lower_vbox(std::slice::from_ref(self))
     }
     /// Lower the arguments of this element to a CST args iterator.
     pub fn lower_args<'b>(&'b self) -> impl cst::ArgsIter<'a> + 'b {
         self.lower_args_impl()
     }
     fn lower_args_impl<'b>(&'b self) -> CstArgsIter<'a, 'b> {
-        CstArgsIter::Vlist {
+        CstArgsIter::V {
             elem: self,
             next: 0,
         }
@@ -131,7 +131,7 @@ impl<'a> DiscretionaryElem<'a> {
         self.lower_args_impl()
     }
     fn lower_args_impl<'b>(&'b self) -> CstArgsIter<'a, 'b> {
-        CstArgsIter::Dlist {
+        CstArgsIter::D {
             elem: self,
             next: 0,
         }
@@ -139,30 +139,30 @@ impl<'a> DiscretionaryElem<'a> {
 }
 
 enum CstTreeIter<'a, 'b> {
-    Hlist {
+    H {
         list: &'b [Horizontal<'a>],
         next: usize,
     },
-    Vlist {
+    V {
         list: &'b [Vertical<'a>],
         next: usize,
     },
-    Dlist {
+    D {
         list: &'b [DiscretionaryElem<'a>],
         next: usize,
     },
 }
 
 enum CstArgsIter<'a, 'b> {
-    Hlist {
+    H {
         elem: &'b Horizontal<'a>,
         next: usize,
     },
-    Vlist {
+    V {
         elem: &'b Vertical<'a>,
         next: usize,
     },
-    Dlist {
+    D {
         elem: &'b DiscretionaryElem<'a>,
         next: usize,
     },
@@ -173,7 +173,7 @@ impl<'a, 'b> Iterator for CstTreeIter<'a, 'b> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            CstTreeIter::Hlist { list, next } => {
+            CstTreeIter::H { list, next } => {
                 let h = list.get(*next)?;
                 *next += 1;
                 Some(cst::TreeItem::FuncCall {
@@ -181,7 +181,7 @@ impl<'a, 'b> Iterator for CstTreeIter<'a, 'b> {
                     args: h.lower_args_impl(),
                 })
             }
-            CstTreeIter::Vlist { list, next } => {
+            CstTreeIter::V { list, next } => {
                 let h = list.get(*next)?;
                 *next += 1;
                 Some(cst::TreeItem::FuncCall {
@@ -189,7 +189,7 @@ impl<'a, 'b> Iterator for CstTreeIter<'a, 'b> {
                     args: h.lower_args_impl(),
                 })
             }
-            CstTreeIter::Dlist { list, next } => {
+            CstTreeIter::D { list, next } => {
                 let h = list.get(*next)?;
                 *next += 1;
                 Some(cst::TreeItem::FuncCall {
@@ -213,17 +213,17 @@ impl<'a, 'b> Iterator for CstArgsIter<'a, 'b> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            CstArgsIter::Hlist { elem, next } => {
+            CstArgsIter::H { elem, next } => {
                 let l = elem.lower_arg(*next)?;
                 *next += 1;
                 Some(l)
             }
-            CstArgsIter::Vlist { elem, next } => {
+            CstArgsIter::V { elem, next } => {
                 let l = elem.lower_arg(*next)?;
                 *next += 1;
                 Some(l)
             }
-            CstArgsIter::Dlist { elem, next } => {
+            CstArgsIter::D { elem, next } => {
                 let l = elem.lower_arg(*next)?;
                 *next += 1;
                 Some(l)
@@ -243,16 +243,16 @@ impl<'a> std::fmt::Display for Horizontal<'a> {
 }
 
 /// Parse Box language source code into a horizontal list.
-pub fn parse_hlist(source: &str) -> Result<Vec<Horizontal<'_>>, Vec<Error<'_>>> {
+pub fn parse_hbox(source: &str) -> Result<Vec<Horizontal<'_>>, Vec<Error<'_>>> {
     let errs: ErrorAccumulator = Default::default();
     let calls = cst::parse(source, errs.clone());
-    let v = parse_hlist_using_cst(calls, &errs);
+    let v = parse_hbox_using_cst(calls, &errs);
     errs.check()?;
     Ok(v)
 }
 
-/// Parse a hlist using an explicitly provided CST.
-pub fn parse_hlist_using_cst<'a>(
+/// Parse a hbox using an explicitly provided CST.
+pub fn parse_hbox_using_cst<'a>(
     cst: impl cst::TreeIter<'a>,
     errs: &ErrorAccumulator<'a>,
 ) -> Vec<Horizontal<'a>> {
@@ -260,7 +260,7 @@ pub fn parse_hlist_using_cst<'a>(
     for call in cst {
         match call {
             cst::TreeItem::FuncCall { func_name, args } => {
-                if let Some(elem) = convert_call_to_hlist_elem(func_name, args, errs) {
+                if let Some(elem) = convert_call_to_hbox_elem(func_name, args, errs) {
                     v.push(elem);
                 }
             }
@@ -270,8 +270,8 @@ pub fn parse_hlist_using_cst<'a>(
     v
 }
 
-/// Parse a hlist using an explicitly provided CST.
-pub fn parse_vlist_using_cst<'a>(
+/// Parse a hbox using an explicitly provided CST.
+pub fn parse_vbox_using_cst<'a>(
     cst: impl cst::TreeIter<'a>,
     errs: &ErrorAccumulator<'a>,
 ) -> Vec<Vertical<'a>> {
@@ -279,7 +279,7 @@ pub fn parse_vlist_using_cst<'a>(
     for call in cst {
         match call {
             cst::TreeItem::FuncCall { func_name, args } => {
-                if let Some(elem) = convert_call_to_vlist_elem(func_name, args, errs) {
+                if let Some(elem) = convert_call_to_vbox_elem(func_name, args, errs) {
                     v.push(elem);
                 }
             }
@@ -402,7 +402,7 @@ macro_rules! functions {
                 }
             }
         }
-        fn convert_call_to_hlist_elem<'a>(
+        fn convert_call_to_hbox_elem<'a>(
             func_name: Str<'a>,
             call: impl cst::ArgsIter<'a>,
             errs: &ErrorAccumulator<'a>,
@@ -484,7 +484,7 @@ macro_rules! functions {
                 }
             }
         }
-        fn convert_call_to_vlist_elem<'a>(
+        fn convert_call_to_vbox_elem<'a>(
             func_name: Str<'a>,
             call: impl cst::ArgsIter<'a>,
             errs: &ErrorAccumulator<'a>,
@@ -659,22 +659,22 @@ functions!(
         }
     ),
     (
-        struct Hlist<'a> {
+        struct HBox<'a> {
             width: common::Scaled,
             content: Vec<Horizontal<'a>>,
         }
         impl Func {
-            func_name: "hlist",
+            func_name: "hbox",
             default_num_pos_arg: 0,
         }
         impl Horizontal {
-            variant: Hlist,
+            variant: HBox,
         }
         impl Vertical {
-            variant: Hlist,
+            variant: HBox,
         }
         impl DiscretionaryElem {
-            variant: Hlist,
+            variant: HBox,
         }
     ),
     (
@@ -695,21 +695,21 @@ functions!(
         }
     ),
     (
-        struct Vlist<'a> {
+        struct VBox<'a> {
             content: Vec<Vertical<'a>>,
         }
         impl Func {
-            func_name: "vlist",
+            func_name: "vbox",
             default_num_pos_arg: 0,
         }
         impl Horizontal {
-            variant: Vlist,
+            variant: VBox,
         }
         impl Vertical {
-            variant: Vlist,
+            variant: VBox,
         }
         impl DiscretionaryElem {
-            variant: Vlist,
+            variant: VBox,
         }
     ),
     (
@@ -782,7 +782,7 @@ functions!(
             split_top_skip_stretch: (common::Scaled, common::GlueOrder),
             split_top_skip_shrink: (common::Scaled, common::GlueOrder),
             float_penalty: i32,
-            vlist: Vec<Vertical<'a>>,
+            vbox: Vec<Vertical<'a>>,
         }
         impl Func {
             func_name: "insertion",
@@ -996,29 +996,29 @@ impl<'a> Value<'a> for (common::Scaled, common::GlueOrder) {
 }
 
 impl<'a> Value<'a> for Vec<Vertical<'a>> {
-    const DESCRIPTION: &'static str = "a vlist";
+    const DESCRIPTION: &'static str = "a vbox";
     fn try_cast_list<F: cst::TreeIter<'a>>(value: F, errs: &ErrorAccumulator<'a>) -> Option<Self> {
-        Some(parse_vlist_using_cst(value, errs))
+        Some(parse_vbox_using_cst(value, errs))
     }
     fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>> {
         cst::ArgsItem::List {
             key,
             square_open: "".into(),
-            tree: lower_vlist_impl(self),
+            tree: lower_vbox_impl(self),
         }
     }
 }
 
 impl<'a> Value<'a> for Vec<Horizontal<'a>> {
-    const DESCRIPTION: &'static str = "a hlist";
+    const DESCRIPTION: &'static str = "a hbox";
     fn try_cast_list<F: cst::TreeIter<'a>>(value: F, errs: &ErrorAccumulator<'a>) -> Option<Self> {
-        Some(parse_hlist_using_cst(value, errs))
+        Some(parse_hbox_using_cst(value, errs))
     }
     fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>> {
         cst::ArgsItem::List {
             key,
             square_open: "".into(),
-            tree: lower_hlist_impl(self),
+            tree: lower_hbox_impl(self),
         }
     }
 }
@@ -1051,15 +1051,15 @@ mod tests {
     use super::*;
     /// FYI: most of the tests are doc tests.
     #[test]
-    fn hlist() {
+    fn hbox() {
         let input = r#"
-            hlist(
+            hbox(
                 width=1pt,
                 content=[chars("Hello")],
             )
         "#;
 
-        let want = vec![Horizontal::Hlist(Hlist {
+        let want = vec![Horizontal::HBox(HBox {
             width: Arg {
                 value: common::Scaled::ONE.into(),
                 source: Some("1pt".into()),
@@ -1081,7 +1081,7 @@ mod tests {
             ..Default::default()
         })];
 
-        let got = parse_hlist(&input).expect("parsing succeeds");
+        let got = parse_hbox(&input).expect("parsing succeeds");
 
         assert_eq!(got, want);
     }

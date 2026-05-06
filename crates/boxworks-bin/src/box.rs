@@ -142,11 +142,11 @@ impl Hbox {
             None
         };
         let labels = make_labels(self.texts.len(), num_direct, &file_line_numbers);
-        let hlists = match tex_engine {
-            Some(engine) => run_tex_hlists(engine.as_ref(), self.texts, self.font_metrics)?,
-            None => run_box_hlists(self.texts, self.font_metrics)?,
+        let hboxs = match tex_engine {
+            Some(engine) => run_tex_hboxs(engine.as_ref(), self.texts, self.font_metrics)?,
+            None => run_box_hboxs(self.texts, self.font_metrics)?,
         };
-        print_hlists(hlists, labels);
+        print_hboxs(hboxs, labels);
         Ok(())
     }
 }
@@ -296,11 +296,11 @@ impl Linebreak {
     }
 }
 
-fn print_vlist_text(vlist: &bwl::ast::Vlist<'_>) {
+fn print_vlist_text(vlist: &bwl::ast::VBox<'_>) {
     for elem in &vlist.content.value {
-        if let bwl::ast::Vertical::Hlist(hlist) = elem {
+        if let bwl::ast::Vertical::HBox(hbox) = elem {
             let mut line = String::new();
-            for h in &hlist.content.value {
+            for h in &hbox.content.value {
                 match h {
                     bwl::ast::Horizontal::Chars(c) => line.push_str(&c.content.value),
                     bwl::ast::Horizontal::Ligature(l) => line.push_str(&l.original_chars.value),
@@ -346,10 +346,10 @@ fn build_tex_context(
     Ok((auxiliary_files, preamble))
 }
 
-fn run_box_hlists(
+fn run_box_hboxs(
     texts: Vec<String>,
     font_metrics: Option<PathBuf>,
-) -> Result<Vec<bwl::ast::Hlist<'static>>, String> {
+) -> Result<Vec<bwl::ast::HBox<'static>>, String> {
     let (tfm_bytes, _) = load_font_metrics(font_metrics)?;
     let mut tfm_file = tfm::File::deserialize(&tfm_bytes).0.unwrap();
     let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
@@ -367,24 +367,24 @@ fn run_box_hlists(
     use bwl::convert::ToBoxLang;
     Ok(raw
         .into_iter()
-        .map(|got| bwl::ast::Hlist {
+        .map(|got| bwl::ast::HBox {
             width: Default::default(),
             content: got.to_box_lang().into(),
         })
         .collect())
 }
 
-fn run_tex_hlists(
+fn run_tex_hboxs(
     tex_engine: &dyn bwt::TexEngine,
     texts: Vec<String>,
     font_metrics: Option<PathBuf>,
-) -> Result<Vec<bwl::ast::Hlist<'static>>, String> {
+) -> Result<Vec<bwl::ast::HBox<'static>>, String> {
     let (auxiliary_files, preamble) = build_tex_context(font_metrics)?;
-    let (fonts, hlists) =
+    let (fonts, hboxs) =
         bwt::build_horizontal_lists(tex_engine, &auxiliary_files, &preamble, &mut texts.iter());
     _ = fonts;
     use bwl::convert::ToBoxLang;
-    Ok(hlists.into_iter().map(|l| l.to_box_lang()).collect())
+    Ok(hboxs.into_iter().map(|l| l.to_box_lang()).collect())
 }
 
 fn run_tex_vlists(
@@ -393,7 +393,7 @@ fn run_tex_vlists(
     font_metrics: Option<PathBuf>,
     widths: &[common::Scaled],
     params: &boxworks_knuthplass::Params,
-) -> Result<Vec<bwl::ast::Vlist<'static>>, String> {
+) -> Result<Vec<bwl::ast::VBox<'static>>, String> {
     let (auxiliary_files, preamble) = build_tex_context(font_metrics)?;
     let (_, vlists) = bwt::build_vertical_lists(
         tex_engine,
@@ -407,26 +407,26 @@ fn run_tex_vlists(
     Ok(vlists.into_iter().map(|l| l.to_box_lang()).collect())
 }
 
-fn print_hlists(hlists: Vec<bwl::ast::Hlist<'static>>, labels: Vec<Option<usize>>) {
-    for (i, (mut hlist, label)) in hlists.into_iter().zip(labels).enumerate() {
-        hlist.width = common::Scaled::ZERO.into();
+fn print_hboxs(hboxs: Vec<bwl::ast::HBox<'static>>, labels: Vec<Option<usize>>) {
+    for (i, (mut hbox, label)) in hboxs.into_iter().zip(labels).enumerate() {
+        hbox.width = common::Scaled::ZERO.into();
         println!("#");
         match label {
-            Some(line_num) => println!("# hlist {} (line {})", i + 1, line_num),
-            None => println!("# hlist {}", i + 1),
+            Some(line_num) => println!("# hbox {} (line {})", i + 1, line_num),
+            None => println!("# hbox {}", i + 1),
         }
-        println!("{}", bwl::ast::Horizontal::Hlist(hlist));
+        println!("{}", bwl::ast::Horizontal::HBox(hbox));
     }
 }
 
-fn print_vlists(vlists: Vec<bwl::ast::Vlist<'static>>, labels: Vec<Option<usize>>) {
+fn print_vlists(vlists: Vec<bwl::ast::VBox<'static>>, labels: Vec<Option<usize>>) {
     for (i, (vlist, label)) in vlists.into_iter().zip(labels).enumerate() {
         println!("#");
         match label {
             Some(line_num) => println!("# vlist {} (line {})", i + 1, line_num),
             None => println!("# vlist {}", i + 1),
         }
-        println!("{}", bwl::ast::Horizontal::Vlist(vlist));
+        println!("{}", bwl::ast::Horizontal::VBox(vlist));
     }
 }
 

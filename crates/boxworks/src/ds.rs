@@ -16,8 +16,8 @@ use std::rc::Rc;
 #[derive(Debug, Clone)]
 pub enum Horizontal {
     Char(Char),
-    HList(HList),
-    VList(VList),
+    HBox(HBox),
+    VBox(VBox),
     Rule(Rule),
     Mark(Mark),
     Insertion(Insertion),
@@ -55,8 +55,8 @@ macro_rules! horizontal_impl {
 
 horizontal_impl!(
     Char,
-    HList,
-    VList,
+    HBox,
+    VBox,
     Rule,
     Mark,
     Insertion,
@@ -72,8 +72,8 @@ horizontal_impl!(
 /// Element of a vertical list.
 #[derive(Clone, Debug)]
 pub enum Vertical {
-    HList(HList),
-    VList(VList),
+    HBox(HBox),
+    VBox(VBox),
     Rule(Rule),
     Mark(Mark),
     Insertion(Insertion),
@@ -106,7 +106,7 @@ macro_rules! vertical_impl {
     };
 }
 
-vertical_impl!(HList, VList, Rule, Mark, Insertion, Math, Glue, Kern, Penalty,);
+vertical_impl!(HBox, VBox, Rule, Mark, Insertion, Math, Glue, Kern, Penalty,);
 
 /// A character in a specific font.
 ///
@@ -123,7 +123,7 @@ pub struct Char {
 ///
 /// Described in TeX.2021.135.
 #[derive(Clone, Debug, PartialEq)]
-pub struct HList {
+pub struct HBox {
     pub height: Number,
     pub width: Number,
     pub depth: Number,
@@ -162,8 +162,8 @@ pub enum GlueSign {
     Normal,
 }
 
-impl HList {
-    /// Returns a hlist node corresponding to the TeX snippet `\hbox{}`.
+impl HBox {
+    /// Returns a hbox node corresponding to the TeX snippet `\hbox{}`.
     ///
     /// Described in TeX.2021.136.
     pub fn new_null_box() -> Self {
@@ -180,7 +180,7 @@ impl HList {
     }
 }
 
-impl Default for HList {
+impl Default for HBox {
     fn default() -> Self {
         Self::new_null_box()
     }
@@ -188,12 +188,12 @@ impl Default for HList {
 
 /// A box made from a vertical list.
 ///
-/// This is the same as [HList], except the list inside holds [Vertical] nodes
+/// This is the same as [HBox], except the list inside holds [Vertical] nodes
 /// instead of [Horizontal] nodes.
 ///
 /// Described in TeX.2021.137.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct VList {
+pub struct VBox {
     pub height: Number,
     pub width: Number,
     pub depth: Number,
@@ -261,7 +261,7 @@ pub struct Insertion {
     /// Penalty to be used if this insertion floats to a subsequent
     /// page after a split insertion of the same class.
     pub float_penalty: u32,
-    pub vlist: Vec<Vertical>,
+    pub vbox: Vec<Vertical>,
 }
 
 /// Contents of a user's `\mark` text.
@@ -341,8 +341,8 @@ impl Default for Discretionary {
 #[derive(Clone, Debug, PartialEq)]
 pub enum DiscretionaryElem {
     Char(Char),
-    HList(HList),
-    VList(VList),
+    HBox(HBox),
+    VBox(VBox),
     Rule(Rule),
     Ligature(Ligature),
     Kern(Kern),
@@ -355,8 +355,8 @@ impl DiscretionaryElem {
             Char(char) => font_width
                 .width(char.char, char.font)
                 .unwrap_or(common::Scaled::ZERO),
-            HList(hlist) => hlist.width,
-            VList(vlist) => vlist.width,
+            HBox(hlist) => hlist.width,
+            VBox(vlist) => vlist.width,
             Rule(rule) => rule.width,
             Ligature(ligature) => font_width
                 .width(ligature.char, ligature.font)
@@ -374,8 +374,8 @@ impl TryFrom<Horizontal> for DiscretionaryElem {
         use Horizontal::*;
         let out = match value {
             Char(char) => Out::Char(char),
-            HList(hlist) => Out::HList(hlist),
-            VList(vlist) => Out::VList(vlist),
+            HBox(hlist) => Out::HBox(hlist),
+            VBox(vlist) => Out::VBox(vlist),
             Rule(rule) => Out::Rule(rule),
             Ligature(ligature) => Out::Ligature(ligature),
             Kern(kern) => Out::Kern(kern),
@@ -438,7 +438,7 @@ impl Horizontal {
     pub fn precedes_break(&self) -> bool {
         use Horizontal::*;
         match self {
-            Char(_) | HList(_) | VList(_) | Rule(_) | Mark(_) | Insertion(_) | Adjust(_)
+            Char(_) | HBox(_) | VBox(_) | Rule(_) | Mark(_) | Insertion(_) | Adjust(_)
             | Ligature(_) | Discretionary(_) | Whatsit(_) => true,
             Kern(kern) => kern.kind != KernKind::Explicit,
             Math(_) | Glue(_) | Penalty(_) => false,
@@ -466,7 +466,7 @@ impl Vertical {
         use Vertical::*;
         matches!(
             self,
-            HList(_) | VList(_) | Rule(_) | Mark(_) | Insertion(_) | Whatsit(_)
+            HBox(_) | VBox(_) | Rule(_) | Mark(_) | Insertion(_) | Whatsit(_)
         )
     }
 }
@@ -564,7 +564,7 @@ pub fn short_display_hlist(w: &mut dyn std::fmt::Write, hlist: &[Horizontal]) ->
         use Horizontal::*;
         match elem {
             Char(char) => write!(w, "{}", char.char)?,
-            HList(_) | VList(_) | Whatsit(_) | Mark(_) | Adjust(_) => write!(w, "[]")?,
+            HBox(_) | VBox(_) | Whatsit(_) | Mark(_) | Adjust(_) => write!(w, "[]")?,
             Rule(_) => write!(w, "|")?,
             Ligature(ligature) => write!(w, "{}", ligature.original_chars)?,
             Discretionary(discretionary) => {
@@ -595,7 +595,7 @@ fn short_display_dlist(
         use DiscretionaryElem::*;
         match elem {
             Char(char) => write!(w, "{}", char.char)?,
-            HList(_) | VList(_) => write!(w, "[]")?,
+            HBox(_) | VBox(_) => write!(w, "[]")?,
             Rule(_) => write!(w, "|")?,
             Ligature(ligature) => write!(w, "{}", ligature.original_chars)?,
             Kern(_) => {}

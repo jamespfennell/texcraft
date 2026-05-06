@@ -110,7 +110,7 @@ pub fn build_horizontal_lists(
     auxiliary_files: &HashMap<PathBuf, Vec<u8>>,
     preamble: &str,
     contents: &mut dyn Iterator<Item = &String>,
-) -> (HashMap<String, u32>, Vec<ds::HList>) {
+) -> (HashMap<String, u32>, Vec<ds::HBox>) {
     let macro_calls: Vec<String> = contents.map(|s| format!(r#"\printBox{{{s}}}"#)).collect();
     let tex_source_code = CONVERT_TEXT_TEMPLATE
         .replace("<preamble>", preamble)
@@ -140,7 +140,7 @@ pub fn build_vertical_lists(
     widths: &[common::Scaled],
     params: &boxworks_knuthplass::Params,
     contents: &mut dyn Iterator<Item = &String>,
-) -> (HashMap<String, u32>, Vec<ds::VList>) {
+) -> (HashMap<String, u32>, Vec<ds::VBox>) {
     let params_preamble = format!(
         "\n\\adjdemerits={}\n\\doublehyphendemerits={}\n\\exhyphenpenalty={}\n\\finalhyphendemerits={}\n\\hyphenpenalty={}\n\\leftskip={}\n\\linepenalty={}\n\\looseness={}\n\\parfillskip={}\n\\pretolerance={}\n\\rightskip={}\n\\tolerance={}\n",
         params.adj_demerits,
@@ -280,7 +280,7 @@ fn extract_texcraft_segments(mut s: &str) -> impl Iterator<Item = &str> {
 /// Parse a single raw hlist segment (as produced by [`extract_hlist_segments`]) into an hlist.
 ///
 /// The `fonts` map is updated in place as new fonts are encountered.
-fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds::HList {
+fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds::HBox {
     let mut hlist = {
         let line = iter.next().expect("hlist must be non-empty");
         let s = line
@@ -307,7 +307,7 @@ fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
             ds::GlueSign::Normal,
             common::GlueOrder::Normal,
         ));
-        ds::HList {
+        ds::HBox {
             height,
             width,
             depth,
@@ -406,7 +406,7 @@ fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
 }
 
 /// Parse a single raw vlist segment into a vlist.
-fn parse_vlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds::VList {
+fn parse_vlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds::VBox {
     let mut vlist = {
         let line = iter.next().expect("vlist must be non-empty");
         let s = line
@@ -422,7 +422,7 @@ fn parse_vlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
             .expect("vbox dimension spec has a )x between depth and width");
         let depth = parse_scaled(&s[..i]);
         let width = parse_scaled(&s[i + 2..]);
-        ds::VList {
+        ds::VBox {
             height,
             width,
             depth,
@@ -694,7 +694,7 @@ Transcript written on test.log.
             &mut vec!["".to_string()].iter(),
         );
 
-        let want_list = ds::HList {
+        let want_list = ds::HBox {
             height: parse_scaled("6.94444"),
             width: parse_scaled("56.66678"),
             depth: common::Scaled::ZERO,
@@ -800,7 +800,7 @@ Transcript written on test.log.
             &mut vec!["".to_string()].iter(),
         );
 
-        let want_list = ds::VList {
+        let want_list = ds::VBox {
             height: parse_scaled("18.94444"),
             width: parse_scaled("41.0"),
             depth: common::Scaled::ZERO,
@@ -809,7 +809,7 @@ Transcript written on test.log.
             glue_sign: ds::GlueSign::Normal,
             glue_order: common::GlueOrder::Normal,
             list: vec![
-                ds::Vertical::HList(ds::HList {
+                ds::Vertical::HBox(ds::HBox {
                     height: parse_scaled("6.94444"),
                     width: parse_scaled("41.0"),
                     depth: common::Scaled::ZERO,
@@ -865,7 +865,7 @@ Transcript written on test.log.
                         shrink_order: common::GlueOrder::Normal,
                     },
                 }),
-                ds::Vertical::HList(ds::HList {
+                ds::Vertical::HBox(ds::HBox {
                     height: parse_scaled("4.30554"),
                     width: parse_scaled("41.0"),
                     depth: common::Scaled::ZERO,
@@ -962,7 +962,7 @@ Transcript written on test.log.
             &mut vec!["".to_string()].iter(),
         );
 
-        let want_list = ds::VList {
+        let want_list = ds::VBox {
             height: parse_scaled("6.83331"),
             width: parse_scaled("41.0"),
             depth: common::Scaled::ZERO,
@@ -970,23 +970,23 @@ Transcript written on test.log.
             glue_ratio: ds::GlueRatio(0.0),
             glue_sign: ds::GlueSign::Normal,
             glue_order: common::GlueOrder::Normal,
-            list: vec![ds::Vertical::HList(ds::HList {
+            list: vec![ds::Vertical::HBox(ds::HBox {
                 height: parse_scaled("6.83331"),
                 width: parse_scaled("41.0"),
                 depth: common::Scaled::ZERO,
                 list: vec![
                     ds::Char { char: 'A', font: 0 }.into(),
-                    ds::Horizontal::HList(ds::HList {
+                    ds::Horizontal::HBox(ds::HBox {
                         height: parse_scaled("6.83331"),
                         width: parse_scaled("48.08336"),
                         depth: common::Scaled::ZERO,
                         list: vec![
                             ds::Char { char: 'B', font: 0 }.into(),
-                            ds::Horizontal::VList(ds::VList {
+                            ds::Horizontal::VBox(ds::VBox {
                                 height: parse_scaled("6.83331"),
                                 width: parse_scaled("41.0"),
                                 depth: common::Scaled::ZERO,
-                                list: vec![ds::Vertical::HList(ds::HList {
+                                list: vec![ds::Vertical::HBox(ds::HBox {
                                     height: parse_scaled("6.83331"),
                                     width: parse_scaled("41.0"),
                                     depth: common::Scaled::ZERO,
@@ -994,14 +994,14 @@ Transcript written on test.log.
                                     glue_sign: ds::GlueSign::Stretching,
                                     glue_order: common::GlueOrder::Fil,
                                     list: vec![
-                                        ds::Horizontal::HList(ds::HList {
+                                        ds::Horizontal::HBox(ds::HBox {
                                             height: common::Scaled::ZERO,
                                             width: parse_scaled("20.0"),
                                             depth: common::Scaled::ZERO,
                                             ..Default::default()
                                         }),
                                         ds::Char { char: 'C', font: 0 }.into(),
-                                        ds::Horizontal::HList(ds::HList {
+                                        ds::Horizontal::HBox(ds::HBox {
                                             height: parse_scaled("6.83331"),
                                             width: parse_scaled("7.6389"),
                                             depth: common::Scaled::ZERO,
