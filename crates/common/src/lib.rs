@@ -207,7 +207,7 @@ impl Scaled {
                 }
                 write!(fm, "{}.", self.s.integer_part().abs())?;
                 // Fractional part
-                let mut f = self.s.abs().fractional_part() * 10 + Scaled(5);
+                let mut f = self.s.fractional_part().abs() * 10 + Scaled(5);
                 let mut delta = Scaled(10);
                 loop {
                     if delta > Scaled::ONE {
@@ -601,5 +601,10 @@ mod tests {
         bad_unit:      "10xx"   => Err("invalid unit \"xx\" in dimension \"10xx\"".to_string()),
         bad_number:    "abpt"   => Err("invalid number \"ab\" in dimension \"abpt\"".to_string()),
         bad_fraction:  "1.xpt"  => Err("invalid fractional part \"x\" in dimension \"1.xpt\"".to_string()),
+    }
+
+    #[test]
+    fn print_smallest_scaled() {
+        assert_eq!("-32768.0pt", format!("{}", Scaled(i32::MIN)));
     }
 }
