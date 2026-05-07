@@ -349,12 +349,25 @@ fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
                 .into()
             }
             "discretionary" => {
+                // Inverse of TeX.2021.195
                 // TODO: handle replacing_spec
-                _ = tail;
+                // TODO: actually implement this
+                let mut words = tail.split_ascii_whitespace();
+                let replace_count = match words.next() {
+                    None => 0,
+                    Some(replacing) => {
+                        assert_eq!(replacing, "replacing");
+                        words
+                            .next()
+                            .unwrap()
+                            .parse()
+                            .expect("replacing value is u32")
+                    }
+                };
                 ds::Discretionary {
-                    pre_break: vec![],
+                    pre_break: vec![ds::DiscretionaryElem::Char(ds::Char { char: '-', font: 0 })],
                     post_break: vec![],
-                    replace_count: 1,
+                    replace_count,
                 }
                 .into()
             }

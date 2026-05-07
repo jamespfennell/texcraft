@@ -448,6 +448,26 @@ impl File {
                 .to_scaled(self.header.design_size),
         )
     }
+    pub fn height_utf8(&self, char: char) -> Option<common::Scaled> {
+        let char: Char = char.try_into().ok()?;
+        let dimens = self.char_dimens.get(&char)?;
+        let i = dimens.height_index;
+        Some(
+            self.widths
+                .get(i as usize)?
+                .to_scaled(self.header.design_size),
+        )
+    }
+    pub fn depth_utf8(&self, char: char) -> Option<common::Scaled> {
+        let char: Char = char.try_into().ok()?;
+        let dimens = self.char_dimens.get(&char)?;
+        let i = dimens.depth_index;
+        Some(
+            self.widths
+                .get(i as usize)?
+                .to_scaled(self.header.design_size),
+        )
+    }
 }
 
 impl From<crate::pl::File> for File {

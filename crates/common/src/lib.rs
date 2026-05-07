@@ -261,10 +261,17 @@ impl std::ops::AddAssign<Scaled> for Scaled {
         self.0 += rhs.0;
     }
 }
+
 impl std::ops::Sub<Scaled> for Scaled {
     type Output = Scaled;
     fn sub(self, rhs: Scaled) -> Self::Output {
         Scaled(self.0 - rhs.0)
+    }
+}
+
+impl std::ops::SubAssign<Scaled> for Scaled {
+    fn sub_assign(&mut self, rhs: Scaled) {
+        self.0 -= rhs.0;
     }
 }
 

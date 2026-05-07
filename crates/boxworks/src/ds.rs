@@ -137,6 +137,138 @@ pub struct HBox {
     pub glue_order: GlueOrder,
 }
 
+/// Pack width specifies how width is handled when packing
+pub enum PackWidth {
+    /// Make the box exactly this width, generally by stretching or shrinking
+    /// glue within the box.
+    Exact(common::Scaled),
+
+    /// Make the box its natural width, plus the additional width specified here.
+    Additional(common::Scaled),
+}
+
+impl HBox {
+    /// Create a horizontal from a vertical list.
+    ///
+    pub fn pack<F: super::FontRepo>(
+        font_repo: &F,
+        list: Vec<Horizontal>,
+        pack_width: PackWidth,
+    ) -> HBox {
+        // This function corresponds to hpack in TeX.2021.649.
+        let mut hbox = HBox {
+            list,
+            ..Default::default()
+        };
+        let mut total_glue = common::Glue::default();
+        let mut natural_width = common::Scaled::ZERO;
+        for elem in &hbox.list {
+            // TeX.2021.658
+            use Horizontal as H;
+            let [w, h, d] = match elem {
+                H::Ligature(Ligature { char, font, .. }) | H::Char(Char { char, font }) => {
+                    // TeX.2021.654
+                    let Some([w, h, d]) = font_repo.width_height_depth(*char, *font) else {
+                        continue;
+                    };
+                    [w, h, d]
+                }
+                // The next 3 cases are TeX.2021.653.
+                H::HBox(HBox {
+                    height,
+                    width,
+                    depth,
+                    shift_amount,
+                    ..
+                })
+                | H::VBox(VBox {
+                    height,
+                    width,
+                    depth,
+                    shift_amount,
+                    ..
+                }) => [*height - *shift_amount, *width, *depth + *shift_amount],
+                H::Rule(Rule {
+                    height,
+                    width,
+                    depth,
+                }) => [*height, *width, *depth],
+                // The next 3 cases are TeX.2021.655
+                H::Mark(_) | H::Insertion(_) | H::Adjust(_) => {
+                    todo!("support more nodes here")
+                }
+                H::Discretionary(_discretionary) => {
+                    // Do nothing. Discretionaries are only relevant if they are break points.
+                    continue;
+                }
+                H::Whatsit(_whatsit) => {
+                    // Do nothing for the moment. But maybe support a callback here.
+                    // TeX.2021.1360.
+                    continue;
+                }
+                H::Math(_math) => {
+                    todo!("support math nodes here")
+                }
+                H::Glue(glue) => {
+                    // TeX.2021.656
+                    use std::cmp::Ordering::*;
+                    match total_glue.shrink_order.cmp(&glue.value.shrink_order) {
+                        Less => {
+                            total_glue.shrink = glue.value.shrink;
+                            total_glue.shrink_order = glue.value.shrink_order;
+                        }
+                        Equal => {
+                            total_glue.shrink += glue.value.shrink;
+                        }
+                        Greater => {
+                            // Do nothing.
+                            // This glue has smaller order than some other glue in the box, so will
+                            // not be used for shrinking.
+                        }
+                    }
+                    match total_glue.stretch_order.cmp(&glue.value.stretch_order) {
+                        Less => {
+                            total_glue.stretch = glue.value.stretch;
+                            total_glue.stretch_order = glue.value.shrink_order;
+                        }
+                        Equal => {
+                            total_glue.stretch += glue.value.stretch;
+                        }
+                        Greater => {
+                            // Do nothing.
+                            // This glue has smaller order than some other glue in the box, so will
+                            // not be used for stretching.
+                        }
+                    }
+                    // TODO: implement leader support.
+                    [glue.value.width, common::Scaled::ZERO, common::Scaled::ZERO]
+                }
+                H::Kern(kern) => [kern.width, common::Scaled::ZERO, common::Scaled::ZERO],
+                H::Penalty(_) => {
+                    // Do nothing.
+                    continue;
+                }
+            };
+            natural_width += w;
+            if h > hbox.height {
+                hbox.height = h;
+            }
+            if d > hbox.depth {
+                hbox.depth = d;
+            }
+        }
+
+        // TeX.2021.657
+        hbox.width = match pack_width {
+            PackWidth::Exact(exact) => exact,
+            PackWidth::Additional(additional) => natural_width + additional,
+        };
+        let excess = hbox.width - natural_width;
+        _ = excess;
+        hbox
+    }
+}
+
 /// Ratio by which glue should shrink or stretch.
 ///
 /// This is one of the few (only?) places in TeX where a floating point
@@ -346,6 +478,21 @@ pub enum DiscretionaryElem {
     Rule(Rule),
     Ligature(Ligature),
     Kern(Kern),
+}
+
+impl From<DiscretionaryElem> for Horizontal {
+    fn from(value: DiscretionaryElem) -> Self {
+        use DiscretionaryElem as In;
+        use Horizontal as Out;
+        match value {
+            In::Char(char) => Out::Char(char),
+            In::HBox(hbox) => Out::HBox(hbox),
+            In::VBox(vbox) => Out::VBox(vbox),
+            In::Rule(rule) => Out::Rule(rule),
+            In::Ligature(ligature) => Out::Ligature(ligature),
+            In::Kern(kern) => Out::Kern(kern),
+        }
+    }
 }
 
 impl DiscretionaryElem {

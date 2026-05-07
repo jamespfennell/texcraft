@@ -8,17 +8,22 @@ pub mod debug;
 
 pub struct LineBreaker<'a> {
     pub params: &'a Params,
-    pub line_widths: &'a [common::Scaled],
+    pub line_widths: &'a [Scaled],
+    pub line_indents: &'a [Scaled],
     pub debug_logger: Option<&'a mut dyn debug::Logger>,
 }
 
 #[derive(Debug)]
 pub struct Params {
     pub adj_demerits: i32,
+    pub broken_penalty: i32,
     pub double_hyphen_demerits: i32,
+    pub club_penalty: i32,
     pub ex_hyphen_penalty: i32,
     pub final_hyphen_demerits: i32,
+    pub final_widow_penalty: i32,
     pub hyphen_penalty: i32,
+    pub inter_line_penalty: i32,
     pub left_skip: common::Glue,
     pub line_penalty: i32,
     pub looseness: i32,
@@ -38,18 +43,22 @@ impl Params {
     pub fn plain_tex_defaults() -> Self {
         Self {
             adj_demerits: 10000,
+            broken_penalty: 100,
             double_hyphen_demerits: 10000,
+            club_penalty: 150,
             ex_hyphen_penalty: 50,
             final_hyphen_demerits: 5000,
+            final_widow_penalty: 150,
             hyphen_penalty: 50,
+            inter_line_penalty: 0,
             left_skip: common::Glue::ZERO,
             line_penalty: 10,
             looseness: 0,
             par_fill_skip: common::Glue {
-                width: common::Scaled::ZERO,
-                stretch: common::Scaled::ONE,
+                width: Scaled::ZERO,
+                stretch: Scaled::ONE,
                 stretch_order: common::GlueOrder::Fil,
-                shrink: common::Scaled::ZERO,
+                shrink: Scaled::ZERO,
                 shrink_order: Default::default(),
             },
             pre_tolerance: 100,
@@ -86,14 +95,14 @@ impl std::ops::Neg for Scaled64 {
     }
 }
 
-impl AddAssign<common::Scaled> for Scaled64 {
-    fn add_assign(&mut self, rhs: common::Scaled) {
+impl AddAssign<Scaled> for Scaled64 {
+    fn add_assign(&mut self, rhs: Scaled) {
         self.0 += rhs.0 as i64
     }
 }
 
-impl std::ops::SubAssign<common::Scaled> for Scaled64 {
-    fn sub_assign(&mut self, rhs: common::Scaled) {
+impl std::ops::SubAssign<Scaled> for Scaled64 {
+    fn sub_assign(&mut self, rhs: Scaled) {
         self.0 -= rhs.0 as i64
     }
 }
@@ -148,10 +157,10 @@ enum FitnessClass {
 
 struct PassiveNode {
     // Index of the element in the horizontal list
-    _elem: usize,
+    elem: usize,
     // Index of the passive node corresponding to the previous break
     // in the optimal path to this node.
-    _previous_node_index: usize,
+    previous_node_index: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -165,9 +174,11 @@ impl<'a> boxworks::LineBreaker for LineBreaker<'a> {
     fn break_line<F: boxworks::FontRepo>(
         mut self,
         font_repo: &F,
-        _v_list: &mut Vec<ds::Vertical>,
+        v_list: &mut Vec<ds::Vertical>,
         h_list: &mut Vec<ds::Horizontal>,
     ) {
+        // This function is analagous to TeX.2021.815.
+
         // TeX.2021.816
         if matches!(h_list.last(), Some(ds::Horizontal::Glue(_))) {
             h_list.pop();
@@ -178,34 +189,183 @@ impl<'a> boxworks::LineBreaker for LineBreaker<'a> {
             value: self.params.par_fill_skip,
         }));
 
+        let break_points = self.break_line_all_attempts(font_repo, v_list, h_list);
+        println!("{break_points:?}");
+        self.post_line_break(font_repo, v_list, h_list, &break_points);
+    }
+}
+
+impl<'a> LineBreaker<'a> {
+    fn post_line_break<F: boxworks::FontRepo>(
+        &self,
+        font_repo: &F,
+        v_list: &mut Vec<ds::Vertical>,
+        h_list: &[ds::Horizontal],
+        break_points: &[usize],
+    ) {
+        let mut start_of_line = 0_usize;
+        let mut disc_post_break_nodes: Option<Vec<ds::DiscretionaryElem>> = None;
+        for (line_index, break_point) in break_points.iter().enumerate() {
+            let mut inner_list: Vec<ds::Horizontal> = vec![];
+
+            // TeX.2021.887
+            if !self.params.left_skip.is_zero() {
+                inner_list.push(
+                    ds::Glue {
+                        value: self.params.left_skip,
+                        kind: ds::GlueKind::Normal,
+                    }
+                    .into(),
+                );
+            }
+
+            // TeX.2021.884
+            if let Some(disc_nodes) = disc_post_break_nodes.take() {
+                for disc_node in disc_nodes {
+                    inner_list.push(disc_node.into());
+                }
+            }
+
+            inner_list.extend_from_slice(&h_list[start_of_line..*break_point]);
+            start_of_line = *break_point + 1;
+
+            // TeX.2021.881
+            // This is the check that `q != null` in Knuth's TeX.
+            // This logic does not run for the final breakpoint.
+            if let Some(break_point_node) = h_list.get(*break_point).cloned() {
+                use ds::Horizontal::*;
+                match break_point_node {
+                    Discretionary(discretionary) => {
+                        // TeX.2021.882
+                        for pre_break_node in discretionary.pre_break {
+                            inner_list.push(pre_break_node.into());
+                        }
+                        disc_post_break_nodes = Some(discretionary.post_break);
+                        start_of_line += discretionary.replace_count as usize;
+                    }
+                    Math(math) => {
+                        // TODO: set the width of Math to zero
+                        inner_list.push(math.into());
+                    }
+                    Glue(_) => {
+                        // Do nothing. In TeX there is an "optimization" in which the glue is
+                        // modified to be \rightskip, but we don't do this. Instead it is inserted
+                        // below.
+                    }
+                    Kern(mut kern) => {
+                        kern.width = Scaled::ZERO;
+                        inner_list.push(kern.into());
+                    }
+                    Penalty(_) => {
+                        // Do nothing.
+                    }
+                    _ => {
+                        unreachable!("node cannot appear as a breakpoint: {break_point_node:?}");
+                    }
+                }
+            }
+
+            // TeX.2021.886
+            // Unlike \leftskip, there is no check if the glue here is zero.
+            inner_list.push(
+                ds::Glue {
+                    value: self.params.right_skip,
+                    kind: ds::GlueKind::Normal,
+                }
+                .into(),
+            );
+
+            // TeX.2021.889
+            let width = self
+                .line_widths
+                .get(line_index)
+                .unwrap_or(self.line_widths.last().expect("non-empty line widths"));
+            let indent = self
+                .line_indents
+                .get(line_index)
+                .copied()
+                .unwrap_or(self.line_indents.last().copied().unwrap_or(Scaled::ZERO));
+            let h_box = {
+                let mut b = ds::HBox::pack(font_repo, inner_list, ds::PackWidth::Exact(*width));
+                b.shift_amount = indent;
+                b
+            };
+
+            // TeX.2021.888 and TeX.2021.679
+            if !v_list.is_empty() {
+                // TODO: make \baselineskip configurable
+                // TODO: implement `\lineskiplimit` `\lineskip`.
+                let mut baseline_skip = common::Glue {
+                    width: common::Scaled::ONE * 12,
+                    ..Default::default()
+                };
+                baseline_skip.width -= h_box.height;
+                // TODO: it's the _last_ box's depth that should be used here.
+                baseline_skip.width -= h_box.depth;
+                v_list.push(
+                    ds::Glue {
+                        value: baseline_skip,
+                        kind: Default::default(),
+                    }
+                    .into(),
+                );
+            }
+            v_list.push(h_box.into());
+
+            // TeX.2021.890
+            // If this is not the last line, we consider penalties.
+            if line_index + 1 != break_points.len() {
+                let mut p = self.params.inter_line_penalty;
+                if line_index == 0 {
+                    p += self.params.club_penalty;
+                }
+                if line_index + 2 == break_points.len() {
+                    p += self.params.final_widow_penalty;
+                }
+                if disc_post_break_nodes.is_some() {
+                    p += self.params.broken_penalty;
+                }
+                if p != 0 {
+                    v_list.push(ds::Penalty(p).into());
+                }
+            }
+        }
+    }
+    pub fn break_line_all_attempts<F: boxworks::FontRepo>(
+        &mut self,
+        font_repo: &F,
+        _v_list: &mut Vec<ds::Vertical>,
+        h_list: &mut Vec<ds::Horizontal>,
+    ) -> Vec<usize> {
+        // We manually unroll the "loop" in TeX.2021.863.
         if let Some(debug_logger) = self.debug_logger.as_deref_mut() {
             debug_logger.log_attempt(1);
         }
-        if self.break_line_attempt(h_list, font_repo, self.params.pre_tolerance) {
-            return;
+        if let Some(v) =
+            self.break_line_single_attempt(h_list, font_repo, self.params.pre_tolerance)
+        {
+            return v;
         }
         if let Some(debug_logger) = self.debug_logger.as_deref_mut() {
             debug_logger.log_attempt(2);
         }
         boxworks_hyphenate::hyphenate_list(h_list);
-        if self.break_line_attempt(h_list, font_repo, self.params.tolerance) {
-            return;
+        if let Some(v) = self.break_line_single_attempt(h_list, font_repo, self.params.tolerance) {
+            return v;
         }
-        println!("need emergency attempt");
+        panic!("need emergency attempt");
     }
-}
 
-impl<'a> LineBreaker<'a> {
-    pub fn break_line_attempt<F: boxworks::FontRepo>(
+    pub fn break_line_single_attempt<F: boxworks::FontRepo>(
         &mut self,
         list: &[ds::Horizontal],
         font_repo: &F,
         tolerance: i32,
-    ) -> bool {
+    ) -> Option<Vec<usize>> {
         let mut auto_breaking = true;
         let mut passive_nodes = vec![PassiveNode {
-            _elem: 0,
-            _previous_node_index: 0,
+            elem: 0,
+            previous_node_index: 0,
         }];
 
         let mut active_nodes = VecDeque::<ActiveNode>::from([
@@ -239,7 +399,7 @@ impl<'a> LineBreaker<'a> {
             // contain a continue statement.
             let (mut penalty, hyphenated) = match elem {
                 None => {
-                    // TeX.202.873
+                    // This corresponds to the try_break call in TeX.202.873.
                     // I'm guessing the last break is considered hyphenated so as to penalize
                     // the second-to-last line being hyphenated. A hyphen doesn't look nice
                     // in the bottom right of the paragraph.
@@ -249,9 +409,7 @@ impl<'a> LineBreaker<'a> {
                     Char(ds::Char { char, font }) | Ligature(ds::Ligature { char, font, .. }) => {
                         // TeX.2021.867 has an optimization in which subsequent chars are read
                         // here. I'm not convinced it's worth it.
-                        diffs.width += font_repo
-                            .width(*char, *font)
-                            .unwrap_or(common::Scaled::ZERO);
+                        diffs.width += font_repo.width(*char, *font).unwrap_or(Scaled::ZERO);
                         continue;
                     }
                     HBox(ds::HBox { width, .. })
@@ -323,7 +481,6 @@ impl<'a> LineBreaker<'a> {
                             // and that it is not part of a math formula.
                             (0, false)
                         } else {
-                            println!("adding kern width {}", kern.width);
                             diffs.width += kern.width;
                             continue;
                         }
@@ -520,9 +677,9 @@ impl<'a> LineBreaker<'a> {
                                 while j < i + 1 + discretionary.replace_count as usize {
                                     diffs.width += match &list[j] {
                                         Char(ds::Char { char, font })
-                                        | Ligature(ds::Ligature { char, font, .. }) => font_repo
-                                            .width(*char, *font)
-                                            .unwrap_or(common::Scaled::ZERO),
+                                        | Ligature(ds::Ligature { char, font, .. }) => {
+                                            font_repo.width(*char, *font).unwrap_or(Scaled::ZERO)
+                                        }
                                         HBox(ds::HBox { width, .. })
                                         | VBox(ds::VBox { width, .. })
                                         | Rule(ds::Rule { width, .. })
@@ -532,7 +689,7 @@ impl<'a> LineBreaker<'a> {
                                                 "invalid node {:?} in discretionary replacement list",
                                                 &list[j]
                                             );
-                                            common::Scaled::ZERO
+                                            Scaled::ZERO
                                         }
                                     };
                                     j += 1;
@@ -586,8 +743,8 @@ impl<'a> LineBreaker<'a> {
                         }
                         active_nodes.push_back(active_node);
                         passive_nodes.push(PassiveNode {
-                            _elem: i,
-                            _previous_node_index: candidate.previous_node_index,
+                            elem: i,
+                            previous_node_index: candidate.previous_node_index,
                         });
                     }
                 }
@@ -620,10 +777,23 @@ impl<'a> LineBreaker<'a> {
             }
         }
 
-        !active_nodes.is_empty()
-        // TODO:
-        // Chose active nodes where i = list.len()-1 !
-        // And then return the list of optimal breaks
+        // TeX.2021.874
+        // The following line exits early if there are no active nodes and thus no solution.
+        let mut best = active_nodes.front()?;
+        for active_node in &active_nodes {
+            if active_node.total_demerits < best.total_demerits {
+                best = active_node;
+            }
+        }
+        let mut v = vec![];
+        let mut index = best.node_index;
+        while index > 0 {
+            let passive_node = &passive_nodes[index];
+            v.push(passive_node.elem);
+            index = passive_node.previous_node_index;
+        }
+        v.reverse();
+        Some(v)
     }
 
     /// TeX.2021.859
@@ -712,6 +882,7 @@ fn get_next_line_class(active_nodes: &VecDeque<ActiveNode>, max: usize) -> (Line
 mod tests {
     use super::*;
     use boxworks::TextPreprocessor;
+    use boxworks_lang as bwl;
     use boxworks_text as bwt;
     use pretty_assertions::assert_eq;
     use std::{cell::RefCell, rc::Rc};
@@ -728,20 +899,40 @@ mod tests {
         fields under a wide sky, you might just be able to imagine Cambridge: no farther.
     ";
     const WOLF_HALL_5IN_LOG: &'static str = include_str!("../testdata/wolf_hall_5in_log.txt");
+    const WOLF_HALL_5IN_WANT: &'static str = include_str!("../testdata/wolf_hall_5in_want.txt");
+    const _WOLF_HALL_3IN_WANT: &'static str = include_str!("../testdata/wolf_hall_3in_want.txt");
     const WOLF_HALL_3IN_LOG: &'static str = include_str!("../testdata/wolf_hall_3in_log.txt");
     const TFM_CMR10: &'static [u8] = include_bytes!("../../tfm/corpus/computer-modern/cmr10.tfm");
 
     #[test]
     fn wolf_hall_5in() {
-        run_log_test(TFM_CMR10, WOLF_HALL_5IN_TYPESET, WOLF_HALL_5IN_LOG, "5in");
+        run_test(
+            TFM_CMR10,
+            WOLF_HALL_5IN_TYPESET,
+            Some(WOLF_HALL_5IN_WANT),
+            Some(WOLF_HALL_5IN_LOG),
+            "5in",
+        );
     }
 
     #[test]
     fn wolf_hall_3in() {
-        run_log_test(TFM_CMR10, WOLF_HALL_5IN_TYPESET, WOLF_HALL_3IN_LOG, "3in");
+        run_test(
+            TFM_CMR10,
+            WOLF_HALL_5IN_TYPESET,
+            None,
+            Some(WOLF_HALL_3IN_LOG),
+            "3in",
+        );
     }
 
-    fn run_log_test(tfm_bytes: &[u8], input: &str, want_log: &str, width: &str) {
+    fn run_test(
+        tfm_bytes: &[u8],
+        input: &str,
+        want: Option<&str>,
+        want_log: Option<&str>,
+        width: &str,
+    ) {
         let mut tfm_file = tfm::File::deserialize(tfm_bytes).0.unwrap();
         let lig_kern_program =
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
@@ -765,6 +956,7 @@ mod tests {
         let line_breaker = super::LineBreaker {
             params: &params,
             line_widths: &[width],
+            line_indents: &[],
             debug_logger: Some(&mut logger),
         };
         let mut v_list = vec![];
@@ -772,7 +964,19 @@ mod tests {
         line_breaker.break_line(&font_repo, &mut v_list, &mut list);
 
         let log = log.take();
-        assert_eq!(normalize(want_log), normalize(&log));
+        if let Some(want_log) = want_log {
+            assert_eq!(normalize(want_log), normalize(&log));
+        }
+
+        let v_box = ds::VBox {
+            list: v_list,
+            ..Default::default()
+        };
+        use bwl::convert::ToBoxLang;
+        let got = format!("{}", v_box.to_box_lang());
+        if let Some(want) = want {
+            assert_eq!(want.trim(), got.trim());
+        }
     }
 
     fn normalize(s: &str) -> String {

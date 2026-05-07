@@ -213,6 +213,7 @@ version = "0.1.0"
 dependencies = [
  "boxworks",
  "boxworks-hyphenate",
+ "boxworks-lang",
  "boxworks-text",
  "common",
  "pretty_assertions",

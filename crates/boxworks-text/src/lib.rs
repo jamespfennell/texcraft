@@ -200,6 +200,12 @@ impl boxworks::FontRepo for TfmFontRepo {
     fn width(&self, c: char, font: u32) -> Option<common::Scaled> {
         self.fonts[&font].width_utf8(c)
     }
+    fn height(&self, c: char, font: u32) -> Option<common::Scaled> {
+        self.fonts[&font].depth_utf8(c)
+    }
+    fn depth(&self, c: char, font: u32) -> Option<common::Scaled> {
+        self.fonts[&font].depth_utf8(c)
+    }
 }
 
 #[cfg(test)]

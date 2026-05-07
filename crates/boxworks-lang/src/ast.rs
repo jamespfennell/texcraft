@@ -151,6 +151,8 @@ enum CstTreeIter<'a, 'b> {
         list: &'b [DiscretionaryElem<'a>],
         next: usize,
     },
+    Other(&'b Horizontal<'a>),
+    Exausted,
 }
 
 enum CstArgsIter<'a, 'b> {
@@ -197,6 +199,15 @@ impl<'a, 'b> Iterator for CstTreeIter<'a, 'b> {
                     args: h.lower_args_impl(),
                 })
             }
+            CstTreeIter::Other(h) => {
+                let r = cst::TreeItem::FuncCall {
+                    func_name: h.func_name().into(),
+                    args: h.lower_args_impl(),
+                };
+                *self = CstTreeIter::Exausted;
+                Some(r)
+            }
+            CstTreeIter::Exausted => None,
         }
     }
 }
@@ -234,6 +245,12 @@ impl<'a, 'b> Iterator for CstArgsIter<'a, 'b> {
 
 impl<'a, 'b> cst::ArgsIter<'a> for CstArgsIter<'a, 'b> {
     type TreeIter = CstTreeIter<'a, 'b>;
+}
+
+impl<'a> std::fmt::Display for Vertical<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        cst::pretty_print(f, self.lower())
+    }
 }
 
 impl<'a> std::fmt::Display for Horizontal<'a> {
@@ -811,6 +828,15 @@ functions!(
         }
     ),
 );
+
+impl<'a> std::fmt::Display for VBox<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let v_box: VBox<'a> = self.clone();
+        let tree = CstTreeIter::Other(&Horizontal::VBox(v_box));
+        cst::pretty_print(f, tree)?;
+        Ok(())
+    }
+}
 
 /// An argument of type `T` to a function.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
