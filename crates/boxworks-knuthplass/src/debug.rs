@@ -81,7 +81,10 @@ impl Logger for TexLogger {
                 Some(elem) => {
                     use ds::Horizontal::*;
                     match elem {
-                        Discretionary(_) => r"\discretionary",
+                        Discretionary(discretionary) => {
+                            self.next_elem_to_write += discretionary.replace_count as usize;
+                            r"\discretionary"
+                        }
                         _ => "",
                     }
                 }

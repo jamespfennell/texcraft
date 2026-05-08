@@ -237,6 +237,8 @@ impl<'a> LineBreaker<'a> {
                 match break_point_node {
                     Discretionary(discretionary) => {
                         // TeX.2021.882
+                        // The empty discretionary survives in the list, funnily enough.
+                        inner_list.push(Discretionary(Default::default()));
                         for pre_break_node in discretionary.pre_break {
                             inner_list.push(pre_break_node.into());
                         }
@@ -256,8 +258,9 @@ impl<'a> LineBreaker<'a> {
                         kern.width = Scaled::ZERO;
                         inner_list.push(kern.into());
                     }
-                    Penalty(_) => {
+                    Penalty(penalty) => {
                         // Do nothing.
+                        inner_list.push(penalty.into());
                     }
                     _ => {
                         unreachable!("node cannot appear as a breakpoint: {break_point_node:?}");
@@ -300,8 +303,24 @@ impl<'a> LineBreaker<'a> {
                     ..Default::default()
                 };
                 baseline_skip.width -= h_box.height;
-                // TODO: it's the _last_ box's depth that should be used here.
-                baseline_skip.width -= h_box.depth;
+                let mut j = v_list.len() - 1;
+                // TODO: this is probably way too wrong. And shouldn't be managed
+                // here: probably the v list should carry last_depth, like Knuth
+                // does.
+                let last_depth = loop {
+                    let elem = &v_list[j];
+                    use ds::Vertical::*;
+                    match elem {
+                        HBox(hbox) => break hbox.depth,
+                        VBox(vbox) => break vbox.depth,
+                        _ => {}
+                    };
+                    j = match j.checked_sub(1) {
+                        None => break common::Scaled::ZERO,
+                        Some(j) => j,
+                    };
+                };
+                baseline_skip.width -= last_depth;
                 v_list.push(
                     ds::Glue {
                         value: baseline_skip,
@@ -899,7 +918,7 @@ mod tests {
     ";
     const WOLF_HALL_5IN_LOG: &'static str = include_str!("../testdata/wolf_hall_5in_log.txt");
     const WOLF_HALL_5IN_WANT: &'static str = include_str!("../testdata/wolf_hall_5in_want.txt");
-    const _WOLF_HALL_3IN_WANT: &'static str = include_str!("../testdata/wolf_hall_3in_want.txt");
+    const WOLF_HALL_3IN_WANT: &'static str = include_str!("../testdata/wolf_hall_3in_want.txt");
     const WOLF_HALL_3IN_LOG: &'static str = include_str!("../testdata/wolf_hall_3in_log.txt");
     const TFM_CMR10: &'static [u8] = include_bytes!("../../tfm/corpus/computer-modern/cmr10.tfm");
 
@@ -919,7 +938,7 @@ mod tests {
         run_test(
             TFM_CMR10,
             WOLF_HALL_5IN_TYPESET,
-            None,
+            Some(WOLF_HALL_3IN_WANT),
             Some(WOLF_HALL_3IN_LOG),
             "3in",
         );

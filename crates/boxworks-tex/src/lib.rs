@@ -414,6 +414,44 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+fn parse_disc_elem(
+    line: &str,
+    line_number: usize,
+    fonts: &mut HashMap<String, u32>,
+) -> Result<ds::DiscretionaryElem, Error> {
+    let (keyword, tail) = keyword_and_tail(line);
+    match keyword {
+        "kern" => {
+            let mut words = tail.split_ascii_whitespace();
+            let width = parse_scaled(words.next().ok_or(Error {
+                kind: ErrorKind::KernMissingWidth,
+                line_number,
+            })?);
+            Ok(ds::DiscretionaryElem::Kern(ds::Kern {
+                kind: ds::KernKind::Normal,
+                width,
+            }))
+        }
+        font_name => {
+            use std::collections::hash_map::Entry;
+            let num_fonts: u32 = fonts.len().try_into().expect("no more than 2^32 fonts");
+            let font = match fonts.entry(font_name.to_string()) {
+                Entry::Occupied(e) => *e.get(),
+                Entry::Vacant(e) => {
+                    e.insert(num_fonts);
+                    num_fonts
+                }
+            };
+            let mut words = tail.split_ascii_whitespace();
+            let char = parse_char(words.next().ok_or(Error {
+                kind: ErrorKind::MissingCharAfterFont,
+                line_number,
+            })?);
+            Ok(ds::DiscretionaryElem::Char(ds::Char { char, font }))
+        }
+    }
+}
+
 /// Parse a single raw hlist segment (as produced by [`extract_hlist_segments`]) into an hlist.
 ///
 /// The `fonts` map is updated in place as new fonts are encountered.
@@ -503,8 +541,6 @@ fn parse_hlist(
             }
             "discretionary" => {
                 // Inverse of TeX.2021.195
-                // TODO: handle replacing_spec
-                // TODO: actually implement this
                 let mut words = tail.split_ascii_whitespace();
                 let replace_count = match words.next() {
                     None => 0,
@@ -525,9 +561,31 @@ fn parse_hlist(
                         })?
                     }
                 };
+                // Consume the \discretionary line now so iter.peek() below sees sub-items.
+                iter.next();
+                consume_line = false;
+                // Pre-break items are at depth+1 (normal dot-prefixed sub-lines).
+                let mut pre_break = vec![];
+                {
+                    let mut pre_iter = iter.inner();
+                    while let Some((ln, line)) = pre_iter.peek() {
+                        pre_break.push(parse_disc_elem(line, ln, fonts)?);
+                        pre_iter.next();
+                    }
+                }
+                // Post-break items are at the current depth but with content starting with `|`.
+                // iter.peek() lazily skips the depth+1 pre-break lines via peek_impl's Greater branch.
+                let mut post_break = vec![];
+                while let Some((ln, line)) = iter.peek() {
+                    let Some(post_line) = line.strip_prefix('|') else {
+                        break;
+                    };
+                    iter.next();
+                    post_break.push(parse_disc_elem(post_line, ln, fonts)?);
+                }
                 ds::Discretionary {
-                    pre_break: vec![ds::DiscretionaryElem::Char(ds::Char { char: '-', font: 0 })],
-                    post_break: vec![],
+                    pre_break,
+                    post_break,
                     replace_count,
                 }
                 .into()
@@ -950,6 +1008,35 @@ Transcript written on test.log.
 
         assert_eq!(got_list, vec![want_list]);
         assert_eq!(got_fonts, want_fonts);
+    }
+
+    #[test]
+    fn test_discretionary_pre_and_post_break() {
+        let input = r"> \box0=
+\hbox(6.94444+0.0)x10.0
+.\discretionary replacing 3
+..\tenrm d
+..\tenrm e
+..\tenrm f
+.|\tenrm g
+.|\tenrm h
+";
+        let mut fonts = Default::default();
+        let got = parse_hlist(&mut TexOutputIter::new(input), &mut fonts).unwrap();
+        let want = parse_hbox_lang(
+            r#"hbox(
+                height=6.94444pt,
+                width=10.0pt,
+                content=[
+                    disc(
+                        pre_break=[chars("def", font=0)],
+                        post_break=[chars("gh", font=0)],
+                        replace_count=3,
+                    )
+                ]
+            )"#,
+        );
+        assert_eq!(got, want);
     }
 
     #[test]

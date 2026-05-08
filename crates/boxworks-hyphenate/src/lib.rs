@@ -202,20 +202,32 @@ pub fn hyphenate_impl(list: &[ds::Horizontal]) -> Vec<ds::Horizontal> {
                     {
                         replace_count += 1;
                     }
-                    if replace_count > 0 {
-                        println!(
-                            "[{s}] replace_count={replace_count} at index {next} will be node {}",
-                            out.len()
+                    let mut pre_break = vec![];
+                    let put_back = if replace_count > 0 {
+                        let last_char = out.pop().expect("char character was just written");
+                        pre_break.push(
+                            last_char
+                                .clone()
+                                .try_into()
+                                .expect("this must be a char item"),
                         );
-                    }
+                        replace_count += 1;
+                        Some(last_char)
+                    } else {
+                        None
+                    };
+                    pre_break.push(ds::DiscretionaryElem::Char(ds::Char {
+                        char: '-',
+                        font: hyphenation_font,
+                    }));
                     out.push(ds::Horizontal::Discretionary(ds::Discretionary {
-                        pre_break: vec![ds::DiscretionaryElem::Char(ds::Char {
-                            char: '-',
-                            font: hyphenation_font,
-                        })],
+                        pre_break,
                         post_break: vec![],
                         replace_count,
                     }));
+                    if let Some(put_back) = put_back {
+                        out.push(put_back);
+                    }
                 }
                 if next <= chars_pushed {
                     next_or = indices.next();

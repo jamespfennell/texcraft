@@ -11,7 +11,7 @@ vbox(
       width=216.81pt,
       depth=1.94444pt,
       shift_amount=0.0pt,
-      glue_ratio="20000.0",
+      glue_ratio="0.6564",
       glue_order="normal",
       content=[
         chars("He", font=0)
@@ -64,7 +64,7 @@ vbox(
       width=216.81pt,
       depth=1.94444pt,
       shift_amount=0.0pt,
-      glue_ratio="284.0",
+      glue_ratio="0.00433",
       glue_order="normal",
       content=[
         chars("the", font=0)
@@ -76,6 +76,7 @@ vbox(
         chars("e", font=0)
         disc(
           pre_break=[
+            chars("v", font=0)
             chars("-", font=0)
           ],
           post_break=[
@@ -128,7 +129,7 @@ vbox(
       width=216.81pt,
       depth=1.94444pt,
       shift_amount=0.0pt,
-      glue_ratio="12302.0",
+      glue_ratio="0.18771",
       glue_order="normal",
       content=[
         chars("to", font=0)
@@ -169,7 +170,7 @@ vbox(
       width=216.81pt,
       depth=1.94444pt,
       shift_amount=0.0pt,
-      glue_ratio="20000.0",
+      glue_ratio="0.67024",
       glue_order="normal",
       content=[
         chars("y", font=0)
@@ -215,7 +216,7 @@ vbox(
       width=216.81pt,
       depth=1.94444pt,
       shift_amount=0.0pt,
-      glue_ratio="20000.0",
+      glue_ratio="0.73364",
       glue_order="normal",
       content=[
         chars("y", font=0)
@@ -263,7 +264,6 @@ vbox(
         chars("some", font=0)
         disc(
           pre_break=[
-            chars("-", font=0)
           ],
           post_break=[
           ],
@@ -280,7 +280,7 @@ vbox(
       width=216.81pt,
       depth=1.94444pt,
       shift_amount=0.0pt,
-      glue_ratio="20000.0",
+      glue_ratio="0.31857",
       glue_order="normal",
       content=[
         chars("times", font=0)
@@ -326,7 +326,7 @@ vbox(
       width=216.81pt,
       depth=1.94444pt,
       shift_amount=0.0pt,
-      glue_ratio="20000.0",
+      glue_ratio="0.7524",
       glue_order="normal",
       content=[
         chars("w", font=0)
@@ -385,7 +385,7 @@ vbox(
       width=216.81pt,
       depth=1.94444pt,
       shift_amount=0.0pt,
-      glue_ratio="20000.0",
+      glue_ratio="0.42033",
       glue_order="normal",
       content=[
         chars("and", font=0)
@@ -436,7 +436,7 @@ vbox(
       width=216.81pt,
       depth=1.94444pt,
       shift_amount=0.0pt,
-      glue_ratio="20000.0",
+      glue_ratio="0.78845",
       glue_order="normal",
       content=[
         chars("fra", font=0)
@@ -483,7 +483,7 @@ vbox(
       width=216.81pt,
       depth=1.94444pt,
       shift_amount=0.0pt,
-      glue_ratio="12154.0",
+      glue_ratio="0.18546",
       glue_order="normal",
       content=[
         chars("y", font=0)
@@ -529,7 +529,7 @@ vbox(
       width=216.81pt,
       depth=1.94444pt,
       shift_amount=0.0pt,
-      glue_ratio="20000.0",
+      glue_ratio="0.66905",
       glue_order="normal",
       content=[
         chars("w", font=0)
@@ -582,7 +582,7 @@ vbox(
       width=216.81pt,
       depth=1.94444pt,
       shift_amount=0.0pt,
-      glue_ratio="20000.0",
+      glue_ratio="0.39755",
       glue_order="normal",
       content=[
         chars("the", font=0)
@@ -624,6 +624,7 @@ vbox(
         kern(-0.27779pt)
         disc(
           pre_break=[
+            chars("w", font=0)
             chars("-", font=0)
           ],
           post_break=[
@@ -644,7 +645,7 @@ vbox(
       width=216.81pt,
       depth=1.94444pt,
       shift_amount=0.0pt,
-      glue_ratio="20000.0",
+      glue_ratio="0.41656",
       glue_order="normal",
       content=[
         chars("stone", font=0)
@@ -692,7 +693,7 @@ vbox(
       width=216.81pt,
       depth=1.94444pt,
       shift_amount=0.0pt,
-      glue_ratio="18963.0",
+      glue_ratio="0.28935",
       glue_order="normal",
       content=[
         chars("w", font=0)
@@ -751,7 +752,7 @@ vbox(
       width=216.81pt,
       depth=1.94444pt,
       shift_amount=0.0pt,
-      glue_ratio="20000.0",
+      glue_ratio="0.5444",
       glue_order="normal",
       content=[
         chars("sky", font=0)
@@ -790,6 +791,7 @@ vbox(
         chars("Ca", font=0)
         disc(
           pre_break=[
+            chars("m", font=0)
             chars("-", font=0)
           ],
           post_break=[
@@ -809,7 +811,7 @@ vbox(
       width=216.81pt,
       depth=0.0pt,
       shift_amount=0.0pt,
-      glue_ratio="20000.0",
+      glue_ratio="170.36545",
       glue_order="fil",
       content=[
         chars("no", font=0)
