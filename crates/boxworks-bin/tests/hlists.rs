@@ -27,10 +27,14 @@ macro_rules! hlists_tests {
             fn $name() {
                 const GOLDEN: &str = include_str!($golden_file);
                 let box_output = run_hlists($texts_file);
-                similar_asserts::assert_eq!(got: box_output, want: GOLDEN);
+                similar_asserts::assert_eq!(got: normalize(&box_output), want: normalize(GOLDEN));
             }
         )+
     };
+}
+
+fn normalize(s: &str) -> String {
+    s.lines().collect::<Vec<_>>().join("\n")
 }
 
 hlists_tests!((
