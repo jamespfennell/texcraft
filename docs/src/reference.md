@@ -16,9 +16,11 @@
 
 ## Boxworks
 
-- [`boxworks`](/reference/boxworks/) — the Knuth/TeX typesetting engine
+- [`boxworks`](/reference/boxworks/) — the Knuth/TeX typesetting engine, including a domain-specific language for specifying typesetting operations
+- [`boxworks-hyphenate`](/reference/boxworks_hyphenate/) — hyphenation integration for Boxworks
 - [`boxworks-knuthplass`](/reference/boxworks_knuthplass/) — Knuth-Plass line breaking algorithm
-- [`boxworks-lang`](/reference/boxworks_lang/) — domain-specific language for specifying typesetting operations
+- [`boxworks-tex`](/reference/boxworks_tex/) — tools for converting TeX's internal data structures to Boxworks
+- [`boxworks-testing`](/reference/boxworks_testing/) — testing utilities for Boxworks-based code
 - [`boxworks-texlang`](/reference/boxworks_texlang/) — Texlang integration for Boxworks
 - [`boxworks-text`](/reference/boxworks_text/) — text preprocessing (ligatures, kerning, space factor)
 

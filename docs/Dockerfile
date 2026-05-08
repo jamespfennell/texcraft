@@ -24,6 +24,7 @@ RUN RUSTDOCFLAGS="-D warnings" cargo doc --all-features --lib --no-deps \
   -p "boxworks*" \
   -p common \
   -p dvi \
+  -p hyphenate \
   -p texcraft-stdext \
   -p "texlang*" \
   -p tfm

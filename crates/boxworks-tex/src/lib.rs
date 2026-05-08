@@ -286,7 +286,7 @@ fn extract_texcraft_segments(mut s: &str) -> impl Iterator<Item = &str> {
     })
 }
 
-/// Errors returned by [`parse_hlist`] and [`parse_vlist`].
+/// Kind of error when parsing TeX logs.
 #[derive(Debug, PartialEq)]
 pub enum ErrorKind {
     /// The iterator was empty when the start of an hlist was expected.
@@ -399,7 +399,9 @@ impl std::fmt::Display for ErrorKind {
 
 impl std::error::Error for ErrorKind {}
 
-/// Error returned by [`parse_hlist`] and [`parse_vlist`].
+/// Error returned by internal functions that parse TeX logs
+/// These internal parsing functions will eventually be made public
+/// and so the errors were made public.
 #[derive(Debug, PartialEq)]
 pub struct Error {
     pub kind: ErrorKind,
