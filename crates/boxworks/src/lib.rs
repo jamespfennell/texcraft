@@ -6,6 +6,7 @@
 //! languages that use this engine to perform the actual typesetting.
 
 pub mod ds;
+pub mod lang;
 
 pub trait TextPreprocessor {
     fn new_paragraph(&mut self);

@@ -211,8 +211,8 @@ impl boxworks::FontRepo for TfmFontRepo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use boxworks::lang as bwl;
     use boxworks::TextPreprocessor;
-    use boxworks_lang as bwl;
 
     macro_rules! preprocessor_tests {
         ( $namespace: ident, $tfm: ident, $( ( $name: ident, $input: expr, $want: expr, ), )+ ) => {

@@ -10,3 +10,8 @@ keywords = ["tex", "texcraft"]
 
 [dependencies]
 common = { path = "../common", features=[] }
+ariadne = {version="0.5.0", default-features = false, optional = true}
+
+[features]
+default = []
+ariadne = ["dep:ariadne"]

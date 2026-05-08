@@ -1,7 +1,7 @@
 //! Lexer and tokens for Box language.
 
+use super::Error;
 use super::Str;
-use crate::Error;
 use std::{borrow::Cow, rc::Rc};
 
 /// Box language lexer.
@@ -455,7 +455,7 @@ impl<'a> Lexer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ErrorAccumulator;
+    use super::super::ErrorAccumulator;
 
     use super::*;
     fn run_lexer_test(input: &str, want: Vec<TokenValue>) {

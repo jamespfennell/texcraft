@@ -1,6 +1,6 @@
 //! # Boxworks language
 //!
-//! This crate defines a domain-specific language (DSL) for Boxworks.
+//! This module defines a domain-specific language (DSL) for Boxworks.
 //! This language is used to describe Boxworks elements in Knuth's box-and-glue model.
 //! The initial motivation for the language is to make it
 //!     easy to create Boxworks primitives,
@@ -17,7 +17,7 @@
 //!
 //! ```
 //! use boxworks::ds;
-//! use boxworks_lang as bwl;
+//! use boxworks::lang as bwl;
 //!
 //! let source = r#"
 //!     ## The chars() function typesets characters.
@@ -89,7 +89,7 @@
 //! Arguments can be provided positionally:
 //!
 //! ```
-//! # use boxworks_lang as bwl;
+//! # use boxworks::lang as bwl;
 //! # use boxworks::ds;
 //! let source = r#"
 //!     chars("A", 1)
@@ -103,7 +103,7 @@
 //! Or by keyword, potentially out of order:
 //!
 //! ```
-//! # use boxworks_lang as bwl;
+//! # use boxworks::lang as bwl;
 //! # use boxworks::ds;
 //! let source = r#"
 //!     chars(font=2, content="B")
@@ -117,7 +117,7 @@
 //! Or by a combination of positional and by keyword:
 //!
 //! ```
-//! # use boxworks_lang as bwl;
+//! # use boxworks::lang as bwl;
 //! # use boxworks::ds;
 //! let source = r#"
 //!     chars("C", font=3)
@@ -132,7 +132,7 @@
 //! keyword arguments:
 //!
 //! ```
-//! # use boxworks_lang as bwl;
+//! # use boxworks::lang as bwl;
 //! # use boxworks::ds;
 //! let source = r#"
 //!     chars(content="C", 3)
@@ -218,7 +218,7 @@ pub mod lexer;
 use convert::ToBoxworks;
 pub use error::{Error, ErrorAccumulator, ErrorLabel};
 
-use boxworks::ds;
+use crate::ds;
 
 /// String type used in the crate's public API.
 #[derive(Debug, Clone)]

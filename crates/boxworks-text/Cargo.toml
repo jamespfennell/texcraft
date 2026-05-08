@@ -12,7 +12,3 @@ keywords = ["tex", "texcraft"]
 boxworks = { path = "../boxworks", features=[] }
 common = { path = "../common", features=[] }
 tfm = { path = "../tfm", features=[] }
-
-
-[dev-dependencies]
-boxworks-lang = {path="../boxworks-lang" , features = ["ariadne"]}

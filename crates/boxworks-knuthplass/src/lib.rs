@@ -881,8 +881,8 @@ fn get_next_line_class(active_nodes: &VecDeque<ActiveNode>, max: usize) -> (Line
 #[cfg(test)]
 mod tests {
     use super::*;
+    use boxworks::lang as bwl;
     use boxworks::TextPreprocessor;
-    use boxworks_lang as bwl;
     use boxworks_text as bwt;
     use pretty_assertions::assert_eq;
     use std::{cell::RefCell, rc::Rc};

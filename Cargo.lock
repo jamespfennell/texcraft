@@ -179,6 +179,7 @@ dependencies = [
 name = "boxworks"
 version = "0.1.0"
 dependencies = [
+ "ariadne",
  "common",
 ]
 
@@ -190,7 +191,6 @@ dependencies = [
  "assert_cmd",
  "boxworks",
  "boxworks-knuthplass",
- "boxworks-lang",
  "boxworks-tex",
  "boxworks-text",
  "clap 4.4.8",
@@ -213,20 +213,10 @@ version = "0.1.0"
 dependencies = [
  "boxworks",
  "boxworks-hyphenate",
- "boxworks-lang",
  "boxworks-text",
  "common",
  "pretty_assertions",
  "tfm",
-]
-
-[[package]]
-name = "boxworks-lang"
-version = "0.1.0"
-dependencies = [
- "ariadne",
- "boxworks",
- "common",
 ]
 
 [[package]]
@@ -235,7 +225,6 @@ version = "0.1.0"
 dependencies = [
  "boxworks",
  "boxworks-knuthplass",
- "boxworks-lang",
  "common",
 ]
 
@@ -254,7 +243,6 @@ name = "boxworks-text"
 version = "0.1.0"
 dependencies = [
  "boxworks",
- "boxworks-lang",
  "common",
  "tfm",
 ]

@@ -17,8 +17,8 @@
 //!     over the tree.
 //!
 
-use crate::lexer::ClosingParen;
-use crate::Error;
+use super::lexer::ClosingParen;
+use super::Error;
 
 use super::lexer;
 use super::Str;
@@ -492,7 +492,7 @@ impl<'a> ParseIterCommon<'a> {
                     self.comments.push_back(token.source.str());
                 }
                 lexer::TokenValue::SquareClose | lexer::TokenValue::RoundClose => {
-                    self.errs.add(crate::Error::UnmatchedClosingBracket {
+                    self.errs.add(super::Error::UnmatchedClosingBracket {
                         close: token.source,
                     });
                 }
@@ -867,8 +867,8 @@ impl<'a> std::fmt::Display for FuncCall<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ErrorAccumulator;
 
+    use super::super::error::ErrorAccumulator;
     use super::*;
 
     fn run_parse_test(input: &str, want: Vec<FuncCall>) {

@@ -9,9 +9,8 @@ repository = "https://github.com/jamespfennell/texcraft"
 keywords = ["tex", "texcraft"]
 
 [dependencies]
-boxworks = {path="../boxworks" }
+boxworks = {path="../boxworks", features=["ariadne"] }
 boxworks-knuthplass = {path="../boxworks-knuthplass" }
-boxworks-lang = {path="../boxworks-lang" , features = ["ariadne"]}
 boxworks-tex = {path="../boxworks-tex" }
 boxworks-text = {path="../boxworks-text" }
 tfm = { path="../tfm" }

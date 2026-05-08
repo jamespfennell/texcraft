@@ -1,8 +1,8 @@
 //! Box language abstract syntax tree
 //!
 
-use crate::cst::TreeIter;
-use crate::ErrorAccumulator;
+use super::cst::TreeIter;
+use super::ErrorAccumulator;
 
 use super::cst;
 use super::error::Error;
@@ -682,7 +682,7 @@ functions!(
             width: common::Scaled,
             depth: common::Scaled,
             shift_amount: common::Scaled,
-            glue_ratio: boxworks::ds::GlueRatio,
+            glue_ratio: crate::ds::GlueRatio,
             glue_order: common::GlueOrder,
             content: Vec<Horizontal<'a>>,
         }
@@ -1014,10 +1014,10 @@ impl<'a> Value<'a> for common::GlueOrder {
     }
 }
 
-impl<'a> Value<'a> for boxworks::ds::GlueRatio {
+impl<'a> Value<'a> for crate::ds::GlueRatio {
     const DESCRIPTION: &'static str = "a glue ratio (floating point number)";
     fn try_cast_string(s: Cow<'a, str>) -> Option<Self> {
-        boxworks::ds::GlueRatio::from_float_str(&s)
+        crate::ds::GlueRatio::from_float_str(&s)
     }
     fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>> {
         cst::ArgsItem::Regular {

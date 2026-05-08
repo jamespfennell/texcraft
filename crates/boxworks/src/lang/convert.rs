@@ -2,8 +2,8 @@
 
 use std::borrow::Cow;
 
-use crate::ast;
-use boxworks::ds;
+use super::ast;
+use crate::ds;
 
 /// Convert a Boxworks data structure to a Box language data structure.
 pub trait ToBoxLang {
@@ -20,7 +20,7 @@ pub trait ToBoxworks {
 impl ToBoxLang for ds::Vertical {
     type Output = ast::Vertical<'static>;
     fn to_box_lang(&self) -> Self::Output {
-        use boxworks::ds::Vertical::*;
+        use crate::ds::Vertical::*;
         match self {
             HBox(hbox) => ast::Vertical::HBox(hbox.to_box_lang()),
             VBox(vbox) => ast::Vertical::VBox(vbox.to_box_lang()),
@@ -160,7 +160,7 @@ impl<'a> ToBoxworks for ast::Horizontal<'a> {
 impl ToBoxLang for ds::Horizontal {
     type Output = ast::Horizontal<'static>;
     fn to_box_lang(&self) -> Self::Output {
-        use boxworks::ds::Horizontal::*;
+        use crate::ds::Horizontal::*;
         match self {
             Char(char) => ast::Horizontal::Chars(char.to_box_lang()),
             HBox(hbox) => ast::Horizontal::HBox(hbox.to_box_lang()),
@@ -202,8 +202,8 @@ impl<'a> ToBoxworks for ast::DiscretionaryElem<'a> {
 impl ToBoxLang for ds::DiscretionaryElem {
     type Output = ast::DiscretionaryElem<'static>;
     fn to_box_lang(&self) -> Self::Output {
+        use crate::ds::DiscretionaryElem::*;
         use ast::DiscretionaryElem as Out;
-        use boxworks::ds::DiscretionaryElem::*;
         match self {
             Char(char) => Out::Chars(char.to_box_lang()),
             HBox(hbox) => Out::HBox(hbox.to_box_lang()),

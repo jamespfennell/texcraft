@@ -1,5 +1,5 @@
+use boxworks::lang as bwl;
 use boxworks::TextPreprocessor;
-use boxworks_lang as bwl;
 use boxworks_tex as bwt;
 use clap::Parser;
 use std::collections::HashMap;

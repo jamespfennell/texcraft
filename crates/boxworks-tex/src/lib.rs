@@ -663,7 +663,7 @@ mod tests {
     use super::*;
 
     fn parse_hbox_lang(source: &str) -> ds::HBox {
-        let mut list = boxworks_lang::parse_horizontal_list(source).unwrap();
+        let mut list = boxworks::lang::parse_horizontal_list(source).unwrap();
         assert_eq!(list.len(), 1);
         match list.remove(0) {
             ds::Horizontal::HBox(hbox) => hbox,
@@ -672,7 +672,7 @@ mod tests {
     }
 
     fn parse_vbox_lang(source: &str) -> ds::VBox {
-        let mut list = boxworks_lang::parse_horizontal_list(source).unwrap();
+        let mut list = boxworks::lang::parse_horizontal_list(source).unwrap();
         assert_eq!(list.len(), 1);
         match list.remove(0) {
             ds::Horizontal::VBox(mut vbox) => {
