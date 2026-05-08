@@ -11,7 +11,6 @@ vbox(
       shift_amount=0.0pt,
       glue_ratio="0.30101",
       glue_order="normal",
-      glue_sign="shrinking",
       content=[
         chars("He", font=0)
         glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -78,7 +77,6 @@ vbox(
       shift_amount=0.0pt,
       glue_ratio="0.20268",
       glue_order="normal",
-      glue_sign="shrinking",
       content=[
         chars("widening", font=0)
         glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -136,7 +134,6 @@ vbox(
       shift_amount=0.0pt,
       glue_ratio="0.49738",
       glue_order="normal",
-      glue_sign="shrinking",
       content=[
         chars("it", font=0)
         glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -190,7 +187,6 @@ vbox(
       shift_amount=0.0pt,
       glue_ratio="0.50133",
       glue_order="normal",
-      glue_sign="shrinking",
       content=[
         chars("upriv", font=0)
         kern(-0.27779pt)
@@ -254,7 +250,6 @@ vbox(
       shift_amount=0.0pt,
       glue_ratio="0.18877",
       glue_order="normal",
-      glue_sign="stretching",
       content=[
         chars("and", font=0)
         glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -298,7 +293,6 @@ vbox(
       shift_amount=0.0pt,
       glue_ratio="0.21063",
       glue_order="normal",
-      glue_sign="stretching",
       content=[
         chars("around", font=0)
         glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -354,7 +348,6 @@ vbox(
       shift_amount=0.0pt,
       glue_ratio="0.35101",
       glue_order="normal",
-      glue_sign="stretching",
       content=[
         chars("the", font=0)
         glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -405,7 +398,6 @@ vbox(
       shift_amount=0.0pt,
       glue_ratio="0.1165",
       glue_order="normal",
-      glue_sign="stretching",
       content=[
         chars("stone", font=0)
         glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -467,7 +459,6 @@ vbox(
       shift_amount=0.0pt,
       glue_ratio="3.29376",
       glue_order="fil",
-      glue_sign="stretching",
       content=[
         lig("\u{c}", "fi", font=0)
         chars("elds", font=0)

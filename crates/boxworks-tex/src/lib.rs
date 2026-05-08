@@ -302,17 +302,14 @@ fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
             (rest, None)
         };
         let width = parse_scaled(width_str);
-        let (glue_ratio, glue_sign, glue_order) = glue_set_str.map(parse_glue_set).unwrap_or((
-            ds::GlueRatio(0.0),
-            ds::GlueSign::Normal,
-            common::GlueOrder::Normal,
-        ));
+        let (glue_ratio, glue_order) = glue_set_str
+            .map(parse_glue_set)
+            .unwrap_or((ds::GlueRatio::default(), common::GlueOrder::Normal));
         ds::HBox {
             height,
             width,
             depth,
             glue_ratio,
-            glue_sign,
             glue_order,
             ..Default::default()
         }
@@ -447,8 +444,7 @@ fn parse_vlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
             depth,
             shift_amount: common::Scaled::ZERO,
             list: vec![],
-            glue_ratio: ds::GlueRatio(0.0),
-            glue_sign: ds::GlueSign::Normal,
+            glue_ratio: Default::default(),
             glue_order: common::GlueOrder::Normal,
         }
     };
@@ -539,11 +535,11 @@ fn parse_glue_amount(s: &str) -> (common::Scaled, common::GlueOrder) {
 }
 
 /// Parse the `"N[order]"` text that follows `", glue set "` on an hbox line.
-fn parse_glue_set(s: &str) -> (ds::GlueRatio, ds::GlueSign, common::GlueOrder) {
-    let (sign, s) = if let Some(s) = s.strip_prefix("- ") {
-        (ds::GlueSign::Shrinking, s)
+fn parse_glue_set(s: &str) -> (ds::GlueRatio, common::GlueOrder) {
+    let (neg, s) = if let Some(s) = s.strip_prefix("- ") {
+        (true, s)
     } else {
-        (ds::GlueSign::Stretching, s)
+        (false, s)
     };
     let (s, order) = if let Some(s) = s.strip_suffix("filll") {
         (s, common::GlueOrder::Filll)
@@ -554,8 +550,11 @@ fn parse_glue_set(s: &str) -> (ds::GlueRatio, ds::GlueSign, common::GlueOrder) {
     } else {
         (s, common::GlueOrder::Normal)
     };
-    let ratio: f32 = s.parse().expect("glue set ratio is a float");
-    (ds::GlueRatio(ratio), sign, order)
+    let mut ratio = ds::GlueRatio::from_float_str(s).expect("glue set ratio is a float");
+    if neg {
+        ratio.num.0 *= -1;
+    }
+    (ratio, order)
 }
 
 fn parse_char(s: &str) -> char {
@@ -826,7 +825,6 @@ Transcript written on test.log.
                         height=6.94444pt,
                         width=41.0pt,
                         glue_ratio="0.26662",
-                        glue_sign="stretching",
                         content=[
                             chars("Min")
                             kern(-0.27779pt)
@@ -842,7 +840,6 @@ Transcript written on test.log.
                         height=4.30554pt,
                         width=41.0pt,
                         glue_ratio="28.2222",
-                        glue_sign="stretching",
                         glue_order="fil",
                         content=[
                             chars("me")
@@ -939,7 +936,6 @@ Transcript written on test.log.
                                                 height=6.83331pt,
                                                 width=41.0pt,
                                                 glue_ratio="6.13887",
-                                                glue_sign="stretching",
                                                 glue_order="fil",
                                                 content=[
                                                     hbox(width=20.0pt)

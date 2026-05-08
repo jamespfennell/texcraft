@@ -682,9 +682,8 @@ functions!(
             width: common::Scaled,
             depth: common::Scaled,
             shift_amount: common::Scaled,
-            glue_ratio: Cow<'a, str>,
+            glue_ratio: boxworks::ds::GlueRatio,
             glue_order: common::GlueOrder,
-            glue_sign: boxworks::ds::GlueSign,
             content: Vec<Horizontal<'a>>,
         }
         impl Func {
@@ -1015,28 +1014,15 @@ impl<'a> Value<'a> for common::GlueOrder {
     }
 }
 
-impl<'a> Value<'a> for boxworks::ds::GlueSign {
-    const DESCRIPTION: &'static str = "a glue sign (normal, stretching or shrinking)";
+impl<'a> Value<'a> for boxworks::ds::GlueRatio {
+    const DESCRIPTION: &'static str = "a glue ratio (floating point number)";
     fn try_cast_string(s: Cow<'a, str>) -> Option<Self> {
-        match s.as_ref() {
-            "normal" => Some(Self::Normal),
-            "stretching" => Some(Self::Stretching),
-            "shrinking" => Some(Self::Shrinking),
-            _ => None,
-        }
+        boxworks::ds::GlueRatio::from_float_str(&s)
     }
     fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>> {
-        use boxworks::ds::GlueSign::*;
         cst::ArgsItem::Regular {
             key,
-            value: cst::Value::String(
-                match self {
-                    Stretching => "stretching",
-                    Shrinking => "shrinking",
-                    Normal => "normal",
-                }
-                .into(),
-            ),
+            value: cst::Value::String(format!["{}", self].into()),
             value_source: "".into(),
         }
     }

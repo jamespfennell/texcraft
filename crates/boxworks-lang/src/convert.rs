@@ -236,9 +236,8 @@ impl ToBoxLang for ds::HBox {
             width: self.width.into(),
             depth: self.depth.into(),
             shift_amount: self.shift_amount.into(),
-            glue_ratio: Cow::<'static, str>::Owned(format!("{}", self.glue_ratio)).into(),
+            glue_ratio: self.glue_ratio.into(),
             glue_order: self.glue_order.into(),
-            glue_sign: self.glue_sign.into(),
             content: self.list.to_box_lang().into(),
         }
     }
@@ -252,8 +251,7 @@ impl<'a> ToBoxworks for ast::HBox<'a> {
             width: self.width.value,
             depth: self.depth.value,
             shift_amount: self.shift_amount.value,
-            glue_ratio: ds::GlueRatio(self.glue_ratio.value.parse().unwrap_or(0.0)),
-            glue_sign: self.glue_sign.value,
+            glue_ratio: self.glue_ratio.value,
             glue_order: self.glue_order.value,
             list: self.content.value.to_boxworks(),
         }

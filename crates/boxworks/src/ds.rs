@@ -133,7 +133,6 @@ pub struct HBox {
     pub shift_amount: Number,
     pub list: Vec<Horizontal>,
     pub glue_ratio: GlueRatio,
-    pub glue_sign: GlueSign,
     pub glue_order: GlueOrder,
 }
 
@@ -268,9 +267,11 @@ impl HBox {
         match excess.cmp(&common::Scaled::ZERO) {
             Less => {
                 // TeX.2021.664
-                hbox.glue_sign = GlueSign::Shrinking;
                 hbox.glue_order = total_glue.shrink_order;
-                hbox.glue_ratio = GlueRatio((-excess.0 as f32) / (total_glue.shrink.0 as f32));
+                hbox.glue_ratio = GlueRatio {
+                    num: excess,
+                    den: total_glue.shrink,
+                };
             }
             Equal => {
                 // Do nothing: hbox defaults cover this case.
@@ -278,9 +279,11 @@ impl HBox {
             Greater => {
                 // TeX.2021.658
                 if total_glue.stretch != common::Scaled::ZERO {
-                    hbox.glue_sign = GlueSign::Stretching;
                     hbox.glue_order = total_glue.stretch_order;
-                    hbox.glue_ratio = GlueRatio((excess.0 as f32) / (total_glue.stretch.0 as f32));
+                    hbox.glue_ratio = GlueRatio {
+                        num: excess,
+                        den: total_glue.stretch,
+                    };
                 }
                 if total_glue.stretch_order == GlueOrder::Normal {
                     // TODO(TeX.2021.660): report an underfull box
@@ -293,37 +296,61 @@ impl HBox {
 
 /// Ratio by which glue should shrink or stretch.
 ///
-/// This is one of the few (only?) places in TeX where a floating point
+/// This is one of the few (only?) places in Knuth's TeX where a floating point
 /// number is used.
 /// In general TeX uses fixed point integers to ensure that the results are
 /// the same on every computer/CPU.
 /// But the exact semantics of the glue ratio don't affect the output, so
-/// using a float is okay.
+/// using a float is deemed okay by Knuth.
+///
+/// However we opt to use a real ratio: i.e., a numerator and a denominator.
 ///
 /// Described in TeX.2021.109.
-#[derive(Clone, Default, Debug, PartialEq)]
-pub struct GlueRatio(pub f32);
+#[derive(Copy, Clone, Debug, Eq)]
+pub struct GlueRatio {
+    pub num: common::Scaled,
+    pub den: common::Scaled,
+}
 
-// TODO: ensure that glue ratio cannot be NaN
-impl Eq for GlueRatio {}
+impl PartialEq for GlueRatio {
+    fn eq(&self, other: &Self) -> bool {
+        (self.num.0 as i64) * (other.den.0 as i64) == (other.num.0 as i64) * (self.den.0 as i64)
+    }
+}
+
+impl Default for GlueRatio {
+    fn default() -> Self {
+        Self {
+            num: common::Scaled(0),
+            den: common::Scaled(1),
+        }
+    }
+}
+
+impl GlueRatio {
+    pub fn as_float(&self) -> f32 {
+        (self.num.0 as f32) / (self.den.0 as f32)
+    }
+
+    pub fn from_float_str(s: &str) -> Option<Self> {
+        let s = format!("{s}pt");
+        let num = common::Scaled::parse_from_string(&s).ok()?;
+        Some(Self {
+            num,
+            den: common::Scaled::ONE,
+        })
+    }
+}
 
 impl std::fmt::Display for GlueRatio {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // TeX.2021.186
-        let g = self.0;
+        let g = self.as_float();
+        let g = g.abs();
         let g = if g.abs() >= 20000.0 { 20000.0 } else { g };
         let g = ((common::Scaled::ONE.0 as f32) * g).round() as i32;
         write!(f, "{}", common::Scaled(g).display_no_units())
     }
-}
-
-/// Description of whether the glue should stretch, shrink, or remain rigid.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum GlueSign {
-    Stretching,
-    Shrinking,
-    #[default]
-    Normal,
 }
 
 impl HBox {
@@ -337,8 +364,7 @@ impl HBox {
             depth: Number::ZERO,
             shift_amount: Number::ZERO,
             list: vec![],
-            glue_ratio: GlueRatio(0.0),
-            glue_sign: GlueSign::Normal,
+            glue_ratio: Default::default(),
             glue_order: GlueOrder::Normal,
         }
     }
@@ -364,7 +390,6 @@ pub struct VBox {
     pub shift_amount: Number,
     pub list: Vec<Vertical>,
     pub glue_ratio: GlueRatio,
-    pub glue_sign: GlueSign,
     pub glue_order: GlueOrder,
 }
 
