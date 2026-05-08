@@ -109,7 +109,7 @@ impl Hyphenator {
         }
     }
     /// Add multiple hyphenation exceptions. These are separate words separated by whitespace, with
-    /// each word satisfying the format in [`insert_exception`].
+    /// each word satisfying the format in [`Self::insert_exception`].
     pub fn insert_exceptions(&mut self, hyphenated_words: &str) {
         hyphenated_words
             .lines()

@@ -11,7 +11,7 @@ use std::borrow::Cow;
 
 /// Element of a vertical list.
 ///
-/// Corresponds to the [`boxworks::ds::Vertical`] type.
+/// Corresponds to the [`super::ds::Vertical`] type.
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum Vertical<'a> {
@@ -28,7 +28,7 @@ pub enum Vertical<'a> {
 
 /// Element of a horizontal list.
 ///
-/// Corresponds to the [`boxworks::ds::Horizontal`] type.
+/// Corresponds to the [`super::ds::Horizontal`] type.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Horizontal<'a> {
     Chars(Chars<'a>),
@@ -54,7 +54,7 @@ impl<'a> From<Chars<'a>> for Horizontal<'a> {
 
 /// Element of a discretionary pre- or post-break list.
 ///
-/// Corresponds to the [`boxworks::ds::DiscretionaryElem`] type.
+/// Corresponds to the [`super::ds::DiscretionaryElem`] type.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum DiscretionaryElem<'a> {
     Chars(Chars<'a>),
@@ -925,8 +925,8 @@ where
 
 /// A rule dimension that is either a fixed length or running (i.e. determined by context).
 ///
-/// Written as a dimension like `3pt` or as `*` for running in Box language.
-/// A running dimension corresponds to [`ds::Rule::RUNNING`].
+/// Written as a dimension like `3pt` or as `"running"` for running in Box language.
+/// A running dimension corresponds to [`super::ds::Rule::RUNNING`].
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum MaybeRunning {
     Running,

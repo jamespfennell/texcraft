@@ -149,34 +149,70 @@
 //! Every function argument expects a specific concrete type.
 //! These are the types:
 //!
-//! | Name | Description | Examples
-//! |------|-------------|---------
-//! | String | Arbitrary UTF-8 characters between double quotes. Currently the string can't contain a double quote character. | `"a string"`
-//! | Integer | Decimal integer in the range (-2^31,2^31). | `123`, `-456`
-//! | Dimension | Decimal number with a unit attached. The format and the allowable units are the same as in TeX. | `1pt`, `2.04in`, `-10sp`
-//! | Glue stretch or shrink | A dimension where the unit can alternatively be an infinite stretch/shrink unit. | `1fil`, `-2fill`, `3filll`
+//! | Name | Description | Examples |
+//! |------|-------------|---------|
+//! | String | Arbitrary UTF-8 characters between double quotes. Currently the string can't contain a double quote character. | `"a string"` |
+//! | Integer | Decimal integer in the range (-2^31,2^31). | `123`, `-456` |
+//! | Dimension | Decimal number with a unit attached. The format and the allowable units are the same as in TeX. | `1pt`, `2.04in`, `-10sp` |
+//! | Glue stretch or shrink | A dimension where the unit can alternatively be an infinite stretch/shrink unit. | `1fil`, `-2fill`, `3filll` |
+//! | Character | A string containing exactly one UTF-8 character. | `"A"`, `"ñ"` |
+//! | Glue order | One of the strings `"normal"`, `"fil"`, `"fill"`, or `"filll"`. | `"normal"`, `"fill"` |
+//! | Glue ratio | A floating-point number represented as a string. | `"1.5"`, `"-0.25"` |
+//! | Dimension or running | Either a dimension, or the string `"running"` to indicate the value is determined by context. | `1pt`, `"running"` |
+//! | Horizontal list | A bracket-enclosed list of horizontal-mode function calls. | `[chars("Hi") glue()]` |
+//! | Vertical list | A bracket-enclosed list of vertical-mode function calls. | `[glue() kern(1pt)]` |
+//! | Discretionary list | A bracket-enclosed list of function calls valid in discretionary pre/post-break lists. | `[chars("-") kern(0.5pt)]` |
 //!
 //! ### Available functions
 //!
 //! More functions will be added over time.
 //! These are the currently supported functions.
 //!
-//! #### `glue`: add a glue node to the current list
+//! #### `chars`: typeset some characters
 //!
-//! Adds a value of the Rust type [`boxworks::ds::Glue`]
-//! to the current list.
+//! Adds a value of the Rust type [`super::ds::Char`] for each character in the
+//! input string.
+//!
+//! Only available in horizontal and discretionary lists, not vertical lists.
 //!
 //! Parameters:
 //!
-//! | Number | Name    | Type      | Default |
-//! |--------|---------|-----------|---------|
-//! | 1      | `width` | dimension | `0pt`   |
+//! | Number | Name      | Type    | Default |
+//! |--------|-----------|---------|---------|
+//! | 1      | `content` | string  | `""`    |
+//! | 2      | `font`    | integer | `0`     |
+//!
+//! #### `glue`: add a glue node to the current list
+//!
+//! Adds a value of the Rust type [`super::ds::Glue`]
+//! to the current list.
+//!
+//! Only available in horizontal and vertical lists, not discretionary lists.
+//!
+//! Parameters:
+//!
+//! | Number | Name      | Type                   | Default |
+//! |--------|-----------|------------------------|---------|
+//! | 1      | `width`   | dimension              | `0pt`   |
 //! | 2      | `stretch` | glue stretch or shrink | `0pt`   |
-//! | 3      | `shrink` | glue stretch or shrink | `0pt`   |
+//! | 3      | `shrink`  | glue stretch or shrink | `0pt`   |
+//!
+//! #### `penalty`: add a penalty node to the current list
+//!
+//! Adds a value of the Rust type [`super::ds::Penalty`]
+//! to the current list.
+//!
+//! Only available in horizontal and vertical lists, not discretionary lists.
+//!
+//! Parameters:
+//!
+//! | Number | Name    | Type    | Default |
+//! |--------|---------|---------|---------|
+//! | 1      | `value` | integer | `0`     |
 //!
 //! #### `kern`: add a kern node to the current list
 //!
-//! Adds a value of the Rust type [`boxworks::ds::Kern`]
+//! Adds a value of the Rust type [`super::ds::Kern`]
 //! to the current list.
 //!
 //! Parameters:
@@ -185,31 +221,135 @@
 //! |--------|---------|-----------|---------|
 //! | 1      | `width` | dimension | `0pt`   |
 //!
-//! #### `text`: typeset some text
+//! #### `hbox`: add a horizontal box to the current list
 //!
-//! The goal of this function is to add character and glue nodes
-//! like TeX does when it is processing normal text.
-//! In TeX this is actually a complicated process that includes:
-//!
-//! - Adding kerns between characters.
-//! - Applying ligature rules.
-//! - Adjusting the space factor that determines the size of inter-word glue.
-//!
-//! Right now the `text` function is much simpler.
-//! It iterates over all characters in the string and:
-//!
-//! - For space characters, adds a glue node corresponding
-//!   to the glue `10pt plus 4pt minus 4pt`.
-//!
-//! - For all other characters, adds a value of the Rust type
-//!   [`boxworks::ds::Char`].
+//! Adds a value of the Rust type [`super::ds::HBox`]
+//! to the current list.
 //!
 //! Parameters:
 //!
-//! | Number | Name    | Type      | Default |
-//! |--------|---------|-----------|---------|
-//! | 1      | `content` | string | `""`   |
-//! | 2      | `font` | integer | `0`   |
+//! | Number | Name           | Type            | Default    |
+//! |--------|----------------|-----------------|------------|
+//! | 1      | `height`       | dimension       | `0pt`      |
+//! | 2      | `width`        | dimension       | `0pt`      |
+//! | 3      | `depth`        | dimension       | `0pt`      |
+//! | 4      | `shift_amount` | dimension       | `0pt`      |
+//! | 5      | `glue_ratio`   | glue ratio      | `"0.0"`    |
+//! | 6      | `glue_order`   | glue order      | `"normal"` |
+//! | 7      | `content`      | horizontal list | `[]`       |
+//!
+//! #### `lig`: add a ligature node to the current list
+//!
+//! Adds a value of the Rust type [`super::ds::Ligature`]
+//! to the current list.
+//!
+//! Only available in horizontal and discretionary lists, not vertical lists.
+//!
+//! Parameters:
+//!
+//! | Number | Name             | Type      | Default  |
+//! |--------|------------------|-----------|----------|
+//! | 1      | `char`           | character | `"\0"`   |
+//! | 2      | `original_chars` | string    | `""`     |
+//! | 3      | `font`           | integer   | `0`      |
+//!
+//! #### `vbox`: add a vertical box to the current list
+//!
+//! Adds a value of the Rust type [`super::ds::VBox`]
+//! to the current list.
+//!
+//! Parameters:
+//!
+//! | Number | Name           | Type          | Default |
+//! |--------|----------------|---------------|---------|
+//! | 1      | `height`       | dimension     | `0pt`   |
+//! | 2      | `width`        | dimension     | `0pt`   |
+//! | 3      | `depth`        | dimension     | `0pt`   |
+//! | 4      | `shift_amount` | dimension     | `0pt`   |
+//! | 5      | `content`      | vertical list | `[]`    |
+//!
+//! #### `disc`: add a discretionary node to the current list
+//!
+//! Adds a value of the Rust type [`super::ds::Discretionary`]
+//! to the current list.
+//!
+//! Only available in horizontal lists.
+//!
+//! Parameters:
+//!
+//! | Number | Name            | Type               | Default |
+//! |--------|-----------------|--------------------|---------|
+//! | 1      | `pre_break`     | discretionary list | `[]`    |
+//! | 2      | `post_break`    | discretionary list | `[]`    |
+//! | 3      | `replace_count` | integer            | `0`     |
+//!
+//! #### `rule`: add a rule to the current list
+//!
+//! Adds a value of the Rust type [`super::ds::Rule`]
+//! to the current list.
+//!
+//! Parameters:
+//!
+//! | Number | Name     | Type                 | Default |
+//! |--------|----------|----------------------|---------|
+//! | 1      | `height` | dimension or running | `0pt`   |
+//! | 2      | `width`  | dimension or running | `0pt`   |
+//! | 3      | `depth`  | dimension or running | `0pt`   |
+//!
+//! #### `mark`: add a mark node to the current list
+//!
+//! Adds a value of the Rust type [`super::ds::Mark`]
+//! to the current list.
+//!
+//! Only available in horizontal and vertical lists, not discretionary lists.
+//!
+//! Parameters: none.
+//!
+//! #### `adjust`: add an adjust node to the current list
+//!
+//! Adds a value of the Rust type [`super::ds::Adjust`]
+//! to the current list.
+//!
+//! Only available in horizontal lists.
+//!
+//! Parameters:
+//!
+//! | Number | Name      | Type          | Default |
+//! |--------|-----------|---------------|---------|
+//! | 1      | `content` | vertical list | `[]`    |
+//!
+//! #### `insertion`: add an insertion node to the current list
+//!
+//! Adds a value of the Rust type [`super::ds::Insertion`]
+//! to the current list.
+//!
+//! Only available in horizontal and vertical lists, not discretionary lists.
+//!
+//! Parameters:
+//!
+//! | Number | Name                      | Type                   | Default |
+//! |--------|---------------------------|------------------------|---------|
+//! | 1      | `box_number`              | integer                | `0`     |
+//! | 2      | `height`                  | dimension              | `0pt`   |
+//! | 3      | `split_max_depth`         | dimension              | `0pt`   |
+//! | 4      | `split_top_skip_width`    | dimension              | `0pt`   |
+//! | 5      | `split_top_skip_stretch`  | glue stretch or shrink | `0pt`   |
+//! | 6      | `split_top_skip_shrink`   | glue stretch or shrink | `0pt`   |
+//! | 7      | `float_penalty`           | integer                | `0`     |
+//! | 8      | `vbox`                    | vertical list          | `[]`    |
+//!
+//! #### `math`: add a math node to the current list
+//!
+//! Adds a value of the Rust type [`super::ds::Math`]
+//! to the current list.
+//!
+//! Only available in horizontal and vertical lists, not discretionary lists.
+//!
+//! Parameters:
+//!
+//! | Number | Name   | Type   | Default |
+//! |--------|--------|--------|---------|
+//! | 1      | `kind` | string | `""`    |
 pub mod ast;
 pub mod convert;
 pub mod cst;
