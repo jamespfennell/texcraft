@@ -120,7 +120,7 @@ pub fn build_horizontal_lists(
     let segments = extract_texcraft_segments(&output);
     let mut fonts: HashMap<String, u32> = Default::default();
     let hlists = segments
-        .map(|s| parse_hlist(&mut TexOutputIter::new(s), &mut fonts))
+        .map(|s| parse_hlist(&mut TexOutputIter::new(s), &mut fonts).unwrap())
         .collect();
     (fonts, hlists)
 }
@@ -178,7 +178,7 @@ pub fn build_vertical_lists(
     let segments = extract_texcraft_segments(&output);
     let mut fonts: HashMap<String, u32> = Default::default();
     let vlists = segments
-        .map(|s| parse_vlist(&mut TexOutputIter::new(s), &mut fonts))
+        .map(|s| parse_vlist(&mut TexOutputIter::new(s), &mut fonts).unwrap())
         .collect();
     (fonts, vlists)
 }
@@ -186,43 +186,52 @@ pub fn build_vertical_lists(
 struct TexOutputIter<'tex> {
     s: &'tex str,
     depth: usize,
+    line_number: usize,
 }
 
 impl<'tex> Iterator for TexOutputIter<'tex> {
-    type Item = &'tex str;
+    type Item = (usize, &'tex str);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let (line, n) = self.peek_impl()?;
+        let (line_number, line, n) = self.peek_impl()?;
         self.s = &self.s[n..];
-        Some(line)
+        self.line_number += 1;
+        Some((line_number, line))
     }
 }
 
 impl<'tex> TexOutputIter<'tex> {
     fn new(mut s: &'tex str) -> Self {
+        let mut line_number = 1_usize;
         loop {
             let line = s
                 .split_inclusive('\n')
                 .next()
                 .expect("still searching for start of output");
             s = &s[line.len()..];
+            line_number += 1;
             if !line.starts_with(r"> \box0=") {
                 continue;
             }
-            return Self { s, depth: 0 };
+            return Self {
+                s,
+                depth: 0,
+                line_number,
+            };
         }
     }
     fn inner(&self) -> Self {
         Self {
             s: self.s,
             depth: self.depth + 1,
+            line_number: self.line_number,
         }
     }
-    fn peek(&mut self) -> Option<&'tex str> {
-        let (line, _) = self.peek_impl()?;
-        Some(line)
+    fn peek(&mut self) -> Option<(usize, &'tex str)> {
+        let (line_number, line, _) = self.peek_impl()?;
+        Some((line_number, line))
     }
-    fn peek_impl(&mut self) -> Option<(&'tex str, usize)> {
+    fn peek_impl(&mut self) -> Option<(usize, &'tex str, usize)> {
         loop {
             let line = self.s.split_inclusive('\n').next()?;
             let n = line.len();
@@ -239,11 +248,11 @@ impl<'tex> TexOutputIter<'tex> {
                     return None;
                 }
                 Equal => {
-                    return Some((&line[line_depth..], n));
+                    return Some((self.line_number, &line[line_depth..], n));
                 }
                 Greater => {
-                    // skip this line
                     self.s = &self.s[n..];
+                    self.line_number += 1;
                 }
             }
         }
@@ -277,23 +286,161 @@ fn extract_texcraft_segments(mut s: &str) -> impl Iterator<Item = &str> {
     })
 }
 
+/// Errors returned by [`parse_hlist`] and [`parse_vlist`].
+#[derive(Debug, PartialEq)]
+pub enum ErrorKind {
+    /// The iterator was empty when the start of an hlist was expected.
+    EmptyHlist,
+    /// The first line did not start with `\hbox(` as required.
+    MissingHboxPrefix,
+    /// The hbox dimension spec had no `+` separating height from depth.
+    MissingHboxHeightDepthSeparator,
+    /// The hbox dimension spec had no `)x` separating depth from width.
+    MissingHboxDepthWidthSeparator,
+    /// A `\kern` item had no width value.
+    KernMissingWidth,
+    /// A `\penalty` value could not be parsed as an integer.
+    InvalidPenaltyValue,
+    /// A `\rule` item had no `x` separating the height/depth from the width.
+    RuleMissingWidthSeparator,
+    /// A `\discretionary` item had a word other than `replacing` where `replacing` was expected.
+    DiscretionaryExpectedReplacingKeyword,
+    /// A `\discretionary replacing` item had no replacement count.
+    DiscretionaryMissingReplaceCount,
+    /// A `\discretionary replacing N` item had a count that could not be parsed as an integer.
+    DiscretionaryInvalidReplaceCount,
+    /// A font command was not followed by a character.
+    MissingCharAfterFont,
+    /// A ligature item had no original chars word after `(ligature`.
+    LigatureMissingOriginalChars,
+    /// The original chars of a ligature did not end with `)`.
+    LigatureMissingClosingParen,
+    /// The iterator was empty when the start of a vlist was expected.
+    EmptyVlist,
+    /// The first line did not start with `\vbox(` as required.
+    MissingVboxPrefix,
+    /// The vbox dimension spec had no `+` separating height from depth.
+    MissingVboxHeightDepthSeparator,
+    /// The vbox dimension spec had no `)x` separating depth from width.
+    MissingVboxDepthWidthSeparator,
+    /// A vlist contained a keyword that is not yet handled.
+    UnknownVlistKeyword,
+}
+
+impl std::fmt::Display for ErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorKind::EmptyHlist => write!(f, "iterator was empty when an hlist was expected"),
+            ErrorKind::MissingHboxPrefix => write!(f, r"first line did not start with \hbox("),
+            ErrorKind::MissingHboxHeightDepthSeparator => {
+                write!(
+                    f,
+                    r"hbox dimension spec missing '+' between height and depth"
+                )
+            }
+            ErrorKind::MissingHboxDepthWidthSeparator => {
+                write!(
+                    f,
+                    r"hbox dimension spec missing ')x' between depth and width"
+                )
+            }
+            ErrorKind::KernMissingWidth => write!(f, r"\kern item had no width value"),
+            ErrorKind::InvalidPenaltyValue => {
+                write!(f, r"\penalty value could not be parsed as an integer")
+            }
+            ErrorKind::RuleMissingWidthSeparator => {
+                write!(
+                    f,
+                    r"\rule item had no 'x' separating height/depth from width"
+                )
+            }
+            ErrorKind::DiscretionaryExpectedReplacingKeyword => {
+                write!(
+                    f,
+                    r"\discretionary item had unexpected word where 'replacing' was expected"
+                )
+            }
+            ErrorKind::DiscretionaryMissingReplaceCount => {
+                write!(f, r"\discretionary replacing item had no replacement count")
+            }
+            ErrorKind::DiscretionaryInvalidReplaceCount => {
+                write!(
+                    f,
+                    r"\discretionary replacing count could not be parsed as an integer"
+                )
+            }
+            ErrorKind::MissingCharAfterFont => {
+                write!(f, "font command was not followed by a character")
+            }
+            ErrorKind::LigatureMissingOriginalChars => {
+                write!(f, "ligature item had no original chars after '(ligature'")
+            }
+            ErrorKind::LigatureMissingClosingParen => {
+                write!(f, "ligature original chars did not end with ')'")
+            }
+            ErrorKind::EmptyVlist => write!(f, "iterator was empty when a vlist was expected"),
+            ErrorKind::MissingVboxPrefix => write!(f, r"first line did not start with \vbox("),
+            ErrorKind::MissingVboxHeightDepthSeparator => {
+                write!(
+                    f,
+                    r"vbox dimension spec missing '+' between height and depth"
+                )
+            }
+            ErrorKind::MissingVboxDepthWidthSeparator => {
+                write!(
+                    f,
+                    r"vbox dimension spec missing ')x' between depth and width"
+                )
+            }
+            ErrorKind::UnknownVlistKeyword => write!(f, "vlist contained an unhandled keyword"),
+        }
+    }
+}
+
+impl std::error::Error for ErrorKind {}
+
+/// Error returned by [`parse_hlist`] and [`parse_vlist`].
+#[derive(Debug, PartialEq)]
+pub struct Error {
+    pub kind: ErrorKind,
+    pub line_number: usize,
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "line {}: {}", self.line_number, self.kind)
+    }
+}
+
+impl std::error::Error for Error {}
+
 /// Parse a single raw hlist segment (as produced by [`extract_hlist_segments`]) into an hlist.
 ///
 /// The `fonts` map is updated in place as new fonts are encountered.
-fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds::HBox {
+fn parse_hlist(
+    iter: &mut TexOutputIter,
+    fonts: &mut HashMap<String, u32>,
+) -> Result<ds::HBox, Error> {
     let mut hlist = {
-        let line = iter.next().expect("hlist must be non-empty");
-        let s = line
-            .strip_prefix(r"\hbox(")
-            .expect("first line must be a hlist spec");
-        let i = s
-            .find('+')
-            .expect("hbox dimension spec has a + between height and depth");
+        let line_number_hint = iter.line_number;
+        let (line_number, line) = iter.next().ok_or(Error {
+            kind: ErrorKind::EmptyHlist,
+            line_number: line_number_hint,
+        })?;
+        let s = line.strip_prefix(r"\hbox(").ok_or(Error {
+            kind: ErrorKind::MissingHboxPrefix,
+            line_number,
+        })?;
+        let i = s.find('+').ok_or(Error {
+            kind: ErrorKind::MissingHboxHeightDepthSeparator,
+            line_number,
+        })?;
         let height = parse_scaled(&s[..i]);
         let s = &s[i + 1..];
-        let i = s
-            .find(")x")
-            .expect("hbox dimension spec has a )x between depth and width");
+        let i = s.find(")x").ok_or(Error {
+            kind: ErrorKind::MissingHboxDepthWidthSeparator,
+            line_number,
+        })?;
         let depth = parse_scaled(&s[..i]);
         let rest = &s[i + 2..];
         let (width_str, glue_set_str) = if let Some(j) = rest.find(", glue set ") {
@@ -315,7 +462,7 @@ fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
         }
     };
     let mut iter = iter.inner();
-    while let Some(line) = iter.peek() {
+    while let Some((line_number, line)) = iter.peek() {
         let (keyword, tail) = keyword_and_tail(line);
         let mut consume_line = true;
         let elem: ds::Horizontal = match keyword {
@@ -326,7 +473,10 @@ fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
             .into(),
             "kern" => {
                 let mut words = tail.split_ascii_whitespace();
-                let width = parse_scaled(words.next().expect("kern has 1 word"));
+                let width = parse_scaled(words.next().ok_or(Error {
+                    kind: ErrorKind::KernMissingWidth,
+                    line_number,
+                })?);
                 ds::Kern {
                     kind: ds::KernKind::Normal,
                     width,
@@ -334,11 +484,17 @@ fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
                 .into()
             }
             "penalty" => {
-                let value: i32 = tail.trim().parse().expect("penalty value is i32");
+                let value: i32 = tail.trim().parse().map_err(|_| Error {
+                    kind: ErrorKind::InvalidPenaltyValue,
+                    line_number,
+                })?;
                 ds::Penalty(value).into()
             }
             "rule" => {
-                let i = tail.find('x').expect("rule has a width");
+                let i = tail.find('x').ok_or(Error {
+                    kind: ErrorKind::RuleMissingWidthSeparator,
+                    line_number,
+                })?;
                 ds::Rule {
                     width: parse_scaled(&tail[i + 1..]),
                     ..Default::default()
@@ -353,12 +509,20 @@ fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
                 let replace_count = match words.next() {
                     None => 0,
                     Some(replacing) => {
-                        assert_eq!(replacing, "replacing");
-                        words
-                            .next()
-                            .unwrap()
-                            .parse()
-                            .expect("replacing value is u32")
+                        if replacing != "replacing" {
+                            return Err(Error {
+                                kind: ErrorKind::DiscretionaryExpectedReplacingKeyword,
+                                line_number,
+                            });
+                        }
+                        let count_str = words.next().ok_or(Error {
+                            kind: ErrorKind::DiscretionaryMissingReplaceCount,
+                            line_number,
+                        })?;
+                        count_str.parse().map_err(|_| Error {
+                            kind: ErrorKind::DiscretionaryInvalidReplaceCount,
+                            line_number,
+                        })?
                     }
                 };
                 ds::Discretionary {
@@ -370,11 +534,11 @@ fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
             }
             "hbox" => {
                 consume_line = false;
-                parse_hlist(&mut iter, fonts).into()
+                parse_hlist(&mut iter, fonts)?.into()
             }
             "vbox" => {
                 consume_line = false;
-                parse_vlist(&mut iter, fonts).into()
+                parse_vlist(&mut iter, fonts)?.into()
             }
             font_name => {
                 use std::collections::hash_map::Entry;
@@ -387,13 +551,19 @@ fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
                     }
                 };
                 let mut words = tail.split_ascii_whitespace();
-                let char =
-                    parse_char(words.next().unwrap_or_else(|| {
-                        panic!("expected char after font command \\{font_name}")
-                    }));
+                let char = parse_char(words.next().ok_or(Error {
+                    kind: ErrorKind::MissingCharAfterFont,
+                    line_number,
+                })?);
                 if words.next() == Some("(ligature") {
-                    let og_chars = words.next().expect("lig has 4 words");
-                    let og_chars = og_chars.strip_suffix(")").expect("lig ends with ')'");
+                    let og_chars = words.next().ok_or(Error {
+                        kind: ErrorKind::LigatureMissingOriginalChars,
+                        line_number,
+                    })?;
+                    let og_chars = og_chars.strip_suffix(')').ok_or(Error {
+                        kind: ErrorKind::LigatureMissingClosingParen,
+                        line_number,
+                    })?;
                     ds::Ligature {
                         included_left_boundary: false,
                         included_right_boundary: false,
@@ -412,24 +582,34 @@ fn parse_hlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
             iter.next();
         }
     }
-    hlist
+    Ok(hlist)
 }
 
 /// Parse a single raw vlist segment into a vlist.
-fn parse_vlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds::VBox {
+fn parse_vlist(
+    iter: &mut TexOutputIter,
+    fonts: &mut HashMap<String, u32>,
+) -> Result<ds::VBox, Error> {
     let mut vlist = {
-        let line = iter.next().expect("vlist must be non-empty");
-        let s = line
-            .strip_prefix(r"\vbox(")
-            .expect("first line must be a vlist spec");
-        let i = s
-            .find('+')
-            .expect("vbox dimension spec has a + between height and depth");
+        let line_number_hint = iter.line_number;
+        let (line_number, line) = iter.next().ok_or(Error {
+            kind: ErrorKind::EmptyVlist,
+            line_number: line_number_hint,
+        })?;
+        let s = line.strip_prefix(r"\vbox(").ok_or(Error {
+            kind: ErrorKind::MissingVboxPrefix,
+            line_number,
+        })?;
+        let i = s.find('+').ok_or(Error {
+            kind: ErrorKind::MissingVboxHeightDepthSeparator,
+            line_number,
+        })?;
         let _height = parse_scaled(&s[..i]);
         let s = &s[i + 1..];
-        let i = s
-            .find(")x")
-            .expect("vbox dimension spec has a )x between depth and width");
+        let i = s.find(")x").ok_or(Error {
+            kind: ErrorKind::MissingVboxDepthWidthSeparator,
+            line_number,
+        })?;
         let _depth = parse_scaled(&s[..i]);
         let _width = parse_scaled(&s[i + 2..]);
         // TODO: use the real heights when Boxworks has these populated too.
@@ -449,30 +629,38 @@ fn parse_vlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
         }
     };
     let mut iter = iter.inner();
-    while let Some(line) = iter.peek() {
+    while let Some((line_number, line)) = iter.peek() {
         let (keyword, tail) = keyword_and_tail(line);
         let mut consume_line = true;
         let elem: ds::Vertical = match keyword {
             "hbox" => {
                 consume_line = false;
-                parse_hlist(&mut iter, fonts).into()
+                parse_hlist(&mut iter, fonts)?.into()
             }
             "penalty" => {
-                let value: i32 = tail.trim().parse().expect("penalty value is i32");
+                let value: i32 = tail.trim().parse().map_err(|_| Error {
+                    kind: ErrorKind::InvalidPenaltyValue,
+                    line_number,
+                })?;
                 ds::Penalty(value).into()
             }
             "glue" => ds::Vertical::Glue(ds::Glue {
                 kind: ds::GlueKind::Normal,
                 value: parse_glue_value(tail),
             }),
-            _ => unimplemented!("vlist keyword {keyword} is not implemented"),
+            _ => {
+                return Err(Error {
+                    kind: ErrorKind::UnknownVlistKeyword,
+                    line_number,
+                })
+            }
         };
         vlist.list.push(elem);
         if consume_line {
             iter.next();
         }
     }
-    vlist
+    Ok(vlist)
 }
 
 fn keyword_and_tail(s: &str) -> (&str, &str) {
@@ -973,4 +1161,231 @@ Transcript written on test.log.
         assert_eq!(got_fonts, want_fonts);
         assert_eq!(got_list, vec![want_list]);
     }
+
+    macro_rules! test_parse_hlist_error {
+        ($(($name:ident, $input:expr, $expected:expr)),* $(,)?) => [$(
+            #[test]
+            fn $name() {
+                let err = parse_hlist(&mut TexOutputIter::new($input), &mut Default::default())
+                    .unwrap_err();
+                assert_eq!(err, $expected);
+            }
+        )*];
+    }
+
+    test_parse_hlist_error![
+        (
+            test_empty_hlist,
+            r"> \box0=
+",
+            Error {
+                kind: ErrorKind::EmptyHlist,
+                line_number: 2
+            }
+        ),
+        (
+            test_missing_hbox_prefix,
+            r"> \box0=
+\vbox(6.0+0.0)x10.0
+",
+            Error {
+                kind: ErrorKind::MissingHboxPrefix,
+                line_number: 2
+            }
+        ),
+        (
+            test_missing_height_depth_separator,
+            r"> \box0=
+\hbox(6.94444 no plus here)x10.0
+",
+            Error {
+                kind: ErrorKind::MissingHboxHeightDepthSeparator,
+                line_number: 2
+            }
+        ),
+        (
+            test_missing_depth_width_separator,
+            r"> \box0=
+\hbox(6.94444+0.0 no depth width)
+",
+            Error {
+                kind: ErrorKind::MissingHboxDepthWidthSeparator,
+                line_number: 2
+            }
+        ),
+        (
+            test_kern_missing_width,
+            r"> \box0=
+\hbox(6.94444+0.0)x10.0
+.\kern
+",
+            Error {
+                kind: ErrorKind::KernMissingWidth,
+                line_number: 3
+            }
+        ),
+        (
+            test_invalid_penalty_value,
+            r"> \box0=
+\hbox(6.94444+0.0)x10.0
+.\penalty abc
+",
+            Error {
+                kind: ErrorKind::InvalidPenaltyValue,
+                line_number: 3
+            }
+        ),
+        (
+            test_rule_missing_width_separator,
+            r"> \box0=
+\hbox(6.94444+0.0)x10.0
+.\rule (*+*) 5.0
+",
+            Error {
+                kind: ErrorKind::RuleMissingWidthSeparator,
+                line_number: 3
+            }
+        ),
+        (
+            test_discretionary_expected_replacing_keyword,
+            r"> \box0=
+\hbox(6.94444+0.0)x10.0
+.\discretionary wrong 3
+",
+            Error {
+                kind: ErrorKind::DiscretionaryExpectedReplacingKeyword,
+                line_number: 3
+            }
+        ),
+        (
+            test_discretionary_missing_replace_count,
+            r"> \box0=
+\hbox(6.94444+0.0)x10.0
+.\discretionary replacing
+",
+            Error {
+                kind: ErrorKind::DiscretionaryMissingReplaceCount,
+                line_number: 3
+            }
+        ),
+        (
+            test_discretionary_invalid_replace_count,
+            r"> \box0=
+\hbox(6.94444+0.0)x10.0
+.\discretionary replacing abc
+",
+            Error {
+                kind: ErrorKind::DiscretionaryInvalidReplaceCount,
+                line_number: 3
+            }
+        ),
+        (
+            test_missing_char_after_font,
+            r"> \box0=
+\hbox(6.94444+0.0)x10.0
+.\tenrm
+",
+            Error {
+                kind: ErrorKind::MissingCharAfterFont,
+                line_number: 3
+            }
+        ),
+        (
+            test_ligature_missing_original_chars,
+            r"> \box0=
+\hbox(6.94444+0.0)x10.0
+.\tenrm f (ligature
+",
+            Error {
+                kind: ErrorKind::LigatureMissingOriginalChars,
+                line_number: 3
+            }
+        ),
+        (
+            test_ligature_missing_closing_paren,
+            r"> \box0=
+\hbox(6.94444+0.0)x10.0
+.\tenrm f (ligature fi
+",
+            Error {
+                kind: ErrorKind::LigatureMissingClosingParen,
+                line_number: 3
+            }
+        ),
+    ];
+
+    macro_rules! test_parse_vlist_error {
+        ($(($name:ident, $input:expr, $expected:expr)),* $(,)?) => [$(
+            #[test]
+            fn $name() {
+                let err = parse_vlist(&mut TexOutputIter::new($input), &mut Default::default())
+                    .unwrap_err();
+                assert_eq!(err, $expected);
+            }
+        )*];
+    }
+
+    test_parse_vlist_error![
+        (
+            test_empty_vlist,
+            r"> \box0=
+",
+            Error {
+                kind: ErrorKind::EmptyVlist,
+                line_number: 2
+            }
+        ),
+        (
+            test_missing_vbox_prefix,
+            r"> \box0=
+\hbox(6.94444+0.0)x10.0
+",
+            Error {
+                kind: ErrorKind::MissingVboxPrefix,
+                line_number: 2
+            }
+        ),
+        (
+            test_missing_vbox_height_depth_separator,
+            r"> \box0=
+\vbox(6.94444 no plus here)x10.0
+",
+            Error {
+                kind: ErrorKind::MissingVboxHeightDepthSeparator,
+                line_number: 2
+            }
+        ),
+        (
+            test_missing_vbox_depth_width_separator,
+            r"> \box0=
+\vbox(6.94444+0.0 no depth width)
+",
+            Error {
+                kind: ErrorKind::MissingVboxDepthWidthSeparator,
+                line_number: 2
+            }
+        ),
+        (
+            test_vlist_invalid_penalty_value,
+            r"> \box0=
+\vbox(6.94444+0.0)x10.0
+.\penalty abc
+",
+            Error {
+                kind: ErrorKind::InvalidPenaltyValue,
+                line_number: 3
+            }
+        ),
+        (
+            test_unknown_vlist_keyword,
+            r"> \box0=
+\vbox(6.94444+0.0)x10.0
+.\unknown stuff
+",
+            Error {
+                kind: ErrorKind::UnknownVlistKeyword,
+                line_number: 3
+            }
+        ),
+    ];
 }
