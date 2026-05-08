@@ -219,6 +219,10 @@ impl ToBoxLang for ds::VBox {
     type Output = ast::VBox<'static>;
     fn to_box_lang(&self) -> Self::Output {
         ast::VBox {
+            height: self.height.into(),
+            width: self.width.into(),
+            depth: self.depth.into(),
+            shift_amount: self.shift_amount.into(),
             content: self.list.to_box_lang().into(),
         }
     }
@@ -228,7 +232,13 @@ impl ToBoxLang for ds::HBox {
     type Output = ast::HBox<'static>;
     fn to_box_lang(&self) -> Self::Output {
         ast::HBox {
+            height: self.height.into(),
             width: self.width.into(),
+            depth: self.depth.into(),
+            shift_amount: self.shift_amount.into(),
+            glue_ratio: Cow::<'static, str>::Owned(format!("{}", self.glue_ratio)).into(),
+            glue_order: self.glue_order.into(),
+            glue_sign: self.glue_sign.into(),
             content: self.list.to_box_lang().into(),
         }
     }
@@ -238,10 +248,14 @@ impl<'a> ToBoxworks for ast::HBox<'a> {
     type Output = ds::HBox;
     fn to_boxworks(&self) -> Self::Output {
         ds::HBox {
+            height: self.height.value,
             width: self.width.value,
+            depth: self.depth.value,
+            shift_amount: self.shift_amount.value,
+            glue_ratio: ds::GlueRatio(self.glue_ratio.value.parse().unwrap_or(0.0)),
+            glue_sign: self.glue_sign.value,
+            glue_order: self.glue_order.value,
             list: self.content.value.to_boxworks(),
-            // TODO: all the other stuff
-            ..Default::default()
         }
     }
 }
@@ -250,8 +264,11 @@ impl<'a> ToBoxworks for ast::VBox<'a> {
     type Output = ds::VBox;
     fn to_boxworks(&self) -> Self::Output {
         ds::VBox {
+            height: self.height.value,
+            width: self.width.value,
+            depth: self.depth.value,
+            shift_amount: self.shift_amount.value,
             list: self.content.value.to_boxworks(),
-            // TODO: all the other stuff
             ..Default::default()
         }
     }
@@ -411,9 +428,9 @@ impl ToBoxLang for ds::Rule {
     type Output = ast::Rule<'static>;
     fn to_box_lang(&self) -> Self::Output {
         ast::Rule {
-            height: self.height.into(),
-            width: self.width.into(),
-            depth: self.depth.into(),
+            height: ast::MaybeRunning::from_scaled(self.height).into(),
+            width: ast::MaybeRunning::from_scaled(self.width).into(),
+            depth: ast::MaybeRunning::from_scaled(self.depth).into(),
         }
     }
 }
@@ -422,9 +439,9 @@ impl<'a> ToBoxworks for ast::Rule<'a> {
     type Output = ds::Rule;
     fn to_boxworks(&self) -> Self::Output {
         ds::Rule {
-            height: self.height.value,
-            width: self.width.value,
-            depth: self.depth.value,
+            height: self.height.value.to_scaled(),
+            width: self.width.value.to_scaled(),
+            depth: self.depth.value.to_scaled(),
         }
     }
 }

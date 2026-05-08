@@ -71,8 +71,8 @@ pub trait FontRepo {
     fn width_height_depth(&self, c: char, font: u32) -> Option<[common::Scaled; 3]> {
         Some([
             self.width(c, font)?,
-            self.height(c, font)?,
-            self.depth(c, font)?,
+            self.height(c, font).unwrap_or(common::Scaled::ZERO),
+            self.depth(c, font).unwrap_or(common::Scaled::ZERO),
         ])
     }
 }

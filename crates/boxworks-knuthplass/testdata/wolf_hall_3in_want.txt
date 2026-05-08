@@ -1,9 +1,19 @@
 #
 # vlist 1
 vbox(
+  height=186.94444pt,
+  width=216.81pt,
+  depth=0.0pt,
+  shift_amount=0.0pt,
   content=[
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.6564",
+      glue_order="normal",
+      glue_sign="stretching",
       content=[
         chars("He", font=0)
         glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -51,7 +61,13 @@ vbox(
     penalty(150)
     glue(3.11111pt, 0.0pt, 0.0pt)
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.00433",
+      glue_order="normal",
+      glue_sign="stretching",
       content=[
         chars("the", font=0)
         glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -110,7 +126,13 @@ vbox(
     )
     glue(3.11111pt, 0.0pt, 0.0pt)
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.18771",
+      glue_order="normal",
+      glue_sign="stretching",
       content=[
         chars("to", font=0)
         glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -146,7 +168,13 @@ vbox(
     )
     glue(3.11111pt, 0.0pt, 0.0pt)
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.67024",
+      glue_order="normal",
+      glue_sign="stretching",
       content=[
         chars("y", font=0)
         kern(-0.27779pt)
@@ -187,7 +215,13 @@ vbox(
     )
     glue(3.11111pt, 0.0pt, 0.0pt)
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.73364",
+      glue_order="normal",
+      glue_sign="stretching",
       content=[
         chars("y", font=0)
         kern(-0.27779pt)
@@ -247,7 +281,13 @@ vbox(
     penalty(100)
     glue(3.11111pt, 0.0pt, 0.0pt)
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.31857",
+      glue_order="normal",
+      glue_sign="stretching",
       content=[
         chars("times", font=0)
         glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -288,7 +328,13 @@ vbox(
     )
     glue(3.11111pt, 0.0pt, 0.0pt)
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.7524",
+      glue_order="normal",
+      glue_sign="stretching",
       content=[
         chars("w", font=0)
         kern(-0.27779pt)
@@ -342,7 +388,13 @@ vbox(
     )
     glue(3.11111pt, 0.0pt, 0.0pt)
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.42033",
+      glue_order="normal",
+      glue_sign="stretching",
       content=[
         chars("and", font=0)
         glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -388,7 +440,13 @@ vbox(
     )
     glue(3.11111pt, 0.0pt, 0.0pt)
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.78845",
+      glue_order="normal",
+      glue_sign="stretching",
       content=[
         chars("fra", font=0)
         disc(
@@ -430,7 +488,13 @@ vbox(
     )
     glue(3.11111pt, 0.0pt, 0.0pt)
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.18546",
+      glue_order="normal",
+      glue_sign="stretching",
       content=[
         chars("y", font=0)
         kern(-0.27779pt)
@@ -471,7 +535,13 @@ vbox(
     )
     glue(3.11111pt, 0.0pt, 0.0pt)
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.66905",
+      glue_order="normal",
+      glue_sign="stretching",
       content=[
         chars("w", font=0)
         kern(-0.27779pt)
@@ -519,7 +589,13 @@ vbox(
     )
     glue(3.11111pt, 0.0pt, 0.0pt)
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.39755",
+      glue_order="normal",
+      glue_sign="shrinking",
       content=[
         chars("the", font=0)
         glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -576,7 +652,13 @@ vbox(
     )
     glue(3.11111pt, 0.0pt, 0.0pt)
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.41656",
+      glue_order="normal",
+      glue_sign="shrinking",
       content=[
         chars("stone", font=0)
         glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -619,7 +701,13 @@ vbox(
     )
     glue(3.11111pt, 0.0pt, 0.0pt)
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.28935",
+      glue_order="normal",
+      glue_sign="shrinking",
       content=[
         chars("w", font=0)
         kern(-0.27779pt)
@@ -673,7 +761,13 @@ vbox(
     )
     glue(3.11111pt, 0.0pt, 0.0pt)
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.5444",
+      glue_order="normal",
+      glue_sign="shrinking",
       content=[
         chars("sky", font=0)
         kern(-0.83334pt)
@@ -726,7 +820,13 @@ vbox(
     penalty(150)
     glue(3.11111pt, 0.0pt, 0.0pt)
     hbox(
+      height=6.94444pt,
       width=216.81pt,
+      depth=0.0pt,
+      shift_amount=0.0pt,
+      glue_ratio="170.36545",
+      glue_order="fil",
+      glue_sign="stretching",
       content=[
         chars("no", font=0)
         glue(3.33333pt, 1.66666pt, 1.11111pt)

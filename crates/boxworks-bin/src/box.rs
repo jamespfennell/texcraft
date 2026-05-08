@@ -356,22 +356,23 @@ fn run_box_hboxs(
     let mut tp: boxworks_text::TextPreprocessorImpl = Default::default();
     tp.register_font(0, &tfm_file, lig_kern_program);
     tp.activate_font(0);
-    let raw: Vec<Vec<_>> = texts
+    let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
+    font_repo.register_font(0, tfm_file);
+    use boxworks::ds;
+    let raw: Vec<ds::HBox> = texts
         .into_iter()
         .map(|text| {
             let mut got = vec![];
             tp.add_text(&text, &mut got);
-            got
+            ds::HBox::pack(
+                &font_repo,
+                got,
+                ds::PackWidth::Additional(common::Scaled::ZERO),
+            )
         })
         .collect();
     use bwl::convert::ToBoxLang;
-    Ok(raw
-        .into_iter()
-        .map(|got| bwl::ast::HBox {
-            width: Default::default(),
-            content: got.to_box_lang().into(),
-        })
-        .collect())
+    Ok(raw.into_iter().map(|got| got.to_box_lang()).collect())
 }
 
 fn run_tex_hboxs(
@@ -408,8 +409,7 @@ fn run_tex_vlists(
 }
 
 fn print_hboxs(hboxs: Vec<bwl::ast::HBox<'static>>, labels: Vec<Option<usize>>) {
-    for (i, (mut hbox, label)) in hboxs.into_iter().zip(labels).enumerate() {
-        hbox.width = common::Scaled::ZERO.into();
+    for (i, (hbox, label)) in hboxs.into_iter().zip(labels).enumerate() {
         println!("#");
         match label {
             Some(line_num) => println!("# hbox {} (line {})", i + 1, line_num),

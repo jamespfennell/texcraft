@@ -607,4 +607,11 @@ mod tests {
     fn print_smallest_scaled() {
         assert_eq!("-32768.0pt", format!("{}", Scaled(i32::MIN)));
     }
+
+    #[test]
+    fn glue_order_ordering() {
+        assert!(GlueOrder::Normal < GlueOrder::Fil);
+        assert!(GlueOrder::Fil < GlueOrder::Fill);
+        assert!(GlueOrder::Fill < GlueOrder::Filll);
+    }
 }

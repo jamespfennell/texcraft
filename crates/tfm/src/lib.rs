@@ -453,7 +453,7 @@ impl File {
         let dimens = self.char_dimens.get(&char)?;
         let i = dimens.height_index;
         Some(
-            self.widths
+            self.heights
                 .get(i as usize)?
                 .to_scaled(self.header.design_size),
         )
@@ -463,7 +463,7 @@ impl File {
         let dimens = self.char_dimens.get(&char)?;
         let i = dimens.depth_index;
         Some(
-            self.widths
+            self.depths
                 .get(i as usize)?
                 .to_scaled(self.header.design_size),
         )

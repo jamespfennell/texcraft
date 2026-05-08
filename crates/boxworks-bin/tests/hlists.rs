@@ -20,14 +20,6 @@ fn run_hlists(texts_file: &str) -> String {
     String::from_utf8(output.stdout).unwrap()
 }
 
-fn filter_width_lines(s: &str) -> String {
-    let s = s.trim();
-    s.lines()
-        .filter(|line| !line.contains("width"))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
 macro_rules! hlists_tests {
     ( $( ($name:ident, $texts_file:expr, $golden_file:expr), )+ ) => {
         $(
@@ -35,9 +27,7 @@ macro_rules! hlists_tests {
             fn $name() {
                 const GOLDEN: &str = include_str!($golden_file);
                 let box_output = run_hlists($texts_file);
-                let box_filtered = filter_width_lines(&box_output);
-                let golden_filtered = filter_width_lines(GOLDEN);
-                similar_asserts::assert_eq!(got: box_filtered, want: golden_filtered);
+                similar_asserts::assert_eq!(got: box_output, want: GOLDEN);
             }
         )+
     };

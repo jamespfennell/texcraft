@@ -428,13 +428,19 @@ fn parse_vlist(iter: &mut TexOutputIter, fonts: &mut HashMap<String, u32>) -> ds
         let i = s
             .find('+')
             .expect("vbox dimension spec has a + between height and depth");
-        let height = parse_scaled(&s[..i]);
+        let _height = parse_scaled(&s[..i]);
         let s = &s[i + 1..];
         let i = s
             .find(")x")
             .expect("vbox dimension spec has a )x between depth and width");
-        let depth = parse_scaled(&s[..i]);
-        let width = parse_scaled(&s[i + 2..]);
+        let _depth = parse_scaled(&s[..i]);
+        let _width = parse_scaled(&s[i + 2..]);
+        // TODO: use the real heights when Boxworks has these populated too.
+        let (width, height, depth) = (
+            common::Scaled::ZERO,
+            common::Scaled::ZERO,
+            common::Scaled::ZERO,
+        );
         ds::VBox {
             height,
             width,
@@ -657,6 +663,31 @@ We add some text at the end.
 mod tests {
     use super::*;
 
+    fn parse_hbox_lang(source: &str) -> ds::HBox {
+        let mut list = boxworks_lang::parse_horizontal_list(source).unwrap();
+        assert_eq!(list.len(), 1);
+        match list.remove(0) {
+            ds::Horizontal::HBox(hbox) => hbox,
+            other => panic!("expected hbox, got {other:?}"),
+        }
+    }
+
+    fn parse_vbox_lang(source: &str) -> ds::VBox {
+        let mut list = boxworks_lang::parse_horizontal_list(source).unwrap();
+        assert_eq!(list.len(), 1);
+        match list.remove(0) {
+            ds::Horizontal::VBox(mut vbox) => {
+                // TODO: when vpack is implemented, remove this.
+                vbox.width = common::Scaled::ZERO;
+                vbox.height = common::Scaled::ZERO;
+                vbox.depth = common::Scaled::ZERO;
+                vbox.shift_amount = common::Scaled::ZERO;
+                vbox
+            }
+            other => panic!("expected vbox, got {other:?}"),
+        }
+    }
+
     struct MockTexEngine(String);
 
     impl TexEngine for MockTexEngine {
@@ -707,50 +738,23 @@ Transcript written on test.log.
             &mut vec!["".to_string()].iter(),
         );
 
-        let want_list = ds::HBox {
-            height: parse_scaled("6.94444"),
-            width: parse_scaled("56.66678"),
-            depth: common::Scaled::ZERO,
-            list: vec![
-                ds::Char { char: 'M', font: 0 }.into(),
-                ds::Char { char: 'i', font: 0 }.into(),
-                ds::Char { char: 'n', font: 0 }.into(),
-                ds::Kern {
-                    kind: ds::KernKind::Normal,
-                    width: parse_scaled("-0.27779"),
-                }
-                .into(),
-                ds::Char { char: 't', font: 0 }.into(),
-                ds::Glue {
-                    kind: ds::GlueKind::Normal,
-                    value: common::Glue {
-                        width: parse_scaled("3.33333"),
-                        stretch: parse_scaled("1.66666"),
-                        stretch_order: common::GlueOrder::Normal,
-                        shrink: parse_scaled("1.11111"),
-                        shrink_order: common::GlueOrder::Normal,
-                    },
-                }
-                .into(),
-                ds::Char { char: 'a', font: 0 }.into(),
-                ds::Char { char: 'n', font: 0 }.into(),
-                ds::Char { char: 'd', font: 0 }.into(),
-                ds::Glue {
-                    kind: ds::GlueKind::Normal,
-                    value: common::Glue {
-                        width: parse_scaled("3.33333"),
-                        stretch: parse_scaled("1.66666"),
-                        stretch_order: common::GlueOrder::Normal,
-                        shrink: parse_scaled("1.11111"),
-                        shrink_order: common::GlueOrder::Normal,
-                    },
-                }
-                .into(),
-                ds::Char { char: 'm', font: 0 }.into(),
-                ds::Char { char: 'e', font: 0 }.into(),
-            ],
-            ..Default::default()
-        };
+        let want_list = parse_hbox_lang(
+            r#"
+            hbox(
+                height=6.94444pt,
+                width=56.66678pt,
+                content=[
+                    chars("Min")
+                    kern(-0.27779pt)
+                    chars("t")
+                    glue(3.33333pt, 1.66666pt, 1.11111pt)
+                    chars("and")
+                    glue(3.33333pt, 1.66666pt, 1.11111pt)
+                    chars("me")
+                ]
+            )
+        "#,
+        );
         let want_fonts = {
             let mut m = HashMap::new();
             m.insert("tenrm".to_string(), 0);
@@ -802,7 +806,6 @@ Texcraft: end
 No pages of output.
 Transcript written on test.log.
 "#;
-
         let tex_engine = MockTexEngine(log.to_string());
         let (got_fonts, got_list) = build_vertical_lists(
             &tex_engine,
@@ -813,109 +816,45 @@ Transcript written on test.log.
             &mut vec!["".to_string()].iter(),
         );
 
-        let want_list = ds::VBox {
-            height: parse_scaled("18.94444"),
-            width: parse_scaled("41.0"),
-            depth: common::Scaled::ZERO,
-            shift_amount: common::Scaled::ZERO,
-            glue_ratio: ds::GlueRatio(0.0),
-            glue_sign: ds::GlueSign::Normal,
-            glue_order: common::GlueOrder::Normal,
-            list: vec![
-                ds::Vertical::HBox(ds::HBox {
-                    height: parse_scaled("6.94444"),
-                    width: parse_scaled("41.0"),
-                    depth: common::Scaled::ZERO,
-                    glue_ratio: ds::GlueRatio(0.26662),
-                    glue_sign: ds::GlueSign::Stretching,
-                    glue_order: common::GlueOrder::Normal,
-                    list: vec![
-                        ds::Char { char: 'M', font: 0 }.into(),
-                        ds::Char { char: 'i', font: 0 }.into(),
-                        ds::Char { char: 'n', font: 0 }.into(),
-                        ds::Kern {
-                            kind: ds::KernKind::Normal,
-                            width: parse_scaled("-0.27779"),
-                        }
-                        .into(),
-                        ds::Char { char: 't', font: 0 }.into(),
-                        ds::Glue {
-                            kind: ds::GlueKind::Normal,
-                            value: common::Glue {
-                                width: parse_scaled("3.33333"),
-                                stretch: parse_scaled("1.66666"),
-                                stretch_order: common::GlueOrder::Normal,
-                                shrink: parse_scaled("1.11111"),
-                                shrink_order: common::GlueOrder::Normal,
-                            },
-                        }
-                        .into(),
-                        ds::Char { char: 'a', font: 0 }.into(),
-                        ds::Char { char: 'n', font: 0 }.into(),
-                        ds::Char { char: 'd', font: 0 }.into(),
-                        ds::Glue {
-                            kind: ds::GlueKind::Normal,
-                            value: common::Glue {
-                                width: common::Scaled::ZERO,
-                                stretch: common::Scaled::ZERO,
-                                stretch_order: common::GlueOrder::Normal,
-                                shrink: common::Scaled::ZERO,
-                                shrink_order: common::GlueOrder::Normal,
-                            },
-                        }
-                        .into(),
-                    ],
-                    ..Default::default()
-                }),
-                ds::Vertical::Penalty(ds::Penalty(300)),
-                ds::Vertical::Glue(ds::Glue {
-                    kind: ds::GlueKind::Normal,
-                    value: common::Glue {
-                        width: parse_scaled("7.69446"),
-                        stretch: common::Scaled::ZERO,
-                        stretch_order: common::GlueOrder::Normal,
-                        shrink: common::Scaled::ZERO,
-                        shrink_order: common::GlueOrder::Normal,
-                    },
-                }),
-                ds::Vertical::HBox(ds::HBox {
-                    height: parse_scaled("4.30554"),
-                    width: parse_scaled("41.0"),
-                    depth: common::Scaled::ZERO,
-                    glue_ratio: ds::GlueRatio(28.2222),
-                    glue_sign: ds::GlueSign::Stretching,
-                    glue_order: common::GlueOrder::Fil,
-                    list: vec![
-                        ds::Char { char: 'm', font: 0 }.into(),
-                        ds::Char { char: 'e', font: 0 }.into(),
-                        ds::Penalty(10000).into(),
-                        ds::Glue {
-                            kind: ds::GlueKind::Normal,
-                            value: common::Glue {
-                                width: common::Scaled::ZERO,
-                                stretch: parse_scaled("1.0"),
-                                stretch_order: common::GlueOrder::Fil,
-                                shrink: common::Scaled::ZERO,
-                                shrink_order: common::GlueOrder::Normal,
-                            },
-                        }
-                        .into(),
-                        ds::Glue {
-                            kind: ds::GlueKind::Normal,
-                            value: common::Glue {
-                                width: common::Scaled::ZERO,
-                                stretch: common::Scaled::ZERO,
-                                stretch_order: common::GlueOrder::Normal,
-                                shrink: common::Scaled::ZERO,
-                                shrink_order: common::GlueOrder::Normal,
-                            },
-                        }
-                        .into(),
-                    ],
-                    ..Default::default()
-                }),
-            ],
-        };
+        let want_list = parse_vbox_lang(
+            r#"
+            vbox(
+                height=18.94444pt,
+                width=41.0pt,
+                content=[
+                    hbox(
+                        height=6.94444pt,
+                        width=41.0pt,
+                        glue_ratio="0.26662",
+                        glue_sign="stretching",
+                        content=[
+                            chars("Min")
+                            kern(-0.27779pt)
+                            chars("t")
+                            glue(3.33333pt, 1.66666pt, 1.11111pt)
+                            chars("and")
+                            glue()
+                        ]
+                    )
+                    penalty(300)
+                    glue(7.69446pt)
+                    hbox(
+                        height=4.30554pt,
+                        width=41.0pt,
+                        glue_ratio="28.2222",
+                        glue_sign="stretching",
+                        glue_order="fil",
+                        content=[
+                            chars("me")
+                            penalty(10000)
+                            glue(0.0pt, 1.0fil, 0.0pt)
+                            glue()
+                        ]
+                    )
+                ]
+            )
+        "#,
+        );
         let want_fonts = {
             let mut m = HashMap::new();
             m.insert("tenrm".to_string(), 0);
@@ -975,116 +914,60 @@ Transcript written on test.log.
             &mut vec!["".to_string()].iter(),
         );
 
-        let want_list = ds::VBox {
-            height: parse_scaled("6.83331"),
-            width: parse_scaled("41.0"),
-            depth: common::Scaled::ZERO,
-            shift_amount: common::Scaled::ZERO,
-            glue_ratio: ds::GlueRatio(0.0),
-            glue_sign: ds::GlueSign::Normal,
-            glue_order: common::GlueOrder::Normal,
-            list: vec![ds::Vertical::HBox(ds::HBox {
-                height: parse_scaled("6.83331"),
-                width: parse_scaled("41.0"),
-                depth: common::Scaled::ZERO,
-                list: vec![
-                    ds::Char { char: 'A', font: 0 }.into(),
-                    ds::Horizontal::HBox(ds::HBox {
-                        height: parse_scaled("6.83331"),
-                        width: parse_scaled("48.08336"),
-                        depth: common::Scaled::ZERO,
-                        list: vec![
-                            ds::Char { char: 'B', font: 0 }.into(),
-                            ds::Horizontal::VBox(ds::VBox {
-                                height: parse_scaled("6.83331"),
-                                width: parse_scaled("41.0"),
-                                depth: common::Scaled::ZERO,
-                                list: vec![ds::Vertical::HBox(ds::HBox {
-                                    height: parse_scaled("6.83331"),
-                                    width: parse_scaled("41.0"),
-                                    depth: common::Scaled::ZERO,
-                                    glue_ratio: ds::GlueRatio(6.13887),
-                                    glue_sign: ds::GlueSign::Stretching,
-                                    glue_order: common::GlueOrder::Fil,
-                                    list: vec![
-                                        ds::Horizontal::HBox(ds::HBox {
-                                            height: common::Scaled::ZERO,
-                                            width: parse_scaled("20.0"),
-                                            depth: common::Scaled::ZERO,
-                                            ..Default::default()
-                                        }),
-                                        ds::Char { char: 'C', font: 0 }.into(),
-                                        ds::Horizontal::HBox(ds::HBox {
-                                            height: parse_scaled("6.83331"),
-                                            width: parse_scaled("7.6389"),
-                                            depth: common::Scaled::ZERO,
-                                            list: vec![ds::Char { char: 'D', font: 0 }.into()],
-                                            ..Default::default()
-                                        }),
-                                        ds::Penalty(10000).into(),
-                                        ds::Glue {
-                                            kind: ds::GlueKind::Normal,
-                                            value: common::Glue {
-                                                width: common::Scaled::ZERO,
-                                                stretch: parse_scaled("1.0"),
-                                                stretch_order: common::GlueOrder::Fil,
-                                                shrink: common::Scaled::ZERO,
-                                                shrink_order: common::GlueOrder::Normal,
-                                            },
-                                        }
-                                        .into(),
-                                        ds::Glue {
-                                            kind: ds::GlueKind::Normal,
-                                            value: common::Glue {
-                                                width: common::Scaled::ZERO,
-                                                stretch: common::Scaled::ZERO,
-                                                stretch_order: common::GlueOrder::Normal,
-                                                shrink: common::Scaled::ZERO,
-                                                shrink_order: common::GlueOrder::Normal,
-                                            },
-                                        }
-                                        .into(),
-                                    ],
-                                    ..Default::default()
-                                })],
-                                ..Default::default()
-                            }),
-                        ],
-                        ..Default::default()
-                    }),
-                    ds::Penalty(10000).into(),
-                    ds::Glue {
-                        kind: ds::GlueKind::Normal,
-                        value: common::Glue {
-                            width: common::Scaled::ZERO,
-                            stretch: parse_scaled("1.0"),
-                            stretch_order: common::GlueOrder::Fil,
-                            shrink: common::Scaled::ZERO,
-                            shrink_order: common::GlueOrder::Normal,
-                        },
-                    }
-                    .into(),
-                    ds::Glue {
-                        kind: ds::GlueKind::Normal,
-                        value: common::Glue {
-                            width: common::Scaled::ZERO,
-                            stretch: common::Scaled::ZERO,
-                            stretch_order: common::GlueOrder::Normal,
-                            shrink: common::Scaled::ZERO,
-                            shrink_order: common::GlueOrder::Normal,
-                        },
-                    }
-                    .into(),
-                    ds::Rule {
-                        height: ds::Rule::RUNNING,
-                        depth: ds::Rule::RUNNING,
-                        width: parse_scaled("5.0"),
-                    }
-                    .into(),
-                ],
-                ..Default::default()
-            })],
-        };
+        let want_list = parse_vbox_lang(
+            r#"
+            vbox(
+                height=6.83331pt,
+                width=41.0pt,
+                content=[
+                    hbox(
+                        height=6.83331pt,
+                        width=41.0pt,
+                        content=[
+                            chars("A")
+                            hbox(
+                                height=6.83331pt,
+                                width=48.08336pt,
+                                content=[
+                                    chars("B")
+                                    vbox(
+                                        # todo
+                                        # height=6.83331pt,
+                                        # width=41.0pt,
+                                        content=[
+                                            hbox(
+                                                height=6.83331pt,
+                                                width=41.0pt,
+                                                glue_ratio="6.13887",
+                                                glue_sign="stretching",
+                                                glue_order="fil",
+                                                content=[
+                                                    hbox(width=20.0pt)
+                                                    chars("C")
+                                                    hbox(
+                                                        height=6.83331pt,
+                                                        width=7.6389pt,
+                                                        content=[chars("D")]
+                                                    )
+                                                    penalty(10000)
+                                                    glue(0.0pt, 1.0fil, 0.0pt)
+                                                    glue()
+                                                ]
+                                            )
+                                        ]
+                                    )
+                                ]
+                            )
+                            penalty(10000)
+                            glue(0.0pt, 1.0fil, 0.0pt)
+                            glue()
+                            rule(height="running", width=5.0pt, depth="running")
+                        ]
+                    )
+                ]
+            )
+        "#,
+        );
         let want_fonts = {
             let mut m = HashMap::new();
             m.insert("tenrm".to_string(), 0);

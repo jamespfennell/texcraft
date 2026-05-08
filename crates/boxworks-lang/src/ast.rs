@@ -225,6 +225,7 @@ impl<'a, 'b> Iterator for CstArgsIter<'a, 'b> {
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             CstArgsIter::H { elem, next } => {
+                // keep looking for argrs until next is too big?
                 let l = elem.lower_arg(*next)?;
                 *next += 1;
                 Some(l)
@@ -677,7 +678,13 @@ functions!(
     ),
     (
         struct HBox<'a> {
+            height: common::Scaled,
             width: common::Scaled,
+            depth: common::Scaled,
+            shift_amount: common::Scaled,
+            glue_ratio: Cow<'a, str>,
+            glue_order: common::GlueOrder,
+            glue_sign: boxworks::ds::GlueSign,
             content: Vec<Horizontal<'a>>,
         }
         impl Func {
@@ -713,6 +720,10 @@ functions!(
     ),
     (
         struct VBox<'a> {
+            height: common::Scaled,
+            width: common::Scaled,
+            depth: common::Scaled,
+            shift_amount: common::Scaled,
             content: Vec<Vertical<'a>>,
         }
         impl Func {
@@ -745,9 +756,9 @@ functions!(
     ),
     (
         struct Rule<'a> {
-            height: common::Scaled,
-            width: common::Scaled,
-            depth: common::Scaled,
+            height: MaybeRunning,
+            width: MaybeRunning,
+            depth: MaybeRunning,
         }
         impl Func {
             func_name: "rule",
@@ -913,6 +924,39 @@ where
     }
 }
 
+/// A rule dimension that is either a fixed length or running (i.e. determined by context).
+///
+/// Written as a dimension like `3pt` or as `*` for running in Box language.
+/// A running dimension corresponds to [`ds::Rule::RUNNING`].
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum MaybeRunning {
+    Running,
+    Scaled(common::Scaled),
+}
+
+impl Default for MaybeRunning {
+    fn default() -> Self {
+        MaybeRunning::Scaled(common::Scaled::ZERO)
+    }
+}
+
+impl MaybeRunning {
+    pub fn to_scaled(self) -> common::Scaled {
+        match self {
+            MaybeRunning::Running => common::Scaled(i32::MIN),
+            MaybeRunning::Scaled(s) => s,
+        }
+    }
+
+    pub fn from_scaled(s: common::Scaled) -> Self {
+        if s.0 == i32::MIN {
+            MaybeRunning::Running
+        } else {
+            MaybeRunning::Scaled(s)
+        }
+    }
+}
+
 /// Values in the AST.
 ///
 /// These can possibly be obtained from a [`cst::Value`]
@@ -940,6 +984,62 @@ trait Value<'a>: Sized {
     }
 
     fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>>;
+}
+
+impl<'a> Value<'a> for common::GlueOrder {
+    const DESCRIPTION: &'static str = "a glue sign (normal, stretching or shrinking)";
+    fn try_cast_string(s: Cow<'a, str>) -> Option<Self> {
+        match s.as_ref() {
+            "normal" => Some(Self::Normal),
+            "fil" => Some(Self::Fil),
+            "fill" => Some(Self::Fill),
+            "filll" => Some(Self::Filll),
+            _ => None,
+        }
+    }
+    fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>> {
+        use common::GlueOrder::*;
+        cst::ArgsItem::Regular {
+            key,
+            value: cst::Value::String(
+                match self {
+                    Normal => "normal",
+                    Fil => "fil",
+                    Fill => "fill",
+                    Filll => "filll",
+                }
+                .into(),
+            ),
+            value_source: "".into(),
+        }
+    }
+}
+
+impl<'a> Value<'a> for boxworks::ds::GlueSign {
+    const DESCRIPTION: &'static str = "a glue sign (normal, stretching or shrinking)";
+    fn try_cast_string(s: Cow<'a, str>) -> Option<Self> {
+        match s.as_ref() {
+            "normal" => Some(Self::Normal),
+            "stretching" => Some(Self::Stretching),
+            "shrinking" => Some(Self::Shrinking),
+            _ => None,
+        }
+    }
+    fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>> {
+        use boxworks::ds::GlueSign::*;
+        cst::ArgsItem::Regular {
+            key,
+            value: cst::Value::String(
+                match self {
+                    Stretching => "stretching",
+                    Shrinking => "shrinking",
+                    Normal => "normal",
+                }
+                .into(),
+            ),
+            value_source: "".into(),
+        }
+    }
 }
 
 impl<'a> Value<'a> for char {
@@ -999,6 +1099,31 @@ impl<'a> Value<'a> for common::Scaled {
         cst::ArgsItem::Regular {
             key,
             value: cst::Value::Scaled(*self),
+            value_source: "".into(),
+        }
+    }
+}
+
+impl<'a> Value<'a> for MaybeRunning {
+    const DESCRIPTION: &'static str = "a dimension or *";
+    fn try_cast_scaled(s: common::Scaled) -> Option<Self> {
+        Some(MaybeRunning::Scaled(s))
+    }
+    fn try_cast_string(s: Cow<'a, str>) -> Option<Self> {
+        if s == "running" {
+            Some(MaybeRunning::Running)
+        } else {
+            None
+        }
+    }
+    fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>> {
+        let value = match self {
+            MaybeRunning::Running => cst::Value::String("running".into()),
+            MaybeRunning::Scaled(s) => cst::Value::Scaled(*s),
+        };
+        cst::ArgsItem::Regular {
+            key,
+            value,
             value_source: "".into(),
         }
     }

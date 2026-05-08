@@ -229,7 +229,7 @@ impl HBox {
                     match total_glue.stretch_order.cmp(&glue.value.stretch_order) {
                         Less => {
                             total_glue.stretch = glue.value.stretch;
-                            total_glue.stretch_order = glue.value.shrink_order;
+                            total_glue.stretch_order = glue.value.stretch_order;
                         }
                         Equal => {
                             total_glue.stretch += glue.value.stretch;
@@ -264,7 +264,29 @@ impl HBox {
             PackWidth::Additional(additional) => natural_width + additional,
         };
         let excess = hbox.width - natural_width;
-        _ = excess;
+        use std::cmp::Ordering::*;
+        match excess.cmp(&common::Scaled::ZERO) {
+            Less => {
+                // TeX.2021.664
+                hbox.glue_sign = GlueSign::Shrinking;
+                hbox.glue_order = total_glue.shrink_order;
+                hbox.glue_ratio = GlueRatio((-excess.0 as f32) / (total_glue.shrink.0 as f32));
+            }
+            Equal => {
+                // Do nothing: hbox defaults cover this case.
+            }
+            Greater => {
+                // TeX.2021.658
+                if total_glue.stretch != common::Scaled::ZERO {
+                    hbox.glue_sign = GlueSign::Stretching;
+                    hbox.glue_order = total_glue.stretch_order;
+                    hbox.glue_ratio = GlueRatio((excess.0 as f32) / (total_glue.stretch.0 as f32));
+                }
+                if total_glue.stretch_order == GlueOrder::Normal {
+                    // TODO(TeX.2021.660): report an underfull box
+                }
+            }
+        }
         hbox
     }
 }
@@ -285,8 +307,18 @@ pub struct GlueRatio(pub f32);
 // TODO: ensure that glue ratio cannot be NaN
 impl Eq for GlueRatio {}
 
+impl std::fmt::Display for GlueRatio {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TeX.2021.186
+        let g = self.0;
+        let g = if g.abs() >= 20000.0 { 20000.0 } else { g };
+        let g = ((common::Scaled::ONE.0 as f32) * g).round() as i32;
+        write!(f, "{}", common::Scaled(g).display_no_units())
+    }
+}
+
 /// Description of whether the glue should stretch, shrink, or remain rigid.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum GlueSign {
     Stretching,
     Shrinking,
