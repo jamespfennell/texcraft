@@ -314,7 +314,14 @@ pub struct GlueRatio {
 
 impl PartialEq for GlueRatio {
     fn eq(&self, other: &Self) -> bool {
-        (self.num.0 as i64) * (other.den.0 as i64) == (other.num.0 as i64) * (self.den.0 as i64)
+        // We would prefer to use:
+        // (self.num.0 as i64) * (other.den.0 as i64) == (other.num.0 as i64) * (self.den.0 as i64)
+        // but the maping from ratios to floats and back to ratios is unfortunately
+        // lossy. A better approach might be to "canonicalize" glue ratios when we construct
+        // them. This would be equivalent to writing the string and parsing it back in.
+        let lhs = format!["{}", self];
+        let rhs = format!["{}", other];
+        lhs == rhs
     }
 }
 

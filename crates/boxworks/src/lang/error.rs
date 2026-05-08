@@ -61,6 +61,9 @@ pub enum Error<'a> {
         skipped: Str<'a>,
     },
 
+    /// An unknown escape sequence like `\a`.
+    UnknownEscapeSequence { sequence: Str<'a> },
+
     /// A function name appeared without any arguments
     MissingArgsForFunction { function_name: Str<'a> },
 
@@ -103,6 +106,9 @@ impl<'a> Error<'a> {
             }
             UnexpectedToken { want, .. } => {
                 format!["Unexpected token while looking for {want}"]
+            }
+            UnknownEscapeSequence { sequence } => {
+                format!["Unknown escape sequence {sequence}"]
             }
             MissingArgsForFunction { function_name } => {
                 format!["No arguments provided for '{function_name}'"]
@@ -225,6 +231,12 @@ impl<'a> Error<'a> {
                             text: "this source code will be skipped".to_string(),
                         },
                     ],
+                    UnknownEscapeSequence { sequence } => vec![
+                        ErrorLabel {
+                            span: sequence.span(),
+                            text: "unknown escape sequence".to_string(),
+                        },
+                    ],
             MissingArgsForFunction { function_name } => vec![
                         ErrorLabel {
                             span: function_name.span(),
@@ -294,6 +306,7 @@ MultipleDecimalPoints { point } => vec![
             | NoSuchArgument { .. }
             | DuplicateArgument { .. }
             | NoSuchFunction { .. }
+            | UnknownEscapeSequence { .. }
             | IncompleteKeywordArg { .. }
             | InvalidDimensionUnit { .. }
             | MultipleDecimalPoints { .. }

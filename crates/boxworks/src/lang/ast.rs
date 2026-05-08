@@ -1029,7 +1029,7 @@ impl<'a> Value<'a> for crate::ds::GlueRatio {
 }
 
 impl<'a> Value<'a> for char {
-    const DESCRIPTION: &'static str = "a character";
+    const DESCRIPTION: &'static str = "a character (i.e. a string containing single character)";
     fn try_cast_string(s: Cow<'a, str>) -> Option<Self> {
         let mut iter = s.chars();
         let c = iter.next()?;

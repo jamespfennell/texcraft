@@ -881,7 +881,6 @@ fn get_next_line_class(active_nodes: &VecDeque<ActiveNode>, max: usize) -> (Line
 #[cfg(test)]
 mod tests {
     use super::*;
-    use boxworks::lang as bwl;
     use boxworks::TextPreprocessor;
     use boxworks_text as bwt;
     use pretty_assertions::assert_eq;
@@ -972,10 +971,8 @@ mod tests {
             list: v_list,
             ..Default::default()
         };
-        use bwl::convert::ToBoxLang;
-        let got = format!("{}", v_box.to_box_lang());
         if let Some(want) = want {
-            assert_eq!(want.trim(), got.trim());
+            boxworks_testing::assert_box_eq!(want, v_box);
         }
     }
 

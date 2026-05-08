@@ -16,4 +16,5 @@ boxworks-hyphenate = { path = "../boxworks-hyphenate" }
 [dev-dependencies]
 tfm = { path = "../tfm" }
 boxworks-text = { path = "../boxworks-text" }
+boxworks-testing = { path = "../boxworks-testing" }
 pretty_assertions = {version = "1.4.1" }

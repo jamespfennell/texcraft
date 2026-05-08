@@ -213,10 +213,21 @@ version = "0.1.0"
 dependencies = [
  "boxworks",
  "boxworks-hyphenate",
+ "boxworks-testing",
  "boxworks-text",
  "common",
  "pretty_assertions",
  "tfm",
+]
+
+[[package]]
+name = "boxworks-testing"
+version = "0.1.0"
+dependencies = [
+ "ariadne",
+ "boxworks",
+ "common",
+ "pretty_assertions",
 ]
 
 [[package]]

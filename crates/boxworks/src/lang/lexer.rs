@@ -253,7 +253,7 @@ impl<'a> Iterator for Lexer<'a> {
                         return None;
                     };
                     self.l += n.len_utf8();
-                    match n {
+                    let c: char = match n {
                         '"' => {
                             break;
                         }
@@ -268,9 +268,11 @@ impl<'a> Iterator for Lexer<'a> {
                             };
                             self.l += n.len_utf8();
                             match n {
-                                '\"' | '\\' => {
-                                    buf.push(n);
-                                }
+                                '\"' | '\'' | '\\' => n,
+                                'n' => '\n',
+                                't' => '\t',
+                                '0' => '\0',
+                                'r' => '\r',
                                 'u' => {
                                     if iter.next() != Some('{') {
                                         // TODO error
@@ -306,17 +308,23 @@ impl<'a> Iterator for Lexer<'a> {
                                         // TODO: error
                                         continue;
                                     };
-                                    buf.push(c);
+                                    c
                                 }
                                 _ => {
-                                    // TODO: error for unexpected special character
+                                    self.errs.add(Error::UnknownEscapeSequence {
+                                        sequence: Str {
+                                            value: self.s,
+                                            start: self.l - n.len_utf8() - 1,
+                                            end: self.l,
+                                        },
+                                    });
+                                    continue;
                                 }
                             }
                         }
-                        _ => {
-                            buf.push(n);
-                        }
-                    }
+                        _ => n,
+                    };
+                    buf.push(c);
                 }
                 // If the string is exactly in this source (e.g. no special control sequences)
                 // then we can avoid an allocation.
