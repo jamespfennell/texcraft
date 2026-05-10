@@ -113,7 +113,7 @@ pub fn build_horizontal_lists(
     hyphenated: bool,
 ) -> (HashMap<String, u32>, Vec<ds::HBox>) {
     let macro_calls: Vec<String> = contents.map(|s| format!(r#"\printBox{{{s}}}"#)).collect();
-    let box_template = r"\vbox{{\hbox{{#1}}\noindent \pretolerance=-1 \hsize=16383pt #1}}";
+    let box_template = r"\vbox{\hbox{#1} \pretolerance=-1 \hsize=16383pt \noindent  #1}";
     let tex_source_code = CONVERT_TEXT_TEMPLATE
         .replace("<preamble>", preamble)
         .replace("<box_template>", box_template)
@@ -143,12 +143,10 @@ pub fn build_horizontal_lists(
                     }
                 }
             }
-            let h_box = h_box.unwrap();
-            let h_box_hyphenated = h_box_hyphenated.unwrap();
             if hyphenated {
-                h_box_hyphenated
+                h_box_hyphenated.unwrap()
             } else {
-                h_box
+                h_box.unwrap()
             }
         })
         .collect();
