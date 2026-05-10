@@ -12,6 +12,9 @@ keywords = ["tex", "texcraft"]
 common = { path = "../common", features=[] }
 ariadne = {version="0.5.0", default-features = false, optional = true}
 
+[dev-dependencies]
+pretty_assertions = {version = "1.4.1" }
+
 [features]
 default = []
 ariadne = ["dep:ariadne"]

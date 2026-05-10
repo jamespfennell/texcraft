@@ -479,6 +479,6 @@ hlist(
 )
 "#;
         let got = format(&input).unwrap();
-        assert_eq!(got, want);
+        pretty_assertions::assert_eq!(got, want);
     }
 }

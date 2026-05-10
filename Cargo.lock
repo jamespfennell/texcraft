@@ -181,6 +181,7 @@ version = "0.1.0"
 dependencies = [
  "ariadne",
  "common",
+ "pretty_assertions",
 ]
 
 [[package]]

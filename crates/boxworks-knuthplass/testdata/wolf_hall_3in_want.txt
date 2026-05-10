@@ -39,8 +39,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("ney", font=0)
@@ -79,8 +78,7 @@ vbox(
             chars("v", font=0)
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=2,
         )
         chars("v", font=0)
@@ -100,8 +98,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("ined", font=0)
@@ -113,8 +110,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("ing", font=0)
@@ -186,8 +182,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("ture", font=0)
@@ -240,8 +235,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("eign", font=0)
@@ -253,8 +247,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("ple", font=0)
@@ -263,10 +256,8 @@ vbox(
         glue(3.33333pt, 1.66666pt, 1.11111pt)
         chars("some", font=0)
         disc(
-          pre_break=[
-          ],
-          post_break=[
-          ],
+          pre_break=[],
+          post_break=[],
           replace_count=0,
         )
         chars("-", font=0)
@@ -292,8 +283,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("riv", font=0)
@@ -354,8 +344,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("ble", font=0)
@@ -369,8 +358,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("men", font=0)
@@ -397,8 +385,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("co", font=0)
@@ -414,8 +401,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("sides", font=0)
@@ -444,8 +430,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("grance", font=0)
@@ -461,8 +446,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("ing", font=0)
@@ -515,8 +499,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("neys", font=0)
@@ -559,8 +542,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("ra", font=0)
@@ -568,8 +550,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("cotta,", font=0)
@@ -600,8 +581,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("other", font=0)
@@ -611,8 +591,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("mate,", font=0)
@@ -627,8 +606,7 @@ vbox(
             chars("w", font=0)
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=2,
         )
         chars("w", font=0)
@@ -667,8 +645,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("ples", font=0)
@@ -715,8 +692,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("ton,", font=0)
@@ -734,8 +710,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("der", font=0)
@@ -782,8 +757,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("ine", font=0)
@@ -794,8 +768,7 @@ vbox(
             chars("m", font=0)
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=2,
         )
         chars("m", font=0)
@@ -821,8 +794,7 @@ vbox(
           pre_break=[
             chars("-", font=0)
           ],
-          post_break=[
-          ],
+          post_break=[],
           replace_count=0,
         )
         chars("ther.", font=0)

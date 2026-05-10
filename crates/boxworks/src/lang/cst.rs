@@ -190,7 +190,18 @@ fn pretty_print_impl<'a, W: std::fmt::Write, T: TreeIter<'a>>(
         indent: depth,
         ..Default::default()
     };
-    for item in tree {
+    // If this is not the root tree, print the opening brace.
+    if depth.checked_sub(2).is_some() {
+        write!(w, "[")?;
+    }
+    let mut has_items = false;
+    for (i, item) in tree.enumerate() {
+        if i == 0 {
+            has_items = true;
+            if depth.checked_sub(2).is_some() {
+                writeln!(w)?;
+            }
+        }
         match item {
             TreeItem::FuncCall { func_name, args } => {
                 write!(w, "{indent}{func_name}(")?;
@@ -213,13 +224,12 @@ fn pretty_print_impl<'a, W: std::fmt::Write, T: TreeIter<'a>>(
                             tree,
                         } => {
                             ap.activate_multiline(w)?;
+                            //
                             write!(w, "\n{indent}  ")?;
                             if let Some(key) = key {
                                 write!(w, "{key}=")?;
                             }
-                            writeln!(w, "[")?;
                             pretty_print_impl(w, tree, depth + 4)?;
-                            write!(w, "{indent}  ],")?;
                         }
                     }
                 }
@@ -230,6 +240,14 @@ fn pretty_print_impl<'a, W: std::fmt::Write, T: TreeIter<'a>>(
                 writeln!(w, "{indent}#{value}")?;
             }
         };
+    }
+    // If this is not the root tree, print the closing brace.
+    if let Some(prev_depth) = depth.checked_sub(2) {
+        if has_items {
+            write!(w, "{}],", Indent(prev_depth))?;
+        } else {
+            write!(w, "],")?;
+        }
     }
     Ok(())
 }
