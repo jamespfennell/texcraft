@@ -118,6 +118,10 @@ struct Hbox {
     /// Empty lines are ignored. Each non-empty line is converted into a separate horizontal list.
     #[clap(long)]
     texts_file: Option<PathBuf>,
+
+    /// Run the hyphenation algorithm on the text before boxing it.
+    #[clap(long)]
+    hyphenate: bool,
 }
 
 impl Hbox {
@@ -143,7 +147,12 @@ impl Hbox {
         };
         let labels = make_labels(self.texts.len(), num_direct, &file_line_numbers);
         let hboxs = match tex_engine {
-            Some(engine) => run_tex_hboxs(engine.as_ref(), self.texts, self.font_metrics)?,
+            Some(engine) => run_tex_hboxs(
+                engine.as_ref(),
+                self.texts,
+                self.font_metrics,
+                self.hyphenate,
+            )?,
             None => run_box_hboxs(self.texts, self.font_metrics)?,
         };
         print_hboxs(hboxs, labels);
@@ -379,10 +388,16 @@ fn run_tex_hboxs(
     tex_engine: &dyn bwt::TexEngine,
     texts: Vec<String>,
     font_metrics: Option<PathBuf>,
+    hyphenated: bool,
 ) -> Result<Vec<bwl::ast::HBox<'static>>, String> {
     let (auxiliary_files, preamble) = build_tex_context(font_metrics)?;
-    let (fonts, hboxs) =
-        bwt::build_horizontal_lists(tex_engine, &auxiliary_files, &preamble, &mut texts.iter());
+    let (fonts, hboxs) = bwt::build_horizontal_lists(
+        tex_engine,
+        &auxiliary_files,
+        &preamble,
+        &mut texts.iter(),
+        hyphenated,
+    );
     _ = fonts;
     use bwl::convert::ToBoxLang;
     Ok(hboxs.into_iter().map(|l| l.to_box_lang()).collect())

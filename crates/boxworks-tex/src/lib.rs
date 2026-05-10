@@ -110,17 +110,47 @@ pub fn build_horizontal_lists(
     auxiliary_files: &HashMap<PathBuf, Vec<u8>>,
     preamble: &str,
     contents: &mut dyn Iterator<Item = &String>,
+    hyphenated: bool,
 ) -> (HashMap<String, u32>, Vec<ds::HBox>) {
     let macro_calls: Vec<String> = contents.map(|s| format!(r#"\printBox{{{s}}}"#)).collect();
+    let box_template = r"\vbox{{\hbox{{#1}}\noindent \pretolerance=-1 \hsize=16383pt #1}}";
     let tex_source_code = CONVERT_TEXT_TEMPLATE
         .replace("<preamble>", preamble)
-        .replace("<box_template>", r"\hbox{#1}")
+        .replace("<box_template>", box_template)
         .replace("<print_calls>", &macro_calls.join("\n\n"));
     let output = tex_engine.run(&tex_source_code, auxiliary_files);
     let segments = extract_texcraft_segments(&output);
     let mut fonts: HashMap<String, u32> = Default::default();
     let hlists = segments
-        .map(|s| parse_hlist(&mut TexOutputIter::new(s), &mut fonts).unwrap())
+        .map(|s| {
+            let v_box = parse_vlist(&mut TexOutputIter::new(s), &mut fonts).unwrap();
+
+            let mut h_box = None;
+            let mut h_box_hyphenated = None;
+            for elem in v_box.list {
+                if let ds::Vertical::HBox(mut next_h_box) = elem {
+                    match &mut h_box {
+                        None => h_box = Some(next_h_box),
+                        Some(ref mut first_hbox) => {
+                            next_h_box.width = first_hbox.width;
+                            // remove the 3 items that the line-breaking algorithm sticks on.
+                            next_h_box.list.pop();
+                            next_h_box.list.pop();
+                            next_h_box.list.pop();
+                            h_box_hyphenated = Some(next_h_box);
+                            break;
+                        }
+                    }
+                }
+            }
+            let h_box = h_box.unwrap();
+            let h_box_hyphenated = h_box_hyphenated.unwrap();
+            if hyphenated {
+                h_box_hyphenated
+            } else {
+                h_box
+            }
+        })
         .collect();
     (fonts, hlists)
 }
@@ -945,37 +975,66 @@ mod tests {
 
     #[test]
     fn test_build_horizontal_lists() {
-        let log = r#"This is TeX, Version 3.141592653 (TeX Live 2024) (preloaded format=tex)
-(./tmp/test.tex
+        let log = r#"This is TeX, Version 3.141592653 (TeX Live 2024) (preloaded format=tex 2025.1.20)  9 MAY 2026 22:47
+**/var/folders/tk/q1zszl0n7c34crg980zs_0lw0000gn/T/tex-input.tex
+(/var/folders/tk/q1zszl0n7c34crg980zs_0lw0000gn/T/tex-input.tex
+@firstpass
+\customFont Mint and me
+@\par via @@0 b=0 p=-10000 d=100
+@@1: line 1.2- t=100 -> @@0
+
 
 Texcraft: begin
 > \box0=
-\hbox(6.94444+0.0)x56.66678
-.\tenrm M
-.\tenrm i
-.\tenrm n
-.\kern-0.27779
-.\tenrm t
-.\glue 3.33333 plus 1.66666 minus 1.11111
-.\tenrm a
-.\tenrm n
-.\tenrm d
-.\glue 3.33333 plus 1.66666 minus 1.11111
-.\tenrm m
-.\tenrm e
+\vbox(18.94444+0.0)x469.75499
+.\hbox(6.94444+0.0)x56.66678
+..\customFont M
+..\customFont i
+..\customFont n
+..\kern-0.27779
+..\customFont t
+..\glue 3.33333 plus 1.66666 minus 1.11111
+..\customFont a
+..\customFont n
+..\customFont d
+..\glue 3.33333 plus 1.66666 minus 1.11111
+..\customFont m
+..\customFont e
+.\glue(\parskip) 0.0 plus 1.0
+.\glue(\baselineskip) 5.05556
+.\hbox(6.94444+0.0)x469.75499, glue set 413.08821fil
+..\customFont M
+..\customFont i
+..\customFont n
+..\kern-0.27779
+..\customFont t
+..\glue 3.33333 plus 1.66666 minus 1.11111
+..\customFont a
+..\customFont n
+..\customFont d
+..\glue 3.33333 plus 1.66666 minus 1.11111
+..\customFont m
+..\customFont e
+..\penalty 10000
+..\glue(\parfillskip) 0.0 plus 1.0fil
+..\glue(\rightskip) 0.0
 
 ! OK.
-\printBox ...Message {Texcraft: begin} \showbox 0 
-                                                  \par \fullLineMessage {Tex...
-l.31 \printBox{Mint and me}
-                           
+\printBox ...Message {Texcraft: begin} \showbox 0
+                                                    \par \fullLineMessage {Tex...
+l.45 \printBox{Mint and me}
+
+
 
 Texcraft: end
- )
-(see the transcript file for additional information)
-No pages of output.
-Transcript written on test.log.
-"#;
+@firstpass
+[]\customFont We add some text at the end.
+@\par via @@0 b=0 p=-10000 d=100
+@@1: line 1.2- t=100 -> @@0
+
+[1] )
+Output written on tex-input.dvi (1 page, 244 bytes).
+        "#;
 
         let tex_engine = MockTexEngine(log.to_string());
         let (got_fonts, got_list) = build_horizontal_lists(
@@ -983,6 +1042,7 @@ Transcript written on test.log.
             &Default::default(),
             &"",
             &mut vec!["".to_string()].iter(),
+            false,
         );
 
         let want_list = parse_hbox_lang(
@@ -1004,7 +1064,7 @@ Transcript written on test.log.
         );
         let want_fonts = {
             let mut m = HashMap::new();
-            m.insert("tenrm".to_string(), 0);
+            m.insert("customFont".to_string(), 0);
             m
         };
 
