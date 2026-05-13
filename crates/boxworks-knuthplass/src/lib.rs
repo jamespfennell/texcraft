@@ -22,6 +22,7 @@ pub struct Params {
     pub club_penalty: i32,
     pub ex_hyphen_penalty: i32,
     pub final_hyphen_demerits: i32,
+    // TODO: this is actually different for each invocation. Make it so!
     pub final_widow_penalty: i32,
     pub hyphen_penalty: i32,
     pub inter_line_penalty: i32,
@@ -66,6 +67,47 @@ impl Params {
             right_skip: common::Glue::ZERO,
             tolerance: 200,
         }
+    }
+
+    /// Output the parameters in TeX format.
+    pub fn tex(&self) -> String {
+        let Params {
+            adj_demerits,
+            broken_penalty,
+            double_hyphen_demerits,
+            club_penalty,
+            ex_hyphen_penalty,
+            final_hyphen_demerits,
+            final_widow_penalty: _,
+            hyphen_penalty,
+            inter_line_penalty,
+            left_skip,
+            line_penalty,
+            looseness,
+            par_fill_skip,
+            pre_tolerance,
+            right_skip,
+            tolerance,
+        } = self;
+        format!(
+            r"
+            \adjdemerits={adj_demerits}
+            \brokenpenalty={broken_penalty}
+            \clubpenalty={club_penalty}
+            \doublehyphendemerits={double_hyphen_demerits}
+            \exhyphenpenalty={ex_hyphen_penalty}
+            \finalhyphendemerits={final_hyphen_demerits}
+            \hyphenpenalty={hyphen_penalty}
+            \interlinepenalty={inter_line_penalty}
+            \leftskip={left_skip}
+            \linepenalty={line_penalty}
+            \looseness={looseness}
+            \parfillskip={par_fill_skip}
+            \pretolerance={pre_tolerance}
+            \rightskip={right_skip}
+            \tolerance={tolerance}
+        "
+        )
     }
 }
 

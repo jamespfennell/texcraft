@@ -1,7 +1,7 @@
 use boxworks::lang as bwl;
+use boxworks::tex as bwt;
 use boxworks::LineBreaker;
 use boxworks::TextPreprocessor;
-use boxworks_tex as bwt;
 use clap::Parser;
 use std::collections::HashMap;
 use std::fs;
@@ -499,13 +499,13 @@ fn run_tex_vlists(
     widths: &[common::Scaled],
     params: &boxworks_knuthplass::Params,
 ) -> Result<Vec<bwl::ast::VBox<'static>>, String> {
-    let (auxiliary_files, preamble) = build_tex_context(font_metrics)?;
+    let (auxiliary_files, mut preamble) = build_tex_context(font_metrics)?;
+    preamble.push_str(&params.tex());
     let (_, vlists) = bwt::build_vertical_lists(
         tex_engine,
         &auxiliary_files,
         &preamble,
         widths,
-        params,
         &mut texts.iter(),
     );
     use bwl::convert::ToBoxLang;

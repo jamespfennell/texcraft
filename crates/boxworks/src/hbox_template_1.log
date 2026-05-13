@@ -1,0 +1,96 @@
+This is TeX, Version 3.141592653 (TeX Live 2024) (preloaded format=tex 2025.1.20)  11 MAY 2026 20:15
+**/var/folders/tk/q1zszl0n7c34crg980zs_0lw0000gn/T/tex-input.tex
+(/var/folders/tk/q1zszl0n7c34crg980zs_0lw0000gn/T/tex-input.tex
+
+internal horizontal box start
+> \box253=
+\hbox(6.94444+0.0)x56.66678
+.\customFont M
+.\customFont i
+.\customFont n
+.\kern-0.27779
+.\customFont t
+.\glue 3.33333 plus 1.66666 minus 1.11111
+.\customFont a
+.\customFont n
+.\customFont d
+.\glue 3.33333 plus 1.66666 minus 1.11111
+.\customFont m
+.\customFont e
+
+! OK.
+\buildAndPrintBoxes ...53=\hbox {#1} \showbox 253 
+                                                  \fullLineMessage {internal...
+l.69 \buildAndPrintBoxes{Mint and me}
+                                     
+
+
+internal horiztonal box end
+
+unhyphenated hlist start
+
+### horizontal mode entered at line 69
+\customFont M
+\customFont i
+\customFont n
+\kern-0.27779
+\customFont t
+\glue 3.33333 plus 1.66666 minus 1.11111
+\customFont a
+\customFont n
+\customFont d
+\glue 3.33333 plus 1.66666 minus 1.11111
+\customFont m
+\customFont e
+spacefactor 1000
+### vertical mode entered at line 0
+prevdepth ignored
+
+! OK.
+\buildAndPrintBoxes ...ted hlist start}\showlists 
+                                                  \fullLineMessage {unhyphen...
+l.69 \buildAndPrintBoxes{Mint and me}
+                                     
+
+
+unhyphenated hlist end
+\customFont Mint and me 
+@\par via @@0 b=0 p=-10000 d=*
+@@1: line 1.2- t=0 -> @@0
+
+
+hyphenated hlist start
+
+### vertical mode entered at line 0
+### current page:
+\glue(\topskip) 3.05556
+\hbox(6.94444+0.0)x16383.0, glue set 16326.33322fil
+.\customFont M
+.\customFont i
+.\customFont n
+.\kern-0.27779
+.\customFont t
+.\glue 3.33333 plus 1.66666 minus 1.11111
+.\customFont a
+.\customFont n
+.\customFont d
+.\glue 3.33333 plus 1.66666 minus 1.11111
+.\customFont m
+.\customFont e
+.\penalty 10000
+.\glue(\parfillskip) 0.0 plus 1.0fil
+.\glue(\rightskip) 0.0
+total height 10.0
+ goal height 643.20255
+prevdepth 0.0, prevgraf 1 line
+
+! OK.
+\buildAndPrintBoxes ...ted hlist start}\showlists 
+                                                  \fullLineMessage {hyphenat...
+l.69 \buildAndPrintBoxes{Mint and me}
+                                     
+
+
+hyphenated hlist end
+[1] )
+Output written on tex-input.dvi (1 page, 128 bytes).

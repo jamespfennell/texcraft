@@ -193,7 +193,6 @@ dependencies = [
  "boxworks",
  "boxworks-hyphenate",
  "boxworks-knuthplass",
- "boxworks-tex",
  "boxworks-text",
  "clap 4.4.8",
  "common",
@@ -230,15 +229,6 @@ dependencies = [
  "boxworks",
  "common",
  "pretty_assertions",
-]
-
-[[package]]
-name = "boxworks-tex"
-version = "0.1.0"
-dependencies = [
- "boxworks",
- "boxworks-knuthplass",
- "common",
 ]
 
 [[package]]

@@ -13,7 +13,7 @@
 //! These functions require that TeX is installed
 //!     because they ultimately invoke TeX to generate the right diagnostic information.
 
-use boxworks::ds;
+use crate::ds;
 use std::{collections::HashMap, path::PathBuf};
 
 /// Implementations of this trait can run TeX source code and return stdout.
@@ -205,25 +205,8 @@ pub fn build_vertical_lists(
     auxiliary_files: &HashMap<PathBuf, Vec<u8>>,
     preamble: &str,
     widths: &[common::Scaled],
-    params: &boxworks_knuthplass::Params,
     contents: &mut dyn Iterator<Item = &String>,
 ) -> (HashMap<String, u32>, Vec<ds::VBox>) {
-    let params_preamble = format!(
-        "\n\\adjdemerits={}\n\\doublehyphendemerits={}\n\\exhyphenpenalty={}\n\\finalhyphendemerits={}\n\\hyphenpenalty={}\n\\leftskip={}\n\\linepenalty={}\n\\looseness={}\n\\parfillskip={}\n\\pretolerance={}\n\\rightskip={}\n\\tolerance={}\n",
-        params.adj_demerits,
-        params.double_hyphen_demerits,
-        params.ex_hyphen_penalty,
-        params.final_hyphen_demerits,
-        params.hyphen_penalty,
-        params.left_skip,
-        params.line_penalty,
-        params.looseness,
-        params.par_fill_skip,
-        params.pre_tolerance,
-        params.right_skip,
-        params.tolerance,
-    );
-    let combined_preamble = format!("{preamble}{params_preamble}");
     let last_width = *widths.last().expect("widths is non-empty");
     let box_template = if widths.len() == 1 {
         format!(r"\vbox{{\noindent \hsize={} #1}}", last_width)
@@ -238,7 +221,7 @@ pub fn build_vertical_lists(
     };
     let macro_calls: Vec<String> = contents.map(|s| format!(r#"\printBox{{{s}}}"#)).collect();
     let tex_source_code = CONVERT_TEXT_TEMPLATE
-        .replace("<preamble>", &combined_preamble)
+        .replace("<preamble>", preamble)
         .replace("<box_template>", &box_template)
         .replace("<print_calls>", &macro_calls.join("\n\n"));
     let output = tex_engine.run(&tex_source_code, auxiliary_files);
@@ -1002,7 +985,7 @@ mod tests {
     use super::*;
 
     fn parse_hbox_lang(source: &str) -> ds::HBox {
-        let mut list = boxworks::lang::parse_horizontal_list(source).unwrap();
+        let mut list = crate::lang::parse_horizontal_list(source).unwrap();
         assert_eq!(list.len(), 1);
         match list.remove(0) {
             ds::Horizontal::HBox(hbox) => hbox,
@@ -1011,7 +994,7 @@ mod tests {
     }
 
     fn parse_vbox_lang(source: &str) -> ds::VBox {
-        let mut list = boxworks::lang::parse_horizontal_list(source).unwrap();
+        let mut list = crate::lang::parse_horizontal_list(source).unwrap();
         assert_eq!(list.len(), 1);
         match list.remove(0) {
             ds::Horizontal::VBox(mut vbox) => {
@@ -1076,7 +1059,7 @@ mod tests {
 
     #[test]
     fn test_discretionary_pre_and_post_break() {
-        let input = r"> \box0=
+        let input = r"> \box0=x
 \hbox(6.94444+0.0)x10.0
 .\discretionary replacing 3
 ..\tenrm d
@@ -1150,7 +1133,6 @@ Transcript written on test.log.
             &Default::default(),
             &"",
             &[common::Scaled::ONE * 41],
-            &boxworks_knuthplass::Params::default(),
             &mut vec!["".to_string()].iter(),
         );
 
@@ -1246,7 +1228,6 @@ Transcript written on test.log.
             &Default::default(),
             &"",
             &[common::Scaled::ONE * 41],
-            &boxworks_knuthplass::Params::default(),
             &mut vec!["".to_string()].iter(),
         );
 

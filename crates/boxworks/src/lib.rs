@@ -7,6 +7,7 @@
 
 pub mod ds;
 pub mod lang;
+pub mod tex;
 
 pub trait TextPreprocessor {
     fn new_paragraph(&mut self);
