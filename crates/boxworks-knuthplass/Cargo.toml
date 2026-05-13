@@ -11,10 +11,10 @@ keywords = ["tex", "texcraft"]
 [dependencies]
 common = { path = "../common", version="0.1.0" }
 boxworks = { path = "../boxworks", version="0.1.0" }
-boxworks-hyphenate = { path = "../boxworks-hyphenate" }
 
 [dev-dependencies]
 tfm = { path = "../tfm" }
+boxworks-hyphenate = { path = "../boxworks-hyphenate" }
 boxworks-text = { path = "../boxworks-text" }
 boxworks-testing = { path = "../boxworks-testing" }
 pretty_assertions = {version = "1.4.1" }

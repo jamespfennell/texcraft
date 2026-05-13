@@ -6,7 +6,7 @@
 //! TeX (starting in TeX.2021.1029).
 
 use boxworks::ds;
-use std::{collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 use tfm::ligkern;
 
 #[derive(Debug)]
@@ -102,25 +102,45 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
         struct Emitter<'a>(&'a mut Vec<ds::Horizontal>, u32);
         impl<'a> ligkern::Emitter for Emitter<'a> {
             fn emit_character(&mut self, c: char) {
-                self.0.push(ds::Horizontal::Char(ds::Char {
-                    char: c,
-                    font: self.1,
-                }));
+                self.0.push(
+                    ds::Char {
+                        char: c,
+                        font: self.1,
+                    }
+                    .into(),
+                );
+                // TeX.2021.1035
+                // TODO: \hyphenchar
+                if c == '-' {
+                    self.0.push(ds::Discretionary::default().into());
+                }
             }
             fn emit_kern(&mut self, kern: common::Scaled) {
-                self.0.push(ds::Horizontal::Kern(ds::Kern {
-                    width: kern,
-                    kind: ds::KernKind::Normal,
-                }));
+                self.0.push(
+                    ds::Kern {
+                        width: kern,
+                        kind: ds::KernKind::Normal,
+                    }
+                    .into(),
+                );
             }
-            fn emit_ligature(&mut self, c: char, original: Rc<str>) {
-                self.0.push(ds::Horizontal::Ligature(ds::Ligature {
-                    included_left_boundary: false,
-                    included_right_boundary: false,
-                    char: c,
-                    font: self.1,
-                    original_chars: original,
-                }));
+            fn emit_ligature(&mut self, ligature: ligkern::Ligature) {
+                let ins_disc = ligature.original.as_ref().ends_with('-');
+                self.0.push(
+                    ds::Ligature {
+                        included_left_boundary: false,
+                        included_right_boundary: false,
+                        char: ligature.c,
+                        font: self.1,
+                        original_chars: ligature.original,
+                    }
+                    .into(),
+                );
+                // TeX.2021.1035
+                // TODO: \hyphenchar
+                if ins_disc {
+                    self.0.push(ds::Discretionary::default().into());
+                }
             }
         }
 

@@ -98,6 +98,8 @@ impl TexEngine for TexEngineBinary {
     }
 }
 
+const HBOX_TEMPLATE: &str = include_str!("hbox_template.tex");
+
 /// Build horizontal lists from some text.
 ///
 /// This function works by putting the text inside a TeX `\hbox{}`,
@@ -110,47 +112,84 @@ pub fn build_horizontal_lists(
     auxiliary_files: &HashMap<PathBuf, Vec<u8>>,
     preamble: &str,
     contents: &mut dyn Iterator<Item = &String>,
-    hyphenated: bool,
+    hyphenate: bool,
 ) -> (HashMap<String, u32>, Vec<ds::HBox>) {
-    let macro_calls: Vec<String> = contents.map(|s| format!(r#"\printBox{{{s}}}"#)).collect();
-    let box_template = r"\vbox{\hbox{#1} \pretolerance=-1 \hsize=16383pt \noindent  #1}";
-    let tex_source_code = CONVERT_TEXT_TEMPLATE
+    let macro_calls: Vec<String> = contents
+        .map(|s| format!(r#"\buildAndPrintBoxes{{{s}}}"#))
+        .collect();
+    let tex_source_code = HBOX_TEMPLATE
         .replace("<preamble>", preamble)
-        .replace("<box_template>", box_template)
         .replace("<print_calls>", &macro_calls.join("\n\n"));
     let output = tex_engine.run(&tex_source_code, auxiliary_files);
-    let segments = extract_texcraft_segments(&output);
-    let mut fonts: HashMap<String, u32> = Default::default();
-    let hlists = segments
-        .map(|s| {
-            let v_box = parse_vlist(&mut TexOutputIter::new(s), &mut fonts).unwrap();
 
-            let mut h_box = None;
-            let mut h_box_hyphenated = None;
-            for elem in v_box.list {
-                if let ds::Vertical::HBox(mut next_h_box) = elem {
-                    match &mut h_box {
-                        None => h_box = Some(next_h_box),
-                        Some(ref mut first_hbox) => {
-                            next_h_box.width = first_hbox.width;
-                            // remove the 3 items that the line-breaking algorithm sticks on.
-                            next_h_box.list.pop();
-                            next_h_box.list.pop();
-                            next_h_box.list.pop();
-                            h_box_hyphenated = Some(next_h_box);
-                            break;
-                        }
+    let mut fonts: HashMap<String, u32> = Default::default();
+    let mut tail: &str = &output;
+    let mut line_number = 0_usize;
+    enum Next {
+        First,
+        Second(ds::HBox),
+        Third(ds::HBox, ds::HBox),
+    }
+    let mut next = Next::First;
+    let mut h_boxes = vec![];
+    while let Some(line) = tail.split_inclusive('\n').next() {
+        line_number += 1;
+        tail = &tail[line.len()..];
+        if !line.trim().starts_with(match next {
+            Next::First => r"> \box253=",
+            Next::Second(_) => "### horizontal mode entered at line",
+            Next::Third(_, _) => "### current page:",
+        }) {
+            continue;
+        }
+        let mut iter = TexOutputIter {
+            s: tail,
+            depth: 0,
+            line_number,
+        };
+        next = match next {
+            Next::First => Next::Second(parse_h_box(&mut iter, &mut fonts).unwrap()),
+            Next::Second(h_box_1) => {
+                let h_box_2_list = parse_h_box_list(&mut iter, &mut fonts).unwrap();
+                let h_box_2 = ds::HBox {
+                    height: h_box_1.height,
+                    width: h_box_1.width,
+                    depth: h_box_1.depth,
+                    shift_amount: h_box_1.shift_amount,
+                    list: h_box_2_list,
+                    glue_ratio: h_box_1.glue_ratio,
+                    glue_order: h_box_1.glue_order,
+                };
+                Next::Third(h_box_1, h_box_2)
+            }
+            Next::Third(h_box_1, h_box_2) => {
+                let mut list = parse_v_box_list(&mut iter, &mut fonts).unwrap();
+                let h_box_3_list = match list.remove(1) {
+                    ds::Vertical::HBox(h_box_3) => {
+                        let mut list = h_box_3.list;
+                        // Remove the 3 elements the line breaking algorithm adds.
+                        list.pop();
+                        list.pop();
+                        list.pop();
+                        list
                     }
-                }
+                    _ => panic!("expected h_box, got {:?}", list[1]),
+                };
+                let h_box_3 = ds::HBox {
+                    height: h_box_1.height,
+                    width: h_box_1.width,
+                    depth: h_box_1.depth,
+                    shift_amount: h_box_1.shift_amount,
+                    list: h_box_3_list,
+                    glue_ratio: h_box_1.glue_ratio,
+                    glue_order: h_box_1.glue_order,
+                };
+                h_boxes.push(if hyphenate { h_box_3 } else { h_box_2 });
+                Next::First
             }
-            if hyphenated {
-                h_box_hyphenated.unwrap()
-            } else {
-                h_box.unwrap()
-            }
-        })
-        .collect();
-    (fonts, hlists)
+        };
+    }
+    (fonts, h_boxes)
 }
 
 /// Build verticals list from some text.
@@ -206,7 +245,7 @@ pub fn build_vertical_lists(
     let segments = extract_texcraft_segments(&output);
     let mut fonts: HashMap<String, u32> = Default::default();
     let vlists = segments
-        .map(|s| parse_vlist(&mut TexOutputIter::new(s), &mut fonts).unwrap())
+        .map(|s| parse_v_box(&mut TexOutputIter::new(s), &mut fonts).unwrap())
         .collect();
     (fonts, vlists)
 }
@@ -449,7 +488,7 @@ fn parse_disc_elem(
     line_number: usize,
     fonts: &mut HashMap<String, u32>,
 ) -> Result<ds::DiscretionaryElem, Error> {
-    let (keyword, tail) = keyword_and_tail(line);
+    let (keyword, tail) = keyword_and_tail(line).unwrap();
     match keyword {
         "kern" => {
             let mut words = tail.split_ascii_whitespace();
@@ -485,11 +524,11 @@ fn parse_disc_elem(
 /// Parse a single raw hlist segment (as produced by [`extract_hlist_segments`]) into an hlist.
 ///
 /// The `fonts` map is updated in place as new fonts are encountered.
-fn parse_hlist(
+fn parse_h_box(
     iter: &mut TexOutputIter,
     fonts: &mut HashMap<String, u32>,
 ) -> Result<ds::HBox, Error> {
-    let mut hlist = {
+    let mut h_box = {
         let line_number_hint = iter.line_number;
         let (line_number, line) = iter.next().ok_or(Error {
             kind: ErrorKind::EmptyHlist,
@@ -530,8 +569,19 @@ fn parse_hlist(
         }
     };
     let mut iter = iter.inner();
+    h_box.list = parse_h_box_list(&mut iter, fonts)?;
+    Ok(h_box)
+}
+
+fn parse_h_box_list(
+    iter: &mut TexOutputIter,
+    fonts: &mut HashMap<String, u32>,
+) -> Result<Vec<ds::Horizontal>, Error> {
+    let mut list = vec![];
     while let Some((line_number, line)) = iter.peek() {
-        let (keyword, tail) = keyword_and_tail(line);
+        let Some((keyword, tail)) = keyword_and_tail(line) else {
+            break;
+        };
         let mut consume_line = true;
         let elem: ds::Horizontal = match keyword {
             "glue" => ds::Glue {
@@ -622,11 +672,11 @@ fn parse_hlist(
             }
             "hbox" => {
                 consume_line = false;
-                parse_hlist(&mut iter, fonts)?.into()
+                parse_h_box(iter, fonts)?.into()
             }
             "vbox" => {
                 consume_line = false;
-                parse_vlist(&mut iter, fonts)?.into()
+                parse_v_box(iter, fonts)?.into()
             }
             font_name => {
                 use std::collections::hash_map::Entry;
@@ -665,16 +715,16 @@ fn parse_hlist(
                 }
             }
         };
-        hlist.list.push(elem);
+        list.push(elem);
         if consume_line {
             iter.next();
         }
     }
-    Ok(hlist)
+    Ok(list)
 }
 
 /// Parse a single raw vlist segment into a vlist.
-fn parse_vlist(
+fn parse_v_box(
     iter: &mut TexOutputIter,
     fonts: &mut HashMap<String, u32>,
 ) -> Result<ds::VBox, Error> {
@@ -717,13 +767,24 @@ fn parse_vlist(
         }
     };
     let mut iter = iter.inner();
+    vlist.list = parse_v_box_list(&mut iter, fonts)?;
+    Ok(vlist)
+}
+
+fn parse_v_box_list(
+    iter: &mut TexOutputIter,
+    fonts: &mut HashMap<String, u32>,
+) -> Result<Vec<ds::Vertical>, Error> {
+    let mut list = vec![];
     while let Some((line_number, line)) = iter.peek() {
-        let (keyword, tail) = keyword_and_tail(line);
+        let Some((keyword, tail)) = keyword_and_tail(line) else {
+            break;
+        };
         let mut consume_line = true;
         let elem: ds::Vertical = match keyword {
             "hbox" => {
                 consume_line = false;
-                parse_hlist(&mut iter, fonts)?.into()
+                parse_h_box(iter, fonts)?.into()
             }
             "penalty" => {
                 let value: i32 = tail.trim().parse().map_err(|_| Error {
@@ -743,17 +804,19 @@ fn parse_vlist(
                 })
             }
         };
-        vlist.list.push(elem);
+        list.push(elem);
         if consume_line {
             iter.next();
         }
     }
-    Ok(vlist)
+    Ok(list)
 }
 
-fn keyword_and_tail(s: &str) -> (&str, &str) {
+fn keyword_and_tail(s: &str) -> Option<(&str, &str)> {
     let mut c = s.chars();
-    assert_eq!(c.next(), Some('\\'), "line expected to begin with \\");
+    if c.next() != Some('\\') {
+        return None;
+    }
     let mut keyword_len = 0_usize;
     for next in c {
         if next.is_alphabetic() {
@@ -762,7 +825,7 @@ fn keyword_and_tail(s: &str) -> (&str, &str) {
             break;
         }
     }
-    (&s[1..1 + keyword_len], s[1 + keyword_len..].trim())
+    Some((&s[1..1 + keyword_len], s[1 + keyword_len..].trim()))
 }
 
 /// Parse the glue value from the text following `\glue` in TeX's box display.
@@ -973,66 +1036,7 @@ mod tests {
 
     #[test]
     fn test_build_horizontal_lists() {
-        let log = r#"This is TeX, Version 3.141592653 (TeX Live 2024) (preloaded format=tex 2025.1.20)  9 MAY 2026 22:47
-**/var/folders/tk/q1zszl0n7c34crg980zs_0lw0000gn/T/tex-input.tex
-(/var/folders/tk/q1zszl0n7c34crg980zs_0lw0000gn/T/tex-input.tex
-@firstpass
-\customFont Mint and me
-@\par via @@0 b=0 p=-10000 d=100
-@@1: line 1.2- t=100 -> @@0
-
-
-Texcraft: begin
-> \box0=
-\vbox(18.94444+0.0)x469.75499
-.\hbox(6.94444+0.0)x56.66678
-..\customFont M
-..\customFont i
-..\customFont n
-..\kern-0.27779
-..\customFont t
-..\glue 3.33333 plus 1.66666 minus 1.11111
-..\customFont a
-..\customFont n
-..\customFont d
-..\glue 3.33333 plus 1.66666 minus 1.11111
-..\customFont m
-..\customFont e
-.\glue(\parskip) 0.0 plus 1.0
-.\glue(\baselineskip) 5.05556
-.\hbox(6.94444+0.0)x469.75499, glue set 413.08821fil
-..\customFont M
-..\customFont i
-..\customFont n
-..\kern-0.27779
-..\customFont t
-..\glue 3.33333 plus 1.66666 minus 1.11111
-..\customFont a
-..\customFont n
-..\customFont d
-..\glue 3.33333 plus 1.66666 minus 1.11111
-..\customFont m
-..\customFont e
-..\penalty 10000
-..\glue(\parfillskip) 0.0 plus 1.0fil
-..\glue(\rightskip) 0.0
-
-! OK.
-\printBox ...Message {Texcraft: begin} \showbox 0
-                                                    \par \fullLineMessage {Tex...
-l.45 \printBox{Mint and me}
-
-
-
-Texcraft: end
-@firstpass
-[]\customFont We add some text at the end.
-@\par via @@0 b=0 p=-10000 d=100
-@@1: line 1.2- t=100 -> @@0
-
-[1] )
-Output written on tex-input.dvi (1 page, 244 bytes).
-        "#;
+        let log = include_str!("hbox_template_1.log");
 
         let tex_engine = MockTexEngine(log.to_string());
         let (got_fonts, got_list) = build_horizontal_lists(
@@ -1082,7 +1086,7 @@ Output written on tex-input.dvi (1 page, 244 bytes).
 .|\tenrm h
 ";
         let mut fonts = Default::default();
-        let got = parse_hlist(&mut TexOutputIter::new(input), &mut fonts).unwrap();
+        let got = parse_h_box(&mut TexOutputIter::new(input), &mut fonts).unwrap();
         let want = parse_hbox_lang(
             r#"hbox(
                 height=6.94444pt,
@@ -1313,7 +1317,7 @@ Transcript written on test.log.
         ($(($name:ident, $input:expr, $expected:expr)),* $(,)?) => [$(
             #[test]
             fn $name() {
-                let err = parse_hlist(&mut TexOutputIter::new($input), &mut Default::default())
+                let err = parse_h_box(&mut TexOutputIter::new($input), &mut Default::default())
                     .unwrap_err();
                 assert_eq!(err, $expected);
             }
@@ -1465,7 +1469,7 @@ Transcript written on test.log.
         ($(($name:ident, $input:expr, $expected:expr)),* $(,)?) => [$(
             #[test]
             fn $name() {
-                let err = parse_vlist(&mut TexOutputIter::new($input), &mut Default::default())
+                let err = parse_v_box(&mut TexOutputIter::new($input), &mut Default::default())
                     .unwrap_err();
                 assert_eq!(err, $expected);
             }

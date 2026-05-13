@@ -1,0 +1,64 @@
+<preamble>
+
+% Log to stderr as well as the log file.
+\tracingonline=1
+
+% Don't stop when messages are printed to the terminal
+\nonstopmode
+
+% Output up to 1 million nodes.
+\showboxbreadth=1000000
+% Output up to 100 nested boxes.
+\showboxdepth=100
+
+% Make the page really wide and then skip the first pass of the line-breaking algorithm.
+% This forces the hyphenation to kick in.
+\pretolerance=-1
+\hsize=16383pt
+
+% Don't output anything to the DVI file.
+\output={
+    % This is needed to avoid warnings about some items not being output.
+    \setbox254=\box255
+    \setbox255=\hbox{} \shipout\box255
+}
+
+% Macro that prints the contents on its own line in the terminal.
+\def\fullLineMessage#1{%
+    {%
+        \newlinechar=`@%
+        \message{@#1@}%
+    }%
+}
+
+\def\buildAndPrintBoxes#1{
+
+% Flush the output of the main vertical list so that any content already there
+% won't be seen in this macro expansion.
+\eject
+
+% (1) First we print a regular hbox containing the text.
+% The only catch here is that the text is set in internal horizontal mode,
+% which is a little different than regular horiztonal mode. Specfically, some
+% manual discretionaries are not created.
+\fullLineMessage{internal horizontal box start}
+\setbox253=\hbox{#1}
+\showbox253
+\fullLineMessage{internal horiztonal box end}
+
+% (2) Next print the text as it is put on the main horizontal list.
+\noindent
+#1%
+\fullLineMessage{unhyphenated hlist start}\showlists\fullLineMessage{unhyphenated hlist end}
+
+% (3) After the last paragraph ended, TeX ran the line breaking algoirthm, performed
+% hyphenation (becaues \pretolerance=-1) and put the resulting hbox on the vertical list
+% (a single hbox because the page is so wide). So printing the current lists will
+% show this hbox.
+\fullLineMessage{hyphenated hlist start}\showlists\fullLineMessage{hyphenated hlist end}
+
+}
+
+<print_calls>
+
+\end

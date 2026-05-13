@@ -1,14 +1,16 @@
 use assert_cmd::prelude::*;
 use std::process::Command;
 
-fn run_hlists(texts_file: &str) -> String {
+fn run_hlists(args: &[&str], texts_file: &str) -> String {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let texts_file_path = std::path::Path::new(&manifest_dir)
         .join("tests")
         .join(texts_file);
 
     let mut cmd = Command::cargo_bin("box").unwrap();
-    cmd.arg("hbox");
+    for arg in args {
+        cmd.arg(arg);
+    }
     cmd.arg(format!("--texts-file={}", texts_file_path.display()));
     let output = cmd.output().unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
@@ -20,13 +22,21 @@ fn run_hlists(texts_file: &str) -> String {
     String::from_utf8(output.stdout).unwrap()
 }
 
-macro_rules! hlists_tests {
-    ( $( ($name:ident, $texts_file:expr, $golden_file:expr), )+ ) => {
+macro_rules! tests {
+    ( $( (
+        $name:ident,
+        $golden_file:expr,
+        $texts_file:expr,
+        [
+            $( $arg: expr ),+
+        ],
+   ), )+ ) => {
         $(
             #[test]
             fn $name() {
                 const GOLDEN: &str = include_str!($golden_file);
-                let box_output = run_hlists($texts_file);
+                let args = [ $( $arg ),+ ];
+                let box_output = run_hlists(&args, $texts_file);
                 similar_asserts::assert_eq!(got: normalize(&box_output), want: normalize(GOLDEN));
             }
         )+
@@ -37,8 +47,19 @@ fn normalize(s: &str) -> String {
     s.lines().collect::<Vec<_>>().join("\n")
 }
 
-hlists_tests!((
-    alice,
-    "alice_in_wonderland.txt",
-    "alice_in_wonderland_hlists.txt"
-),);
+tests!(
+    (
+        alice_hbox_unhyphenated,
+        "alice_in_wonderland_hlists.txt",
+        "alice_in_wonderland.txt",
+        ["hbox"],
+    ),
+    /*
+    (
+        alice_hbox_hyphenated,
+        "alice_in_wonderland_hlists_hyphenated.txt",
+        "alice_in_wonderland.txt",
+        ["hbox", "--hyphenate"],
+    ),
+    */
+);

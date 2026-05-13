@@ -162,7 +162,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("Rabbit-Hole", font=0)
+    chars("Rabbit-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("Hole", font=0)
   ],
 )
 
@@ -218,7 +224,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("A", font=0)
     glue(3.33333pt, 1.66498pt, 1.11221pt)
-    chars("Caucus-Race", font=0)
+    chars("Caucus-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("Race", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -334,7 +346,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("T", font=0)
     kern(-0.83334pt)
-    chars("ea-P", font=0)
+    chars("ea-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("P", font=0)
     kern(-0.27779pt)
     chars("art", font=0)
     kern(-0.27779pt)
@@ -366,7 +384,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Cro", font=0)
     kern(0.27779pt)
-    chars("quet-Ground", font=0)
+    chars("quet-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("Ground", font=0)
   ],
 )
 
@@ -502,7 +526,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("Rabbit-Hole", font=0)
+    chars("Rabbit-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("Hole", font=0)
   ],
 )
 
@@ -756,7 +786,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("daisy-c", font=0)
+    chars("daisy-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("c", font=0)
     kern(-0.27779pt)
     chars("hain", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -1026,7 +1062,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("w", font=0)
     kern(-0.27779pt)
-    chars("aistcoat-p", font=0)
+    chars("aistcoat-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("p", font=0)
     kern(0.27779pt)
     chars("o", font=0)
     kern(0.27779pt)
@@ -1109,7 +1151,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("w", font=0)
     kern(-0.27779pt)
-    chars("aistcoat-p", font=0)
+    chars("aistcoat-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("p", font=0)
     kern(0.27779pt)
     chars("o", font=0)
     kern(0.27779pt)
@@ -1200,7 +1248,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("large", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("rabbit-hole", font=0)
+    chars("rabbit-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("hole", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("under", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -1292,7 +1346,13 @@ hbox(
   content=[
     chars("The", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("rabbit-hole", font=0)
+    chars("rabbit-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("hole", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("w", font=0)
     kern(-0.27779pt)
@@ -1619,7 +1679,13 @@ hbox(
     kern(0.27779pt)
     chars("o", font=0)
     kern(0.27779pt)
-    chars("ok-shelv", font=0)
+    chars("ok-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("shelv", font=0)
     kern(-0.27779pt)
     chars("es;", font=0)
     glue(3.33333pt, 2.49998pt, 0.74074pt)
@@ -2090,6 +2156,11 @@ hbox(
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("think", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("(for,", font=0)
@@ -2235,6 +2306,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("y", font=0)
     kern(-0.27779pt)
     chars("es,", font=0)
@@ -2253,6 +2329,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("distance", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("but", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("then", font=0)
@@ -2435,6 +2516,11 @@ hbox(
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("think", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("(she", font=0)
@@ -2487,6 +2573,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("but", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("I", font=0)
@@ -2566,6 +2657,11 @@ hbox(
     kern(-0.27779pt)
     chars("e", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("fancy", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("curtseying", font=0)
@@ -2731,7 +2827,13 @@ hbox(
     kern(-0.27779pt)
     chars("h", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("to-nigh", font=0)
+    chars("to-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("nigh", font=0)
     kern(-0.27779pt)
     chars("t,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
@@ -2777,7 +2879,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("at", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("tea-time.", font=0)
+    chars("tea-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("time.", font=0)
     glue(4.44444pt, 4.99997pt, 0.37036pt)
     chars("Dinah", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -3694,7 +3802,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("little", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("three-legged", font=0)
+    chars("three-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("legged", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("table,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
@@ -4031,7 +4145,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("rat-hole:", font=0)
+    chars("rat-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("hole:", font=0)
     glue(4.44444pt, 3.33331pt, 0.55556pt)
     chars("she", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -4314,7 +4434,25 @@ hbox(
     kern(-0.27779pt)
     chars("y", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("out-of-the-w", font=0)
+    chars("out-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("of-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("the-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("w", font=0)
     kern(-0.27779pt)
     chars("a", font=0)
     kern(-0.27779pt)
@@ -4830,7 +4968,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("red-hot", font=0)
+    chars("red-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("hot", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("p", font=0)
     kern(0.27779pt)
@@ -5069,11 +5213,23 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("c", font=0)
     kern(-0.27779pt)
-    chars("herry-tart,", font=0)
+    chars("herry-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("tart,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("custard,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
-    chars("pine-apple,", font=0)
+    chars("pine-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("apple,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("roast", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -6592,7 +6748,25 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("but", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("out-of-the-w", font=0)
+    chars("out-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("of-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("the-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("w", font=0)
     kern(-0.27779pt)
     chars("a", font=0)
     kern(-0.27779pt)
@@ -6924,7 +7098,13 @@ hbox(
     kern(0.27779pt)
     chars("o", font=0)
     kern(0.27779pt)
-    chars("d-b", font=0)
+    chars("d-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("b", font=0)
     kern(-0.27779pt)
     chars("y", font=0)
     kern(-0.27779pt)
@@ -7132,6 +7312,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("can;", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("but", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("I", font=0)
@@ -8157,6 +8342,11 @@ hbox(
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("sir", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("The", font=0)
@@ -8320,7 +8510,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("is", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("to-da", font=0)
+    chars("to-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("da", font=0)
     kern(-0.27779pt)
     chars("y!", font=0)
     glue(4.44444pt, 4.99997pt, 0.37036pt)
@@ -8696,6 +8892,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("and", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("oh", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("dear,", font=0)
@@ -8789,6 +8990,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("is", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("oh", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("dear!", font=0)
@@ -8887,6 +9093,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Rome", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("no,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("that\'s", font=0)
@@ -8945,6 +9156,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("little", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     chars("\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -9038,6 +9254,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("do:", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -9596,6 +9817,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("else\'", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("but,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("oh", font=0)
@@ -10734,7 +10960,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("queer", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("to-da", font=0)
+    chars("to-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("da", font=0)
     kern(-0.27779pt)
     chars("y", font=0)
     kern(-0.83334pt)
@@ -10989,7 +11221,25 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("so", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("out-of-the-w", font=0)
+    chars("out-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("of-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("the-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("w", font=0)
     kern(-0.27779pt)
     chars("a", font=0)
     kern(-0.27779pt)
@@ -11203,22 +11453,42 @@ hbox(
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("mouse", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("of", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("mouse", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("to", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("mouse", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("mouse", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("O", font=0)
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("mouse!", font=0)
@@ -11452,7 +11722,13 @@ hbox(
     kern(-0.27779pt)
     chars("h", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("lesson-b", font=0)
+    chars("lesson-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("b", font=0)
     kern(0.27779pt)
     chars("o", font=0)
     kern(0.27779pt)
@@ -11858,6 +12134,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("face", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("she", font=0)
@@ -11882,6 +12163,11 @@ hbox(
     kern(-0.27779pt)
     chars("urse", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("she\'s", font=0)
@@ -11904,6 +12190,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("mice", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("oh,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("I", font=0)
@@ -12190,6 +12481,11 @@ hbox(
     kern(-0.27779pt)
     chars("ou", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("are", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("y", font=0)
@@ -12198,8 +12494,18 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("fond", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("of", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("of", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("dogs?", font=0)
@@ -12278,7 +12584,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("brigh", font=0)
     kern(-0.27779pt)
-    chars("t-ey", font=0)
+    chars("t-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("ey", font=0)
     kern(-0.27779pt)
     chars("ed", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -12362,6 +12674,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("things", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("I", font=0)
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("can\'t", font=0)
@@ -12378,6 +12695,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("them", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("it", font=0)
@@ -12448,6 +12770,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("and", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("oh", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("dear!", font=0)
@@ -12949,7 +13276,13 @@ hbox(
   content=[
     chars("A", font=0)
     glue(3.33333pt, 1.66498pt, 1.11221pt)
-    chars("Caucus-Race", font=0)
+    chars("Caucus-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("Race", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -12983,7 +13316,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("queer-lo", font=0)
+    chars("queer-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("lo", font=0)
     kern(0.27779pt)
     chars("oking", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -13003,6 +13342,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("bank", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("birds", font=0)
@@ -13693,6 +14037,11 @@ hbox(
     kern(-0.27779pt)
     chars("bria", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     chars("\'", font=0)
   ],
@@ -13848,6 +14197,11 @@ hbox(
     glue(4.44444pt, 4.99997pt, 0.37036pt)
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("I", font=0)
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("pro", font=0)
@@ -13914,6 +14268,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("advisable", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     chars("\'", font=0)
   ],
@@ -14128,6 +14487,11 @@ hbox(
     lig("\\", "``", font=0)
     chars("`", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("found", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("it", font=0)
@@ -14195,6 +14559,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Normans", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Ho", font=0)
@@ -14379,6 +14748,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("remedies", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -14584,7 +14958,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("Caucus-race.", font=0)
+    chars("Caucus-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("race.", font=0)
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -14606,7 +14986,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("Caucus-race?", font=0)
+    chars("Caucus-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("race?", font=0)
     lig("\"", "\'\'", font=0)
     glue(4.44444pt, 4.99997pt, 0.37036pt)
     chars("said", font=0)
@@ -14843,7 +15229,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("race-course,", font=0)
+    chars("race-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("course,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("in", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -15545,7 +15937,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("one", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("a-piece,", font=0)
+    chars("a-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("piece,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("all", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -16215,6 +16613,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("hate", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("C", font=0)
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("and", font=0)
@@ -16434,6 +16837,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("this:", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -16603,6 +17011,11 @@ hbox(
     kern(-0.27779pt)
     chars("ou.", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Come,", font=0)
   ],
 )
@@ -18280,7 +18693,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("nigh", font=0)
     kern(-0.27779pt)
-    chars("t-air", font=0)
+    chars("t-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("air", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("do", font=0)
     kern(0.27779pt)
@@ -18575,7 +18994,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("lo", font=0)
     kern(-0.27779pt)
-    chars("w-spirited.", font=0)
+    chars("w-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("spirited.", font=0)
     glue(4.44444pt, 4.99997pt, 0.37036pt)
     chars("In", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -18948,7 +19373,13 @@ hbox(
     kern(0.27779pt)
     chars("o", font=0)
     kern(0.27779pt)
-    chars("d-naturedly", font=0)
+    chars("d-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("naturedly", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("b", font=0)
     kern(0.27779pt)
@@ -18988,6 +19419,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("seen", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("ev", font=0)
     kern(-0.27779pt)
     chars("erything", font=0)
@@ -19359,6 +19795,11 @@ hbox(
     kern(-0.27779pt)
     chars("es", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("that", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("is,", font=0)
@@ -19965,7 +20406,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("lo", font=0)
     kern(0.27779pt)
-    chars("oking-glass.", font=0)
+    chars("oking-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("glass.", font=0)
     glue(4.44444pt, 4.99997pt, 0.37036pt)
     chars("There", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -20288,6 +20735,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("enough", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("I", font=0)
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("hop", font=0)
@@ -20308,6 +20760,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("more", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("As", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("it", font=0)
@@ -20330,6 +20787,11 @@ hbox(
     kern(0.27779pt)
     chars("or", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("I", font=0)
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("do", font=0)
@@ -20865,20 +21327,41 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("that", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("rabbit-hole", font=0)
+    chars("rabbit-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("hole", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("y", font=0)
     kern(-0.27779pt)
     chars("et", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("y", font=0)
     kern(-0.27779pt)
     chars("et", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("it\'s", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("rather", font=0)
@@ -20937,7 +21420,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("read", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("fairy-tales,", font=0)
+    chars("fairy-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("tales,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("I", font=0)
     glue(3.33333pt, 1.66498pt, 1.11221pt)
@@ -21035,6 +21524,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("one", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("but", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("I\'m", font=0)
@@ -21163,6 +21657,11 @@ hbox(
     kern(-0.27779pt)
     chars("y", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("nev", font=0)
     kern(-0.27779pt)
     chars("er", font=0)
@@ -21181,10 +21680,20 @@ hbox(
     kern(-0.27779pt)
     chars("oman", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("but", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("then", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("alw", font=0)
     kern(-0.27779pt)
     chars("a", font=0)
@@ -21309,7 +21818,13 @@ hbox(
     kern(-0.27779pt)
     chars("y", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("lesson-b", font=0)
+    chars("lesson-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("b", font=0)
     kern(0.27779pt)
     chars("o", font=0)
     kern(0.27779pt)
@@ -21907,7 +22422,13 @@ hbox(
     kern(-0.27779pt)
     chars("b", font=0)
     kern(0.27779pt)
-    chars("er-frame,", font=0)
+    chars("er-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("frame,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("or", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -21943,10 +22464,20 @@ hbox(
     kern(-0.27779pt)
     chars("oice", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Rabbit\'s", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\\", "``", font=0)
     chars("P", font=0)
     kern(-0.27779pt)
@@ -22502,7 +23033,13 @@ hbox(
     kern(-0.27779pt)
     chars("b", font=0)
     kern(0.27779pt)
-    chars("er-frames", font=0)
+    chars("er-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("frames", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("there", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -22700,6 +23237,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("ladder?", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Wh", font=0)
     kern(-0.27779pt)
     chars("y", font=0)
@@ -22726,6 +23268,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("other", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Bill!", font=0)
     glue(4.44444pt, 4.99997pt, 0.37036pt)
     chars("fetc", font=0)
@@ -22738,6 +23285,11 @@ hbox(
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("lad!", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Here,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("put", font=0)
@@ -22752,6 +23304,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("corner", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("No,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("tie", font=0)
@@ -22763,6 +23320,11 @@ hbox(
     lig("\u{c}", "fi", font=0)
     chars("rst", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("they", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("don\'t", font=0)
@@ -22781,6 +23343,11 @@ hbox(
     kern(-0.27779pt)
     chars("et", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Oh!", font=0)
     glue(4.44444pt, 4.99997pt, 0.37036pt)
     chars("they\'ll", font=0)
@@ -22801,6 +23368,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("particular", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Here,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("Bill!", font=0)
@@ -22819,6 +23391,11 @@ hbox(
     kern(0.27779pt)
     chars("e", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Will", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
@@ -22831,6 +23408,11 @@ hbox(
     kern(0.27779pt)
     chars("ear?", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Mind", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("that", font=0)
@@ -22841,6 +23423,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("slate", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Oh,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("it\'s", font=0)
@@ -22866,6 +23453,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("crash)", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\\", "``", font=0)
     chars("No", font=0)
     kern(-0.27779pt)
@@ -22877,6 +23469,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("that?", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("It", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("w", font=0)
@@ -22889,6 +23486,11 @@ hbox(
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("fancy", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Who\'s", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("to", font=0)
@@ -22905,6 +23507,11 @@ hbox(
     kern(-0.27779pt)
     chars("himney?", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Na", font=0)
     kern(-0.27779pt)
     chars("y", font=0)
@@ -22923,6 +23530,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("it!", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("That", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("I", font=0)
@@ -22933,6 +23545,11 @@ hbox(
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("then!", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Bill\'s", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("to", font=0)
@@ -22943,6 +23560,11 @@ hbox(
     kern(-0.27779pt)
     chars("wn", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Here,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("Bill!", font=0)
@@ -23342,6 +23964,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("along", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\\", "``", font=0)
     chars("Catc", font=0)
     kern(-0.27779pt)
@@ -23380,6 +24007,11 @@ hbox(
     kern(-0.27779pt)
     chars("oices", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\\", "``", font=0)
     chars("Hold", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -23389,12 +24021,22 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("head", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Brandy", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("no", font=0)
     kern(-0.27779pt)
     chars("w", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Don\'t", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("c", font=0)
@@ -23405,6 +24047,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("him", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Ho", font=0)
     kern(-0.27779pt)
     chars("w", font=0)
@@ -23502,6 +24149,11 @@ hbox(
     kern(-0.27779pt)
     chars("w", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("No", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("more,", font=0)
@@ -23522,6 +24174,11 @@ hbox(
     kern(-0.27779pt)
     chars("w", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("but", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("I\'m", font=0)
@@ -23545,6 +24202,11 @@ hbox(
     kern(-0.27779pt)
     chars("ou", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("all", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("I", font=0)
@@ -23571,7 +24233,25 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Jac", font=0)
     kern(-0.27779pt)
-    chars("k-in-the-b", font=0)
+    chars("k-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("in-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("the-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("b", font=0)
     kern(0.27779pt)
     chars("o", font=0)
     kern(-0.27779pt)
@@ -23593,7 +24273,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("sky-ro", font=0)
+    chars("sky-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("ro", font=0)
     kern(0.27779pt)
     chars("c", font=0)
     kern(-0.27779pt)
@@ -24386,7 +25072,13 @@ hbox(
     kern(-0.27779pt)
     chars("o", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("guinea-pigs,", font=0)
+    chars("guinea-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("pigs,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("who", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -25280,7 +25972,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("cart-horse,", font=0)
+    chars("cart-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("horse,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -25700,6 +26398,11 @@ hbox(
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("if", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("if", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("I\'d", font=0)
@@ -25758,6 +26461,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("see", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("ho", font=0)
     kern(-0.27779pt)
     chars("w", font=0)
@@ -26401,6 +27109,11 @@ hbox(
     lig("\\", "``", font=0)
     chars("I", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("I", font=0)
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("hardly", font=0)
@@ -26419,6 +27132,11 @@ hbox(
     kern(-0.27779pt)
     chars("t", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("at", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("least", font=0)
@@ -26821,6 +27539,11 @@ hbox(
     kern(-0.27779pt)
     chars("hrysalis", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("y", font=0)
     kern(-0.27779pt)
     chars("ou", font=0)
@@ -26843,6 +27566,11 @@ hbox(
     kern(-0.27779pt)
     chars("w", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("then", font=0)
@@ -27692,6 +28420,11 @@ hbox(
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("used", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("I", font=0)
@@ -27898,6 +28631,11 @@ hbox(
     kern(0.27779pt)
     chars("egan:", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -28007,6 +28745,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("head", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -28284,7 +29027,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("bac", font=0)
     kern(-0.27779pt)
-    chars("k-somersault", font=0)
+    chars("k-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("somersault", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("in", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -28296,6 +29045,11 @@ hbox(
     kern(0.27779pt)
     chars("or", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -28441,6 +29195,11 @@ hbox(
     kern(-0.27779pt)
     chars("t", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("one", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("shilling", font=0)
@@ -28453,6 +29212,11 @@ hbox(
     kern(-0.27779pt)
     chars("x", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -28609,6 +29373,11 @@ hbox(
     kern(0.27779pt)
     chars("eak", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -28918,6 +29687,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("nose", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -30387,7 +31161,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("righ", font=0)
     kern(-0.27779pt)
-    chars("t-hand", font=0)
+    chars("t-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("hand", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("bit", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -31783,7 +32563,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("lo", font=0)
     kern(0.27779pt)
-    chars("ok-out", font=0)
+    chars("ok-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("out", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("for", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -32073,10 +32859,20 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("I\'m", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -32152,6 +32948,11 @@ hbox(
     lig("\\", "``", font=0)
     chars("I", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("I\'m", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
@@ -33298,6 +34099,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("garden", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("ho", font=0)
     kern(-0.27779pt)
     chars("w", font=0)
@@ -33641,6 +34447,11 @@ hbox(
     kern(0.27779pt)
     chars("d", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("(she", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("considered", font=0)
@@ -33712,6 +34523,11 @@ hbox(
     lig("\u{c}", "fi", font=0)
     chars("sh)", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("rapp", font=0)
@@ -33906,7 +34722,13 @@ hbox(
   content=[
     chars("The", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("Fish-F", font=0)
+    chars("Fish-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("F", font=0)
     kern(-0.83334pt)
     chars("o", font=0)
     kern(0.27779pt)
@@ -34018,7 +34840,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("F", font=0)
     kern(-0.83334pt)
-    chars("rog-F", font=0)
+    chars("rog-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("F", font=0)
     kern(-0.83334pt)
     chars("o", font=0)
     kern(0.27779pt)
@@ -34226,7 +35054,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("Fish-F", font=0)
+    chars("Fish-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("F", font=0)
     kern(-0.83334pt)
     chars("o", font=0)
     kern(0.27779pt)
@@ -34474,6 +35308,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("within", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("constan", font=0)
@@ -34843,6 +35682,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("questions.", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Ho", font=0)
     kern(-0.27779pt)
     chars("w", font=0)
@@ -34907,6 +35751,11 @@ hbox(
     kern(-0.27779pt)
     chars("w", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -35027,6 +35876,11 @@ hbox(
   content=[
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("or", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("next", font=0)
@@ -35597,7 +36451,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("three-legged", font=0)
+    chars("three-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("legged", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("sto", font=0)
     kern(0.27779pt)
@@ -36153,6 +37013,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("again:", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -36545,10 +37410,21 @@ hbox(
     kern(-0.27779pt)
     chars("y", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     lig("\u{c}", "fi", font=0)
-    chars("re-irons", font=0)
+    chars("re-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("irons", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("came", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -37010,7 +37886,13 @@ hbox(
     kern(-0.27779pt)
     chars("t", font=0)
     kern(-0.27779pt)
-    chars("y-four", font=0)
+    chars("y-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("four", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("hours", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -37026,6 +37908,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("axis", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -37178,7 +38065,13 @@ hbox(
     kern(-0.27779pt)
     chars("t", font=0)
     kern(-0.27779pt)
-    chars("y-four", font=0)
+    chars("y-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("four", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("hours,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
@@ -37202,6 +38095,11 @@ hbox(
     glue(4.44444pt, 4.99997pt, 0.37036pt)
     chars("I", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -37627,6 +38525,11 @@ hbox(
     kern(-0.27779pt)
     chars("ords:", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -37933,7 +38836,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("frying-pan", font=0)
+    chars("frying-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("pan", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("after", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -38007,7 +38916,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("queer-shap", font=0)
+    chars("queer-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("shap", font=0)
     kern(0.27779pt)
     chars("ed", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -38045,6 +38960,11 @@ hbox(
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("star-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\u{c}", "fi", font=0)
     chars("sh,", font=0)
     lig("\"", "\'\'", font=0)
@@ -38079,7 +38999,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("steam-engine", font=0)
+    chars("steam-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("engine", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("when", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -38591,7 +39517,13 @@ hbox(
     kern(-0.27779pt)
     chars("ery", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("turn-up", font=0)
+    chars("turn-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("up", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("nose,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
@@ -39308,6 +40240,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("them", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("when", font=0)
@@ -39406,7 +40343,13 @@ hbox(
     kern(0.27779pt)
     chars("o", font=0)
     kern(0.27779pt)
-    chars("d-natured,", font=0)
+    chars("d-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("natured,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("she", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -39705,6 +40648,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("where", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("said", font=0)
@@ -39771,6 +40719,11 @@ hbox(
   content=[
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("so", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("long", font=0)
@@ -40559,7 +41512,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Queen", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("to-da", font=0)
+    chars("to-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("da", font=0)
     kern(-0.27779pt)
     chars("y?", font=0)
     lig("\"", "\'\'", font=0)
@@ -40767,7 +41726,19 @@ hbox(
   glue_order="normal",
   content=[
     lig("\\", "``", font=0)
-    chars("By-the-b", font=0)
+    chars("By-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("the-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("b", font=0)
     kern(-0.27779pt)
     chars("y", font=0)
     kern(-0.27779pt)
@@ -41099,6 +42070,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("mad", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("at", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("least", font=0)
@@ -41789,7 +42765,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("T", font=0)
     kern(-0.83334pt)
-    chars("ea-P", font=0)
+    chars("ea-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("P", font=0)
     kern(-0.27779pt)
     chars("art", font=0)
     kern(-0.27779pt)
@@ -42121,7 +43103,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("large", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("arm-c", font=0)
+    chars("arm-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("c", font=0)
     kern(-0.27779pt)
     chars("hair", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -42665,7 +43653,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("writing-desk?", font=0)
+    chars("writing-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("desk?", font=0)
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -42727,6 +43721,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("riddles.", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("I", font=0)
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("b", font=0)
@@ -42912,6 +43911,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("least", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("at", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("least", font=0)
@@ -42928,6 +43932,11 @@ hbox(
     kern(-0.27779pt)
     chars("y", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("that\'s", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
@@ -43327,7 +44336,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("writing-desks,", font=0)
+    chars("writing-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("desks,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("whic", font=0)
     kern(-0.27779pt)
@@ -43707,7 +44722,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("bread-knife.", font=0)
+    chars("bread-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("knife.", font=0)
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -45016,7 +46037,13 @@ hbox(
     kern(-0.27779pt)
     chars("winkling!", font=0)
     glue(4.44444pt, 4.99997pt, 0.37036pt)
-    chars("Half-past", font=0)
+    chars("Half-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("past", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("one,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
@@ -45119,6 +46146,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("then", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("I", font=0)
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("shouldn\'t", font=0)
@@ -45192,7 +46224,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("to", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("half-past", font=0)
+    chars("half-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("past", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("one", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -45300,6 +46338,11 @@ hbox(
     kern(-0.27779pt)
     chars("h", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("just", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("b", font=0)
@@ -45324,6 +46367,11 @@ hbox(
     kern(-0.27779pt)
     chars("w", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("(p", font=0)
@@ -45356,6 +46404,11 @@ hbox(
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("it", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("w", font=0)
@@ -45560,6 +46613,11 @@ hbox(
     kern(-0.27779pt)
     chars("y:", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -45616,7 +46674,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("tea-tra", font=0)
+    chars("tea-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("tra", font=0)
     kern(-0.27779pt)
     chars("y", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -45647,6 +46711,11 @@ hbox(
     kern(-0.27779pt)
     chars("winkle", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     chars("\'", font=0)
   ],
@@ -45703,6 +46772,11 @@ hbox(
     kern(-0.27779pt)
     chars("winkle", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("and", font=0)
@@ -45982,7 +47056,13 @@ hbox(
     kern(-0.27779pt)
     chars("y", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("tea-things", font=0)
+    chars("tea-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("things", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("are", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -46042,7 +47122,13 @@ hbox(
     kern(-0.27779pt)
     chars("ys", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("tea-time,", font=0)
+    chars("tea-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("time,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -46704,6 +47790,11 @@ hbox(
     kern(-0.27779pt)
     chars("ell", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -47324,7 +48415,19 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("bread-and-butter,", font=0)
+    chars("bread-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("and-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("butter,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -47439,7 +48542,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("treacle-w", font=0)
+    chars("treacle-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("w", font=0)
     kern(-0.27779pt)
     chars("ell.", font=0)
     lig("\"", "\'\'", font=0)
@@ -47696,6 +48805,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("sisters", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("they", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("w", font=0)
@@ -47718,6 +48832,11 @@ hbox(
     kern(-0.27779pt)
     chars("w", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -48029,7 +49148,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("milk-jug", font=0)
+    chars("milk-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("jug", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("in", font=0)
     kern(-0.27779pt)
@@ -48146,7 +49271,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("w", font=0)
     kern(-0.27779pt)
-    chars("ater-w", font=0)
+    chars("ater-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("w", font=0)
     kern(-0.27779pt)
     chars("ell,", font=0)
     lig("\"", "\'\'", font=0)
@@ -48184,10 +49315,21 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("treacle-w", font=0)
+    chars("treacle-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("w", font=0)
     kern(-0.27779pt)
     chars("ell", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("eh,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("stupid?", font=0)
@@ -48283,6 +49425,11 @@ hbox(
     glue(3.33333pt, 2.49998pt, 0.74074pt)
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("w", font=0)
     kern(-0.27779pt)
     chars("ell", font=0)
@@ -48437,6 +49584,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("things", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("ev", font=0)
     kern(-0.27779pt)
     chars("erything", font=0)
@@ -48453,6 +49605,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("M", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -48640,6 +49797,11 @@ hbox(
     glue(4.44444pt, 3.33331pt, 0.55556pt)
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("that", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("b", font=0)
@@ -48658,7 +49820,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("as", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("mouse-traps,", font=0)
+    chars("mouse-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("traps,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -48682,6 +49850,11 @@ hbox(
     kern(-0.27779pt)
     chars("hness", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("y", font=0)
     kern(-0.27779pt)
     chars("ou", font=0)
@@ -48720,6 +49893,11 @@ hbox(
     chars("hness", font=0)
     lig("\"", "\'\'", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("did", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("y", font=0)
@@ -48812,6 +49990,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("think", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -49101,7 +50284,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("stupidest", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("tea-part", font=0)
+    chars("tea-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("part", font=0)
     kern(-0.27779pt)
     chars("y", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -49476,6 +50665,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("then", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("she", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("found", font=0)
@@ -49509,7 +50703,13 @@ hbox(
     kern(-0.27779pt)
     chars("w", font=0)
     kern(-0.27779pt)
-    chars("er-b", font=0)
+    chars("er-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("b", font=0)
     kern(0.27779pt)
     chars("eds", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -49563,7 +50763,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Cro", font=0)
     kern(0.27779pt)
-    chars("quet-Ground", font=0)
+    chars("quet-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("Ground", font=0)
   ],
 )
 
@@ -49581,7 +50787,13 @@ hbox(
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("large", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("rose-tree", font=0)
+    chars("rose-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("tree", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("sto", font=0)
     kern(0.27779pt)
@@ -50063,6 +51275,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("him", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("it", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("w", font=0)
@@ -50079,7 +51296,13 @@ hbox(
     kern(0.27779pt)
     chars("ok", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("tulip-ro", font=0)
+    chars("tulip-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("ro", font=0)
     kern(0.27779pt)
     chars("ots", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -50142,6 +51365,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("things", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("when", font=0)
@@ -50395,7 +51623,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("red", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("rose-tree,", font=0)
+    chars("rose-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("tree,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -50504,6 +51738,11 @@ hbox(
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("to", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("A", font=0)
@@ -51518,7 +52757,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("rose-tree;", font=0)
+    chars("rose-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("tree;", font=0)
     glue(3.33333pt, 2.49998pt, 0.74074pt)
     chars("for,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
@@ -51747,6 +52992,11 @@ hbox(
     chars("O", font=0)
     lig("\u{b}", "ff", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -52110,7 +53360,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("rose-tree,", font=0)
+    chars("rose-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("tree,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("she", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -52233,6 +53489,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("trying", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -52393,7 +53654,13 @@ hbox(
     kern(-0.27779pt)
     chars("w", font=0)
     kern(-0.27779pt)
-    chars("er-p", font=0)
+    chars("er-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("p", font=0)
     kern(0.27779pt)
     chars("ot", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -52746,6 +54013,11 @@ hbox(
     lig("\\", "``", font=0)
     chars("It\'s", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("it\'s", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("a", font=0)
@@ -52844,6 +54116,11 @@ hbox(
     glue(4.44444pt, 3.33331pt, 0.55556pt)
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("where\'s", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
@@ -53117,6 +54394,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("ears", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
@@ -53208,6 +54490,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("said", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -53360,7 +54647,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("cro", font=0)
     kern(0.27779pt)
-    chars("quet-ground", font=0)
+    chars("quet-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("ground", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("in", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -53830,7 +55123,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("doubled-up", font=0)
+    chars("doubled-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("up", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("soldiers", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -54767,6 +56066,11 @@ hbox(
     kern(0.27779pt)
     chars("eak", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("they", font=0)
@@ -54815,6 +56119,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("them", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("y", font=0)
@@ -54899,6 +56208,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("ground", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("I", font=0)
@@ -55035,6 +56349,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("extremely", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Just", font=0)
@@ -55079,6 +56398,11 @@ hbox(
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("lik", font=0)
     kern(-0.27779pt)
     chars("ely", font=0)
@@ -55218,6 +56542,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("mine", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("a", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Cheshire", font=0)
@@ -57508,6 +58837,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("without", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Ma", font=0)
     kern(-0.27779pt)
     chars("yb", font=0)
@@ -57538,7 +58872,13 @@ hbox(
     kern(0.27779pt)
     chars("eople", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("hot-temp", font=0)
+    chars("hot-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("temp", font=0)
     kern(0.27779pt)
     chars("ered,", font=0)
     lig("\"", "\'\'", font=0)
@@ -57600,6 +58940,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("sour", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("camomile", font=0)
@@ -57614,11 +58959,27 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("bitter", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("barley-sugar", font=0)
+    chars("barley-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("sugar", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -57640,7 +59001,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("sw", font=0)
     kern(-0.27779pt)
-    chars("eet-temp", font=0)
+    chars("eet-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("temp", font=0)
     kern(0.27779pt)
     chars("ered.", font=0)
     glue(4.44444pt, 4.99997pt, 0.37036pt)
@@ -57688,6 +59055,11 @@ hbox(
     kern(-0.27779pt)
     chars("w", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -58245,6 +59617,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("is", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("`Oh,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("\'tis", font=0)
@@ -58422,6 +59799,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("is", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("`T", font=0)
     kern(-0.83334pt)
     chars("ak", font=0)
@@ -58734,6 +60116,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("is", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("`Birds", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("of", font=0)
@@ -58934,7 +60321,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("m", font=0)
     kern(-0.27779pt)
-    chars("ustard-mine", font=0)
+    chars("ustard-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("mine", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("near", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -58952,6 +60345,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("is", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("`The", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("more", font=0)
@@ -59101,6 +60499,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("is", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("`Be", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("what", font=0)
@@ -59121,6 +60524,11 @@ hbox(
     kern(0.27779pt)
     chars("e\'", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("or", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("if", font=0)
@@ -59141,6 +60549,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("simply", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("`Nev", font=0)
     kern(-0.27779pt)
     chars("er", font=0)
@@ -59771,6 +61184,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("m", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -60248,7 +61666,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("cro", font=0)
     kern(0.27779pt)
-    chars("quet-ground.", font=0)
+    chars("quet-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("ground.", font=0)
   ],
 )
 
@@ -62458,6 +63882,11 @@ hbox(
     kern(-0.83334pt)
     chars("urtle", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("w", font=0)
     kern(-0.27779pt)
     chars("e", font=0)
@@ -62474,6 +63903,11 @@ hbox(
     kern(-0.83334pt)
     chars("ortoise", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -62839,6 +64273,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("it", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -62998,6 +64437,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("educations", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("in", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("fact,", font=0)
@@ -63028,6 +64472,11 @@ hbox(
     kern(-0.27779pt)
     chars("y", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -63057,7 +64506,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("da", font=0)
     kern(-0.27779pt)
-    chars("y-sc", font=0)
+    chars("y-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("sc", font=0)
     kern(-0.27779pt)
     chars("ho", font=0)
     kern(0.27779pt)
@@ -63349,6 +64804,11 @@ hbox(
     kern(-0.27779pt)
     chars("ashing", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("extra.", font=0)
     lig("\"", "\'\'", font=0)
     chars("\'", font=0)
@@ -63574,6 +65034,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Arithmetic", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Am", font=0)
     kern(-0.27779pt)
     chars("bition,", font=0)
@@ -63749,16 +65214,36 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("means", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("to", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("mak", font=0)
     kern(-0.27779pt)
     chars("e", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("an", font=0)
     kern(-0.27779pt)
     chars("ything", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("prettier.", font=0)
     lig("\"", "\'\'", font=0)
   ],
@@ -63972,6 +65457,11 @@ hbox(
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("Mystery", font=0)
     kern(-0.83334pt)
     chars(",", font=0)
@@ -63998,11 +65488,22 @@ hbox(
     kern(-0.27779pt)
     chars("wling", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Dra", font=0)
     kern(-0.27779pt)
-    chars("wling-master", font=0)
+    chars("wling-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("master", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("w", font=0)
     kern(-0.27779pt)
@@ -64012,7 +65513,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("old", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("conger-eel,", font=0)
+    chars("conger-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("eel,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("that", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -65097,6 +66604,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("again:", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -65143,6 +66655,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("sea", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("(", font=0)
@@ -65160,6 +66677,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Alice)", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\\", "``", font=0)
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -65195,6 +66717,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("lobster", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("(Alice", font=0)
@@ -65216,6 +66743,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("tasted", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("but", font=0)
@@ -65249,6 +66781,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("so", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("y", font=0)
@@ -65372,8 +66909,19 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("sea-shore", font=0)
+    chars("sea-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("shore", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -65440,6 +66988,11 @@ hbox(
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("jelly-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\u{c}", "fi", font=0)
     chars("sh", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -65455,6 +67008,11 @@ hbox(
     kern(-0.27779pt)
     chars("y", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -65505,6 +67063,11 @@ hbox(
   content=[
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("y", font=0)
     kern(-0.27779pt)
     chars("ou", font=0)
@@ -65517,6 +67080,11 @@ hbox(
     kern(-0.27779pt)
     chars("wice", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -65602,6 +67170,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("partners", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -65618,6 +67191,11 @@ hbox(
   content=[
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("c", font=0)
     kern(-0.27779pt)
     chars("hange", font=0)
@@ -65700,6 +67278,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -65756,6 +67339,11 @@ hbox(
   content=[
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("as", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("far", font=0)
@@ -65774,6 +67362,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("can", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -66394,6 +67987,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("sadly:", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -66544,6 +68142,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("shingle", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("will", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("y", font=0)
@@ -66812,6 +68415,11 @@ hbox(
     kern(-0.55556pt)
     chars("ance", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -67057,6 +68665,11 @@ hbox(
     kern(-0.83334pt)
     chars("rance", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -67348,6 +68961,11 @@ hbox(
     lig("\\", "``", font=0)
     chars("they", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("y", font=0)
     kern(-0.27779pt)
     chars("ou\'v", font=0)
@@ -67400,6 +69018,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("dinn", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("she", font=0)
@@ -67559,6 +69182,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("mouths", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("they\'re", font=0)
@@ -67672,6 +69300,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("is", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("here", font=0)
@@ -67706,6 +69339,11 @@ hbox(
     kern(-0.27779pt)
     chars("es.", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\\", "``", font=0)
     chars("T", font=0)
     kern(-0.83334pt)
@@ -68923,6 +70561,11 @@ hbox(
     kern(-0.27779pt)
     chars("tures", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("b", font=0)
     kern(0.27779pt)
     chars("eginning", font=0)
@@ -69753,6 +71396,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("indeed:", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -70642,6 +72290,11 @@ hbox(
     kern(-0.27779pt)
     chars("oice:", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -70722,6 +72375,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("pie", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -70776,7 +72434,13 @@ hbox(
     kern(0.27779pt)
     chars("ok", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("pie-crust,", font=0)
+    chars("pie-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("crust,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -70969,6 +72633,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("banquet", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("]", font=0)
   ],
 )
@@ -71400,6 +73069,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("this:", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -71557,6 +73231,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Beau", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("o", font=0)
     kern(0.27779pt)
     chars("otiful", font=0)
@@ -71565,6 +73244,11 @@ hbox(
     kern(0.27779pt)
     chars("o", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("o", font=0)
     kern(0.27779pt)
     chars("op!", font=0)
@@ -71584,6 +73268,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Beau", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("o", font=0)
     kern(0.27779pt)
     chars("otiful", font=0)
@@ -71592,6 +73281,11 @@ hbox(
     kern(0.27779pt)
     chars("o", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("o", font=0)
     kern(0.27779pt)
     chars("op!", font=0)
@@ -71612,6 +73306,11 @@ hbox(
     kern(0.27779pt)
     chars("o", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("o", font=0)
     kern(0.27779pt)
     chars("op", font=0)
@@ -71622,8 +73321,18 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("e", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("e", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("ev", font=0)
     kern(-0.27779pt)
     chars("ening,", font=0)
@@ -71810,6 +73519,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Beau", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("o", font=0)
     kern(0.27779pt)
     chars("otiful", font=0)
@@ -71818,6 +73532,11 @@ hbox(
     kern(0.27779pt)
     chars("o", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("o", font=0)
     kern(0.27779pt)
     chars("op!", font=0)
@@ -71837,6 +73556,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Beau", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("o", font=0)
     kern(0.27779pt)
     chars("otiful", font=0)
@@ -71845,6 +73569,11 @@ hbox(
     kern(0.27779pt)
     chars("o", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("o", font=0)
     kern(0.27779pt)
     chars("op!", font=0)
@@ -71865,6 +73594,11 @@ hbox(
     kern(0.27779pt)
     chars("o", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("o", font=0)
     kern(0.27779pt)
     chars("op", font=0)
@@ -71875,8 +73609,18 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("e", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("e", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("ev", font=0)
     kern(-0.27779pt)
     chars("ening,", font=0)
@@ -71900,6 +73644,11 @@ hbox(
     kern(0.27779pt)
     chars("eauti", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("FUL", font=0)
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("SOUP!", font=0)
@@ -72157,6 +73906,11 @@ hbox(
     kern(-0.27779pt)
     chars("ords:", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -72175,6 +73929,11 @@ hbox(
     kern(0.27779pt)
     chars("o", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("o", font=0)
     kern(0.27779pt)
     chars("op", font=0)
@@ -72185,8 +73944,18 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("e", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("e", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("ev", font=0)
     kern(-0.27779pt)
     chars("ening,", font=0)
@@ -72315,6 +74084,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("them", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("all", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("sorts", font=0)
@@ -72531,6 +74305,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("them", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\\", "``", font=0)
     chars("I", font=0)
     glue(3.33333pt, 1.66498pt, 1.11221pt)
@@ -72909,7 +74688,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("jury-b", font=0)
+    chars("jury-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("b", font=0)
     kern(0.27779pt)
     chars("o", font=0)
     kern(-0.27779pt)
@@ -73109,7 +74894,13 @@ hbox(
     chars("er,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     lig("\\", "``", font=0)
-    chars("jury-men", font=0)
+    chars("jury-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("men", font=0)
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("w", font=0)
@@ -73959,6 +75750,11 @@ hbox(
     kern(-0.27779pt)
     chars("ws:", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -74288,7 +76084,19 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("of", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("bread-and-butter", font=0)
+    chars("bread-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("and-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("butter", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("in", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -74470,7 +76278,19 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("court,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
-    chars("arm-in-arm", font=0)
+    chars("arm-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("in-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("arm", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("with", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -75050,7 +76870,19 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("bread-and-butter.", font=0)
+    chars("bread-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("and-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("butter.", font=0)
   ],
 )
 
@@ -75780,6 +77612,11 @@ hbox(
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("I", font=0)
@@ -75796,6 +77633,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("tea", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("not", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("ab", font=0)
@@ -75816,6 +77658,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("so", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("what", font=0)
@@ -75824,7 +77671,19 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("bread-and-butter", font=0)
+    chars("bread-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("and-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("butter", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("getting", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -75832,6 +77691,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("thin", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
@@ -75846,6 +77710,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("tea", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -76031,6 +77900,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("that", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("only", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
@@ -76043,6 +77917,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("said", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -76216,6 +78095,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("said", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
@@ -76315,8 +78199,25 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("more", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("bread-and-butter", font=0)
+    chars("bread-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("and-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("butter", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -76473,7 +78374,19 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("bread-and-butter,", font=0)
+    chars("bread-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("and-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("butter,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -76587,7 +78500,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("guinea-pigs", font=0)
+    chars("guinea-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("pigs", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("c", font=0)
     kern(-0.27779pt)
@@ -76709,7 +78628,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("guinea-pig,", font=0)
+    chars("guinea-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("pig,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("head", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -77029,7 +78954,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("other", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("guinea-pig", font=0)
+    chars("guinea-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("pig", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("c", font=0)
     kern(-0.27779pt)
@@ -77065,7 +78996,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("guinea-pigs!", font=0)
+    chars("guinea-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("pigs!", font=0)
     lig("\"", "\'\'", font=0)
     glue(4.44444pt, 4.99997pt, 0.37036pt)
     chars("though", font=0)
@@ -77241,6 +79178,11 @@ hbox(
   content=[
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("just", font=0)
@@ -77387,7 +79329,13 @@ hbox(
     kern(0.27779pt)
     chars("epp", font=0)
     kern(0.27779pt)
-    chars("er-b", font=0)
+    chars("er-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("b", font=0)
     kern(0.27779pt)
     chars("o", font=0)
     kern(-0.27779pt)
@@ -77588,7 +79536,13 @@ hbox(
     kern(-0.27779pt)
     chars("ust", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("cross-examine", font=0)
+    chars("cross-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("examine", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("this", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -78023,7 +79977,13 @@ hbox(
     kern(-0.27779pt)
     chars("ust", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("cross-examine", font=0)
+    chars("cross-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("examine", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -78128,6 +80088,11 @@ hbox(
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("for", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("they", font=0)
@@ -78342,7 +80307,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("jury-b", font=0)
+    chars("jury-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("b", font=0)
     kern(0.27779pt)
     chars("o", font=0)
     kern(-0.27779pt)
@@ -78610,7 +80581,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("jury-b", font=0)
+    chars("jury-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("b", font=0)
     kern(0.27779pt)
     chars("o", font=0)
     kern(-0.27779pt)
@@ -78701,6 +80678,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("places", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("all,", font=0)
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
@@ -78758,7 +80740,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("jury-b", font=0)
+    chars("jury-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("b", font=0)
     kern(0.27779pt)
     chars("o", font=0)
     kern(-0.27779pt)
@@ -79501,24 +81489,44 @@ hbox(
     kern(-0.27779pt)
     chars("t", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("unimp", font=0)
     kern(0.27779pt)
     chars("ortan", font=0)
     kern(-0.27779pt)
     chars("t", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("unimp", font=0)
     kern(0.27779pt)
     chars("ortan", font=0)
     kern(-0.27779pt)
     chars("t", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("imp", font=0)
     kern(0.27779pt)
     chars("ortan", font=0)
     kern(-0.27779pt)
     chars("t", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("as", font=0)
@@ -79705,7 +81713,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("his", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("note-b", font=0)
+    chars("note-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("b", font=0)
     kern(0.27779pt)
     chars("o", font=0)
     kern(0.27779pt)
@@ -79744,7 +81758,13 @@ hbox(
     kern(-0.83334pt)
     chars("ort", font=0)
     kern(-0.27779pt)
-    chars("y-t", font=0)
+    chars("y-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("t", font=0)
     kern(-0.27779pt)
     chars("w", font=0)
     kern(-0.27779pt)
@@ -80073,7 +82093,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("his", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("note-b", font=0)
+    chars("note-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("b", font=0)
     kern(0.27779pt)
     chars("o", font=0)
     kern(0.27779pt)
@@ -80306,6 +82332,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("to", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("to", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("someb", font=0)
@@ -81208,6 +83239,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("read:", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -81985,6 +84021,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("jury", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -82347,6 +84388,11 @@ hbox(
     glue(4.44444pt, 4.99997pt, 0.37036pt)
     lig("\\", "``", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("said", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("I", font=0)
@@ -82357,6 +84403,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("swim", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("y", font=0)
@@ -82551,6 +84602,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("true", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("that\'s", font=0)
@@ -82565,6 +84621,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("course", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("`I", font=0)
     glue(3.33333pt, 1.66498pt, 1.11221pt)
     chars("ga", font=0)
@@ -82593,6 +84654,11 @@ hbox(
     kern(-0.27779pt)
     chars("o", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("wh", font=0)
@@ -82631,6 +84697,11 @@ hbox(
     kern(-0.27779pt)
     chars("w", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     lig("\"", "\'\'", font=0)
   ],
 )
@@ -82753,6 +84824,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("again", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("`b", font=0)
     kern(0.27779pt)
     chars("efore", font=0)
@@ -82766,6 +84842,11 @@ hbox(
     lig("\u{c}", "fi", font=0)
     chars("t", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("\'", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("y", font=0)
@@ -83141,6 +85222,11 @@ hbox(
     lig("\u{c}", "fi", font=0)
     chars("rst", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("v", font=0)
     kern(-0.27779pt)
     chars("erdict", font=0)
@@ -83966,6 +86052,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("dream:", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
   ],
 )
 
@@ -84053,6 +86144,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("hers", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("she", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("could", font=0)
@@ -84135,6 +86231,11 @@ hbox(
     kern(-0.27779pt)
     chars("es", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("still", font=0)
@@ -84231,6 +86332,11 @@ hbox(
     kern(-0.27779pt)
     chars("y", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("frigh", font=0)
@@ -84265,6 +86371,11 @@ hbox(
     kern(0.27779pt)
     chars("ol", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("she", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("could", font=0)
@@ -84303,7 +86414,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("nev", font=0)
     kern(-0.27779pt)
-    chars("er-ending", font=0)
+    chars("er-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("ending", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("meal,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
@@ -84338,13 +86455,24 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("execution", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("once", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("more", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("pig-bab", font=0)
+    chars("pig-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("bab", font=0)
     kern(-0.27779pt)
     chars("y", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
@@ -84378,6 +86506,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("it", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("once", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("more", font=0)
@@ -84402,7 +86535,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("Lizard\'s", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("slate-p", font=0)
+    chars("slate-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("p", font=0)
     kern(0.27779pt)
     chars("encil,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
@@ -84420,7 +86559,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("suppressed", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("guinea-pigs,", font=0)
+    chars("guinea-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("pigs,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     lig("\u{c}", "fi", font=0)
     chars("lled", font=0)
@@ -84547,6 +86692,11 @@ hbox(
     kern(-0.27779pt)
     chars("y", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("grass", font=0)
@@ -84597,6 +86747,11 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("reeds", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("rattling", font=0)
@@ -84615,7 +86770,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("tinkling", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("sheep-b", font=0)
+    chars("sheep-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("b", font=0)
     kern(0.27779pt)
     chars("ells,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
@@ -84649,6 +86810,11 @@ hbox(
     kern(-0.27779pt)
     chars("y", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
@@ -84713,10 +86879,21 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("busy", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("farm-y", font=0)
+    chars("farm-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("y", font=0)
     kern(-0.27779pt)
     chars("ard", font=0)
     lig("{", "--", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
     chars("while", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
@@ -84817,7 +86994,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("the", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)
-    chars("after-time,", font=0)
+    chars("after-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("time,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("b", font=0)
     kern(0.27779pt)
@@ -85036,7 +87219,13 @@ hbox(
     glue(3.33333pt, 1.66666pt, 1.11111pt)
     chars("c", font=0)
     kern(-0.27779pt)
-    chars("hild-life,", font=0)
+    chars("hild-", font=0)
+    disc(
+      pre_break=[],
+      post_break=[],
+      replace_count=0,
+    )
+    chars("life,", font=0)
     glue(3.33333pt, 2.08331pt, 0.88889pt)
     chars("and", font=0)
     glue(3.33333pt, 1.66666pt, 1.11111pt)

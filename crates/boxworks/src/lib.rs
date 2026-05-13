@@ -86,3 +86,7 @@ pub trait LineBreaker {
         h_list: &mut Vec<ds::Horizontal>,
     );
 }
+
+pub trait Hyphenator {
+    fn hyphenate(&self, list: &mut Vec<ds::Horizontal>);
+}

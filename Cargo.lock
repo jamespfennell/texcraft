@@ -191,6 +191,7 @@ dependencies = [
  "ariadne",
  "assert_cmd",
  "boxworks",
+ "boxworks-hyphenate",
  "boxworks-knuthplass",
  "boxworks-tex",
  "boxworks-text",

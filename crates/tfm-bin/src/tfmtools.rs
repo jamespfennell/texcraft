@@ -423,8 +423,8 @@ impl LigKern {
                     print!(" kern({kern})");
                 }
 
-                fn emit_ligature(&mut self, c: char, original: std::rc::Rc<str>) {
-                    print!(" lig({c}, {original})");
+                fn emit_ligature(&mut self, ligature: tfm::ligkern::Ligature) {
+                    print!(" lig({}, {})", ligature.c, ligature.original);
                 }
             }
             let mut emitter = Emitter {};

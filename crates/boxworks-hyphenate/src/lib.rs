@@ -1,12 +1,28 @@
 use boxworks::ds;
 
-pub fn hyphenate_list(list: &mut Vec<ds::Horizontal>) {
-    let out = hyphenate_impl(list);
-    *list = out;
+#[derive(Default)]
+pub struct Hyphenator {
+    hyphenator: hyphenate::Hyphenator,
 }
 
-pub fn hyphenate_impl(list: &[ds::Horizontal]) -> Vec<ds::Horizontal> {
-    let hyphenater = hyphenate::Hyphenator::plain_tex_en_us();
+impl Hyphenator {
+    pub fn plain_tex_en_us() -> Self {
+        Self {
+            hyphenator: hyphenate::Hyphenator::plain_tex_en_us(),
+        }
+    }
+}
+impl boxworks::Hyphenator for Hyphenator {
+    fn hyphenate(&self, list: &mut Vec<ds::Horizontal>) {
+        let out = hyphenate_impl(&self.hyphenator, list);
+        *list = out;
+    }
+}
+
+fn hyphenate_impl(
+    hyphenater: &hyphenate::Hyphenator,
+    list: &[ds::Horizontal],
+) -> Vec<ds::Horizontal> {
     let lower_caser = hyphenate::AsciiLowerCaser::default();
     let mut out = vec![];
     let mut i = 0;
@@ -42,10 +58,14 @@ pub fn hyphenate_impl(list: &[ds::Horizontal]) -> Vec<ds::Horizontal> {
                     // and that \lccode has its PlainTeX values (has lower case character iff
                     // ASCII alphabetic). We should remove these assumptions by plumbing in some
                     // parameters.
-                    if char.char.is_ascii_alphabetic() && hyf_char > 0 && hyf_char <= 255 {
-                        Action::Start { font: char.font }
+                    if char.char.is_ascii_alphabetic() {
+                        if hyf_char > 0 && hyf_char <= 255 {
+                            Action::Start { font: char.font }
+                        } else {
+                            Action::Abort
+                        }
                     } else {
-                        Action::Abort
+                        Action::Continue
                     }
                 }
                 Ligature(ligature) => {
@@ -53,12 +73,16 @@ pub fn hyphenate_impl(list: &[ds::Horizontal]) -> Vec<ds::Horizontal> {
                         None => Action::Continue,
                         Some(char) => {
                             // TODO: all of the TODOs in the Char arm.
-                            if char.is_ascii_alphabetic() && hyf_char > 0 && hyf_char <= 255 {
-                                Action::Start {
-                                    font: ligature.font,
+                            if char.is_ascii_alphabetic() {
+                                if hyf_char > 0 && hyf_char <= 255 {
+                                    Action::Start {
+                                        font: ligature.font,
+                                    }
+                                } else {
+                                    Action::Abort
                                 }
                             } else {
-                                Action::Abort
+                                Action::Continue
                             }
                         }
                     }
@@ -177,7 +201,7 @@ pub fn hyphenate_impl(list: &[ds::Horizontal]) -> Vec<ds::Horizontal> {
                     break true;
                 }
                 HBox(_) | VBox(_) | Rule(_) | Discretionary(_) | Math(_) => {
-                    // done1 in Knuth's TeX.
+                    // done1 in Knuth's TeX.f
                     break false;
                 }
             }

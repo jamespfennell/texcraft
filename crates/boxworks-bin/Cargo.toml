@@ -12,6 +12,7 @@ keywords = ["tex", "texcraft"]
 boxworks = {path="../boxworks", features=["ariadne"] }
 boxworks-knuthplass = {path="../boxworks-knuthplass" }
 boxworks-tex = {path="../boxworks-tex" }
+boxworks-hyphenate = {path="../boxworks-hyphenate" }
 boxworks-text = {path="../boxworks-text" }
 tfm = { path="../tfm" }
 common = { path="../common" }

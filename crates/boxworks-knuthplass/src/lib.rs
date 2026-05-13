@@ -11,6 +11,7 @@ pub struct LineBreaker<'a> {
     pub line_widths: &'a [Scaled],
     pub line_indents: &'a [Scaled],
     pub debug_logger: Option<&'a mut dyn debug::Logger>,
+    pub hyphenator: &'a dyn boxworks::Hyphenator,
 }
 
 #[derive(Debug)]
@@ -189,7 +190,7 @@ impl<'a> boxworks::LineBreaker for LineBreaker<'a> {
             value: self.params.par_fill_skip,
         }));
 
-        let break_points = self.break_line_all_attempts(font_repo, v_list, h_list);
+        let break_points = self.break_line_all_attempts(font_repo, self.hyphenator, v_list, h_list);
         println!("{break_points:?}");
         self.post_line_break(font_repo, v_list, h_list, &break_points);
     }
@@ -353,6 +354,7 @@ impl<'a> LineBreaker<'a> {
     pub fn break_line_all_attempts<F: boxworks::FontRepo>(
         &mut self,
         font_repo: &F,
+        hyphenator: &dyn boxworks::Hyphenator,
         _v_list: &mut Vec<ds::Vertical>,
         h_list: &mut Vec<ds::Horizontal>,
     ) -> Vec<usize> {
@@ -368,7 +370,7 @@ impl<'a> LineBreaker<'a> {
         if let Some(debug_logger) = self.debug_logger.as_deref_mut() {
             debug_logger.log_attempt(2);
         }
-        boxworks_hyphenate::hyphenate_list(h_list);
+        hyphenator.hyphenate(h_list);
         if let Some(v) = self.break_line_single_attempt(h_list, font_repo, self.params.tolerance) {
             return v;
         }
@@ -971,11 +973,14 @@ mod tests {
         let log: Rc<RefCell<String>> = Default::default();
         let mut logger = debug::TexLogger::new(log.clone());
 
+        let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us();
+
         let line_breaker = super::LineBreaker {
             params: &params,
             line_widths: &[width],
             line_indents: &[],
             debug_logger: Some(&mut logger),
+            hyphenator: &hyphenator,
         };
         let mut v_list = vec![];
         use boxworks::LineBreaker;

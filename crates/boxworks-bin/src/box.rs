@@ -1,4 +1,5 @@
 use boxworks::lang as bwl;
+use boxworks::LineBreaker;
 use boxworks::TextPreprocessor;
 use boxworks_tex as bwt;
 use clap::Parser;
@@ -153,7 +154,7 @@ impl Hbox {
                 self.font_metrics,
                 self.hyphenate,
             )?,
-            None => run_box_hboxs(self.texts, self.font_metrics)?,
+            None => run_box_hboxs(self.texts, self.font_metrics, self.hyphenate)?,
         };
         print_hboxs(hboxs, labels);
         Ok(())
@@ -172,7 +173,13 @@ struct Linebreak {
 
     /// Use a TeX engine to build the lists (e.g. `tex`, `pdftex`).
     #[clap(long)]
-    tex_engine: String,
+    tex_engine: Option<String>,
+
+    /// Path to a file containing texts to convert, one per line.
+    ///
+    /// Empty lines are ignored. Each non-empty line is converted into a separate horizontal list.
+    #[clap(long)]
+    texts_file: Option<PathBuf>,
 
     /// Width of the vertical list, e.g. "100pt" or "6.5in".
     #[clap(long)]
@@ -236,7 +243,19 @@ struct Linebreak {
 }
 
 impl Linebreak {
-    fn run(self) -> Result<(), String> {
+    fn run(mut self) -> Result<(), String> {
+        if let Some(ref path) = self.texts_file.clone() {
+            let content = match fs::read_to_string(path) {
+                Ok(s) => s,
+                Err(err) => return Err(format!["failed to open file {:?}: {err}", path]),
+            };
+            for line in content.lines() {
+                if !line.is_empty() {
+                    self.texts.push(line.to_owned());
+                }
+            }
+        }
+
         let mut params = boxworks_knuthplass::Params::plain_tex_defaults();
         if let Some(v) = self.adj_demerits {
             params.adj_demerits = v;
@@ -285,14 +304,20 @@ impl Linebreak {
                 .collect::<Result<_, _>>()?,
         };
 
-        let engine = bwt::new_tex_engine_binary(self.tex_engine).map_err(|err| format!["{err}"])?;
-        let vlists = run_tex_vlists(
-            engine.as_ref(),
-            self.texts,
-            self.font_metrics,
-            &widths,
-            &params,
-        )?;
+        let vlists = match self.tex_engine {
+            None => run_box_vlists(self.texts, self.font_metrics, &widths, &params)?,
+            Some(tex_engine) => {
+                let engine =
+                    bwt::new_tex_engine_binary(tex_engine).map_err(|err| format!["{err}"])?;
+                run_tex_vlists(
+                    engine.as_ref(),
+                    self.texts,
+                    self.font_metrics,
+                    &widths,
+                    &params,
+                )?
+            }
+        };
         if self.output_text {
             for vlist in vlists {
                 print_vlist_text(&vlist);
@@ -358,6 +383,7 @@ fn build_tex_context(
 fn run_box_hboxs(
     texts: Vec<String>,
     font_metrics: Option<PathBuf>,
+    hyphenated: bool,
 ) -> Result<Vec<bwl::ast::HBox<'static>>, String> {
     let (tfm_bytes, _) = load_font_metrics(font_metrics)?;
     let mut tfm_file = tfm::File::deserialize(&tfm_bytes).0.unwrap();
@@ -368,16 +394,31 @@ fn run_box_hboxs(
     let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
     font_repo.register_font(0, tfm_file);
     use boxworks::ds;
+    let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us();
     let raw: Vec<ds::HBox> = texts
         .into_iter()
         .map(|text| {
             let mut got = vec![];
             tp.add_text(&text, &mut got);
-            ds::HBox::pack(
+            let box_1 = ds::HBox::pack(
                 &font_repo,
-                got,
+                got.clone(),
                 ds::PackWidth::Additional(common::Scaled::ZERO),
-            )
+            );
+            if !hyphenated {
+                return box_1;
+            }
+            use boxworks::Hyphenator;
+            hyphenator.hyphenate(&mut got);
+            let mut box_2 = ds::HBox::pack(
+                &font_repo,
+                got.clone(),
+                ds::PackWidth::Additional(common::Scaled::ZERO),
+            );
+            box_2.width = box_1.width;
+            box_2.glue_order = box_1.glue_order;
+            box_2.glue_ratio = box_1.glue_ratio;
+            box_2
         })
         .collect();
     use bwl::convert::ToBoxLang;
@@ -401,6 +442,54 @@ fn run_tex_hboxs(
     _ = fonts;
     use bwl::convert::ToBoxLang;
     Ok(hboxs.into_iter().map(|l| l.to_box_lang()).collect())
+}
+
+fn run_box_vlists(
+    texts: Vec<String>,
+    font_metrics: Option<PathBuf>,
+    widths: &[common::Scaled],
+    params: &boxworks_knuthplass::Params,
+) -> Result<Vec<bwl::ast::VBox<'static>>, String> {
+    let (tfm_bytes, _) = load_font_metrics(font_metrics)?;
+    let mut tfm_file = tfm::File::deserialize(&tfm_bytes).0.unwrap();
+    let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
+    let mut tp: boxworks_text::TextPreprocessorImpl = Default::default();
+    tp.register_font(0, &tfm_file, lig_kern_program);
+    tp.activate_font(0);
+    let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
+    font_repo.register_font(0, tfm_file);
+
+    let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us();
+    use boxworks::ds;
+    let raw: Vec<ds::VBox> = texts
+        .into_iter()
+        .map(|text| {
+            let lb = boxworks_knuthplass::LineBreaker {
+                params,
+                line_widths: widths,
+                line_indents: &[],
+                debug_logger: None,
+                hyphenator: &hyphenator,
+            };
+            let mut vlist = vec![];
+
+            let mut h_list = vec![];
+            tp.add_text(&text, &mut h_list);
+            lb.break_line(&font_repo, &mut vlist, &mut h_list);
+            ds::VBox {
+                height: common::Scaled::ZERO,
+                width: common::Scaled::ZERO,
+                depth: common::Scaled::ZERO,
+                shift_amount: common::Scaled::ZERO,
+                list: vlist,
+                glue_ratio: Default::default(),
+                glue_order: Default::default(),
+            }
+        })
+        .collect();
+    use bwl::convert::ToBoxLang;
+
+    Ok(raw.into_iter().map(|got| got.to_box_lang()).collect())
 }
 
 fn run_tex_vlists(
