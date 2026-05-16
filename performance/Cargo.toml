@@ -23,3 +23,6 @@ harness = false
 [[bench]]
 name = "primes"
 harness = false
+
+[lints]
+workspace = true

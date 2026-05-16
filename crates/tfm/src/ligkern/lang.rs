@@ -5,6 +5,7 @@
 //! The types here are put in a separate module because users of this crate are generally not expected to use them.
 //! Instead, users will work with compiled lig/kern programs.
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -91,7 +92,271 @@ pub enum Operation {
     EntrypointRedirect(u16, bool),
 }
 
+/// Errors returned by the [`Operation::parse_compact`] method.
+#[derive(Debug, PartialEq)]
+pub enum ParseCompactOperationError {
+    NotThreeWords,
+    MiddleWordIsNotAnArrow,
+    FirstWordIsWrongSize,
+    LeftCharInvalid,
+    RightCharInvalid,
+    ReplacementCharInvalid,
+    InvalidDigit,
+    InvalidKern,
+    InvalidLigature,
+    MissingCursor,
+    CursorNotAfterChar,
+    MultipleCursors,
+    MissingReplacementChar,
+    MissingLeftChar,
+    MissingRightChar,
+}
+
 impl Operation {
+    /// Parses a compact representation of an operation.
+    ///
+    /// The representation is of the form:
+    ///
+    ///   <left><right> -> <operation>
+    ///
+    /// where `<left>` and `<right>` are the pair of characters this operation applies to,
+    /// and `<operation>` describes the [`Operation`].
+    ///
+    /// ## Kerns
+    ///
+    /// For kerns, the operation is `<left>[<n>]<right>` where `<n>` is a decimal integer
+    /// (possibly negative) giving the kern size as a [`FixWord`]:
+    ///
+    /// ```
+    /// use tfm::ligkern::lang::*;
+    /// use tfm::FixWord;
+    /// assert_eq![
+    ///     Operation::parse_compact("ab -> a[13]b"),
+    ///     Ok(('a', 'b', Operation::Kern(FixWord(13))))
+    /// ];
+    /// assert_eq![
+    ///     Operation::parse_compact("ab -> a[-4]b"),
+    ///     Ok(('a', 'b', Operation::Kern(FixWord(-4))))
+    /// ];
+    /// ```
+    ///
+    /// ## Ligatures
+    ///
+    /// For ligatures, the operation consists of four characters.
+    /// The following three characters come in order:
+    /// 1.  the left character if it is retained, or `_` if it is not.
+    /// 1.  the replacement character.
+    /// 1.  the right character if it is retained, or `_` if it is not.
+    ///
+    /// There is also a caret `^` indicating where the cursor should be after
+    /// the replacement. The caret can come after any character that is not `_`.
+    /// Thus:
+    ///
+    /// ```
+    /// use tfm::ligkern::lang::*;
+    /// assert_eq![
+    ///     Operation::parse_compact("ab -> ax^b"),
+    ///     Ok(('a', 'b', Operation::Ligature{
+    ///         char_to_insert: 'x'.try_into().unwrap(),
+    ///         post_lig_operation: PostLigOperation::RetainBothMoveToInserted,
+    ///         post_lig_tag_invalid: false,
+    ///     }))
+    /// ];
+    /// assert_eq![
+    ///     Operation::parse_compact("ab -> _xb^"),
+    ///     Ok(('a', 'b', Operation::Ligature{
+    ///         char_to_insert: 'x'.try_into().unwrap(),
+    ///         post_lig_operation: PostLigOperation::RetainRightMoveToRight,
+    ///         post_lig_tag_invalid: false,
+    ///     }))
+    /// ];
+    /// ```
+    pub fn parse_compact(s: &str) -> Result<(char, char, Self), ParseCompactOperationError> {
+        use ParseCompactOperationError::*;
+        let words: Option<[&str; 3]> = (|| {
+            let mut raw = s.split_ascii_whitespace();
+            let words = [raw.next()?, raw.next()?, raw.next()?];
+            if raw.next().is_some() {
+                None
+            } else {
+                Some(words)
+            }
+        })();
+        let Some([first, second, third]) = words else {
+            return Err(NotThreeWords);
+        };
+        if second != "->" {
+            return Err(MiddleWordIsNotAnArrow);
+        }
+        let mut c = first.chars();
+        let (l, r) = match (c.next(), c.next(), c.next()) {
+            (Some(l), Some(r), None) => (l, r),
+            _ => {
+                return Err(FirstWordIsWrongSize);
+            }
+        };
+        if l == '_' || l == '^' {
+            return Err(LeftCharInvalid);
+        }
+        if r == '_' || r == '^' {
+            return Err(RightCharInvalid);
+        }
+
+        if third.contains('[') {
+            let mut chars = third.chars();
+            let lc = chars.next().ok_or(MissingLeftChar)?;
+            if chars.next() != Some('[') {
+                return Err(InvalidKern);
+            }
+            let n_start = lc.len_utf8() + '['.len_utf8();
+            let mut n_end = n_start;
+            loop {
+                match chars.next() {
+                    None => return Err(InvalidKern),
+                    Some(']') => break,
+                    Some(c) => {
+                        n_end += c.len_utf8();
+                    }
+                }
+            }
+            let rc = chars.next().ok_or(MissingRightChar)?;
+            if chars.next().is_some() {
+                return Err(InvalidKern);
+            }
+            if lc != l {
+                return Err(MissingLeftChar);
+            }
+            if rc != r {
+                return Err(MissingRightChar);
+            }
+            let n: i32 = third[n_start..n_end].parse().map_err(|_| InvalidKern)?;
+            return Ok((l, r, Operation::Kern(FixWord(n))));
+        }
+
+        let mut c = third.chars();
+        let c = match (c.next(), c.next(), c.next(), c.next(), c.next()) {
+            (Some(a), Some(b), Some(c), Some(d), None) => (a, b, c, d),
+            _ => {
+                return Err(InvalidLigature);
+            }
+        };
+        enum CaretPos {
+            Left,
+            Middle,
+            Right,
+        }
+        let (caret_pos, a, b, c) = match c {
+            ('^', _, _, _) => {
+                return Err(CursorNotAfterChar);
+            }
+            (a, '^', b, c) => (CaretPos::Left, a, b, c),
+            (a, b, '^', c) => (CaretPos::Middle, a, b, c),
+            (a, b, c, '^') => (CaretPos::Right, a, b, c),
+            _ => {
+                return Err(MissingCursor);
+            }
+        };
+        let retain_l = if a == l {
+            true
+        } else if a == '_' {
+            false
+        } else {
+            return Err(MissingLeftChar);
+        };
+        if b == '_' {
+            return Err(ReplacementCharInvalid);
+        }
+        let Ok(b) = b.try_into() else {
+            return Err(ReplacementCharInvalid);
+        };
+        let retain_r = if c == r {
+            true
+        } else if c == '_' {
+            false
+        } else {
+            return Err(MissingRightChar);
+        };
+        let post_lig_operation = match (retain_l, retain_r, caret_pos) {
+            (true, true, CaretPos::Left) => PostLigOperation::RetainBothMoveNowhere,
+            (true, true, CaretPos::Middle) => PostLigOperation::RetainBothMoveToInserted,
+            (true, true, CaretPos::Right) => PostLigOperation::RetainBothMoveToRight,
+            (true, false, CaretPos::Left) => PostLigOperation::RetainLeftMoveNowhere,
+            (true, false, CaretPos::Middle) => PostLigOperation::RetainLeftMoveToInserted,
+            (false, true, CaretPos::Middle) => PostLigOperation::RetainRightMoveToInserted,
+            (false, true, CaretPos::Right) => PostLigOperation::RetainRightMoveToRight,
+            (false, false, CaretPos::Middle) => PostLigOperation::RetainNeitherMoveToInserted,
+            (true, false, CaretPos::Right)
+            | (false, true, CaretPos::Left)
+            | (false, false, CaretPos::Left)
+            | (false, false, CaretPos::Right) => return Err(CursorNotAfterChar),
+        };
+        Ok((
+            l,
+            r,
+            Operation::Ligature {
+                char_to_insert: b,
+                post_lig_operation,
+                post_lig_tag_invalid: false,
+            },
+        ))
+    }
+
+    /// Display the compact representation of a operation. The format is described in [`parse_compact`].
+    pub fn display_compact<'a>(&'a self, l: char, r: char) -> impl std::fmt::Display + 'a {
+        struct D<'a> {
+            s: &'a Operation,
+            l: char,
+            r: char,
+        }
+        impl<'a> std::fmt::Display for D<'a> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}{} -> ", self.l, self.r)?;
+                match self.s {
+                    Operation::Kern(kern) => {
+                        write!(f, "{}[{}]{}", self.l, kern.0, self.r)
+                    }
+                    Operation::KernAtIndex(_) | Operation::EntrypointRedirect(_, _) => {
+                        write!(f, "<unknown>")
+                    }
+                    Operation::Ligature {
+                        char_to_insert,
+                        post_lig_operation,
+                        post_lig_tag_invalid: _,
+                    } => {
+                        use PostLigOperation::*;
+                        match post_lig_operation {
+                            RetainBothMoveNowhere => {
+                                write!(f, "{}^{}{}", self.l, char_to_insert, self.r)
+                            }
+                            RetainBothMoveToInserted => {
+                                write!(f, "{}{}^{}", self.l, char_to_insert, self.r)
+                            }
+                            RetainBothMoveToRight => {
+                                write!(f, "{}{}{}^", self.l, char_to_insert, self.r)
+                            }
+                            RetainRightMoveToInserted => {
+                                write!(f, "_{}^{}", char_to_insert, self.r)
+                            }
+                            RetainRightMoveToRight => {
+                                write!(f, "_{}{}^", char_to_insert, self.r)
+                            }
+                            RetainLeftMoveNowhere => {
+                                write!(f, "{}^{}_", self.l, char_to_insert)
+                            }
+                            RetainLeftMoveToInserted => {
+                                write!(f, "{}{}^_", self.l, char_to_insert)
+                            }
+                            RetainNeitherMoveToInserted => {
+                                write!(f, "_{}^_", char_to_insert)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        D { s: self, l, r }
+    }
+
     pub(crate) fn lig_kern_operation_from_bytes(op_byte: u8, remainder: u8) -> Self {
         match op_byte.checked_sub(128) {
             Some(r) => Self::KernAtIndex(u16::from_be_bytes([r, remainder])),
@@ -176,7 +441,74 @@ pub enum InvalidEntrypointError {
     Indirect { packed: u8, unpacked: u16 },
 }
 
+#[derive(PartialEq, Debug)]
+pub enum ParseCompactProgramError {
+    InvalidOperation(ParseCompactOperationError),
+    InvalidLeftChar,
+    InvalidRightChar,
+    TooManyOperations,
+}
+
+impl From<ParseCompactOperationError> for ParseCompactProgramError {
+    fn from(value: ParseCompactOperationError) -> Self {
+        Self::InvalidOperation(value)
+    }
+}
+
 impl Program {
+    pub fn parse_compact(s: &str) -> Result<(Self, HashMap<Char, u16>), ParseCompactProgramError> {
+        use ParseCompactProgramError::*;
+        let mut operations: BTreeMap<Char, BTreeMap<Char, Operation>> = Default::default();
+        for line in s.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let (l, r, op) = Operation::parse_compact(line)?;
+            let Ok(l) = l.try_into() else {
+                return Err(InvalidLeftChar);
+            };
+            let m = operations.entry(l).or_default();
+            let Ok(r) = r.try_into() else {
+                return Err(InvalidRightChar);
+            };
+            m.insert(r, op);
+        }
+        let mut entrypoints: HashMap<Char, u16> = Default::default();
+        let mut instructions: Vec<Instruction> = vec![];
+        for (left_char, m) in operations {
+            let i: u16 = instructions
+                .len()
+                .try_into()
+                .map_err(|_| TooManyOperations)?;
+            entrypoints.insert(left_char, i);
+            let mut has_operations = false;
+            for (right_char, operation) in m {
+                instructions.push(Instruction {
+                    next_instruction: Some(1),
+                    right_char,
+                    operation,
+                });
+                has_operations = true;
+            }
+            if has_operations {
+                instructions
+                    .last_mut()
+                    .expect("we wrote at least one instruction")
+                    .next_instruction = None;
+            }
+        }
+        Ok((
+            Self {
+                instructions,
+                left_boundary_char_entrypoint: None,
+                right_boundary_char: None,
+                passthrough: Default::default(),
+            },
+            entrypoints,
+        ))
+    }
+
     pub fn unpack_entrypoint(&mut self, entrypoint: u8) -> Result<u16, InvalidEntrypointError> {
         match self.instructions.get(entrypoint as usize) {
             None => Err(InvalidEntrypointError::Direct { entrypoint }),
@@ -670,4 +1002,271 @@ impl<'a> Iterator for InstructionsForEntrypointIter<'a> {
             (this, i)
         })
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    macro_rules! parse_compact_program_tests {
+        ( $( ($name: ident, $input: expr, $want: expr, ),)+ ) => {
+            mod parse_compact_program {
+                use super::*;
+                use ParseCompactProgramError::*;
+            $(
+                #[test]
+                fn $name() {
+                    let want: Result<(Program, HashMap<Char, u16>), ParseCompactProgramError> = $want;
+                    assert_eq![
+                        Program::parse_compact($input),
+                        want,
+                    ];
+                }
+            )+
+            }
+        };
+    }
+
+    parse_compact_program_tests!(
+        (
+            ok,
+            "
+                ac -> _y^_
+                ab -> axb^
+                bc -> b[1]c
+            ",
+            Ok((
+                Program {
+                    instructions: vec![
+                        Instruction {
+                            next_instruction: Some(1),
+                            right_char: 'b'.try_into().unwrap(),
+                            operation: Operation::Ligature {
+                                char_to_insert: 'x'.try_into().unwrap(),
+                                post_lig_operation: PostLigOperation::RetainBothMoveToRight,
+                                post_lig_tag_invalid: false,
+                            }
+                        },
+                        Instruction {
+                            next_instruction: None,
+                            right_char: 'c'.try_into().unwrap(),
+                            operation: Operation::Ligature {
+                                char_to_insert: 'y'.try_into().unwrap(),
+                                post_lig_operation: PostLigOperation::RetainNeitherMoveToInserted,
+                                post_lig_tag_invalid: false,
+                            }
+                        },
+                        Instruction {
+                            next_instruction: None,
+                            right_char: 'c'.try_into().unwrap(),
+                            operation: Operation::Kern(FixWord(1)),
+                        },
+                    ],
+                    left_boundary_char_entrypoint: None,
+                    right_boundary_char: None,
+                    passthrough: Default::default(),
+                },
+                HashMap::from([('a'.try_into().unwrap(), 0), ('b'.try_into().unwrap(), 2),])
+            )),
+        ),
+        (invalid_left_char, "αb -> _c^_", Err(InvalidLeftChar),),
+        (invalid_right_char, "bα -> _c^_", Err(InvalidRightChar),),
+    );
+
+    macro_rules! parse_compact_operation_tests {
+        ( $( ($name: ident, $input: expr, $want: expr, ),)+ ) => {
+            mod parse_compact_operation {
+                use super::*;
+                use ParseCompactOperationError::*;
+            $(
+                #[test]
+                fn $name() {
+                    let want: Result<(char, char, Operation), ParseCompactOperationError> = $want;
+                    assert_eq![
+                        Operation::parse_compact($input),
+                        want,
+                    ];
+                    if let Ok((l, r, op)) = want {
+                        let s = format!["{}", op.display_compact(l, r)];
+                        assert_eq![s, $input];
+                    }
+                }
+            )+
+            }
+        };
+    }
+
+    parse_compact_operation_tests!(
+        (one_word, "ab", Err(NotThreeWords),),
+        (four_words, "ab -> axb^ four", Err(NotThreeWords),),
+        (not_an_arrow, "ab %% axb^", Err(MiddleWordIsNotAnArrow),),
+        (first_too_small, "a -> axb^", Err(FirstWordIsWrongSize),),
+        (first_too_big, "abc -> axb^", Err(FirstWordIsWrongSize),),
+        (left_char_invalid, "_b -> _xb^", Err(LeftCharInvalid),),
+        (right_char_invalid, "a_ -> ax_^", Err(RightCharInvalid),),
+        (
+            cursor_not_after_char_1,
+            "ab -> ^_x_",
+            Err(CursorNotAfterChar),
+        ),
+        (
+            cursor_not_after_char_2,
+            "ab -> _^x_",
+            Err(CursorNotAfterChar),
+        ),
+        (
+            cursor_not_after_char_3,
+            "ab -> _x_^",
+            Err(CursorNotAfterChar),
+        ),
+        (
+            cursor_not_after_char_4,
+            "ab -> _^xb",
+            Err(CursorNotAfterChar),
+        ),
+        (
+            cursor_not_after_char_5,
+            "ab -> ax_^",
+            Err(CursorNotAfterChar),
+        ),
+        (
+            lig_1,
+            "ab -> a^xb",
+            Ok((
+                'a',
+                'b',
+                Operation::Ligature {
+                    char_to_insert: 'x'.try_into().unwrap(),
+                    post_lig_operation: PostLigOperation::RetainBothMoveNowhere,
+                    post_lig_tag_invalid: false,
+                }
+            )),
+        ),
+        (
+            lig_2,
+            "ab -> ax^b",
+            Ok((
+                'a',
+                'b',
+                Operation::Ligature {
+                    char_to_insert: 'x'.try_into().unwrap(),
+                    post_lig_operation: PostLigOperation::RetainBothMoveToInserted,
+                    post_lig_tag_invalid: false,
+                }
+            )),
+        ),
+        (
+            lig_3,
+            "ab -> axb^",
+            Ok((
+                'a',
+                'b',
+                Operation::Ligature {
+                    char_to_insert: 'x'.try_into().unwrap(),
+                    post_lig_operation: PostLigOperation::RetainBothMoveToRight,
+                    post_lig_tag_invalid: false,
+                }
+            )),
+        ),
+        (
+            lig_4,
+            "ab -> _x^b",
+            Ok((
+                'a',
+                'b',
+                Operation::Ligature {
+                    char_to_insert: 'x'.try_into().unwrap(),
+                    post_lig_operation: PostLigOperation::RetainRightMoveToInserted,
+                    post_lig_tag_invalid: false,
+                }
+            )),
+        ),
+        (
+            lig_5,
+            "ab -> _xb^",
+            Ok((
+                'a',
+                'b',
+                Operation::Ligature {
+                    char_to_insert: 'x'.try_into().unwrap(),
+                    post_lig_operation: PostLigOperation::RetainRightMoveToRight,
+                    post_lig_tag_invalid: false,
+                }
+            )),
+        ),
+        (
+            lig_6,
+            "ab -> a^x_",
+            Ok((
+                'a',
+                'b',
+                Operation::Ligature {
+                    char_to_insert: 'x'.try_into().unwrap(),
+                    post_lig_operation: PostLigOperation::RetainLeftMoveNowhere,
+                    post_lig_tag_invalid: false,
+                }
+            )),
+        ),
+        (
+            lig_7,
+            "ab -> ax^_",
+            Ok((
+                'a',
+                'b',
+                Operation::Ligature {
+                    char_to_insert: 'x'.try_into().unwrap(),
+                    post_lig_operation: PostLigOperation::RetainLeftMoveToInserted,
+                    post_lig_tag_invalid: false,
+                }
+            )),
+        ),
+        (
+            lig_8,
+            "ab -> _x^_",
+            Ok((
+                'a',
+                'b',
+                Operation::Ligature {
+                    char_to_insert: 'x'.try_into().unwrap(),
+                    post_lig_operation: PostLigOperation::RetainNeitherMoveToInserted,
+                    post_lig_tag_invalid: false,
+                }
+            )),
+        ),
+        (
+            kern_1,
+            "ab -> a[13]b",
+            Ok(('a', 'b', Operation::Kern(FixWord(13)),)),
+        ),
+        (
+            kern_2,
+            "ab -> a[-789]b",
+            Ok(('a', 'b', Operation::Kern(FixWord(-789)),)),
+        ),
+        (kern_char_before_bracket, "ab -> ax[1]b", Err(InvalidKern),),
+        (kern_no_close_bracket, "ab -> a[13", Err(InvalidKern),),
+        (kern_no_right_char, "ab -> a[13]", Err(MissingRightChar),),
+        (kern_trailing_chars, "ab -> a[13]bx", Err(InvalidKern),),
+        (kern_wrong_left_char, "ab -> c[13]b", Err(MissingLeftChar),),
+        (kern_wrong_right_char, "ab -> a[13]c", Err(MissingRightChar),),
+        (kern_invalid_number, "ab -> a[xyz]b", Err(InvalidKern),),
+        (kern_empty_number, "ab -> a[]b", Err(InvalidKern),),
+        (third_too_small, "ab -> axb", Err(InvalidLigature),),
+        (third_too_big, "ab -> axbc^", Err(InvalidLigature),),
+        (missing_cursor, "ab -> axb_", Err(MissingCursor),),
+        (
+            replacement_char_is_underscore,
+            "ab -> a^_b",
+            Err(ReplacementCharInvalid),
+        ),
+        (
+            replacement_char_out_of_range,
+            "ab -> a^αb",
+            Err(ReplacementCharInvalid),
+        ),
+        (missing_left_char, "ab -> cxb^", Err(MissingLeftChar),),
+        (missing_right_char, "ab -> axc^", Err(MissingRightChar),),
+        (left_char_is_caret, "^b -> ^xb^", Err(LeftCharInvalid),),
+        (right_char_is_caret, "a^ -> ax^^", Err(RightCharInvalid),),
+    );
 }

@@ -10,3 +10,6 @@ dvi = { version = "0.1", path = "../dvi"}
 [[bin]]
 name = "dvitools"
 path = "src/dvitools.rs"
+
+[lints]
+workspace = true

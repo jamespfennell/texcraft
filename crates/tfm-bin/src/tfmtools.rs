@@ -405,26 +405,26 @@ impl LigKern {
         for (l, r) in lig_kern_program.all_pairs_with_replacements() {
             let s = match l {
                 None => {
-                    print!("     {r} ->");
+                    print!("     {r} -> ");
                     format!["{r}"]
                 }
                 Some(l) => {
-                    print!("   {l} {r} ->");
+                    print!("   {l}{r} -> ");
                     format!["{l}{r}"]
                 }
             };
             struct Emitter;
             impl tfm::ligkern::Emitter for Emitter {
                 fn emit_character(&mut self, c: char) {
-                    print!(" char({c})")
+                    print!("{}", c.escape_debug())
                 }
 
                 fn emit_kern(&mut self, kern: common::Scaled) {
-                    print!(" kern({kern})");
+                    print!("[{}]", kern.0);
                 }
 
                 fn emit_ligature(&mut self, ligature: tfm::ligkern::Ligature) {
-                    print!(" lig({}, {})", ligature.c, ligature.original);
+                    print!("{}", ligature.c.escape_debug());
                 }
             }
             let mut emitter = Emitter {};

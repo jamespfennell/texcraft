@@ -16,3 +16,6 @@ tempfile = "3"
 [[bin]]
 name = "hyphenate"
 path = "src/main.rs"
+
+[lints]
+workspace = true

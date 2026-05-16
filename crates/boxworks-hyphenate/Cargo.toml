@@ -12,3 +12,6 @@ keywords = ["tex", "texcraft"]
 # Texcraft
 hyphenate = { path = "../hyphenate" }
 boxworks = { path = "../boxworks" }
+
+[lints]
+workspace = true

@@ -31,3 +31,6 @@ path = "src/texcraft.rs"
 [[bin]]
 name = "randtex"
 path = "src/randtex.rs"
+
+[lints]
+workspace = true

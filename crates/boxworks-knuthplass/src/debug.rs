@@ -97,8 +97,7 @@ impl Logger for TexLogger {
         self.pending_fbs.push((fb, line));
     }
     fn log_new_active_node(&mut self, an: NewActiveNode) {
-        self.pending_fbs
-            .sort_by(|a, b| a.0.previous_node_index.cmp(&b.0.previous_node_index));
+        self.pending_fbs.sort_by_key(|a| a.0.previous_node_index);
         for (_, line) in &self.pending_fbs {
             _ = writeln!(self.writer.borrow_mut(), "{}", line);
         }

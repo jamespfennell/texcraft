@@ -24,3 +24,6 @@ texcraft-stdext = { path = "../texcraft-stdext" }
 
 [features]
 serde = ["dep:serde", "texlang-testing/serde", "texlang-stdlib/serde" ]
+
+[lints]
+workspace = true

@@ -344,8 +344,8 @@ pub fn pretty_print_prefix_and_parameters(
     }
 
     d.push_str(&format![" . Parameters ({}):\n", parameters.len()]);
-    let mut parameter_number = 1;
-    for parameter in parameters {
+    for (i, parameter) in parameters.iter().enumerate() {
+        let parameter_number = i + 1;
         match parameter {
             Parameter::Undelimited => {
                 d.push_str(&format![
@@ -361,18 +361,16 @@ pub fn pretty_print_prefix_and_parameters(
                 ]);
             }
         }
-        parameter_number += 1;
     }
 
     d.push_str(" . Full argument specification: `");
     d.push_str(&token::write_tokens(prefix, interner));
-    let mut parameter_number = 1;
-    for parameter in parameters {
+    for (i, parameter) in parameters.iter().enumerate() {
+        let parameter_number = i + 1;
         d.push_str(&colored_parameter_number(parameter_number));
         if let Parameter::Delimited(factory) = parameter {
             d.push_str(token::write_token_values(factory.substring(), interner).as_str());
         }
-        parameter_number += 1;
     }
     d.push('`');
     d

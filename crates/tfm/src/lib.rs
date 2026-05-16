@@ -922,7 +922,7 @@ impl std::fmt::Display for Char {
         if (self.0 as char).is_ascii_graphic() {
             write!(f, "{}", self.0 as char)
         } else {
-            write!(f, "0x{:02x}", self.0)
+            write!(f, "\\u{{{:02x}}}", self.0)
         }
     }
 }

@@ -21,3 +21,6 @@ bincode = { version="2.0.0-rc.3", default-features = false, features = ["alloc",
 [features]
 default = []
 serde = ["dep:serde", "dep:serde_json", "dep:rmp-serde", "dep:bincode", "texlang/serde"]
+
+[lints]
+workspace = true

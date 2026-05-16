@@ -17,3 +17,6 @@ texlang-stdlib = { path = "../texlang-stdlib", default-features = false, feature
 [dev-dependencies]
 texcraft-stdext = { path = "../texcraft-stdext" }
 texlang-testing = { path = "../texlang-testing" }
+
+[lints]
+workspace = true

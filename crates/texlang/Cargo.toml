@@ -21,3 +21,6 @@ serde = {features = ["derive"], version="^1.0", optional = true}
 default = ["color"]
 color = ["texcraft-stdext/color"]
 serde = ["dep:serde", "texcraft-stdext/serde", "common/serde"]
+
+[lints]
+workspace = true

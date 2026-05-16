@@ -29,3 +29,6 @@ path = "src/tftopl.rs"
 [[bin]]
 name = "pltotf"
 path = "src/pltotf.rs"
+
+[lints]
+workspace = true

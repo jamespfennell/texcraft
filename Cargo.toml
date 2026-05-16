@@ -7,5 +7,8 @@ members = [
 ]
 resolver = "2"
 
+[workspace.lints.clippy]
+collapsible_match = "allow"
+
 [profile.release]
 lto = true

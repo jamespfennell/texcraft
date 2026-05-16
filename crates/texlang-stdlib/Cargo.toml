@@ -51,3 +51,6 @@ serde = [
     "texlang-testing/serde"
 ]
 time = ["dep:chrono"]
+
+[lints]
+workspace = true

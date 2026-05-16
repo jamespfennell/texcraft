@@ -79,7 +79,7 @@ pub fn find_close_words(dictionary: &[&str], word: &str) -> Vec<WordDiff> {
         let comparison = levenshtein_distance(word, valid_word); // word);
         comparisons.push(comparison);
     }
-    comparisons.sort_by(|a, b| a.distance.cmp(&b.distance));
+    comparisons.sort_by_key(|a| a.distance);
     comparisons
 }
 

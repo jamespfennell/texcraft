@@ -11,3 +11,6 @@ keywords = ["tex", "texcraft"]
 [dependencies]
 
 [features]
+
+[lints]
+workspace = true

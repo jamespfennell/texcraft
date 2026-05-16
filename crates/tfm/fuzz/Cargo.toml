@@ -27,3 +27,6 @@ path = "fuzz_targets/fuzz_pltotf.rs"
 test = false
 doc = false
 bench = false
+
+[lints]
+workspace = true
