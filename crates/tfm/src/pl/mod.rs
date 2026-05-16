@@ -154,6 +154,19 @@ impl File {
             .collect()
     }
 
+    pub fn replace_lig_kern_program(
+        &mut self,
+        program: ligkern::lang::Program,
+        entrypoints: HashMap<Char, u16>,
+    ) {
+        self.lig_kern_program = program;
+        self.char_tags
+            .retain(|_, tag| !matches!(tag, CharTag::Ligature(_)));
+        for (c, ep) in entrypoints {
+            self.char_tags.insert(c, CharTag::Ligature(ep));
+        }
+    }
+
     /// Clear all lig/kern data from the file.
     pub fn clear_lig_kern_data(&mut self) {
         // PLtoTF.2014.125

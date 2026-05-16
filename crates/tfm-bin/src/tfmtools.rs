@@ -48,7 +48,7 @@ impl Cli {
             Command::Convert(convert) => convert.run(self.pl_indent, self.pl_charcode_format),
             Command::Debug(debug) => debug.run(),
             Command::Fmt(format) => format.run(),
-            Command::Ligkern(lig_kern) => lig_kern.run(),
+            Command::Ligkern { action: lig_kern } => lig_kern.run(),
             Command::Undebug(undebug) => undebug.run(),
         }
     }
@@ -91,8 +91,11 @@ enum Command {
     /// Format a property list file.
     Fmt(Format),
 
-    /// Compile and describe the lig/kern program in a .tfm or property list file.
-    Ligkern(LigKern),
+    /// Perform operations related to the lig/kern program in a .tfm or property list file.
+    Ligkern {
+        #[command(subcommand)]
+        action: LigKern,
+    },
 
     /// Create a .tfm file from the (potentially modified) output of `tfmtools debug`
     ///
@@ -377,13 +380,31 @@ impl Format {
     }
 }
 
+#[derive(Clone, Debug, clap::Subcommand)]
+enum LigKern {
+    Describe(LigKernDescribe),
+    Replace(LigKernReplace),
+    Run(LigKernRun),
+}
+
+impl LigKern {
+    fn run(&self) -> Result<(), String> {
+        use LigKern::*;
+        match self {
+            Describe(describe) => describe.run(),
+            Replace(replace) => replace.run(),
+            Run(run) => run.run(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Parser)]
-struct LigKern {
+struct LigKernDescribe {
     /// Path to the .tfm or property list file.
     path: TfOrPlPath,
 }
 
-impl LigKern {
+impl LigKernDescribe {
     fn run(&self) -> Result<(), String> {
         let lig_kern_program = match &self.path {
             TfOrPlPath::Tf(tfm_path) => {
@@ -432,6 +453,115 @@ impl LigKern {
             println!();
         }
         Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Parser)]
+struct LigKernRun {
+    /// Path to the .tfm or property list file.
+    path: TfOrPlPath,
+
+    /// The string to run through the lig/kern program.
+    input: String,
+}
+
+impl LigKernRun {
+    fn run(&self) -> Result<(), String> {
+        let lig_kern_program = match &self.path {
+            TfOrPlPath::Tf(tfm_path) => {
+                let mut tfm_file = tfm_path.read(false)?.file;
+                tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0
+            }
+            TfOrPlPath::Pl(pl_path) => {
+                let (pl_file, _) = pl_path.read()?;
+                let entrypoints = pl_file.lig_kern_entrypoints(true);
+                tfm::ligkern::CompiledProgram::compile(
+                    &pl_file.lig_kern_program,
+                    pl_file.header.design_size,
+                    &[],
+                    entrypoints,
+                )
+                .0
+            }
+        };
+        struct Emitter;
+        impl tfm::ligkern::Emitter for Emitter {
+            fn emit_character(&mut self, c: char) {
+                print!("{c}")
+            }
+            fn emit_kern(&mut self, kern: common::Scaled) {
+                print!("[{}]", kern.0);
+            }
+            fn emit_ligature(&mut self, ligature: tfm::ligkern::Ligature) {
+                print!("{}", ligature.c);
+            }
+        }
+        lig_kern_program.run(&self.input, &mut Emitter);
+        println!();
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Parser)]
+struct LigKernReplace {
+    /// Path to the .tfm or property list file.
+    path: TfOrPlPath,
+
+    /// Path to the lig/kern program file to use as a replacement.
+    #[arg(long)]
+    program: std::path::PathBuf,
+
+    /// Modify the input file in place.
+    #[arg(long)]
+    in_place: bool,
+
+    /// Path to write the output file.
+    #[arg(long)]
+    output: Option<TfOrPlPath>,
+}
+
+impl LigKernReplace {
+    fn run(&self) -> Result<(), String> {
+        if !self.in_place && self.output.is_none() {
+            return Err("one of --in-place or --output must be provided".into());
+        }
+        let program_text = std::fs::read_to_string(&self.program)
+            .map_err(|e| format!("Failed to read `{}`: {}", self.program.display(), e))?;
+        let (new_program, entrypoints) = tfm::ligkern::lang::Program::parse_compact(&program_text)
+            .map_err(|e| format!("Failed to parse lig/kern program: {e:?}"))?;
+        match &self.path {
+            TfOrPlPath::Tf(tf_path) => {
+                let mut tfm = tf_path.read(false)?;
+                tfm.file.replace_lig_kern_program(new_program, entrypoints);
+                let bytes = tfm.file.serialize();
+                let out_path = match (self.in_place, &self.output) {
+                    (true, _) => tf_path.clone(),
+                    (_, Some(TfOrPlPath::Tf(out_tf))) => out_tf.clone(),
+                    (_, Some(TfOrPlPath::Pl(_))) => {
+                        return Err("cannot write a .tfm file to a .pl path".into())
+                    }
+                    _ => unreachable!(),
+                };
+                out_path.write(&bytes)
+            }
+            TfOrPlPath::Pl(pl_path) => {
+                let (mut pl_file, _) = pl_path.read()?;
+                pl_file.replace_lig_kern_program(new_program, entrypoints);
+                let pl_text = format!(
+                    "{}",
+                    pl_file.display(0, tfm::pl::CharDisplayFormat::Default)
+                );
+                let out_path = match (self.in_place, &self.output) {
+                    (true, _) => pl_path.clone(),
+                    (_, Some(TfOrPlPath::Pl(out_pl))) => out_pl.clone(),
+                    (_, Some(TfOrPlPath::Tf(_))) => {
+                        return Err("cannot write a .pl file to a .tfm path".into())
+                    }
+                    _ => unreachable!(),
+                };
+                out_path.write(&pl_text)
+            }
+        }
     }
 }
 

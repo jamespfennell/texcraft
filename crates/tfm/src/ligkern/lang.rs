@@ -485,7 +485,7 @@ impl Program {
             let mut has_operations = false;
             for (right_char, operation) in m {
                 instructions.push(Instruction {
-                    next_instruction: Some(1),
+                    next_instruction: Some(0),
                     right_char,
                     operation,
                 });
@@ -1039,7 +1039,7 @@ mod tests {
                 Program {
                     instructions: vec![
                         Instruction {
-                            next_instruction: Some(1),
+                            next_instruction: Some(0),
                             right_char: 'b'.try_into().unwrap(),
                             operation: Operation::Ligature {
                                 char_to_insert: 'x'.try_into().unwrap(),

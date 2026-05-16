@@ -375,6 +375,19 @@ impl File {
         serialize::serialize(self)
     }
 
+    pub fn replace_lig_kern_program(
+        &mut self,
+        program: ligkern::lang::Program,
+        entrypoints: HashMap<Char, u16>,
+    ) {
+        self.lig_kern_program = program;
+        self.char_tags
+            .retain(|_, tag| !matches!(tag, CharTag::Ligature(_)));
+        for (c, ep) in entrypoints {
+            self.char_tags.insert(c, CharTag::Ligature(ep as u8));
+        }
+    }
+
     /// Return a map from characters to the lig/kern entrypoint for that character.
     /// TODO: can probably return impl Iterator<Item=(Char, u8)>
     pub fn lig_kern_entrypoints(&self) -> HashMap<Char, u8> {
