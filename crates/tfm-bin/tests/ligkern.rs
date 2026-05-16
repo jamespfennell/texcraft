@@ -45,6 +45,27 @@ fn ligkern_run_and_replace() {
         .assert()
         .success()
         .stdout("difabcdeficult\n");
+
+    // Step 4: remove the lig/kern program entirely.
+    Command::cargo_bin("tfmtools")
+        .unwrap()
+        .args([
+            "ligkern",
+            "replace",
+            tfm_path.to_str().unwrap(),
+            "--remove",
+            "--in-place",
+        ])
+        .assert()
+        .success();
+
+    // Step 5: with no lig/kern program, the word is returned unchanged.
+    Command::cargo_bin("tfmtools")
+        .unwrap()
+        .args(["ligkern", "run", tfm_path.to_str().unwrap(), "difficult"])
+        .assert()
+        .success()
+        .stdout("difficult\n");
 }
 
 const PROGRAM: &str = "
