@@ -28,7 +28,7 @@
     }
 
     h1 {
-      font-size: 3rem;
+      font-size: 2rem;
       font-weight: 500;
       color: #8b3a3a;
     }
@@ -97,10 +97,17 @@
     }
 
     await init();
+
+    const pathWord = window.location.pathname.slice(1).trim();
+    if (pathWord) {
+      input.value = pathWord;
+    }
+
     renderResult(hyphenate(input.value));
 
     input.addEventListener('input', () => {
       const word = input.value.trim();
+      history.replaceState(null, '', word ? `/${word}` : '/');
       renderResult(word ? hyphenate(word) : '');
     });
   </script>

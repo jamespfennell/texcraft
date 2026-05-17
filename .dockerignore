@@ -28,5 +28,6 @@
 !docs/src/*
 
 # hyphenate.dev site
+!sites/hyphenate.dev/Caddyfile
 !sites/hyphenate.dev/index.html
 !sites/hyphenate.dev/hyphenate-wasm

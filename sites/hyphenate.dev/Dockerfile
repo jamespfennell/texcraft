@@ -14,5 +14,6 @@ RUN cd sites/hyphenate.dev/hyphenate-wasm && \
 
 FROM caddy
 
+COPY sites/hyphenate.dev/Caddyfile /etc/caddy/Caddyfile
 COPY sites/hyphenate.dev/index.html /usr/share/caddy/
 COPY --from=builder /build/sites/hyphenate.dev/pkg/ /usr/share/caddy/pkg/
