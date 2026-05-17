@@ -1,0 +1,51 @@
+name: play.texcraft.dev
+
+on: [push, pull_request]
+
+jobs:
+  e2e-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -f playground/Dockerfile -t play.texcraft.dev .
+
+      - name: Start server
+        run: docker run -d -p 8080:8080 play.texcraft.dev --memory
+
+      - name: Wait for server to be ready
+        run: timeout 30 bash -c 'until curl -sf http://localhost:8080; do sleep 1; done'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install test dependencies
+        run: npm install puppeteer
+        working-directory: playground
+
+      - name: Run smoke test
+        run: node smoke.test.js
+        working-directory: playground
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: e2e-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: jamespfennell
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: playground/Dockerfile
+          push: true
+          tags: jamespfennell/play.texcraft.dev:latest
