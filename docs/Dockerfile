@@ -6,6 +6,7 @@ COPY Cargo.lock .
 COPY Cargo.toml .
 COPY performance performance
 COPY playground playground
+COPY sites sites
 COPY crates crates
 RUN cargo fetch
 # In order to run the MD book tests we need one and only one build of the Texlang code

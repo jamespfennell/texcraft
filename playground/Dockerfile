@@ -7,6 +7,7 @@ COPY Cargo.toml Cargo.toml
 COPY Cargo.lock Cargo.lock
 COPY performance performance
 COPY playground playground
+COPY sites sites
 COPY crates crates
 RUN wasm-pack build --release playground
 

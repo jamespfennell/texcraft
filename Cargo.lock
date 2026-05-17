@@ -688,6 +688,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyphenate-wasm"
+version = "0.1.0"
+dependencies = [
+ "hyphenate",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "iana-time-zone"
 version = "0.1.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"

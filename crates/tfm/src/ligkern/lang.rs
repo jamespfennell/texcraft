@@ -115,10 +115,7 @@ pub enum ParseCompactOperationError {
 impl Operation {
     /// Parses a compact representation of an operation.
     ///
-    /// The representation is of the form:
-    ///
-    ///   <left><right> -> <operation>
-    ///
+    /// The representation is of the form `<left><right> -> <operation>` 
     /// where `<left>` and `<right>` are the pair of characters this operation applies to,
     /// and `<operation>` describes the [`Operation`].
     ///
@@ -301,7 +298,7 @@ impl Operation {
         ))
     }
 
-    /// Display the compact representation of a operation. The format is described in [`parse_compact`].
+    /// Display the compact representation of a operation. The format is described in [`Operation::parse_compact`].
     pub fn display_compact<'a>(&'a self, l: char, r: char) -> impl std::fmt::Display + 'a {
         struct D<'a> {
             s: &'a Operation,

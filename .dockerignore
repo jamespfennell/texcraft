@@ -26,3 +26,7 @@
 
 !docs/book.toml
 !docs/src/*
+
+# hyphenate.dev site
+!sites/hyphenate.dev/index.html
+!sites/hyphenate.dev/hyphenate-wasm

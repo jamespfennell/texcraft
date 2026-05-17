@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>hyphenate.dev</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #e8d5c4;
+      color: #5c2a2a;
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2.5rem;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 3rem;
+      font-weight: 500;
+      color: #8b3a3a;
+    }
+
+    #word-input {
+      font-size: 3rem;
+      font-family: inherit;
+      width: 100%;
+      max-width: 480px;
+      padding: 0.75rem 1.25rem;
+      border: 2px solid #8b3a3a;
+      border-radius: 6px;
+      background-color: #f5ede3;
+      color: #5c2a2a;
+      text-align: center;
+      outline: none;
+      appearance: none;
+    }
+
+    #word-input:focus {
+      border-color: #8b3a3a;
+      background-color: #fdf6f0;
+    }
+
+    #result {
+      font-size: 3rem;
+      color: #5c2a2a;
+      min-height: 1.2em;
+    }
+
+    #result .hyphen {
+      color: #8b3a3a;
+    }
+
+    #attribution {
+      position: fixed;
+      bottom: 1rem;
+      right: 1.25rem;
+      font-size: 1rem;
+      color: #5c2a2a;
+    }
+
+    #attribution a {
+      color: inherit;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+  </style>
+</head>
+<body>
+  <h1>hyphenate.dev</h1>
+  <input id="word-input" type="text" value="difficult" spellcheck="false" autocomplete="off" />
+  <div id="result">dif-fi-cult</div>
+  <p id="attribution">A <a href="https://github.com/jamespfennell/texcraft">Texcraft</a> project</p>
+
+  <script type="module">
+    import init, { hyphenate } from './pkg/hyphenate_wasm.js';
+
+    const input = document.getElementById('word-input');
+    const result = document.getElementById('result');
+
+    function renderResult(hyphenated) {
+      result.innerHTML = hyphenated
+        .split('-')
+        .join('<span class="hyphen">-</span>');
+    }
+
+    await init();
+    renderResult(hyphenate(input.value));
+
+    input.addEventListener('input', () => {
+      const word = input.value.trim();
+      renderResult(word ? hyphenate(word) : '');
+    });
+  </script>
+</body>
+</html>

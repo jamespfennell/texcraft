@@ -4,6 +4,7 @@ members = [
     "crates/tfm/fuzz",
     "performance",
     "playground",
+    "sites/hyphenate.dev/hyphenate-wasm",
 ]
 resolver = "2"
 
