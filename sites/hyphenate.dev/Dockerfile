@@ -2,7 +2,7 @@
 #   docker build -f sites/hyphenate.dev/Dockerfile -t hyphenate.dev .
 #   docker run -p 8080:80 hyphenate.dev
 
-FROM rust:1.82.0 AS builder
+FROM rust:1.95.0 AS builder
 
 RUN cargo install wasm-pack && rustup target add wasm32-unknown-unknown
 
