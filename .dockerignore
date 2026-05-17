@@ -9,20 +9,20 @@
 !crates
 
 # Playground Rust files
-!playground/Cargo.toml
-!playground/src
+!sites/play.texcraft.dev/Cargo.toml
+!sites/play.texcraft.dev/src
 
 # Playground Javascript
-!playground/ui/src
-!playground/ui/static
-!playground/ui/*.json
-!playground/ui/.babelrc
-!playground/ui/webpack.config.js
+!sites/play.texcraft.dev/ui/src
+!sites/play.texcraft.dev/ui/static
+!sites/play.texcraft.dev/ui/*.json
+!sites/play.texcraft.dev/ui/.babelrc
+!sites/play.texcraft.dev/ui/webpack.config.js
 
 # Playground Go
-!playground/go.mod
-!playground/go.sum
-!playground/*.go
+!sites/play.texcraft.dev/go.mod
+!sites/play.texcraft.dev/go.sum
+!sites/play.texcraft.dev/*.go
 
 !docs/book.toml
 !docs/src/*

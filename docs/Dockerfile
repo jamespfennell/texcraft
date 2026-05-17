@@ -5,7 +5,6 @@ WORKDIR /texcraft
 COPY Cargo.lock .
 COPY Cargo.toml .
 COPY performance performance
-COPY playground playground
 COPY sites sites
 COPY crates crates
 RUN cargo fetch

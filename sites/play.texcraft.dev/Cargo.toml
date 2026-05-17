@@ -20,10 +20,10 @@ web-sys = {version = "0.3.22", features = ["console"]}
 # in debug mode.
 console_error_panic_hook = "0.1.5"
 
-common = { path = "../crates/common", default-features = false }
-texcraft-stdext = { path = "../crates/texcraft-stdext", default-features = false }
-texlang = { path = "../crates/texlang", default-features = false }
-texlang-stdlib = { path = "../crates/texlang-stdlib", default-features = false }
+common = { path = "../../crates/common", default-features = false }
+texcraft-stdext = { path = "../../crates/texcraft-stdext", default-features = false }
+texlang = { path = "../../crates/texlang", default-features = false }
+texlang-stdlib = { path = "../../crates/texlang-stdlib", default-features = false }
 
 [lints]
 workspace = true

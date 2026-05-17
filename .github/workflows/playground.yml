@@ -9,7 +9,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build Docker image
-        run: docker build -f playground/Dockerfile -t play.texcraft.dev .
+        run: docker build -f sites/play.texcraft.dev/Dockerfile -t play.texcraft.dev .
 
       - name: Start server
         run: docker run -d -p 8080:8080 play.texcraft.dev --memory
@@ -23,11 +23,11 @@ jobs:
 
       - name: Install test dependencies
         run: npm install puppeteer
-        working-directory: playground
+        working-directory: sites/play.texcraft.dev
 
       - name: Run smoke test
         run: node smoke.test.js
-        working-directory: playground
+        working-directory: sites/play.texcraft.dev
 
   build-and-push:
     runs-on: ubuntu-latest
@@ -46,6 +46,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: playground/Dockerfile
+          file: sites/play.texcraft.dev/Dockerfile
           push: true
           tags: jamespfennell/play.texcraft.dev:latest

@@ -3,7 +3,7 @@ members = [
     "crates/*",
     "crates/tfm/fuzz",
     "performance",
-    "playground",
+    "sites/play.texcraft.dev",
     "sites/hyphenate.dev/hyphenate-wasm",
 ]
 resolver = "2"
