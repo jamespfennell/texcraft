@@ -3,26 +3,27 @@ use boxworks::ds;
 #[derive(Default)]
 pub struct Hyphenator {
     hyphenator: hyphenate::Hyphenator,
+    left_hyphen_min: i32,
+    right_hyphen_min: i32,
 }
 
 impl Hyphenator {
     pub fn plain_tex_en_us() -> Self {
         Self {
             hyphenator: hyphenate::Hyphenator::plain_tex_en_us(),
+            left_hyphen_min: 2,
+            right_hyphen_min: 3,
         }
     }
 }
 impl boxworks::Hyphenator for Hyphenator {
     fn hyphenate(&self, list: &mut Vec<ds::Horizontal>) {
-        let out = hyphenate_impl(&self.hyphenator, list);
+        let out = hyphenate_impl(self, list);
         *list = out;
     }
 }
 
-fn hyphenate_impl(
-    hyphenater: &hyphenate::Hyphenator,
-    list: &[ds::Horizontal],
-) -> Vec<ds::Horizontal> {
+fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::Horizontal> {
     let lower_caser = hyphenate::AsciiLowerCaser::default();
     let mut out = vec![];
     let mut i = 0;
@@ -212,14 +213,30 @@ fn hyphenate_impl(
             continue;
         }
 
-        let mut indices = hyphenater.calculate_indices(&lower_caser, &s);
+        let l = s.chars().count();
+        // TeX.2021.1200
+        let left_hyphen_min = if hyphenater.left_hyphen_min < 1 {
+            1
+        } else {
+            hyphenater.left_hyphen_min as usize
+        };
+        let right_hyphen_min = if hyphenater.right_hyphen_min < 1 {
+            1
+        } else {
+            hyphenater.right_hyphen_min as usize
+        };
+
+        let mut indices = hyphenater.hyphenator.calculate_indices(&lower_caser, &s);
         let mut next_or = indices.next();
 
         let mut j = hyphenation_start_i;
         let mut chars_pushed = 0;
         while j < i {
             if let Some(next) = next_or {
-                if next == chars_pushed {
+                if next == chars_pushed
+                    && next >= left_hyphen_min
+                    && next <= l.saturating_sub(right_hyphen_min)
+                {
                     let mut replace_count = 0_u32;
                     while j + (replace_count as usize) < i
                         && matches!(&list[j + (replace_count as usize)], ds::Horizontal::Kern(_))

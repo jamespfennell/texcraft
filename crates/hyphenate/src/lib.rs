@@ -221,8 +221,7 @@ impl Hyphenator {
             num_chars += 1;
         }
         total_scores[0] = 0;
-        total_scores[1] = 0;
-        total_scores.truncate(num_chars.saturating_sub(2_usize));
+        total_scores.truncate(num_chars);
         total_scores
             .into_iter()
             .enumerate()
@@ -297,7 +296,8 @@ mod test {
     }
 
     hyphenation_tests!(
-        // From the TeXBook
+        // From the TeXBook.
+        // But the TeXBook assumes that \leftminhyphen=\rightminhyphen=3 so the results are a little different.
         record => "record",
         hyphenation => "hy-phen-ation",
         concatenation => "con-cate-na-tion",
@@ -306,17 +306,17 @@ mod test {
         echelon => "ech-e-lon",
         toothaches => "toothaches",
         campfire => "camp-fire",
-        biorhythm => "biorhythm",
-        algorithm => "al-go-rithm",
-        pneumonoultramicroscopicsilicovolcanoconiosis => "pneu-monoul-tra-mi-cro-scop-ic-sil-i-co-vol-canoco-nio-sis",
+        biorhythm => "biorhyth-m",
+        algorithm => "al-go-rith-m",
+        pneumonoultramicroscopicsilicovolcanoconiosis => "p-neu-monoul-tra-mi-cro-scop-ic-sil-i-co-vol-canoco-nio-sis",
         project => "project",
         present => "present",
         table => "ta-ble",
         Table => "Ta-ble",
         // From running the hyphenator over /usr/share/dict/words on Mac
         ach => "ach",
-        Aaronic => "Aa-ronic",
-        Abelia => "Abelia",
+        Aaronic => "Aa-ron-ic",
+        Abelia => "A-beli-a",
         William => "William",
         chaffless => "chaf-f-less",
     );
