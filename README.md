@@ -1,9 +1,14 @@
 # Texcraft
 
-Texcraft is an experimental project to create a composable, LLVM-style framework for building TeX and other typesetting software.
+Texcraft is a research project to develop a fully modular, LLVM-style framework for
+  building TeX typesetting software.
+We say "research project" because the work is somewhat speculative,
+  though over time the goal seems more and more attainable.
 
 Existing TeX engines (Knuth's original TeX '82, pdfTeX, XeTeX, etc.)
-    all have monolithic software architectures that are not amenable to modification or code sharing.
+  all have monolithic software architectures that are hard to change
+  and essentially impossible to use outside the context of compiling full documents.
+They are not [malleable](https://www.inkandswitch.com/essay/malleable-software/).
 The goal of Texcraft is change this by essentially doing for TeX engines what
     [LLVM](https://en.wikipedia.org/wiki/LLVM) did for compilers.
 In Texcraft, a TeX engine is implemented as a loose collection of libraries that compose together
@@ -13,24 +18,27 @@ The same code can be shared between engines - for example,
     primitive](https://github.com/jamespfennell/texcraft/blob/main/crates/texlang-stdlib/src/registers.rs)
     can be used both for TeX '82 (which has 256 memory registers) and pdfTeX (which has over 32,000 registers).
 
-As of 2025, the project is divided into two main sub-projects:
+The project is divided into two main sub-projects:
 
-- **Texlang** is a framework for building [fast](https://github.com/jamespfennell/texcraft/tree/main/performance)
-    and correct TeX language interpreters.
-    It provides APIs for defining TeX primitives and is thus the core of any "TeX engine" built with Texcraft.
-    Texlang's standard library contains implementations of many TeX primitives like `\count`, `\def` and `\expandafter`.
-
-- **Boxworks** is an implementation of the typesetting engine inside TeX.
+- **Boxworks** is a language-agnostic implementation of the typesetting engine inside TeX.
     It is designed to be fully independent of the TeX language.
     One of the main goals of Boxworks is to support creating new non-TeX typesetting languages
     that use the engine for typesetting.
 
-There are other smaller parts of the project, for example
-    a Rust crates for working with
-    [TeX font metric data](https://texcraft.dev/reference/tfm/)
-    and [DVI output files](https://texcraft.dev/reference/dvi/).
+- **Texlang** is a framework for building [fast](https://github.com/jamespfennell/texcraft/tree/main/performance)
+    TeX language interpreters.
+    It is primarily designed for building TeX language frontends for Boxworks,
+    but it can be used in other contexts too like the [Texcraft playground](https://play.texcraft.dev).
+    Texlang's standard library contains implementations of many TeX primitives like `\count`, `\def` and `\expandafter`.
 
-The [project manifesto](https://texcraft.dev/manifesto.html) describes the big-picture ideas and goals behind project.
+There are other smaller parts of the project, for example
+    a Rust crates for
+    [TeX font metric data](https://texcraft.dev/reference/tfm/),
+    [DVI output files](https://texcraft.dev/reference/dvi/)
+    and [hyphenation](https://texcraft.dev/reference/hyphenate/).
+
+The [project manifesto](https://texcraft.dev/manifesto.html)
+  describes goals of the project in greater depth.
 
 ## Trying it out
 
@@ -58,8 +66,10 @@ The [documentation website](https://texcraft.dev) has more information.
 
 ## Getting involved
 
-There is a lot of low hanging fruit that is intentionally left unpicked so
-    people who want to contribute to Texcraft have a good starting point.
+The contribution bar for Texcraft is unfortunately high right now.
+Texcraft is being built to produce identical output to Knuth's TeX, so working
+  on the project largely involves studying [Knuth's TeX source code](https://tug.ctan.org/info/knuth-pdf/tex/tex.pdf)
+  and strategizing ways to write diff tests.
 
 ## Related projects
 

@@ -205,7 +205,10 @@ name = "boxworks-hyphenate"
 version = "0.1.0"
 dependencies = [
  "boxworks",
+ "boxworks-testing",
+ "boxworks-text",
  "hyphenate",
+ "tfm",
 ]
 
 [[package]]

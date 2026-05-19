@@ -2,9 +2,9 @@ use boxworks::ds;
 
 #[derive(Default)]
 pub struct Hyphenator {
-    hyphenator: hyphenate::Hyphenator,
-    left_hyphen_min: i32,
-    right_hyphen_min: i32,
+    pub hyphenator: hyphenate::Hyphenator,
+    pub left_hyphen_min: i32,
+    pub right_hyphen_min: i32,
 }
 
 impl Hyphenator {
@@ -16,6 +16,7 @@ impl Hyphenator {
         }
     }
 }
+
 impl boxworks::Hyphenator for Hyphenator {
     fn hyphenate(&self, list: &mut Vec<ds::Horizontal>) {
         let out = hyphenate_impl(self, list);
@@ -290,4 +291,85 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use boxworks::TextPreprocessor;
+    use boxworks_testing::assert_box_eq;
+    use boxworks_text as bwt;
+
+    const TFM_CMR10: &'static [u8] = include_bytes!("../../tfm/corpus/computer-modern/cmr10.tfm");
+    #[test]
+    fn first() {
+        let input = "a-b";
+
+        let want = r#"
+            chars("a")
+            disc(
+              pre_break=[
+                chars("-", font=0)
+              ],
+            )
+            chars("b")
+            "#;
+
+        let unhyphenated: String = input.chars().filter(|c| *c != '-').collect();
+
+        // TeX does not hyphenate the first word of a paragraph so we need to out
+        // another word before the word of interest
+        let tex_input = format!["x {unhyphenated}"];
+
+        let mut tfm_file = tfm::File::deserialize(TFM_CMR10).0.unwrap();
+        let lig_kern_program =
+            tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
+        let mut tp: bwt::TextPreprocessorImpl = Default::default();
+        tp.register_font(0, &tfm_file, lig_kern_program);
+        tp.activate_font(0);
+        let mut list = vec![];
+        for word in tex_input.split_ascii_whitespace() {
+            tp.add_word(word.trim_matches(' '), &mut list);
+            tp.add_space(&mut list);
+        }
+        list.pop();
+
+        let mut font_repo: bwt::TfmFontRepo = Default::default();
+        font_repo.register_font(0, tfm_file);
+
+        let mut hyphenator = Hyphenator::plain_tex_en_us();
+        hyphenator.hyphenator.insert_exception(input);
+        hyphenator.left_hyphen_min = 1;
+        hyphenator.right_hyphen_min = 1;
+        {
+            use boxworks::Hyphenator;
+            hyphenator.hyphenate(&mut list)
+        }
+
+        let tex_got: Vec<boxworks::ds::Horizontal> = list[2..].iter().cloned().collect();
+        assert_box_eq!(want, tex_got);
+
+        if std::env::var("TEXCRAFT_VERIFY").unwrap_or("".to_string()) != "tex" {
+            return;
+        }
+
+        let preamble = format![
+            r"
+            \hyphenation{{{input}}}
+            \lefthyphenmin=0
+            \righthyphenmin=0
+        "
+        ];
+        let tex_engine = boxworks::tex::new_tex_engine_binary("tex".to_string()).unwrap();
+        let (_, tex_got) = boxworks::tex::build_horizontal_lists(
+            tex_engine.as_ref(),
+            &Default::default(),
+            &preamble,
+            &mut vec![tex_input].iter(),
+            /*hyphenate=*/ true,
+        );
+        let tex_got: Vec<boxworks::ds::Horizontal> = tex_got[0].list[2..].iter().cloned().collect();
+
+        assert_box_eq!(want, tex_got);
+    }
 }

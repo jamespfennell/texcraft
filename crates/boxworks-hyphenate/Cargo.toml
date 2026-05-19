@@ -13,5 +13,10 @@ keywords = ["tex", "texcraft"]
 hyphenate = { path = "../hyphenate" }
 boxworks = { path = "../boxworks" }
 
+[dev-dependencies]
+boxworks-testing = {path="../boxworks-testing"}
+tfm = { path = "../tfm" }
+boxworks-text = { path = "../boxworks-text" }
+
 [lints]
 workspace = true

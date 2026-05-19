@@ -74,6 +74,18 @@ impl From<ds::VBox> for Value {
     }
 }
 
+impl From<ds::HBox> for Value {
+    fn from(value: ds::HBox) -> Self {
+        Value::Box(vec![ds::Horizontal::HBox(value)])
+    }
+}
+
+impl From<Vec<ds::Horizontal>> for Value {
+    fn from(value: Vec<ds::Horizontal>) -> Self {
+        Value::Box(value)
+    }
+}
+
 pub fn assert_eq(lhs: Value, rhs: Value) {
     let (lhs_list, lhs_s) = normalize(lhs, "lhs.box");
     let (rhs_list, rhs_s) = normalize(rhs, "rhs.box");
