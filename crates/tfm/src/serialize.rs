@@ -22,6 +22,8 @@ pub fn serialize(file: &File) -> Vec<u8> {
         nh: serialize_section(&file.heights, &mut b, None),
         nd: serialize_section(&file.depths, &mut b, None),
         ni: serialize_section(&file.italic_corrections, &mut b, None),
+        // Is the bug here? we don't serialize the left_boundary_char_entrypoint.
+        // We don't refer to it!! But in the pltoft diff tests it works!
         nl: serialize_section(
             &file.lig_kern_program.instructions,
             &mut b,

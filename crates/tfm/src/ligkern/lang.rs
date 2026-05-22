@@ -115,9 +115,10 @@ pub enum ParseCompactOperationError {
 impl Operation {
     /// Parses a compact representation of an operation.
     ///
-    /// The representation is of the form `<left><right> -> <operation>` 
+    /// The representation is of the form `<left><right> -> <operation>`
     /// where `<left>` and `<right>` are the pair of characters this operation applies to,
     /// and `<operation>` describes the [`Operation`].
+    /// The value of `<left>` being `|` means that the rule is for the left boundary of a word.
     ///
     /// ## Kerns
     ///
@@ -129,11 +130,11 @@ impl Operation {
     /// use tfm::FixWord;
     /// assert_eq![
     ///     Operation::parse_compact("ab -> a[13]b"),
-    ///     Ok(('a', 'b', Operation::Kern(FixWord(13))))
+    ///     Ok((Some('a'), 'b', Operation::Kern(FixWord(13))))
     /// ];
     /// assert_eq![
     ///     Operation::parse_compact("ab -> a[-4]b"),
-    ///     Ok(('a', 'b', Operation::Kern(FixWord(-4))))
+    ///     Ok((Some('a'), 'b', Operation::Kern(FixWord(-4))))
     /// ];
     /// ```
     ///
@@ -153,7 +154,7 @@ impl Operation {
     /// use tfm::ligkern::lang::*;
     /// assert_eq![
     ///     Operation::parse_compact("ab -> ax^b"),
-    ///     Ok(('a', 'b', Operation::Ligature{
+    ///     Ok((Some('a'), 'b', Operation::Ligature{
     ///         char_to_insert: 'x'.try_into().unwrap(),
     ///         post_lig_operation: PostLigOperation::RetainBothMoveToInserted,
     ///         post_lig_tag_invalid: false,
@@ -161,14 +162,16 @@ impl Operation {
     /// ];
     /// assert_eq![
     ///     Operation::parse_compact("ab -> _xb^"),
-    ///     Ok(('a', 'b', Operation::Ligature{
+    ///     Ok((Some('a'), 'b', Operation::Ligature{
     ///         char_to_insert: 'x'.try_into().unwrap(),
     ///         post_lig_operation: PostLigOperation::RetainRightMoveToRight,
     ///         post_lig_tag_invalid: false,
     ///     }))
     /// ];
     /// ```
-    pub fn parse_compact(s: &str) -> Result<(char, char, Self), ParseCompactOperationError> {
+    pub fn parse_compact(
+        s: &str,
+    ) -> Result<(Option<char>, char, Self), ParseCompactOperationError> {
         use ParseCompactOperationError::*;
         let words: Option<[&str; 3]> = (|| {
             let mut raw = s.split_ascii_whitespace();
@@ -227,7 +230,11 @@ impl Operation {
                 return Err(MissingRightChar);
             }
             let n: i32 = third[n_start..n_end].parse().map_err(|_| InvalidKern)?;
-            return Ok((l, r, Operation::Kern(FixWord(n))));
+            return Ok((
+                if l == '|' { None } else { Some(l) },
+                r,
+                Operation::Kern(FixWord(n)),
+            ));
         }
 
         let mut c = third.chars();
@@ -288,7 +295,7 @@ impl Operation {
             | (false, false, CaretPos::Right) => return Err(CursorNotAfterChar),
         };
         Ok((
-            l,
+            if l == '|' { None } else { Some(l) },
             r,
             Operation::Ligature {
                 char_to_insert: b,
@@ -455,16 +462,23 @@ impl From<ParseCompactOperationError> for ParseCompactProgramError {
 impl Program {
     pub fn parse_compact(s: &str) -> Result<(Self, HashMap<Char, u16>), ParseCompactProgramError> {
         use ParseCompactProgramError::*;
-        let mut operations: BTreeMap<Char, BTreeMap<Char, Operation>> = Default::default();
+        let mut operations: BTreeMap<Option<Char>, BTreeMap<Char, Operation>> = Default::default();
         for line in s.lines() {
             let line = line.trim();
             if line.is_empty() {
                 continue;
             }
             let (l, r, op) = Operation::parse_compact(line)?;
-            let Ok(l) = l.try_into() else {
-                return Err(InvalidLeftChar);
+            let l: Option<Char> = match l {
+                None => None,
+                Some(l) => {
+                    let Ok(l) = l.try_into() else {
+                        return Err(InvalidLeftChar);
+                    };
+                    Some(l)
+                }
             };
+
             let m = operations.entry(l).or_default();
             let Ok(r) = r.try_into() else {
                 return Err(InvalidRightChar);
@@ -472,13 +486,19 @@ impl Program {
             m.insert(r, op);
         }
         let mut entrypoints: HashMap<Char, u16> = Default::default();
+        let mut left_boundary_char_entrypoint: Option<u16> = None;
         let mut instructions: Vec<Instruction> = vec![];
         for (left_char, m) in operations {
             let i: u16 = instructions
                 .len()
                 .try_into()
                 .map_err(|_| TooManyOperations)?;
-            entrypoints.insert(left_char, i);
+            match left_char {
+                None => left_boundary_char_entrypoint = Some(i),
+                Some(left_char) => {
+                    entrypoints.insert(left_char, i);
+                }
+            }
             let mut has_operations = false;
             for (right_char, operation) in m {
                 instructions.push(Instruction {
@@ -498,7 +518,7 @@ impl Program {
         Ok((
             Self {
                 instructions,
-                left_boundary_char_entrypoint: None,
+                left_boundary_char_entrypoint,
                 right_boundary_char: None,
                 passthrough: Default::default(),
             },
@@ -1078,13 +1098,13 @@ mod tests {
             $(
                 #[test]
                 fn $name() {
-                    let want: Result<(char, char, Operation), ParseCompactOperationError> = $want;
+                    let want: Result<(Option<char>, char, Operation), ParseCompactOperationError> = $want;
                     assert_eq![
                         Operation::parse_compact($input),
                         want,
                     ];
                     if let Ok((l, r, op)) = want {
-                        let s = format!["{}", op.display_compact(l, r)];
+                        let s = format!["{}", op.display_compact(l.unwrap_or('|'), r)];
                         assert_eq![s, $input];
                     }
                 }
@@ -1130,7 +1150,7 @@ mod tests {
             lig_1,
             "ab -> a^xb",
             Ok((
-                'a',
+                Some('a'),
                 'b',
                 Operation::Ligature {
                     char_to_insert: 'x'.try_into().unwrap(),
@@ -1143,7 +1163,7 @@ mod tests {
             lig_2,
             "ab -> ax^b",
             Ok((
-                'a',
+                Some('a'),
                 'b',
                 Operation::Ligature {
                     char_to_insert: 'x'.try_into().unwrap(),
@@ -1156,7 +1176,7 @@ mod tests {
             lig_3,
             "ab -> axb^",
             Ok((
-                'a',
+                Some('a'),
                 'b',
                 Operation::Ligature {
                     char_to_insert: 'x'.try_into().unwrap(),
@@ -1169,7 +1189,7 @@ mod tests {
             lig_4,
             "ab -> _x^b",
             Ok((
-                'a',
+                Some('a'),
                 'b',
                 Operation::Ligature {
                     char_to_insert: 'x'.try_into().unwrap(),
@@ -1182,7 +1202,7 @@ mod tests {
             lig_5,
             "ab -> _xb^",
             Ok((
-                'a',
+                Some('a'),
                 'b',
                 Operation::Ligature {
                     char_to_insert: 'x'.try_into().unwrap(),
@@ -1195,7 +1215,7 @@ mod tests {
             lig_6,
             "ab -> a^x_",
             Ok((
-                'a',
+                Some('a'),
                 'b',
                 Operation::Ligature {
                     char_to_insert: 'x'.try_into().unwrap(),
@@ -1208,7 +1228,7 @@ mod tests {
             lig_7,
             "ab -> ax^_",
             Ok((
-                'a',
+                Some('a'),
                 'b',
                 Operation::Ligature {
                     char_to_insert: 'x'.try_into().unwrap(),
@@ -1221,7 +1241,7 @@ mod tests {
             lig_8,
             "ab -> _x^_",
             Ok((
-                'a',
+                Some('a'),
                 'b',
                 Operation::Ligature {
                     char_to_insert: 'x'.try_into().unwrap(),
@@ -1231,14 +1251,32 @@ mod tests {
             )),
         ),
         (
+            lig_left_boundary_char,
+            "|b -> |x^b",
+            Ok((
+                None,
+                'b',
+                Operation::Ligature {
+                    char_to_insert: 'x'.try_into().unwrap(),
+                    post_lig_operation: PostLigOperation::RetainBothMoveToInserted,
+                    post_lig_tag_invalid: false,
+                }
+            )),
+        ),
+        (
             kern_1,
             "ab -> a[13]b",
-            Ok(('a', 'b', Operation::Kern(FixWord(13)),)),
+            Ok((Some('a'), 'b', Operation::Kern(FixWord(13)),)),
         ),
         (
             kern_2,
             "ab -> a[-789]b",
-            Ok(('a', 'b', Operation::Kern(FixWord(-789)),)),
+            Ok((Some('a'), 'b', Operation::Kern(FixWord(-789)),)),
+        ),
+        (
+            kern_left_boundary_char,
+            "|b -> |[-789]b",
+            Ok((None, 'b', Operation::Kern(FixWord(-789)),)),
         ),
         (kern_char_before_bracket, "ab -> ax[1]b", Err(InvalidKern),),
         (kern_no_close_bracket, "ab -> a[13", Err(InvalidKern),),

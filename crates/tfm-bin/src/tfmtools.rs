@@ -464,6 +464,7 @@ fn compile_lig_kern_program(
 }
 
 #[derive(Clone, Debug, Parser)]
+/// Describe a lig/kern program.
 struct LigKernDescribe {
     /// Path to a .tfm file, property list file, or compact lig/kern program.
     path: std::path::PathBuf,
@@ -526,6 +527,7 @@ impl LigKernDescribe {
 }
 
 #[derive(Clone, Debug, Parser)]
+/// Run a lig/kern program.
 struct LigKernRun {
     /// Path to a .tfm file, property list file, or compact lig/kern program.
     path: std::path::PathBuf,
@@ -556,6 +558,7 @@ impl LigKernRun {
 }
 
 #[derive(Clone, Debug, Parser)]
+/// Replace the lig/kern program in a .tfm or .pl file.
 struct LigKernReplace {
     /// Path to the .tfm or property list file.
     path: TfOrPlPath,

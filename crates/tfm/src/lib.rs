@@ -377,14 +377,15 @@ impl File {
 
     pub fn replace_lig_kern_program(
         &mut self,
-        program: ligkern::lang::Program,
+        mut program: ligkern::lang::Program,
         entrypoints: HashMap<Char, u16>,
     ) {
+        let entrypoints = program.pack_entrypoints(entrypoints);
         self.lig_kern_program = program;
         self.char_tags
             .retain(|_, tag| !matches!(tag, CharTag::Ligature(_)));
         for (c, ep) in entrypoints {
-            self.char_tags.insert(c, CharTag::Ligature(ep as u8));
+            self.char_tags.insert(c, CharTag::Ligature(ep));
         }
     }
 
