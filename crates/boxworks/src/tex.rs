@@ -63,7 +63,15 @@ struct TexEngineBinary(String);
 
 impl TexEngine for TexEngineBinary {
     fn run(&self, tex_source_code: &str, auxiliary_files: &HashMap<PathBuf, Vec<u8>>) -> String {
-        let dir = std::env::temp_dir();
+        let mut dir = std::env::temp_dir();
+        let thread = std::thread::current();
+        let thread_name = thread
+            .name()
+            .unwrap_or("texcraft_unknown_thread_name")
+            .replace("::", "__");
+        dir.push("texcraft_tex");
+        dir.push(thread_name);
+        std::fs::create_dir_all(&dir).unwrap();
 
         for (file_name, content) in auxiliary_files {
             let mut path = dir.clone();

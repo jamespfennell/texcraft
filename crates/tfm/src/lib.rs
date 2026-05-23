@@ -381,6 +381,7 @@ impl File {
         entrypoints: HashMap<Char, u16>,
     ) {
         let entrypoints = program.pack_entrypoints(entrypoints);
+        self.kerns = program.unpack_kerns();
         self.lig_kern_program = program;
         self.char_tags
             .retain(|_, tag| !matches!(tag, CharTag::Ligature(_)));

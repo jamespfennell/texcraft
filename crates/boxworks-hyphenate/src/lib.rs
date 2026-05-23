@@ -295,33 +295,60 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
     use super::*;
     use boxworks::TextPreprocessor;
     use boxworks_testing::assert_box_eq;
     use boxworks_text as bwt;
 
     const TFM_CMR10: &'static [u8] = include_bytes!("../../tfm/corpus/computer-modern/cmr10.tfm");
-    #[test]
-    fn first() {
-        let input = "a-b";
 
-        let want = r#"
-            chars("a")
-            disc(
-              pre_break=[
-                chars("-", font=0)
-              ],
-            )
-            chars("b")
-            "#;
-
+    fn run_hyphenation_test(input: &str, lig_kern_program: &str, want: &str) {
         let unhyphenated: String = input.chars().filter(|c| *c != '-').collect();
 
-        // TeX does not hyphenate the first word of a paragraph so we need to out
+        // TeX does not hyphenate the first word of a paragraph so we need to put
         // another word before the word of interest
         let tex_input = format!["x {unhyphenated}"];
 
         let mut tfm_file = tfm::File::deserialize(TFM_CMR10).0.unwrap();
+        {
+            let (p, e) = tfm::ligkern::lang::Program::parse_compact(lig_kern_program).unwrap();
+            tfm_file.replace_lig_kern_program(p, e);
+        }
+
+        if std::env::var("TEXCRAFT_VERIFY").unwrap_or("".to_string()) == "tex" {
+            let tfm_bytes = tfm_file.serialize();
+            let mut auxiliary_files: HashMap<PathBuf, Vec<u8>> = Default::default();
+            auxiliary_files.insert("specialFont.tfm".into(), tfm_bytes);
+
+            let preamble = format![
+                r"
+                    \font \customFont specialFont
+                    
+                    \hyphenation{{{input}}}
+                    \lefthyphenmin=0
+                    \righthyphenmin=0
+                    
+                    \customFont
+                "
+            ];
+            let tex_engine = boxworks::tex::new_tex_engine_binary("tex".to_string()).unwrap();
+            let (_, tex_got) = boxworks::tex::build_horizontal_lists(
+                tex_engine.as_ref(),
+                &auxiliary_files,
+                &preamble,
+                &mut vec![tex_input.clone()].iter(),
+                /*hyphenate=*/ true,
+            );
+            let tex_got: Vec<boxworks::ds::Horizontal> =
+                tex_got[0].list[2..].iter().cloned().collect();
+
+            assert_box_eq!(want, tex_got);
+        }
+
+        /*
         let lig_kern_program =
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
         let mut tp: bwt::TextPreprocessorImpl = Default::default();
@@ -348,28 +375,308 @@ mod tests {
 
         let tex_got: Vec<boxworks::ds::Horizontal> = list[2..].iter().cloned().collect();
         assert_box_eq!(want, tex_got);
-
-        if std::env::var("TEXCRAFT_VERIFY").unwrap_or("".to_string()) != "tex" {
-            return;
-        }
-
-        let preamble = format![
-            r"
-            \hyphenation{{{input}}}
-            \lefthyphenmin=0
-            \righthyphenmin=0
-        "
-        ];
-        let tex_engine = boxworks::tex::new_tex_engine_binary("tex".to_string()).unwrap();
-        let (_, tex_got) = boxworks::tex::build_horizontal_lists(
-            tex_engine.as_ref(),
-            &Default::default(),
-            &preamble,
-            &mut vec![tex_input].iter(),
-            /*hyphenate=*/ true,
-        );
-        let tex_got: Vec<boxworks::ds::Horizontal> = tex_got[0].list[2..].iter().cloned().collect();
-
-        assert_box_eq!(want, tex_got);
+        */
     }
+
+    macro_rules! hyphenation_tests {
+        ( $( { $name: ident, $input: expr, $lig_kern_program: expr, $want: expr }, )* ) => {
+            $(
+                #[test]
+                fn $name() {
+                    run_hyphenation_test($input, $lig_kern_program, $want);
+                }
+            )*
+        };
+    }
+
+    hyphenation_tests![
+        {
+            most_simple_case, "a-b", "",
+            r#"
+                chars("a")
+                disc(
+                  pre_break=[
+                    chars("-")
+                  ],
+                )
+                chars("b")
+            "#
+        },
+        {
+            lig_with_hyphen, "a-b",
+            "
+                a- -> ax-^
+            ",
+            r#"
+                disc(
+                  pre_break=[
+                    chars("ax")
+                    chars("-")
+                  ],
+                  replace_count=1,
+                )
+                chars("a")
+                chars("b")
+            "#
+        },
+        {
+            lig_with_hyphen_and_letters, "a-b",
+            "
+                a- -> ax-^
+                ab -> ac^_
+            ",
+            r#"
+                disc(
+                  pre_break=[
+                    chars("ax")
+                    chars("-")
+                  ],
+                  post_break=[
+                    chars("b")
+                  ],
+                  replace_count=2,
+                )
+                chars("a")
+                lig("c", "b")
+            "#
+        },
+        {
+            left_boundary_char, "a-b",
+            "
+                |b -> |c^_
+            ",
+            r#"
+                chars("a")
+                disc(
+                  pre_break=[
+                    chars("-")
+                  ],
+                  post_break=[
+                    chars("c")
+                  ],
+                  replace_count=1,
+                )
+                chars("b")
+            "#
+        },
+        {
+            right_boundary_char, "a-b",
+            "
+                -| -> -c^|
+            ",
+            r#"
+                chars("a")
+                disc(
+                  pre_break=[
+                    chars("-c")
+                  ],
+                )
+                chars("b")
+            "#
+        },
+        {
+            big_lig_1, "a-bc",
+            "
+                ab -> _x^_
+                xc -> _y^_
+            ",
+            r#"
+                disc(
+                  pre_break=[
+                    chars("a")
+                    chars("-")
+                  ],
+                  post_break=[
+                    chars("b")
+                    chars("c")
+                  ],
+                  replace_count=1,
+                )
+                lig("y", "abc")
+            "#
+        },
+        {
+            big_lig_2, "a-bc",
+            "
+                ab -> _x^_
+                xc -> _y^_
+                bc -> _z^_
+            ",
+            r#"
+                disc(
+                  pre_break=[
+                    chars("a")
+                    chars("-")
+                  ],
+                  post_break=[
+                    chars("z")
+                  ],
+                  replace_count=1,
+                )
+                lig("y", "abc")
+            "#
+        },
+        {
+            big_lig_3, "ab-c",
+            "
+                ab -> _x^_
+                xc -> _y^_
+            ",
+            r#"
+                disc(
+                  pre_break=[
+                    chars("x")
+                    chars("-")
+                  ],
+                  post_break=[
+                    chars("c")
+                  ],
+                  replace_count=1,
+                )
+                lig("y", "abc")
+            "#
+        },
+        {
+            big_lig_with_hyphen, "ab-c",
+            "
+                ab -> ax^_
+                x- -> xy^-
+            ",
+            r#"
+                disc(
+                  pre_break=[
+                    chars("axy")
+                    chars("-")
+                  ],
+                  replace_count=2,
+                )
+                chars("a")
+                lig("x", "b")
+                chars("c")
+            "#
+        },
+        {
+            empty_lig_before, "a-b",
+            "
+                ab -> ax^b
+            ",
+            r#"
+                disc(
+                  pre_break=[
+                    chars("a")
+                    chars("-")
+                  ],
+                  replace_count=2,
+                )
+                chars("a")
+                lig("x", "")
+                chars("b")
+            "#
+        },
+        {
+            same_kern, "a-b",
+            "
+                ab -> a[100]b
+                a- -> a[100]-
+            ",
+            r#"
+                disc(
+                  pre_break=[
+                    chars("a")
+                    kern(0.00095pt)
+                    chars("-")
+                  ],
+                  replace_count=2,
+                )
+                chars("a")
+                kern(0.00095pt)
+                chars("b")
+            "#
+        },
+        {
+            synchronization_1, "a-bcdefgh",
+            "
+                ab -> _x^_
+                bc -> _y^_
+                cd -> _z^_
+                de -> _w^_
+                ef -> _v^_
+            ",
+            r#"
+                disc(
+                  pre_break=[
+                    chars("a-")
+                  ],
+                  post_break=[
+                    chars("ywf")
+                  ],
+                  replace_count=3,
+                )
+                lig("x", "ab")
+                lig("z", "cd")
+                lig("v", "ef")
+                # synchronization point
+                chars("gh", font=0)
+            "#
+        },
+        {
+            synchronization_2, "a-bcd-ef-gh",
+            "
+                ab -> _x^_
+                bc -> _y^_
+                cd -> _z^_
+                de -> _w^_
+                ef -> _v^_
+            ",
+            r#"
+                disc(
+                  pre_break=[
+                    chars("a-")
+                  ],
+                  post_break=[
+                    chars("ywf")
+                  ],
+                  replace_count=3,
+                )
+                lig("x", "ab")
+                lig("z", "cd")
+                # the hyphen here is skipped
+                lig("v", "ef")
+                # synchronization point
+                disc(
+                  pre_break=[
+                    chars("-")
+                  ],
+                  post_break=[
+                  ],
+                )
+                chars("gh", font=0)
+            "#
+        },
+        {
+            synchronization_4, "a-bcde",
+            "
+                ab -> _x^_
+                bc -> _y^_
+                xc -> _y^_
+                yd -> yzd^
+            ",
+            r#"
+                disc(
+                  pre_break=[
+                    chars("a-")
+                  ],
+                  post_break=[
+                    # these are duplicated from the main list.
+                    # we could have nothing here and replace_count=0
+                    chars("yz")
+                  ],
+                  replace_count=2,
+                )
+                lig("y", "abc")
+                lig("z", "")
+                chars("de", font=0)
+            "#
+        },
+    ];
 }
