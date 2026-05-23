@@ -463,6 +463,7 @@ impl Program {
     pub fn parse_compact(s: &str) -> Result<(Self, HashMap<Char, u16>), ParseCompactProgramError> {
         use ParseCompactProgramError::*;
         let mut operations: BTreeMap<Option<Char>, BTreeMap<Char, Operation>> = Default::default();
+        let mut right_boundary_char: Option<Char> = None;
         for line in s.lines() {
             let line = line.trim();
             if line.is_empty() {
@@ -478,6 +479,9 @@ impl Program {
                     Some(l)
                 }
             };
+            if r == '|' {
+                right_boundary_char = Some('|'.try_into().expect("| is ASCII"));
+            }
 
             let m = operations.entry(l).or_default();
             let Ok(r) = r.try_into() else {
@@ -519,7 +523,7 @@ impl Program {
             Self {
                 instructions,
                 left_boundary_char_entrypoint,
-                right_boundary_char: None,
+                right_boundary_char,
                 passthrough: Default::default(),
             },
             entrypoints,

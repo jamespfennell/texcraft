@@ -47,10 +47,10 @@ fn ligkern_run_and_replace() {
         .stdout("difabcdeficult\n");
     Command::cargo_bin("tfmtools")
         .unwrap()
-        .args(["ligkern", "run", tfm_path.to_str().unwrap(), "About"])
+        .args(["ligkern", "run", tfm_path.to_str().unwrap(), "ABC"])
         .assert()
         .success()
-        .stdout("BAbout\n");
+        .stdout("XABCY\n");
 
     // Step 4: remove the lig/kern program entirely.
     Command::cargo_bin("tfmtools")
@@ -80,5 +80,6 @@ fc -> f^bc
 fd -> f^cd
 fe -> f^de
 ff -> f^ef
-|A -> |BA^
+|A -> |XA^
+C| -> CY^|
 ";
