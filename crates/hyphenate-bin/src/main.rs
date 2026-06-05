@@ -104,6 +104,8 @@ fn tex_hyphenate(words: &[String]) -> HashMap<String, String> {
     writeln!(file, "\\lefthyphenmin=0").unwrap();
     writeln!(file, "\\righthyphenmin=0").unwrap();
     writeln!(file, "\\font\\tenrm=cmr10-no-lig").unwrap();
+    writeln!(file, "\\lefthyphenmin=0").unwrap();
+    writeln!(file, "\\righthyphenmin=0").unwrap();
     for word in words {
         writeln!(file, "\\showhyphens{{{word}}}").unwrap();
     }

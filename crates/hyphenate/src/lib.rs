@@ -220,7 +220,9 @@ impl Hyphenator {
             lower += c.len_utf8();
             num_chars += 1;
         }
+        // Never hyphenate before the word.
         total_scores[0] = 0;
+        // Never hyphenate after the word.
         total_scores.truncate(num_chars);
         total_scores
             .into_iter()

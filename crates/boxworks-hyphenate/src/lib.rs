@@ -1,6 +1,5 @@
 use boxworks::ds;
 
-#[derive(Default)]
 pub struct Hyphenator {
     pub hyphenator: hyphenate::Hyphenator,
     pub left_hyphen_min: i32,
@@ -36,8 +35,6 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
             continue;
         }
 
-        // TODO: implement \lefthyphenmin and \righthyphenmin,
-        // we assume they are 2 and 3 in the hyphenate package
         // TODO: hyf_char needs to be read from somewhere using the font numbers
         // in char and lig nodes.
         let hyf_char = 3_i32;
@@ -215,19 +212,17 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
         }
 
         let l = s.chars().count();
-        // TeX.2021.1200
-        let left_hyphen_min = if hyphenater.left_hyphen_min < 1 {
-            1
-        } else {
-            hyphenater.left_hyphen_min as usize
-        };
-        let right_hyphen_min = if hyphenater.right_hyphen_min < 1 {
-            1
-        } else {
-            hyphenater.right_hyphen_min as usize
-        };
 
         let mut indices = hyphenater.hyphenator.calculate_indices(&lower_caser, &s);
+        // TeX.2021.1200
+        let left_hyphen_min: usize = match hyphenater.left_hyphen_min.try_into() {
+            Ok(0) | Err(_) => 1,
+            Ok(i) => i,
+        };
+        let right_hyphen_min: usize = match hyphenater.right_hyphen_min.try_into() {
+            Ok(0) | Err(_) => 1,
+            Ok(i) => i,
+        };
         let mut next_or = indices.next();
 
         let mut j = hyphenation_start_i;
