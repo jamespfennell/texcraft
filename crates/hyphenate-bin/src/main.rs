@@ -22,6 +22,10 @@ struct Args {
     validate: bool,
 
     #[arg(long)]
+    /// Print an explanation of how the hyphenation was determined.
+    explain: bool,
+
+    #[arg(long)]
     /// Prints the time it took per hyphenation.
     time: bool,
 }
@@ -55,6 +59,10 @@ fn main() {
         hyphenator.hypthenate(&lower_caser, word, &mut hyphenated);
         if !args.no_output {
             println!("{}", hyphenated);
+        }
+        if args.explain {
+            let explanation = hyphenator.calculate_explanation(&lower_caser, word);
+            println!("\n{explanation}");
         }
         if let Some(tex_results) = &tex_results {
             let Some(tex_result) = tex_results.get(word) else {

@@ -680,6 +680,9 @@ dependencies = [
 [[package]]
 name = "hyphenate"
 version = "0.1.0"
+dependencies = [
+ "pretty_assertions",
+]
 
 [[package]]
 name = "hyphenate-bin"
