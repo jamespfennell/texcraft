@@ -12,19 +12,27 @@ async function main() {
       const page = await browser.newPage();
       await page.goto(`http://localhost:${PORT}`);
 
-      await page.waitForSelector('#result .hyphen');
+      await page.waitForSelector('#suggestions');
 
-      await page.evaluate((word) => {
+      await page.evaluate(() => {
         const input = document.getElementById('word-input');
-        input.value = word;
+        input.value = 'difficult';
         input.dispatchEvent(new Event('input'));
-      }, 'concatenation');
+      });
 
       await page.waitForFunction(
         (expected) => document.getElementById('result').textContent === expected,
         {},
-        'con-cate-na-tion',
+        'd-if-fi-cult',
       );
+
+      const suggestionsVisible = await page.$eval(
+        '#suggestions',
+        (el) => el.style.display !== 'none',
+      );
+      if (suggestionsVisible) {
+        throw new Error('expected suggestions to be hidden after typing');
+      }
 
       const result = await page.$eval('#result', (el) => el.textContent);
       console.log(`PASS test 1: "${result}"`);
@@ -36,7 +44,7 @@ async function main() {
       const page = await browser.newPage();
       await page.goto(`http://localhost:${PORT}`);
 
-      await page.waitForSelector('#result .hyphen');
+      await page.waitForSelector('#suggestions');
 
       await page.evaluate(() => {
         const input = document.getElementById('word-input');
