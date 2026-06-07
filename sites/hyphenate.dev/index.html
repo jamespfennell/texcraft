@@ -48,6 +48,43 @@
                 font-size: 2rem;
                 font-weight: 500;
                 color: var(--accent);
+                cursor: pointer;
+            }
+
+            .exp-box {
+                width: fit-content;
+                min-width: min(480px, 100%);
+                margin: 0 auto;
+                padding: 1.5rem 2rem;
+                background-color: var(--surface);
+                border-radius: 6px;
+            }
+
+            .exp-heading {
+                font-size: 2rem;
+                font-weight: 500;
+                color: var(--accent);
+                text-align: center;
+                padding-bottom: 0.5rem;
+            }
+
+            .exp-description a {
+                color: inherit;
+                transition: opacity 0.15s;
+            }
+
+            .exp-description a:hover {
+                opacity: 0.6;
+            }
+
+            .exp-description {
+                font-size: 0.95rem;
+                color: var(--text);
+                text-align: center;
+                line-height: 1.6;
+                padding: 0.75rem 0 1.25rem;
+                width: 0;
+                min-width: 100%;
             }
 
             #word-input {
@@ -103,19 +140,14 @@
                 display: grid;
                 align-items: center;
                 justify-items: center;
-                width: fit-content;
-                margin: 0 auto;
+                justify-content: center;
                 row-gap: 0.15rem;
-                padding: 1.5rem 2rem;
-                background-color: var(--surface);
-                border-radius: 6px;
-                border: 0px solid var(--accent);
+                margin: 0 auto;
             }
 
             .exp-sep {
                 height: 1px;
                 background: var(--separator);
-                margin: 0.3rem 0;
                 align-self: center;
             }
 
@@ -167,6 +199,31 @@
                 justify-content: center;
             }
 
+            .exp-label {
+                grid-column: 1 / -1;
+                font-style: italic;
+                color: var(--accent);
+                font-size: 0.85rem;
+                width: 100%;
+                text-align: center;
+                padding: 0.35rem 0;
+            }
+
+            .exp-pattern-text {
+                font-family: monospace;
+                font-size: 0.9rem;
+                background-color: rgba(0, 0, 0, 0.08);
+                border-radius: 6px;
+                padding: 0.2em 0.5em;
+                color: var(--text);
+                white-space: nowrap;
+                text-decoration: none;
+            }
+
+            .exp-pattern-text:hover {
+                background-color: rgba(0, 0, 0, 0.16);
+            }
+
             .exp-dot {
                 font-size: 2rem;
                 color: var(--text);
@@ -176,6 +233,27 @@
                 font-size: 2rem;
                 color: var(--hyphen);
             }
+
+            #suggestions {
+                display: flex;
+                gap: 1.25rem;
+                margin-top: -1.5rem;
+            }
+
+            .suggestion-chip {
+                font-family: inherit;
+                font-size: 1.2rem;
+                color: var(--text);
+                background: none;
+                border: none;
+                padding: 0;
+                cursor: pointer;
+                text-decoration: underline;
+            }
+
+            .suggestion-chip:hover {
+                opacity: 0.6;
+            }
         </style>
     </head>
     <body>
@@ -183,10 +261,15 @@
         <input
             id="word-input"
             type="text"
-            value="difficult"
+            value=""
             spellcheck="false"
             autocomplete="off"
         />
+        <div id="suggestions">
+            <button class="suggestion-chip">difficult</button>
+            <button class="suggestion-chip">grapefruit</button>
+            <button class="suggestion-chip">cosmos</button>
+        </div>
         <div id="result"></div>
         <div id="explanation"></div>
         <p id="attribution">
@@ -201,6 +284,24 @@
             const input = document.getElementById("word-input");
             const result = document.getElementById("result");
             const explanationEl = document.getElementById("explanation");
+            const suggestionsEl = document.getElementById("suggestions");
+
+            function updateSuggestions(word) {
+                suggestionsEl.style.display = word ? "none" : "flex";
+            }
+
+            suggestionsEl
+                .querySelectorAll(".suggestion-chip")
+                .forEach((chip) => {
+                    chip.addEventListener("click", () => {
+                        input.value = chip.textContent;
+                        const word = chip.textContent;
+                        history.replaceState(null, "", `/${word}`);
+                        renderResult(hyphenate(word));
+                        renderExplanation(word);
+                        updateSuggestions(word);
+                    });
+                });
 
             function renderResult(hyphenated) {
                 result.innerHTML = hyphenated
@@ -235,16 +336,22 @@
                 );
 
                 // 2n+3 columns: start-dot | score | char | score | char | ... | score | end-dot
-                // Odd-indexed template entries are score cols (2ch); even-indexed are dot/char cols (max-content).
+                // then a gap col and a pattern-text col on the right.
                 const numCols = 2 * n + 3;
-                const colTemplate = Array.from({ length: numCols }, (_, i) =>
-                    i % 2 === 1 ? "2ch" : "max-content",
-                ).join(" ");
+                const patternTextCol = numCols + 2; // after a 1.5rem gap col
+                const colTemplate = [
+                    ...Array.from({ length: numCols }, (_, i) =>
+                        i % 2 === 1 ? "2ch" : "max-content",
+                    ),
+                    "1.5rem",
+                    "max-content",
+                ].join(" ");
                 // Column helpers (1-indexed CSS grid columns):
-                //   start dot  → col 1
+                //   start dot   → col 1
                 //   score pos i → col 2*i+2
                 //   char pos i  → col 2*i+3
                 //   end dot     → col 2*n+3
+                //   pattern text → col patternTextCol
 
                 const grid = document.createElement("div");
                 grid.className = "exp-grid";
@@ -261,6 +368,37 @@
                     grid.appendChild(el);
                 }
 
+                function patternText(p) {
+                    let t = p.start_of_word ? "." : "";
+                    const pChars = [...p.chars];
+                    for (let i = 0; i < p.scores.length; i++) {
+                        if (p.scores[i] !== 0) t += String(p.scores[i]);
+                        if (i < pChars.length) t += pChars[i];
+                    }
+                    if (p.end_of_word) t += ".";
+                    return t;
+                }
+
+                function addLink(row, col, text, cls, href) {
+                    const el = document.createElement("a");
+                    el.className = cls;
+                    el.style.gridRow = row;
+                    el.style.gridColumn = col;
+                    el.textContent = text;
+                    el.href = href;
+                    el.target = "_blank";
+                    el.rel = "noopener noreferrer";
+                    grid.appendChild(el);
+                }
+
+                function addLabel(row, text) {
+                    const el = document.createElement("div");
+                    el.className = "exp-label";
+                    el.style.gridRow = row;
+                    el.textContent = text;
+                    grid.appendChild(el);
+                }
+
                 function addSeparator(row) {
                     const el = document.createElement("div");
                     el.className = "exp-sep";
@@ -269,7 +407,33 @@
                     grid.appendChild(el);
                 }
 
+                const box = document.createElement("div");
+                box.className = "exp-box";
+
+                const heading = document.createElement("div");
+                heading.className = "exp-heading";
+                heading.textContent = "how it works";
+                box.appendChild(heading);
+
+                const desc = document.createElement("p");
+                desc.className = "exp-description";
+                const patternsLink = document.createElement("a");
+                patternsLink.href =
+                    "https://github.com/hyphenation/tex-hyphen/blob/5684c0f51c0b81133db2efbe60a408b4155a3ff5/hyph-utf8/tex/generic/hyph-utf8/patterns/tex/hyph-en-us.tex";
+                patternsLink.target = "_blank";
+                patternsLink.rel = "noopener noreferrer";
+                patternsLink.textContent =
+                    "TeX’s American English patterns file";
+                desc.append(
+                    "hyphenate.dev uses the Liang hyphenation algorithm which was developed in the 1980s for the TeX typesetting system. This new implementation uses ",
+                    patternsLink,
+                    " and gives the same result as TeX.",
+                );
+                box.appendChild(desc);
+                box.appendChild(grid);
+
                 // Word row
+                addLabel(nextRow++, "start with the word");
                 addCell(nextRow, 1, "·", "exp-dot");
                 for (let i = 0; i < n; i++) {
                     addCell(nextRow, 2 * i + 3, chars[i], "exp-word-char");
@@ -278,6 +442,7 @@
                 nextRow++;
 
                 addSeparator(nextRow++);
+                addLabel(nextRow++, "find matching patterns");
 
                 // Pattern rows: score at col 2*(offset+i)+2, char at col 2*(offset+i)+3
                 for (const p of patterns) {
@@ -301,9 +466,19 @@
                         addCell(row, col, pChars[i], "exp-pattern-char");
                     }
                     if (p.end_of_word) addCell(row, 2 * n + 3, "·", "exp-dot");
+                    const pt = patternText(p);
+                    const searchUrl = `https://github.com/search?q=repo%3Ahyphenation%2Ftex-hyphen%20path%3Ahyph-utf8%2Ftex%2Fgeneric%2Fhyph-utf8%2Fpatterns%2Ftex%2Fhyph-en-us.tex%20${encodeURIComponent(pt)}&type=code`;
+                    addLink(
+                        row,
+                        patternTextCol,
+                        pt,
+                        "exp-pattern-text",
+                        searchUrl,
+                    );
                 }
 
                 addSeparator(nextRow++);
+                addLabel(nextRow++, "pick the largest score");
 
                 // Aggregate scores row
                 for (let i = 0; i < data.aggregate_scores.length; i++) {
@@ -321,6 +496,7 @@
                 nextRow++;
 
                 addSeparator(nextRow++);
+                addLabel(nextRow++, "hyphenate odd scores");
 
                 // Hyphenated word row: chars in char columns, hyphens in score columns at break points
                 addCell(nextRow, 1, "·", "exp-dot");
@@ -335,7 +511,7 @@
                 addCell(nextRow, 2 * n + 3, "·", "exp-dot");
 
                 explanationEl.innerHTML = "";
-                explanationEl.appendChild(grid);
+                explanationEl.appendChild(box);
             }
 
             await init();
@@ -345,14 +521,24 @@
                 input.value = pathWord;
             }
 
+            document.querySelector("h1").addEventListener("click", () => {
+                input.value = "";
+                history.replaceState(null, "", "/");
+                renderResult("");
+                renderExplanation("");
+                updateSuggestions("");
+            });
+
             renderResult(hyphenate(input.value));
             renderExplanation(input.value.trim());
+            updateSuggestions(input.value.trim());
 
             input.addEventListener("input", () => {
                 const word = input.value.trim();
                 history.replaceState(null, "", word ? `/${word}` : "/");
                 renderResult(word ? hyphenate(word) : "");
                 renderExplanation(word);
+                updateSuggestions(word);
             });
         </script>
     </body>
