@@ -1,115 +1,359 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>hyphenate.dev</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>hyphenate.dev</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                --bg: #f2f9f4;
+                --surface: #ffffff;
+                --surface-hover: #e8f4ec;
+                --text: #0d2b1a;
+                --accent: #2d6a4f;
+                --separator: #a8cdb8;
+                --hyphen: #2d6a4f;
+                --score-break: #22a84a;
+                --score-nobreak: #e03a3a;
+            }
 
-    body {
-      background-color: #e8d5c4;
-      color: #5c2a2a;
-      font-family: 'Inter', sans-serif;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2.5rem;
-      padding: 2rem;
-    }
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
 
-    h1 {
-      font-size: 2rem;
-      font-weight: 500;
-      color: #8b3a3a;
-    }
+            body {
+                background-color: var(--bg);
+                color: var(--text);
+                font-family: "Inter", sans-serif;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 2.5rem;
+                padding: 2rem;
+            }
 
-    #word-input {
-      font-size: 3rem;
-      font-family: inherit;
-      width: 100%;
-      max-width: 480px;
-      padding: 0.75rem 1.25rem;
-      border: 2px solid #8b3a3a;
-      border-radius: 6px;
-      background-color: #f5ede3;
-      color: #5c2a2a;
-      text-align: center;
-      outline: none;
-      appearance: none;
-    }
+            h1 {
+                font-size: 2rem;
+                font-weight: 500;
+                color: var(--accent);
+            }
 
-    #word-input:focus {
-      border-color: #8b3a3a;
-      background-color: #fdf6f0;
-    }
+            #word-input {
+                font-size: 3rem;
+                font-family: inherit;
+                width: 100%;
+                max-width: 480px;
+                padding: 0.75rem 1.25rem;
+                border: 2px solid var(--accent);
+                border-radius: 6px;
+                background-color: var(--surface);
+                color: var(--text);
+                text-align: center;
+                outline: none;
+                appearance: none;
+            }
 
-    #result {
-      font-size: 3rem;
-      color: #5c2a2a;
-      min-height: 1.2em;
-    }
+            #word-input:focus {
+                border-color: var(--text);
+            }
 
-    #result .hyphen {
-      color: #8b3a3a;
-    }
+            #result {
+                font-size: 3rem;
+                color: var(--text);
+                min-height: 1.2em;
+            }
 
-    #attribution {
-      position: fixed;
-      bottom: 1rem;
-      right: 1.25rem;
-      font-size: 1rem;
-      color: #5c2a2a;
-    }
+            #result .hyphen {
+                color: var(--hyphen);
+            }
 
-    #attribution a {
-      color: inherit;
-      text-decoration: underline;
-      text-underline-offset: 2px;
-    }
-  </style>
-</head>
-<body>
-  <h1>hyphenate.dev</h1>
-  <input id="word-input" type="text" value="difficult" spellcheck="false" autocomplete="off" />
-  <div id="result">dif-fi-cult</div>
-  <p id="attribution">A <a href="https://github.com/jamespfennell/texcraft">Texcraft</a> project</p>
+            #attribution {
+                position: fixed;
+                bottom: 1rem;
+                right: 1.25rem;
+                font-size: 1rem;
+                color: var(--text);
+            }
 
-  <script type="module">
-    import init, { hyphenate } from './pkg/hyphenate_wasm.js';
+            #attribution a {
+                color: inherit;
+                text-decoration: underline;
+                text-underline-offset: 2px;
+            }
 
-    const input = document.getElementById('word-input');
-    const result = document.getElementById('result');
+            #explanation {
+                width: 100%;
+                max-width: 720px;
+                overflow-x: auto;
+            }
 
-    function renderResult(hyphenated) {
-      result.innerHTML = hyphenated
-        .split('-')
-        .join('<span class="hyphen">-</span>');
-    }
+            .exp-grid {
+                display: grid;
+                align-items: center;
+                justify-items: center;
+                width: fit-content;
+                margin: 0 auto;
+                row-gap: 0.15rem;
+                padding: 1.5rem 2rem;
+                background-color: var(--surface);
+                border-radius: 6px;
+                border: 0px solid var(--accent);
+            }
 
-    await init();
+            .exp-sep {
+                height: 1px;
+                background: var(--separator);
+                margin: 0.3rem 0;
+                align-self: center;
+            }
 
-    const pathWord = window.location.pathname.slice(1).trim();
-    if (pathWord) {
-      input.value = pathWord;
-    }
+            .exp-word-char {
+                font-size: 2rem;
+                color: var(--text);
+                padding: 0 0.15rem;
+            }
 
-    renderResult(hyphenate(input.value));
+            .exp-pattern-char {
+                font-size: 2rem;
+                color: var(--text);
+                padding: 0 0.15rem;
+            }
 
-    input.addEventListener('input', () => {
-      const word = input.value.trim();
-      history.replaceState(null, '', word ? `/${word}` : '/');
-      renderResult(word ? hyphenate(word) : '');
-    });
-  </script>
-</body>
+            .exp-score {
+                font-size: 0.85rem;
+                font-weight: 700;
+                font-family: monospace;
+                line-height: 1;
+            }
+
+            .exp-agg-score {
+                font-size: 0.85rem;
+                font-weight: 700;
+                font-family: monospace;
+                line-height: 1;
+            }
+
+            .exp-score-break {
+                background-color: var(--score-break);
+                color: white;
+                border-radius: 50%;
+                width: 1.4em;
+                height: 1.4em;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .exp-score-nobreak {
+                background-color: var(--score-nobreak);
+                color: white;
+                border-radius: 50%;
+                width: 1.4em;
+                height: 1.4em;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .exp-dot {
+                font-size: 2rem;
+                color: var(--text);
+            }
+
+            .exp-hyphen {
+                font-size: 2rem;
+                color: var(--hyphen);
+            }
+        </style>
+    </head>
+    <body>
+        <h1>hyphenate.dev</h1>
+        <input
+            id="word-input"
+            type="text"
+            value="difficult"
+            spellcheck="false"
+            autocomplete="off"
+        />
+        <div id="result"></div>
+        <div id="explanation"></div>
+        <p id="attribution">
+            A
+            <a href="https://github.com/jamespfennell/texcraft">Texcraft</a>
+            project
+        </p>
+
+        <script type="module">
+            import init, { hyphenate, explain } from "./pkg/hyphenate_wasm.js";
+
+            const input = document.getElementById("word-input");
+            const result = document.getElementById("result");
+            const explanationEl = document.getElementById("explanation");
+
+            function renderResult(hyphenated) {
+                result.innerHTML = hyphenated
+                    .split("-")
+                    .join('<span class="hyphen">-</span>');
+            }
+
+            function renderExplanation(word) {
+                if (!word) {
+                    explanationEl.innerHTML = "";
+                    return;
+                }
+
+                let data;
+                try {
+                    data = JSON.parse(explain(word));
+                } catch {
+                    explanationEl.innerHTML = "";
+                    return;
+                }
+
+                const chars = [...data.word];
+                const n = chars.length;
+                if (n === 0) {
+                    explanationEl.innerHTML = "";
+                    return;
+                }
+
+                // Filter patterns where all scores are 0 (match but contribute nothing).
+                const patterns = data.patterns.filter((p) =>
+                    p.scores.some((s) => s !== 0),
+                );
+
+                // 2n+3 columns: start-dot | score | char | score | char | ... | score | end-dot
+                // Odd-indexed template entries are score cols (2ch); even-indexed are dot/char cols (max-content).
+                const numCols = 2 * n + 3;
+                const colTemplate = Array.from({ length: numCols }, (_, i) =>
+                    i % 2 === 1 ? "2ch" : "max-content",
+                ).join(" ");
+                // Column helpers (1-indexed CSS grid columns):
+                //   start dot  → col 1
+                //   score pos i → col 2*i+2
+                //   char pos i  → col 2*i+3
+                //   end dot     → col 2*n+3
+
+                const grid = document.createElement("div");
+                grid.className = "exp-grid";
+                grid.style.gridTemplateColumns = colTemplate;
+
+                let nextRow = 1;
+
+                function addCell(row, col, text, cls) {
+                    const el = document.createElement("div");
+                    el.className = cls;
+                    el.style.gridRow = row;
+                    el.style.gridColumn = col;
+                    if (text) el.textContent = text;
+                    grid.appendChild(el);
+                }
+
+                function addSeparator(row) {
+                    const el = document.createElement("div");
+                    el.className = "exp-sep";
+                    el.style.gridRow = row;
+                    el.style.gridColumn = "1 / -1";
+                    grid.appendChild(el);
+                }
+
+                // Word row
+                addCell(nextRow, 1, "·", "exp-dot");
+                for (let i = 0; i < n; i++) {
+                    addCell(nextRow, 2 * i + 3, chars[i], "exp-word-char");
+                }
+                addCell(nextRow, 2 * n + 3, "·", "exp-dot");
+                nextRow++;
+
+                addSeparator(nextRow++);
+
+                // Pattern rows: score at col 2*(offset+i)+2, char at col 2*(offset+i)+3
+                for (const p of patterns) {
+                    const row = nextRow++;
+                    const pChars = [...p.chars];
+                    if (p.start_of_word) addCell(row, 1, "·", "exp-dot");
+                    for (let i = 0; i < p.scores.length; i++) {
+                        const score = p.scores[i];
+                        if (score !== 0) {
+                            const col = 2 * (p.offset + i) + 2;
+                            addCell(
+                                row,
+                                col,
+                                String(score),
+                                `exp-score ${score % 2 !== 0 ? "exp-score-break" : "exp-score-nobreak"}`,
+                            );
+                        }
+                    }
+                    for (let i = 0; i < pChars.length; i++) {
+                        const col = 2 * (p.offset + i) + 3;
+                        addCell(row, col, pChars[i], "exp-pattern-char");
+                    }
+                    if (p.end_of_word) addCell(row, 2 * n + 3, "·", "exp-dot");
+                }
+
+                addSeparator(nextRow++);
+
+                // Aggregate scores row
+                for (let i = 0; i < data.aggregate_scores.length; i++) {
+                    const score = data.aggregate_scores[i];
+                    if (score !== 0) {
+                        const col = 2 * i + 2;
+                        addCell(
+                            nextRow,
+                            col,
+                            String(score),
+                            `exp-agg-score ${score % 2 !== 0 ? "exp-score-break" : "exp-score-nobreak"}`,
+                        );
+                    }
+                }
+                nextRow++;
+
+                addSeparator(nextRow++);
+
+                // Hyphenated word row: chars in char columns, hyphens in score columns at break points
+                addCell(nextRow, 1, "·", "exp-dot");
+                for (let i = 0; i < n; i++) {
+                    addCell(nextRow, 2 * i + 3, chars[i], "exp-word-char");
+                }
+                for (let i = 0; i < data.aggregate_scores.length; i++) {
+                    if (data.aggregate_scores[i] % 2 !== 0) {
+                        addCell(nextRow, 2 * i + 2, "-", "exp-hyphen");
+                    }
+                }
+                addCell(nextRow, 2 * n + 3, "·", "exp-dot");
+
+                explanationEl.innerHTML = "";
+                explanationEl.appendChild(grid);
+            }
+
+            await init();
+
+            const pathWord = window.location.pathname.slice(1).trim();
+            if (pathWord) {
+                input.value = pathWord;
+            }
+
+            renderResult(hyphenate(input.value));
+            renderExplanation(input.value.trim());
+
+            input.addEventListener("input", () => {
+                const word = input.value.trim();
+                history.replaceState(null, "", word ? `/${word}` : "/");
+                renderResult(word ? hyphenate(word) : "");
+                renderExplanation(word);
+            });
+        </script>
+    </body>
 </html>
