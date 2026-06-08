@@ -35,13 +35,14 @@
                 background-color: var(--bg);
                 color: var(--text);
                 font-family: "Inter", sans-serif;
-                min-height: 100vh;
+            }
+
+            #hero {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                justify-content: center;
                 gap: 2.5rem;
-                padding: 2rem;
+                padding: 30vh 2rem 8rem;
             }
 
             h1 {
@@ -55,6 +56,7 @@
                 width: fit-content;
                 min-width: min(480px, 100%);
                 margin: 0 auto;
+                margin-bottom: 4rem;
                 padding: 1.5rem 2rem;
                 background-color: var(--surface);
                 border-radius: 6px;
@@ -106,14 +108,24 @@
                 border-color: var(--text);
             }
 
-            #result {
+            #below-input {
                 font-size: 3rem;
                 color: var(--text);
-                min-height: 1.2em;
+                height: 1.2em;
+                display: flex;
+                align-items: flex-start;
+                justify-content: center;
             }
 
-            #result .hyphen {
+            #below-input .hyphen {
                 color: var(--hyphen);
+            }
+
+            #below-input .suggestions-row {
+                display: flex;
+                gap: 1.25rem;
+                font-size: 1.2rem;
+                margin-top: -1.5rem;
             }
 
             #attribution {
@@ -131,9 +143,8 @@
             }
 
             #explanation {
-                width: 100%;
-                max-width: 720px;
-                overflow-x: auto;
+                margin: 0 auto;
+                padding: 0 2rem;
             }
 
             .exp-grid {
@@ -234,15 +245,9 @@
                 color: var(--hyphen);
             }
 
-            #suggestions {
-                display: flex;
-                gap: 1.25rem;
-                margin-top: -1.5rem;
-            }
-
             .suggestion-chip {
                 font-family: inherit;
-                font-size: 1.2rem;
+                font-size: inherit;
                 color: var(--text);
                 background: none;
                 border: none;
@@ -257,20 +262,17 @@
         </style>
     </head>
     <body>
-        <h1>hyphenate.dev</h1>
-        <input
-            id="word-input"
-            type="text"
-            value=""
-            spellcheck="false"
-            autocomplete="off"
-        />
-        <div id="suggestions">
-            <button class="suggestion-chip">difficult</button>
-            <button class="suggestion-chip">grapefruit</button>
-            <button class="suggestion-chip">cosmos</button>
+        <div id="hero">
+            <h1>hyphenate.dev</h1>
+            <input
+                id="word-input"
+                type="text"
+                value=""
+                spellcheck="false"
+                autocomplete="off"
+            />
+            <div id="below-input"></div>
         </div>
-        <div id="result"></div>
         <div id="explanation"></div>
         <p id="attribution">
             A
@@ -282,31 +284,174 @@
             import init, { hyphenate, explain } from "./pkg/hyphenate_wasm.js";
 
             const input = document.getElementById("word-input");
-            const result = document.getElementById("result");
+            const belowInput = document.getElementById("below-input");
             const explanationEl = document.getElementById("explanation");
-            const suggestionsEl = document.getElementById("suggestions");
 
-            function updateSuggestions(word) {
-                suggestionsEl.style.display = word ? "none" : "flex";
+            // I put some Jack Gilbert poems I like from Refusing Heaven into a text file
+            // and then ran:
+            // egrep -wo '[[:alnum:]]{6,}' tmp/gilbert.txt | tr '[:upper:]' '[:lower:]'  | sort -u
+            const SUGGESTION_POOL = [
+                "absurd",
+                "afternoon",
+                "against",
+                "antelope",
+                "anyone",
+                "anything",
+                "around",
+                "asleep",
+                "awareness",
+                "beauty",
+                "because",
+                "before",
+                "behind",
+                "believe",
+                "better",
+                "blessed",
+                "bodice",
+                "bottom",
+                "breakfast",
+                "burning",
+                "coming",
+                "consequence",
+                "cosmos",
+                "desiring",
+                "doorjamb",
+                "dreaming",
+                "duplication",
+                "easter",
+                "eleven",
+                "endless",
+                "enough",
+                "everybody",
+                "everyone",
+                "exalted",
+                "excess",
+                "extravagantly",
+                "fading",
+                "failed",
+                "failing",
+                "flowers",
+                "flying",
+                "forgets",
+                "garden",
+                "gentleness",
+                "greasy",
+                "habitat",
+                "happiness",
+                "harvest",
+                "helpless",
+                "horror",
+                "icarus",
+                "implication",
+                "incidentals",
+                "infidelity",
+                "inside",
+                "island",
+                "iteration",
+                "itself",
+                "kamakura",
+                "listened",
+                "little",
+                "living",
+                "loneliness",
+                "manger",
+                "marriage",
+                "meaningless",
+                "meanwhile",
+                "merely",
+                "miming",
+                "mistake",
+                "momentary",
+                "morning",
+                "mountain",
+                "nights",
+                "noodles",
+                "nothing",
+                "people",
+                "perfection",
+                "perish",
+                "pertinence",
+                "phenomenon",
+                "physics",
+                "powerful",
+                "present",
+                "pretty",
+                "provence",
+                "quickly",
+                "recognize",
+                "rhubarb",
+                "season",
+                "secretly",
+                "shoulders",
+                "showing",
+                "simple",
+                "singularity",
+                "slight",
+                "sometimes",
+                "source",
+                "spirit",
+                "squirrels",
+                "standing",
+                "strangeness",
+                "straps",
+                "stubborn",
+                "summer",
+                "surrounded",
+                "swimming",
+                "temporary",
+                "thought",
+                "through",
+                "tilted",
+                "triumph",
+                "uninflected",
+                "universe",
+                "vastness",
+                "visible",
+                "visitation",
+                "wasteland",
+                "watched",
+                "watching",
+                "without",
+                "worked",
+            ];
+
+            function randomSuggestions() {
+                const pool = [...SUGGESTION_POOL];
+                for (let i = pool.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [pool[i], pool[j]] = [pool[j], pool[i]];
+                }
+                return pool.slice(0, 3);
             }
 
-            suggestionsEl
-                .querySelectorAll(".suggestion-chip")
-                .forEach((chip) => {
-                    chip.addEventListener("click", () => {
-                        input.value = chip.textContent;
-                        const word = chip.textContent;
-                        history.replaceState(null, "", `/${word}`);
-                        renderResult(hyphenate(word));
-                        renderExplanation(word);
-                        updateSuggestions(word);
-                    });
-                });
-
-            function renderResult(hyphenated) {
-                result.innerHTML = hyphenated
-                    .split("-")
-                    .join('<span class="hyphen">-</span>');
+            function renderBelow(word) {
+                if (word) {
+                    belowInput.innerHTML = hyphenate(word)
+                        .split("-")
+                        .join('<span class="hyphen">-</span>');
+                } else {
+                    const words = randomSuggestions();
+                    belowInput.innerHTML =
+                        '<div class="suggestions-row">' +
+                        words
+                            .map(
+                                (w) =>
+                                    `<button class="suggestion-chip">${w}</button>`,
+                            )
+                            .join("") +
+                        "</div>";
+                    belowInput
+                        .querySelectorAll(".suggestion-chip")
+                        .forEach((chip) => {
+                            chip.addEventListener("click", () => {
+                                const w = chip.textContent;
+                                input.value = w;
+                                history.replaceState(null, "", `/${w}`);
+                                renderBelow(w);
+                                renderExplanation(w);
+                            });
+                        });
+                }
             }
 
             function renderExplanation(word) {
@@ -425,7 +570,9 @@
                 patternsLink.textContent =
                     "TeX’s American English patterns file";
                 desc.append(
-                    "hyphenate.dev uses the Liang hyphenation algorithm which was developed in the 1980s for the TeX typesetting system. This new implementation uses ",
+                    "The Liang hyphenation algorithm ",
+                    "was developed in the 1980s for the TeX typesetting system. ",
+                    "hyphenate.dev uses a new implementation of the algorithm with ",
                     patternsLink,
                     " and gives the same result as TeX.",
                 );
@@ -524,21 +671,18 @@
             document.querySelector("h1").addEventListener("click", () => {
                 input.value = "";
                 history.replaceState(null, "", "/");
-                renderResult("");
+                renderBelow("");
                 renderExplanation("");
-                updateSuggestions("");
             });
 
-            renderResult(hyphenate(input.value));
+            renderBelow(input.value.trim());
             renderExplanation(input.value.trim());
-            updateSuggestions(input.value.trim());
 
             input.addEventListener("input", () => {
                 const word = input.value.trim();
                 history.replaceState(null, "", word ? `/${word}` : "/");
-                renderResult(word ? hyphenate(word) : "");
+                renderBelow(word);
                 renderExplanation(word);
-                updateSuggestions(word);
             });
         </script>
     </body>
