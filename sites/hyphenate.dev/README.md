@@ -21,13 +21,24 @@ wasm-pack build --target web --out-dir ../pkg
 ## Run locally
 
 WASM modules must be served over HTTP (browsers block `file://` imports).
-From this directory:
+Use Caddy for local development — it supports the URL routing (`/word`) that the site relies on:
 
 ```
-python3 -m http.server 8765
+caddy run --config Caddyfile.local
 ```
 
-Then open http://localhost:8765 in a browser.
+Then open http://localhost:8765 in a browser. Stop the server with `caddy stop` or `Ctrl+C`.
+
+To install Caddy: `brew install caddy` (macOS) or see https://caddyserver.com/docs/install.
+
+## Test locally
+
+With the Caddy server running on port 8765, install dependencies and run the smoke tests:
+
+```
+npm install
+npm test
+```
 
 ## Docker
 
