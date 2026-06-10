@@ -1,5 +1,5 @@
 # Stage 1: build the Texcraft WebAssembly binary
-FROM rust:1.94 as rust-wasm-builder
+FROM rust:1.94 AS rust-wasm-builder
 # This installs the wasm-pack tool
 RUN  curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 WORKDIR /texcraft
@@ -18,7 +18,7 @@ COPY sites/play.texcraft.dev/ui .
 RUN npm install && npm run build
 
 # Stage 3: build the backend server
-FROM golang:1.17 as go-builder
+FROM golang:1.17 AS go-builder
 COPY --from=js-builder /texcraft/sites/play.texcraft.dev/ui/dist /texcraft/sites/play.texcraft.dev/ui/dist
 WORKDIR /texcraft/sites/play.texcraft.dev
 COPY sites/play.texcraft.dev/go.mod .

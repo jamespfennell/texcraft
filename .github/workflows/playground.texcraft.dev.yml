@@ -1,23 +1,34 @@
 name: play.texcraft.dev
 
-on: [push, pull_request]
+on:
+  workflow_call:
+    inputs:
+      push_to_registry:
+        type: boolean
+        required: true
 
 jobs:
-  e2e-test:
+  build-test-push:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build Docker image
-        run: docker build -f sites/play.texcraft.dev/Dockerfile -t play.texcraft.dev .
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: sites/play.texcraft.dev/Dockerfile
+          load: true
+          push: false
+          tags: jamespfennell/play.texcraft.dev:latest
 
       - name: Start server
-        run: docker run -d -p 8080:8080 play.texcraft.dev --memory
+        run: docker run -d -p 8080:8080 jamespfennell/play.texcraft.dev:latest --memory
 
       - name: Wait for server to be ready
         run: timeout 30 bash -c 'until curl -sf http://localhost:8080; do sleep 1; done'
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
 
@@ -29,23 +40,13 @@ jobs:
         run: node smoke.test.js
         working-directory: sites/play.texcraft.dev
 
-  build-and-push:
-    runs-on: ubuntu-latest
-    needs: e2e-test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@v4
-
       - name: Log in to Docker Hub
+        if: inputs.push_to_registry
         uses: docker/login-action@v3
         with:
           username: jamespfennell
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: sites/play.texcraft.dev/Dockerfile
-          push: true
-          tags: jamespfennell/play.texcraft.dev:latest
+      - name: Push to Docker Hub
+        if: inputs.push_to_registry
+        run: docker push jamespfennell/play.texcraft.dev:latest
