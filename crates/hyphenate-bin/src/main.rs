@@ -26,6 +26,14 @@ struct Args {
     explain: bool,
 
     #[arg(long)]
+    /// Only print words with interesting hyphenations.
+    ///
+    /// A hyphenation is interesting if there is at least one hyphen
+    /// and there is at least one position where there are competing patterns
+    /// (i.e. one pattern says to hyphenate and another says not to).
+    interesting: bool,
+
+    #[arg(long)]
     /// Prints the time it took per hyphenation.
     time: bool,
 }
@@ -57,13 +65,8 @@ fn main() {
     for word in &words {
         hyphenated.clear();
         hyphenator.hypthenate(&lower_caser, word, &mut hyphenated);
-        if !args.no_output {
-            println!("{}", hyphenated);
-        }
-        if args.explain {
-            let explanation = hyphenator.calculate_explanation(&lower_caser, word);
-            println!("\n{explanation}");
-        }
+
+        // First, verify the result matches TeX, if necessary.
         if let Some(tex_results) = &tex_results {
             let Some(tex_result) = tex_results.get(word) else {
                 eprintln!(
@@ -75,6 +78,24 @@ fn main() {
                 eprintln!("Validation error when hyphenating {word}: hyphenate={hyphenated} != tex={tex_result}");
                 errors += 1;
             }
+        }
+
+        if args.no_output {
+            continue;
+        }
+
+        let explanation = if args.interesting || args.explain {
+            Some(hyphenator.calculate_explanation(&lower_caser, word))
+        } else {
+            // As an optimization, we don't calculate the explanation unless we need it.
+            None
+        };
+        if args.interesting && !explanation.as_ref().unwrap().is_interesting() {
+            continue;
+        }
+        println!("{}", hyphenated);
+        if args.explain {
+            println!("\n{}", explanation.unwrap());
         }
     }
     if args.time {

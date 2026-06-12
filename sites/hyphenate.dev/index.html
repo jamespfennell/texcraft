@@ -243,13 +243,13 @@
                 opacity: 0.6;
             }
 
-            #links {
+            .page-section {
                 display: none;
                 text-align: center;
-                padding: 0 2rem 4rem;
+                padding: 0 2rem 2rem;
             }
 
-            body.has-word #links {
+            body.has-word .page-section {
                 display: block;
             }
 
@@ -273,6 +273,18 @@
 
             #links a:hover {
                 opacity: 0.6;
+            }
+
+            #word-source {
+                padding-bottom: 4rem;
+            }
+
+            #word-source p {
+                width: min(480px, 100%);
+                margin: 0 auto;
+                font-size: 0.95rem;
+                line-height: 1.6;
+                padding-top: 0.75rem;
             }
 
             @media (max-width: 640px) {
@@ -306,7 +318,8 @@
                 }
 
                 .exp-grid {
-                    justify-content: start;
+                    width: fit-content;
+                    margin: 0 auto;
                 }
 
                 .exp-heading {
@@ -389,7 +402,7 @@
                 <div id="exp-grid-container"></div>
             </div>
         </div>
-        <div id="links">
+        <div id="links" class="page-section">
             <h2 class="exp-heading">links</h2>
             <ul>
                 <li>
@@ -426,6 +439,14 @@
                 </li>
             </ul>
         </div>
+        <div id="word-source" class="page-section">
+            <h2 class="exp-heading">notes</h2>
+            <p>
+                the suggested words all have "interesting" hyphenation
+                patterns and were selected from seven poems in Jack
+                Gilbert's collection <em>Refusing Heaven</em>
+            </p>
+        </div>
         <p id="attribution">
             A
             <a href="https://github.com/jamespfennell/texcraft">Texcraft</a>
@@ -440,136 +461,90 @@
             const expBox = document.getElementById("exp-box");
             const gridContainer = document.getElementById("exp-grid-container");
 
-            // I put some Jack Gilbert poems I like from Refusing Heaven into a text file
-            // and then ran:
-            // egrep -wo '[[:alnum:]]{6,}' tmp/gilbert.txt | tr '[:upper:]' '[:lower:]'  | sort -u
+            /*
+            I put some Jack Gilbert poems I like from Refusing Heaven into a text file
+            and then ran:
+            
+            cargo run --bin hyphenate -- --words-file=tmp/gilbert.txt --interesting \
+              | sed 's/[^[:alnum:][:space:]]//g' \
+              |  tr '[:upper:]' '[:lower:]' \
+              | sort -u \
+              | sed -E 's/([[:alnum:]]+)/"\1",/g'
+
+            This: 
+            - generates interesting hyphenations
+            - strips out the hyphens and punctuation
+            - makes it all lower case
+            - sorts and removes duplicates
+            - places each other in quotes and follows with a comma
+            */
             const SUGGESTION_POOL = [
-                "absurd",
-                "afternoon",
                 "against",
-                "antelope",
-                "anyone",
-                "anything",
-                "around",
-                "asleep",
-                "awareness",
-                "beauty",
-                "because",
-                "before",
-                "behind",
-                "believe",
-                "better",
+                "another",
                 "blessed",
-                "bodice",
-                "bottom",
-                "breakfast",
-                "burning",
-                "coming",
+                "buddha",
+                "cabin",
+                "calling",
+                "calls",
+                "cicadas",
                 "consequence",
-                "cosmos",
-                "desiring",
-                "doorjamb",
-                "dreaming",
-                "duplication",
-                "easter",
-                "eleven",
-                "endless",
-                "enough",
-                "everybody",
-                "everyone",
+                "criticism",
+                "decorum",
                 "exalted",
-                "excess",
+                "examines",
                 "extravagantly",
-                "fading",
-                "failed",
-                "failing",
-                "flowers",
+                "famous",
+                "farmhouses",
                 "flying",
-                "forgets",
-                "garden",
                 "gentleness",
-                "greasy",
                 "habitat",
+                "happen",
                 "happiness",
-                "harvest",
                 "helpless",
-                "horror",
-                "icarus",
-                "implication",
-                "incidentals",
+                "hitting",
                 "infidelity",
-                "inside",
-                "island",
-                "iteration",
-                "itself",
-                "kamakura",
-                "listened",
+                "italy",
+                "kill",
+                "kimono",
+                "kyoto",
                 "little",
-                "living",
-                "loneliness",
-                "manger",
                 "marriage",
                 "meaningless",
-                "meanwhile",
-                "merely",
-                "miming",
-                "mistake",
                 "momentary",
-                "morning",
-                "mountain",
-                "nights",
+                "mother",
                 "noodles",
-                "nothing",
-                "people",
-                "perfection",
+                "obstacle",
+                "other",
                 "perish",
+                "perishing",
                 "pertinence",
                 "phenomenon",
-                "physics",
-                "powerful",
-                "present",
-                "pretty",
-                "provence",
-                "quickly",
                 "recognize",
-                "rhubarb",
-                "season",
-                "secretly",
                 "shoulders",
-                "showing",
-                "simple",
+                "silence",
                 "singularity",
-                "slight",
-                "sometimes",
-                "source",
-                "spirit",
-                "squirrels",
-                "standing",
+                "sleep",
+                "slept",
+                "snorting",
                 "strangeness",
-                "straps",
-                "stubborn",
-                "summer",
                 "surrounded",
-                "swimming",
-                "temporary",
-                "thought",
-                "through",
+                "tells",
                 "tilted",
                 "triumph",
+                "unanswered",
                 "uninflected",
                 "universe",
-                "vastness",
-                "visible",
-                "visitation",
-                "wasteland",
-                "watched",
-                "watching",
-                "without",
-                "worked",
+                "usual",
+                "vagrant",
+                "valley",
+                "women",
+                "writing",
+                "zero",
             ];
 
             function randomSuggestions() {
-                const pool = [...SUGGESTION_POOL];
+                const isMobile = window.matchMedia("(max-width: 640px)").matches;
+                const pool = SUGGESTION_POOL.filter(w => !isMobile || w.length <= 8);
                 for (let i = pool.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [pool[i], pool[j]] = [pool[j], pool[i]];

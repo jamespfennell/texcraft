@@ -352,6 +352,35 @@ pub struct Explanation {
     pub aggregate_scores: Vec<u8>,
 }
 
+impl Explanation {
+    /// Whether this hyphenation explanation is "interesting"
+    ///
+    /// A hyphenation is interesting if there is at least one hyphen
+    /// and there is at least one position where there are competing patterns
+    /// (i.e. one pattern says to hyphenate and another says not to).
+    pub fn is_interesting(&self) -> bool {
+        // Check for a hyphen
+        if !self.aggregate_scores.iter().any(|score| score % 2 == 1) {
+            return false;
+        }
+        // Check for an inhibitor
+        self.patterns.iter().any(|p| {
+            p.scores
+                .iter()
+                .zip(self.aggregate_scores[p.offset..].iter())
+                .any(|(&pattern_score, &aggregate_score)| {
+                    // If this pattern says there should be a hyphen but there
+                    // isn't, another pattern must inhibit the hyphen.
+                    // Hence an inhibitor exists.
+                    pattern_score > 0
+                        && aggregate_score > 0
+                        && pattern_score % 2 != aggregate_score % 2
+                    // pattern_score % 2 == 1 && aggregate_score > 0 && aggregate_score % 2 == 0
+                })
+        })
+    }
+}
+
 impl std::fmt::Display for Explanation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let n = self.lower_cased.chars().count();
