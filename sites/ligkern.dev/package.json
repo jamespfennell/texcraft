@@ -1,0 +1,10 @@
+{
+  "name": "ligkern-dev-tests",
+  "private": true,
+  "scripts": {
+    "test": "node smoke.test.js"
+  },
+  "devDependencies": {
+    "puppeteer": "^22.0.0"
+  }
+}

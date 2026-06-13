@@ -1,0 +1,15 @@
+[package]
+name = "ligkern-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+common = { path = "../../../crates/common" }
+tfm = { path = "../../../crates/tfm" }
+wasm-bindgen = "0.2"
+
+[lints]
+workspace = true

@@ -57,6 +57,13 @@ jobs:
       push_to_registry: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     secrets: inherit
 
+  ligkern_dev:
+    needs: unit-and-doc-tests-ubuntu
+    uses: ./.github/workflows/ligkern.dev.yml
+    with:
+      push_to_registry: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    secrets: inherit
+
   docs_texcraft_dev:
     needs: unit-and-doc-tests-ubuntu
     runs-on: ubuntu-latest

@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>ligkern.dev</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                --bg: #f2f4f9;
+                --surface: #ffffff;
+                --text: #1a1f36;
+                --accent: #3b5bdb;
+                --separator: #b0bde8;
+
+                --chip-char-bg: #d8f0de;
+                --chip-kern-pos-bg: #fff3bf;
+                --chip-kern-pos-text: #7a5800;
+                --chip-kern-neg-bg: #ffe0e0;
+                --chip-kern-neg-text: #8a1515;
+                --chip-lig-bg: #dbe4ff;
+                --chip-lig-text: #2a3f9e;
+            }
+
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                background-color: var(--bg);
+                color: var(--text);
+                font-family: "Inter", sans-serif;
+            }
+
+            /* ── Page layout ── */
+
+            #hero {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 1rem;
+                padding: 2rem 2rem 4rem;
+            }
+
+            h1 {
+                font-size: 2rem;
+                font-weight: 500;
+                color: var(--accent);
+                cursor: pointer;
+                width: min(560px, 100%);
+            }
+
+            #main-box {
+                width: min(560px, 100%);
+                background: var(--surface);
+                border: 1px solid var(--separator);
+                border-radius: 8px;
+                padding: 1.25rem 1.5rem;
+                display: flex;
+                flex-direction: column;
+                gap: 1.25rem;
+            }
+
+            .section-label {
+                font-size: 0.7rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.07em;
+                color: var(--accent);
+                margin-bottom: 0.5rem;
+            }
+
+            /* ── Program selector ── */
+
+            #program-area {
+                display: flex;
+                flex-direction: column;
+                gap: 0.6rem;
+            }
+
+.toggle-group {
+                display: flex;
+                border: 1px solid var(--separator);
+                border-radius: 4px;
+                overflow: hidden;
+                width: fit-content;
+            }
+
+            .toggle-btn {
+                font-family: inherit;
+                font-size: 0.82rem;
+                padding: 0.28rem 0.75rem;
+                border: none;
+                border-right: 1px solid var(--separator);
+                background: var(--bg);
+                color: var(--text);
+                cursor: pointer;
+                opacity: 0.65;
+            }
+
+            .toggle-btn:last-child {
+                border-right: none;
+            }
+
+            .toggle-btn.active {
+                background: var(--surface);
+                opacity: 1;
+                font-weight: 600;
+                color: var(--accent);
+            }
+
+            #builtin-panel {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                font-size: 0.9rem;
+            }
+
+            #font-select {
+                font-family: inherit;
+                font-size: 0.9rem;
+                padding: 0.3rem 0.6rem;
+                border: 1px solid var(--separator);
+                border-radius: 4px;
+                background: var(--bg);
+                color: var(--text);
+                cursor: pointer;
+            }
+
+            #custom-panel {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            #format-row {
+                display: flex;
+                align-items: center;
+                gap: 0.6rem;
+                font-size: 0.9rem;
+            }
+
+            .program-textarea {
+                font-family: monospace;
+                font-size: inherit;
+                width: 100%;
+                min-height: 7rem;
+                padding: 0.5rem 0.75rem;
+                border: 1px solid var(--separator);
+                border-radius: 4px;
+                background: var(--surface);
+                color: var(--text);
+                resize: vertical;
+                outline: none;
+            }
+
+            .program-textarea:focus {
+                border-color: var(--accent);
+            }
+
+            #program-error {
+                font-size: 0.8rem;
+                color: #c0392b;
+            }
+
+            #program-error:empty {
+                display: none;
+            }
+
+            /* ── Text input ── */
+
+            #text-input {
+                font-size: inherit;
+                font-family: monospace;
+                width: 100%;
+                min-height: 12rem;
+                padding: 0.5rem 0.75rem;
+                border: 1px solid var(--separator);
+                border-radius: 4px;
+                background: var(--surface);
+                color: var(--text);
+                resize: vertical;
+                outline: none;
+            }
+
+            #text-input:focus {
+                border-color: var(--accent);
+            }
+
+            /* ── Output ── */
+
+            #output-area {
+                width: 100%;
+                min-height: 14rem;
+                padding: 0.5rem 0.75rem;
+                border: 1px solid var(--separator);
+                border-radius: 4px;
+                background: var(--surface);
+            }
+
+            #legend {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem 1.25rem;
+                margin-top: 0.5rem;
+            }
+
+            .legend-item {
+                display: flex;
+                align-items: center;
+                gap: 0.4rem;
+            }
+
+            .legend-label {
+                font-size: 0.75rem;
+                color: var(--text);
+            }
+
+            #legend .chip {
+                font-size: 0.7rem;
+                padding: 0.25rem 0.35rem;
+            }
+
+            #output-row {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .output-line {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: flex-start;
+                gap: 0.75rem 1.5rem;
+            }
+
+            .word-group {
+                display: inline-flex;
+                flex-wrap: nowrap;
+                align-items: flex-start;
+                gap: 0.2rem;
+                padding-bottom: 0.85rem;
+            }
+
+            .chip {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 4px;
+                font-size: 0.85rem;
+                font-family: monospace;
+                font-weight: 600;
+                line-height: 1;
+                padding: 0.45rem 0.5rem;
+                white-space: nowrap;
+            }
+
+            .chip-char {
+                background: var(--chip-char-bg);
+            }
+
+            .chip-kern.positive {
+                background: var(--chip-kern-pos-bg);
+                color: var(--chip-kern-pos-text);
+            }
+
+            .chip-kern.negative {
+                background: var(--chip-kern-neg-bg);
+                color: var(--chip-kern-neg-text);
+            }
+
+            .chip-lig {
+                background: var(--chip-lig-bg);
+                color: var(--chip-lig-text);
+            }
+
+            .lig-wrapper {
+                position: relative;
+                display: inline-flex;
+                align-items: center;
+            }
+
+            .lig-original {
+                position: absolute;
+                top: calc(100% + 0.15rem);
+                left: 50%;
+                transform: translateX(-50%);
+                font-size: 0.65rem;
+                font-family: monospace;
+                font-weight: 700;
+                color: var(--text);
+                white-space: nowrap;
+            }
+
+            #output-empty {
+                font-size: 0.9rem;
+                color: var(--text);
+                opacity: 0.5;
+                display: none;
+                padding-top: 0.25rem;
+            }
+
+            #output-empty.visible {
+                display: block;
+            }
+
+            /* ── Attribution ── */
+
+            #attribution {
+                position: fixed;
+                bottom: 1rem;
+                right: 1.25rem;
+                font-size: 1rem;
+                color: var(--text);
+            }
+
+            #attribution a {
+                color: inherit;
+                text-decoration: underline;
+                text-underline-offset: 2px;
+            }
+
+            @media (max-width: 600px) {
+                #hero {
+                    padding: 1.5rem 1rem 3rem;
+                }
+
+                h1 {
+                    font-size: 1.5rem;
+                }
+
+                #main-box {
+                    padding: 1rem 1rem;
+                }
+
+                #attribution {
+                    right: 0;
+                    left: 0;
+                    text-align: center;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div id="hero">
+            <h1>ligkern.dev</h1>
+
+            <div id="main-box">
+                <div id="program-section">
+                    <div class="section-label">lig/kern program</div>
+                    <div id="program-area">
+                        <div class="toggle-group" id="type-toggle">
+                            <button class="toggle-btn active" data-type="builtin">Built-in</button>
+                            <button class="toggle-btn" data-type="custom">Custom</button>
+                        </div>
+                        <div id="builtin-panel">
+                            <select id="font-select"></select>
+                        </div>
+                        <div id="custom-panel" style="display:none">
+                            <div id="format-row">
+                                <span id="format-label">Format:</span>
+                                <div class="toggle-group" id="format-toggle">
+                                    <button class="toggle-btn active" data-format="compact">Compact</button>
+                                    <button class="toggle-btn" data-format="pl">Property List</button>
+                                </div>
+                            </div>
+                            <textarea
+                                id="compact-input"
+                                class="program-textarea"
+                                spellcheck="false"
+                                autocomplete="off"
+                            ></textarea>
+                            <textarea
+                                id="pl-input"
+                                class="program-textarea"
+                                spellcheck="false"
+                                autocomplete="off"
+                                style="display:none"
+                            ></textarea>
+                            <div id="program-error"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="input-section">
+                    <div class="section-label">input</div>
+                    <textarea
+                        id="text-input"
+                        spellcheck="false"
+                        autocomplete="off"
+                        placeholder="type text…"
+                    >Difficulty</textarea>
+                </div>
+
+                <div id="output-section">
+                    <div class="section-label">output</div>
+                    <div id="output-area">
+                        <div id="output-row"></div>
+                        <div id="output-empty">no output — the program produced no elements</div>
+                    </div>
+                    <div id="legend">
+                        <div class="legend-item">
+                            <div class="chip chip-char">f</div>
+                            <span class="legend-label">character</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="lig-wrapper">
+                                <div class="chip chip-lig">U+000C</div>
+                                <span class="lig-original">fi</span>
+                            </div>
+                            <span class="legend-label">ligature</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="chip chip-kern positive">+0.020pt</div>
+                            <span class="legend-label">kern</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="chip chip-kern negative">−0.083pt</div>
+                            <span class="legend-label">kern</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <p id="attribution">
+            A
+            <a href="https://github.com/jamespfennell/texcraft">Texcraft</a>
+            project
+        </p>
+
+        <script type="module">
+            import init, {
+                list_bundled_fonts,
+                run_bundled,
+                run_compact,
+                run_pl,
+            } from "./pkg/ligkern_wasm.js";
+
+            await init();
+
+            // ── State ──────────────────────────────────────────────────────
+
+            let programType = "builtin"; // "builtin" | "custom"
+            let customFormat = "compact"; // "compact" | "pl"
+            let selectedFont = "cmr10";
+
+            // ── DOM refs ───────────────────────────────────────────────────
+
+            const textInput = document.getElementById("text-input");
+            const outputRow = document.getElementById("output-row");
+            const outputEmpty = document.getElementById("output-empty");
+            const fontSelect = document.getElementById("font-select");
+            const programError = document.getElementById("program-error");
+            const builtinPanel = document.getElementById("builtin-panel");
+            const customPanel = document.getElementById("custom-panel");
+            const compactInput = document.getElementById("compact-input");
+            const plInput = document.getElementById("pl-input");
+
+            // ── Populate font selector ─────────────────────────────────────
+
+            const fonts = JSON.parse(list_bundled_fonts());
+            for (const f of fonts) {
+                const opt = document.createElement("option");
+                opt.value = f.name;
+                opt.textContent = f.display_name;
+                fontSelect.appendChild(opt);
+            }
+            fontSelect.value = selectedFont;
+
+            // ── Default programs for custom modes ─────────────────────────
+
+            const DEFAULT_COMPACT = `\
+ab -> _x^_
+ac -> a[65536]c`;
+
+            const DEFAULT_PL = `\
+(LIGTABLE
+   (LABEL C f)
+   (LIG C i C fi)
+   (LIG C l C fl)
+   (STOP)
+   (LABEL C fi)
+   (LIG C l C ffl)
+   (STOP)
+)`;
+
+            compactInput.value = DEFAULT_COMPACT;
+            plInput.value = DEFAULT_PL;
+
+            // ── Type toggle (Built-in / Custom) ────────────────────────────
+
+            document.querySelectorAll("#type-toggle .toggle-btn").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    document
+                        .querySelectorAll("#type-toggle .toggle-btn")
+                        .forEach((b) => b.classList.remove("active"));
+                    btn.classList.add("active");
+                    programType = btn.dataset.type;
+
+                    if (programType === "builtin") {
+                        builtinPanel.style.display = "";
+                        customPanel.style.display = "none";
+                    } else {
+                        builtinPanel.style.display = "none";
+                        customPanel.style.display = "";
+                    }
+                    programError.textContent = "";
+                    render();
+                });
+            });
+
+            // ── Format sub-toggle (Compact / Property List) ────────────────
+
+            document.querySelectorAll("#format-toggle .toggle-btn").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    document
+                        .querySelectorAll("#format-toggle .toggle-btn")
+                        .forEach((b) => b.classList.remove("active"));
+                    btn.classList.add("active");
+                    customFormat = btn.dataset.format;
+
+                    if (customFormat === "compact") {
+                        compactInput.style.display = "";
+                        plInput.style.display = "none";
+                    } else {
+                        compactInput.style.display = "none";
+                        plInput.style.display = "";
+                    }
+                    programError.textContent = "";
+                    render();
+                });
+            });
+
+            fontSelect.addEventListener("change", () => {
+                selectedFont = fontSelect.value;
+                render();
+            });
+
+            // ── Render ─────────────────────────────────────────────────────
+
+            function runProgram(word) {
+                if (programType === "builtin") {
+                    return JSON.parse(run_bundled(selectedFont, word));
+                } else if (customFormat === "compact") {
+                    return JSON.parse(run_compact(compactInput.value, word));
+                } else {
+                    return JSON.parse(run_pl(plInput.value, word));
+                }
+            }
+
+            function render() {
+                const text = textInput.value;
+                document.body.classList.toggle("has-output", !!text);
+
+                outputRow.innerHTML = "";
+                outputEmpty.classList.remove("visible");
+                programError.textContent = "";
+
+                if (!text) return;
+
+                const lines = text.split("\n");
+                let anyElements = false;
+
+                for (const line of lines) {
+                    const words = line.split(/[ \t]+/).filter((w) => w.length > 0);
+                    const lineEl = document.createElement("div");
+                    lineEl.className = "output-line";
+
+                    for (const word of words) {
+                        let result;
+                        try {
+                            result = runProgram(word);
+                        } catch {
+                            return;
+                        }
+
+                        if (result.error) {
+                            programError.textContent = result.error;
+                            return;
+                        }
+
+                        if (result.elements.length === 0) continue;
+                        anyElements = true;
+
+                        const group = document.createElement("div");
+                        group.className = "word-group";
+                        for (const el of result.elements) {
+                            group.appendChild(makeChip(el));
+                        }
+                        lineEl.appendChild(group);
+                    }
+
+                    outputRow.appendChild(lineEl);
+                }
+
+                if (!anyElements) {
+                    outputEmpty.classList.add("visible");
+                }
+            }
+
+            function makeChip(el) {
+                if (el.type === "char") {
+                    const div = document.createElement("div");
+                    div.className = "chip chip-char";
+                    div.textContent = el.char;
+                    return div;
+                } else if (el.type === "kern") {
+                    const div = document.createElement("div");
+                    div.className = "chip chip-kern";
+                    const sign = el.value_pt >= 0 ? "+" : "";
+                    div.textContent = `${sign}${el.value_pt.toFixed(3)}pt`;
+                    div.classList.add(el.value_pt >= 0 ? "positive" : "negative");
+                    return div;
+                } else if (el.type === "ligature") {
+                    const wrapper = document.createElement("div");
+                    wrapper.className = "lig-wrapper";
+                    const chip = document.createElement("div");
+                    chip.className = "chip chip-lig";
+                    chip.textContent = `U+${el.char_hex}`;
+                    const orig = document.createElement("span");
+                    orig.className = "lig-original";
+                    orig.textContent = el.original || "boundary";
+                    wrapper.appendChild(chip);
+                    wrapper.appendChild(orig);
+                    return wrapper;
+                }
+            }
+
+            // ── Input events ───────────────────────────────────────────────
+
+            textInput.addEventListener("input", render);
+            compactInput.addEventListener("input", render);
+            plInput.addEventListener("input", render);
+
+            // ── Title click resets ─────────────────────────────────────────
+
+            document.querySelector("h1").addEventListener("click", () => {
+                textInput.value = "";
+                render();
+            });
+
+            // ── Initial render ─────────────────────────────────────────────
+
+            render();
+        </script>
+    </body>
+</html>

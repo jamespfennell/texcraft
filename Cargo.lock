@@ -801,6 +801,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ligkern-wasm"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "tfm",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "linefeed"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
