@@ -31,3 +31,9 @@
 !sites/hyphenate.dev/Caddyfile
 !sites/hyphenate.dev/index.html
 !sites/hyphenate.dev/hyphenate-wasm
+
+# ligkern.dev site
+!sites/ligkern.dev/Caddyfile
+!sites/ligkern.dev/index.html
+!sites/ligkern.dev/ligkern-wasm
+
