@@ -201,6 +201,8 @@
             #output-area {
                 width: 100%;
                 min-height: 14rem;
+                max-height: 22rem;
+                overflow-y: auto;
                 padding: 0.5rem 0.75rem;
                 border: 1px solid var(--separator);
                 border-radius: 4px;
@@ -333,7 +335,7 @@
 
             @media (max-width: 600px) {
                 #hero {
-                    padding: 1.5rem 1rem 3rem;
+                    padding: 1.5rem 1rem 0.5rem;
                 }
 
                 h1 {
@@ -345,9 +347,9 @@
                 }
 
                 #attribution {
-                    right: 0;
-                    left: 0;
+                    position: static;
                     text-align: center;
+                    padding: 0.5rem 0 1rem;
                 }
             }
         </style>
