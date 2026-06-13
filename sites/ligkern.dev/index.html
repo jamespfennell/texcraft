@@ -216,7 +216,7 @@
 
             .legend-item {
                 display: flex;
-                align-items: center;
+                align-items: flex-start;
                 gap: 0.4rem;
             }
 
@@ -248,7 +248,7 @@
                 flex-wrap: nowrap;
                 align-items: flex-start;
                 gap: 0.2rem;
-                padding-bottom: 0.85rem;
+                padding-bottom: 0.25rem;
             }
 
             .chip {
@@ -284,21 +284,23 @@
             }
 
             .lig-wrapper {
-                position: relative;
                 display: inline-flex;
-                align-items: center;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.15rem;
+            }
+
+            .lig-wrapper .chip {
+                justify-content: center;
             }
 
             .lig-original {
-                position: absolute;
-                top: calc(100% + 0.15rem);
-                left: 50%;
-                transform: translateX(-50%);
                 font-size: 0.65rem;
                 font-family: monospace;
                 font-weight: 700;
                 color: var(--text);
                 white-space: nowrap;
+                text-align: center;
             }
 
             #output-empty {
@@ -626,7 +628,10 @@ ac -> a[65536]c`;
                     wrapper.className = "lig-wrapper";
                     const chip = document.createElement("div");
                     chip.className = "chip chip-lig";
-                    chip.textContent = `U+${el.char_hex}`;
+                    const cp = parseInt(el.char_hex, 16);
+                    chip.textContent = cp >= 0x21 && cp <= 0x7e
+                        ? String.fromCodePoint(cp)
+                        : `U+${el.char_hex}`;
                     const orig = document.createElement("span");
                     orig.className = "lig-original";
                     orig.textContent = el.original || "boundary";
