@@ -501,6 +501,54 @@ ac -> a[65536]c`;
             compactInput.value = DEFAULT_COMPACT;
             plInput.value = DEFAULT_PL;
 
+            // ── URL state ─────────────────────────────────────────────────
+
+            function encodeState() {
+                const p = new URLSearchParams();
+                if (programType === "custom") {
+                    p.set("type", "custom");
+                    p.set("format", customFormat);
+                    p.set("program", customFormat === "compact" ? compactInput.value : plInput.value);
+                } else {
+                    p.set("font", selectedFont);
+                }
+                if (textInput.value) p.set("text", textInput.value);
+                const qs = p.toString();
+                history.replaceState(null, "", qs ? "?" + qs : location.pathname);
+            }
+
+            function loadFromURL() {
+                const p = new URLSearchParams(location.search);
+                if (p.get("type") === "custom") {
+                    programType = "custom";
+                    builtinPanel.style.display = "none";
+                    customPanel.style.display = "";
+                    document.querySelectorAll("#type-toggle .toggle-btn").forEach((b) => {
+                        b.classList.toggle("active", b.dataset.type === "custom");
+                    });
+                    const fmt = p.get("format") === "pl" ? "pl" : "compact";
+                    customFormat = fmt;
+                    document.querySelectorAll("#format-toggle .toggle-btn").forEach((b) => {
+                        b.classList.toggle("active", b.dataset.format === fmt);
+                    });
+                    if (fmt === "compact") {
+                        compactInput.value = p.get("program") ?? DEFAULT_COMPACT;
+                        compactInput.style.display = "";
+                        plInput.style.display = "none";
+                    } else {
+                        plInput.value = p.get("program") ?? DEFAULT_PL;
+                        plInput.style.display = "";
+                        compactInput.style.display = "none";
+                    }
+                } else if (p.has("font")) {
+                    selectedFont = p.get("font");
+                    fontSelect.value = selectedFont;
+                }
+                if (p.has("text")) textInput.value = p.get("text");
+            }
+
+            loadFromURL();
+
             // ── Type toggle (Built-in / Custom) ────────────────────────────
 
             document.querySelectorAll("#type-toggle .toggle-btn").forEach((btn) => {
@@ -570,7 +618,7 @@ ac -> a[65536]c`;
                 outputEmpty.classList.remove("visible");
                 programError.textContent = "";
 
-                if (!text) return;
+                if (!text) { encodeState(); return; }
 
                 const lines = text.split("\n");
                 let anyElements = false;
@@ -610,6 +658,8 @@ ac -> a[65536]c`;
                 if (!anyElements) {
                     outputEmpty.classList.add("visible");
                 }
+
+                encodeState();
             }
 
             function makeChip(el) {

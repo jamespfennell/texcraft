@@ -83,6 +83,61 @@ async function main() {
       console.log("PASS test 3: has-output absent after clearing input");
       await page.close();
     }
+
+    // Test 4: state is encoded in URL after typing
+    {
+      const page = await browser.newPage();
+      await page.goto(`http://localhost:${PORT}`);
+
+      await page.evaluate(() => {
+        const input = document.getElementById("text-input");
+        input.value = "AVAST";
+        input.dispatchEvent(new Event("input"));
+      });
+
+      const params = await page.evaluate(() => Object.fromEntries(new URLSearchParams(location.search)));
+      if (params.font !== "cmr10") throw new Error(`expected font=cmr10 in URL, got: ${JSON.stringify(params)}`);
+      if (params.text !== "AVAST") throw new Error(`expected text=AVAST in URL, got: ${JSON.stringify(params)}`);
+
+      console.log("PASS test 4: URL encodes builtin state");
+      await page.close();
+    }
+
+    // Test 5: loading a URL restores builtin state and renders output
+    {
+      const page = await browser.newPage();
+      await page.goto(`http://localhost:${PORT}?font=cmr10&text=AVAST`);
+
+      const textVal = await page.$eval("#text-input", (el) => el.value);
+      if (textVal !== "AVAST") throw new Error(`expected text input = "AVAST", got: "${textVal}"`);
+
+      await page.waitForSelector(".chip-kern");
+      const kernCount = await page.$$eval(".chip-kern", (els) => els.length);
+      if (kernCount === 0) throw new Error("expected kern chips to be rendered from URL state");
+
+      console.log("PASS test 5: URL restores builtin state and renders output");
+      await page.close();
+    }
+
+    // Test 6: loading a URL restores custom compact state
+    {
+      const program = "ab -> fi";
+      const url = `http://localhost:${PORT}?type=custom&format=compact&program=${encodeURIComponent(program)}&text=ab`;
+      const page = await browser.newPage();
+      await page.goto(url);
+
+      const customVisible = await page.$eval("#custom-panel", (el) => el.style.display !== "none");
+      if (!customVisible) throw new Error("expected custom panel to be visible");
+
+      const programVal = await page.$eval("#compact-input", (el) => el.value);
+      if (programVal !== program) throw new Error(`expected compact program = "${program}", got: "${programVal}"`);
+
+      const textVal = await page.$eval("#text-input", (el) => el.value);
+      if (textVal !== "ab") throw new Error(`expected text input = "ab", got: "${textVal}"`);
+
+      console.log("PASS test 6: URL restores custom compact state");
+      await page.close();
+    }
   } finally {
     await browser.close();
   }
