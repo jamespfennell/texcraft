@@ -544,6 +544,24 @@ pub enum DiscretionaryElem {
     Kern(Kern),
 }
 
+impl From<Char> for DiscretionaryElem {
+    fn from(value: Char) -> Self {
+        DiscretionaryElem::Char(value)
+    }
+}
+
+impl From<Kern> for DiscretionaryElem {
+    fn from(value: Kern) -> Self {
+        DiscretionaryElem::Kern(value)
+    }
+}
+
+impl From<Ligature> for DiscretionaryElem {
+    fn from(value: Ligature) -> Self {
+        DiscretionaryElem::Ligature(value)
+    }
+}
+
 impl From<DiscretionaryElem> for Horizontal {
     fn from(value: DiscretionaryElem) -> Self {
         use DiscretionaryElem as In;

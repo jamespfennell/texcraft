@@ -151,6 +151,10 @@ impl CompiledProgram {
         )
     }
 
+    pub fn has_replacement(&self, left_char: Option<char>, right_char: Option<char>) -> bool {
+        self.get_replacement_utf8(left_char, right_char).is_some()
+    }
+
     fn get_replacement(
         &self,
         left_char: Option<Char>,
@@ -348,6 +352,181 @@ impl CompiledProgram {
             }
         }
     }
+
+    pub fn run_iter<'a>(&'a self, word: &'a str) -> RunIter<'a> {
+        RunIter {
+            program: self,
+            word: word.chars(),
+            intermediate_ops: &[],
+            terminal_op: None,
+            ligature: None,
+            left_in_original: true,
+            left: None,
+            right: None,
+        }
+    }
+}
+
+#[derive(PartialEq, Debug)]
+pub enum RunItem {
+    Char(char),
+    Kern(common::Scaled),
+    Ligature(Ligature),
+}
+
+struct PendingLigature {
+    s: String,
+    includes_left_boundary: bool,
+    includes_right_boundary: bool,
+}
+impl PendingLigature {
+    fn into_ligature(self, c: char) -> Ligature {
+        Ligature {
+            c,
+            original: self.s.into(),
+            includes_left_boundary: self.includes_left_boundary,
+            includes_right_boundary: self.includes_right_boundary,
+        }
+    }
+}
+
+pub struct RunIter<'a> {
+    program: &'a CompiledProgram,
+    word: std::str::Chars<'a>,
+    intermediate_ops: &'a [IntermediateOp],
+    terminal_op: Option<compiler::C>,
+    ligature: Option<PendingLigature>,
+    left_in_original: bool, // default true
+    left: Option<char>,
+    right: Option<char>,
+}
+
+impl<'a> RunIter<'a> {
+    pub fn is_separation_point(&self) -> bool {
+        self.intermediate_ops.is_empty() && self.left_in_original
+    }
+}
+
+impl<'a> Iterator for RunIter<'a> {
+    type Item = RunItem;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next = if let Some((op, tail)) = self.intermediate_ops.split_first() {
+            self.intermediate_ops = tail;
+            Some(match op {
+                IntermediateOp::Kern(kern) => RunItem::Kern(*kern),
+                IntermediateOp::C(compiler::C {
+                    c,
+                    is_lig: false,
+                    consumes_left,
+                    consumes_right,
+                }) => {
+                    debug_assert!(consumes_left);
+                    debug_assert!(!consumes_right);
+                    match self.ligature.take() {
+                        Some(l) => {
+                            // This happens when left is a ligature.
+                            RunItem::Ligature(l.into_ligature((*c).into()))
+                        }
+                        None => RunItem::Char((*c).into()),
+                    }
+                }
+                IntermediateOp::C(compiler::C {
+                    c,
+                    is_lig: true,
+                    consumes_left,
+                    consumes_right,
+                }) => {
+                    debug_assert!(!consumes_right);
+                    let mut s = self.ligature.take().unwrap_or(PendingLigature {
+                        s: Default::default(),
+                        includes_left_boundary: false,
+                        includes_right_boundary: false,
+                    });
+                    if *consumes_left && self.left_in_original {
+                        // TODO: figure out where in TeX the '|' comes from!
+                        s.s.push(self.left.unwrap_or('|'));
+                        s.includes_left_boundary = self.left.is_none();
+                    }
+                    if *consumes_right {
+                        s.s.push(self.right.unwrap_or('|'));
+                        s.includes_right_boundary = self.right.is_none();
+                    }
+                    RunItem::Ligature(s.into_ligature((*c).into()))
+                }
+            })
+        } else {
+            None
+        };
+        if self.intermediate_ops.is_empty() {
+            if let Some(op) = self.terminal_op.take() {
+                match op {
+                    compiler::C {
+                        c,
+                        is_lig: false,
+                        consumes_left: _,
+                        consumes_right,
+                    } => {
+                        debug_assert!(consumes_right);
+                        if self.right.is_none() {
+                            self.left = None;
+                        } else {
+                            self.left = Some(c.into());
+                            self.left_in_original = true; // = consumes_right;
+                        }
+                    }
+                    compiler::C {
+                        c,
+                        is_lig: true,
+                        consumes_left,
+                        consumes_right,
+                    } => {
+                        debug_assert!(consumes_right);
+                        let s = self.ligature.get_or_insert(PendingLigature {
+                            s: Default::default(),
+                            includes_left_boundary: false,
+                            includes_right_boundary: false,
+                        });
+                        if consumes_left && self.left_in_original {
+                            s.s.push(self.left.unwrap_or('|'));
+                            s.includes_left_boundary = self.left.is_none();
+                        }
+                        if consumes_right {
+                            s.s.push(self.right.unwrap_or('|'));
+                            s.includes_right_boundary = self.right.is_none();
+                        }
+                        self.left = Some(c.into());
+                        self.left_in_original = false;
+                    }
+                }
+            }
+        }
+        if let Some(next) = next {
+            return Some(next);
+        }
+        self.right = self.word.next();
+        if self.left.is_none() && self.right.is_none() {
+            return None;
+        }
+        match self.program.get_replacement_utf8(self.left, self.right) {
+            Some(replacement) => {
+                self.intermediate_ops = &replacement.0;
+                self.terminal_op = Some(replacement.1.clone());
+            }
+            None => {
+                let old_left = self.left;
+                self.left = self.right;
+                self.left_in_original = true;
+                if let Some(left) = old_left {
+                    return Some(match self.ligature.take() {
+                        Some(l) => RunItem::Ligature(l.into_ligature(left)),
+                        None => RunItem::Char(left),
+                    });
+                }
+            }
+        }
+        self.next()
+    }
 }
 
 /// Implementations of this trait determine how characters, kerns and ligatures
@@ -416,37 +595,33 @@ mod tests {
 
     const LIGAROO: &'static str = include_str!["ligaroo.plst"];
 
-    #[derive(PartialEq, Debug)]
-    enum Element {
-        Char(char),
-        Kern(common::Scaled),
-        Ligature(L),
-    }
-
     #[derive(Default)]
-    struct ElementEmitter(Vec<Element>);
+    struct ElementEmitter(Vec<RunItem>);
 
     impl Emitter for ElementEmitter {
         fn emit_character(&mut self, c: char) {
-            self.0.push(Element::Char(c))
+            self.0.push(RunItem::Char(c))
         }
 
         fn emit_kern(&mut self, kern: common::Scaled) {
-            self.0.push(Element::Kern(kern))
+            self.0.push(RunItem::Kern(kern))
         }
 
         fn emit_ligature(&mut self, ligature: L) {
-            self.0.push(Element::Ligature(ligature))
+            self.0.push(RunItem::Ligature(ligature))
         }
     }
 
-    fn run_test(program: &str, input: &str, want: Vec<Element>) {
+    fn run_test(program: &str, input: &str, want: Vec<RunItem>) {
         let source = LIGAROO.replace("(LIGTABLE", &format!["(LIGTABLE\n{program}"]);
         let pl_file = crate::pl::File::from_pl_source_code(&source).0;
         let program = CompiledProgram::compile_from_pl_file(&pl_file).0;
         let mut emitter: ElementEmitter = Default::default();
         program.run(input, &mut emitter);
         assert_eq!(emitter.0, want);
+
+        let got: Vec<RunItem> = program.run_iter(input).collect();
+        assert_eq!(got, want);
     }
 
     macro_rules! tests {
@@ -455,7 +630,7 @@ mod tests {
         )+ ) => { $(
             #[test]
             fn $name() {
-                use Element::*;
+                use RunItem::*;
                 let program = $program;
                 let input = $input;
                 let want = $want;
