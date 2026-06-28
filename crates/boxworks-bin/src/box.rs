@@ -389,12 +389,13 @@ fn run_box_hboxs(
     let mut tfm_file = tfm::File::deserialize(&tfm_bytes).0.unwrap();
     let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
     let mut tp: boxworks_text::TextPreprocessorImpl = Default::default();
-    tp.register_font(0, &tfm_file, lig_kern_program);
+    tp.register_font(0, &tfm_file, lig_kern_program.clone());
     tp.activate_font(0);
     let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
     font_repo.register_font(0, tfm_file);
     use boxworks::ds;
-    let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us();
+    let mut hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us();
+    hyphenator.lig_kern_program = lig_kern_program;
     let raw: Vec<ds::HBox> = texts
         .into_iter()
         .map(|text| {

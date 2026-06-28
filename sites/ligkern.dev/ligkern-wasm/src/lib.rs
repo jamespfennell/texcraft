@@ -1,8 +1,7 @@
 use tfm::ligkern::{CompiledProgram, Emitter, Ligature};
 use wasm_bindgen::prelude::*;
 
-const CMR10_TFM: &[u8] =
-    include_bytes!("../../../../crates/tfm/corpus/computer-modern/cmr10.tfm");
+const CMR10_TFM: &[u8] = include_bytes!("../../../../crates/tfm/corpus/computer-modern/cmr10.tfm");
 
 #[wasm_bindgen]
 pub fn list_bundled_fonts() -> String {
@@ -19,11 +18,11 @@ pub fn run_bundled(font_name: &str, text: &str) -> String {
 
 #[wasm_bindgen]
 pub fn run_compact(program_str: &str, text: &str) -> String {
-    let (lang_program, entrypoints) =
-        match tfm::ligkern::lang::Program::parse_compact(program_str) {
-            Ok(p) => p,
-            Err(e) => return make_error(&format!("{e:?}")),
-        };
+    let (lang_program, entrypoints) = match tfm::ligkern::lang::Program::parse_compact(program_str)
+    {
+        Ok(p) => p,
+        Err(e) => return make_error(&format!("{e:?}")),
+    };
     // Use 10pt design size to match cmr10.
     let design_size = tfm::FixWord::ONE * 10;
     let (program, _) = CompiledProgram::compile(&lang_program, design_size, &[], entrypoints);

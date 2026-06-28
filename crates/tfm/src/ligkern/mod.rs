@@ -353,7 +353,11 @@ impl CompiledProgram {
         }
     }
 
-    pub fn run_iter<'a>(&'a self, word: &'a str) -> RunIter<'a> {
+    pub fn run_iter<'a>(
+        &'a self,
+        word: &'a str,
+        right_boundary_override: Option<char>,
+    ) -> RunIter<'a> {
         RunIter {
             program: self,
             word: word.chars(),
@@ -363,6 +367,7 @@ impl CompiledProgram {
             left_in_original: true,
             left: None,
             right: None,
+            right_boundary_override,
         }
     }
 }
@@ -399,6 +404,7 @@ pub struct RunIter<'a> {
     left_in_original: bool, // default true
     left: Option<char>,
     right: Option<char>,
+    right_boundary_override: Option<char>,
 }
 
 impl<'a> RunIter<'a> {
@@ -508,7 +514,16 @@ impl<'a> Iterator for RunIter<'a> {
         if self.left.is_none() && self.right.is_none() {
             return None;
         }
-        match self.program.get_replacement_utf8(self.left, self.right) {
+        let right_for_lookup = match self.right {
+            Some(r) => Some(r),
+            None => self.right_boundary_override,
+        };
+        // self.left is None if we're at the left boundary
+        // self.right is None if we're at the right boundary
+        match self
+            .program
+            .get_replacement_utf8(self.left, right_for_lookup)
+        {
             Some(replacement) => {
                 self.intermediate_ops = &replacement.0;
                 self.terminal_op = Some(replacement.1.clone());
@@ -620,7 +635,7 @@ mod tests {
         program.run(input, &mut emitter);
         assert_eq!(emitter.0, want);
 
-        let got: Vec<RunItem> = program.run_iter(input).collect();
+        let got: Vec<RunItem> = program.run_iter(input, None).collect();
         assert_eq!(got, want);
     }
 

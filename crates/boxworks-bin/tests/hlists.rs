@@ -54,12 +54,10 @@ tests!(
         "alice_in_wonderland.txt",
         ["hbox"],
     ),
-    /*
     (
         alice_hbox_hyphenated,
         "alice_in_wonderland_hlists_hyphenated.txt",
         "alice_in_wonderland.txt",
         ["hbox", "--hyphenate"],
     ),
-    */
 );

@@ -999,7 +999,7 @@ mod tests {
         let lig_kern_program =
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
         let mut tp: bwt::TextPreprocessorImpl = Default::default();
-        tp.register_font(0, &tfm_file, lig_kern_program);
+        tp.register_font(0, &tfm_file, lig_kern_program.clone());
         tp.activate_font(0);
         let mut list = vec![];
         for word in input.split_ascii_whitespace() {
@@ -1015,7 +1015,8 @@ mod tests {
         let log: Rc<RefCell<String>> = Default::default();
         let mut logger = debug::TexLogger::new(log.clone());
 
-        let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us();
+        let mut hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us();
+        hyphenator.lig_kern_program = lig_kern_program;
 
         let line_breaker = super::LineBreaker {
             params: &params,
@@ -1028,17 +1029,17 @@ mod tests {
         use boxworks::LineBreaker;
         line_breaker.break_line(&font_repo, &mut v_list, &mut list);
 
-        let log = log.take();
-        if let Some(want_log) = want_log {
-            assert_eq!(normalize(want_log), normalize(&log));
-        }
-
         let v_box = ds::VBox {
             list: v_list,
             ..Default::default()
         };
         if let Some(want) = want {
             boxworks_testing::assert_box_eq!(want, v_box);
+        }
+
+        let log = log.take();
+        if let Some(want_log) = want_log {
+            assert_eq!(normalize(want_log), normalize(&log));
         }
     }
 
