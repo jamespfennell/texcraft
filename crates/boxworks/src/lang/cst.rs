@@ -896,7 +896,7 @@ mod tests {
         };
         let errs: ErrorAccumulator = Default::default();
         let got = Tree::build(parse(input, errs.clone()));
-        assert_eq!(got, want);
+        pretty_assertions::assert_eq!(got, want);
         assert_eq!(Ok(()), errs.check());
     }
 
@@ -990,6 +990,62 @@ mod tests {
                 },],
                 trailing_comments: vec![],
             }],
+        ),
+        (
+            repeated_escape_chars,
+            r#"lig("\"")lig("\"")lig("\\")lig("\\")chars()"#,
+            vec![
+                FuncCall {
+                    comments: vec![],
+                    func_name: "lig".into(),
+                    args: vec![Arg {
+                        comments: vec![],
+                        key: None,
+                        value: Value::String("\"".into()),
+                        value_source: "\"\\\"\"".into(),
+                    }],
+                    trailing_comments: vec![]
+                },
+                FuncCall {
+                    comments: vec![],
+                    func_name: "lig".into(),
+                    args: vec![Arg {
+                        comments: vec![],
+                        key: None,
+                        value: Value::String("\"".into()),
+                        value_source: "\"\\\"\"".into(),
+                    }],
+                    trailing_comments: vec![]
+                },
+                FuncCall {
+                    comments: vec![],
+                    func_name: "lig".into(),
+                    args: vec![Arg {
+                        comments: vec![],
+                        key: None,
+                        value: Value::String("\\".into()),
+                        value_source: "\"\\\\\"".into(),
+                    }],
+                    trailing_comments: vec![]
+                },
+                FuncCall {
+                    comments: vec![],
+                    func_name: "lig".into(),
+                    args: vec![Arg {
+                        comments: vec![],
+                        key: None,
+                        value: Value::String("\\".into()),
+                        value_source: "\"\\\\\"".into(),
+                    }],
+                    trailing_comments: vec![]
+                },
+                FuncCall {
+                    comments: vec![],
+                    func_name: "chars".into(),
+                    args: vec![],
+                    trailing_comments: vec![]
+                }
+            ],
         ),
     );
 

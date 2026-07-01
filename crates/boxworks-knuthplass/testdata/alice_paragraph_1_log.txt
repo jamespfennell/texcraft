@@ -1,0 +1,15 @@
+@firstpass
+\customFont ``Well!'' thought Alice to herself, ``after such a fall as this, I shall think nothing of tumbling down stairs! How brave they'll all think me at home! Why, I
+@ via @@0 b=72 p=0 d=6724
+@@1: line 1.1 t=6724 -> @@0
+wouldn't
+@ via @@0 b=1 p=0 d=121
+@@2: line 1.2 t=121 -> @@0
+say
+@ via @@0 b=1 p=0 d=121
+@@3: line 1.2 t=121 -> @@0
+anything about it, even if I fell off the top of the house!'' (Which was very likely true.)
+@\par via @@1 b=0 p=-10000 d=100
+@\par via @@2 b=0 p=-10000 d=100
+@\par via @@3 b=0 p=-10000 d=100
+@@4: line 2.2- t=221 -> @@3

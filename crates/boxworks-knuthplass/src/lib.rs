@@ -183,7 +183,6 @@ struct ActiveNode {
     fitness_class: FitnessClass,
     hyphenated: bool,
     line_number: usize,
-    line_class: LineClass,
     // Index of the passive node corresponding to this active node.
     node_index: usize,
     total_demerits: i32,
@@ -206,13 +205,6 @@ struct PassiveNode {
     previous_node_index: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum LineClass {
-    Beginning,
-    Numbered(usize),
-    End,
-}
-
 impl<'a> boxworks::LineBreaker for LineBreaker<'a> {
     fn break_line<F: boxworks::FontRepo>(
         mut self,
@@ -233,7 +225,6 @@ impl<'a> boxworks::LineBreaker for LineBreaker<'a> {
         }));
 
         let break_points = self.break_line_all_attempts(font_repo, self.hyphenator, v_list, h_list);
-        println!("{break_points:?}");
         self.post_line_break(font_repo, v_list, h_list, &break_points);
     }
 }
@@ -405,7 +396,7 @@ impl<'a> LineBreaker<'a> {
             debug_logger.log_attempt(1);
         }
         if let Some(v) =
-            self.break_line_single_attempt(h_list, font_repo, self.params.pre_tolerance)
+            self.break_line_single_attempt(h_list, font_repo, self.params.pre_tolerance, false)
         {
             return v;
         }
@@ -413,9 +404,12 @@ impl<'a> LineBreaker<'a> {
             debug_logger.log_attempt(2);
         }
         hyphenator.hyphenate(h_list);
-        if let Some(v) = self.break_line_single_attempt(h_list, font_repo, self.params.tolerance) {
+        if let Some(v) =
+            self.break_line_single_attempt(h_list, font_repo, self.params.tolerance, true)
+        {
             return v;
         }
+        // TODO: implement \emergencystretch and final pass
         panic!("need emergency attempt");
     }
 
@@ -424,6 +418,7 @@ impl<'a> LineBreaker<'a> {
         list: &[ds::Horizontal],
         font_repo: &F,
         tolerance: i32,
+        force_solution: bool,
     ) -> Option<Vec<usize>> {
         let mut auto_breaking = true;
         let mut passive_nodes = vec![PassiveNode {
@@ -444,7 +439,6 @@ impl<'a> LineBreaker<'a> {
                 fitness_class: FitnessClass::Decent,
                 hyphenated: false,
                 line_number: 0,
-                line_class: LineClass::Beginning,
                 node_index: 0,
                 total_demerits: 0,
             },
@@ -558,7 +552,7 @@ impl<'a> LineBreaker<'a> {
 
             // TeX.2021.831
             if penalty >= INFINITE_PENALTY {
-                // TODO: For discretionaty nodes we need to adjust the width here?
+                // TODO: For discretionary nodes we need to adjust the width here?
                 continue;
             }
             if penalty <= EJECT_PENALTY {
@@ -567,35 +561,11 @@ impl<'a> LineBreaker<'a> {
 
             let mut n = active_nodes.len();
             while n > 0 {
-                let (line_class, mut m) = get_next_line_class(&active_nodes, n);
-                n -= m;
-
-                // TODO: destroy this. Instead just use the line number to calculate the class.
-
-                // The line width is calculated in TeX.2021.850. However in this implementation
-                // of Knuth-Plass, the line width calculator is passed as a parameter.
-                let (next_line_class, line_width) = match line_class {
-                    // todo: if len(self.line_widths) = 1 then we should return End
-                    LineClass::Beginning => {
-                        if self.line_widths.len() == 1 {
-                            (LineClass::End, *self.line_widths.first().unwrap())
-                        } else {
-                            (LineClass::Numbered(0), *self.line_widths.first().unwrap())
-                        }
-                    }
-                    LineClass::Numbered(i) => match self.line_widths.get(i + 1) {
-                        Some(line_width) => {
-                            // if index i+1 is the last element, meaning it has i+2 elements
-                            if self.line_widths.len() == i + 2 {
-                                (LineClass::End, *line_width)
-                            } else {
-                                (LineClass::Numbered(i + 1), *line_width)
-                            }
-                        }
-                        None => (LineClass::End, *self.line_widths.last().unwrap()),
-                    },
-                    LineClass::End => (LineClass::End, *self.line_widths.last().unwrap()),
-                };
+                // TODO: when we implement looseness this while loop will run for every line class,
+                // and m will be the number of elements in the class.
+                let mut m = n;
+                let line_width = *self.line_widths.first().unwrap();
+                n = 0;
 
                 // TeX.2021.833
                 #[derive(Clone, Copy, Debug)]
@@ -606,11 +576,11 @@ impl<'a> LineBreaker<'a> {
                 }
                 // TeX.2021.834
                 let mut candidates = [Candidate {
-                    total_demerits: i32::MAX,
+                    total_demerits: AWFUL_BAD,
                     previous_node_index: 0,
                     line_number: 0,
                 }; 4];
-                let mut minimum_demerits = i32::MAX;
+                let mut minimum_demerits = AWFUL_BAD;
 
                 while m > 0 {
                     m -= 1;
@@ -667,27 +637,38 @@ impl<'a> LineBreaker<'a> {
                         }
                     };
 
-                    // The conidition of the if statement is in TeX.2021.851
-                    let deactivate = if badness > INFINITE_BADNESS || penalty == EJECT_PENALTY {
-                        // TeX.2021.854
-                        // TODO: finish TeX.2021.854 when we implement the final pass.
-                        true
-                    } else {
-                        false
-                    };
+                    // The condition of the if statement is in TeX.2021.851
+                    let (deactivate, allowable_break, artificial_demerits) =
+                        if badness > INFINITE_BADNESS || penalty == EJECT_PENALTY {
+                            // TeX.2021.854
+                            if force_solution
+                                && minimum_demerits == AWFUL_BAD
+                                && active_nodes.is_empty()
+                            {
+                                (false, true, true)
+                            } else {
+                                (true, badness <= tolerance, false)
+                            }
+                        } else {
+                            (false, badness <= tolerance, false)
+                        };
 
                     // Allowable break.
                     // Add a candidate
-                    if badness <= tolerance {
+                    if allowable_break {
                         // TeX.2021.855
-                        let demerits = self.demerits(
-                            badness,
-                            penalty,
-                            active_node.fitness_class,
-                            fitness_class,
-                            active_node.hyphenated && hyphenated,
-                            active_node.hyphenated && elem.is_none(),
-                        );
+                        let demerits = if artificial_demerits {
+                            0_i32
+                        } else {
+                            self.demerits(
+                                badness,
+                                penalty,
+                                active_node.fitness_class,
+                                fitness_class,
+                                active_node.hyphenated && hyphenated,
+                                active_node.hyphenated && elem.is_none(),
+                            )
+                        };
                         let total_demerits = demerits + active_node.total_demerits;
                         // The logging here is implemented in TeX.2021.856
                         if let Some(debug_logger) = self.debug_logger.as_deref_mut() {
@@ -704,7 +685,6 @@ impl<'a> LineBreaker<'a> {
                         }
                         let candidate = &mut candidates[fitness_class as usize];
                         if total_demerits <= candidate.total_demerits {
-                            // TeX.2021.856
                             *candidate = Candidate {
                                 total_demerits,
                                 previous_node_index: active_node.node_index,
@@ -716,12 +696,12 @@ impl<'a> LineBreaker<'a> {
                         }
                     }
                     if !deactivate {
+                        // Our implementation of TeX.2021.860
                         active_nodes.push_back(active_node);
                     }
                 }
 
                 // TeX.2021.835
-                // TODO: if this is the last active node we must also calculated candidates
                 if minimum_demerits < AWFUL_BAD {
                     // TeX.2021.836
                     if self.params.adj_demerits.abs() >= AWFUL_BAD - minimum_demerits {
@@ -788,7 +768,6 @@ impl<'a> LineBreaker<'a> {
                             fitness_class,
                             hyphenated,
                             line_number: candidate.line_number,
-                            line_class: next_line_class,
                             node_index: passive_nodes.len(),
                             total_demerits: candidate.total_demerits,
                         };
@@ -923,24 +902,6 @@ fn badness(shortfall: Scaled64, stretchability: Scaled64) -> i32 {
     }
 }
 
-fn get_next_line_class(active_nodes: &VecDeque<ActiveNode>, max: usize) -> (LineClass, usize) {
-    let line_class = active_nodes
-        .front()
-        .expect("still active nodes to be considered")
-        .line_class;
-    let mut m = 0;
-    for (i, node) in active_nodes.iter().enumerate() {
-        if i >= max {
-            break;
-        }
-        if node.line_class != line_class {
-            break;
-        }
-        m += 1;
-    }
-    (line_class, m)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -949,52 +910,86 @@ mod tests {
     use pretty_assertions::assert_eq;
     use std::{cell::RefCell, rc::Rc};
 
-    const WOLF_HALL_5IN_TYPESET: &'static str = "
-        He thinks, if you were born in Putney, you saw the river every day, and imagined it 
-        widening out to the sea. Even if you had never seen the ocean you had a picture of 
-        it in your head from what you had been told by foreign people who sometimes came 
-        upriver. You knew that one day you would go out into a world of marble pavements 
-        and peacocks, of hillsides buzzing with heat, the fragrance of crushed herbs rising 
-        around you as you walked. You planned for what your journeys would bring you: 
-        the touch of warm terracotta, the night sky of another climate, alien flowers, the 
-        stone eyed gaze of other peoples saints. But if you were born in Aslockton, in flat 
-        fields under a wide sky, you might just be able to imagine Cambridge: no farther.
-    ";
-    const WOLF_HALL_5IN_LOG: &'static str = include_str!("../testdata/wolf_hall_5in_log.txt");
-    const WOLF_HALL_5IN_WANT: &'static str = include_str!("../testdata/wolf_hall_5in_want.txt");
-    const WOLF_HALL_3IN_WANT: &'static str = include_str!("../testdata/wolf_hall_3in_want.txt");
-    const WOLF_HALL_3IN_LOG: &'static str = include_str!("../testdata/wolf_hall_3in_log.txt");
     const TFM_CMR10: &'static [u8] = include_bytes!("../../tfm/corpus/computer-modern/cmr10.tfm");
 
-    #[test]
-    fn wolf_hall_5in() {
-        run_test(
-            TFM_CMR10,
-            WOLF_HALL_5IN_TYPESET,
-            Some(WOLF_HALL_5IN_WANT),
-            Some(WOLF_HALL_5IN_LOG),
+    macro_rules! tests {
+        (
+            $( (
+                $name: ident,
+                $input: expr,
+                $width: expr,
+                $( typeset: $want: expr, )?
+                $( log: $want_log: expr, )?
+            ), )+
+        ) => {
+            $(
+                mod $name {
+                    use super::*;
+                    const INPUT: &'static str = include_str!(concat!("../testdata/", $input));
+                    $(
+                    #[test]
+                    fn typeset() {
+                        let want = include_str!(concat!("../testdata/", $want));
+                        let width = $width;
+                        run_test(
+                            TFM_CMR10,
+                            INPUT,
+                            want,
+                            width,
+                        );
+                    }
+                    )?
+                    $(
+                    #[test]
+                    fn log() {
+                        let want_log = include_str!(concat!("../testdata/", $want_log));
+                        let width = $width;
+                        run_log_test(
+                            TFM_CMR10,
+                            INPUT,
+                            want_log,
+                            width,
+                        );
+                    }
+                    )?
+                }
+
+            )+
+        };
+    }
+
+    tests!(
+        (
+            wolf_hall_5in,
+            "wolf_hall_input.txt",
             "5in",
-        );
-    }
-
-    #[test]
-    fn wolf_hall_3in() {
-        run_test(
-            TFM_CMR10,
-            WOLF_HALL_5IN_TYPESET,
-            Some(WOLF_HALL_3IN_WANT),
-            Some(WOLF_HALL_3IN_LOG),
+            typeset: "wolf_hall_5in_want.txt",
+            log: "wolf_hall_5in_log.txt",
+        ),
+        (
+            wolf_hall_3in,
+            "wolf_hall_input.txt",
             "3in",
-        );
-    }
+            typeset: "wolf_hall_3in_want.txt",
+            log: "wolf_hall_3in_log.txt",
+        ),
+        (
+            alice_paragraph_1_10in,
+            "alice_paragraph_1.txt",
+            "10in",
+            typeset: "alice_paragraph_1_want.txt",
+            log: "alice_paragraph_1_log.txt",
+        ),
+        (
+            alice_paragraph_2_10in,
+            "alice_paragraph_2.txt",
+            "10in",
+            typeset: "alice_paragraph_2_want.txt",
+            log: "alice_paragraph_2_log.txt",
+        ),
+    );
 
-    fn run_test(
-        tfm_bytes: &[u8],
-        input: &str,
-        want: Option<&str>,
-        want_log: Option<&str>,
-        width: &str,
-    ) {
+    fn run(tfm_bytes: &[u8], input: &str, width: &str) -> (ds::VBox, String) {
         let mut tfm_file = tfm::File::deserialize(tfm_bytes).0.unwrap();
         let lig_kern_program =
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
@@ -1033,14 +1028,17 @@ mod tests {
             list: v_list,
             ..Default::default()
         };
-        if let Some(want) = want {
-            boxworks_testing::assert_box_eq!(want, v_box);
-        }
+        (v_box, log.take())
+    }
 
-        let log = log.take();
-        if let Some(want_log) = want_log {
-            assert_eq!(normalize(want_log), normalize(&log));
-        }
+    fn run_test(tfm_bytes: &[u8], input: &str, want: &str, width: &str) {
+        let (got, _) = run(tfm_bytes, input, width);
+        boxworks_testing::assert_box_eq!(want, got);
+    }
+
+    fn run_log_test(tfm_bytes: &[u8], input: &str, want_log: &str, width: &str) {
+        let (_, got_log) = run(tfm_bytes, input, width);
+        assert_eq!(normalize(want_log), normalize(&got_log));
     }
 
     fn normalize(s: &str) -> String {

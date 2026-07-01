@@ -1,7 +1,7 @@
 use assert_cmd::prelude::*;
 use std::process::Command;
 
-fn run_hlists(args: &[&str], texts_file: &str) -> String {
+fn run_box(args: &[&str], texts_file: &str) -> String {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let texts_file_path = std::path::Path::new(&manifest_dir)
         .join("tests")
@@ -36,7 +36,7 @@ macro_rules! tests {
             fn $name() {
                 const GOLDEN: &str = include_str!($golden_file);
                 let args = [ $( $arg ),+ ];
-                let box_output = run_hlists(&args, $texts_file);
+                let box_output = run_box(&args, $texts_file);
                 similar_asserts::assert_eq!(got: normalize(&box_output), want: normalize(GOLDEN));
             }
         )+
@@ -59,5 +59,11 @@ tests!(
         "alice_in_wonderland_hlists_hyphenated.txt",
         "alice_in_wonderland.txt",
         ["hbox", "--hyphenate"],
+    ),
+    (
+        alice_linebreak,
+        "alice_in_wonderland_linebreak.txt",
+        "alice_in_wonderland.txt",
+        ["linebreak", "--widths=10in"],
     ),
 );

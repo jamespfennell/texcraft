@@ -1,0 +1,572 @@
+@firstpass
+\customFont Down, down, down. There was nothing else to do, so Alice soon began talking again. ``Dinah'll miss me very much to-night, I should think!'' (Dinah was
+@ via @@0 b=86 p=0 d=9216
+@@1: line 1.1 t=9216 -> @@0
+the
+@ via @@0 b=22 p=0 d=1024
+@@2: line 1.1 t=1024 -> @@0
+cat.)
+@ via @@0 b=1 p=0 d=121
+@@3: line 1.2 t=121 -> @@0
+``I
+@ via @@0 b=0 p=0 d=100
+@@4: line 1.2 t=100 -> @@0
+hope
+@ via @@0 b=86 p=0 d=9216
+@@5: line 1.3 t=9216 -> @@0
+they'll remember her saucer of milk at tea-time. Dinah my dear! I wish you were down here with me! There are no mice in the air, I'm
+@ via @@1 b=50 p=0 d=3600
+@@6: line 2.1 t=12816 -> @@1
+afraid,
+@ via @@1 b=2 p=0 d=144
+@ via @@2 b=18 p=0 d=784
+@@7: line 2.1 t=1808 -> @@2
+@@8: line 2.2 t=9360 -> @@1
+but
+@ via @@1 b=0 p=0 d=100
+@ via @@2 b=2 p=0 d=144
+@ via @@3 b=34 p=0 d=1936
+@ via @@4 b=77 p=0 d=7569
+@@9: line 2.1 t=2057 -> @@3
+@@10: line 2.2 t=1168 -> @@2
+you
+@ via @@1 b=16 p=0 d=10676
+@ via @@2 b=0 p=0 d=100
+@ via @@3 b=5 p=0 d=225
+@ via @@4 b=20 p=0 d=900
+@@11: line 2.1 t=1000 -> @@4
+@@12: line 2.2 t=346 -> @@3
+might
+@ via @@2 b=69 p=0 d=16241
+@ via @@3 b=0 p=0 d=100
+@ via @@4 b=0 p=0 d=100
+@ via @@5 b=13 p=0 d=10529
+@@13: line 2.2 t=200 -> @@4
+catch
+@ via @@3 b=78 p=0 d=7744
+@ via @@4 b=21 p=0 d=961
+@ via @@5 b=0 p=0 d=100
+@@14: line 2.2 t=9316 -> @@5
+@@15: line 2.3 t=1061 -> @@4
+a
+@ via @@4 b=55 p=0 d=4225
+@ via @@5 b=0 p=0 d=100
+@@16: line 2.2 t=9316 -> @@5
+@@17: line 2.3 t=4325 -> @@4
+bat,
+@ via @@5 b=36 p=0 d=2116
+@@18: line 2.3 t=11332 -> @@5
+and that's very like a mouse, you know. But do cats eat bats, I wonder?'' And here Alice began to get rather sleepy, and
+@ via @@6 b=29 p=0 d=1521
+@@19: line 3.1 t=14337 -> @@6
+went
+@ via @@6 b=1 p=0 d=121
+@ via @@7 b=50 p=0 d=3600
+@ via @@8 b=50 p=0 d=3600
+@@20: line 3.1 t=5408 -> @@7
+@@21: line 3.2 t=12937 -> @@6
+on
+@ via @@6 b=0 p=0 d=100
+@ via @@7 b=16 p=0 d=676
+@ via @@8 b=16 p=0 d=676
+@ via @@9 b=66 p=0 d=5776
+@ via @@10 b=66 p=0 d=5776
+@@22: line 3.1 t=2484 -> @@7
+saying
+@ via @@6 b=66 p=0 d=15776
+@ via @@7 b=0 p=0 d=100
+@ via @@8 b=0 p=0 d=100
+@ via @@9 b=4 p=0 d=196
+@ via @@10 b=4 p=0 d=196
+@ via @@11 b=30 p=0 d=1600
+@ via @@12 b=30 p=0 d=1600
+@@23: line 3.1 t=1946 -> @@12
+@@24: line 3.2 t=1364 -> @@10
+to
+@ via @@7 b=3 p=0 d=169
+@ via @@8 b=3 p=0 d=169
+@ via @@9 b=0 p=0 d=100
+@ via @@10 b=0 p=0 d=100
+@ via @@11 b=9 p=0 d=361
+@ via @@12 b=9 p=0 d=361
+@ via @@13 b=86 p=0 d=9216
+@@25: line 3.1 t=9416 -> @@13
+@@26: line 3.2 t=707 -> @@12
+herself,
+@ via @@9 b=45 p=0 d=13025
+@ via @@10 b=45 p=0 d=3025
+@ via @@11 b=1 p=0 d=121
+@ via @@12 b=1 p=0 d=121
+@ via @@13 b=4 p=0 d=196
+@ via @@14 b=54 p=0 d=4096
+@ via @@15 b=54 p=0 d=14096
+@ via @@16 b=95 p=0 d=11025
+@ via @@17 b=95 p=0 d=21025
+@@27: line 3.2 t=396 -> @@13
+@@28: line 3.3 t=4193 -> @@10
+in
+@ via @@11 b=17 p=0 d=10729
+@ via @@12 b=17 p=0 d=729
+@ via @@13 b=0 p=0 d=100
+@ via @@14 b=21 p=0 d=961
+@ via @@15 b=21 p=0 d=10961
+@ via @@16 b=42 p=0 d=2704
+@ via @@17 b=42 p=0 d=12704
+@@29: line 3.1 t=10277 -> @@14
+@@30: line 3.2 t=300 -> @@13
+@@31: line 3.3 t=1075 -> @@12
+a
+@ via @@11 b=47 p=0 d=13249
+@ via @@12 b=47 p=0 d=3249
+@ via @@13 b=0 p=0 d=100
+@ via @@14 b=9 p=0 d=361
+@ via @@15 b=9 p=0 d=361
+@ via @@16 b=21 p=0 d=961
+@ via @@17 b=21 p=0 d=10961
+@ via @@18 b=90 p=0 d=20000
+@@32: line 3.1 t=10277 -> @@16
+@@33: line 3.2 t=300 -> @@13
+@@34: line 3.3 t=3595 -> @@12
+dreamy
+@ via @@13 b=93 p=0 d=10609
+@ via @@14 b=1 p=0 d=121
+@ via @@15 b=1 p=0 d=121
+@ via @@16 b=0 p=0 d=100
+@ via @@17 b=0 p=0 d=100
+@ via @@18 b=4 p=0 d=196
+@@35: line 3.2 t=1182 -> @@15
+@@36: line 3.3 t=10809 -> @@13
+sort
+@ via @@14 b=51 p=0 d=3721
+@ via @@15 b=51 p=0 d=3721
+@ via @@16 b=19 p=0 d=841
+@ via @@17 b=19 p=0 d=841
+@ via @@18 b=0 p=0 d=100
+@@37: line 3.2 t=11432 -> @@18
+@@38: line 3.3 t=4782 -> @@15
+of
+@ via @@16 b=69 p=0 d=6241
+@ via @@17 b=69 p=0 d=6241
+@ via @@18 b=3 p=0 d=169
+@@39: line 3.2 t=11501 -> @@18
+@@40: line 3.3 t=10566 -> @@17
+way,
+@ via @@18 b=79 p=0 d=7921
+@@41: line 3.3 t=19253 -> @@18
+``Do cats eat bats? Do cats eat bats?'' and sometimes, ``Do bats eat cats?'' for, you see, as she couldn't
+@ via @@19 b=36 p=0 d=2116
+@@42: line 4.1 t=16453 -> @@19
+answer
+@ via @@19 b=1 p=0 d=121
+@ via @@20 b=18 p=0 d=784
+@ via @@21 b=18 p=0 d=784
+@ via @@22 b=53 p=0 d=3969
+@@43: line 4.1 t=6192 -> @@20
+@@44: line 4.2 t=14458 -> @@19
+either
+@ via @@19 b=15 p=0 d=10625
+@ via @@20 b=0 p=0 d=100
+@ via @@21 b=0 p=0 d=100
+@ via @@22 b=4 p=0 d=196
+@ via @@23 b=61 p=0 d=5041
+@ via @@24 b=61 p=0 d=5041
+@@45: line 4.1 t=6405 -> @@24
+@@46: line 4.2 t=2680 -> @@22
+question,
+@ via @@22 b=34 p=0 d=11936
+@ via @@23 b=0 p=0 d=100
+@ via @@24 b=0 p=0 d=100
+@ via @@25 b=4 p=0 d=196
+@ via @@26 b=4 p=0 d=196
+@ via @@27 b=85 p=0 d=9025
+@ via @@28 b=85 p=0 d=19025
+@@47: line 4.1 t=9421 -> @@27
+@@48: line 4.2 t=903 -> @@26
+it
+@ via @@22 b=98 p=0 d=21664
+@ via @@23 b=0 p=0 d=100
+@ via @@24 b=0 p=0 d=100
+@ via @@25 b=1 p=0 d=121
+@ via @@26 b=1 p=0 d=121
+@ via @@27 b=42 p=0 d=2704
+@ via @@28 b=42 p=0 d=12704
+@ via @@29 b=90 p=0 d=10000
+@ via @@30 b=90 p=0 d=10000
+@ via @@31 b=90 p=0 d=20000
+@@49: line 4.1 t=3100 -> @@27
+@@50: line 4.2 t=828 -> @@26
+didn't
+@ via @@23 b=87 p=0 d=19409
+@ via @@24 b=87 p=0 d=9409
+@ via @@25 b=21 p=0 d=10961
+@ via @@26 b=21 p=0 d=961
+@ via @@27 b=2 p=0 d=144
+@ via @@28 b=2 p=0 d=144
+@ via @@29 b=9 p=0 d=361
+@ via @@30 b=9 p=0 d=361
+@ via @@31 b=9 p=0 d=361
+@ via @@32 b=23 p=0 d=1089
+@ via @@33 b=23 p=0 d=1089
+@ via @@34 b=23 p=0 d=11089
+@@51: line 4.1 t=1389 -> @@33
+@@52: line 4.2 t=540 -> @@27
+@@53: line 4.3 t=1668 -> @@26
+much
+@ via @@27 b=4 p=0 d=196
+@ via @@28 b=4 p=0 d=196
+@ via @@29 b=0 p=0 d=100
+@ via @@30 b=0 p=0 d=100
+@ via @@31 b=0 p=0 d=100
+@ via @@32 b=0 p=0 d=100
+@ via @@33 b=0 p=0 d=100
+@ via @@34 b=0 p=0 d=100
+@ via @@35 b=44 p=0 d=2916
+@ via @@36 b=44 p=0 d=12916
+@@54: line 4.1 t=4098 -> @@35
+@@55: line 4.2 t=400 -> @@33
+matter
+@ via @@32 b=49 p=0 d=13481
+@ via @@33 b=49 p=0 d=3481
+@ via @@34 b=49 p=0 d=3481
+@ via @@35 b=1 p=0 d=121
+@ via @@36 b=1 p=0 d=121
+@ via @@37 b=16 p=0 d=676
+@ via @@38 b=16 p=0 d=10676
+@ via @@39 b=43 p=0 d=2809
+@ via @@40 b=43 p=0 d=12809
+@@56: line 4.2 t=1303 -> @@35
+@@57: line 4.3 t=3781 -> @@33
+which
+@ via @@35 b=17 p=0 d=729
+@ via @@36 b=17 p=0 d=729
+@ via @@37 b=0 p=0 d=100
+@ via @@38 b=0 p=0 d=100
+@ via @@39 b=2 p=0 d=144
+@ via @@40 b=2 p=0 d=144
+@ via @@41 b=27 p=0 d=11369
+@@58: line 4.2 t=4882 -> @@38
+@@59: line 4.3 t=1911 -> @@35
+way
+@ via @@37 b=18 p=0 d=784
+@ via @@38 b=18 p=0 d=784
+@ via @@39 b=1 p=0 d=121
+@ via @@40 b=1 p=0 d=121
+@ via @@41 b=2 p=0 d=144
+@@60: line 4.2 t=10687 -> @@40
+@@61: line 4.3 t=5566 -> @@38
+she
+@ via @@39 b=43 p=0 d=2809
+@ via @@40 b=43 p=0 d=2809
+@ via @@41 b=0 p=0 d=100
+@@62: line 4.2 t=19353 -> @@41
+@@63: line 4.3 t=13375 -> @@40
+put
+@ via @@41 b=24 p=0 d=1156
+@@64: line 4.3 t=20409 -> @@41
+it. She felt that she was dozing off, and had just begun to dream that she was walking hand
+@ via @@42 b=19 p=0 d=841
+@@65: line 5.1 t=17294 -> @@42
+in
+@ via @@42 b=4 p=0 d=196
+@ via @@43 b=96 p=0 d=11236
+@ via @@44 b=96 p=0 d=11236
+@@66: line 5.1 t=17428 -> @@43
+@@67: line 5.2 t=16649 -> @@42
+hand
+@ via @@42 b=1 p=0 d=121
+@ via @@43 b=12 p=0 d=484
+@ via @@44 b=12 p=0 d=484
+@@68: line 5.2 t=6676 -> @@43
+with
+@ via @@42 b=60 p=0 d=14900
+@ via @@43 b=0 p=0 d=100
+@ via @@44 b=0 p=0 d=100
+@ via @@45 b=22 p=0 d=1024
+@ via @@46 b=22 p=0 d=1024
+@@69: line 5.1 t=3704 -> @@46
+@@70: line 5.2 t=6292 -> @@43
+Dinah,
+@ via @@43 b=56 p=0 d=14356
+@ via @@44 b=56 p=0 d=4356
+@ via @@45 b=0 p=0 d=100
+@ via @@46 b=0 p=0 d=100
+@ via @@47 b=49 p=0 d=3481
+@ via @@48 b=49 p=0 d=3481
+@@71: line 5.1 t=4384 -> @@48
+@@72: line 5.2 t=2780 -> @@46
+and
+@ via @@45 b=19 p=0 d=10841
+@ via @@46 b=19 p=0 d=841
+@ via @@47 b=7 p=0 d=289
+@ via @@48 b=7 p=0 d=289
+@ via @@49 b=22 p=0 d=1024
+@ via @@50 b=22 p=0 d=1024
+@@73: line 5.1 t=1852 -> @@50
+@@74: line 5.2 t=1192 -> @@48
+@@75: line 5.3 t=3521 -> @@46
+saying
+@ via @@47 b=1 p=0 d=121
+@ via @@48 b=1 p=0 d=121
+@ via @@49 b=0 p=0 d=100
+@ via @@50 b=0 p=0 d=100
+@ via @@51 b=20 p=0 d=900
+@ via @@52 b=20 p=0 d=900
+@ via @@53 b=20 p=0 d=10900
+@@76: line 5.1 t=1440 -> @@52
+@@77: line 5.2 t=928 -> @@50
+to
+@ via @@47 b=17 p=0 d=10729
+@ via @@48 b=17 p=0 d=729
+@ via @@49 b=2 p=0 d=144
+@ via @@50 b=2 p=0 d=144
+@ via @@51 b=4 p=0 d=196
+@ via @@52 b=4 p=0 d=196
+@ via @@53 b=4 p=0 d=196
+@ via @@54 b=62 p=0 d=5184
+@ via @@55 b=62 p=0 d=5184
+@@78: line 5.1 t=5584 -> @@55
+@@79: line 5.2 t=736 -> @@52
+@@80: line 5.3 t=1632 -> @@48
+her
+@ via @@49 b=44 p=0 d=12916
+@ via @@50 b=44 p=0 d=2916
+@ via @@51 b=0 p=0 d=100
+@ via @@52 b=0 p=0 d=100
+@ via @@53 b=0 p=0 d=100
+@ via @@54 b=14 p=0 d=576
+@ via @@55 b=14 p=0 d=576
+@@81: line 5.1 t=976 -> @@55
+@@82: line 5.2 t=640 -> @@52
+@@83: line 5.3 t=3744 -> @@50
+very
+@ via @@51 b=17 p=0 d=10729
+@ via @@52 b=17 p=0 d=729
+@ via @@53 b=17 p=0 d=729
+@ via @@54 b=0 p=0 d=100
+@ via @@55 b=0 p=0 d=100
+@ via @@56 b=36 p=0 d=2116
+@ via @@57 b=36 p=0 d=12116
+@@84: line 5.1 t=3419 -> @@56
+@@85: line 5.2 t=500 -> @@55
+@@86: line 5.3 t=1269 -> @@52
+earnestly,
+@ via @@56 b=0 p=0 d=100
+@ via @@57 b=0 p=0 d=100
+@ via @@58 b=8 p=0 d=324
+@ via @@59 b=8 p=0 d=324
+@ via @@60 b=54 p=0 d=4096
+@ via @@61 b=54 p=0 d=14096
+@@87: line 5.2 t=1403 -> @@56
+``Now,
+@ via @@56 b=99 p=0 d=11881
+@ via @@57 b=99 p=0 d=11881
+@ via @@58 b=1 p=0 d=121
+@ via @@59 b=1 p=0 d=121
+@ via @@60 b=1 p=0 d=121
+@ via @@61 b=1 p=0 d=121
+@ via @@62 b=18 p=0 d=784
+@ via @@63 b=18 p=0 d=10784
+@ via @@64 b=80 p=0 d=18100
+@@88: line 5.2 t=2032 -> @@59
+Dinah,
+@ via @@60 b=17 p=0 d=729
+@ via @@61 b=17 p=0 d=729
+@ via @@62 b=0 p=0 d=100
+@ via @@63 b=0 p=0 d=100
+@ via @@64 b=3 p=0 d=169
+@@89: line 5.2 t=13475 -> @@63
+@@90: line 5.3 t=6295 -> @@61
+tell
+@ via @@62 b=17 p=0 d=729
+@ via @@63 b=17 p=0 d=729
+@ via @@64 b=0 p=0 d=100
+@@91: line 5.2 t=20509 -> @@64
+@@92: line 5.3 t=14104 -> @@63
+me
+@ via @@64 b=12 p=0 d=484
+@@93: line 5.2 t=20893 -> @@64
+the
+@ via @@64 b=92 p=0 d=10404
+@@94: line 5.3 t=30813 -> @@64
+truth: did you ever eat a bat?'' when suddenly, thump! thump! down she
+@ via @@65 b=54 p=0 d=4096
+@@95: line 6.1 t=21390 -> @@65
+came
+@ via @@65 b=5 p=0 d=225
+@ via @@66 b=19 p=0 d=841
+@ via @@67 b=19 p=0 d=841
+@@96: line 6.1 t=17490 -> @@67
+@@97: line 6.2 t=17519 -> @@65
+upon
+@ via @@65 b=0 p=0 d=100
+@ via @@66 b=0 p=0 d=100
+@ via @@67 b=0 p=0 d=100
+@ via @@68 b=19 p=0 d=841
+@ via @@69 b=96 p=0 d=11236
+@ via @@70 b=96 p=0 d=11236
+@@98: line 6.1 t=7517 -> @@68
+@@99: line 6.2 t=16749 -> @@67
+a
+@ via @@65 b=6 p=0 d=256
+@ via @@66 b=0 p=0 d=100
+@ via @@67 b=0 p=0 d=100
+@ via @@68 b=7 p=0 d=289
+@ via @@69 b=55 p=0 d=4225
+@ via @@70 b=55 p=0 d=4225
+@@100: line 6.1 t=7929 -> @@69
+@@101: line 6.2 t=6965 -> @@68
+heap
+@ via @@66 b=50 p=0 d=13600
+@ via @@67 b=50 p=0 d=3600
+@ via @@68 b=0 p=0 d=100
+@ via @@69 b=6 p=0 d=256
+@ via @@70 b=6 p=0 d=256
+@ via @@71 b=92 p=0 d=10404
+@ via @@72 b=92 p=0 d=10404
+@@102: line 6.1 t=13184 -> @@72
+@@103: line 6.2 t=3960 -> @@69
+of
+@ via @@68 b=4 p=0 d=196
+@ via @@69 b=1 p=0 d=121
+@ via @@70 b=1 p=0 d=121
+@ via @@71 b=43 p=0 d=2809
+@ via @@72 b=43 p=0 d=2809
+@@104: line 6.1 t=5589 -> @@72
+@@105: line 6.2 t=3825 -> @@69
+sticks
+@ via @@69 b=12 p=0 d=484
+@ via @@70 b=12 p=0 d=484
+@ via @@71 b=3 p=0 d=169
+@ via @@72 b=3 p=0 d=169
+@ via @@73 b=25 p=0 d=1225
+@ via @@74 b=25 p=0 d=1225
+@ via @@75 b=25 p=0 d=11225
+@@106: line 6.1 t=2417 -> @@74
+@@107: line 6.2 t=2949 -> @@72
+and
+@ via @@71 b=0 p=0 d=100
+@ via @@72 b=0 p=0 d=100
+@ via @@73 b=3 p=0 d=169
+@ via @@74 b=3 p=0 d=169
+@ via @@75 b=3 p=0 d=169
+@ via @@76 b=53 p=0 d=3969
+@ via @@77 b=53 p=0 d=3969
+@@108: line 6.1 t=4897 -> @@77
+@@109: line 6.2 t=1361 -> @@74
+dry
+@ via @@71 b=25 p=0 d=11225
+@ via @@72 b=25 p=0 d=1225
+@ via @@73 b=0 p=0 d=100
+@ via @@74 b=0 p=0 d=100
+@ via @@75 b=0 p=0 d=100
+@ via @@76 b=12 p=0 d=484
+@ via @@77 b=12 p=0 d=484
+@ via @@78 b=36 p=0 d=2116
+@ via @@79 b=36 p=0 d=2116
+@ via @@80 b=36 p=0 d=12116
+@@110: line 6.1 t=2852 -> @@79
+@@111: line 6.2 t=1292 -> @@74
+@@112: line 6.3 t=4005 -> @@72
+leaves,
+@ via @@76 b=0 p=0 d=100
+@ via @@77 b=0 p=0 d=100
+@ via @@78 b=1 p=0 d=121
+@ via @@79 b=1 p=0 d=121
+@ via @@80 b=1 p=0 d=121
+@ via @@81 b=11 p=0 d=441
+@ via @@82 b=11 p=0 d=441
+@ via @@83 b=11 p=0 d=441
+@ via @@84 b=66 p=0 d=5776
+@ via @@85 b=66 p=0 d=5776
+@ via @@86 b=66 p=0 d=15776
+@@113: line 6.1 t=6276 -> @@85
+@@114: line 6.2 t=857 -> @@79
+and
+@ via @@76 b=28 p=0 d=11444
+@ via @@77 b=28 p=0 d=1444
+@ via @@78 b=2 p=0 d=144
+@ via @@79 b=2 p=0 d=144
+@ via @@80 b=2 p=0 d=144
+@ via @@81 b=0 p=0 d=100
+@ via @@82 b=0 p=0 d=100
+@ via @@83 b=0 p=0 d=100
+@ via @@84 b=14 p=0 d=576
+@ via @@85 b=14 p=0 d=576
+@ via @@86 b=14 p=0 d=10576
+@@115: line 6.1 t=1076 -> @@85
+@@116: line 6.2 t=740 -> @@82
+@@117: line 6.3 t=2372 -> @@77
+the
+@ via @@78 b=55 p=0 d=14225
+@ via @@79 b=55 p=0 d=4225
+@ via @@80 b=55 p=0 d=4225
+@ via @@81 b=2 p=0 d=144
+@ via @@82 b=2 p=0 d=144
+@ via @@83 b=2 p=0 d=144
+@ via @@84 b=1 p=0 d=121
+@ via @@85 b=1 p=0 d=121
+@ via @@86 b=1 p=0 d=121
+@ via @@87 b=93 p=0 d=10609
+@@118: line 6.2 t=621 -> @@85
+@@119: line 6.3 t=4961 -> @@79
+fall
+@ via @@81 b=53 p=0 d=13969
+@ via @@82 b=53 p=0 d=3969
+@ via @@83 b=53 p=0 d=3969
+@ via @@84 b=0 p=0 d=100
+@ via @@85 b=0 p=0 d=100
+@ via @@86 b=0 p=0 d=100
+@ via @@87 b=31 p=0 d=1681
+@@120: line 6.1 t=3084 -> @@87
+@@121: line 6.2 t=600 -> @@85
+@@122: line 6.3 t=4609 -> @@82
+was
+@ via @@84 b=37 p=0 d=12209
+@ via @@85 b=37 p=0 d=2209
+@ via @@86 b=37 p=0 d=2209
+@ via @@87 b=4 p=0 d=196
+@ via @@88 b=64 p=0 d=5476
+@@123: line 6.1 t=7508 -> @@88
+@@124: line 6.2 t=1599 -> @@87
+@@125: line 6.3 t=2709 -> @@85
+over.
+@\par via @@87 b=0 p=-10000 d=100
+@\par via @@88 b=0 p=-10000 d=100
+@\par via @@89 b=0 p=-10000 d=100
+@\par via @@90 b=0 p=-10000 d=100
+@\par via @@91 b=0 p=-10000 d=100
+@\par via @@92 b=0 p=-10000 d=100
+@\par via @@93 b=0 p=-10000 d=100
+@\par via @@94 b=0 p=-10000 d=100
+@\par via @@95 b=0 p=-10000 d=100
+@\par via @@96 b=0 p=-10000 d=100
+@\par via @@97 b=0 p=-10000 d=100
+@\par via @@98 b=0 p=-10000 d=100
+@\par via @@99 b=0 p=-10000 d=100
+@\par via @@100 b=0 p=-10000 d=100
+@\par via @@101 b=0 p=-10000 d=100
+@\par via @@102 b=0 p=-10000 d=100
+@\par via @@103 b=0 p=-10000 d=100
+@\par via @@104 b=0 p=-10000 d=100
+@\par via @@105 b=0 p=-10000 d=100
+@\par via @@106 b=0 p=-10000 d=100
+@\par via @@107 b=0 p=-10000 d=100
+@\par via @@108 b=0 p=-10000 d=100
+@\par via @@109 b=0 p=-10000 d=100
+@\par via @@110 b=0 p=-10000 d=100
+@\par via @@111 b=0 p=-10000 d=100
+@\par via @@112 b=0 p=-10000 d=100
+@\par via @@113 b=0 p=-10000 d=100
+@\par via @@114 b=0 p=-10000 d=100
+@\par via @@115 b=0 p=-10000 d=100
+@\par via @@116 b=0 p=-10000 d=100
+@\par via @@117 b=0 p=-10000 d=100
+@\par via @@118 b=0 p=-10000 d=100
+@\par via @@119 b=0 p=-10000 d=100
+@\par via @@120 b=0 p=-10000 d=100
+@\par via @@121 b=0 p=-10000 d=100
+@\par via @@122 b=0 p=-10000 d=100
+@\par via @@123 b=0 p=-10000 d=100
+@\par via @@124 b=0 p=-10000 d=100
+@\par via @@125 b=0 p=-10000 d=100
+@@126: line 7.2- t=700 -> @@121

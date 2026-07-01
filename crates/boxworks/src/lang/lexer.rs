@@ -87,7 +87,10 @@ impl<'a> Lexer<'a> {
         enum State {
             Regular,
             Comment,
+            /// In a string.
             String,
+            /// In a string after the escape character \
+            StringEscaped,
         }
         struct Stack {
             i: usize,
@@ -122,7 +125,13 @@ impl<'a> Lexer<'a> {
                 ('"', State::String) => {
                     state = State::Regular;
                 }
-                _ => {}
+                ('\\', State::String) => {
+                    state = State::StringEscaped;
+                }
+                (_, State::StringEscaped) => {
+                    state = State::String;
+                }
+                (_, State::Regular | State::Comment | State::String) => {}
             }
             i += c.len_utf8();
         }
