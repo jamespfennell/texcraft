@@ -213,19 +213,25 @@ fn build_output(v_list: &[ds::Vertical], font_repo: &boxworks_text::TfmFontRepo)
             }
         };
         prev_depth_pt = Some(pt(hbox.depth));
+        let width_pt = pt(hbox.width);
+        let (elements, end_x_pt) = build_elements(hbox, font_repo);
         lines.push(Line {
             baseline_pt,
-            width_pt: pt(hbox.width),
+            width_pt,
             height_pt,
             depth_pt: pt(hbox.depth),
-            badness: badness(hbox),
-            elements: build_elements(hbox, font_repo),
+            badness: badness(hbox, end_x_pt - width_pt),
+            elements,
         });
     }
     Output { lines }
 }
 
-fn build_elements(hbox: &ds::HBox, font_repo: &boxworks_text::TfmFontRepo) -> Vec<Element> {
+/// Returns the elements of the line and the x position at which they end.
+fn build_elements(
+    hbox: &ds::HBox,
+    font_repo: &boxworks_text::TfmFontRepo,
+) -> (Vec<Element>, f64) {
     use boxworks::FontRepo;
     let mut elements = vec![];
     let mut x_pt = 0.0;
@@ -270,7 +276,7 @@ fn build_elements(hbox: &ds::HBox, font_repo: &boxworks_text::TfmFontRepo) -> Ve
             _ => {}
         }
     }
-    elements
+    (elements, x_pt)
 }
 
 /// The width of a glue element after the line's stretch/shrink ratio is applied.
@@ -292,14 +298,16 @@ fn set_glue_width_pt(hbox: &ds::HBox, glue: &common::Glue) -> f64 {
     width_pt
 }
 
-fn badness(hbox: &ds::HBox) -> i64 {
+fn badness(hbox: &ds::HBox, overflow_pt: f64) -> i64 {
+    // Overfull boxes have their glue ratio clamped to unity during packing,
+    // so they are detected by their content overflowing the line width.
+    if overflow_pt > 0.001 {
+        return 1000000;
+    }
     if hbox.glue_order != common::GlueOrder::Normal || hbox.glue_ratio.den == Scaled::ZERO {
         return 0;
     }
     let r = hbox.glue_ratio.as_float() as f64;
-    if r < -1.0 {
-        return 1000000;
-    }
     (100.0 * r.abs().powi(3)).round().min(10000.0) as i64
 }
 

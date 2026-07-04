@@ -371,6 +371,10 @@ fn build_tex_context(
 
 \tracingparagraphs=1
 
+% Boxworks does not yet append the \overfullrule rule to overfull boxes
+% (TeX.2021.666), so suppress it in TeX's output for now.
+\hfuzz=\maxdimen
+
             \font \customFont {file_stem}
 
             \customFont

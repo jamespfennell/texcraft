@@ -645,7 +645,7 @@ impl<'a> LineBreaker<'a> {
                                 && minimum_demerits == AWFUL_BAD
                                 && active_nodes.is_empty()
                             {
-                                (false, true, true)
+                                (true, true, true)
                             } else {
                                 (true, badness <= tolerance, false)
                             }
@@ -974,6 +974,12 @@ mod tests {
             log: "wolf_hall_3in_log.txt",
         ),
         (
+            wolf_hall_2in,
+            "wolf_hall_input.txt",
+            "2in",
+            typeset: "wolf_hall_2in_want.txt",
+        ),
+        (
             alice_paragraph_1_10in,
             "alice_paragraph_1.txt",
             "10in",
@@ -1031,13 +1037,124 @@ mod tests {
     }
 
     fn run_test(tfm_bytes: &[u8], input: &str, want: &str, width: &str) {
+        if verify_with_tex() {
+            verify_want_against_tex(tfm_bytes, input, want, width);
+            return;
+        }
         let (got, _) = run(tfm_bytes, input, width);
         boxworks_testing::assert_box_eq!(want, got);
     }
 
     fn run_log_test(tfm_bytes: &[u8], input: &str, want_log: &str, width: &str) {
+        if verify_with_tex() {
+            let (_, stdout) = run_tex(tfm_bytes, input, width);
+            let trace = extract_paragraph_trace(&stdout);
+            assert_eq!(normalize(want_log), normalize(&trace));
+            return;
+        }
         let (_, got_log) = run(tfm_bytes, input, width);
         assert_eq!(normalize(want_log), normalize(&got_log));
+    }
+
+    fn verify_with_tex() -> bool {
+        std::env::var("TEXCRAFT_VERIFY").unwrap_or_default() == "tex"
+    }
+
+    /// Verifies that the expected output in the testdata directory matches
+    /// what TeX actually produces. Run with `TEXCRAFT_VERIFY=tex cargo test`;
+    /// requires a `tex` binary on the path.
+    ///
+    /// This runs the same pipeline that generates the testdata files
+    /// (`box linebreak --tex-engine=tex`, see the testdata README).
+    fn verify_want_against_tex(tfm_bytes: &[u8], input: &str, want: &str, width: &str) {
+        let (vlist, _) = run_tex(tfm_bytes, input, width);
+        boxworks_testing::assert_box_eq!(want, vlist);
+    }
+
+    /// A [`boxworks::tex::TexEngine`] that records the terminal output of the
+    /// inner engine. The box-building templates set `\tracingonline=1`, so
+    /// the `\tracingparagraphs` trace appears in this output.
+    struct RecordingTexEngine {
+        inner: Box<dyn boxworks::tex::TexEngine>,
+        stdout: RefCell<String>,
+    }
+
+    impl boxworks::tex::TexEngine for RecordingTexEngine {
+        fn run(
+            &self,
+            tex_source_code: &str,
+            auxiliary_files: &std::collections::HashMap<std::path::PathBuf, Vec<u8>>,
+        ) -> String {
+            let output = self.inner.run(tex_source_code, auxiliary_files);
+            *self.stdout.borrow_mut() = output.clone();
+            output
+        }
+    }
+
+    /// Runs TeX on the input and returns the resulting vertical list and the
+    /// raw terminal output.
+    fn run_tex(tfm_bytes: &[u8], input: &str, width: &str) -> (ds::VBox, String) {
+        use std::collections::HashMap;
+        use std::path::PathBuf;
+
+        let mut auxiliary_files: HashMap<PathBuf, Vec<u8>> = Default::default();
+        auxiliary_files.insert("customFont.tfm".into(), tfm_bytes.to_vec());
+        let preamble = format![
+            r"
+            \tracingparagraphs=1
+
+            % Boxworks does not yet append the \overfullrule rule to overfull
+            % boxes (TeX.2021.666), so suppress it in TeX's output for now.
+            \hfuzz=\maxdimen
+
+            \font \customFont customFont
+
+            \customFont
+            {}
+            ",
+            Params::plain_tex_defaults().tex(),
+        ];
+
+        // By default TeX wraps terminal output at 79 characters, which would
+        // split long \tracingparagraphs lines. The testdata log files are
+        // unwrapped, so raise the limit; the spawned tex process inherits it.
+        std::env::set_var("max_print_line", "10000");
+
+        let width = common::Scaled::parse_from_string(width).unwrap();
+        let engine = RecordingTexEngine {
+            inner: boxworks::tex::new_tex_engine_binary("tex".to_string()).unwrap(),
+            stdout: Default::default(),
+        };
+        let texts = vec![input.trim().to_string()];
+        let (_, vlists) = boxworks::tex::build_vertical_lists(
+            &engine,
+            &auxiliary_files,
+            &preamble,
+            &[width],
+            &mut texts.iter(),
+        );
+        let [vlist]: [ds::VBox; 1] = vlists.try_into().expect("one text in, one vlist out");
+        (vlist, engine.stdout.into_inner())
+    }
+
+    /// Extracts the `\tracingparagraphs` trace from TeX's terminal output:
+    /// everything from `@firstpass` (or `@secondpass`, if the first pass is
+    /// skipped) up to the box display that follows the paragraph.
+    fn extract_paragraph_trace(stdout: &str) -> String {
+        let mut lines = vec![];
+        let mut in_trace = false;
+        for line in stdout.lines() {
+            if !in_trace && (line.starts_with("@firstpass") || line.starts_with("@secondpass")) {
+                in_trace = true;
+            }
+            if line.starts_with("Texcraft: begin") {
+                break;
+            }
+            if in_trace {
+                lines.push(line);
+            }
+        }
+        lines.join("\n")
     }
 
     fn normalize(s: &str) -> String {

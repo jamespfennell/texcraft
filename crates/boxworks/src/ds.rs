@@ -268,10 +268,22 @@ impl HBox {
             Less => {
                 // TeX.2021.664
                 hbox.glue_order = total_glue.shrink_order;
-                hbox.glue_ratio = GlueRatio {
-                    num: excess,
-                    den: total_glue.shrink,
-                };
+                if total_glue.shrink_order == GlueOrder::Normal && total_glue.shrink < -excess {
+                    // The box is overfull: the glue shrinks by exactly its
+                    // shrinkability (TeX sets the glue ratio to unity) and
+                    // the content overflows the box.
+                    // TODO(TeX.2021.666): report the overfull box and append
+                    // the \overfullrule rule.
+                    hbox.glue_ratio = GlueRatio {
+                        num: -common::Scaled::ONE,
+                        den: common::Scaled::ONE,
+                    };
+                } else {
+                    hbox.glue_ratio = GlueRatio {
+                        num: excess,
+                        den: total_glue.shrink,
+                    };
+                }
             }
             Equal => {
                 // Do nothing: hbox defaults cover this case.

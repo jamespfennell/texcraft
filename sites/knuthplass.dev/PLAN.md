@@ -5,7 +5,7 @@ A website that demonstrates the Knuth-Plass line breaking algorithm from the
 Compiler Explorer: input paragraph and algorithm parameters on the left, the
 typeset paragraph on the right.
 
-## Status (2026-07-03)
+## Status (updated 2026-07-04)
 
 **Milestone 1 — done (committed).** `knuthplass-wasm` crate exporting
 `break_paragraph(text, params_json)`. Mirrors the `box linebreak` pipeline;
@@ -19,7 +19,7 @@ that go beyond the original schema sketch:
   table (f-ligatures at U+FB00–FB04, `` `` ``→U+201C, `''`→U+201D,
   `--`/`---`→en/em dash, etc.).
 
-**Milestone 2 — done (uncommitted).** The site itself:
+**Milestone 2 — done (committed).** The site itself:
 
 - `index.html` single-page app per the layout below; parameter inputs are
   generated from a JS table; modified params highlighted; state in the URL
@@ -35,28 +35,33 @@ that go beyond the original schema sketch:
 - Deployment files mirror ligkern.dev: Caddyfile, Caddyfile.local (port
   8767), Dockerfile, package.json; 5 puppeteer smoke tests pass.
 - Local dev: `caddy start --config Caddyfile.local` then `npm test`.
+- CI: `.github/workflows/knuthplass.dev.yml` (mirrors ligkern.dev — builds
+  the Docker image, runs the smoke tests against it, pushes
+  `jamespfennell/knuthplass.dev:latest` on push to main); `.dockerignore`
+  allowlists the site files incl. `fonts/`.
 
 **Upstream bugs found while building (in the crates, not the site):**
 
-1. **The hyphenation pass drops the final line.** Whenever pass 2 runs and
-   selects a solution, the last line is missing; a single-line paragraph
-   (e.g. one word) produces nothing at all. Repro:
-   `box linebreak --width 300pt --pre-tolerance=-1 --output-text "hello world this is a test"`
-   → empty. Curiously `--tolerance=10000` produces complete output.
-   `post_line_break` is innocent (it emits every breakpoint given), so the
-   chain returned by `break_line_single_attempt` is missing the final
-   break. Prime suspect: best-node selection at TeX.2021.874 combined with
-   the artificial-demerits path not deactivating the old node (ties on
-   total_demerits + strict `<` keep the non-final node). The UI shows a
-   "known bug" message when zero lines come back.
+1. ~~**The hyphenation pass drops the final line.**~~ — fixed 2026-07-04.
+   Root cause was as suspected: the artificial-demerits branch
+   (TeX.2021.854) kept the old active node alive; it tied with the
+   final-break node on total demerits and won the strict `<` best-node
+   scan, so the returned chain never reached the final break. Fixed by
+   James (the branch now deactivates the node like TeX). Two packing
+   divergences surfaced by the regression test were also addressed:
+   overfull boxes now clamp the glue ratio to unity (TeX.2021.664), and
+   TeX's \overfullrule rule (TeX.2021.666) is deferred — suppressed in
+   TeX-generated test data via `\hfuzz=\maxdimen` (TODOs in code).
+   Regression test: `wolf_hall_2in` in boxworks-knuthplass, whose
+   TeX-generated expectation is certified by `TEXCRAFT_VERIFY=tex`.
 2. ~~**Hyphenation destroys ligatures**~~ — fixed 2026-07-04. Root cause
    (found by James): reconstitution is fully implemented in
    `boxworks-hyphenate`, but both call sites (`knuthplass-wasm` and
    `box.rs`) constructed the hyphenator without setting its public
    `lig_kern_program` field, so reconstitution ran with an empty program.
-   Both now assign the compiled cmr10 program. Possible upstream
-   follow-up: make the constructor require the program so it can't be
-   forgotten.
+   Both now assign the compiled cmr10 program. The footgun is also fixed
+   upstream: `plain_tex_en_us` now *requires* the lig/kern program as an
+   argument (all five call sites updated).
 3. The "need emergency attempt" panic is effectively unreachable: the second
    pass runs with `force_solution=true`, so infeasible tolerances produce
    overfull lines (badness 1000000) rather than panicking. The UI keeps a
