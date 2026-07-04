@@ -1010,8 +1010,7 @@ mod tests {
         let log: Rc<RefCell<String>> = Default::default();
         let mut logger = debug::TexLogger::new(log.clone());
 
-        let mut hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us();
-        hyphenator.lig_kern_program = lig_kern_program;
+        let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us(lig_kern_program);
 
         let line_breaker = super::LineBreaker {
             params: &params,

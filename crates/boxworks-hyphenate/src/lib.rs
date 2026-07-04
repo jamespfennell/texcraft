@@ -14,9 +14,16 @@ pub struct Hyphenator {
 }
 
 impl Hyphenator {
-    pub fn plain_tex_en_us() -> Self {
+    /// Creates a hyphenator with plain TeX's English patterns and defaults.
+    ///
+    /// The lig/kern program of the font being hyphenated is required because
+    /// hyphenation breaks ligatures apart to insert discretionaries, and the
+    /// program is needed to reconstitute ligatures and kerns in the result.
+    /// Passing the wrong program (e.g. an empty one) silently produces
+    /// un-ligatured output.
+    pub fn plain_tex_en_us(lig_kern_program: tfm::ligkern::CompiledProgram) -> Self {
         Self {
-            lig_kern_program: Default::default(),
+            lig_kern_program,
             hyphenator: hyphenate::Hyphenator::plain_tex_en_us(),
             left_hyphen_min: 2,
             right_hyphen_min: 3,
@@ -572,8 +579,7 @@ mod tests {
         let mut font_repo: bwt::TfmFontRepo = Default::default();
         font_repo.register_font(0, tfm_file);
 
-        let mut hyphenator = Hyphenator::plain_tex_en_us();
-        hyphenator.lig_kern_program = lig_kern_program;
+        let mut hyphenator = Hyphenator::plain_tex_en_us(lig_kern_program);
         hyphenator
             .hyphenator
             .insert_exceptions(hyphenation_patterns);

@@ -49,11 +49,14 @@ that go beyond the original schema sketch:
    the artificial-demerits path not deactivating the old node (ties on
    total_demerits + strict `<` keep the non-final node). The UI shows a
    "known bug" message when zero lines come back.
-2. **Hyphenation destroys ligatures** (`boxworks-hyphenate`): ligs are split
-   into plain chars to insert discretionaries and never reconstituted, so
-   pass 2 loses ligatures (and lig kerns) even in words that aren't broken.
-   TeX re-ligatures the fragments. Surfaced on the site as "ligatures for
-   difficult don't work".
+2. ~~**Hyphenation destroys ligatures**~~ — fixed 2026-07-04. Root cause
+   (found by James): reconstitution is fully implemented in
+   `boxworks-hyphenate`, but both call sites (`knuthplass-wasm` and
+   `box.rs`) constructed the hyphenator without setting its public
+   `lig_kern_program` field, so reconstitution ran with an empty program.
+   Both now assign the compiled cmr10 program. Possible upstream
+   follow-up: make the constructor require the program so it can't be
+   forgotten.
 3. The "need emergency attempt" panic is effectively unreachable: the second
    pass runs with `force_solution=true`, so infeasible tolerances produce
    overfull lines (badness 1000000) rather than panicking. The UI keeps a

@@ -113,8 +113,8 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
     if text.trim().is_empty() {
         return Ok(Output { lines: vec![] });
     }
-    let input: ParamsInput = serde_json::from_str(params_json)
-        .map_err(|err| format!("invalid parameters: {err}"))?;
+    let input: ParamsInput =
+        serde_json::from_str(params_json).map_err(|err| format!("invalid parameters: {err}"))?;
     let params = build_params(&input)?;
     let width = match input.width_pt {
         None => return Err("width_pt is required".into()),
@@ -128,12 +128,12 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
     let mut tfm_file = tfm_result.map_err(|err| format!("{err:?}"))?;
     let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
     let mut tp: boxworks_text::TextPreprocessorImpl = Default::default();
-    tp.register_font(0, &tfm_file, lig_kern_program);
+    tp.register_font(0, &tfm_file, lig_kern_program.clone());
     tp.activate_font(0);
     let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
     font_repo.register_font(0, tfm_file);
 
-    let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us();
+    let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us(lig_kern_program);
     let line_widths = [width];
     let lb = boxworks_knuthplass::LineBreaker {
         params: &params,
@@ -328,15 +328,15 @@ fn ot1_to_unicode(c: char) -> char {
         '\u{1D}' => 'Æ',
         '\u{1E}' => 'Œ',
         '\u{1F}' => 'Ø',
-        '"' => '\u{201D}',  // '' ligature produces the code of "
+        '"' => '\u{201D}', // '' ligature produces the code of "
         '<' => '¡',
         '>' => '¿',
         '\\' => '\u{201C}', // `` ligature produces the code of \
         '_' => '˙',
         '`' => '\u{2018}',
         '\'' => '\u{2019}',
-        '{' => '\u{2013}',  // -- ligature produces the code of {
-        '|' => '\u{2014}',  // --- ligature produces the code of |
+        '{' => '\u{2013}', // -- ligature produces the code of {
+        '|' => '\u{2014}', // --- ligature produces the code of |
         '}' => '˝',
         '~' => '˜',
         c => c,
@@ -375,7 +375,11 @@ mod tests {
     fn alice_breaks_into_justified_lines() {
         let v = run(ALICE, r#"{"width_pt":250}"#);
         let lines = v["lines"].as_array().unwrap();
-        assert!(lines.len() > 5, "expected several lines, got {}", lines.len());
+        assert!(
+            lines.len() > 5,
+            "expected several lines, got {}",
+            lines.len()
+        );
 
         for (i, line) in lines.iter().enumerate() {
             let width = line["width_pt"].as_f64().unwrap();
@@ -411,10 +415,7 @@ mod tests {
 
     #[test]
     fn ligatures_are_reported_with_originals() {
-        let v = run(
-            "the office is difficult to fly to",
-            r#"{"width_pt":500}"#,
-        );
+        let v = run("the office is difficult to fly to", r#"{"width_pt":500}"#);
         let lines = v["lines"].as_array().unwrap();
         assert_eq!(lines.len(), 1);
         let ligs: Vec<(&str, &str)> = lines[0]["elements"]

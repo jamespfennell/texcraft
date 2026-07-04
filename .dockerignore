@@ -32,6 +32,12 @@
 !sites/hyphenate.dev/index.html
 !sites/hyphenate.dev/hyphenate-wasm
 
+# knuthplass.dev site
+!sites/knuthplass.dev/Caddyfile
+!sites/knuthplass.dev/index.html
+!sites/knuthplass.dev/fonts
+!sites/knuthplass.dev/knuthplass-wasm
+
 # ligkern.dev site
 !sites/ligkern.dev/Caddyfile
 !sites/ligkern.dev/index.html
