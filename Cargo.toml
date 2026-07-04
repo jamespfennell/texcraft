@@ -5,6 +5,7 @@ members = [
     "performance",
     "sites/play.texcraft.dev",
     "sites/hyphenate.dev/hyphenate-wasm",
+    "sites/knuthplass.dev/knuthplass-wasm",
     "sites/ligkern.dev/ligkern-wasm",
 ]
 resolver = "2"

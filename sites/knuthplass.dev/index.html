@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>knuthplass.dev</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            @font-face {
+                font-family: "Latin Modern Roman";
+                src: url("./fonts/lmroman10-regular.otf") format("opentype");
+                font-display: swap;
+            }
+
+            :root {
+                --bg: #f2f4f9;
+                --surface: #ffffff;
+                --text: #1a1f36;
+                --accent: #3b5bdb;
+                --separator: #b0bde8;
+
+                --glue-fill: #d8f0de;
+                --kern-pos-fill: #ffe89e;
+                --kern-neg-fill: #ffc2c2;
+                --lig-fill: #c5d3ff;
+                --error-text: #c0392b;
+            }
+
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                background-color: var(--bg);
+                color: var(--text);
+                font-family: "Inter", sans-serif;
+                height: 100vh;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+            }
+
+            /* ── Header ── */
+
+            header {
+                display: flex;
+                align-items: baseline;
+                gap: 1rem;
+                padding: 1rem 1.5rem 0.75rem;
+            }
+
+            #attribution {
+                margin-left: auto;
+                font-size: 0.85rem;
+            }
+
+            #attribution a {
+                color: inherit;
+                text-decoration: underline;
+                text-underline-offset: 2px;
+            }
+
+            h1 {
+                font-size: 1.6rem;
+                font-weight: 500;
+                color: var(--accent);
+                cursor: pointer;
+            }
+
+            #tagline {
+                font-size: 0.85rem;
+                opacity: 0.7;
+            }
+
+            /* ── Split layout ── */
+
+            main {
+                flex: 1;
+                min-height: 0;
+                display: flex;
+                gap: 1.25rem;
+                padding: 0 1.5rem 1.25rem;
+            }
+
+            #controls {
+                flex: 1 1 0;
+                min-width: 0;
+                overflow-y: auto;
+                background: var(--surface);
+                border: 1px solid var(--separator);
+                border-radius: 8px;
+                padding: 1rem 1.25rem;
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            #output-panel {
+                flex: 1 1 0;
+                min-width: 0;
+                min-height: 0;
+                background: var(--surface);
+                border: 1px solid var(--separator);
+                border-radius: 8px;
+                padding: 1rem 1.25rem;
+                display: flex;
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+
+            .section-label {
+                font-size: 0.7rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.07em;
+                color: var(--accent);
+                margin-bottom: 0.4rem;
+            }
+
+            /* ── Controls ── */
+
+            #text-input {
+                font-size: 0.85rem;
+                font-family: monospace;
+                width: 100%;
+                min-height: 9rem;
+                padding: 0.5rem 0.75rem;
+                border: 1px solid var(--separator);
+                border-radius: 4px;
+                background: var(--surface);
+                color: var(--text);
+                resize: vertical;
+                outline: none;
+            }
+
+            #text-input:focus {
+                border-color: var(--accent);
+            }
+
+            #width-row {
+                display: flex;
+                align-items: center;
+                gap: 0.6rem;
+                font-size: 0.85rem;
+            }
+
+            #width-slider {
+                flex: 1;
+                accent-color: var(--accent);
+            }
+
+            #width-number {
+                width: 4.5rem;
+            }
+
+            details {
+                border: 1px solid var(--separator);
+                border-radius: 4px;
+            }
+
+            summary {
+                font-size: 0.8rem;
+                font-weight: 600;
+                padding: 0.45rem 0.75rem;
+                cursor: pointer;
+                user-select: none;
+            }
+
+            .param-grid {
+                display: grid;
+                grid-template-columns: 1fr auto;
+                align-items: center;
+                gap: 0.4rem 0.75rem;
+                padding: 0.25rem 0.75rem 0.75rem;
+            }
+
+            .param-grid label {
+                font-size: 0.78rem;
+                font-family: monospace;
+            }
+
+            .param-grid input {
+                width: 7.5rem;
+                justify-self: end;
+            }
+
+            input[type="number"],
+            input[type="text"] {
+                font-family: monospace;
+                font-size: 0.78rem;
+                padding: 0.25rem 0.4rem;
+                border: 1px solid var(--separator);
+                border-radius: 4px;
+                background: var(--surface);
+                color: var(--text);
+                outline: none;
+            }
+
+            input[type="number"]:focus,
+            input[type="text"]:focus {
+                border-color: var(--accent);
+            }
+
+            input.invalid {
+                border-color: var(--error-text);
+            }
+
+            .modified {
+                color: var(--accent);
+                font-weight: 700;
+            }
+
+            #reset-btn {
+                font-family: inherit;
+                font-size: 0.8rem;
+                align-self: flex-start;
+                padding: 0.35rem 0.9rem;
+                border: 1px solid var(--separator);
+                border-radius: 4px;
+                background: var(--bg);
+                color: var(--text);
+                cursor: pointer;
+            }
+
+            #reset-btn:hover {
+                border-color: var(--accent);
+                color: var(--accent);
+            }
+
+            /* ── Output ── */
+
+            #overlay-toggles {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.4rem 1.25rem;
+                font-size: 0.82rem;
+                align-items: center;
+            }
+
+            #overlay-toggles label {
+                display: flex;
+                align-items: center;
+                gap: 0.35rem;
+                cursor: pointer;
+                user-select: none;
+            }
+
+            #overlay-toggles input {
+                accent-color: var(--accent);
+            }
+
+            .swatch {
+                display: inline-block;
+                width: 0.7rem;
+                height: 0.7rem;
+                border-radius: 2px;
+            }
+
+            #output-scroll {
+                flex: 1;
+                min-height: 0;
+                overflow: auto;
+                border: 1px solid var(--separator);
+                border-radius: 4px;
+                padding: 1.5rem;
+                background: var(--surface);
+            }
+
+            #output-svg {
+                display: block;
+                width: 100%;
+                height: auto;
+                max-width: 60rem;
+                margin: 0 auto;
+            }
+
+            #output-svg text {
+                font-family: "Latin Modern Roman", serif;
+                font-kerning: none;
+                font-feature-settings:
+                    "liga" 0,
+                    "clig" 0;
+                white-space: pre;
+            }
+
+            .glue-rect {
+                fill: var(--glue-fill);
+            }
+
+            .kern-rect.positive {
+                fill: var(--kern-pos-fill);
+            }
+
+            .kern-rect.negative {
+                fill: var(--kern-neg-fill);
+            }
+
+            .lig-rect {
+                fill: var(--lig-fill);
+            }
+
+            .badness-label {
+                font-family: "Inter", sans-serif !important;
+                fill: var(--text);
+                opacity: 0.45;
+            }
+
+            #output-error {
+                font-size: 0.85rem;
+                color: var(--error-text);
+            }
+
+            #output-error:empty {
+                display: none;
+            }
+
+            /* ── Mobile ── */
+
+            @media (max-width: 800px) {
+                body {
+                    height: auto;
+                    min-height: 100vh;
+                    overflow: auto;
+                }
+
+                main {
+                    flex-direction: column;
+                    min-height: 0;
+                    padding: 0 1rem 1rem;
+                }
+
+                #controls,
+                #output-panel {
+                    flex: none;
+                    overflow: visible;
+                }
+
+                #output-scroll {
+                    flex: none;
+                    min-height: 12rem;
+                }
+
+                #tagline {
+                    display: none;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>knuthplass.dev</h1>
+            <span id="tagline">the Knuth-Plass line breaking algorithm, live</span>
+            <span id="attribution">
+                A <a href="https://github.com/jamespfennell/texcraft">Texcraft</a> project
+            </span>
+        </header>
+
+        <main>
+            <div id="controls">
+                <div>
+                    <div class="section-label">paragraph</div>
+                    <textarea
+                        id="text-input"
+                        spellcheck="false"
+                        autocomplete="off"
+                        placeholder="type a paragraph…"
+                    ></textarea>
+                </div>
+
+                <div>
+                    <div class="section-label">width</div>
+                    <div id="width-row">
+                        <input type="range" id="width-slider" min="72" max="500" step="1" />
+                        <input type="number" id="width-number" min="72" max="500" step="1" />
+                        <span>pt</span>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="section-label">parameters</div>
+                    <div id="param-groups" style="display: flex; flex-direction: column; gap: 0.5rem"></div>
+                </div>
+
+                <button id="reset-btn">reset to plain TeX defaults</button>
+            </div>
+
+            <div id="output-panel">
+                <div id="overlay-toggles">
+                    <span class="section-label" style="margin: 0">show:</span>
+                    <label>
+                        <input type="checkbox" id="toggle-kerns" checked />
+                        <span class="swatch" style="background: var(--kern-neg-fill)"></span>
+                        kerns
+                    </label>
+                    <label>
+                        <input type="checkbox" id="toggle-ligs" checked />
+                        <span class="swatch" style="background: var(--lig-fill)"></span>
+                        ligatures
+                    </label>
+                    <label>
+                        <input type="checkbox" id="toggle-glue" />
+                        <span class="swatch" style="background: var(--glue-fill)"></span>
+                        glue
+                    </label>
+                    <label>
+                        <input type="checkbox" id="toggle-badness" />
+                        badness
+                    </label>
+                </div>
+                <div id="output-error"></div>
+                <div id="output-scroll">
+                    <svg id="output-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+                </div>
+            </div>
+        </main>
+
+        <script type="module">
+            import init, { break_paragraph } from "./pkg/knuthplass_wasm.js";
+
+            await init();
+
+            // ── Parameter definitions ──────────────────────────────────────
+
+            const PARAM_GROUPS = [
+                {
+                    label: "Tolerance",
+                    open: true,
+                    params: [
+                        { name: "pre_tolerance", def: 100 },
+                        { name: "tolerance", def: 200 },
+                        { name: "looseness", def: 0 },
+                    ],
+                },
+                {
+                    label: "Penalties",
+                    params: [
+                        { name: "hyphen_penalty", def: 50 },
+                        { name: "ex_hyphen_penalty", def: 50 },
+                        { name: "line_penalty", def: 10 },
+                        { name: "broken_penalty", def: 100 },
+                        { name: "club_penalty", def: 150 },
+                        { name: "final_widow_penalty", def: 150 },
+                        { name: "inter_line_penalty", def: 0 },
+                    ],
+                },
+                {
+                    label: "Demerits",
+                    params: [
+                        { name: "adj_demerits", def: 10000 },
+                        { name: "double_hyphen_demerits", def: 10000 },
+                        { name: "final_hyphen_demerits", def: 5000 },
+                    ],
+                },
+                {
+                    label: "Glue",
+                    params: [
+                        { name: "left_skip", def: "0pt", glue: true },
+                        { name: "right_skip", def: "0pt", glue: true },
+                        { name: "par_fill_skip", def: "0pt plus 1fil", glue: true },
+                    ],
+                },
+            ];
+
+            const DEFAULT_TEXT =
+                "Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once or twice she had peeped into the book her sister was reading, but it had no pictures or conversations in it, ``and what is the use of a book,'' thought Alice ``without pictures or conversations?''";
+            const DEFAULT_WIDTH = 300;
+            const FONT_SIZE_PT = 10;
+
+            // ── DOM refs ───────────────────────────────────────────────────
+
+            const textInput = document.getElementById("text-input");
+            const widthSlider = document.getElementById("width-slider");
+            const widthNumber = document.getElementById("width-number");
+            const paramGroupsEl = document.getElementById("param-groups");
+            const outputSvg = document.getElementById("output-svg");
+            const outputError = document.getElementById("output-error");
+            const toggles = {
+                kerns: document.getElementById("toggle-kerns"),
+                ligs: document.getElementById("toggle-ligs"),
+                glue: document.getElementById("toggle-glue"),
+                badness: document.getElementById("toggle-badness"),
+            };
+
+            // ── Build parameter inputs ─────────────────────────────────────
+
+            const paramInputs = {}; // name -> {input, label, def, glue}
+
+            for (const group of PARAM_GROUPS) {
+                const details = document.createElement("details");
+                if (group.open) details.open = true;
+                const summary = document.createElement("summary");
+                summary.textContent = group.label;
+                details.appendChild(summary);
+                const grid = document.createElement("div");
+                grid.className = "param-grid";
+                for (const p of group.params) {
+                    const label = document.createElement("label");
+                    label.textContent = p.name;
+                    label.htmlFor = "param-" + p.name;
+                    const input = document.createElement("input");
+                    input.id = "param-" + p.name;
+                    if (p.glue) {
+                        input.type = "text";
+                    } else {
+                        input.type = "number";
+                        input.step = "1";
+                    }
+                    input.value = p.def;
+                    input.addEventListener("input", () => {
+                        markModified(p.name);
+                        render();
+                    });
+                    grid.appendChild(label);
+                    grid.appendChild(input);
+                    paramInputs[p.name] = { input, label, def: p.def, glue: !!p.glue };
+                }
+                details.appendChild(grid);
+                paramGroupsEl.appendChild(details);
+            }
+
+            function markModified(name) {
+                const p = paramInputs[name];
+                p.label.classList.toggle("modified", String(p.input.value) !== String(p.def));
+            }
+
+            // ── State <-> URL ──────────────────────────────────────────────
+
+            function encodeState() {
+                const p = new URLSearchParams();
+                if (textInput.value !== DEFAULT_TEXT) p.set("text", textInput.value);
+                if (Number(widthNumber.value) !== DEFAULT_WIDTH) p.set("width", widthNumber.value);
+                for (const [name, { input, def }] of Object.entries(paramInputs)) {
+                    if (String(input.value) !== String(def)) p.set(name, input.value);
+                }
+                if (!toggles.kerns.checked) p.set("kerns", "0");
+                if (!toggles.ligs.checked) p.set("ligs", "0");
+                if (toggles.glue.checked) p.set("glue", "1");
+                if (toggles.badness.checked) p.set("badness", "1");
+                const qs = p.toString();
+                history.replaceState(null, "", qs ? "?" + qs : location.pathname);
+            }
+
+            function loadFromURL() {
+                const p = new URLSearchParams(location.search);
+                textInput.value = p.get("text") ?? DEFAULT_TEXT;
+                const w = Number(p.get("width") ?? DEFAULT_WIDTH);
+                widthSlider.value = w;
+                widthNumber.value = w;
+                for (const [name, entry] of Object.entries(paramInputs)) {
+                    if (p.has(name)) {
+                        entry.input.value = p.get(name);
+                        markModified(name);
+                    }
+                }
+                if (p.get("kerns") === "0") toggles.kerns.checked = false;
+                if (p.get("ligs") === "0") toggles.ligs.checked = false;
+                if (p.get("glue") === "1") toggles.glue.checked = true;
+                if (p.get("badness") === "1") toggles.badness.checked = true;
+            }
+
+            // ── Run the algorithm ──────────────────────────────────────────
+
+            function collectParams() {
+                const params = { width_pt: Number(widthNumber.value) };
+                let anyInvalid = false;
+                for (const [name, { input, def, glue }] of Object.entries(paramInputs)) {
+                    input.classList.remove("invalid");
+                    if (String(input.value) === String(def)) continue;
+                    if (glue) {
+                        params[name] = input.value;
+                    } else {
+                        const v = Number(input.value);
+                        if (!Number.isInteger(v)) {
+                            input.classList.add("invalid");
+                            anyInvalid = true;
+                            continue;
+                        }
+                        params[name] = v;
+                    }
+                }
+                return anyInvalid ? null : params;
+            }
+
+            function runBreaker() {
+                const params = collectParams();
+                if (params === null) {
+                    return { error: "some parameter values are not valid integers" };
+                }
+                try {
+                    return JSON.parse(break_paragraph(textInput.value, JSON.stringify(params)));
+                } catch (e) {
+                    // The line breaker panics (aborting the wasm call) when no
+                    // feasible set of breaks exists within the tolerance.
+                    return {
+                        error:
+                            "no feasible line breaks found with these parameters — " +
+                            "try increasing tolerance or the width",
+                    };
+                }
+            }
+
+            // ── SVG rendering ──────────────────────────────────────────────
+
+            const SVG_NS = "http://www.w3.org/2000/svg";
+
+            function svgEl(tag, attrs) {
+                const el = document.createElementNS(SVG_NS, tag);
+                for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+                return el;
+            }
+
+            function addTooltip(el, text) {
+                const t = document.createElementNS(SVG_NS, "title");
+                t.textContent = text;
+                el.appendChild(t);
+            }
+
+            function render() {
+                outputError.textContent = "";
+                const result = runBreaker();
+                encodeState();
+
+                if (result.error) {
+                    outputError.textContent = result.error;
+                    outputSvg.replaceChildren();
+                    return;
+                }
+
+                const lines = result.lines;
+                outputSvg.replaceChildren();
+                if (lines.length === 0) {
+                    if (textInput.value.trim()) {
+                        outputError.textContent =
+                            "the algorithm produced no lines — this is a known " +
+                            "bug when a single word is wider than the line";
+                    }
+                    return;
+                }
+
+                const width = Number(widthNumber.value);
+                const last = lines[lines.length - 1];
+                const totalHeight = last.baseline_pt + last.depth_pt;
+                const PAD = 4;
+                const BADNESS_GUTTER = toggles.badness.checked ? 40 : 0;
+                outputSvg.setAttribute(
+                    "viewBox",
+                    `${-PAD} ${-PAD} ${width + 2 * PAD + BADNESS_GUTTER} ${totalHeight + 2 * PAD}`,
+                );
+
+                const overlays = svgEl("g", {});
+                const textLayer = svgEl("g", { "font-size": FONT_SIZE_PT });
+                outputSvg.appendChild(overlays);
+                outputSvg.appendChild(textLayer);
+
+                for (const line of lines) {
+                    const top = line.baseline_pt - line.height_pt;
+                    const boxHeight = line.height_pt + line.depth_pt;
+
+                    for (const el of line.elements) {
+                        if (el.type === "char" || el.type === "lig") {
+                            const t = svgEl("text", {
+                                x: el.x_pt,
+                                y: line.baseline_pt,
+                            });
+                            t.textContent = el.unicode;
+                            textLayer.appendChild(t);
+                            if (el.type === "lig" && toggles.ligs.checked) {
+                                const r = svgEl("rect", {
+                                    class: "lig-rect",
+                                    x: el.x_pt,
+                                    y: top,
+                                    width: el.width_pt,
+                                    height: boxHeight,
+                                });
+                                addTooltip(r, `ligature: ${el.original} → ${el.unicode}`);
+                                overlays.appendChild(r);
+                            }
+                        } else if (el.type === "kern" && toggles.kerns.checked) {
+                            // Negative kerns move the next glyph left; draw the
+                            // marker over the overlapped region.
+                            const w = Math.max(Math.abs(el.width_pt), 0.4);
+                            const x = el.width_pt >= 0 ? el.x_pt : el.x_pt + el.width_pt;
+                            const r = svgEl("rect", {
+                                class: "kern-rect " + (el.width_pt >= 0 ? "positive" : "negative"),
+                                x,
+                                y: top,
+                                width: w,
+                                height: boxHeight,
+                            });
+                            addTooltip(r, `kern: ${el.width_pt.toFixed(3)}pt`);
+                            overlays.appendChild(r);
+                        } else if (el.type === "glue" && toggles.glue.checked) {
+                            if (el.width_pt <= 0) continue;
+                            const r = svgEl("rect", {
+                                class: "glue-rect",
+                                x: el.x_pt,
+                                y: top,
+                                width: el.width_pt,
+                                height: boxHeight,
+                            });
+                            addTooltip(
+                                r,
+                                `glue: set to ${el.width_pt.toFixed(3)}pt\n` +
+                                    `natural ${el.natural_pt.toFixed(3)}pt ` +
+                                    `plus ${el.stretch_pt.toFixed(3)}pt ` +
+                                    `minus ${el.shrink_pt.toFixed(3)}pt`,
+                            );
+                            overlays.appendChild(r);
+                        }
+                    }
+
+                    if (toggles.badness.checked) {
+                        const t = svgEl("text", {
+                            class: "badness-label",
+                            x: width + 10,
+                            y: line.baseline_pt,
+                            "font-size": 5,
+                        });
+                        t.textContent = line.badness;
+                        addTooltip(t, "badness of this line's glue setting");
+                        textLayer.appendChild(t);
+                    }
+                }
+            }
+
+            // ── Events ─────────────────────────────────────────────────────
+
+            textInput.addEventListener("input", render);
+
+            widthSlider.addEventListener("input", () => {
+                widthNumber.value = widthSlider.value;
+                render();
+            });
+
+            widthNumber.addEventListener("input", () => {
+                const v = Number(widthNumber.value);
+                if (v >= 72 && v <= 500) {
+                    widthSlider.value = v;
+                    render();
+                }
+            });
+
+            for (const t of Object.values(toggles)) {
+                t.addEventListener("change", render);
+            }
+
+            document.getElementById("reset-btn").addEventListener("click", () => {
+                for (const [name, { input, def }] of Object.entries(paramInputs)) {
+                    input.value = def;
+                    markModified(name);
+                }
+                widthSlider.value = DEFAULT_WIDTH;
+                widthNumber.value = DEFAULT_WIDTH;
+                render();
+            });
+
+            document.querySelector("h1").addEventListener("click", () => {
+                textInput.value = DEFAULT_TEXT;
+                document.getElementById("reset-btn").click();
+            });
+
+            // ── Init ───────────────────────────────────────────────────────
+
+            loadFromURL();
+            render();
+        </script>
+    </body>
+</html>

@@ -767,6 +767,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "knuthplass-wasm"
+version = "0.1.0"
+dependencies = [
+ "boxworks",
+ "boxworks-hyphenate",
+ "boxworks-knuthplass",
+ "boxworks-text",
+ "common",
+ "serde",
+ "serde_json",
+ "tfm",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
