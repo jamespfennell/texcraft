@@ -5,278 +5,114 @@ A website that demonstrates the Knuth-Plass line breaking algorithm from the
 Compiler Explorer: input paragraph and algorithm parameters on the left, the
 typeset paragraph on the right.
 
-## Status (updated 2026-07-04)
+## Status (updated 2026-07-05)
 
-**Milestone 1 — done (committed).** `knuthplass-wasm` crate exporting
-`break_paragraph(text, params_json)`. Mirrors the `box linebreak` pipeline;
-all positions computed in Rust. 7 native unit tests. Implementation notes
-that go beyond the original schema sketch:
+- **v1 done and committed**: `knuthplass-wasm` crate
+  (`break_paragraph(text, params_json)` → JSON lines/elements, all positions
+  computed in Rust), `index.html` single-page app, deployment files
+  mirroring ligkern.dev, CI workflow pushing `jamespfennell/knuthplass.dev`.
+- **v1.1 mostly done** (two review rounds, 2026-07-04/05 — details in git
+  history): full-height 50/50 split with draggable divider, teal-on-paper
+  color scheme, sliders + scales + tooltips on all params,
+  force-hyphenation checkbox, element info row, badness/glue-set margin
+  columns with headers, kern hover dots, stats strip.
+- Remaining work: two v1.1 items and v2 introspection, below.
+- Local dev: `caddy start --config Caddyfile.local` (port 8767), then
+  `npm test` (7 puppeteer smoke tests).
 
-- Each line carries `baseline_pt` / `height_pt` / `depth_pt` (vertical
-  placement follows TeX's `\baselineskip`=12pt / `\lineskip`=1pt rule), plus
-  `badness` (approximated as 100·|glue ratio|³; 1000000 for overfull).
-- Char/lig elements carry a `unicode` field mapped through an OT1→Unicode
-  table (f-ligatures at U+FB00–FB04, `` `` ``→U+201C, `''`→U+201D,
-  `--`/`---`→en/em dash, etc.).
-
-**Milestone 2 — done (committed).** The site itself:
-
-- `index.html` single-page app per the layout below; parameter inputs are
-  generated from a JS table; modified params highlighted; state in the URL
-  (only non-default values encoded).
-- SVG rendering as designed. A fourth overlay toggle was added: per-line
-  **badness** labels in the right margin.
-- Font: `fonts/lmroman10-regular.otf` from CTAN (plain OTF, not WOFF2 —
-  browsers handle OTF fine and it saved a conversion step). Its cmap was
-  verified to contain all the OT1-mapped codepoints. Rendering disables
-  browser shaping (`font-kerning: none`, `liga`/`clig` off).
-- Default text is Alice paragraph 1 with TeX-style `` `` `` quoting so the
-  quote ligatures fire.
-- Deployment files mirror ligkern.dev: Caddyfile, Caddyfile.local (port
-  8767), Dockerfile, package.json; 5 puppeteer smoke tests pass.
-- Local dev: `caddy start --config Caddyfile.local` then `npm test`.
-- CI: `.github/workflows/knuthplass.dev.yml` (mirrors ligkern.dev — builds
-  the Docker image, runs the smoke tests against it, pushes
-  `jamespfennell/knuthplass.dev:latest` on push to main); `.dockerignore`
-  allowlists the site files incl. `fonts/`.
-
-**Upstream bugs found while building (in the crates, not the site):**
-
-1. ~~**The hyphenation pass drops the final line.**~~ — fixed 2026-07-04.
-   Root cause was as suspected: the artificial-demerits branch
-   (TeX.2021.854) kept the old active node alive; it tied with the
-   final-break node on total demerits and won the strict `<` best-node
-   scan, so the returned chain never reached the final break. Fixed by
-   James (the branch now deactivates the node like TeX). Two packing
-   divergences surfaced by the regression test were also addressed:
-   overfull boxes now clamp the glue ratio to unity (TeX.2021.664), and
-   TeX's \overfullrule rule (TeX.2021.666) is deferred — suppressed in
-   TeX-generated test data via `\hfuzz=\maxdimen` (TODOs in code).
-   Regression test: `wolf_hall_2in` in boxworks-knuthplass, whose
-   TeX-generated expectation is certified by `TEXCRAFT_VERIFY=tex`.
-2. ~~**Hyphenation destroys ligatures**~~ — fixed 2026-07-04. Root cause
-   (found by James): reconstitution is fully implemented in
-   `boxworks-hyphenate`, but both call sites (`knuthplass-wasm` and
-   `box.rs`) constructed the hyphenator without setting its public
-   `lig_kern_program` field, so reconstitution ran with an empty program.
-   Both now assign the compiled cmr10 program. The footgun is also fixed
-   upstream: `plain_tex_en_us` now *requires* the lig/kern program as an
-   argument (all five call sites updated).
-3. The "need emergency attempt" panic is effectively unreachable: the second
-   pass runs with `force_solution=true`, so infeasible tolerances produce
-   overfull lines (badness 1000000) rather than panicking. The UI keeps a
-   try/catch anyway.
-
-## Core interaction
-
-1. User types or pastes a paragraph of text on the left
-2. User adjusts the paragraph width and any of the Knuth-Plass parameters
-3. The right panel re-renders the typeset paragraph on every change,
-   using the exact output of the algorithm (positions from TFM metrics,
-   not browser text layout)
-
-## Left panel: inputs
-
-- **Paragraph text** — a textarea, prefilled with a demo paragraph
-  (e.g. the first paragraph of Alice in Wonderland, already used in
-  `boxworks-knuthplass/testdata`)
-- **Width** (`\hsize`) — the main knob; a slider + numeric input in pt.
-  Dragging the slider and watching breaks reflow is the signature demo.
-- **Parameters** — the fields of `boxworks_knuthplass::Params`, grouped:
-  - *Penalties*: `hyphen_penalty`, `ex_hyphen_penalty`, `broken_penalty`,
-    `club_penalty`, `final_widow_penalty`, `inter_line_penalty`, `line_penalty`
-  - *Demerits*: `adj_demerits`, `double_hyphen_demerits`, `final_hyphen_demerits`
-  - *Tolerance*: `pre_tolerance`, `tolerance`, `looseness`
-  - *Glue*: `left_skip`, `right_skip`, `par_fill_skip` — text inputs parsed
-    in TeX glue syntax ("0pt plus 1fil"), same parsing as `box linebreak`
-  - A "reset to plain TeX defaults" button (`Params::plain_tex_defaults`)
-- Numeric params are number inputs; consider sliders for the high-impact ones
-  (tolerance, hyphen_penalty, adj_demerits).
-
-## Right panel: typeset output
-
-The paragraph rendered exactly as the algorithm broke it. Rendering is **SVG**:
-
-- The WASM layer returns, per line, a list of positioned elements
-  (x offset + width in pt, both computed in Rust with `Scaled` arithmetic
-  from the TFM metrics and the glue set ratio). JS only places elements —
-  it never measures text itself.
-- Each char/ligature is an SVG `<text>` element at its exact x position.
-  SVG viewBox is in pt units, so zoom/resize is free.
-- Glyphs come from a **Latin Modern webfont** (WOFF2, self-hosted). We use it
-  only for glyph *shapes*; all positioning comes from cmr10's TFM data.
-  Requires an OT1 → Unicode mapping for display (most of ASCII maps directly;
-  ligatures ff/fi/fl/ffi/ffl are U+FB00–FB04; quotes and a few others differ).
-- v1 font: cmr10 only. The `.tfm` is embedded in the WASM binary
-  (same approach as ligkern.dev).
-
-### Kern & ligature visibility
-
-Kerns and ligatures are invisible in correct typeset output, so they are shown
-via toggleable overlays (checkboxes above the output):
-
-- **Show kerns** — a thin colored marker in the kern's gap (color-coded
-  positive vs negative), hover tooltip with the value in pt
-- **Show ligatures** — colored underline/background on ligature glyphs,
-  hover tooltip showing original chars (e.g. "ffi → U+FB03")
-- **Show glue** — shade inter-word spaces; tooltip with natural/stretch/shrink
-  and the set width for that line
-- Per-line badness/demerits shown in the margin (cheap, and a preview of v2)
-
-## Pipeline (mirrors `box linebreak`, see `boxworks-bin/src/box.rs`)
+## Architecture (short reference — the code is the truth)
 
 ```
 text ──boxworks-text──▶ h-list (chars, ligs, kerns, glue)
-     ──LineBreaker::break_line_all_attempts──▶ breakpoints
-     ──▶ lines with glue set ratios ──▶ positioned elements JSON
+     ──LineBreaker::break_line──▶ lines with glue set ratios
+     ──▶ positioned elements JSON ──▶ JS places SVG elements
 ```
 
-Hyphenation: use the same `Hyphenator` the CLI uses (English patterns),
-embedded in WASM.
+Mirrors the `box linebreak` pipeline (`boxworks-bin/src/box.rs`), including
+the same English-pattern `Hyphenator`. The wasm export returns
+`{ lines: [{ baseline_pt, badness, glue_ratio, glue_order, elements: [...] }] }`
+or `{ error }`; element types are char/lig/kern/glue with `x_pt`/`width_pt`.
 
-## WASM API (knuthplass-wasm crate)
+## Design decisions (rationale not recoverable from the code)
 
-One main export, returning a JSON string:
+- **SVG rendering, positions computed in Rust.** Chosen over HTML/CSS
+  specifically because v2 introspection is a diagram (connector paths,
+  breakpoint chain highlights). JS never measures text; all positions come
+  from `Scaled` arithmetic on the embedded cmr10 TFM.
+- **Latin Modern OTF for glyph shapes only** (plain OTF from CTAN, not
+  WOFF2 — browsers handle OTF fine). Metrics come from the TFM; browser
+  shaping is disabled (`font-kerning: none`, `liga`/`clig` off). Display
+  needs an OT1→Unicode mapping (f-ligatures U+FB00–FB04, TeX quotes, en/em
+  dashes).
+- **Badness** is approximated in the wasm layer as 100·|glue ratio|³, with
+  1000000 marking overfull lines (detected geometrically, since overfull
+  glue ratios are clamped to unity upstream, per TeX.2021.664).
+- **URL is the state store**, only non-default values encoded. Two
+  re-encodings to be aware of: overlay defaults flipped 2026-07-05
+  (kerns/ligs now default off, badness/glue-set on — old bookmarked overlay
+  params are reinterpreted), and the force-hyphenation checkbox encodes
+  `forcehyph=1` plus the value pre_tolerance will *revert to*, not −1.
+- **Tolerance sliders range from −1** (meaningful in TeX: the pass always
+  fails; −1 pre_tolerance is the standard force-hyphenation idiom).
+- **Output leading is not exact TeX**: `LINE_EXTRA_PT = 4` in `render()`
+  adds presentational leading so the kern hover dots have a lane between
+  lines. Set it to 0 to restore exact `\baselineskip` geometry. Breaks,
+  badness, and glue values are unaffected.
+- **Single width for v1** (+ maybe `\parindent`); shaped paragraphs via
+  `line_widths`/`line_indents` are future work.
+- **No debounce**: the wasm call runs on every input event with no visible
+  lag.
+- Default text is the opening paragraph of *A Farewell to Arms*,
+  ASCII-ified ("cafes", straight apostrophes) — the site rejects characters
+  the font lacks.
 
-```
-break_paragraph(text: &str, params_json: &str) -> String
-```
+## Remaining v1.1 work
 
-Input `params_json`: all `Params` fields plus `width_pt`. Omitted fields use
-plain TeX defaults.
-
-### Output JSON schema (sketch)
-
-```json
-{
-  "lines": [
-    {
-      "width_pt": 300.0,
-      "badness": 23,
-      "elements": [
-        { "type": "char", "x_pt": 0.0, "width_pt": 5.5, "unicode": "T" },
-        { "type": "lig",  "x_pt": 5.5, "width_pt": 8.1, "unicode": "ﬁ",
-          "original": "fi" },
-        { "type": "kern", "x_pt": 13.6, "width_pt": -0.83 },
-        { "type": "glue", "x_pt": 20.0, "width_pt": 3.9,
-          "natural_pt": 3.33, "stretch_pt": 1.66, "shrink_pt": 1.11 }
-      ]
-    }
-  ]
-}
-```
-
-### Error JSON schema
-
-```json
-{ "error": "description of the error" }
-```
-
-## Page layout
-
-```
-knuthplass.dev                                    ← h1, clickable to reset
-┌──────────────────────────┬──────────────────────────────┐
-│ [paragraph textarea]     │ ☑ kerns ☑ ligatures ☐ glue   │
-│                          │                              │
-│ width ────●──── 300pt    │   Alice was beginning to     │
-│                          │   get very tired of sit-     │
-│ ▸ Penalties              │   ting by her sister on      │
-│ ▸ Demerits               │   the bank, …                │
-│ ▸ Tolerance              │                              │
-│ ▸ Glue                   │                              │
-│ [reset to defaults]      │                              │
-└──────────────────────────┴──────────────────────────────┘
-```
-
-Parameter groups are collapsible so the common case (text + width) is clean.
-Stacks vertically on mobile. State saved in the URL bar (same mechanism as
-ligkern.dev).
-
-## File structure (mirrors ligkern.dev)
-
-```
-sites/knuthplass.dev/
-  index.html          ← single-page app, all CSS + JS inline
-  knuthplass-wasm/
-    Cargo.toml
-    src/lib.rs
-  fonts/              ← Latin Modern OTF (self-hosted)
-  Caddyfile
-  Caddyfile.local
-  Dockerfile
-  package.json
-  smoke.test.js
-  PLAN.md
-```
-
-## Decided
-
-- Webfont: **Latin Modern** (canonical Computer Modern successor,
-  MathJax-proven; used for glyph shapes only)
-- Positions computed in **Rust** (Scaled arithmetic already exists there);
-  JS only places elements
-- v1 width model: **single width** (+ maybe `\parindent`); shaped paragraphs
-  via `line_widths`/`line_indents` arrays are future work
-- Debounce: none needed — the WASM call runs on every input/slider event
-  with no visible lag
-
-## v1.1 — planned improvements (from review, 2026-07-03)
-
-### Layout & look
-
-- ~~**Full-height split layout**~~ — done (2026-07-03): 50/50 split filling
-  the viewport, panels scroll internally, attribution moved into the header,
-  mobile stacks with normal page scrolling. Draggable divider still a
-  nice-to-have for later.
-- **New color scheme** — keep the current visual language but change the
-  palette; the current one is inherited from ligkern.dev and the sites
-  should be distinguishable. Proposal: teal/green accent replacing the
-  indigo, warmer overlay tones. Exact values at implementation time.
-
-### Parameters panel
-
-- **Slider + number inputs** — every numeric param gets a slider with a
-  tuned range plus a small editable number, like the width control:
-  tolerances 0–10000 (log-scale), penalties −10000–10000, demerits
-  0–100000 (log-scale), looseness −3–+3. Glue params stay text inputs.
-- **Explanatory tooltips on every parameter** — one- or two-sentence
-  TeXbook-derived explanation, stored in the JS parameter table.
-- **Force-hyphenation checkbox** (Tolerance group) — sets
-  `pre_tolerance = -1` so the first (no-hyphenation) pass always fails and
-  the hyphenated pass always runs, matching the TeX idiom.
-
-### Output panel
-
-- **Custom tooltips on every element** — replace the native `<title>`
-  tooltips with a styled tooltip that appears instantly. Invisible hover
-  target rects exist for *all* elements regardless of overlay toggles
-  (overlays only add color). Content:
-  - glue: ideal (natural) width, stretch/shrink spec, actual set width and
-    the delta ("3.33pt, stretched +1.42pt → 4.76pt")
-  - kern: value in pt
-  - ligature: original chars → glyph, width
-  - char: glyph, OT1 code, width
-- **Glue-set margin annotation** — toggle (next to badness) showing how much
-  each line stretched or shrank, e.g. "+1.9pt (38% of stretch)"; the value
-  is the line's glue ratio.
-- **Summary statistics strip** — above the output: number of lines,
-  hyphenated lines, total badness, worst-line badness. Total demerits once
-  the v2 introspection data is available.
 - **Boxworks language tab** (ambitious) — tabs on the output panel:
   *Typeset* | *Boxworks*. A second WASM export returns the broken paragraph
   as Boxworks language text via `bwl::convert::ToBoxLang` + `Display`,
   exactly like `box linebreak`'s default output. Adds a `boxworks-lang`
   dependency to the wasm crate.
-
-### Input
-
 - **Multiple paragraphs** — split the input on blank lines (TeX convention),
   run the breaker per paragraph, stack results with `\parskip`
   (plain TeX: `0pt plus 1pt`). JSON schema grows a `paragraphs` level.
   This also motivates adding a `\parindent` param (plain TeX: 20pt) via the
   `LineBreaker::line_indents` field — verify upstream support when
   implementing.
+
+## Upstream bugs found while building (in the crates, not the site)
+
+1. ~~**The hyphenation pass drops the final line**~~ — fixed by James
+   2026-07-04: the artificial-demerits branch (TeX.2021.854) didn't
+   deactivate the old active node, which tied and won the strict `<`
+   best-node scan (TeX.2021.874). Fallout fixed with it: overfull glue
+   ratios now clamp to unity (TeX.2021.664); TeX's \overfullrule appending
+   (TeX.2021.666) is **still TODO** — suppressed in TeX-generated test data
+   via `\hfuzz=\maxdimen`. Regression test `wolf_hall_2in` in
+   boxworks-knuthplass; its expectation is certified against real TeX by
+   the `TEXCRAFT_VERIFY=tex` test mode (needs `max_print_line` raised).
+2. ~~**Hyphenation destroys ligatures**~~ — fixed 2026-07-04 (James's
+   diagnosis): call sites constructed the `Hyphenator` without its lig/kern
+   program, so reconstitution ran empty. The footgun is closed upstream:
+   `plain_tex_en_us` now *requires* the lig/kern program as an argument.
+3. The "need emergency attempt" panic is effectively unreachable (the
+   second pass forces a solution → overfull lines, not a panic). The UI
+   keeps a try/catch anyway.
+4. **OPEN: wasm allocator crash on some non-ASCII inputs.** Passing certain
+   texts containing non-ASCII characters (e.g. "és and artillery up", but
+   not "és and" — heap-state dependent, non-monotonic in length) aborts the
+   wasm call with `dlmalloc-0.2.11 ... assertion failed: psize <= size +
+   max_overhead`. That is the allocator vendored in the Rust toolchain's
+   std (rustc 1.94.0 locally), likely tripped by wasm-bindgen's
+   grow-then-shrink realloc when passing non-ASCII strings across the JS
+   boundary. Our code is not at fault: the same inputs work natively, and
+   the font-character validation returns a proper error whenever the call
+   survives. When it aborts, the UI now shows a generic "internal error"
+   message. Candidate fixes to investigate: a newer toolchain (does
+   rust:1.95 in the Dockerfile vendor a fixed dlmalloc?); overriding
+   `#[global_allocator]` in the wasm crate with a fixed allocator crate;
+   or an upstream report. Note ligkern.dev and hyphenate.dev pass user
+   text across the same boundary and may be equally affected.
 
 ## Future work (v2+)
 
@@ -289,7 +125,8 @@ sites/knuthplass.dev/
   rendered paragraph). Also show per-break demerits and fitness class.
   Requires capturing passive nodes via `debug::Logger` before they're
   discarded — verify/extend the logger to record predecessor indices.
-  This is the Compiler-Explorer-style payoff.
+  This is the Compiler-Explorer-style payoff. (The stats strip's "total
+  demerits" also waits for this data.)
 - Show pass number (pre_tolerance pass vs hyphenation pass) and what
   hyphenation points were considered
 - More fonts (cmbx10, cmti10, …)

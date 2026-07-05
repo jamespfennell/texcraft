@@ -79,6 +79,12 @@ struct Line {
     /// (TeX's formula, without its fixed-point rounding). 1000000 for an
     /// overfull line; 0 when the glue is infinitely stretchable.
     badness: i64,
+    /// The line's glue set ratio: positive when stretching, negative when
+    /// shrinking. Clamped to -1 for overfull lines.
+    glue_ratio: f64,
+    /// The glue order the ratio applies to: "normal", "fil", "fill" or
+    /// "filll".
+    glue_order: &'static str,
     elements: Vec<Element>,
 }
 
@@ -105,8 +111,20 @@ enum Element {
         width_pt: f64,
         natural_pt: f64,
         stretch_pt: f64,
+        /// "" for normal (finite) stretch, else "fil"/"fill"/"filll".
+        stretch_order: &'static str,
         shrink_pt: f64,
+        shrink_order: &'static str,
     },
+}
+
+fn order_suffix(order: common::GlueOrder) -> &'static str {
+    match order {
+        common::GlueOrder::Normal => "",
+        common::GlueOrder::Fil => "fil",
+        common::GlueOrder::Fill => "fill",
+        common::GlueOrder::Filll => "filll",
+    }
 }
 
 fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String> {
@@ -132,6 +150,33 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
     tp.activate_font(0);
     let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
     font_repo.register_font(0, tfm_file);
+
+    // Reject characters the font has no glyph for; they would otherwise be
+    // silently dropped or typeset with zero width.
+    {
+        use boxworks::FontRepo;
+        let mut missing: Vec<char> = vec![];
+        for c in text.chars() {
+            if c.is_whitespace() || missing.contains(&c) {
+                continue;
+            }
+            if font_repo.width(c, 0).is_none() {
+                missing.push(c);
+            }
+        }
+        if !missing.is_empty() {
+            let list: Vec<String> = missing
+                .iter()
+                .take(5)
+                .map(|c| format!("\"{c}\" (U+{:04X})", *c as u32))
+                .collect();
+            return Err(format!(
+                "the text contains character{} not in the Computer Modern font: {}",
+                if missing.len() == 1 { "" } else { "s" },
+                list.join(", "),
+            ));
+        }
+    }
 
     let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us(lig_kern_program);
     let line_widths = [width];
@@ -221,6 +266,17 @@ fn build_output(v_list: &[ds::Vertical], font_repo: &boxworks_text::TfmFontRepo)
             height_pt,
             depth_pt: pt(hbox.depth),
             badness: badness(hbox, end_x_pt - width_pt),
+            glue_ratio: if hbox.glue_ratio.den == Scaled::ZERO {
+                0.0
+            } else {
+                hbox.glue_ratio.as_float() as f64
+            },
+            glue_order: match hbox.glue_order {
+                common::GlueOrder::Normal => "normal",
+                common::GlueOrder::Fil => "fil",
+                common::GlueOrder::Fill => "fill",
+                common::GlueOrder::Filll => "filll",
+            },
             elements,
         });
     }
@@ -268,7 +324,9 @@ fn build_elements(
                     width_pt,
                     natural_pt: pt(g.value.width),
                     stretch_pt: pt(g.value.stretch),
+                    stretch_order: order_suffix(g.value.stretch_order),
                     shrink_pt: pt(g.value.shrink),
+                    shrink_order: order_suffix(g.value.shrink_order),
                 });
                 x_pt += width_pt;
             }
@@ -371,6 +429,23 @@ mod tests {
     fn error_on_unknown_param() {
         let v = run("hello world", r#"{"width_pt":300,"tollerance":10}"#);
         assert!(v["error"].as_str().unwrap().contains("invalid parameters"));
+    }
+
+    #[test]
+    fn error_on_characters_not_in_font() {
+        let v = run("cafés and a goat’s chin tuft", r#"{"width_pt":300}"#);
+        let error = v["error"].as_str().unwrap();
+        assert!(error.contains("not in the Computer Modern font"), "{error}");
+        assert!(error.contains("U+00E9"), "{error}");
+        assert!(error.contains("U+2019"), "{error}");
+    }
+
+    #[test]
+    fn ascii_punctuation_is_accepted() {
+        // These map to other glyphs in the OT1 encoding but are in the font.
+        let v = run("so-called `quotes' and --- dashes?!", r#"{"width_pt":300}"#);
+        assert!(v["error"].is_null(), "{v}");
+        assert_eq!(v["lines"].as_array().unwrap().len(), 1);
     }
 
     #[test]
@@ -514,3 +589,4 @@ fn parse_scaled_inf(s: &str) -> Result<(common::Scaled, common::GlueOrder), Stri
         common::GlueOrder::Normal,
     ))
 }
+

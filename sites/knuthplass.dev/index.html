@@ -17,12 +17,15 @@
                 font-display: swap;
             }
 
+            /* Paper background with teal-ink accent — the sibling sites own
+               other hues (ligkern.dev: indigo, hyphenate.dev: forest green). */
             :root {
-                --bg: #f2f4f9;
+                --bg: #f6f1ea;
                 --surface: #ffffff;
-                --text: #1a1f36;
-                --accent: #3b5bdb;
-                --separator: #b0bde8;
+                --text: #243330;
+                --muted: #4f5e5a;
+                --accent: #0f766e;
+                --separator: #b5cec7;
 
                 --glue-fill: #d8f0de;
                 --kern-pos-fill: #ffe89e;
@@ -78,7 +81,7 @@
 
             #tagline {
                 font-size: 0.85rem;
-                opacity: 0.7;
+                color: var(--muted);
             }
 
             /* ── Split layout ── */
@@ -87,7 +90,6 @@
                 flex: 1;
                 min-height: 0;
                 display: flex;
-                gap: 1.25rem;
                 padding: 0 1.5rem 1.25rem;
             }
 
@@ -102,6 +104,30 @@
                 display: flex;
                 flex-direction: column;
                 gap: 1rem;
+            }
+
+            #divider {
+                flex: 0 0 1.25rem;
+                cursor: col-resize;
+                position: relative;
+                touch-action: none;
+            }
+
+            #divider::after {
+                content: "";
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                left: 50%;
+                width: 2px;
+                transform: translateX(-50%);
+                border-radius: 1px;
+                background: transparent;
+            }
+
+            #divider:hover::after,
+            #divider.dragging::after {
+                background: var(--accent);
             }
 
             #output-panel {
@@ -132,7 +158,7 @@
                 font-size: 0.85rem;
                 font-family: monospace;
                 width: 100%;
-                min-height: 9rem;
+                min-height: 22rem;
                 padding: 0.5rem 0.75rem;
                 border: 1px solid var(--separator);
                 border-radius: 4px;
@@ -177,9 +203,9 @@
 
             .param-grid {
                 display: grid;
-                grid-template-columns: 1fr auto;
+                grid-template-columns: auto 1fr 4.5rem;
                 align-items: center;
-                gap: 0.4rem 0.75rem;
+                gap: 0.45rem 0.75rem;
                 padding: 0.25rem 0.75rem 0.75rem;
             }
 
@@ -188,9 +214,162 @@
                 font-family: monospace;
             }
 
-            .param-grid input {
-                width: 7.5rem;
-                justify-self: end;
+            /* Scale rows occupy only the slider column; make sure the next
+               parameter still starts on a fresh row. */
+            .param-grid label:not(.checkbox-row) {
+                grid-column: 1;
+            }
+
+            .param-grid label.disabled {
+                opacity: 0.45;
+            }
+
+            .param-slider {
+                width: 100%;
+                min-width: 0;
+            }
+
+            /* Custom slider styling: the native thumb draws a drop shadow in
+               some browsers. The teal progress fill is painted from JS as a
+               background gradient (paintSliders). */
+            input[type="range"] {
+                -webkit-appearance: none;
+                appearance: none;
+                height: 4px;
+                border-radius: 2px;
+                background: var(--separator);
+                outline: none;
+                cursor: pointer;
+            }
+
+            input[type="range"]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 14px;
+                height: 14px;
+                border-radius: 50%;
+                border: none;
+                background: var(--accent);
+                box-shadow: none;
+            }
+
+            input[type="range"]::-moz-range-thumb {
+                width: 14px;
+                height: 14px;
+                border-radius: 50%;
+                border: none;
+                background: var(--accent);
+                box-shadow: none;
+            }
+
+            input[type="range"]:disabled {
+                cursor: default;
+            }
+
+            /* Tick labels (min / zero / max) above a run of sliders that
+               share a scale; occupies the slider column of the grid. */
+            .slider-scale {
+                grid-column: 2;
+                position: relative;
+                height: 1.35rem;
+                font-size: 0.62rem;
+                font-family: monospace;
+                color: var(--muted);
+                margin-bottom: -0.35rem;
+            }
+
+            .slider-scale span {
+                position: absolute;
+                bottom: 0.32rem;
+                transform: translateX(-50%);
+                white-space: nowrap;
+            }
+
+            /* Tick line under each label, at the exact track position. */
+            .slider-scale span::after {
+                content: "";
+                position: absolute;
+                top: 100%;
+                left: 50%;
+                width: 1px;
+                height: 0.28rem;
+                background: currentColor;
+            }
+
+            .slider-scale span.tick-left::after {
+                left: 0;
+            }
+
+            .slider-scale span.tick-right::after {
+                left: auto;
+                right: 0;
+            }
+
+            .slider-scale span.tick-left {
+                left: 0;
+                transform: none;
+            }
+
+            .slider-scale span.tick-right {
+                right: 0;
+                left: auto;
+                transform: none;
+            }
+
+            .param-slider:disabled {
+                opacity: 0.45;
+            }
+
+            .param-grid input[type="number"] {
+                width: 100%;
+            }
+
+            .param-grid input:disabled {
+                opacity: 0.45;
+            }
+
+            .param-glue-input {
+                grid-column: 2 / 4;
+                width: 100%;
+            }
+
+            .checkbox-row {
+                grid-column: 1 / 4;
+                display: flex;
+                align-items: center;
+                gap: 0.4rem;
+                font-size: 0.78rem;
+                font-family: monospace;
+                cursor: pointer;
+                user-select: none;
+            }
+
+            .checkbox-row input {
+                accent-color: var(--accent);
+            }
+
+            /* ── Tooltips ── */
+
+            [data-tooltip] {
+                text-decoration: underline dotted;
+                text-underline-offset: 3px;
+                cursor: help;
+            }
+
+            #tooltip {
+                position: fixed;
+                display: none;
+                white-space: pre-line;
+                background: var(--surface);
+                color: var(--text);
+                border: 1px solid var(--separator);
+                border-radius: 4px;
+                padding: 0.5rem 0.65rem;
+                font-size: 0.75rem;
+                line-height: 1.45;
+                max-width: 22rem;
+                z-index: 10;
+                pointer-events: none;
             }
 
             input[type="number"],
@@ -238,6 +417,18 @@
 
             /* ── Output ── */
 
+            /* Toggles + stats, separated from the output below by a rule
+               that spans the full panel width (hence the negative margins,
+               which cancel the panel's horizontal padding). */
+            #output-header {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+                margin: 0 -1.25rem;
+                padding: 0 1.25rem 0.65rem;
+                border-bottom: 1px solid var(--separator);
+            }
+
             #overlay-toggles {
                 display: flex;
                 flex-wrap: wrap;
@@ -269,18 +460,15 @@
                 flex: 1;
                 min-height: 0;
                 overflow: auto;
-                border: 1px solid var(--separator);
-                border-radius: 4px;
-                padding: 1.5rem;
-                background: var(--surface);
+                padding: 0.5rem 0;
             }
 
+            /* The SVG's on-screen size is set explicitly in JS so that one
+               TeX point always maps to the same number of pixels: changing
+               the paragraph width reflows the text instead of zooming it.
+               Oversized paragraphs scroll inside #output-scroll. */
             #output-svg {
                 display: block;
-                width: 100%;
-                height: auto;
-                max-width: 60rem;
-                margin: 0 auto;
             }
 
             #output-svg text {
@@ -304,14 +492,53 @@
                 fill: var(--kern-neg-fill);
             }
 
+            .kern-dot {
+                cursor: help;
+            }
+
+            .kern-dot.positive {
+                fill: var(--kern-pos-fill);
+            }
+
+            .kern-dot.negative {
+                fill: var(--kern-neg-fill);
+            }
+
             .lig-rect {
                 fill: var(--lig-fill);
             }
 
             .badness-label {
                 font-family: "Inter", sans-serif !important;
-                fill: var(--text);
-                opacity: 0.45;
+                fill: var(--muted);
+            }
+
+            #stats {
+                font-size: 0.75rem;
+                color: var(--muted);
+            }
+
+            #stats:empty {
+                display: none;
+            }
+
+            /* Details of the hovered output element; fixed height so the
+               output below does not jump as the content changes. */
+            #element-info {
+                font-size: 0.78rem;
+                min-height: 1.15rem;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            #element-info.placeholder {
+                color: var(--muted);
+            }
+
+            #output-svg .hover-target {
+                fill: transparent;
+                cursor: help;
             }
 
             #output-error {
@@ -335,12 +562,17 @@
                 main {
                     flex-direction: column;
                     min-height: 0;
+                    gap: 1rem;
                     padding: 0 1rem 1rem;
+                }
+
+                #divider {
+                    display: none;
                 }
 
                 #controls,
                 #output-panel {
-                    flex: none;
+                    flex: none !important;
                     overflow: visible;
                 }
 
@@ -393,16 +625,19 @@
                 <button id="reset-btn">reset to plain TeX defaults</button>
             </div>
 
+            <div id="divider" title="drag to resize · double-click to reset"></div>
+
             <div id="output-panel">
+                <div id="output-header">
                 <div id="overlay-toggles">
                     <span class="section-label" style="margin: 0">show:</span>
                     <label>
-                        <input type="checkbox" id="toggle-kerns" checked />
+                        <input type="checkbox" id="toggle-kerns" />
                         <span class="swatch" style="background: var(--kern-neg-fill)"></span>
                         kerns
                     </label>
                     <label>
-                        <input type="checkbox" id="toggle-ligs" checked />
+                        <input type="checkbox" id="toggle-ligs" />
                         <span class="swatch" style="background: var(--lig-fill)"></span>
                         ligatures
                     </label>
@@ -412,16 +647,25 @@
                         glue
                     </label>
                     <label>
-                        <input type="checkbox" id="toggle-badness" />
+                        <input type="checkbox" id="toggle-badness" checked />
                         badness
                     </label>
+                    <label>
+                        <input type="checkbox" id="toggle-glueset" checked />
+                        glue set
+                    </label>
                 </div>
+                <div id="stats"></div>
+                </div>
+                <div id="element-info"></div>
                 <div id="output-error"></div>
                 <div id="output-scroll">
                     <svg id="output-svg" xmlns="http://www.w3.org/2000/svg"></svg>
                 </div>
             </div>
         </main>
+
+        <div id="tooltip"></div>
 
         <script type="module">
             import init, { break_paragraph } from "./pkg/knuthplass_wasm.js";
@@ -430,48 +674,99 @@
 
             // ── Parameter definitions ──────────────────────────────────────
 
+            // Numeric params get a slider (log scale where the useful values
+            // span orders of magnitude) plus an editable number. Descriptions
+            // are shown as tooltips on the parameter names.
             const PARAM_GROUPS = [
                 {
                     label: "Tolerance",
                     open: true,
                     params: [
-                        { name: "pre_tolerance", def: 100 },
-                        { name: "tolerance", def: 200 },
-                        { name: "looseness", def: 0 },
+                        {
+                            name: "pre_tolerance", def: 100, min: -1, max: 10000, log: true,
+                            desc: "Badness tolerance for the first pass, which does not try hyphenation. If the paragraph cannot be broken within this tolerance, the second (hyphenating) pass runs. −1 makes the first pass always fail.",
+                        },
+                        {
+                            name: "tolerance", def: 200, min: -1, max: 10000, log: true,
+                            desc: "Badness tolerance for the second pass, in which hyphenation is attempted. If even this fails, a solution is forced and lines may be overfull.",
+                        },
+                        {
+                            name: "looseness", def: 0, min: -3, max: 3,
+                            desc: "Make the paragraph this many lines longer (+) or shorter (−) than optimal, if possible. Not yet implemented in Boxworks.",
+                        },
                     ],
                 },
                 {
                     label: "Penalties",
                     params: [
-                        { name: "hyphen_penalty", def: 50 },
-                        { name: "ex_hyphen_penalty", def: 50 },
-                        { name: "line_penalty", def: 10 },
-                        { name: "broken_penalty", def: 100 },
-                        { name: "club_penalty", def: 150 },
-                        { name: "final_widow_penalty", def: 150 },
-                        { name: "inter_line_penalty", def: 0 },
+                        {
+                            name: "hyphen_penalty", def: 50, min: -10000, max: 10000, symlog: true,
+                            desc: "Penalty for breaking the line at a hyphenation point. 10000 prevents hyphenation entirely; negative values encourage it.",
+                        },
+                        {
+                            name: "ex_hyphen_penalty", def: 50, min: -10000, max: 10000, symlog: true,
+                            desc: "Penalty for breaking after an explicit hyphen already present in the text, as in “so-called”.",
+                        },
+                        {
+                            name: "line_penalty", def: 10, min: -10000, max: 10000, symlog: true,
+                            desc: "Penalty charged for every line: raising it makes the algorithm prefer paragraphs with fewer lines.",
+                        },
+                        {
+                            name: "broken_penalty", def: 100, min: -10000, max: 10000, symlog: true,
+                            desc: "Penalty inserted after each hyphenated line, discouraging a page break right after it. Affects page breaking, not where lines break.",
+                        },
+                        {
+                            name: "club_penalty", def: 150, min: -10000, max: 10000, symlog: true,
+                            desc: "Penalty inserted after the first line, discouraging a page break that would orphan it. Affects page breaking, not where lines break.",
+                        },
+                        {
+                            name: "final_widow_penalty", def: 150, min: -10000, max: 10000, symlog: true,
+                            desc: "Penalty inserted before the last line (TeX’s \\widowpenalty), discouraging a page break that would widow it. Affects page breaking, not where lines break.",
+                        },
+                        {
+                            name: "inter_line_penalty", def: 0, min: -10000, max: 10000, symlog: true,
+                            desc: "Penalty inserted between every pair of lines, discouraging page breaks anywhere inside the paragraph.",
+                        },
                     ],
                 },
                 {
                     label: "Demerits",
                     params: [
-                        { name: "adj_demerits", def: 10000 },
-                        { name: "double_hyphen_demerits", def: 10000 },
-                        { name: "final_hyphen_demerits", def: 5000 },
+                        {
+                            name: "adj_demerits", def: 10000, min: 0, max: 100000, log: true,
+                            desc: "Extra demerits when consecutive lines have clashing looseness, e.g. a tight line right after a loose one.",
+                        },
+                        {
+                            name: "double_hyphen_demerits", def: 10000, min: 0, max: 100000, log: true,
+                            desc: "Extra demerits when two consecutive lines both end with hyphens.",
+                        },
+                        {
+                            name: "final_hyphen_demerits", def: 5000, min: 0, max: 100000, log: true,
+                            desc: "Extra demerits when the second-to-last line ends with a hyphen.",
+                        },
                     ],
                 },
                 {
                     label: "Glue",
                     params: [
-                        { name: "left_skip", def: "0pt", glue: true },
-                        { name: "right_skip", def: "0pt", glue: true },
-                        { name: "par_fill_skip", def: "0pt plus 1fil", glue: true },
+                        {
+                            name: "left_skip", def: "0pt", glue: true,
+                            desc: "Glue added at the left of every line, in TeX glue syntax. Try “0pt plus 20pt” for ragged-left text.",
+                        },
+                        {
+                            name: "right_skip", def: "0pt", glue: true,
+                            desc: "Glue added at the right of every line. Try “0pt plus 20pt” for ragged-right text.",
+                        },
+                        {
+                            name: "par_fill_skip", def: "0pt plus 1fil", glue: true,
+                            desc: "Glue that finishes the paragraph’s last line. The default infinitely stretchable glue lets the last line end anywhere; “0pt” justifies the last line too.",
+                        },
                     ],
                 },
             ];
 
             const DEFAULT_TEXT =
-                "Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once or twice she had peeped into the book her sister was reading, but it had no pictures or conversations in it, ``and what is the use of a book,'' thought Alice ``without pictures or conversations?''";
+                "The next year there were many victories. The mountain that was beyond the valley and the hillside where the chestnut forest grew was captured and there were victories beyond the plain on the plateau to the south and we crossed the river in August and lived in a house in Gorizia that had a fountain and many thick shady trees in a walled garden and a wistaria vine purple on the side of the house. Now the fighting was in the next mountains beyond and was not a mile away. The town was very nice and our house was very fine. The river ran behind us and the town had been captured very handsomely but the mountains beyond it could not be taken and I was very glad the Austrians seemed to want to come back to the town some time, if the war should end, because they did not bombard it to destroy it but only a little in a military way. People lived on in it and there were hospitals and cafes and artillery up side streets and two bawdy houses, one for troops and one for officers, and with the end of the summer, the cool nights, the fighting in the mountains beyond the town, the shell-marked iron of the railway bridge, the smashed tunnel by the river where the fighting had been, the trees around the square and the long avenue of trees that led to the square; these with there being girls in the town, the King passing in his motor car, sometimes now seeing his face and little long necked body and gray beard like a goat's chin tuft; all these with the sudden interiors of houses that had lost a wall through shelling, with plaster and rubble in their gardens and sometimes in the street, and the whole thing going well on the Carso made the fall very different from the last fall when we had been in the country. The war was changed too.";
             const DEFAULT_WIDTH = 300;
             const FONT_SIZE_PT = 10;
 
@@ -488,11 +783,89 @@
                 ligs: document.getElementById("toggle-ligs"),
                 glue: document.getElementById("toggle-glue"),
                 badness: document.getElementById("toggle-badness"),
+                glueset: document.getElementById("toggle-glueset"),
             };
+            const statsEl = document.getElementById("stats");
 
             // ── Build parameter inputs ─────────────────────────────────────
 
-            const paramInputs = {}; // name -> {input, label, def, glue}
+            const paramInputs = {}; // name -> {input, slider?, label, def, glue, spec}
+            let forceHyphInput; // assigned while building the Tolerance group
+
+            // Log-scale sliders use positions 0..SLIDER_STEPS mapped
+            // exponentially onto [min, max]; linear sliders use the value
+            // directly.
+            const SLIDER_STEPS = 1000;
+
+            function valueToPos(spec, value) {
+                const clamped = Math.min(Math.max(value, spec.min), spec.max);
+                if (spec.symlog) {
+                    // Log-scale magnitude on both sides of zero; assumes
+                    // max == -min. Position range is -SLIDER_STEPS..SLIDER_STEPS.
+                    return Math.round(
+                        (Math.sign(clamped) *
+                            SLIDER_STEPS *
+                            Math.log(Math.abs(clamped) + 1)) /
+                            Math.log(spec.max + 1),
+                    );
+                }
+                if (!spec.log) return value;
+                const range = spec.max - spec.min + 1;
+                return Math.round(
+                    (SLIDER_STEPS * Math.log(clamped - spec.min + 1)) / Math.log(range),
+                );
+            }
+
+            function posToValue(spec, pos) {
+                if (spec.symlog) {
+                    const magnitude =
+                        Math.round(
+                            Math.exp((Math.abs(pos) / SLIDER_STEPS) * Math.log(spec.max + 1)),
+                        ) - 1;
+                    return Math.sign(pos) * magnitude;
+                }
+                if (!spec.log) return pos;
+                const range = spec.max - spec.min + 1;
+                return spec.min + Math.round(Math.exp((pos / SLIDER_STEPS) * Math.log(range))) - 1;
+            }
+
+            function syncSliderToInput(name) {
+                const e = paramInputs[name];
+                if (!e.slider) return;
+                const v = Number(e.input.value);
+                if (Number.isFinite(v)) e.slider.value = valueToPos(e.spec, v);
+            }
+
+            // Where a value sits along the slider track, as a percentage.
+            function valueToPercent(spec, value) {
+                const pos = valueToPos(spec, value);
+                if (spec.symlog) return ((pos + SLIDER_STEPS) / (2 * SLIDER_STEPS)) * 100;
+                if (spec.log) return (pos / SLIDER_STEPS) * 100;
+                return ((value - spec.min) / (spec.max - spec.min)) * 100;
+            }
+
+            function buildSliderScale(spec) {
+                const scale = document.createElement("div");
+                scale.className = "slider-scale";
+                const ticks = [
+                    [spec.min, 0],
+                    [spec.max, 100],
+                ];
+                // Mark the zero point when it is not (visually at) an end.
+                if (spec.min < 0 && spec.max > 0) {
+                    const pct = valueToPercent(spec, 0);
+                    if (pct > 10 && pct < 90) ticks.splice(1, 0, [0, pct]);
+                }
+                for (const [value, pct] of ticks) {
+                    const tick = document.createElement("span");
+                    tick.textContent = value;
+                    if (pct === 0) tick.className = "tick-left";
+                    else if (pct === 100) tick.className = "tick-right";
+                    else tick.style.left = pct + "%";
+                    scale.appendChild(tick);
+                }
+                return scale;
+            }
 
             for (const group of PARAM_GROUPS) {
                 const details = document.createElement("details");
@@ -502,29 +875,108 @@
                 details.appendChild(summary);
                 const grid = document.createElement("div");
                 grid.className = "param-grid";
+                let scaleKey = null;
                 for (const p of group.params) {
+                    if (!p.glue) {
+                        // A scale row above each run of sliders that share
+                        // the same range and mapping.
+                        const key = [!!p.symlog, !!p.log, p.min, p.max].join(":");
+                        if (key !== scaleKey) {
+                            grid.appendChild(buildSliderScale(p));
+                            scaleKey = key;
+                        }
+                    }
                     const label = document.createElement("label");
                     label.textContent = p.name;
                     label.htmlFor = "param-" + p.name;
+                    if (p.desc) label.dataset.tooltip = p.desc;
+                    grid.appendChild(label);
+
                     const input = document.createElement("input");
                     input.id = "param-" + p.name;
+                    input.value = p.def;
                     if (p.glue) {
                         input.type = "text";
+                        input.className = "param-glue-input";
+                        input.addEventListener("input", () => {
+                            markModified(p.name);
+                            render();
+                        });
+                        grid.appendChild(input);
+                        paramInputs[p.name] = { input, label, def: p.def, glue: true };
                     } else {
                         input.type = "number";
                         input.step = "1";
+                        const slider = document.createElement("input");
+                        slider.type = "range";
+                        slider.className = "param-slider";
+                        if (p.symlog) {
+                            slider.min = -SLIDER_STEPS;
+                            slider.max = SLIDER_STEPS;
+                        } else if (p.log) {
+                            slider.min = 0;
+                            slider.max = SLIDER_STEPS;
+                        } else {
+                            slider.min = p.min;
+                            slider.max = p.max;
+                        }
+                        slider.step = 1;
+                        slider.value = valueToPos(p, p.def);
+                        slider.addEventListener("input", () => {
+                            input.value = posToValue(p, Number(slider.value));
+                            markModified(p.name);
+                            render();
+                        });
+                        input.addEventListener("input", () => {
+                            syncSliderToInput(p.name);
+                            markModified(p.name);
+                            render();
+                        });
+                        grid.appendChild(slider);
+                        grid.appendChild(input);
+                        paramInputs[p.name] = { input, slider, label, def: p.def, spec: p };
                     }
-                    input.value = p.def;
-                    input.addEventListener("input", () => {
-                        markModified(p.name);
-                        render();
-                    });
-                    grid.appendChild(label);
-                    grid.appendChild(input);
-                    paramInputs[p.name] = { input, label, def: p.def, glue: !!p.glue };
+
+                    if (p.name === "pre_tolerance") {
+                        const row = document.createElement("label");
+                        row.className = "checkbox-row";
+                        row.dataset.tooltip =
+                            "Sets pre_tolerance to −1, so the first (no-hyphenation) pass " +
+                            "always fails and the hyphenating second pass always runs. " +
+                            "This is the standard TeX idiom for forcing hyphenation.";
+                        forceHyphInput = document.createElement("input");
+                        forceHyphInput.type = "checkbox";
+                        forceHyphInput.id = "force-hyphenation";
+                        forceHyphInput.addEventListener("change", () => {
+                            setForceHyphenation(forceHyphInput.checked);
+                            render();
+                        });
+                        row.appendChild(forceHyphInput);
+                        row.appendChild(document.createTextNode("force hyphenation"));
+                        grid.appendChild(row);
+                    }
                 }
+
                 details.appendChild(grid);
                 paramGroupsEl.appendChild(details);
+            }
+
+            let preTolBeforeForce = null; // pre_tolerance value saved while forcing
+            function setForceHyphenation(on) {
+                forceHyphInput.checked = on;
+                const e = paramInputs.pre_tolerance;
+                if (on) {
+                    if (preTolBeforeForce === null) preTolBeforeForce = e.input.value;
+                    e.input.value = -1;
+                } else if (preTolBeforeForce !== null) {
+                    e.input.value = preTolBeforeForce;
+                    preTolBeforeForce = null;
+                }
+                syncSliderToInput("pre_tolerance");
+                markModified("pre_tolerance");
+                e.input.disabled = on;
+                e.slider.disabled = on;
+                e.label.classList.toggle("disabled", on);
             }
 
             function markModified(name) {
@@ -539,12 +991,20 @@
                 if (textInput.value !== DEFAULT_TEXT) p.set("text", textInput.value);
                 if (Number(widthNumber.value) !== DEFAULT_WIDTH) p.set("width", widthNumber.value);
                 for (const [name, { input, def }] of Object.entries(paramInputs)) {
-                    if (String(input.value) !== String(def)) p.set(name, input.value);
+                    // While forcing hyphenation, pre_tolerance reads -1; encode
+                    // the value it will revert to instead.
+                    const v =
+                        name === "pre_tolerance" && preTolBeforeForce !== null
+                            ? preTolBeforeForce
+                            : input.value;
+                    if (String(v) !== String(def)) p.set(name, v);
                 }
-                if (!toggles.kerns.checked) p.set("kerns", "0");
-                if (!toggles.ligs.checked) p.set("ligs", "0");
+                if (forceHyphInput.checked) p.set("forcehyph", "1");
+                if (toggles.kerns.checked) p.set("kerns", "1");
+                if (toggles.ligs.checked) p.set("ligs", "1");
                 if (toggles.glue.checked) p.set("glue", "1");
-                if (toggles.badness.checked) p.set("badness", "1");
+                if (!toggles.badness.checked) p.set("badness", "0");
+                if (!toggles.glueset.checked) p.set("glueset", "0");
                 const qs = p.toString();
                 history.replaceState(null, "", qs ? "?" + qs : location.pathname);
             }
@@ -558,13 +1018,16 @@
                 for (const [name, entry] of Object.entries(paramInputs)) {
                     if (p.has(name)) {
                         entry.input.value = p.get(name);
+                        syncSliderToInput(name);
                         markModified(name);
                     }
                 }
-                if (p.get("kerns") === "0") toggles.kerns.checked = false;
-                if (p.get("ligs") === "0") toggles.ligs.checked = false;
+                if (p.get("forcehyph") === "1") setForceHyphenation(true);
+                if (p.get("kerns") === "1") toggles.kerns.checked = true;
+                if (p.get("ligs") === "1") toggles.ligs.checked = true;
                 if (p.get("glue") === "1") toggles.glue.checked = true;
-                if (p.get("badness") === "1") toggles.badness.checked = true;
+                if (p.get("badness") === "0") toggles.badness.checked = false;
+                if (p.get("glueset") === "0") toggles.glueset.checked = false;
             }
 
             // ── Run the algorithm ──────────────────────────────────────────
@@ -598,12 +1061,13 @@
                 try {
                     return JSON.parse(break_paragraph(textInput.value, JSON.stringify(params)));
                 } catch (e) {
-                    // The line breaker panics (aborting the wasm call) when no
-                    // feasible set of breaks exists within the tolerance.
+                    // A wasm panic aborts the call. Known trigger: a dlmalloc
+                    // bug in the Rust toolchain's wasm allocator, tripped by
+                    // some non-ASCII inputs (see PLAN.md).
                     return {
                         error:
-                            "no feasible line breaks found with these parameters — " +
-                            "try increasing tolerance or the width",
+                            "internal error while breaking the paragraph — " +
+                            "try changing the text or reloading the page",
                     };
                 }
             }
@@ -618,14 +1082,51 @@
                 return el;
             }
 
-            function addTooltip(el, text) {
-                const t = document.createElementNS(SVG_NS, "title");
-                t.textContent = text;
-                el.appendChild(t);
+            // Compact pt formatting for tooltips and labels: "3.33", "1.5", "0".
+            function fmtPt(v) {
+                return String(Math.round(v * 100) / 100);
+            }
+
+            function glueAmount(value, order) {
+                return fmtPt(value) + (order ? order : "pt");
+            }
+
+            function elementTooltip(el) {
+                switch (el.type) {
+                    case "char":
+                        return `“${el.unicode}”\nwidth ${fmtPt(el.width_pt)}pt`;
+                    case "lig":
+                        return `ligature ${el.original} → ${el.unicode}\nwidth ${fmtPt(el.width_pt)}pt`;
+                    case "kern":
+                        return `kern ${fmtPt(el.width_pt)}pt`;
+                    case "glue": {
+                        let spec = fmtPt(el.natural_pt) + "pt";
+                        if (el.stretch_pt) spec += ` plus ${glueAmount(el.stretch_pt, el.stretch_order)}`;
+                        if (el.shrink_pt) spec += ` minus ${glueAmount(el.shrink_pt, el.shrink_order)}`;
+                        const delta = el.width_pt - el.natural_pt;
+                        let action = "at natural width";
+                        if (delta > 0.005) action = `stretched +${fmtPt(delta)}pt`;
+                        else if (delta < -0.005) action = `shrunk −${fmtPt(-delta)}pt`;
+                        return `glue ${spec}\nset to ${fmtPt(el.width_pt)}pt (${action})`;
+                    }
+                }
+            }
+
+            // With appearance: none the track loses its native progress
+            // fill; paint it as a gradient up to the thumb position.
+            function paintSliders() {
+                for (const s of document.querySelectorAll('input[type="range"]')) {
+                    const min = Number(s.min);
+                    const pct = ((Number(s.value) - min) / (Number(s.max) - min)) * 100;
+                    s.style.background = `linear-gradient(to right, var(--accent) ${pct}%, var(--separator) ${pct}%)`;
+                }
             }
 
             function render() {
+                paintSliders();
+                setElementInfo("");
                 outputError.textContent = "";
+                statsEl.textContent = "";
                 const result = runBreaker();
                 encodeState();
 
@@ -645,89 +1146,223 @@
                 }
 
                 const width = Number(widthNumber.value);
+                // Extra leading between lines (beyond what the algorithm
+                // produced), giving the kern hover dots room to sit under
+                // the lines they annotate.
+                const LINE_EXTRA_PT = 4;
                 const last = lines[lines.length - 1];
-                const totalHeight = last.baseline_pt + last.depth_pt;
+                const totalHeight =
+                    last.baseline_pt + last.depth_pt + lines.length * LINE_EXTRA_PT;
                 const PAD = 4;
-                const BADNESS_GUTTER = toggles.badness.checked ? 40 : 0;
+                // Margin annotation columns, sized to their content and
+                // topped with a header row instead of per-row tooltips.
+                const LABEL_CHAR_PT = 2.8; // approx glyph width at font-size 5
+                const COL_GAP = 8;
+                const gluesetTexts = lines.map((line) => {
+                    const delta = line.elements.reduce(
+                        (sum, el) =>
+                            sum + (el.type === "glue" ? el.width_pt - el.natural_pt : 0),
+                        0,
+                    );
+                    const amount = (delta >= 0 ? "+" : "−") + fmtPt(Math.abs(delta)) + "pt";
+                    const detail =
+                        line.glue_order === "normal"
+                            ? Math.round(Math.abs(line.glue_ratio) * 100) + "%"
+                            : line.glue_order;
+                    return `${amount} (${detail})`;
+                });
+                const colWidth = (texts, header) =>
+                    Math.max(header.length, ...texts.map((t) => t.length)) * LABEL_CHAR_PT;
+                const badnessCol = toggles.badness.checked
+                    ? colWidth(lines.map((l) => String(l.badness)), "badness")
+                    : 0;
+                const gluesetCol = toggles.glueset.checked
+                    ? colWidth(gluesetTexts, "glue set")
+                    : 0;
+                const badnessX = width + COL_GAP;
+                const gluesetX = badnessX + (badnessCol ? badnessCol + COL_GAP : 0);
+                let gutter = 0;
+                if (badnessCol) gutter += COL_GAP + badnessCol;
+                if (gluesetCol) gutter += COL_GAP + gluesetCol;
+                const headerPt = gutter ? 10 : 0; // room for the column headers
+                const viewWidth = width + 2 * PAD + gutter;
+                const viewHeight = totalHeight + 2 * PAD + headerPt;
                 outputSvg.setAttribute(
                     "viewBox",
-                    `${-PAD} ${-PAD} ${width + 2 * PAD + BADNESS_GUTTER} ${totalHeight + 2 * PAD}`,
+                    `${-PAD} ${-PAD - headerPt} ${viewWidth} ${viewHeight}`,
                 );
+                // Fixed scale: the text stays the same size at every
+                // paragraph width. True size would be 96/72.27 px per pt
+                // (1 TeX pt = 1/72.27in, CSS defines 96px per inch); we
+                // render 1.5× that for readability.
+                const PX_PER_PT = (1.5 * 96) / 72.27;
+                outputSvg.style.width = `${viewWidth * PX_PER_PT}px`;
+                outputSvg.style.height = `${viewHeight * PX_PER_PT}px`;
 
                 const overlays = svgEl("g", {});
                 const textLayer = svgEl("g", { "font-size": FONT_SIZE_PT });
+                // The hover layer sits on top of everything so tooltips work
+                // regardless of which overlays are enabled.
+                const hoverLayer = svgEl("g", {});
                 outputSvg.appendChild(overlays);
                 outputSvg.appendChild(textLayer);
+                outputSvg.appendChild(hoverLayer);
 
-                for (const line of lines) {
-                    const top = line.baseline_pt - line.height_pt;
+                for (const [col, x, name] of [
+                    [badnessCol, badnessX, "badness"],
+                    [gluesetCol, gluesetX, "glue set"],
+                ]) {
+                    if (!col) continue;
+                    const h = svgEl("text", {
+                        class: "badness-label",
+                        x,
+                        y: -PAD - 3,
+                        "font-size": 5,
+                        "font-weight": 600,
+                    });
+                    h.textContent = name;
+                    textLayer.appendChild(h);
+                }
+
+                let totalBadness = 0;
+                let overfullLines = 0;
+                let worstBadness = 0;
+                let hyphenatedLines = 0;
+
+                for (const [lineIndex, line] of lines.entries()) {
+                    const baseline = line.baseline_pt + lineIndex * LINE_EXTRA_PT;
+                    const top = baseline - line.height_pt;
                     const boxHeight = line.height_pt + line.depth_pt;
+                    let lastGlyph = null;
 
                     for (const el of line.elements) {
+                        // Overlay geometry: negative kerns move the next glyph
+                        // left, so their marker covers the overlapped region.
+                        let hoverX = el.x_pt;
+                        let hoverW = Math.max(Math.abs(el.width_pt), 0.6);
+                        if (el.width_pt < 0) hoverX = el.x_pt + el.width_pt;
+
                         if (el.type === "char" || el.type === "lig") {
                             const t = svgEl("text", {
                                 x: el.x_pt,
-                                y: line.baseline_pt,
+                                y: baseline,
                             });
                             t.textContent = el.unicode;
                             textLayer.appendChild(t);
+                            lastGlyph = el;
                             if (el.type === "lig" && toggles.ligs.checked) {
-                                const r = svgEl("rect", {
-                                    class: "lig-rect",
-                                    x: el.x_pt,
-                                    y: top,
-                                    width: el.width_pt,
-                                    height: boxHeight,
-                                });
-                                addTooltip(r, `ligature: ${el.original} → ${el.unicode}`);
-                                overlays.appendChild(r);
+                                overlays.appendChild(
+                                    svgEl("rect", {
+                                        class: "lig-rect",
+                                        x: el.x_pt,
+                                        y: top,
+                                        width: el.width_pt,
+                                        height: boxHeight,
+                                    }),
+                                );
                             }
-                        } else if (el.type === "kern" && toggles.kerns.checked) {
-                            // Negative kerns move the next glyph left; draw the
-                            // marker over the overlapped region.
-                            const w = Math.max(Math.abs(el.width_pt), 0.4);
-                            const x = el.width_pt >= 0 ? el.x_pt : el.x_pt + el.width_pt;
-                            const r = svgEl("rect", {
-                                class: "kern-rect " + (el.width_pt >= 0 ? "positive" : "negative"),
-                                x,
-                                y: top,
-                                width: w,
-                                height: boxHeight,
-                            });
-                            addTooltip(r, `kern: ${el.width_pt.toFixed(3)}pt`);
-                            overlays.appendChild(r);
-                        } else if (el.type === "glue" && toggles.glue.checked) {
-                            if (el.width_pt <= 0) continue;
-                            const r = svgEl("rect", {
-                                class: "glue-rect",
-                                x: el.x_pt,
-                                y: top,
-                                width: el.width_pt,
-                                height: boxHeight,
-                            });
-                            addTooltip(
-                                r,
-                                `glue: set to ${el.width_pt.toFixed(3)}pt\n` +
-                                    `natural ${el.natural_pt.toFixed(3)}pt ` +
-                                    `plus ${el.stretch_pt.toFixed(3)}pt ` +
-                                    `minus ${el.shrink_pt.toFixed(3)}pt`,
-                            );
-                            overlays.appendChild(r);
+                        } else if (el.type === "kern") {
+                            if (toggles.kerns.checked) {
+                                // Kern markers are hair-thin; a dot under the
+                                // line gives the kern a hoverable handle.
+                                const dot = svgEl("circle", {
+                                    class:
+                                        "kern-dot " +
+                                        (el.width_pt >= 0 ? "positive" : "negative"),
+                                    // Centered under the marker rect (which
+                                    // has a minimum width), touching its
+                                    // bottom edge.
+                                    cx: hoverX + hoverW / 2,
+                                    cy: top + boxHeight + 2.5,
+                                    r: 2.5,
+                                });
+                                dot.dataset.info = elementTooltip(el);
+                                hoverLayer.appendChild(dot);
+                                overlays.appendChild(
+                                    svgEl("rect", {
+                                        class:
+                                            "kern-rect " +
+                                            (el.width_pt >= 0 ? "positive" : "negative"),
+                                        x: hoverX,
+                                        y: top,
+                                        width: hoverW,
+                                        height: boxHeight,
+                                    }),
+                                );
+                            }
+                        } else if (el.type === "glue") {
+                            // Skip hover targets for degenerate glue (e.g. a
+                            // zero \rightskip) that would just add noise.
+                            if (
+                                el.width_pt < 0.05 &&
+                                !el.natural_pt &&
+                                !el.stretch_pt &&
+                                !el.shrink_pt
+                            ) {
+                                continue;
+                            }
+                            if (toggles.glue.checked && el.width_pt > 0) {
+                                overlays.appendChild(
+                                    svgEl("rect", {
+                                        class: "glue-rect",
+                                        x: el.x_pt,
+                                        y: top,
+                                        width: el.width_pt,
+                                        height: boxHeight,
+                                    }),
+                                );
+                            }
                         }
+
+                        const hover = svgEl("rect", {
+                            class: "hover-target",
+                            x: hoverX,
+                            y: top,
+                            width: hoverW,
+                            height: boxHeight,
+                        });
+                        hover.dataset.info = elementTooltip(el);
+                        hoverLayer.appendChild(hover);
                     }
 
                     if (toggles.badness.checked) {
                         const t = svgEl("text", {
                             class: "badness-label",
-                            x: width + 10,
-                            y: line.baseline_pt,
+                            x: badnessX,
+                            y: baseline,
                             "font-size": 5,
                         });
                         t.textContent = line.badness;
-                        addTooltip(t, "badness of this line's glue setting");
                         textLayer.appendChild(t);
                     }
+                    if (toggles.glueset.checked) {
+                        const t = svgEl("text", {
+                            class: "badness-label",
+                            x: gluesetX,
+                            y: baseline,
+                            "font-size": 5,
+                        });
+                        t.textContent = gluesetTexts[lineIndex];
+                        textLayer.appendChild(t);
+                    }
+
+                    if (line.badness >= 1000000) {
+                        overfullLines += 1;
+                    } else {
+                        totalBadness += line.badness;
+                        worstBadness = Math.max(worstBadness, line.badness);
+                    }
+                    if (lastGlyph && lastGlyph.unicode === "-") hyphenatedLines += 1;
                 }
+
+                let stats =
+                    `${lines.length} line${lines.length === 1 ? "" : "s"} · ` +
+                    `${hyphenatedLines} hyphenated · ` +
+                    `total badness ${totalBadness} · worst ${worstBadness}`;
+                if (overfullLines > 0) {
+                    stats += ` · ${overfullLines} overfull`;
+                }
+                statsEl.textContent = stats;
             }
 
             // ── Events ─────────────────────────────────────────────────────
@@ -752,8 +1387,10 @@
             }
 
             document.getElementById("reset-btn").addEventListener("click", () => {
+                setForceHyphenation(false);
                 for (const [name, { input, def }] of Object.entries(paramInputs)) {
                     input.value = def;
+                    syncSliderToInput(name);
                     markModified(name);
                 }
                 widthSlider.value = DEFAULT_WIDTH;
@@ -764,6 +1401,92 @@
             document.querySelector("h1").addEventListener("click", () => {
                 textInput.value = DEFAULT_TEXT;
                 document.getElementById("reset-btn").click();
+            });
+
+            // ── Draggable divider ──────────────────────────────────────────
+
+            {
+                const divider = document.getElementById("divider");
+                const controlsPanel = document.getElementById("controls");
+                const mainEl = document.querySelector("main");
+
+                const setSplit = (pct) => {
+                    controlsPanel.style.flex = `0 0 ${pct}%`;
+                };
+                const saved = Number(localStorage.getItem("split"));
+                if (saved >= 20 && saved <= 80) setSplit(saved);
+
+                divider.addEventListener("pointerdown", (e) => {
+                    e.preventDefault();
+                    divider.setPointerCapture(e.pointerId);
+                    divider.classList.add("dragging");
+                    document.body.style.userSelect = "none";
+                });
+                divider.addEventListener("pointermove", (e) => {
+                    if (!divider.hasPointerCapture(e.pointerId)) return;
+                    const cs = getComputedStyle(mainEl);
+                    const rect = mainEl.getBoundingClientRect();
+                    const left = rect.left + parseFloat(cs.paddingLeft);
+                    const width =
+                        rect.width -
+                        parseFloat(cs.paddingLeft) -
+                        parseFloat(cs.paddingRight);
+                    const pct = Math.max(
+                        20,
+                        Math.min(80, ((e.clientX - left) / width) * 100),
+                    );
+                    setSplit(pct);
+                    localStorage.setItem("split", pct.toFixed(1));
+                });
+                divider.addEventListener("pointerup", (e) => {
+                    divider.releasePointerCapture(e.pointerId);
+                    divider.classList.remove("dragging");
+                    document.body.style.userSelect = "";
+                });
+                divider.addEventListener("dblclick", () => {
+                    controlsPanel.style.flex = "";
+                    localStorage.removeItem("split");
+                });
+            }
+
+            // ── Element info row ───────────────────────────────────────────
+
+            // Hovering an element of the typeset output shows its details in
+            // the row under the output header, instead of a floating tooltip.
+            const elementInfoEl = document.getElementById("element-info");
+            const INFO_PLACEHOLDER = "hover over the output to inspect its elements";
+
+            function setElementInfo(text) {
+                elementInfoEl.classList.toggle("placeholder", !text);
+                elementInfoEl.textContent = text
+                    ? text.replaceAll("\n", " · ")
+                    : INFO_PLACEHOLDER;
+            }
+
+            outputSvg.addEventListener("mouseover", (e) => {
+                const target = e.target.closest?.("[data-info]");
+                if (target) setElementInfo(target.dataset.info);
+            });
+            outputSvg.addEventListener("mouseout", (e) => {
+                if (e.target.closest?.("[data-info]")) setElementInfo("");
+            });
+            setElementInfo("");
+
+            // ── Tooltips ───────────────────────────────────────────────────
+
+            const tooltipEl = document.getElementById("tooltip");
+            document.addEventListener("mouseover", (e) => {
+                const target = e.target.closest?.("[data-tooltip]");
+                if (!target) {
+                    tooltipEl.style.display = "none";
+                    return;
+                }
+                tooltipEl.textContent = target.dataset.tooltip;
+                tooltipEl.style.display = "block";
+                const r = target.getBoundingClientRect();
+                const maxLeft = window.innerWidth - tooltipEl.offsetWidth - 12;
+                tooltipEl.style.left = Math.max(0, Math.min(r.left, maxLeft)) + "px";
+                tooltipEl.style.top = r.bottom + 6 + "px";
             });
 
             // ── Init ───────────────────────────────────────────────────────
