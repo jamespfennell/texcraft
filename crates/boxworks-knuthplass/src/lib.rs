@@ -190,6 +190,24 @@ impl std::ops::Add for Diffs {
         }
     }
 }
+
+impl std::ops::Sub for Diffs {
+    type Output = Diffs;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Diffs {
+            width: self.width - rhs.width,
+            shrinkability: self.shrinkability - rhs.shrinkability,
+            stretchabilities: [
+                self.stretchabilities[0] - rhs.stretchabilities[0],
+                self.stretchabilities[1] - rhs.stretchabilities[1],
+                self.stretchabilities[2] - rhs.stretchabilities[2],
+                self.stretchabilities[3] - rhs.stretchabilities[3],
+            ],
+        }
+    }
+}
+
 // TeX.2021.819
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ActiveNode {
@@ -603,28 +621,13 @@ impl<'a> LineBreaker<'a> {
                 while m > 0 {
                     m -= 1;
                     let active_node = active_nodes.pop_front().expect("active nodes to consider");
-                    let ideal_line_width = Scaled64(line_width.0 as i64);
-                    let actual_line_width_no_stretching =
-                        diffs.width - active_node.diffs.width + Scaled64(disc_width.0 as i64);
-                    let line_diffs = Diffs {
-                        width: ideal_line_width - actual_line_width_no_stretching
-                            + background.width,
-                        shrinkability: diffs.shrinkability - active_node.diffs.shrinkability
-                            + background.shrinkability,
-                        stretchabilities: [
-                            diffs.stretchabilities[0] - active_node.diffs.stretchabilities[0]
-                                + background.stretchabilities[0],
-                            diffs.stretchabilities[1] - active_node.diffs.stretchabilities[1]
-                                + background.stretchabilities[1],
-                            diffs.stretchabilities[2] - active_node.diffs.stretchabilities[2]
-                                + background.stretchabilities[2],
-                            diffs.stretchabilities[3] - active_node.diffs.stretchabilities[3]
-                                + background.stretchabilities[3],
-                        ],
-                    };
+                    // This is the key formula that essentially defines what we're doing with diffs.
+                    let line_diffs = diffs.clone() - active_node.diffs.clone() + background.clone();
 
                     // TeX.2021.851
-                    let shortfall = line_diffs.width;
+                    let shortfall = Scaled64(line_width.0 as i64)
+                        - line_diffs.width
+                        - Scaled64(disc_width.0 as i64);
                     let (badness, fitness_class) = if shortfall.0 > 0 {
                         // Stretching the line
                         // TeX.2021.852
@@ -1056,6 +1059,29 @@ mod tests {
             },
             typeset: "wolf_hall_ragged_right.txt",
             log: "wolf_hall_ragged_right_log.txt",
+        ),
+        (
+            wolf_hall_ragged_right_margin,
+            "wolf_hall_input.txt",
+            "5in",
+            text_params: boxworks_text::Params {
+                space_skip: common::Glue {
+                    width: common::Scaled::parse_from_string("3.33298pt").unwrap(),
+                    ..Default::default()
+                },
+                extra_space_skip: common::Glue {
+                    width: common::Scaled::parse_from_string("5.0pt").unwrap(),
+                    ..Default::default()
+                },
+            },
+            params: Params {
+                right_skip: common::Glue {
+                    width: common::Scaled::parse_from_string("20.0pt").unwrap(),
+                    stretch: common::Scaled::parse_from_string("20.00003pt").unwrap(),
+                    ..Default::default()
+                },
+            },
+            typeset: "wolf_hall_ragged_right_margin.txt",
         ),
         (
             alice_paragraph_1_10in,

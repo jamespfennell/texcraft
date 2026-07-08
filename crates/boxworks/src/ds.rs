@@ -274,15 +274,34 @@ impl HBox {
                     // the content overflows the box.
                     // TODO(TeX.2021.666): report the overfull box and append
                     // the \overfullrule rule.
-                    hbox.glue_ratio = GlueRatio {
-                        num: -common::Scaled::ONE,
-                        den: common::Scaled::ONE,
-                    };
-                } else {
+                    if total_glue.shrink == common::Scaled::ZERO {
+                        // It doesn't look like this case exists in Knuth, but it does, subtly.
+                        // The key thing is that in the `[total_shrink]==0` branch, Knuth sets the
+                        // glue_sign to be normal (i.e., not shrinking or stretching, so zero). This
+                        // means that the assignment of 1 to the glue ratio in overfull branch does nothing
+                        // because the glue_sign being zero means the ratio is always considered zero.
+                        // This was discovered while debugging a failing unit test in the line
+                        // breaker.
+                        hbox.glue_ratio = GlueRatio {
+                            num: common::Scaled::ZERO,
+                            den: common::Scaled::ONE,
+                        };
+                    } else {
+                        hbox.glue_ratio = GlueRatio {
+                            num: common::Scaled::ONE,
+                            den: common::Scaled::ONE,
+                        };
+                    }
+                } else if total_glue.shrink != common::Scaled::ZERO {
                     hbox.glue_ratio = GlueRatio {
                         num: excess,
                         den: total_glue.shrink,
                     };
+                } else {
+                    hbox.glue_ratio = GlueRatio {
+                        num: common::Scaled::ZERO,
+                        den: common::Scaled::ONE,
+                    }
                 }
             }
             Equal => {
