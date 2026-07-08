@@ -398,21 +398,35 @@
                 font-weight: 700;
             }
 
-            #reset-btn {
-                font-family: inherit;
+            #preset-row {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: baseline;
+                gap: 0.5rem;
                 font-size: 0.8rem;
-                align-self: flex-start;
-                padding: 0.35rem 0.9rem;
-                border: 1px solid var(--separator);
-                border-radius: 4px;
-                background: var(--bg);
+                margin-bottom: 0.6rem;
+            }
+
+            .preset-btn {
+                font-family: inherit;
+                font-size: inherit;
+                padding: 0;
+                border: none;
+                background: none;
                 color: var(--text);
                 cursor: pointer;
             }
 
-            #reset-btn:hover {
-                border-color: var(--accent);
+            .preset-btn:hover {
                 color: var(--accent);
+            }
+
+            .preset-btn.active {
+                font-weight: 700;
+            }
+
+            .preset-sep {
+                color: var(--separator);
             }
 
             /* ── Output ── */
@@ -619,10 +633,14 @@
 
                 <div>
                     <div class="section-label">parameters</div>
+                    <div id="preset-row">
+                        standard settings:
+                        <button class="preset-btn" data-preset="plain">plain TeX justified (default)</button>
+                        <span class="preset-sep">|</span>
+                        <button class="preset-btn" data-preset="ragged">ragged right</button>
+                    </div>
                     <div id="param-groups" style="display: flex; flex-direction: column; gap: 0.5rem"></div>
                 </div>
-
-                <button id="reset-btn">reset to plain TeX defaults</button>
             </div>
 
             <div id="divider" title="drag to resize · double-click to reset"></div>
@@ -760,6 +778,14 @@
                         {
                             name: "par_fill_skip", def: "0pt plus 1fil", glue: true,
                             desc: "Glue that finishes the paragraph’s last line. The default infinitely stretchable glue lets the last line end anywhere; “0pt” justifies the last line too.",
+                        },
+                        {
+                            name: "space_skip", def: "0pt", glue: true,
+                            desc: "Glue between words (TeX’s \\spaceskip). If zero (the default), the font’s own interword glue is used, modified by the space factor. Try “10pt plus 5pt minus 2pt” for wide spacing.",
+                        },
+                        {
+                            name: "extra_space_skip", def: "0pt", glue: true,
+                            desc: "Glue between sentences, i.e. after a period or other punctuation that sets the space factor to 2000 or more (TeX’s \\xspaceskip). If zero (the default), the interword glue is used with the font’s extra sentence spacing added.",
                         },
                     ],
                 },
@@ -1124,6 +1150,7 @@
 
             function render() {
                 paintSliders();
+                updatePresetHighlight();
                 setElementInfo("");
                 outputError.textContent = "";
                 statsEl.textContent = "";
@@ -1386,21 +1413,57 @@
                 t.addEventListener("change", render);
             }
 
-            document.getElementById("reset-btn").addEventListener("click", () => {
+            // ── Standard settings presets ──────────────────────────────────
+
+            // Each preset gives every parameter a value: the plain TeX
+            // default unless overridden here. "ragged" is plain TeX's
+            // \raggedright macro (\rightskip=0pt plus2em \spaceskip=.3333em
+            // \xspaceskip=.5em) with 1em = 10pt for cmr10.
+            const PRESET_OVERRIDES = {
+                plain: {},
+                ragged: {
+                    right_skip: "0pt plus 20pt",
+                    space_skip: "3.33333pt",
+                    extra_space_skip: "5pt",
+                },
+            };
+
+            function presetValue(preset, name) {
+                return String(PRESET_OVERRIDES[preset][name] ?? paramInputs[name].def);
+            }
+
+            function applyPreset(preset) {
                 setForceHyphenation(false);
-                for (const [name, { input, def }] of Object.entries(paramInputs)) {
-                    input.value = def;
+                for (const [name, { input }] of Object.entries(paramInputs)) {
+                    input.value = presetValue(preset, name);
                     syncSliderToInput(name);
                     markModified(name);
                 }
-                widthSlider.value = DEFAULT_WIDTH;
-                widthNumber.value = DEFAULT_WIDTH;
                 render();
-            });
+            }
+
+            const presetBtns = document.querySelectorAll(".preset-btn");
+            for (const btn of presetBtns) {
+                btn.addEventListener("click", () => applyPreset(btn.dataset.preset));
+            }
+
+            // A preset is shown bold while every parameter has exactly its
+            // value, so any manual edit un-bolds it. Called from render().
+            function updatePresetHighlight() {
+                for (const btn of presetBtns) {
+                    const active = Object.entries(paramInputs).every(
+                        ([name, e]) =>
+                            String(e.input.value) === presetValue(btn.dataset.preset, name),
+                    );
+                    btn.classList.toggle("active", active);
+                }
+            }
 
             document.querySelector("h1").addEventListener("click", () => {
                 textInput.value = DEFAULT_TEXT;
-                document.getElementById("reset-btn").click();
+                widthSlider.value = DEFAULT_WIDTH;
+                widthNumber.value = DEFAULT_WIDTH;
+                applyPreset("plain");
             });
 
             // ── Draggable divider ──────────────────────────────────────────

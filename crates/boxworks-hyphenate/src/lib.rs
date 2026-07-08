@@ -566,7 +566,7 @@ mod tests {
 
         let lig_kern_program =
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
-        let mut tp: bwt::TextPreprocessorImpl = Default::default();
+        let mut tp = bwt::TextPreprocessorImpl::new(bwt::Params::plain_tex_defaults());
         tp.register_font(0, &tfm_file, lig_kern_program.clone());
         tp.activate_font(0);
         let mut list = vec![];

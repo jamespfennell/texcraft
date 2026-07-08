@@ -13,5 +13,8 @@ boxworks = { path = "../boxworks", features=[] }
 common = { path = "../common", features=[] }
 tfm = { path = "../tfm", features=[] }
 
+[dev-dependencies]
+boxworks-testing = { path = "../boxworks-testing" }
+
 [lints]
 workspace = true

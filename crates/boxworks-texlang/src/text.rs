@@ -3,9 +3,16 @@ use texlang::prelude as txl;
 use texlang::traits::*;
 use texlang::*;
 
-#[derive(Default)]
 pub struct Component {
     text_preprocessor: bwt::TextPreprocessorImpl,
+}
+
+impl Default for Component {
+    fn default() -> Self {
+        Self {
+            text_preprocessor: bwt::TextPreprocessorImpl::new(bwt::Params::plain_tex_defaults()),
+        }
+    }
 }
 
 /// Get the `\sfcode` command.
@@ -22,6 +29,7 @@ fn ref_fn<S: HasComponent<Component>>(state: &S, index: variable::Index) -> &i32
     state
         .component()
         .text_preprocessor
+        .params
         .space_factor_codes
         .0
         .get(index.0)
@@ -32,6 +40,7 @@ fn mut_fn<S: HasComponent<Component>>(state: &mut S, index: variable::Index) -> 
     state
         .component_mut()
         .text_preprocessor
+        .params
         .space_factor_codes
         .0
         .get_mut(index.0)

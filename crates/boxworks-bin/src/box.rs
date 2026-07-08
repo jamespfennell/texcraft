@@ -123,6 +123,20 @@ struct Hbox {
     /// Run the hyphenation algorithm on the text before boxing it.
     #[clap(long)]
     hyphenate: bool,
+
+    /// Glue between words.
+    ///
+    /// If zero (the default), TeX uses the current font's default spacing, potentially modified by the space factor.
+    ///
+    /// Corresponds to the TeX primitive \spaceskip.
+    #[clap(long)]
+    space_skip: Option<String>,
+
+    /// Extra wide glue between words - e.g. after a period.
+    ///
+    /// Corresponds to the TeX primitive \xspaceskip.
+    #[clap(long)]
+    extra_space_skip: Option<String>,
 }
 
 impl Hbox {
@@ -141,6 +155,13 @@ impl Hbox {
                 }
             }
         }
+        let mut params = boxworks_text::Params::plain_tex_defaults();
+        if let Some(ref s) = self.space_skip {
+            params.space_skip = parse_glue(s)?;
+        }
+        if let Some(ref s) = self.extra_space_skip {
+            params.extra_space_skip = parse_glue(s)?;
+        }
         let tex_engine: Option<Box<dyn bwt::TexEngine>> = if let Some(ref name) = self.tex_engine {
             Some(bwt::new_tex_engine_binary(name.clone()).map_err(|err| format!["{err}"])?)
         } else {
@@ -153,8 +174,9 @@ impl Hbox {
                 self.texts,
                 self.font_metrics,
                 self.hyphenate,
+                params,
             )?,
-            None => run_box_hboxs(self.texts, self.font_metrics, self.hyphenate)?,
+            None => run_box_hboxs(self.texts, self.font_metrics, self.hyphenate, params)?,
         };
         print_hboxs(hboxs, labels);
         Ok(())
@@ -237,6 +259,20 @@ struct Linebreak {
     #[clap(long)]
     tolerance: Option<i32>,
 
+    /// Glue between words.
+    ///
+    /// If zero (the default), TeX uses the current font's default spacing, potentially modified by the space factor.
+    ///
+    /// Corresponds to the TeX primitive \spaceskip.
+    #[clap(long)]
+    space_skip: Option<String>,
+
+    /// Extra wide glue between words - e.g. after a period.
+    ///
+    /// Corresponds to the TeX primitive \xspaceskip.
+    #[clap(long)]
+    extra_space_skip: Option<String>,
+
     /// Print the broken text instead of the box representation.
     #[clap(long)]
     output_text: bool,
@@ -254,6 +290,13 @@ impl Linebreak {
                     self.texts.push(line.to_owned());
                 }
             }
+        }
+        let mut text_params = boxworks_text::Params::plain_tex_defaults();
+        if let Some(ref s) = self.space_skip {
+            text_params.space_skip = parse_glue(s)?;
+        }
+        if let Some(ref s) = self.extra_space_skip {
+            text_params.extra_space_skip = parse_glue(s)?;
         }
 
         let mut params = boxworks_knuthplass::Params::plain_tex_defaults();
@@ -305,7 +348,7 @@ impl Linebreak {
         };
 
         let vlists = match self.tex_engine {
-            None => run_box_vlists(self.texts, self.font_metrics, &widths, &params)?,
+            None => run_box_vlists(self.texts, self.font_metrics, &widths, text_params, &params)?,
             Some(tex_engine) => {
                 let engine =
                     bwt::new_tex_engine_binary(tex_engine).map_err(|err| format!["{err}"])?;
@@ -314,6 +357,7 @@ impl Linebreak {
                     self.texts,
                     self.font_metrics,
                     &widths,
+                    text_params,
                     &params,
                 )?
             }
@@ -388,11 +432,12 @@ fn run_box_hboxs(
     texts: Vec<String>,
     font_metrics: Option<PathBuf>,
     hyphenated: bool,
+    params: boxworks_text::Params,
 ) -> Result<Vec<bwl::ast::HBox<'static>>, String> {
     let (tfm_bytes, _) = load_font_metrics(font_metrics)?;
     let mut tfm_file = tfm::File::deserialize(&tfm_bytes).0.unwrap();
     let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
-    let mut tp: boxworks_text::TextPreprocessorImpl = Default::default();
+    let mut tp = boxworks_text::TextPreprocessorImpl::new(params);
     tp.register_font(0, &tfm_file, lig_kern_program.clone());
     tp.activate_font(0);
     let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
@@ -434,8 +479,10 @@ fn run_tex_hboxs(
     texts: Vec<String>,
     font_metrics: Option<PathBuf>,
     hyphenated: bool,
+    params: boxworks_text::Params,
 ) -> Result<Vec<bwl::ast::HBox<'static>>, String> {
-    let (auxiliary_files, preamble) = build_tex_context(font_metrics)?;
+    let (auxiliary_files, mut preamble) = build_tex_context(font_metrics)?;
+    preamble.push_str(&params.tex());
     let (fonts, hboxs) = bwt::build_horizontal_lists(
         tex_engine,
         &auxiliary_files,
@@ -452,12 +499,13 @@ fn run_box_vlists(
     texts: Vec<String>,
     font_metrics: Option<PathBuf>,
     widths: &[common::Scaled],
+    text_params: boxworks_text::Params,
     params: &boxworks_knuthplass::Params,
 ) -> Result<Vec<bwl::ast::VBox<'static>>, String> {
     let (tfm_bytes, _) = load_font_metrics(font_metrics)?;
     let mut tfm_file = tfm::File::deserialize(&tfm_bytes).0.unwrap();
     let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
-    let mut tp: boxworks_text::TextPreprocessorImpl = Default::default();
+    let mut tp = boxworks_text::TextPreprocessorImpl::new(text_params);
     tp.register_font(0, &tfm_file, lig_kern_program.clone());
     tp.activate_font(0);
     let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
@@ -501,9 +549,11 @@ fn run_tex_vlists(
     texts: Vec<String>,
     font_metrics: Option<PathBuf>,
     widths: &[common::Scaled],
+    text_params: boxworks_text::Params,
     params: &boxworks_knuthplass::Params,
 ) -> Result<Vec<bwl::ast::VBox<'static>>, String> {
     let (auxiliary_files, mut preamble) = build_tex_context(font_metrics)?;
+    preamble.push_str(&text_params.tex());
     preamble.push_str(&params.tex());
     let (_, vlists) = bwt::build_vertical_lists(
         tex_engine,

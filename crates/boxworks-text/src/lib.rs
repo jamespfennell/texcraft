@@ -16,14 +16,63 @@ struct Font {
     lig_kern_program: tfm::ligkern::CompiledProgram,
 }
 
-#[derive(Default)]
+pub struct Params {
+    pub space_factor_codes: SpaceFactorCodes,
+    pub space_skip: common::Glue,
+    pub extra_space_skip: common::Glue,
+}
+
+impl Params {
+    /// Output the parameters in TeX format.
+    pub fn tex(&self) -> String {
+        let Params {
+            space_factor_codes,
+            space_skip,
+            extra_space_skip,
+        } = self;
+        _ = space_factor_codes;
+        format!(
+            r"
+            \spaceskip={space_skip}
+            \xspaceskip={extra_space_skip}
+        "
+        )
+    }
+}
+
+impl Default for Params {
+    fn default() -> Self {
+        Self::plain_tex_defaults()
+    }
+}
+
+impl Params {
+    pub fn plain_tex_defaults() -> Self {
+        Self {
+            space_factor_codes: SpaceFactorCodes::plain_tex_defaults(),
+            space_skip: common::Glue::ZERO,
+            extra_space_skip: common::Glue::ZERO,
+        }
+    }
+}
 pub struct TextPreprocessorImpl {
     fonts: Vec<Font>,
     // TODO: should be initialized to the null font
     // TODO: should current_font be some kind of specific font identifier type.
     current_font: u32,
     space_factor: SpaceFactor,
-    pub space_factor_codes: SpaceFactorCodes,
+    pub params: Params,
+}
+
+impl TextPreprocessorImpl {
+    pub fn new(params: Params) -> Self {
+        Self {
+            fonts: vec![],
+            current_font: 0,
+            space_factor: Default::default(),
+            params,
+        }
+    }
 }
 
 pub struct SpaceFactorCodes(pub [i32; 256]);
@@ -150,25 +199,36 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
         // We can change the run method to accept a callback that is invoked for
         // each character.
         for c in word.chars() {
-            self.space_factor.adjust(c, &self.space_factor_codes);
+            self.space_factor.adjust(c, &self.params.space_factor_codes);
         }
     }
 
     fn add_space(&mut self, list: &mut Vec<ds::Horizontal>) {
-        let mut g = self.fonts[self.current_font as usize].default_space;
         let g = if self.space_factor == SpaceFactor::default() {
             // TeX.2021.1041
-            // TODO: implement \spaceskip.
-            g
+            if !self.params.space_skip.is_zero() {
+                self.params.space_skip
+            } else {
+                // TeX.2021.1042
+                self.fonts[self.current_font as usize].default_space
+            }
         } else {
             // TeX.2021.1043
-            // TODO: implement "xspace skip" and \spaceskip
-            if self.space_factor.0 >= 2000 {
-                g.width += self.fonts[self.current_font as usize].extra_space;
+            if self.space_factor.0 >= 2000 && !self.params.extra_space_skip.is_zero() {
+                self.params.extra_space_skip
+            } else if !self.params.space_skip.is_zero() {
+                self.params.space_skip
+            } else {
+                // TeX.2021.1042
+                let mut g = self.fonts[self.current_font as usize].default_space;
+                // TeX.2021.1044
+                if self.space_factor.0 >= 2000 {
+                    g.width += self.fonts[self.current_font as usize].extra_space;
+                }
+                g.stretch = g.stretch.xn_over_d(self.space_factor.0, 1000).unwrap().0;
+                g.shrink = g.shrink.xn_over_d(1000, self.space_factor.0).unwrap().0;
+                g
             }
-            g.stretch = g.stretch.xn_over_d(self.space_factor.0, 1000).unwrap().0;
-            g.shrink = g.shrink.xn_over_d(1000, self.space_factor.0).unwrap().0;
-            g
         };
         list.push(ds::Horizontal::Glue(g.into()));
     }
@@ -231,22 +291,40 @@ impl boxworks::FontRepo for TfmFontRepo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use boxworks::lang as bwl;
     use boxworks::TextPreprocessor;
+    use boxworks_testing;
+    use boxworks_testing::assert_box_eq;
 
     macro_rules! preprocessor_tests {
-        ( $namespace: ident, $tfm: ident, $( ( $name: ident, $input: expr, $want: expr, ), )+ ) => {
-            mod $namespace {
-                $(
-                    #[test]
-                    fn $name() {
-                        let tfm = super::$tfm;
-                        let input = $input;
-                        let want = $want;
-                        super::run_preprocessor_test(tfm, input, want)
-                    }
-                )+
-            }
+        (
+            $namespace: ident,
+            $tfm: ident,
+            $( (
+                $name: ident,
+                $input: expr,
+                $want: expr,
+                $( params: Params {
+                    $( $param_name: ident: $param_value: expr, )+
+                }, )?
+            ), )+ ) => {
+                mod $namespace {
+                    use super::*;
+                    $(
+                        #[test]
+                        fn $name() {
+                            let tfm = super::$tfm;
+                            let input = $input;
+                            let want = $want;
+                            let params = Params {
+                                $( $(
+                                    $param_name: $param_value,
+                                )+ )?
+                                .. Params::plain_tex_defaults()
+                            };
+                            run_preprocessor_test(tfm, params, input, want)
+                        }
+                    )+
+                }
         };
     }
 
@@ -303,6 +381,27 @@ mod tests {
                 lig("\u{e}", "ffi", font=0)
             "#,
         ),
+        (
+            ragged_right,
+            "a b. c",
+            r##"
+                chars("a", font=0)
+                glue(3.33298pt, 0.0pt, 0.0pt)
+                chars("b.", font=0)
+                glue(5.0pt, 0.0pt, 0.0pt)
+                chars("c", font=0)
+            "##,
+            params: Params {
+                space_skip: common::Glue {
+                    width: common::Scaled::parse_from_string("3.33298pt").unwrap(),
+                    ..Default::default()
+                },
+                extra_space_skip: common::Glue {
+                    width: common::Scaled::parse_from_string("5.0pt").unwrap(),
+                    ..Default::default()
+                },
+            },
+        ),
     );
 
     macro_rules! spacing_tests {
@@ -318,7 +417,7 @@ mod tests {
                             {}
                             chars("a", font=0)
                         "#, $input, $want];
-                        super::run_preprocessor_test(tfm, &input, &want)
+                        super::run_preprocessor_test(tfm, Default::default(), &input, &want)
                     }
                 )+
             }
@@ -456,7 +555,6 @@ mod tests {
             "##,
         ),
         /*
-        TODO: right boundary char
         (
             numbers_end_of_word,
             "A123",
@@ -470,14 +568,12 @@ mod tests {
         */
     );
 
-    fn run_preprocessor_test(tfm_bytes: &[u8], input: &str, want: &str) {
+    fn run_preprocessor_test(tfm_bytes: &[u8], params: Params, input: &str, want: &str) {
         let mut tfm_file = tfm::File::deserialize(tfm_bytes).0.unwrap();
         let lig_kern_program =
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
 
-        let want = bwl::parse_horizontal_list(want).unwrap();
-
-        let mut tp: TextPreprocessorImpl = Default::default();
+        let mut tp = TextPreprocessorImpl::new(params);
         tp.register_font(0, &tfm_file, lig_kern_program);
         tp.activate_font(0);
         let mut got = vec![];
@@ -488,6 +584,6 @@ mod tests {
             }
         }
 
-        assert_eq!(got, want);
+        assert_box_eq!(got, want);
     }
 }

@@ -412,6 +412,13 @@ pub struct VBox {
     pub glue_order: GlueOrder,
 }
 
+impl std::fmt::Display for VBox {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use crate::lang::convert::ToBoxLang;
+        write!(f, "{}", self.to_box_lang())
+    }
+}
+
 /// A rule stands for a solid black rectangle.
 ///
 /// It has width, depth and height fields.

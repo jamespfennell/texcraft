@@ -1,0 +1,80 @@
+@firstpass
+He thinks, if you were born in Putney, you saw the river every day, and imagined
+@ via @@0 b=1 p=0 d=121
+@@1: line 1.2 t=121 -> @@0
+@secondpass
+He thinks, if you were born in Put-ney, you saw the river ev-ery day, and imag-
+@\discretionary via @@0 b=97 p=50 d=13949
+@@1: line 1.1- t=13949 -> @@0
+ined
+@ via @@0 b=1 p=0 d=121
+@@2: line 1.2 t=121 -> @@0
+it widen-ing out to the sea. Even if you had never seen the ocean you had
+@ via @@1 b=69 p=0 d=6241
+@@3: line 2.1 t=20190 -> @@1
+a
+@ via @@1 b=10 p=0 d=400
+@@4: line 2.2 t=14349 -> @@1
+pic-
+@\discretionary via @@2 b=19 p=50 d=3341
+@@5: line 2.1- t=3462 -> @@2
+ture of it in your head from what you had been told by for-eign peo-ple who
+@ via @@3 b=22 p=0 d=1024
+@ via @@4 b=106 p=0 d=23456
+@@6: line 3.1 t=21214 -> @@3
+some-
+@\discretionary via @@5 b=1 p=50 d=12621
+@@7: line 3.2- t=16083 -> @@5
+times came up-river. You knew that one day you would go out into a world
+@ via @@6 b=17 p=0 d=729
+@@8: line 4.1 t=21943 -> @@6
+of
+@ via @@7 b=124 p=0 d=27956
+@@9: line 4.0 t=44039 -> @@7
+mar-ble pave-ments and pea-cocks, of hill-sides buzzing with heat, the fra-grance
+@ via @@8 b=24 p=0 d=1156
+@ via @@9 b=168 p=0 d=31684
+@@10: line 5.1 t=23099 -> @@8
+of
+@ via @@8 b=0 p=0 d=100
+@ via @@9 b=24 p=0 d=1156
+@@11: line 5.2 t=22043 -> @@8
+crushed herbs ris-ing around you as you walked. You planned for what your
+@ via @@10 b=93 p=0 d=10609
+@@12: line 6.1 t=33708 -> @@10
+jour-
+@\discretionary via @@11 b=4 p=50 d=2696
+@@13: line 6.2- t=24739 -> @@11
+neys would bring you: the touch of warm ter-ra-cotta, the night sky of an-
+@\discretionary via @@12 b=158 p=50 d=30724
+@@14: line 7.0- t=64432 -> @@12
+other
+@ via @@12 b=1 p=0 d=121
+@ via @@13 b=122 p=0 d=27424
+@@15: line 7.2 t=33829 -> @@12
+cli-
+@\discretionary via @@13 b=1 p=50 d=12621
+@@16: line 7.2- t=37360 -> @@13
+mate, alien flow-ers, the stone eyed gaze of other peo-ples saints. But if
+@ via @@14 b=77 p=0 d=7569
+@@17: line 8.1 t=72001 -> @@14
+you were
+@ via @@15 b=0 p=0 d=100
+@ via @@16 b=24 p=0 d=1156
+@@18: line 8.1 t=38516 -> @@16
+@@19: line 8.2 t=33929 -> @@15
+born in Aslock-ton, in flat fields un-der a wide sky, you might just be
+@ via @@17 b=136 p=0 d=21316
+@@20: line 9.0 t=93317 -> @@17
+able
+@ via @@17 b=0 p=0 d=100
+@@21: line 9.2 t=72101 -> @@17
+to imag-
+@\discretionary via @@18 b=0 p=50 d=2600
+@\discretionary via @@19 b=0 p=50 d=2600
+@@22: line 9.2- t=36529 -> @@19
+ine Cam-bridge: no far-ther.
+@\par via @@20 b=0 p=-10000 d=10100
+@\par via @@21 b=0 p=-10000 d=100
+@\par via @@22 b=0 p=-10000 d=5100
+@@23: line 10.2- t=41629 -> @@22

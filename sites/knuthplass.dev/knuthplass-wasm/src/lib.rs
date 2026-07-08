@@ -21,8 +21,9 @@ const LINE_SKIP_LIMIT_PT: f64 = 0.0;
 /// Breaks a paragraph of text into lines and returns the typeset result as JSON.
 ///
 /// `params_json` holds the fields of [`boxworks_knuthplass::Params`] plus
-/// `width_pt`; omitted fields take their plain TeX default values. Glue
-/// parameters are strings in TeX glue syntax, e.g. `"0pt plus 1fil"`.
+/// `width_pt` and the [`boxworks_text::Params`] glue fields `space_skip` and
+/// `extra_space_skip`; omitted fields take their plain TeX default values.
+/// Glue parameters are strings in TeX glue syntax, e.g. `"0pt plus 1fil"`.
 ///
 /// Note: the line breaker panics if no feasible solution exists within
 /// `tolerance` (the emergency pass is not yet implemented). A panic surfaces
@@ -55,6 +56,8 @@ struct ParamsInput {
     par_fill_skip: Option<String>,
     pre_tolerance: Option<i32>,
     right_skip: Option<String>,
+    space_skip: Option<String>,
+    extra_space_skip: Option<String>,
     tolerance: Option<i32>,
 }
 
@@ -145,7 +148,14 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
     let (tfm_result, _) = tfm::File::deserialize(CMR10_TFM);
     let mut tfm_file = tfm_result.map_err(|err| format!("{err:?}"))?;
     let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
-    let mut tp: boxworks_text::TextPreprocessorImpl = Default::default();
+    let mut text_params = boxworks_text::Params::plain_tex_defaults();
+    if let Some(ref s) = input.space_skip {
+        text_params.space_skip = parse_glue(s)?;
+    }
+    if let Some(ref s) = input.extra_space_skip {
+        text_params.extra_space_skip = parse_glue(s)?;
+    }
+    let mut tp = boxworks_text::TextPreprocessorImpl::new(text_params);
     tp.register_font(0, &tfm_file, lig_kern_program.clone());
     tp.activate_font(0);
     let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
@@ -284,10 +294,7 @@ fn build_output(v_list: &[ds::Vertical], font_repo: &boxworks_text::TfmFontRepo)
 }
 
 /// Returns the elements of the line and the x position at which they end.
-fn build_elements(
-    hbox: &ds::HBox,
-    font_repo: &boxworks_text::TfmFontRepo,
-) -> (Vec<Element>, f64) {
+fn build_elements(hbox: &ds::HBox, font_repo: &boxworks_text::TfmFontRepo) -> (Vec<Element>, f64) {
     use boxworks::FontRepo;
     let mut elements = vec![];
     let mut x_pt = 0.0;
@@ -530,6 +537,46 @@ mod tests {
     }
 
     #[test]
+    fn space_skip_replaces_interword_glue() {
+        let default = run("a b", r#"{"width_pt":500}"#);
+        let custom = run(
+            "a b",
+            r#"{"width_pt":500,"space_skip":"20pt plus 5pt minus 2pt"}"#,
+        );
+        let glue_natural = |v: &serde_json::Value| -> f64 {
+            v["lines"][0]["elements"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|e| e["type"] == "glue")
+                .unwrap()["natural_pt"]
+                .as_f64()
+                .unwrap()
+        };
+        assert_ne!(glue_natural(&default), 20.0);
+        assert_eq!(glue_natural(&custom), 20.0);
+    }
+
+    #[test]
+    fn extra_space_skip_applies_after_periods() {
+        // The space after the period has space factor >= 2000, so
+        // extra_space_skip replaces it; the space between "a b" is unaffected.
+        let v = run("end. a b", r#"{"width_pt":500,"extra_space_skip":"30pt"}"#);
+        let naturals: Vec<f64> = v["lines"][0]["elements"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|e| e["type"] == "glue")
+            .map(|e| e["natural_pt"].as_f64().unwrap())
+            .collect();
+        // The first two glues are the word spaces; the rest are zero-width
+        // line glues (right_skip, par_fill_skip).
+        assert_eq!(naturals[0], 30.0, "{naturals:?}");
+        assert!(naturals[1] > 0.0, "{naturals:?}");
+        assert_ne!(naturals[1], 30.0, "{naturals:?}");
+    }
+
+    #[test]
     fn narrower_width_gives_more_lines() {
         let narrow = run(ALICE, r#"{"width_pt":150}"#);
         let wide = run(ALICE, r#"{"width_pt":400}"#);
@@ -589,4 +636,3 @@ fn parse_scaled_inf(s: &str) -> Result<(common::Scaled, common::GlueOrder), Stri
         common::GlueOrder::Normal,
     ))
 }
-

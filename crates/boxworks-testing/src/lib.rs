@@ -51,6 +51,15 @@ macro_rules! assert_box_eq {
     }};
 }
 
+#[macro_export]
+macro_rules! is_box_eq {
+    ($left:expr, $right:expr$(,)?) => {{
+        let lhs: boxworks_testing::Value = $left.into();
+        let rhs: boxworks_testing::Value = $right.into();
+        boxworks_testing::is_eq(lhs, rhs)
+    }};
+}
+
 pub enum Value {
     String(String),
     Box(Vec<ds::Horizontal>),
@@ -84,6 +93,12 @@ impl From<Vec<ds::Horizontal>> for Value {
     fn from(value: Vec<ds::Horizontal>) -> Self {
         Value::Box(value)
     }
+}
+
+pub fn is_eq(lhs: Value, rhs: Value) -> bool {
+    let (lhs_list, _) = normalize(lhs, "lhs.box");
+    let (rhs_list, _) = normalize(rhs, "rhs.box");
+    lhs_list == rhs_list
 }
 
 pub fn assert_eq(lhs: Value, rhs: Value) {

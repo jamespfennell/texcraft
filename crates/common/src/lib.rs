@@ -329,7 +329,7 @@ impl ScaledUnit {
     /// Parses a unit from a two character abbreviation.
     ///
     /// E.g., `"pc"` is parsed to [`ScaledUnit::Pica`].
-    /// These are abreviations are defined in TeX.2021.458 and chapter 10 of the TeX book.
+    /// These are abbreviations are defined in TeX.2021.458 and chapter 10 of the TeX book.
     pub fn parse(s: &str) -> Option<Self> {
         use ScaledUnit::*;
         Some(match s {

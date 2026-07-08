@@ -174,6 +174,22 @@ impl Diffs {
     }
 }
 
+impl std::ops::Add for Diffs {
+    type Output = Diffs;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Diffs {
+            width: self.width + rhs.width,
+            shrinkability: self.shrinkability + rhs.shrinkability,
+            stretchabilities: [
+                self.stretchabilities[0] + rhs.stretchabilities[0],
+                self.stretchabilities[1] + rhs.stretchabilities[1],
+                self.stretchabilities[2] + rhs.stretchabilities[2],
+                self.stretchabilities[3] + rhs.stretchabilities[3],
+            ],
+        }
+    }
+}
 // TeX.2021.819
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ActiveNode {
@@ -426,16 +442,17 @@ impl<'a> LineBreaker<'a> {
             previous_node_index: 0,
         }];
 
+        let background = {
+            // TeX.2021.827
+            let mut b: Diffs = Default::default();
+            b.update_from_glue(&self.params.left_skip);
+            b.update_from_glue(&self.params.right_skip);
+            b
+        };
         let mut active_nodes = VecDeque::<ActiveNode>::from([
             // TeX.2021.864
             ActiveNode {
-                diffs: {
-                    // TeX.2021.827
-                    let mut d: Diffs = Default::default();
-                    d.update_from_glue(&self.params.left_skip);
-                    d.update_from_glue(&self.params.right_skip);
-                    d
-                },
+                diffs: Default::default(),
                 fitness_class: FitnessClass::Decent,
                 hyphenated: false,
                 line_number: 0,
@@ -443,6 +460,7 @@ impl<'a> LineBreaker<'a> {
                 total_demerits: 0,
             },
         ]);
+        // TeX.2021.864
         let mut diffs: Diffs = Default::default();
         // This is the loop in TeX.2021.863
         for i in 0..=list.len() {
@@ -589,13 +607,19 @@ impl<'a> LineBreaker<'a> {
                     let actual_line_width_no_stretching =
                         diffs.width - active_node.diffs.width + Scaled64(disc_width.0 as i64);
                     let line_diffs = Diffs {
-                        width: ideal_line_width - actual_line_width_no_stretching,
-                        shrinkability: diffs.shrinkability - active_node.diffs.shrinkability,
+                        width: ideal_line_width - actual_line_width_no_stretching
+                            + background.width,
+                        shrinkability: diffs.shrinkability - active_node.diffs.shrinkability
+                            + background.shrinkability,
                         stretchabilities: [
-                            diffs.stretchabilities[0] - active_node.diffs.stretchabilities[0],
-                            diffs.stretchabilities[1] - active_node.diffs.stretchabilities[1],
-                            diffs.stretchabilities[2] - active_node.diffs.stretchabilities[2],
-                            diffs.stretchabilities[3] - active_node.diffs.stretchabilities[3],
+                            diffs.stretchabilities[0] - active_node.diffs.stretchabilities[0]
+                                + background.stretchabilities[0],
+                            diffs.stretchabilities[1] - active_node.diffs.stretchabilities[1]
+                                + background.stretchabilities[1],
+                            diffs.stretchabilities[2] - active_node.diffs.stretchabilities[2]
+                                + background.stretchabilities[2],
+                            diffs.stretchabilities[3] - active_node.diffs.stretchabilities[3]
+                                + background.stretchabilities[3],
                         ],
                     };
 
@@ -918,6 +942,12 @@ mod tests {
                 $name: ident,
                 $input: expr,
                 $width: expr,
+                $( text_params: boxworks_text::Params {
+                    $( $text_param_name: ident: $text_param_value: expr, )+
+                }, )?
+                $( params: Params {
+                    $( $param_name: ident: $param_value: expr, )+
+                }, )?
                 $( typeset: $want: expr, )?
                 $( log: $want_log: expr, )?
             ), )+
@@ -929,31 +959,56 @@ mod tests {
                     $(
                     #[test]
                     fn typeset() {
+                        let input_file = concat!(env!("CARGO_MANIFEST_DIR"), "/testdata/", $want);
                         let want = include_str!(concat!("../testdata/", $want));
                         let width = $width;
                         run_test(
                             TFM_CMR10,
                             INPUT,
+                            input_file,
                             want,
                             width,
+                            text_params(),
+                            params(),
                         );
                     }
                     )?
                     $(
                     #[test]
                     fn log() {
+                        let log_file = concat!(env!("CARGO_MANIFEST_DIR"), "/testdata/", $want_log);
                         let want_log = include_str!(concat!("../testdata/", $want_log));
                         let width = $width;
                         run_log_test(
                             TFM_CMR10,
                             INPUT,
+                            log_file,
                             want_log,
                             width,
+                            text_params(),
+                            params(),
                         );
                     }
                     )?
-                }
 
+                    fn text_params() -> boxworks_text::Params {
+                        boxworks_text::Params {
+                            $( $(
+                                $text_param_name: $text_param_value,
+                            )+ )?
+                            .. boxworks_text::Params::plain_tex_defaults()
+                        }
+                    }
+
+                    fn params() -> Params {
+                        Params {
+                            $( $(
+                                $param_name: $param_value,
+                            )+ )?
+                            .. Params::plain_tex_defaults()
+                        }
+                    }
+                }
             )+
         };
     }
@@ -980,6 +1035,29 @@ mod tests {
             typeset: "wolf_hall_2in_want.txt",
         ),
         (
+            wolf_hall_ragged_right,
+            "wolf_hall_input.txt",
+            "5in",
+            text_params: boxworks_text::Params {
+                space_skip: common::Glue {
+                    width: common::Scaled::parse_from_string("3.33298pt").unwrap(),
+                    ..Default::default()
+                },
+                extra_space_skip: common::Glue {
+                    width: common::Scaled::parse_from_string("5.0pt").unwrap(),
+                    ..Default::default()
+                },
+            },
+            params: Params {
+                right_skip: common::Glue {
+                    stretch: common::Scaled::parse_from_string("20.00003pt").unwrap(),
+                    ..Default::default()
+                },
+            },
+            typeset: "wolf_hall_ragged_right.txt",
+            log: "wolf_hall_ragged_right_log.txt",
+        ),
+        (
             alice_paragraph_1_10in,
             "alice_paragraph_1.txt",
             "10in",
@@ -995,11 +1073,17 @@ mod tests {
         ),
     );
 
-    fn run(tfm_bytes: &[u8], input: &str, width: &str) -> (ds::VBox, String) {
+    fn run(
+        tfm_bytes: &[u8],
+        input: &str,
+        width: &str,
+        text_params: boxworks_text::Params,
+        params: Params,
+    ) -> (ds::VBox, String) {
         let mut tfm_file = tfm::File::deserialize(tfm_bytes).0.unwrap();
         let lig_kern_program =
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
-        let mut tp: bwt::TextPreprocessorImpl = Default::default();
+        let mut tp = bwt::TextPreprocessorImpl::new(text_params);
         tp.register_font(0, &tfm_file, lig_kern_program.clone());
         tp.activate_font(0);
         let mut list = vec![];
@@ -1011,7 +1095,6 @@ mod tests {
         let mut font_repo: bwt::TfmFontRepo = Default::default();
         font_repo.register_font(0, tfm_file);
         let width = common::Scaled::parse_from_string(width).unwrap();
-        let params = Params::plain_tex_defaults();
 
         let log: Rc<RefCell<String>> = Default::default();
         let mut logger = debug::TexLogger::new(log.clone());
@@ -1036,39 +1119,59 @@ mod tests {
         (v_box, log.take())
     }
 
-    fn run_test(tfm_bytes: &[u8], input: &str, want: &str, width: &str) {
+    fn run_test(
+        tfm_bytes: &[u8],
+        input: &str,
+        input_file: &str,
+        want: &str,
+        width: &str,
+        text_params: boxworks_text::Params,
+        params: Params,
+    ) {
         if verify_with_tex() {
-            verify_want_against_tex(tfm_bytes, input, want, width);
+            let (vlist, _) = run_tex(tfm_bytes, input, width, text_params, params);
+            if std::env::var("TEXCRAFT_VERIFY_OVERWRITE").unwrap_or_default() == "true" {
+                if !boxworks_testing::is_box_eq!(want, vlist.clone()) {
+                    std::fs::write(input_file, format!["{vlist}"]).unwrap();
+                }
+            } else {
+                boxworks_testing::assert_box_eq!(want, vlist);
+            }
             return;
         }
-        let (got, _) = run(tfm_bytes, input, width);
+        let (got, _) = run(tfm_bytes, input, width, text_params, params);
         boxworks_testing::assert_box_eq!(want, got);
     }
 
-    fn run_log_test(tfm_bytes: &[u8], input: &str, want_log: &str, width: &str) {
+    fn run_log_test(
+        tfm_bytes: &[u8],
+        input: &str,
+        log_file: &str,
+        want_log: &str,
+        width: &str,
+        text_params: boxworks_text::Params,
+        params: Params,
+    ) {
         if verify_with_tex() {
-            let (_, stdout) = run_tex(tfm_bytes, input, width);
+            let (_, stdout) = run_tex(tfm_bytes, input, width, text_params, params);
             let trace = extract_paragraph_trace(&stdout);
-            assert_eq!(normalize(want_log), normalize(&trace));
+            let want = normalize(want_log);
+            let got = normalize(&trace);
+            if std::env::var("TEXCRAFT_VERIFY_OVERWRITE").unwrap_or_default() == "true" {
+                if want != got {
+                    std::fs::write(log_file, got).unwrap();
+                }
+            } else {
+                assert_eq!(want, got);
+            }
             return;
         }
-        let (_, got_log) = run(tfm_bytes, input, width);
+        let (_, got_log) = run(tfm_bytes, input, width, text_params, params);
         assert_eq!(normalize(want_log), normalize(&got_log));
     }
 
     fn verify_with_tex() -> bool {
         std::env::var("TEXCRAFT_VERIFY").unwrap_or_default() == "tex"
-    }
-
-    /// Verifies that the expected output in the testdata directory matches
-    /// what TeX actually produces. Run with `TEXCRAFT_VERIFY=tex cargo test`;
-    /// requires a `tex` binary on the path.
-    ///
-    /// This runs the same pipeline that generates the testdata files
-    /// (`box linebreak --tex-engine=tex`, see the testdata README).
-    fn verify_want_against_tex(tfm_bytes: &[u8], input: &str, want: &str, width: &str) {
-        let (vlist, _) = run_tex(tfm_bytes, input, width);
-        boxworks_testing::assert_box_eq!(want, vlist);
     }
 
     /// A [`boxworks::tex::TexEngine`] that records the terminal output of the
@@ -1093,7 +1196,13 @@ mod tests {
 
     /// Runs TeX on the input and returns the resulting vertical list and the
     /// raw terminal output.
-    fn run_tex(tfm_bytes: &[u8], input: &str, width: &str) -> (ds::VBox, String) {
+    fn run_tex(
+        tfm_bytes: &[u8],
+        input: &str,
+        width: &str,
+        text_params: boxworks_text::Params,
+        params: Params,
+    ) -> (ds::VBox, String) {
         use std::collections::HashMap;
         use std::path::PathBuf;
 
@@ -1111,8 +1220,10 @@ mod tests {
 
             \customFont
             {}
+            {}
             ",
-            Params::plain_tex_defaults().tex(),
+            text_params.tex(),
+            params.tex(),
         ];
 
         // By default TeX wraps terminal output at 79 characters, which would
