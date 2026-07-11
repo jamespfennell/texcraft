@@ -597,11 +597,8 @@ impl<'a> LineBreaker<'a> {
 
             let mut n = active_nodes.len();
             while n > 0 {
-                // TODO: when we implement looseness this while loop will run for every line class,
-                // and m will be the number of elements in the class.
-                let mut m = n;
-                let line_width = *self.line_widths.first().unwrap();
-                n = 0;
+                let (mut m, line_width) = self.determine_class(&active_nodes, n);
+                n -= m;
 
                 // TeX.2021.833
                 #[derive(Clone, Copy, Debug)]
@@ -895,6 +892,40 @@ impl<'a> LineBreaker<'a> {
         }
         d
     }
+
+    fn determine_class(
+        &self,
+        active_nodes: &VecDeque<ActiveNode>,
+        k: usize,
+    ) -> (usize, common::Scaled) {
+        let first_active_node = active_nodes.front().expect("active nodes are non-empty");
+        let prev_line_number = first_active_node.line_number;
+        if prev_line_number + 1 >= self.line_widths.len() {
+            // This covers the last class of active nodes whose widths are all the same.
+            return (k, *self.line_widths.last().unwrap());
+        }
+        (
+            active_nodes
+                .iter()
+                .zip(0..k) // TODO, better way?
+                .take_while(|(active_node, _)| {
+                    active_node.line_number == first_active_node.line_number
+                })
+                .count(),
+            self.line_widths[prev_line_number],
+        )
+        // get all the nodes with the same line number
+        // OR line number
+        //
+        // The width is self.line_widths[active_nodes[0].line_number]
+        // If active_nodes[0].line_number >= self.line_widths.len() - 1, then
+        // it's the same class. Note in the self.line_widths = [a], it's all
+        // the same class
+        // TODO: when we implement looseness this while loop will run for every line class,
+        // and m will be the number of elements in the class.
+        //
+        // (active_nodes.len(), *self.line_widths.last().unwrap())
+    }
 }
 
 // TeX.2021.833
@@ -944,7 +975,7 @@ mod tests {
             $( (
                 $name: ident,
                 $input: expr,
-                $width: expr,
+                $widths: expr,
                 $( text_params: boxworks_text::Params {
                     $( $text_param_name: ident: $text_param_value: expr, )+
                 }, )?
@@ -964,13 +995,13 @@ mod tests {
                     fn typeset() {
                         let input_file = concat!(env!("CARGO_MANIFEST_DIR"), "/testdata/", $want);
                         let want = include_str!(concat!("../testdata/", $want));
-                        let width = $width;
+                        let widths = $widths;
                         run_test(
                             TFM_CMR10,
                             INPUT,
                             input_file,
                             want,
-                            width,
+                            widths,
                             text_params(),
                             params(),
                         );
@@ -981,13 +1012,13 @@ mod tests {
                     fn log() {
                         let log_file = concat!(env!("CARGO_MANIFEST_DIR"), "/testdata/", $want_log);
                         let want_log = include_str!(concat!("../testdata/", $want_log));
-                        let width = $width;
+                        let widths = $widths;
                         run_log_test(
                             TFM_CMR10,
                             INPUT,
                             log_file,
                             want_log,
-                            width,
+                            widths,
                             text_params(),
                             params(),
                         );
@@ -1020,27 +1051,36 @@ mod tests {
         (
             wolf_hall_5in,
             "wolf_hall_input.txt",
-            "5in",
+            &["5in"],
             typeset: "wolf_hall_5in_want.txt",
             log: "wolf_hall_5in_log.txt",
         ),
         (
             wolf_hall_3in,
             "wolf_hall_input.txt",
-            "3in",
+            &["3in"],
             typeset: "wolf_hall_3in_want.txt",
             log: "wolf_hall_3in_log.txt",
         ),
         (
             wolf_hall_2in,
             "wolf_hall_input.txt",
-            "2in",
+            &["2in"],
             typeset: "wolf_hall_2in_want.txt",
+        ),
+        (
+            wolf_hall_variable_widths,
+            "wolf_hall_input.txt",
+            &["5in", "4in", "3in", "4in"],
+            typeset: "wolf_hall_variable_widths_want.txt",
+            // TODO: figure out why the log lines are not in the right
+            // order and enable this test.
+            // log: "wolf_hall_variable_widths_log.txt",
         ),
         (
             wolf_hall_ragged_right,
             "wolf_hall_input.txt",
-            "5in",
+            &["5in"],
             text_params: boxworks_text::Params {
                 space_skip: common::Glue {
                     width: common::Scaled::parse_from_string("3.33298pt").unwrap(),
@@ -1063,7 +1103,7 @@ mod tests {
         (
             wolf_hall_ragged_right_margin,
             "wolf_hall_input.txt",
-            "5in",
+            &["5in"],
             text_params: boxworks_text::Params {
                 space_skip: common::Glue {
                     width: common::Scaled::parse_from_string("3.33298pt").unwrap(),
@@ -1086,14 +1126,14 @@ mod tests {
         (
             alice_paragraph_1_10in,
             "alice_paragraph_1.txt",
-            "10in",
+            &["10in"],
             typeset: "alice_paragraph_1_want.txt",
             log: "alice_paragraph_1_log.txt",
         ),
         (
             alice_paragraph_2_10in,
             "alice_paragraph_2.txt",
-            "10in",
+            &["10in"],
             typeset: "alice_paragraph_2_want.txt",
             log: "alice_paragraph_2_log.txt",
         ),
@@ -1102,7 +1142,7 @@ mod tests {
     fn run(
         tfm_bytes: &[u8],
         input: &str,
-        width: &str,
+        widths: &[&str],
         text_params: boxworks_text::Params,
         params: Params,
     ) -> (ds::VBox, String) {
@@ -1120,7 +1160,7 @@ mod tests {
 
         let mut font_repo: bwt::TfmFontRepo = Default::default();
         font_repo.register_font(0, tfm_file);
-        let width = common::Scaled::parse_from_string(width).unwrap();
+        let widths = parse_widths(widths);
 
         let log: Rc<RefCell<String>> = Default::default();
         let mut logger = debug::TexLogger::new(log.clone());
@@ -1129,7 +1169,7 @@ mod tests {
 
         let line_breaker = super::LineBreaker {
             params: &params,
-            line_widths: &[width],
+            line_widths: &widths,
             line_indents: &[],
             debug_logger: Some(&mut logger),
             hyphenator: &hyphenator,
@@ -1150,12 +1190,12 @@ mod tests {
         input: &str,
         input_file: &str,
         want: &str,
-        width: &str,
+        widths: &[&str],
         text_params: boxworks_text::Params,
         params: Params,
     ) {
         if verify_with_tex() {
-            let (vlist, _) = run_tex(tfm_bytes, input, width, text_params, params);
+            let (vlist, _) = run_tex(tfm_bytes, input, widths, text_params, params);
             if std::env::var("TEXCRAFT_VERIFY_OVERWRITE").unwrap_or_default() == "true" {
                 if !boxworks_testing::is_box_eq!(want, vlist.clone()) {
                     std::fs::write(input_file, format!["{vlist}"]).unwrap();
@@ -1165,7 +1205,7 @@ mod tests {
             }
             return;
         }
-        let (got, _) = run(tfm_bytes, input, width, text_params, params);
+        let (got, _) = run(tfm_bytes, input, widths, text_params, params);
         boxworks_testing::assert_box_eq!(want, got);
     }
 
@@ -1174,12 +1214,12 @@ mod tests {
         input: &str,
         log_file: &str,
         want_log: &str,
-        width: &str,
+        widths: &[&str],
         text_params: boxworks_text::Params,
         params: Params,
     ) {
         if verify_with_tex() {
-            let (_, stdout) = run_tex(tfm_bytes, input, width, text_params, params);
+            let (_, stdout) = run_tex(tfm_bytes, input, widths, text_params, params);
             let trace = extract_paragraph_trace(&stdout);
             let want = normalize(want_log);
             let got = normalize(&trace);
@@ -1192,8 +1232,15 @@ mod tests {
             }
             return;
         }
-        let (_, got_log) = run(tfm_bytes, input, width, text_params, params);
+        let (_, got_log) = run(tfm_bytes, input, widths, text_params, params);
         assert_eq!(normalize(want_log), normalize(&got_log));
+    }
+
+    fn parse_widths(widths: &[&str]) -> Vec<common::Scaled> {
+        widths
+            .iter()
+            .map(|w| common::Scaled::parse_from_string(w).unwrap())
+            .collect()
     }
 
     fn verify_with_tex() -> bool {
@@ -1225,7 +1272,7 @@ mod tests {
     fn run_tex(
         tfm_bytes: &[u8],
         input: &str,
-        width: &str,
+        widths: &[&str],
         text_params: boxworks_text::Params,
         params: Params,
     ) -> (ds::VBox, String) {
@@ -1257,7 +1304,7 @@ mod tests {
         // unwrapped, so raise the limit; the spawned tex process inherits it.
         std::env::set_var("max_print_line", "10000");
 
-        let width = common::Scaled::parse_from_string(width).unwrap();
+        let widths = parse_widths(widths);
         let engine = RecordingTexEngine {
             inner: boxworks::tex::new_tex_engine_binary("tex".to_string()).unwrap(),
             stdout: Default::default(),
@@ -1267,7 +1314,7 @@ mod tests {
             &engine,
             &auxiliary_files,
             &preamble,
-            &[width],
+            &widths,
             &mut texts.iter(),
         );
         let [vlist]: [ds::VBox; 1] = vlists.try_into().expect("one text in, one vlist out");
