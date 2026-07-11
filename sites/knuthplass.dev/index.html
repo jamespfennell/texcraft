@@ -7,10 +7,12 @@
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
-            href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:wght@400;600&display=swap"
             rel="stylesheet"
         />
         <style>
+            /* Latin Modern is used only inside the galley — it is the one
+               font Boxworks supports today, not a branding choice. */
             @font-face {
                 font-family: "Latin Modern Roman";
                 src: url("./fonts/lmroman10-regular.otf") format("opentype");
@@ -25,13 +27,23 @@
                 --text: #243330;
                 --muted: #4f5e5a;
                 --accent: #0f766e;
+                --accent-strong: #094f4a;
                 --separator: #b5cec7;
+                /* Teal fill for engaged toggle chips — the palette's mid
+                   teal (same as --separator), dark enough to stand off the
+                   paper, light enough for ink text. */
+                --chip-bg: #b5cec7;
 
-                --glue-fill: #d8f0de;
-                --kern-pos-fill: #ffe89e;
-                --kern-neg-fill: #ffc2c2;
-                --lig-fill: #c5d3ff;
+                /* Vivid overlay colors: kerns are green (positive) and red
+                   (negative); glue amber; ligatures indigo. */
+                --glue-fill: #f59e0b;
+                --kern-pos-fill: #16a34a;
+                --kern-neg-fill: #dc2626;
+                --lig-fill: #6366f1;
                 --error-text: #c0392b;
+
+                --sans: "Inter", sans-serif;
+                --mono: "JetBrains Mono", monospace;
             }
 
             *,
@@ -45,20 +57,29 @@
             body {
                 background-color: var(--bg);
                 color: var(--text);
-                font-family: "Inter", sans-serif;
+                font-family: var(--sans);
                 height: 100vh;
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;
             }
 
+            :focus-visible {
+                outline: 2px solid var(--accent);
+                outline-offset: 1px;
+            }
+
             /* ── Header ── */
 
+            /* Header and panels run flush to the browser edges; the divider
+               line runs from the dark masthead band to the bottom edge. */
             header {
                 display: flex;
-                align-items: baseline;
+                align-items: center;
                 gap: 1rem;
-                padding: 1rem 1.5rem 0.75rem;
+                padding: 0.85rem 1.25rem 0.6rem;
+                background: var(--accent);
+                color: #f6f1ea;
             }
 
             #attribution {
@@ -73,15 +94,15 @@
             }
 
             h1 {
-                font-size: 1.6rem;
-                font-weight: 500;
-                color: var(--accent);
+                font-size: 1.75rem;
+                font-weight: 400;
+                color: #ffffff;
                 cursor: pointer;
             }
 
             #tagline {
                 font-size: 0.85rem;
-                color: var(--muted);
+                color: inherit;
             }
 
             /* ── Split layout ── */
@@ -90,57 +111,54 @@
                 flex: 1;
                 min-height: 0;
                 display: flex;
-                padding: 0 1.5rem 1.25rem;
             }
 
+            /* The controls sit directly on the paper background — no card.
+               Structure comes from section heads and hairline rules. */
             #controls {
                 flex: 1 1 0;
                 min-width: 0;
                 overflow-y: auto;
-                background: var(--surface);
-                border: 1px solid var(--separator);
-                border-radius: 8px;
-                padding: 1rem 1.25rem;
+                padding: 1rem 1rem 1.25rem 1.25rem;
                 display: flex;
                 flex-direction: column;
-                gap: 1rem;
+                gap: 1.4rem;
             }
 
+            /* The divider is the 1px teal line itself, so both panels (and
+               the controls scrollbar) run flush up to it. It darkens while
+               resizing. */
             #divider {
-                flex: 0 0 1.25rem;
+                flex: 0 0 1px;
                 cursor: col-resize;
                 position: relative;
                 touch-action: none;
+                background: var(--accent);
             }
 
-            #divider::after {
+            #divider:hover,
+            #divider.dragging {
+                background: var(--accent-strong);
+            }
+
+            /* Invisible grab area beyond the 1px line, biased toward the
+               galley side so it never covers the controls scrollbar. */
+            #divider::before {
                 content: "";
                 position: absolute;
                 top: 0;
                 bottom: 0;
-                left: 50%;
-                width: 2px;
-                transform: translateX(-50%);
-                border-radius: 1px;
-                background: transparent;
-            }
-
-            #divider:hover::after,
-            #divider.dragging::after {
-                background: var(--accent);
+                left: -4px;
+                right: -14px;
             }
 
             #output-panel {
                 flex: 1 1 0;
                 min-width: 0;
                 min-height: 0;
-                background: var(--surface);
-                border: 1px solid var(--separator);
-                border-radius: 8px;
-                padding: 1rem 1.25rem;
+                padding-top: 1rem;
                 display: flex;
                 flex-direction: column;
-                gap: 0.75rem;
             }
 
             .section-label {
@@ -149,27 +167,44 @@
                 text-transform: uppercase;
                 letter-spacing: 0.07em;
                 color: var(--accent);
-                margin-bottom: 0.4rem;
+                margin-bottom: 0.45rem;
+            }
+
+            /* Variant for a section label used inline in a flex row. */
+            .section-label.inline {
+                margin: 0;
+            }
+
+            /* Shrink-wrap a label so its tooltip underline hugs the text. */
+            .section-label.fit {
+                width: fit-content;
+            }
+
+            #param-groups {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
             }
 
             /* ── Controls ── */
 
+            /* The input is prose, not code: set it in the UI face. */
             #text-input {
-                font-size: 0.85rem;
-                font-family: monospace;
+                font-size: 0.88rem;
+                font-family: var(--sans);
+                line-height: 1.5;
                 width: 100%;
-                min-height: 22rem;
+                min-height: 16rem;
                 padding: 0.5rem 0.75rem;
                 border: 1px solid var(--separator);
-                border-radius: 4px;
+                border-radius: 0;
                 background: var(--surface);
                 color: var(--text);
                 resize: vertical;
-                outline: none;
             }
 
-            #text-input:focus {
-                border-color: var(--accent);
+            #text-input:focus-visible {
+                outline-offset: -1px;
             }
 
             #width-row {
@@ -188,17 +223,15 @@
                 width: 4.5rem;
             }
 
-            details {
-                border: 1px solid var(--separator);
-                border-radius: 4px;
-            }
-
-            summary {
-                font-size: 0.8rem;
+            /* Parameter groups are flat and always open: a subhead over a
+               hairline rule, then the grid. */
+            .param-group-title {
+                font-size: 0.78rem;
                 font-weight: 600;
-                padding: 0.45rem 0.75rem;
-                cursor: pointer;
-                user-select: none;
+                color: var(--text);
+                border-bottom: 1px solid var(--separator);
+                padding-bottom: 0.3rem;
+                margin-bottom: 0.55rem;
             }
 
             .param-grid {
@@ -206,12 +239,12 @@
                 grid-template-columns: auto 1fr 4.5rem;
                 align-items: center;
                 gap: 0.45rem 0.75rem;
-                padding: 0.25rem 0.75rem 0.75rem;
+                padding: 0 0 0.25rem;
             }
 
             .param-grid label {
-                font-size: 0.78rem;
-                font-family: monospace;
+                font-size: 0.82rem;
+                font-family: var(--mono);
             }
 
             /* Scale rows occupy only the slider column; make sure the next
@@ -272,9 +305,9 @@
                 grid-column: 2;
                 position: relative;
                 height: 1.35rem;
-                font-size: 0.62rem;
-                font-family: monospace;
-                color: var(--muted);
+                font-size: 0.66rem;
+                font-family: var(--mono);
+                color: var(--text);
                 margin-bottom: -0.35rem;
             }
 
@@ -338,8 +371,8 @@
                 display: flex;
                 align-items: center;
                 gap: 0.4rem;
-                font-size: 0.78rem;
-                font-family: monospace;
+                font-size: 0.82rem;
+                font-family: var(--mono);
                 cursor: pointer;
                 user-select: none;
             }
@@ -363,9 +396,8 @@
                 background: var(--surface);
                 color: var(--text);
                 border: 1px solid var(--separator);
-                border-radius: 4px;
                 padding: 0.5rem 0.65rem;
-                font-size: 0.75rem;
+                font-size: 0.8rem;
                 line-height: 1.45;
                 max-width: 22rem;
                 z-index: 10;
@@ -374,19 +406,18 @@
 
             input[type="number"],
             input[type="text"] {
-                font-family: monospace;
-                font-size: 0.78rem;
+                font-family: var(--mono);
+                font-size: 0.82rem;
                 padding: 0.25rem 0.4rem;
                 border: 1px solid var(--separator);
-                border-radius: 4px;
+                border-radius: 0;
                 background: var(--surface);
                 color: var(--text);
-                outline: none;
             }
 
-            input[type="number"]:focus,
-            input[type="text"]:focus {
-                border-color: var(--accent);
+            input[type="number"]:focus-visible,
+            input[type="text"]:focus-visible {
+                outline-offset: -1px;
             }
 
             input.invalid {
@@ -431,36 +462,75 @@
 
             /* ── Output ── */
 
-            /* Toggles + stats, separated from the output below by a rule
-               that spans the full panel width (hence the negative margins,
-               which cancel the panel's horizontal padding). */
+            /* The rule under the header spans the full panel width,
+               connecting to the divider on its left and the browser edge on
+               its right. Everything below it is the white galley. */
             #output-header {
                 display: flex;
                 flex-direction: column;
                 gap: 0.5rem;
-                margin: 0 -1.25rem;
-                padding: 0 1.25rem 0.65rem;
-                border-bottom: 1px solid var(--separator);
+                padding: 0 1.25rem 0.65rem 1rem;
+                border-bottom: 1px solid var(--accent);
             }
 
             #overlay-toggles {
                 display: flex;
                 flex-wrap: wrap;
-                gap: 0.4rem 1.25rem;
+                gap: 0.4rem 0.5rem;
                 font-size: 0.82rem;
                 align-items: center;
             }
 
+            /* Overlay toggles: no checkbox chrome. An enabled toggle gets a
+               light teal chip — teal is this UI's "active" color — while a
+               disabled one sits directly on the paper, showing a faint chip
+               on hover. The swatches carry the overlay colors. */
             #overlay-toggles label {
                 display: flex;
                 align-items: center;
                 gap: 0.35rem;
                 cursor: pointer;
                 user-select: none;
+                position: relative;
+                isolation: isolate;
+                padding: 0.2rem 0.45rem;
             }
 
+            /* The chip lives on a pseudo-element behind the content, so it
+               can fade without dimming the text. */
+            #overlay-toggles label::after {
+                content: "";
+                position: absolute;
+                inset: 0;
+                z-index: -1;
+                border-radius: 3px;
+                background: var(--chip-bg);
+                opacity: 0;
+            }
+
+            /* Hover hint only on devices that actually hover, so a tap on
+               a touch screen doesn't leave a half-lit chip behind. */
+            @media (hover: hover) {
+                #overlay-toggles label:hover::after {
+                    opacity: 0.5;
+                }
+            }
+
+            #overlay-toggles label:has(input:checked)::after {
+                opacity: 1;
+            }
+
+            /* The real checkboxes stay in the DOM for keyboard use and the
+               existing JS, but render invisibly. */
             #overlay-toggles input {
-                accent-color: var(--accent);
+                position: absolute;
+                opacity: 0;
+                pointer-events: none;
+            }
+
+            #overlay-toggles label:has(input:focus-visible) {
+                outline: 2px solid var(--accent);
+                outline-offset: 2px;
             }
 
             .swatch {
@@ -470,19 +540,73 @@
                 border-radius: 2px;
             }
 
+            /* The galley: the one white surface on the page, running from
+               the header rule to the bottom and right browser edges. */
             #output-scroll {
                 flex: 1;
                 min-height: 0;
                 overflow: auto;
-                padding: 0.5rem 0;
+                background: var(--surface);
+                padding: 1.5rem 1.75rem;
+            }
+
+            /* Plain wrapper for the SVG; the margin-drag listeners live
+               here because it survives re-renders. */
+            #sheet {
+                display: inline-block;
+            }
+
+            /* The right text margin of the sheet is draggable: grabbing the
+               stop marker or the strip just outside the margin changes
+               \hsize and the paragraph re-breaks live. The strip sits on
+               the outside so it never shadows hover on line-final glyphs. */
+            .margin-grab {
+                cursor: col-resize;
+            }
+
+            .margin-handle {
+                fill: transparent;
+            }
+
+            /* The margin stop and its width annotation match the other
+               galley annotations (muted gray), darkening to ink while
+               grabbed. */
+            .margin-stop {
+                fill: var(--muted);
+            }
+
+            /* The solid margin rule appears only while grabbing. */
+            .margin-rule {
+                stroke: transparent;
+                stroke-width: 0.5;
+            }
+
+            #sheet.margin-hover .margin-stop,
+            #sheet.margin-dragging .margin-stop,
+            #sheet.margin-hover .margin-width-label,
+            #sheet.margin-dragging .margin-width-label {
+                fill: var(--text);
+            }
+
+            #sheet.margin-hover .margin-rule,
+            #sheet.margin-dragging .margin-rule {
+                stroke: var(--muted);
+            }
+
+            /* TeX's slug: the black rule marking an overfull line. */
+            .overfull-rule {
+                fill: var(--text);
             }
 
             /* The SVG's on-screen size is set explicitly in JS so that one
                TeX point always maps to the same number of pixels: changing
                the paragraph width reflows the text instead of zooming it.
-               Oversized paragraphs scroll inside #output-scroll. */
+               Oversized paragraphs scroll inside #output-scroll. The cursor
+               is a plain arrow everywhere over the galley; the margin grab
+               (col-resize) is the one exception, being a control. */
             #output-svg {
                 display: block;
+                cursor: default;
             }
 
             #output-svg text {
@@ -491,7 +615,6 @@
                 font-feature-settings:
                     "liga" 0,
                     "clig" 0;
-                white-space: pre;
             }
 
             .glue-rect {
@@ -506,8 +629,9 @@
                 fill: var(--kern-neg-fill);
             }
 
-            .kern-dot {
-                cursor: help;
+            .kern-dot:hover {
+                stroke: var(--text);
+                stroke-width: 0.6;
             }
 
             .kern-dot.positive {
@@ -522,14 +646,16 @@
                 fill: var(--lig-fill);
             }
 
+            /* Margin annotations, set like a compositor's proof marks. */
             .badness-label {
-                font-family: "Inter", sans-serif !important;
+                font-family: "JetBrains Mono", monospace !important;
                 fill: var(--muted);
             }
 
             #stats {
-                font-size: 0.75rem;
-                color: var(--muted);
+                font-family: var(--mono);
+                font-size: 0.78rem;
+                color: var(--text);
             }
 
             #stats:empty {
@@ -539,6 +665,7 @@
             /* Details of the hovered output element; fixed height so the
                output below does not jump as the content changes. */
             #element-info {
+                font-family: var(--mono);
                 font-size: 0.78rem;
                 min-height: 1.15rem;
                 white-space: nowrap;
@@ -547,17 +674,24 @@
             }
 
             #element-info.placeholder {
-                color: var(--muted);
+                color: var(--text);
             }
 
             #output-svg .hover-target {
                 fill: transparent;
-                cursor: help;
+            }
+
+            /* Hovering an element highlights it; the hover layer sits on
+               top of the glyphs, so a translucent fill reads as a
+               highlighter stroke over the element. */
+            #output-svg .hover-target:hover {
+                fill: rgba(15, 118, 110, 0.18);
             }
 
             #output-error {
                 font-size: 0.85rem;
                 color: var(--error-text);
+                margin-bottom: 0.75rem;
             }
 
             #output-error:empty {
@@ -577,7 +711,6 @@
                     flex-direction: column;
                     min-height: 0;
                     gap: 1rem;
-                    padding: 0 1rem 1rem;
                 }
 
                 #divider {
@@ -590,9 +723,20 @@
                     overflow: visible;
                 }
 
+                #controls {
+                    padding: 1rem 1.25rem;
+                }
+
+                /* With the divider hidden, both panels share the same left
+                   edge as the controls above. */
+                #output-header {
+                    padding-left: 1.25rem;
+                }
+
                 #output-scroll {
                     flex: none;
                     min-height: 12rem;
+                    padding: 1.5rem 1.25rem;
                 }
 
                 #tagline {
@@ -604,7 +748,7 @@
     <body>
         <header>
             <h1>knuthplass.dev</h1>
-            <span id="tagline">the Knuth-Plass line breaking algorithm, live</span>
+            <span id="tagline">the Knuth-Plass line breaking algorithm as implemented in TeX</span>
             <span id="attribution">
                 A <a href="https://github.com/jamespfennell/texcraft">Texcraft</a> project
             </span>
@@ -616,6 +760,7 @@
                     <div class="section-label">paragraph</div>
                     <textarea
                         id="text-input"
+                        aria-label="paragraph text"
                         spellcheck="false"
                         autocomplete="off"
                         placeholder="type a paragraph…"
@@ -623,10 +768,29 @@
                 </div>
 
                 <div>
-                    <div class="section-label">width</div>
+                    <div
+                        class="section-label fit"
+                        data-tooltip="The line width the paragraph is broken to (TeX's \hsize). You can also drag the right margin of the typeset output."
+                    >
+                        width
+                    </div>
                     <div id="width-row">
-                        <input type="range" id="width-slider" min="72" max="500" step="1" />
-                        <input type="number" id="width-number" min="72" max="500" step="1" />
+                        <input
+                            type="range"
+                            id="width-slider"
+                            aria-label="line width in points"
+                            min="72"
+                            max="500"
+                            step="1"
+                        />
+                        <input
+                            type="number"
+                            id="width-number"
+                            aria-label="line width in points"
+                            min="72"
+                            max="500"
+                            step="1"
+                        />
                         <span>pt</span>
                     </div>
                 </div>
@@ -639,29 +803,30 @@
                         <span class="preset-sep">|</span>
                         <button class="preset-btn" data-preset="ragged">ragged right</button>
                     </div>
-                    <div id="param-groups" style="display: flex; flex-direction: column; gap: 0.5rem"></div>
+                    <div id="param-groups"></div>
                 </div>
             </div>
 
-            <div id="divider" title="drag to resize · double-click to reset"></div>
+            <div id="divider"></div>
 
             <div id="output-panel">
                 <div id="output-header">
                 <div id="overlay-toggles">
-                    <span class="section-label" style="margin: 0">show:</span>
+                    <span class="section-label inline">show:</span>
                     <label>
                         <input type="checkbox" id="toggle-kerns" />
-                        <span class="swatch" style="background: var(--kern-neg-fill)"></span>
+                        <span class="swatch" aria-hidden="true" style="background: var(--kern-pos-fill)"></span>
+                        <span class="swatch" aria-hidden="true" style="background: var(--kern-neg-fill)"></span>
                         kerns
                     </label>
                     <label>
                         <input type="checkbox" id="toggle-ligs" />
-                        <span class="swatch" style="background: var(--lig-fill)"></span>
+                        <span class="swatch" aria-hidden="true" style="background: var(--lig-fill)"></span>
                         ligatures
                     </label>
                     <label>
                         <input type="checkbox" id="toggle-glue" />
-                        <span class="swatch" style="background: var(--glue-fill)"></span>
+                        <span class="swatch" aria-hidden="true" style="background: var(--glue-fill)"></span>
                         glue
                     </label>
                     <label>
@@ -674,11 +839,18 @@
                     </label>
                 </div>
                 <div id="stats"></div>
-                </div>
                 <div id="element-info"></div>
-                <div id="output-error"></div>
+                </div>
                 <div id="output-scroll">
-                    <svg id="output-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+                    <div id="output-error"></div>
+                    <div id="sheet">
+                        <svg
+                            id="output-svg"
+                            xmlns="http://www.w3.org/2000/svg"
+                            role="img"
+                            aria-label="the typeset paragraph"
+                        ></svg>
+                    </div>
                 </div>
             </div>
         </main>
@@ -698,7 +870,6 @@
             const PARAM_GROUPS = [
                 {
                     label: "Tolerance",
-                    open: true,
                     params: [
                         {
                             name: "pre_tolerance", def: 100, min: -1, max: 10000, log: true,
@@ -791,9 +962,35 @@
                 },
             ];
 
+            // The TeX control sequence each parameter corresponds to, shown
+            // in the parameter's tooltip. Labels use the boxworks names:
+            // this site demonstrates the Knuth-Plass algorithm, not TeX.
+            const TEX_NAMES = {
+                pre_tolerance: "\\pretolerance",
+                tolerance: "\\tolerance",
+                looseness: "\\looseness",
+                hyphen_penalty: "\\hyphenpenalty",
+                ex_hyphen_penalty: "\\exhyphenpenalty",
+                line_penalty: "\\linepenalty",
+                broken_penalty: "\\brokenpenalty",
+                club_penalty: "\\clubpenalty",
+                final_widow_penalty: "\\widowpenalty",
+                inter_line_penalty: "\\interlinepenalty",
+                adj_demerits: "\\adjdemerits",
+                double_hyphen_demerits: "\\doublehyphendemerits",
+                final_hyphen_demerits: "\\finalhyphendemerits",
+                left_skip: "\\leftskip",
+                right_skip: "\\rightskip",
+                par_fill_skip: "\\parfillskip",
+                space_skip: "\\spaceskip",
+                extra_space_skip: "\\xspaceskip",
+            };
+
             const DEFAULT_TEXT =
                 "The next year there were many victories. The mountain that was beyond the valley and the hillside where the chestnut forest grew was captured and there were victories beyond the plain on the plateau to the south and we crossed the river in August and lived in a house in Gorizia that had a fountain and many thick shady trees in a walled garden and a wistaria vine purple on the side of the house. Now the fighting was in the next mountains beyond and was not a mile away. The town was very nice and our house was very fine. The river ran behind us and the town had been captured very handsomely but the mountains beyond it could not be taken and I was very glad the Austrians seemed to want to come back to the town some time, if the war should end, because they did not bombard it to destroy it but only a little in a military way. People lived on in it and there were hospitals and cafes and artillery up side streets and two bawdy houses, one for troops and one for officers, and with the end of the summer, the cool nights, the fighting in the mountains beyond the town, the shell-marked iron of the railway bridge, the smashed tunnel by the river where the fighting had been, the trees around the square and the long avenue of trees that led to the square; these with there being girls in the town, the King passing in his motor car, sometimes now seeing his face and little long necked body and gray beard like a goat's chin tuft; all these with the sudden interiors of houses that had lost a wall through shelling, with plaster and rubble in their gardens and sometimes in the street, and the whole thing going well on the Carso made the fall very different from the last fall when we had been in the country. The war was changed too.";
             const DEFAULT_WIDTH = 300;
+            const WIDTH_MIN = 72;
+            const WIDTH_MAX = 500;
             const FONT_SIZE_PT = 10;
 
             // ── DOM refs ───────────────────────────────────────────────────
@@ -884,7 +1081,7 @@
                 }
                 for (const [value, pct] of ticks) {
                     const tick = document.createElement("span");
-                    tick.textContent = value;
+                    tick.textContent = String(value).replace("-", "−");
                     if (pct === 0) tick.className = "tick-left";
                     else if (pct === 100) tick.className = "tick-right";
                     else tick.style.left = pct + "%";
@@ -894,11 +1091,11 @@
             }
 
             for (const group of PARAM_GROUPS) {
-                const details = document.createElement("details");
-                if (group.open) details.open = true;
-                const summary = document.createElement("summary");
-                summary.textContent = group.label;
-                details.appendChild(summary);
+                const section = document.createElement("div");
+                const title = document.createElement("div");
+                title.className = "param-group-title";
+                title.textContent = group.label;
+                section.appendChild(title);
                 const grid = document.createElement("div");
                 grid.className = "param-grid";
                 let scaleKey = null;
@@ -915,7 +1112,11 @@
                     const label = document.createElement("label");
                     label.textContent = p.name;
                     label.htmlFor = "param-" + p.name;
-                    if (p.desc) label.dataset.tooltip = p.desc;
+                    if (p.desc) {
+                        label.dataset.tooltip = TEX_NAMES[p.name]
+                            ? `${p.desc}\n\nTeX name: ${TEX_NAMES[p.name]}`
+                            : p.desc;
+                    }
                     grid.appendChild(label);
 
                     const input = document.createElement("input");
@@ -983,8 +1184,8 @@
                     }
                 }
 
-                details.appendChild(grid);
-                paramGroupsEl.appendChild(details);
+                section.appendChild(grid);
+                paramGroupsEl.appendChild(section);
             }
 
             let preTolBeforeForce = null; // pre_tolerance value saved while forcing
@@ -1012,6 +1213,16 @@
 
             // ── State <-> URL ──────────────────────────────────────────────
 
+            // Which overlays are on by default; only deviations are encoded
+            // in the URL (as toggle name = "1" or "0").
+            const TOGGLE_DEFAULTS = {
+                kerns: false,
+                ligs: false,
+                glue: false,
+                badness: true,
+                glueset: true,
+            };
+
             function encodeState() {
                 const p = new URLSearchParams();
                 if (textInput.value !== DEFAULT_TEXT) p.set("text", textInput.value);
@@ -1026,11 +1237,11 @@
                     if (String(v) !== String(def)) p.set(name, v);
                 }
                 if (forceHyphInput.checked) p.set("forcehyph", "1");
-                if (toggles.kerns.checked) p.set("kerns", "1");
-                if (toggles.ligs.checked) p.set("ligs", "1");
-                if (toggles.glue.checked) p.set("glue", "1");
-                if (!toggles.badness.checked) p.set("badness", "0");
-                if (!toggles.glueset.checked) p.set("glueset", "0");
+                for (const [name, def] of Object.entries(TOGGLE_DEFAULTS)) {
+                    if (toggles[name].checked !== def) {
+                        p.set(name, toggles[name].checked ? "1" : "0");
+                    }
+                }
                 const qs = p.toString();
                 history.replaceState(null, "", qs ? "?" + qs : location.pathname);
             }
@@ -1038,9 +1249,10 @@
             function loadFromURL() {
                 const p = new URLSearchParams(location.search);
                 textInput.value = p.get("text") ?? DEFAULT_TEXT;
+                // Garbage or out-of-range widths fall back into range
+                // instead of desyncing the controls.
                 const w = Number(p.get("width") ?? DEFAULT_WIDTH);
-                widthSlider.value = w;
-                widthNumber.value = w;
+                setWidth(Number.isFinite(w) ? w : DEFAULT_WIDTH);
                 for (const [name, entry] of Object.entries(paramInputs)) {
                     if (p.has(name)) {
                         entry.input.value = p.get(name);
@@ -1049,11 +1261,11 @@
                     }
                 }
                 if (p.get("forcehyph") === "1") setForceHyphenation(true);
-                if (p.get("kerns") === "1") toggles.kerns.checked = true;
-                if (p.get("ligs") === "1") toggles.ligs.checked = true;
-                if (p.get("glue") === "1") toggles.glue.checked = true;
-                if (p.get("badness") === "0") toggles.badness.checked = false;
-                if (p.get("glueset") === "0") toggles.glueset.checked = false;
+                for (const name of Object.keys(TOGGLE_DEFAULTS)) {
+                    const v = p.get(name);
+                    if (v === "1") toggles[name].checked = true;
+                    else if (v === "0") toggles[name].checked = false;
+                }
             }
 
             // ── Run the algorithm ──────────────────────────────────────────
@@ -1087,9 +1299,12 @@
                 try {
                     return JSON.parse(break_paragraph(textInput.value, JSON.stringify(params)));
                 } catch (e) {
-                    // A wasm panic aborts the call. Known trigger: a dlmalloc
-                    // bug in the Rust toolchain's wasm allocator, tripped by
-                    // some non-ASCII inputs (see PLAN.md).
+                    // A wasm panic aborts the call as a RuntimeError. Known
+                    // trigger: a dlmalloc bug in the Rust toolchain's wasm
+                    // allocator, tripped by some non-ASCII inputs (see
+                    // PLAN.md). Anything else is a bug in this file and
+                    // should surface, not hide behind the generic message.
+                    if (!(e instanceof WebAssembly.RuntimeError)) throw e;
                     return {
                         error:
                             "internal error while breaking the paragraph — " +
@@ -1102,29 +1317,80 @@
 
             const SVG_NS = "http://www.w3.org/2000/svg";
 
+            // Fixed scale: the text stays the same size at every paragraph
+            // width. True size would be 96/72.27 px per pt (1 TeX pt =
+            // 1/72.27in, CSS defines 96px per inch); we render 1.5× that
+            // for readability.
+            const PX_PER_PT = (1.5 * 96) / 72.27;
+
+            // Galley geometry, all in pt.
+            const PAD = 4; // padding inside the viewBox on every side
+            // Extra leading between lines (beyond what the algorithm
+            // produced), giving the kern hover dots room to sit under the
+            // lines they annotate.
+            const LINE_EXTRA_PT = 4;
+            const ANNOT_SIZE_PT = 5; // annotation font size
+            const LABEL_CHAR_PT = 3; // JetBrains Mono advance (0.6em) at that size
+            const COL_GAP = 8; // gap between annotation columns
+            const MARGIN_GAP = 16; // clearance for the margin stop marker
+            const HEADER_ROW_PT = 10; // header row above the first line
+            const HEADER_BASELINE = -PAD - 5.5; // header text baseline
+            const SLUG_PT = 5; // \overfullrule width in plain TeX
+            const KERN_DOT_R = 2.5; // kern hover dot radius
+            const STOP_HALF_W = 3.2; // margin stop half-width
+            const STOP_H = 4.5; // margin stop height
+            const HANDLE_W = 6.4; // margin drag strip width
+
             function svgEl(tag, attrs) {
                 const el = document.createElementNS(SVG_NS, tag);
                 for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
                 return el;
             }
 
-            // Compact pt formatting for tooltips and labels: "3.33", "1.5", "0".
+            // Compact pt formatting for tooltips and labels ("3.33", "1.5",
+            // "0"), with a real minus sign for negative values.
             function fmtPt(v) {
-                return String(Math.round(v * 100) / 100);
+                return String(Math.round(v * 100) / 100).replace("-", "−");
+            }
+
+            // A small muted-mono annotation label (margin columns, line
+            // numbers, headers).
+            function annotation(parent, x, y, text, attrs = {}) {
+                const t = svgEl("text", {
+                    class: "badness-label",
+                    x,
+                    y,
+                    "font-size": ANNOT_SIZE_PT,
+                    ...attrs,
+                });
+                t.textContent = text;
+                parent.appendChild(t);
+                return t;
             }
 
             function glueAmount(value, order) {
                 return fmtPt(value) + (order ? order : "pt");
             }
 
-            function elementTooltip(el) {
+            // before/after are the glyph elements surrounding a kern, used
+            // to say which characters the kern sits between.
+            function elementTooltip(el, before, after) {
                 switch (el.type) {
                     case "char":
                         return `“${el.unicode}”\nwidth ${fmtPt(el.width_pt)}pt`;
                     case "lig":
                         return `ligature ${el.original} → ${el.unicode}\nwidth ${fmtPt(el.width_pt)}pt`;
-                    case "kern":
-                        return `kern ${fmtPt(el.width_pt)}pt`;
+                    case "kern": {
+                        let where = "";
+                        if (before && after) {
+                            where = `\nbetween ${before.unicode} and ${after.unicode}`;
+                        } else if (before) {
+                            where = `\nafter ${before.unicode}`;
+                        } else if (after) {
+                            where = `\nbefore ${after.unicode}`;
+                        }
+                        return `kern ${fmtPt(el.width_pt)}pt${where}`;
+                    }
                     case "glue": {
                         let spec = fmtPt(el.natural_pt) + "pt";
                         if (el.stretch_pt) spec += ` plus ${glueAmount(el.stretch_pt, el.stretch_order)}`;
@@ -1151,7 +1417,6 @@
             function render() {
                 paintSliders();
                 updatePresetHighlight();
-                setElementInfo("");
                 outputError.textContent = "";
                 statsEl.textContent = "";
                 const result = runBreaker();
@@ -1160,6 +1425,13 @@
                 if (result.error) {
                     outputError.textContent = result.error;
                     outputSvg.replaceChildren();
+                    // Errors from the wasm side are prefixed with the
+                    // parameter name; mark that input as the culprit.
+                    const named = result.error.match(/^([a-z_]+):/);
+                    if (named && paramInputs[named[1]]) {
+                        paramInputs[named[1]].input.classList.add("invalid");
+                    }
+                    setElementInfo("");
                     return;
                 }
 
@@ -1169,60 +1441,90 @@
                     if (textInput.value.trim()) {
                         outputError.textContent = "the algorithm produced no lines";
                     }
+                    setElementInfo("");
                     return;
                 }
 
                 const width = Number(widthNumber.value);
-                // Extra leading between lines (beyond what the algorithm
-                // produced), giving the kern hover dots room to sit under
-                // the lines they annotate.
-                const LINE_EXTRA_PT = 4;
                 const last = lines[lines.length - 1];
                 const totalHeight =
                     last.baseline_pt + last.depth_pt + lines.length * LINE_EXTRA_PT;
-                const PAD = 4;
                 // Margin annotation columns, sized to their content and
                 // topped with a header row instead of per-row tooltips.
-                const LABEL_CHAR_PT = 2.8; // approx glyph width at font-size 5
-                const COL_GAP = 8;
-                const gluesetTexts = lines.map((line) => {
+                const gluesetParts = lines.map((line) => {
                     const delta = line.elements.reduce(
                         (sum, el) =>
                             sum + (el.type === "glue" ? el.width_pt - el.natural_pt : 0),
                         0,
                     );
-                    const amount = (delta >= 0 ? "+" : "−") + fmtPt(Math.abs(delta)) + "pt";
                     const detail =
                         line.glue_order === "normal"
                             ? Math.round(Math.abs(line.glue_ratio) * 100) + "%"
                             : line.glue_order;
-                    return `${amount} (${detail})`;
+                    return {
+                        amount: (delta >= 0 ? "+" : "−") + fmtPt(Math.abs(delta)) + "pt",
+                        detail: `(${detail})`,
+                    };
                 });
-                const colWidth = (texts, header) =>
-                    Math.max(header.length, ...texts.map((t) => t.length)) * LABEL_CHAR_PT;
+                // Overfull lines are beyond the badness scale; the column
+                // says "inf" rather than the 1000000 sentinel.
+                const badnessText = (line) =>
+                    line.badness >= 1000000 ? "inf" : String(line.badness);
                 const badnessCol = toggles.badness.checked
-                    ? colWidth(lines.map((l) => String(l.badness)), "badness")
+                    ? Math.max(
+                          "badness".length,
+                          ...lines.map((l) => badnessText(l).length),
+                      ) * LABEL_CHAR_PT
                     : 0;
+                // The glue-set column is two sub-columns: the pt adjustment,
+                // right-aligned so every "pt" lines up, and the parenthesized
+                // detail, left-aligned beside it.
+                const gluesetAmountW =
+                    Math.max(...gluesetParts.map((p) => p.amount.length)) *
+                    LABEL_CHAR_PT;
+                const gluesetDetailW =
+                    Math.max(...gluesetParts.map((p) => p.detail.length)) *
+                    LABEL_CHAR_PT;
                 const gluesetCol = toggles.glueset.checked
-                    ? colWidth(gluesetTexts, "glue set")
+                    ? Math.max(
+                          "glue set".length * LABEL_CHAR_PT,
+                          gluesetAmountW + LABEL_CHAR_PT + gluesetDetailW,
+                      )
                     : 0;
-                const badnessX = width + COL_GAP;
+                // Where each line's content ends (overfull lines carry
+                // their slug past the right margin); the annotation columns
+                // clear the widest line.
+                const contentEnds = lines.map((line) =>
+                    line.elements.reduce(
+                        (end, el) => Math.max(end, el.x_pt + Math.max(el.width_pt, 0)),
+                        0,
+                    ),
+                );
+                const lineEnds = lines.map(
+                    (line, i) =>
+                        contentEnds[i] + (line.badness >= 1000000 ? SLUG_PT : 0),
+                );
+                const maxEndPt = Math.max(width, ...lineEnds);
+                const badnessX = maxEndPt + MARGIN_GAP;
                 const gluesetX = badnessX + (badnessCol ? badnessCol + COL_GAP : 0);
-                let gutter = 0;
-                if (badnessCol) gutter += COL_GAP + badnessCol;
-                if (gluesetCol) gutter += COL_GAP + gluesetCol;
-                const headerPt = gutter ? 10 : 0; // room for the column headers
-                const viewWidth = width + 2 * PAD + gutter;
-                const viewHeight = totalHeight + 2 * PAD + headerPt;
+                let gutter = maxEndPt - width;
+                if (badnessCol || gluesetCol) gutter += MARGIN_GAP;
+                if (badnessCol) gutter += badnessCol;
+                if (badnessCol && gluesetCol) gutter += COL_GAP;
+                if (gluesetCol) gutter += gluesetCol;
+                // Line-number gutter to the left of the text; numbers are
+                // zero-padded to at least two digits (1 → 01).
+                const numDigits = Math.max(2, String(lines.length).length);
+                const leftGutter = numDigits * LABEL_CHAR_PT + COL_GAP;
+                // HEADER_ROW_PT is always reserved (for the column headers
+                // and the width annotation), so toggling the annotation
+                // columns never shifts the paragraph vertically.
+                const viewWidth = width + 2 * PAD + leftGutter + gutter;
+                const viewHeight = totalHeight + 2 * PAD + HEADER_ROW_PT;
                 outputSvg.setAttribute(
                     "viewBox",
-                    `${-PAD} ${-PAD - headerPt} ${viewWidth} ${viewHeight}`,
+                    `${-PAD - leftGutter} ${-PAD - HEADER_ROW_PT} ${viewWidth} ${viewHeight}`,
                 );
-                // Fixed scale: the text stays the same size at every
-                // paragraph width. True size would be 96/72.27 px per pt
-                // (1 TeX pt = 1/72.27in, CSS defines 96px per inch); we
-                // render 1.5× that for readability.
-                const PX_PER_PT = (1.5 * 96) / 72.27;
                 outputSvg.style.width = `${viewWidth * PX_PER_PT}px`;
                 outputSvg.style.height = `${viewHeight * PX_PER_PT}px`;
 
@@ -1235,39 +1537,102 @@
                 outputSvg.appendChild(textLayer);
                 outputSvg.appendChild(hoverLayer);
 
-                for (const [col, x, name] of [
-                    [badnessCol, badnessX, "badness"],
-                    [gluesetCol, gluesetX, "glue set"],
-                ]) {
-                    if (!col) continue;
-                    const h = svgEl("text", {
-                        class: "badness-label",
-                        x,
-                        y: -PAD - 3,
-                        "font-size": 5,
+                // Margin chrome: a stop marker at the right text margin,
+                // like the margin stop of a typewriter. The grab strip sits
+                // just outside the margin (so it never shadows hover on
+                // line-final glyphs) and drags \hsize with the stop.
+                const marginTop = -PAD - HEADER_ROW_PT;
+                const chrome = svgEl("g", {});
+                chrome.appendChild(
+                    svgEl("polygon", {
+                        class: "margin-stop margin-grab",
+                        points: `${width - STOP_HALF_W},${marginTop} ${width + STOP_HALF_W},${marginTop} ${width},${marginTop + STOP_H}`,
+                    }),
+                );
+                // Width annotation in the header row, ending just left of
+                // the margin stop; updates live while dragging.
+                annotation(
+                    chrome,
+                    width - STOP_HALF_W - 2.3,
+                    HEADER_BASELINE,
+                    `width: ${width}pt`,
+                    {
+                        class: "badness-label margin-width-label",
+                        "font-weight": 600,
+                        "text-anchor": "end",
+                    },
+                );
+                chrome.appendChild(
+                    svgEl("line", {
+                        class: "margin-rule",
+                        x1: width,
+                        y1: marginTop + STOP_H,
+                        x2: width,
+                        y2: totalHeight + PAD,
+                    }),
+                );
+                chrome.appendChild(
+                    svgEl("rect", {
+                        class: "margin-handle margin-grab",
+                        x: width,
+                        y: marginTop,
+                        width: HANDLE_W,
+                        height: viewHeight,
+                    }),
+                );
+                outputSvg.appendChild(chrome);
+
+                // The badness header right-aligns with its numbers; the
+                // glue-set header spans its two sub-columns from the left.
+                if (badnessCol) {
+                    annotation(textLayer, badnessX + badnessCol, HEADER_BASELINE, "badness", {
+                        "font-weight": 600,
+                        "text-anchor": "end",
+                    });
+                }
+                if (gluesetCol) {
+                    annotation(textLayer, gluesetX, HEADER_BASELINE, "glue set", {
                         "font-weight": 600,
                     });
-                    h.textContent = name;
-                    textLayer.appendChild(h);
                 }
 
                 let totalBadness = 0;
                 let overfullLines = 0;
-                let worstBadness = 0;
                 let hyphenatedLines = 0;
 
                 for (const [lineIndex, line] of lines.entries()) {
                     const baseline = line.baseline_pt + lineIndex * LINE_EXTRA_PT;
                     const top = baseline - line.height_pt;
                     const boxHeight = line.height_pt + line.depth_pt;
+                    // The last glyph of the line, for hyphenation counting.
                     let lastGlyph = null;
+                    // The glyph a kern would attach to; unlike lastGlyph it
+                    // resets at glue, so a kern after a space is never
+                    // described as sitting "between" glyphs across it.
+                    let prevGlyph = null;
 
-                    for (const el of line.elements) {
+                    for (const [elIndex, el] of line.elements.entries()) {
                         // Overlay geometry: negative kerns move the next glyph
                         // left, so their marker covers the overlapped region.
                         let hoverX = el.x_pt;
                         let hoverW = Math.max(Math.abs(el.width_pt), 0.6);
                         if (el.width_pt < 0) hoverX = el.x_pt + el.width_pt;
+
+                        // For kerns, name the glyphs on either side.
+                        const info =
+                            el.type === "kern"
+                                ? elementTooltip(
+                                      el,
+                                      prevGlyph,
+                                      line.elements
+                                          .slice(elIndex + 1)
+                                          .find(
+                                              (e) =>
+                                                  e.type === "char" ||
+                                                  e.type === "lig",
+                                          ),
+                                  )
+                                : elementTooltip(el);
 
                         if (el.type === "char" || el.type === "lig") {
                             const t = svgEl("text", {
@@ -1277,14 +1642,17 @@
                             t.textContent = el.unicode;
                             textLayer.appendChild(t);
                             lastGlyph = el;
+                            prevGlyph = el;
                             if (el.type === "lig" && toggles.ligs.checked) {
+                                // A thick underline beneath the ligature,
+                                // rather than a wash over the glyph.
                                 overlays.appendChild(
                                     svgEl("rect", {
                                         class: "lig-rect",
                                         x: el.x_pt,
-                                        y: top,
+                                        y: baseline + 1,
                                         width: el.width_pt,
-                                        height: boxHeight,
+                                        height: 2.6,
                                     }),
                                 );
                             }
@@ -1300,10 +1668,10 @@
                                     // has a minimum width), touching its
                                     // bottom edge.
                                     cx: hoverX + hoverW / 2,
-                                    cy: top + boxHeight + 2.5,
-                                    r: 2.5,
+                                    cy: top + boxHeight + KERN_DOT_R,
+                                    r: KERN_DOT_R,
                                 });
-                                dot.dataset.info = elementTooltip(el);
+                                dot.dataset.info = info;
                                 hoverLayer.appendChild(dot);
                                 overlays.appendChild(
                                     svgEl("rect", {
@@ -1318,6 +1686,7 @@
                                 );
                             }
                         } else if (el.type === "glue") {
+                            prevGlyph = null;
                             // Skip hover targets for degenerate glue (e.g. a
                             // zero \rightskip) that would just add noise.
                             if (
@@ -1348,64 +1717,107 @@
                             width: hoverW,
                             height: boxHeight,
                         });
-                        hover.dataset.info = elementTooltip(el);
+                        hover.dataset.info = info;
                         hoverLayer.appendChild(hover);
                     }
 
-                    if (toggles.badness.checked) {
-                        const t = svgEl("text", {
-                            class: "badness-label",
-                            x: badnessX,
-                            y: baseline,
-                            "font-size": 5,
-                        });
-                        t.textContent = line.badness;
-                        textLayer.appendChild(t);
-                    }
-                    if (toggles.glueset.checked) {
-                        const t = svgEl("text", {
-                            class: "badness-label",
-                            x: gluesetX,
-                            y: baseline,
-                            "font-size": 5,
-                        });
-                        t.textContent = gluesetTexts[lineIndex];
-                        textLayer.appendChild(t);
-                    }
+                    annotation(
+                        textLayer,
+                        -COL_GAP,
+                        baseline,
+                        String(lineIndex + 1).padStart(numDigits, "0"),
+                        { "text-anchor": "end" },
+                    );
 
                     if (line.badness >= 1000000) {
                         overfullLines += 1;
+                        // TeX's slug: a black rule appended after the
+                        // protruding content of an overfull line
+                        // (\overfullrule, 5pt in plain TeX).
+                        const slug = svgEl("rect", {
+                            class: "overfull-rule",
+                            x: contentEnds[lineIndex],
+                            y: top,
+                            width: SLUG_PT,
+                            height: boxHeight,
+                        });
+                        slug.dataset.info = `overfull line\ncontent exceeds the width by ${fmtPt(contentEnds[lineIndex] - width)}pt`;
+                        textLayer.appendChild(slug);
                     } else {
                         totalBadness += line.badness;
-                        worstBadness = Math.max(worstBadness, line.badness);
                     }
+
+                    if (toggles.badness.checked) {
+                        annotation(textLayer, badnessX + badnessCol, baseline, badnessText(line), {
+                            "text-anchor": "end",
+                        });
+                    }
+                    if (toggles.glueset.checked) {
+                        const { amount, detail } = gluesetParts[lineIndex];
+                        annotation(textLayer, gluesetX + gluesetAmountW, baseline, amount, {
+                            "text-anchor": "end",
+                        });
+                        annotation(
+                            textLayer,
+                            gluesetX + gluesetAmountW + LABEL_CHAR_PT,
+                            baseline,
+                            detail,
+                        );
+                    }
+
                     if (lastGlyph && lastGlyph.unicode === "-") hyphenatedLines += 1;
                 }
 
-                let stats =
+                // passes === 1 means the first (no-hyphenation) pass
+                // succeeded and hyphenation was never attempted.
+                const hyphenation =
+                    result.passes === 1
+                        ? "hyphenation skipped"
+                        : `${hyphenatedLines} hyphenated`;
+                // Any overfull line puts the total beyond TeX's badness
+                // scale, so report it as infinite (with the count) rather
+                // than summing the remaining feasible lines.
+                const badnessTotal =
+                    overfullLines > 0
+                        ? `infinite (${overfullLines} line${overfullLines === 1 ? "" : "s"} overfull)`
+                        : totalBadness;
+                statsEl.textContent =
                     `${lines.length} line${lines.length === 1 ? "" : "s"} · ` +
-                    `${hyphenatedLines} hyphenated · ` +
-                    `total badness ${totalBadness} · worst ${worstBadness}`;
-                if (overfullLines > 0) {
-                    stats += ` · ${overfullLines} overfull`;
-                }
-                statsEl.textContent = stats;
+                    `${hyphenation} · total badness ${badnessTotal}`;
+                setElementInfo("");
             }
 
             // ── Events ─────────────────────────────────────────────────────
 
             textInput.addEventListener("input", render);
 
+            // The one place the width is written: clamps, syncs both
+            // controls, and clears any stale invalid marker.
+            function setWidth(pt) {
+                const w = Math.round(
+                    Math.max(WIDTH_MIN, Math.min(WIDTH_MAX, pt)),
+                );
+                widthNumber.value = w;
+                widthSlider.value = w;
+                widthNumber.classList.remove("invalid");
+                return w;
+            }
+
             widthSlider.addEventListener("input", () => {
-                widthNumber.value = widthSlider.value;
+                setWidth(Number(widthSlider.value));
                 render();
             });
 
+            // Out-of-range typing is marked invalid instead of silently
+            // ignored (which used to leave the box and the galley showing
+            // different widths).
             widthNumber.addEventListener("input", () => {
                 const v = Number(widthNumber.value);
-                if (v >= 72 && v <= 500) {
-                    widthSlider.value = v;
+                if (Number.isFinite(v) && v >= WIDTH_MIN && v <= WIDTH_MAX) {
+                    setWidth(v);
                     render();
+                } else {
+                    widthNumber.classList.add("invalid");
                 }
             });
 
@@ -1461,17 +1873,38 @@
 
             document.querySelector("h1").addEventListener("click", () => {
                 textInput.value = DEFAULT_TEXT;
-                widthSlider.value = DEFAULT_WIDTH;
-                widthNumber.value = DEFAULT_WIDTH;
+                setWidth(DEFAULT_WIDTH);
                 applyPreset("plain");
             });
 
             // ── Draggable divider ──────────────────────────────────────────
 
+            // Sizes the split so the whole sheet (and its margin
+            // annotations) is visible without scrolling. Used on first load
+            // and when the divider is double-clicked.
+            function autoFitSplit() {
+                const mainEl = document.querySelector("main");
+                const cs = getComputedStyle(mainEl);
+                const available =
+                    mainEl.clientWidth -
+                    parseFloat(cs.paddingLeft) -
+                    parseFloat(cs.paddingRight) -
+                    document.getElementById("divider").offsetWidth;
+                const scs = getComputedStyle(document.getElementById("output-scroll"));
+                const needed =
+                    document.getElementById("sheet").offsetWidth +
+                    parseFloat(scs.paddingLeft) +
+                    parseFloat(scs.paddingRight) +
+                    8;
+                const pct = Math.max(28, Math.min(60, 100 * (1 - needed / available)));
+                document.getElementById("controls").style.flex = `0 0 ${pct}%`;
+            }
+
             {
                 const divider = document.getElementById("divider");
                 const controlsPanel = document.getElementById("controls");
                 const mainEl = document.querySelector("main");
+                let currentPct = null;
 
                 const setSplit = (pct) => {
                     controlsPanel.style.flex = `0 0 ${pct}%`;
@@ -1494,22 +1927,67 @@
                         rect.width -
                         parseFloat(cs.paddingLeft) -
                         parseFloat(cs.paddingRight);
-                    const pct = Math.max(
+                    currentPct = Math.max(
                         20,
                         Math.min(80, ((e.clientX - left) / width) * 100),
                     );
-                    setSplit(pct);
-                    localStorage.setItem("split", pct.toFixed(1));
+                    setSplit(currentPct);
                 });
                 divider.addEventListener("pointerup", (e) => {
                     divider.releasePointerCapture(e.pointerId);
                     divider.classList.remove("dragging");
                     document.body.style.userSelect = "";
+                    // Persist once per drag, not on every move.
+                    if (currentPct !== null) {
+                        localStorage.setItem("split", currentPct.toFixed(1));
+                    }
                 });
                 divider.addEventListener("dblclick", () => {
-                    controlsPanel.style.flex = "";
                     localStorage.removeItem("split");
+                    currentPct = null;
+                    autoFitSplit();
                 });
+            }
+
+            // ── Draggable right margin (\hsize) ────────────────────────────
+
+            // Listeners live on the sheet, which survives re-renders; the
+            // margin-handle rect inside the SVG is rebuilt on every render.
+            {
+                const sheet = document.getElementById("sheet");
+                let drag = null; // { startX, startWidthPt }
+
+                sheet.addEventListener("pointerover", (e) => {
+                    sheet.classList.toggle(
+                        "margin-hover",
+                        !!e.target.closest?.(".margin-grab"),
+                    );
+                });
+                sheet.addEventListener("pointerleave", () => {
+                    sheet.classList.remove("margin-hover");
+                });
+                sheet.addEventListener("pointerdown", (e) => {
+                    if (!e.target.closest?.(".margin-grab")) return;
+                    e.preventDefault();
+                    sheet.setPointerCapture(e.pointerId);
+                    drag = { startX: e.clientX, startWidthPt: Number(widthNumber.value) };
+                    sheet.classList.add("margin-dragging");
+                    document.body.style.userSelect = "none";
+                });
+                sheet.addEventListener("pointermove", (e) => {
+                    if (!drag) return;
+                    const dPt = (e.clientX - drag.startX) / PX_PER_PT;
+                    const before = Number(widthNumber.value);
+                    if (setWidth(drag.startWidthPt + dPt) !== before) render();
+                });
+                const endDrag = () => {
+                    if (!drag) return;
+                    drag = null;
+                    sheet.classList.remove("margin-dragging");
+                    document.body.style.userSelect = "";
+                };
+                sheet.addEventListener("pointerup", endDrag);
+                sheet.addEventListener("pointercancel", endDrag);
             }
 
             // ── Element info row ───────────────────────────────────────────
@@ -1521,9 +1999,12 @@
 
             function setElementInfo(text) {
                 elementInfoEl.classList.toggle("placeholder", !text);
+                // The hover hint only makes sense when there is output to
+                // hover over.
+                const hint = outputSvg.firstChild ? INFO_PLACEHOLDER : "";
                 elementInfoEl.textContent = text
                     ? text.replaceAll("\n", " · ")
-                    : INFO_PLACEHOLDER;
+                    : hint;
             }
 
             outputSvg.addEventListener("mouseover", (e) => {
@@ -1538,24 +2019,49 @@
             // ── Tooltips ───────────────────────────────────────────────────
 
             const tooltipEl = document.getElementById("tooltip");
-            document.addEventListener("mouseover", (e) => {
-                const target = e.target.closest?.("[data-tooltip]");
-                if (!target) {
-                    tooltipEl.style.display = "none";
-                    return;
-                }
+
+            function showTooltip(target) {
                 tooltipEl.textContent = target.dataset.tooltip;
                 tooltipEl.style.display = "block";
                 const r = target.getBoundingClientRect();
                 const maxLeft = window.innerWidth - tooltipEl.offsetWidth - 12;
                 tooltipEl.style.left = Math.max(0, Math.min(r.left, maxLeft)) + "px";
-                tooltipEl.style.top = r.bottom + 6 + "px";
+                // Below the target, flipping above when it would run off
+                // the bottom of the viewport.
+                let top = r.bottom + 6;
+                if (top + tooltipEl.offsetHeight > window.innerHeight - 4) {
+                    top = Math.max(4, r.top - tooltipEl.offsetHeight - 6);
+                }
+                tooltipEl.style.top = top + "px";
+            }
+
+            function hideTooltip() {
+                tooltipEl.style.display = "none";
+            }
+
+            document.addEventListener("mouseover", (e) => {
+                const target = e.target.closest?.("[data-tooltip]");
+                if (target) showTooltip(target);
+                else hideTooltip();
             });
+
+            // Keyboard: focusing a control shows the tooltip of its label
+            // (or of the control itself, if it carries one).
+            document.addEventListener("focusin", (e) => {
+                const target =
+                    e.target.closest?.("[data-tooltip]") ??
+                    [...(e.target.labels ?? [])].find((l) => l.dataset.tooltip);
+                if (target) showTooltip(target);
+                else hideTooltip();
+            });
+            document.addEventListener("focusout", hideTooltip);
 
             // ── Init ───────────────────────────────────────────────────────
 
             loadFromURL();
             render();
+            // A saved split wins; otherwise fit the sheet.
+            if (!localStorage.getItem("split")) autoFitSplit();
         </script>
     </body>
 </html>

@@ -5,18 +5,25 @@ A website that demonstrates the Knuth-Plass line breaking algorithm from the
 Compiler Explorer: input paragraph and algorithm parameters on the left, the
 typeset paragraph on the right.
 
-## Status (updated 2026-07-05)
+## Status (updated 2026-07-10)
 
 - **v1 done and committed**: `knuthplass-wasm` crate
   (`break_paragraph(text, params_json)` → JSON lines/elements, all positions
   computed in Rust), `index.html` single-page app, deployment files
   mirroring ligkern.dev, CI workflow pushing `jamespfennell/knuthplass.dev`.
-- **v1.1 mostly done** (two review rounds, 2026-07-04/05 — details in git
-  history): full-height 50/50 split with draggable divider, teal-on-paper
+- **v1.1 done** (two review rounds, 2026-07-04/05 — details in git
+  history): full-height split with draggable divider, teal-on-paper
   color scheme, sliders + scales + tooltips on all params,
   force-hyphenation checkbox, element info row, badness/glue-set margin
   columns with headers, kern hover dots, stats strip.
-- Remaining work: two v1.1 items and v2 introspection, below.
+- **v1.2 design overhaul done** (2026-07-09/10, iterated with James —
+  details in git history): flush layout with connected teal frame, dark
+  teal masthead, full-bleed white galley (line numbers, aligned annotation
+  columns, width annotation, draggable right margin, overfull slugs, chip
+  toggles, vivid overlay colors), plus a full bug/cleanliness audit pass.
+  Wasm grew a `passes` field (stats say "hyphenation skipped" when the
+  first pass wins) and glue parse errors name their parameter.
+- Remaining work: two v1.1 feature items and v2 introspection, below.
 - Local dev: `caddy start --config Caddyfile.local` (port 8767), then
   `npm test` (7 puppeteer smoke tests).
 
@@ -46,7 +53,15 @@ or `{ error }`; element types are char/lig/kern/glue with `x_pt`/`width_pt`.
   dashes).
 - **Badness** is approximated in the wasm layer as 100·|glue ratio|³, with
   1000000 marking overfull lines (detected geometrically, since overfull
-  glue ratios are clamped to unity upstream, per TeX.2021.664).
+  glue ratios are clamped to unity upstream, per TeX.2021.664). The UI
+  never shows the sentinel: overfull lines read "inf" in the badness
+  column and make the stats total "infinite (N lines overfull)".
+- **The overfull slug is presentation-only**: the 5pt black rule is drawn
+  in the SVG from the geometric detection; appending TeX's real
+  \overfullrule in `HBox::pack` (TeX.2021.666) remains an upstream TODO.
+- **Latin Modern is galley-only** — it is the one font Boxworks supports,
+  not branding; UI text is Inter, data roles (parameter names, stats,
+  annotations) are JetBrains Mono, both from Google Fonts.
 - **URL is the state store**, only non-default values encoded. Two
   re-encodings to be aware of: overlay defaults flipped 2026-07-05
   (kerns/ligs now default off, badness/glue-set on — old bookmarked overlay
@@ -79,6 +94,25 @@ or `{ error }`; element types are char/lig/kern/glue with `x_pt`/`width_pt`.
   This also motivates adding a `\parindent` param (plain TeX: 20pt) via the
   `LineBreaker::line_indents` field — verify upstream support when
   implementing.
+
+## Follow-ups (James's review, 2026-07-10)
+
+- **Max width for the left panel's content.** On very wide viewports the
+  input box and controls stretch too wide; cap their width.
+- **The page-breaking penalties don't visibly do anything.** The
+  penalties that only affect page breaking (broken_penalty, club_penalty,
+  final_widow_penalty, inter_line_penalty) are configurable but change
+  nothing in the output. Either remove them, or add a penalties column to
+  the galley showing the penalty attached to each line.
+- **Deduplicate the glue parsing code** shared by `knuthplass-wasm` and
+  `box linebreak` (`crates/boxworks-bin/src/box.rs`) — the copies carry a
+  "keep in sync" comment today.
+- **Per-line widths and indents**, once implemented in
+  boxworks-knuthplass (`line_widths`/`line_indents`): expose them in the
+  UI — there is probably something nice to do in the galley (e.g. drag
+  individual line margins, shaped-paragraph presets).
+- **An "about"/documentation popup** explaining what the site shows and
+  how to read the galley.
 
 ## Upstream bugs found while building (in the crates, not the site)
 

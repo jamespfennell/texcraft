@@ -69,6 +69,9 @@ struct ErrorOutput {
 #[derive(serde::Serialize)]
 struct Output {
     lines: Vec<Line>,
+    /// How many passes the breaker ran: 1 if the first (no-hyphenation)
+    /// pass succeeded, 2 if the hyphenating pass ran. 0 for empty input.
+    passes: u8,
 }
 
 #[derive(serde::Serialize)]
@@ -121,6 +124,25 @@ enum Element {
     },
 }
 
+/// A debug logger that only records which passes ran.
+#[derive(Default)]
+struct PassRecorder {
+    attempts: u8,
+}
+
+impl boxworks_knuthplass::debug::Logger for PassRecorder {
+    fn log_attempt(&mut self, attempt_number: u8) {
+        self.attempts = self.attempts.max(attempt_number);
+    }
+    fn log_feasible_breakpoint(
+        &mut self,
+        _: &[ds::Horizontal],
+        _: boxworks_knuthplass::debug::FeasibleBreakpoint,
+    ) {
+    }
+    fn log_new_active_node(&mut self, _: boxworks_knuthplass::debug::NewActiveNode) {}
+}
+
 fn order_suffix(order: common::GlueOrder) -> &'static str {
     match order {
         common::GlueOrder::Normal => "",
@@ -132,7 +154,10 @@ fn order_suffix(order: common::GlueOrder) -> &'static str {
 
 fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String> {
     if text.trim().is_empty() {
-        return Ok(Output { lines: vec![] });
+        return Ok(Output {
+            lines: vec![],
+            passes: 0,
+        });
     }
     let input: ParamsInput =
         serde_json::from_str(params_json).map_err(|err| format!("invalid parameters: {err}"))?;
@@ -150,10 +175,10 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
     let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
     let mut text_params = boxworks_text::Params::plain_tex_defaults();
     if let Some(ref s) = input.space_skip {
-        text_params.space_skip = parse_glue(s)?;
+        text_params.space_skip = parse_named_glue("space_skip", s)?;
     }
     if let Some(ref s) = input.extra_space_skip {
-        text_params.extra_space_skip = parse_glue(s)?;
+        text_params.extra_space_skip = parse_named_glue("extra_space_skip", s)?;
     }
     let mut tp = boxworks_text::TextPreprocessorImpl::new(text_params);
     tp.register_font(0, &tfm_file, lig_kern_program.clone());
@@ -190,11 +215,12 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
 
     let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us(lig_kern_program);
     let line_widths = [width];
+    let mut pass_recorder = PassRecorder::default();
     let lb = boxworks_knuthplass::LineBreaker {
         params: &params,
         line_widths: &line_widths,
         line_indents: &[],
-        debug_logger: None,
+        debug_logger: Some(&mut pass_recorder),
         hyphenator: &hyphenator,
     };
 
@@ -203,7 +229,7 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
     let mut v_list = vec![];
     lb.break_line(&font_repo, &mut v_list, &mut h_list);
 
-    Ok(build_output(&v_list, &font_repo))
+    Ok(build_output(&v_list, &font_repo, pass_recorder.attempts))
 }
 
 fn build_params(input: &ParamsInput) -> Result<boxworks_knuthplass::Params, String> {
@@ -233,18 +259,28 @@ fn build_params(input: &ParamsInput) -> Result<boxworks_knuthplass::Params, Stri
         tolerance,
     );
     if let Some(ref s) = input.left_skip {
-        params.left_skip = parse_glue(s)?;
+        params.left_skip = parse_named_glue("left_skip", s)?;
     }
     if let Some(ref s) = input.par_fill_skip {
-        params.par_fill_skip = parse_glue(s)?;
+        params.par_fill_skip = parse_named_glue("par_fill_skip", s)?;
     }
     if let Some(ref s) = input.right_skip {
-        params.right_skip = parse_glue(s)?;
+        params.right_skip = parse_named_glue("right_skip", s)?;
     }
     Ok(params)
 }
 
-fn build_output(v_list: &[ds::Vertical], font_repo: &boxworks_text::TfmFontRepo) -> Output {
+/// Parses a glue parameter, prefixing any error with the parameter name so
+/// the UI can say (and mark) which input is at fault.
+fn parse_named_glue(name: &str, s: &str) -> Result<common::Glue, String> {
+    parse_glue(s).map_err(|err| format!("{name}: {err}"))
+}
+
+fn build_output(
+    v_list: &[ds::Vertical],
+    font_repo: &boxworks_text::TfmFontRepo,
+    passes: u8,
+) -> Output {
     let mut lines = vec![];
     // Vertical placement follows TeX's append_to_vlist (TeX.2021.679): the
     // gap between a line's baseline and the previous baseline is
@@ -290,7 +326,7 @@ fn build_output(v_list: &[ds::Vertical], font_repo: &boxworks_text::TfmFontRepo)
             elements,
         });
     }
-    Output { lines }
+    Output { lines, passes }
 }
 
 /// Returns the elements of the line and the x position at which they end.
@@ -574,6 +610,24 @@ mod tests {
         assert_eq!(naturals[0], 30.0, "{naturals:?}");
         assert!(naturals[1] > 0.0, "{naturals:?}");
         assert_ne!(naturals[1], 30.0, "{naturals:?}");
+    }
+
+    #[test]
+    fn glue_errors_name_the_parameter() {
+        let v = run("hello world", r#"{"width_pt":300,"right_skip":"garbage"}"#);
+        let error = v["error"].as_str().unwrap();
+        assert!(error.starts_with("right_skip:"), "{error}");
+    }
+
+    #[test]
+    fn passes_reports_whether_hyphenation_ran() {
+        let first_pass = run(ALICE, r#"{"width_pt":250}"#);
+        assert_eq!(first_pass["passes"], 1);
+        // pre_tolerance -1 makes the first pass always fail.
+        let second_pass = run(ALICE, r#"{"width_pt":250,"pre_tolerance":-1}"#);
+        assert_eq!(second_pass["passes"], 2);
+        let empty = run(" ", r#"{"width_pt":250}"#);
+        assert_eq!(empty["passes"], 0);
     }
 
     #[test]

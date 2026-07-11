@@ -47,7 +47,9 @@ async function main() {
           `expected a hover target per element, got ${counts.hovers} for ${counts.texts} glyphs`,
         );
       }
-      if (!/^\d+ lines · \d+ hyphenated · total badness \d+ · worst \d+/.test(counts.stats)) {
+      const statsRe =
+        /^\d+ lines? · (hyphenation skipped|\d+ hyphenated) · total badness (\d+|infinite \(\d+ lines? overfull\))$/;
+      if (!statsRe.test(counts.stats)) {
         throw new Error(`unexpected stats: "${counts.stats}"`);
       }
       console.log(`PASS test 1: default render: ${JSON.stringify(counts)}`);
@@ -171,22 +173,28 @@ async function main() {
       );
       await page.waitForSelector("#output-svg text");
 
-      const badnesses = await page.evaluate(() =>
-        [...document.querySelectorAll("#output-svg .badness-label")]
-          // Badness labels are plain numbers; glue-set labels ("+2pt (50%)")
-          // share the class but do not parse.
-          .map((t) => Number(t.textContent))
-          .filter(Number.isFinite),
+      const labels = await page.evaluate(() =>
+        [...document.querySelectorAll("#output-svg .badness-label")].map(
+          (t) => t.textContent,
+        ),
       );
-      if (badnesses.length === 0) {
+      if (labels.length === 0) {
         throw new Error("expected badness labels");
       }
-      if (!badnesses.some((b) => b >= 10000)) {
+      // Overfull lines show "inf" in the badness column, and the stats line
+      // reports the total as infinite.
+      if (!labels.includes("inf")) {
         throw new Error(
-          `expected some very bad lines at tolerance=1, got: ${JSON.stringify(badnesses)}`,
+          `expected overfull (inf) lines at tolerance=1, got: ${JSON.stringify(labels)}`,
         );
       }
-      console.log(`PASS test 4: tolerance=1 renders, line badnesses: ${JSON.stringify(badnesses)}`);
+      const stats = await page.evaluate(
+        () => document.getElementById("stats").textContent,
+      );
+      if (!stats.includes("total badness infinite")) {
+        throw new Error(`expected an infinite badness total, got: "${stats}"`);
+      }
+      console.log(`PASS test 4: tolerance=1 renders with overfull lines: "${stats}"`);
       await page.close();
     }
 
@@ -258,7 +266,8 @@ async function main() {
     }
 
     // Test 6: the divider between the panels can be dragged to resize the
-    // split, and double-clicking it resets to 50/50.
+    // split, and double-clicking it re-fits the output panel to the sheet
+    // (the same fit chosen on first load, so the width returns to it).
     {
       const page = await browser.newPage();
       // The default 800px viewport triggers the mobile layout, which stacks
@@ -277,15 +286,17 @@ async function main() {
         const r = document.getElementById("divider").getBoundingClientRect();
         return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
       });
+      // Drag outward: the auto-fit initial split already sits near the 20%
+      // minimum at this viewport, so there is little room to shrink.
       await page.mouse.move(d.x, d.y);
       await page.mouse.down();
-      await page.mouse.move(d.x - 150, d.y, { steps: 5 });
+      await page.mouse.move(d.x + 150, d.y, { steps: 5 });
       await page.mouse.up();
 
       const after = await controlsWidth();
-      if (after > before - 100) {
+      if (after < before + 100) {
         throw new Error(
-          `expected dragging the divider to shrink the controls panel: before=${before} after=${after}`,
+          `expected dragging the divider to grow the controls panel: before=${before} after=${after}`,
         );
       }
 
