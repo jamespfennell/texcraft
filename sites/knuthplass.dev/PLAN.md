@@ -37,8 +37,13 @@ text ──boxworks-text──▶ h-list (chars, ligs, kerns, glue)
 
 Mirrors the `box linebreak` pipeline (`boxworks-bin/src/box.rs`), including
 the same English-pattern `Hyphenator`. The wasm export returns
-`{ lines: [{ baseline_pt, badness, glue_ratio, glue_order, elements: [...] }] }`
-or `{ error }`; element types are char/lig/kern/glue with `x_pt`/`width_pt`.
+`{ lines: [{ baseline_pt, badness, glue_ratio, glue_order, penalty,
+demerits, artificial_demerits, elements: [...] }] }` or `{ error }`;
+element types are char/lig/kern/glue with `x_pt`/`width_pt`. Per-line
+demerits are the algorithm's own numbers, recovered from the chosen
+active-node chain via the `Logger::log_selected_node` hook added upstream
+for this; `artificial_demerits` marks forced breaks whose demerits TeX
+zeroes (TeX.2021.854), shown as "0*" in the galley.
 
 ## Design decisions (rationale not recoverable from the code)
 
@@ -55,17 +60,21 @@ or `{ error }`; element types are char/lig/kern/glue with `x_pt`/`width_pt`.
   1000000 marking overfull lines (detected geometrically, since overfull
   glue ratios are clamped to unity upstream, per TeX.2021.664). The UI
   never shows the sentinel: overfull lines read "inf" in the badness
-  column and make the stats total "infinite (N lines overfull)".
+  column and are counted in the stats strip ("N lines overfull"). The
+  stats total is demerits, not badness — demerits are what the algorithm
+  minimizes, but forced breaks carry artificial demerits (TeX.2021.854),
+  so the overfull count is reported separately.
 - **The overfull slug is presentation-only**: the 5pt black rule is drawn
   in the SVG from the geometric detection; appending TeX's real
   \overfullrule in `HBox::pack` (TeX.2021.666) remains an upstream TODO.
 - **Latin Modern is galley-only** — it is the one font Boxworks supports,
   not branding; UI text is Inter, data roles (parameter names, stats,
   annotations) are JetBrains Mono, both from Google Fonts.
-- **URL is the state store**, only non-default values encoded. Two
-  re-encodings to be aware of: overlay defaults flipped 2026-07-05
-  (kerns/ligs now default off, badness/glue-set on — old bookmarked overlay
-  params are reinterpreted), and the force-hyphenation checkbox encodes
+- **URL is the state store**, only non-default values encoded. Re-encodings
+  to be aware of: overlay defaults flipped 2026-07-05 (kerns/ligs off,
+  badness/glue-set on) and again 2026-07-11 (only demerits/glue-set on;
+  badness and inter-line penalty off) — old bookmarked overlay params are
+  reinterpreted. Also the force-hyphenation checkbox encodes
   `forcehyph=1` plus the value pre_tolerance will *revert to*, not −1.
 - **Tolerance sliders range from −1** (meaningful in TeX: the pass always
   fails; −1 pre_tolerance is the standard force-hyphenation idiom).
@@ -99,11 +108,9 @@ or `{ error }`; element types are char/lig/kern/glue with `x_pt`/`width_pt`.
 
 - **Max width for the left panel's content.** On very wide viewports the
   input box and controls stretch too wide; cap their width.
-- **The page-breaking penalties don't visibly do anything.** The
-  penalties that only affect page breaking (broken_penalty, club_penalty,
-  final_widow_penalty, inter_line_penalty) are configurable but change
-  nothing in the output. Either remove them, or add a penalties column to
-  the galley showing the penalty attached to each line.
+- ~~**The page-breaking penalties don't visibly do anything.**~~ — resolved
+  2026-07-11: split into an "Inter-line penalties" param group and added a
+  galley penalty column showing the penalty node after each line.
 - **Deduplicate the glue parsing code** shared by `knuthplass-wasm` and
   `box linebreak` (`crates/boxworks-bin/src/box.rs`) — the copies carry a
   "keep in sync" comment today.
@@ -112,7 +119,11 @@ or `{ error }`; element types are char/lig/kern/glue with `x_pt`/`width_pt`.
   UI — there is probably something nice to do in the galley (e.g. drag
   individual line margins, shaped-paragraph presets).
 - **An "about"/documentation popup** explaining what the site shows and
-  how to read the galley.
+  how to read the galley. Must cover the notations that are currently
+  unexplained in the UI: the "0*" artificial-demerits marker in the
+  demerits column (a forced break, TeX.2021.854 — not a genuinely free
+  line), the "n/a" penalty cell on the last line, "inf" badness, and the
+  overfull slug.
 
 ## Upstream bugs found while building (in the crates, not the site)
 
@@ -132,6 +143,12 @@ or `{ error }`; element types are char/lig/kern/glue with `x_pt`/`width_pt`.
 3. The "need emergency attempt" panic is effectively unreachable (the
    second pass forces a solution → overfull lines, not a panic). The UI
    keeps a try/catch anyway.
+3a. ~~**Overfull lines got the decent fitness class**~~ — fixed 2026-07-11:
+   TeX.2021.853 routes the overfull `b := inf_bad + 1` case through the
+   shared `b > 12` check, so it is *tight*, not decent (fitness feeds
+   adj_demerits). Caught by giving `wolf_hall_2in` a TeX-certified log
+   expectation — the first trace test with forced breaks — added to cover
+   the "d=*"/"b=*" artificial-demerits notation in `TexLogger`.
 4. **OPEN: wasm allocator crash on some non-ASCII inputs.** Passing certain
    texts containing non-ASCII characters (e.g. "és and artillery up", but
    not "és and" — heap-state dependent, non-monotonic in length) aborts the
@@ -158,9 +175,18 @@ or `{ error }`; element types are char/lig/kern/glue with `x_pt`/`width_pt`.
   ones — a candidate's optimal chain generally passes mid-line through the
   rendered paragraph). Also show per-break demerits and fitness class.
   Requires capturing passive nodes via `debug::Logger` before they're
-  discarded — verify/extend the logger to record predecessor indices.
-  This is the Compiler-Explorer-style payoff. (The stats strip's "total
-  demerits" also waits for this data.)
+  discarded — the logger records predecessor indices, and the chosen
+  chain is already recovered for the demerits column; introspection needs
+  the *non-chosen* nodes kept too. This is the Compiler-Explorer-style
+  payoff.
+- **Show which looseness values are achievable** — run the breaker for all
+  seven looseness chips and dim the ones that don't change the line count
+  (looseness is best-effort, so a chip can silently do nothing). The wasm
+  call is fast enough to run 7× per input event.
+- **Glue provenance in the glue overlay** — when the glue overlay is on,
+  say where each glue came from: left_skip, right_skip, par_fill_skip,
+  interword space, space_skip, extra_space_skip. Needs the wasm `Element::
+  Glue` to carry a source tag from the h-list construction/line packing.
 - Show pass number (pre_tolerance pass vs hyphenation pass) and what
   hyphenation points were considered
 - More fonts (cmbx10, cmti10, …)

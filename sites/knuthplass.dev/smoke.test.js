@@ -48,7 +48,7 @@ async function main() {
         );
       }
       const statsRe =
-        /^\d+ lines? · (hyphenation skipped|\d+ hyphenated) · total badness (\d+|infinite \(\d+ lines? overfull\))$/;
+        /^\d+ lines? · (hyphenation skipped|\d+ hyphenated)( · \d+ lines? overfull)? · total demerits -?\d+$/;
       if (!statsRe.test(counts.stats)) {
         throw new Error(`unexpected stats: "${counts.stats}"`);
       }
@@ -191,8 +191,8 @@ async function main() {
       const stats = await page.evaluate(
         () => document.getElementById("stats").textContent,
       );
-      if (!stats.includes("total badness infinite")) {
-        throw new Error(`expected an infinite badness total, got: "${stats}"`);
+      if (!/\d+ lines? overfull/.test(stats)) {
+        throw new Error(`expected an overfull-lines count, got: "${stats}"`);
       }
       console.log(`PASS test 4: tolerance=1 renders with overfull lines: "${stats}"`);
       await page.close();
@@ -226,7 +226,7 @@ async function main() {
       if (reverted !== "100") {
         throw new Error(`expected pre_tolerance to revert to 100, got ${reverted}`);
       }
-      if (state.sliders < 13) {
+      if (state.sliders < 12) {
         throw new Error(`expected a slider per numeric param, got ${state.sliders}`);
       }
       if (state.tooltips < 16) {
@@ -258,9 +258,35 @@ async function main() {
         throw new Error(`slider did not sync number input: ${toleranceValue}`);
       }
       const after = await lineCount();
+
+      // The looseness chip row (it has no slider): clicking +1 syncs the
+      // hidden input, encodes the URL, and makes the paragraph one line
+      // longer (achievable here, with tolerance at max from the drag above).
+      const looseness = await page.evaluate(() => {
+        const radio = document.querySelector(
+          'input[name="chips-looseness"][value="1"]',
+        );
+        radio.checked = true;
+        radio.dispatchEvent(new Event("change"));
+        return {
+          value: document.getElementById("param-looseness").value,
+          url: new URLSearchParams(location.search).get("looseness"),
+        };
+      });
+      if (looseness.value !== "1" || looseness.url !== "1") {
+        throw new Error(`looseness chip did not sync: ${JSON.stringify(looseness)}`);
+      }
+      const afterLoose = await lineCount();
+      if (afterLoose !== after + 1) {
+        throw new Error(
+          `looseness=1 should add a line: ${after} -> ${afterLoose}`,
+        );
+      }
+
       console.log(
         `PASS test 5: sliders + force hyphenation: ${JSON.stringify(state)}, ` +
-          `tolerance slider max -> ${toleranceValue}, lines ${before} -> ${after}`,
+          `tolerance slider max -> ${toleranceValue}, lines ${before} -> ${after}, ` +
+          `looseness=1 -> ${afterLoose}`,
       );
       await page.close();
     }

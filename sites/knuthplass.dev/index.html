@@ -366,6 +366,58 @@
                 width: 100%;
             }
 
+            /* Segmented radio row (looseness): one flush square cell per
+               value in the domain, the selected one filled with the same
+               teal chip the overlay toggles use. Fixed-size squares rather
+               than stretched cells, so a minor parameter doesn't dominate
+               the column. The radios render invisibly but stay in the DOM,
+               so arrow keys move between values. */
+            .chip-radio-row {
+                grid-column: 2 / 4;
+                justify-self: start;
+                display: flex;
+                border: 1px solid var(--separator);
+                background: var(--surface);
+            }
+
+            .param-grid .chip-radio-row label {
+                position: relative;
+                width: 1.75rem;
+                height: 1.75rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                user-select: none;
+            }
+
+            .chip-radio-row label + label {
+                border-left: 1px solid var(--separator);
+            }
+
+            /* Hover hint only on devices that actually hover, so a tap on
+               a touch screen doesn't leave a half-lit cell behind. */
+            @media (hover: hover) {
+                .chip-radio-row label:hover {
+                    background: color-mix(in srgb, var(--chip-bg) 50%, transparent);
+                }
+            }
+
+            .chip-radio-row label:has(input:checked) {
+                background: var(--chip-bg);
+            }
+
+            .chip-radio-row input {
+                position: absolute;
+                opacity: 0;
+                pointer-events: none;
+            }
+
+            .chip-radio-row label:has(input:focus-visible) {
+                outline: 2px solid var(--accent);
+                outline-offset: -2px;
+            }
+
             .checkbox-row {
                 grid-column: 1 / 4;
                 display: flex;
@@ -830,12 +882,20 @@
                         glue
                     </label>
                     <label>
-                        <input type="checkbox" id="toggle-badness" checked />
+                        <input type="checkbox" id="toggle-badness" />
                         badness
+                    </label>
+                    <label>
+                        <input type="checkbox" id="toggle-demerits" checked />
+                        demerits
                     </label>
                     <label>
                         <input type="checkbox" id="toggle-glueset" checked />
                         glue set
+                    </label>
+                    <label>
+                        <input type="checkbox" id="toggle-penalty" />
+                        inter-line penalty
                     </label>
                 </div>
                 <div id="stats"></div>
@@ -880,13 +940,13 @@
                             desc: "Badness tolerance for the second pass, in which hyphenation is attempted. If even this fails, a solution is forced and lines may be overfull.",
                         },
                         {
-                            name: "looseness", def: 0, min: -3, max: 3,
-                            desc: "Make the paragraph this many lines longer (+) or shorter (−) than optimal, if possible. Not yet implemented in Boxworks.",
+                            name: "looseness", def: 0, min: -3, max: 3, chips: true,
+                            desc: "Make the paragraph this many lines longer (+) or shorter (−) than optimal. Takes effect only when a breaking with that many lines exists within the tolerance; otherwise the paragraph gets as close as possible.",
                         },
                     ],
                 },
                 {
-                    label: "Penalties",
+                    label: "Line-breaking penalties",
                     params: [
                         {
                             name: "hyphen_penalty", def: 50, min: -10000, max: 10000, symlog: true,
@@ -900,6 +960,14 @@
                             name: "line_penalty", def: 10, min: -10000, max: 10000, symlog: true,
                             desc: "Penalty charged for every line: raising it makes the algorithm prefer paragraphs with fewer lines.",
                         },
+                    ],
+                },
+                // These four don't influence where lines break; they are
+                // attached between the finished lines for the page breaker
+                // to see. The galley's penalty column shows their sum.
+                {
+                    label: "Inter-line penalties",
+                    params: [
                         {
                             name: "broken_penalty", def: 100, min: -10000, max: 10000, symlog: true,
                             desc: "Penalty inserted after each hyphenated line, discouraging a page break right after it. Affects page breaking, not where lines break.",
@@ -1006,7 +1074,9 @@
                 ligs: document.getElementById("toggle-ligs"),
                 glue: document.getElementById("toggle-glue"),
                 badness: document.getElementById("toggle-badness"),
+                demerits: document.getElementById("toggle-demerits"),
                 glueset: document.getElementById("toggle-glueset"),
+                penalty: document.getElementById("toggle-penalty"),
             };
             const statsEl = document.getElementById("stats");
 
@@ -1052,11 +1122,22 @@
                 return spec.min + Math.round(Math.exp((pos / SLIDER_STEPS) * Math.log(range))) - 1;
             }
 
-            function syncSliderToInput(name) {
+            // Reflect a programmatic change of a param's input (URL load,
+            // preset, force-hyphenation) in its slider or chip row.
+            function syncControlsToInput(name) {
                 const e = paramInputs[name];
-                if (!e.slider) return;
                 const v = Number(e.input.value);
-                if (Number.isFinite(v)) e.slider.value = valueToPos(e.spec, v);
+                if (e.slider && Number.isFinite(v)) e.slider.value = valueToPos(e.spec, v);
+                if (e.chips) {
+                    // The chips are the only way to edit the value, so snap
+                    // garbage or out-of-range values (stale URLs) into the
+                    // domain rather than desyncing the highlight.
+                    const snapped = Number.isFinite(v)
+                        ? Math.min(Math.max(Math.round(v), e.spec.min), e.spec.max)
+                        : e.def;
+                    e.input.value = snapped;
+                    for (const c of e.chips) c.checked = Number(c.value) === snapped;
+                }
             }
 
             // Where a value sits along the slider track, as a percentage.
@@ -1100,7 +1181,7 @@
                 grid.className = "param-grid";
                 let scaleKey = null;
                 for (const p of group.params) {
-                    if (!p.glue) {
+                    if (!p.glue && !p.chips) {
                         // A scale row above each run of sliders that share
                         // the same range and mapping.
                         const key = [!!p.symlog, !!p.log, p.min, p.max].join(":");
@@ -1131,6 +1212,38 @@
                         });
                         grid.appendChild(input);
                         paramInputs[p.name] = { input, label, def: p.def, glue: true };
+                    } else if (p.chips) {
+                        // A segmented row of radio chips, one per value —
+                        // the whole (small) domain is visible and one click
+                        // away. The hidden input stays the canonical value
+                        // store so URL/preset/collect code paths are shared
+                        // with the other params.
+                        input.type = "hidden";
+                        grid.appendChild(input);
+                        const row = document.createElement("div");
+                        row.className = "chip-radio-row";
+                        const chips = [];
+                        for (let v = p.min; v <= p.max; v++) {
+                            const cell = document.createElement("label");
+                            const radio = document.createElement("input");
+                            radio.type = "radio";
+                            radio.name = "chips-" + p.name;
+                            radio.value = v;
+                            radio.checked = v === p.def;
+                            radio.addEventListener("change", () => {
+                                input.value = radio.value;
+                                markModified(p.name);
+                                render();
+                            });
+                            cell.appendChild(radio);
+                            cell.appendChild(
+                                document.createTextNode(String(v).replace("-", "−")),
+                            );
+                            row.appendChild(cell);
+                            chips.push(radio);
+                        }
+                        grid.appendChild(row);
+                        paramInputs[p.name] = { input, chips, label, def: p.def, spec: p };
                     } else {
                         input.type = "number";
                         input.step = "1";
@@ -1155,7 +1268,7 @@
                             render();
                         });
                         input.addEventListener("input", () => {
-                            syncSliderToInput(p.name);
+                            syncControlsToInput(p.name);
                             markModified(p.name);
                             render();
                         });
@@ -1199,7 +1312,7 @@
                     e.input.value = preTolBeforeForce;
                     preTolBeforeForce = null;
                 }
-                syncSliderToInput("pre_tolerance");
+                syncControlsToInput("pre_tolerance");
                 markModified("pre_tolerance");
                 e.input.disabled = on;
                 e.slider.disabled = on;
@@ -1219,8 +1332,10 @@
                 kerns: false,
                 ligs: false,
                 glue: false,
-                badness: true,
+                badness: false,
+                demerits: true,
                 glueset: true,
+                penalty: false,
             };
 
             function encodeState() {
@@ -1256,7 +1371,7 @@
                 for (const [name, entry] of Object.entries(paramInputs)) {
                     if (p.has(name)) {
                         entry.input.value = p.get(name);
-                        syncSliderToInput(name);
+                        syncControlsToInput(name);
                         markModified(name);
                     }
                 }
@@ -1333,8 +1448,12 @@
             const LABEL_CHAR_PT = 3; // JetBrains Mono advance (0.6em) at that size
             const COL_GAP = 8; // gap between annotation columns
             const MARGIN_GAP = 16; // clearance for the margin stop marker
-            const HEADER_ROW_PT = 10; // header row above the first line
-            const HEADER_BASELINE = -PAD - 5.5; // header text baseline
+            // Header row above the first line, tall enough for a two-line
+            // header (the inter-line penalty column); single-line headers
+            // sit on the bottom line.
+            const HEADER_ROW_PT = 16;
+            const HEADER_BASELINE = -PAD - 5.5; // bottom header line baseline
+            const HEADER_LINE_PT = 6; // baseline distance between header lines
             const SLUG_PT = 5; // \overfullrule width in plain TeX
             const KERN_DOT_R = 2.5; // kern hover dot radius
             const STOP_HALF_W = 3.2; // margin stop half-width
@@ -1476,6 +1595,17 @@
                           ...lines.map((l) => badnessText(l).length),
                       ) * LABEL_CHAR_PT
                     : 0;
+                // "0*" marks artificially zeroed demerits (a forced break,
+                // TeX.2021.854) as opposed to a genuinely free line.
+                const demeritsText = (line) =>
+                    String(line.demerits).replace("-", "−") +
+                    (line.artificial_demerits ? "*" : "");
+                const demeritsCol = toggles.demerits.checked
+                    ? Math.max(
+                          "demerits".length,
+                          ...lines.map((l) => demeritsText(l).length),
+                      ) * LABEL_CHAR_PT
+                    : 0;
                 // The glue-set column is two sub-columns: the pt adjustment,
                 // right-aligned so every "pt" lines up, and the parenthesized
                 // detail, left-aligned beside it.
@@ -1490,6 +1620,22 @@
                           "glue set".length * LABEL_CHAR_PT,
                           gluesetAmountW + LABEL_CHAR_PT + gluesetDetailW,
                       )
+                    : 0;
+                // The inter-line penalty attached after each line
+                // (TeX.2021.890). No node follows the last line, so its
+                // cell says "n/a" rather than 0.
+                const penaltyText = (line, i) =>
+                    i === lines.length - 1
+                        ? "n/a"
+                        : String(line.penalty).replace("-", "−");
+                // The two-line header ("inter-line" over "penalty") keeps
+                // the column at the width of its bottom line; the longer
+                // top line overhangs into the column gap.
+                const penaltyCol = toggles.penalty.checked
+                    ? Math.max(
+                          "penalty".length,
+                          ...lines.map((l, i) => penaltyText(l, i).length),
+                      ) * LABEL_CHAR_PT
                     : 0;
                 // Where each line's content ends (overfull lines carry
                 // their slug past the right margin); the annotation columns
@@ -1506,12 +1652,19 @@
                 );
                 const maxEndPt = Math.max(width, ...lineEnds);
                 const badnessX = maxEndPt + MARGIN_GAP;
-                const gluesetX = badnessX + (badnessCol ? badnessCol + COL_GAP : 0);
+                const demeritsX = badnessX + (badnessCol ? badnessCol + COL_GAP : 0);
+                const gluesetX = demeritsX + (demeritsCol ? demeritsCol + COL_GAP : 0);
+                const penaltyX = gluesetX + (gluesetCol ? gluesetCol + COL_GAP : 0);
                 let gutter = maxEndPt - width;
-                if (badnessCol || gluesetCol) gutter += MARGIN_GAP;
-                if (badnessCol) gutter += badnessCol;
-                if (badnessCol && gluesetCol) gutter += COL_GAP;
-                if (gluesetCol) gutter += gluesetCol;
+                const colWidths = [badnessCol, demeritsCol, gluesetCol, penaltyCol].filter(
+                    (w) => w > 0,
+                );
+                if (colWidths.length) {
+                    gutter +=
+                        MARGIN_GAP +
+                        colWidths.reduce((a, w) => a + w) +
+                        (colWidths.length - 1) * COL_GAP;
+                }
                 // Line-number gutter to the left of the text; numbers are
                 // zero-padded to at least two digits (1 → 01).
                 const numDigits = Math.max(2, String(lines.length).length);
@@ -1590,13 +1743,29 @@
                         "text-anchor": "end",
                     });
                 }
+                if (demeritsCol) {
+                    annotation(textLayer, demeritsX + demeritsCol, HEADER_BASELINE, "demerits", {
+                        "font-weight": 600,
+                        "text-anchor": "end",
+                    });
+                }
                 if (gluesetCol) {
                     annotation(textLayer, gluesetX, HEADER_BASELINE, "glue set", {
                         "font-weight": 600,
                     });
                 }
+                if (penaltyCol) {
+                    const right = penaltyX + penaltyCol;
+                    annotation(textLayer, right, HEADER_BASELINE - HEADER_LINE_PT, "inter-line", {
+                        "font-weight": 600,
+                        "text-anchor": "end",
+                    });
+                    annotation(textLayer, right, HEADER_BASELINE, "penalty", {
+                        "font-weight": 600,
+                        "text-anchor": "end",
+                    });
+                }
 
-                let totalBadness = 0;
                 let overfullLines = 0;
                 let hyphenatedLines = 0;
 
@@ -1743,14 +1912,21 @@
                         });
                         slug.dataset.info = `overfull line\ncontent exceeds the width by ${fmtPt(contentEnds[lineIndex] - width)}pt`;
                         textLayer.appendChild(slug);
-                    } else {
-                        totalBadness += line.badness;
                     }
 
                     if (toggles.badness.checked) {
                         annotation(textLayer, badnessX + badnessCol, baseline, badnessText(line), {
                             "text-anchor": "end",
                         });
+                    }
+                    if (toggles.demerits.checked) {
+                        annotation(
+                            textLayer,
+                            demeritsX + demeritsCol,
+                            baseline,
+                            demeritsText(line),
+                            { "text-anchor": "end" },
+                        );
                     }
                     if (toggles.glueset.checked) {
                         const { amount, detail } = gluesetParts[lineIndex];
@@ -1764,6 +1940,15 @@
                             detail,
                         );
                     }
+                    if (toggles.penalty.checked) {
+                        annotation(
+                            textLayer,
+                            penaltyX + penaltyCol,
+                            baseline,
+                            penaltyText(line, lineIndex),
+                            { "text-anchor": "end" },
+                        );
+                    }
 
                     if (lastGlyph && lastGlyph.unicode === "-") hyphenatedLines += 1;
                 }
@@ -1774,16 +1959,19 @@
                     result.passes === 1
                         ? "hyphenation skipped"
                         : `${hyphenatedLines} hyphenated`;
-                // Any overfull line puts the total beyond TeX's badness
-                // scale, so report it as infinite (with the count) rather
-                // than summing the remaining feasible lines.
-                const badnessTotal =
+                // The per-line demerits sum to the winning node's total
+                // demerits — the quantity the algorithm minimized. Overfull
+                // lines get their own count: forced breaks carry artificial
+                // demerits (TeX.2021.854), so the total alone can read
+                // deceptively low for an overfull paragraph.
+                const totalDemerits = lines.reduce((a, l) => a + l.demerits, 0);
+                const overfull =
                     overfullLines > 0
-                        ? `infinite (${overfullLines} line${overfullLines === 1 ? "" : "s"} overfull)`
-                        : totalBadness;
+                        ? ` · ${overfullLines} line${overfullLines === 1 ? "" : "s"} overfull`
+                        : "";
                 statsEl.textContent =
                     `${lines.length} line${lines.length === 1 ? "" : "s"} · ` +
-                    `${hyphenation} · total badness ${badnessTotal}`;
+                    `${hyphenation}${overfull} · total demerits ${totalDemerits}`;
                 setElementInfo("");
             }
 
@@ -1848,7 +2036,7 @@
                 setForceHyphenation(false);
                 for (const [name, { input }] of Object.entries(paramInputs)) {
                     input.value = presetValue(preset, name);
-                    syncSliderToInput(name);
+                    syncControlsToInput(name);
                     markModified(name);
                 }
                 render();

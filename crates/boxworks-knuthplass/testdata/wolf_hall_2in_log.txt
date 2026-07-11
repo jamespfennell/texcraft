@@ -1,0 +1,80 @@
+@firstpass
+@secondpass
+He thinks, if you were born in
+@ via @@0 b=195 p=0 d=52025
+@@1: line 1.0 t=52025 -> @@0
+Put-ney, you saw the river ev-ery
+@ via @@1 b=31 p=0 d=1681
+@@2: line 2.1 t=53706 -> @@1
+day, and imag-ined it widen-ing out
+@ via @@2 b=91 p=0 d=20201
+@@3: line 3.3 t=73907 -> @@2
+to the sea. Even if you had never
+@ via @@3 b=1 p=0 d=121
+@@4: line 4.2 t=74028 -> @@3
+seen the ocean you had a pic-ture
+@ via @@4 b=0 p=0 d=100
+@@5: line 5.2 t=74128 -> @@4
+of it in your head from what you
+@ via @@5 b=0 p=0 d=100
+@@6: line 6.2 t=74228 -> @@5
+had been told by for-eign peo-ple
+@ via @@6 b=35 p=0 d=2025
+@@7: line 7.1 t=76253 -> @@6
+who some-times came up-river. You
+@ via @@7 b=* p=0 d=*
+@@8: line 8.3 t=76253 -> @@7
+knew that one day you would go
+@ via @@8 b=1 p=0 d=121
+@@9: line 9.2 t=76374 -> @@8
+out into a world of mar-ble pave-
+@\discretionary via @@9 b=2 p=50 d=2644
+@@10: line 10.2- t=79018 -> @@9
+ments and pea-cocks, of hill-sides
+@ via @@10 b=45 p=0 d=3025
+@@11: line 11.1 t=82043 -> @@10
+buzzing with heat, the fra-grance
+@ via @@11 b=5 p=0 d=225
+@@12: line 12.2 t=82268 -> @@11
+of crushed herbs ris-ing around you
+@ via @@12 b=* p=0 d=*
+@@13: line 13.3 t=82268 -> @@12
+as you walked. You planned for
+@ via @@13 b=14 p=0 d=10576
+@@14: line 14.1 t=92844 -> @@13
+what your jour-neys would bring
+@ via @@14 b=34 p=0 d=1936
+@@15: line 15.1 t=94780 -> @@14
+you: the touch of warm ter-ra-cotta,
+@ via @@15 b=* p=0 d=*
+@@16: line 16.3 t=94780 -> @@15
+the night sky of an-other cli-mate,
+@ via @@16 b=0 p=0 d=100
+@@17: line 17.2 t=94880 -> @@16
+alien flow-ers, the stone eyed gaze
+@ via @@17 b=0 p=0 d=100
+@@18: line 18.2 t=94980 -> @@17
+of other peo-ples saints. But if
+@ via @@18 b=169 p=0 d=42041
+@@19: line 19.0 t=137021 -> @@18
+you
+@ via @@18 b=58 p=0 d=4624
+@@20: line 19.3 t=99604 -> @@18
+were born in Aslock-ton, in
+@ via @@19 b=125 p=0 d=18225
+@@21: line 20.0 t=155246 -> @@19
+flat
+@ via @@20 b=174 p=0 d=43856
+@@22: line 20.0 t=143460 -> @@20
+fields un-der a wide sky, you
+@ via @@21 b=17 p=0 d=729
+@@23: line 21.1 t=155975 -> @@21
+might
+@ via @@22 b=48 p=0 d=13364
+@@24: line 21.3 t=156824 -> @@22
+just be able to imag-ine Cam-bridge:
+@ via @@24 b=* p=0 d=*
+@@25: line 22.3 t=156824 -> @@24
+no far-ther.
+@\par via @@25 b=0 p=-10000 d=*
+@@26: line 23.2- t=156824 -> @@25

@@ -91,6 +91,22 @@ struct Line {
     /// The glue order the ratio applies to: "normal", "fil", "fill" or
     /// "filll".
     glue_order: &'static str,
+    /// The penalty node inserted after this line (TeX.2021.890): the sum
+    /// of inter_line_penalty, plus club_penalty after the first line,
+    /// final_widow_penalty after the second-to-last, and broken_penalty
+    /// after a hyphenated line. 0 when no node was inserted — TeX omits
+    /// zero penalties, and nothing follows the last line.
+    penalty: i32,
+    /// The demerits the breaker charged for this line (TeX.2021.859):
+    /// (line_penalty + badness)² plus the break penalty's contribution,
+    /// plus the adj/double-hyphen/final-hyphen extras. Recovered from the
+    /// chosen active-node chain, so it is the algorithm's own arithmetic,
+    /// not a UI approximation.
+    demerits: i32,
+    /// True when the demerits were artificially zeroed (TeX.2021.854):
+    /// the break was forced because no feasible break existed, so the 0
+    /// says nothing about the line's quality. False for a genuine 0.
+    artificial_demerits: bool,
     elements: Vec<Element>,
 }
 
@@ -124,15 +140,51 @@ enum Element {
     },
 }
 
-/// A debug logger that only records which passes ran.
+/// A debug logger that records which passes ran, plus the active-node data
+/// needed to recover the chosen breaks' demerits.
 #[derive(Default)]
 struct PassRecorder {
     attempts: u8,
+    /// node index -> (total_demerits, previous_node_index,
+    /// artificial_demerits). Cleared each attempt: node numbering
+    /// restarts, and only the successful attempt's nodes matter.
+    nodes: std::collections::HashMap<usize, (i32, usize, bool)>,
+    /// The node the breaker chose; the chosen breakpoints are its chain of
+    /// predecessors.
+    selected: Option<usize>,
+}
+
+impl PassRecorder {
+    /// Demerits charged for each chosen line — a node's total_demerits
+    /// minus its predecessor's — paired with whether they were
+    /// artificially zeroed (TeX.2021.854). Node 0 is the paragraph start:
+    /// it is never logged and its total is 0.
+    fn line_demerits(&self) -> Vec<(i32, bool)> {
+        let mut v = vec![];
+        let Some(mut index) = self.selected else {
+            return v;
+        };
+        while index > 0 {
+            let Some(&(total, prev, artificial)) = self.nodes.get(&index) else {
+                break;
+            };
+            let prev_total = match prev {
+                0 => 0,
+                _ => self.nodes.get(&prev).map_or(0, |&(t, _, _)| t),
+            };
+            v.push((total - prev_total, artificial));
+            index = prev;
+        }
+        v.reverse();
+        v
+    }
 }
 
 impl boxworks_knuthplass::debug::Logger for PassRecorder {
     fn log_attempt(&mut self, attempt_number: u8) {
         self.attempts = self.attempts.max(attempt_number);
+        self.nodes.clear();
+        self.selected = None;
     }
     fn log_feasible_breakpoint(
         &mut self,
@@ -140,7 +192,19 @@ impl boxworks_knuthplass::debug::Logger for PassRecorder {
         _: boxworks_knuthplass::debug::FeasibleBreakpoint,
     ) {
     }
-    fn log_new_active_node(&mut self, _: boxworks_knuthplass::debug::NewActiveNode) {}
+    fn log_new_active_node(&mut self, an: boxworks_knuthplass::debug::NewActiveNode) {
+        self.nodes.insert(
+            an.node_index,
+            (
+                an.total_demerits,
+                an.previous_node_index,
+                an.artificial_demerits,
+            ),
+        );
+    }
+    fn log_selected_node(&mut self, node_index: usize) {
+        self.selected = Some(node_index);
+    }
 }
 
 fn order_suffix(order: common::GlueOrder) -> &'static str {
@@ -229,7 +293,12 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
     let mut v_list = vec![];
     lb.break_line(&font_repo, &mut v_list, &mut h_list);
 
-    Ok(build_output(&v_list, &font_repo, pass_recorder.attempts))
+    Ok(build_output(
+        &v_list,
+        &font_repo,
+        pass_recorder.attempts,
+        &pass_recorder.line_demerits(),
+    ))
 }
 
 fn build_params(input: &ParamsInput) -> Result<boxworks_knuthplass::Params, String> {
@@ -280,8 +349,9 @@ fn build_output(
     v_list: &[ds::Vertical],
     font_repo: &boxworks_text::TfmFontRepo,
     passes: u8,
+    line_demerits: &[(i32, bool)],
 ) -> Output {
-    let mut lines = vec![];
+    let mut lines: Vec<Line> = vec![];
     // Vertical placement follows TeX's append_to_vlist (TeX.2021.679): the
     // gap between a line's baseline and the previous baseline is
     // \baselineskip, unless that would put the boxes closer than
@@ -289,8 +359,15 @@ fn build_output(
     let mut prev_depth_pt: Option<f64> = None;
     let mut baseline_pt = 0.0;
     for elem in v_list {
-        let ds::Vertical::HBox(hbox) = elem else {
-            continue;
+        let hbox = match elem {
+            ds::Vertical::HBox(hbox) => hbox,
+            ds::Vertical::Penalty(p) => {
+                if let Some(line) = lines.last_mut() {
+                    line.penalty = p.0;
+                }
+                continue;
+            }
+            _ => continue,
         };
         let height_pt = pt(hbox.height);
         baseline_pt += match prev_depth_pt {
@@ -323,6 +400,9 @@ fn build_output(
                 common::GlueOrder::Fill => "fill",
                 common::GlueOrder::Filll => "filll",
             },
+            penalty: 0,
+            demerits: line_demerits.get(lines.len()).map_or(0, |&(d, _)| d),
+            artificial_demerits: line_demerits.get(lines.len()).is_some_and(|&(_, a)| a),
             elements,
         });
     }
@@ -628,6 +708,66 @@ mod tests {
         assert_eq!(second_pass["passes"], 2);
         let empty = run(" ", r#"{"width_pt":250}"#);
         assert_eq!(empty["passes"], 0);
+    }
+
+    #[test]
+    fn per_line_penalties_are_reported() {
+        // Width 250 succeeds on the first pass (no hyphenated lines, so
+        // broken_penalty never applies): the first line carries
+        // club_penalty, the second-to-last final_widow_penalty, every
+        // non-final line inter_line_penalty, and the last line nothing.
+        let v = run(
+            ALICE,
+            r#"{"width_pt":250,"inter_line_penalty":7,"club_penalty":150,"final_widow_penalty":150}"#,
+        );
+        let penalties: Vec<i64> = v["lines"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|l| l["penalty"].as_i64().unwrap())
+            .collect();
+        let n = penalties.len();
+        assert!(n >= 4, "{penalties:?}");
+        assert_eq!(penalties[0], 157, "{penalties:?}");
+        assert_eq!(penalties[1], 7, "{penalties:?}");
+        assert_eq!(penalties[n - 2], 157, "{penalties:?}");
+        assert_eq!(penalties[n - 1], 0, "{penalties:?}");
+    }
+
+    #[test]
+    fn per_line_demerits_are_reported() {
+        // A single line breaks at the forced final break (eject penalty,
+        // which contributes nothing) with badness 0 from \parfillskip, so
+        // the demerits are exactly (line_penalty + badness)² = (10+0)².
+        let v = run("hello world", r#"{"width_pt":500}"#);
+        assert_eq!(v["lines"][0]["demerits"], 100);
+        // Multi-line: every line carries the algorithm's demerits.
+        let v = run(ALICE, r#"{"width_pt":250}"#);
+        for line in v["lines"].as_array().unwrap() {
+            assert!(line["demerits"].as_i64().unwrap() > 0, "{line}");
+            assert_eq!(line["artificial_demerits"], false, "{line}");
+        }
+    }
+
+    #[test]
+    fn artificial_demerits_are_flagged() {
+        // An impossible tolerance forces a solution; the forced breaks get
+        // artificially zeroed demerits (TeX.2021.854) and are flagged so
+        // the UI can distinguish them from genuine zeros.
+        let v = run(
+            ALICE,
+            r#"{"width_pt":100,"tolerance":1,"pre_tolerance":1}"#,
+        );
+        let lines = v["lines"].as_array().unwrap();
+        assert!(
+            lines.iter().any(|l| l["artificial_demerits"] == true),
+            "expected at least one forced break"
+        );
+        for line in lines {
+            if line["artificial_demerits"] == true {
+                assert_eq!(line["demerits"], 0, "{line}");
+            }
+        }
     }
 
     #[test]

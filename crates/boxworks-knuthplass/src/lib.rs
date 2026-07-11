@@ -606,12 +606,14 @@ impl<'a> LineBreaker<'a> {
                     total_demerits: i32,
                     previous_node_index: usize,
                     line_number: usize,
+                    artificial_demerits: bool,
                 }
                 // TeX.2021.834
                 let mut candidates = [Candidate {
                     total_demerits: AWFUL_BAD,
                     previous_node_index: 0,
                     line_number: 0,
+                    artificial_demerits: false,
                 }; 4];
                 let mut minimum_demerits = AWFUL_BAD;
 
@@ -646,19 +648,19 @@ impl<'a> LineBreaker<'a> {
                     } else {
                         // Shrinking the line
                         // TeX.2021.853
-                        if -shortfall > line_diffs.shrinkability {
-                            (INFINITE_BADNESS + 1, FitnessClass::Decent)
+                        let b = if -shortfall > line_diffs.shrinkability {
+                            INFINITE_BADNESS + 1
                         } else {
-                            let b = badness(-shortfall, line_diffs.shrinkability);
-                            (
-                                b,
-                                if b <= 12 {
-                                    FitnessClass::Decent
-                                } else {
-                                    FitnessClass::Tight
-                                },
-                            )
-                        }
+                            badness(-shortfall, line_diffs.shrinkability)
+                        };
+                        (
+                            b,
+                            if b <= 12 {
+                                FitnessClass::Decent
+                            } else {
+                                FitnessClass::Tight
+                            },
+                        )
                     };
 
                     // The condition of the if statement is in TeX.2021.851
@@ -703,6 +705,7 @@ impl<'a> LineBreaker<'a> {
                                     badness,
                                     penalty,
                                     demerits,
+                                    artificial_demerits,
                                     previous_node_index: active_node.node_index,
                                 },
                             );
@@ -713,6 +716,7 @@ impl<'a> LineBreaker<'a> {
                                 total_demerits,
                                 previous_node_index: active_node.node_index,
                                 line_number: active_node.line_number + 1,
+                                artificial_demerits,
                             };
                         }
                         if total_demerits <= minimum_demerits {
@@ -804,6 +808,7 @@ impl<'a> LineBreaker<'a> {
                                 fitness_class: active_node.fitness_class as u8,
                                 hyphenated: active_node.hyphenated,
                                 total_demerits: active_node.total_demerits,
+                                artificial_demerits: candidate.artificial_demerits,
                                 previous_node_index: candidate.previous_node_index,
                             });
                         }
@@ -878,6 +883,10 @@ impl<'a> LineBreaker<'a> {
             if actual_looseness != looseness && !force_solution {
                 return None;
             }
+        }
+
+        if let Some(debug_logger) = self.debug_logger.as_deref_mut() {
+            debug_logger.log_selected_node(best.node_index);
         }
 
         // TeX.2021.878
@@ -1089,6 +1098,7 @@ mod tests {
             "wolf_hall_input.txt",
             &["2in"],
             typeset: "wolf_hall_2in_want.txt",
+            log: "wolf_hall_2in_log.txt",
         ),
         (
             wolf_hall_variable_widths,
