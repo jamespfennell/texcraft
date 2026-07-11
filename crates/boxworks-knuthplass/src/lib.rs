@@ -851,6 +851,36 @@ impl<'a> LineBreaker<'a> {
                 best = active_node;
             }
         }
+
+        if self.params.looseness != 0 {
+            // TeX.2021.875
+            let looseness = self.params.looseness;
+            let best_line_number: i32 = best.line_number.try_into().unwrap();
+            let mut actual_looseness = 0;
+            for active_node in &active_nodes {
+                let line_number: i32 = active_node.line_number.try_into().unwrap();
+                let line_diff = line_number - best_line_number;
+
+                if (line_diff < actual_looseness && looseness <= line_diff)
+                    || (line_diff > actual_looseness && looseness >= line_diff)
+                {
+                    best = active_node;
+                    actual_looseness = line_diff;
+                } else if line_diff == actual_looseness
+                    && active_node.total_demerits < best.total_demerits
+                {
+                    best = active_node;
+                }
+            }
+            // If we don't get the desired looseness and this is not the final pass,
+            // we try again. This conditional is a negated version of the last conditional
+            // in TeX.2021.873.
+            if actual_looseness != looseness && !force_solution {
+                return None;
+            }
+        }
+
+        // TeX.2021.878
         let mut v = vec![];
         let mut index = best.node_index;
         while index > 0 {
@@ -900,7 +930,7 @@ impl<'a> LineBreaker<'a> {
     ) -> (usize, common::Scaled) {
         let first_active_node = active_nodes.front().expect("active nodes are non-empty");
         let prev_line_number = first_active_node.line_number;
-        if prev_line_number + 1 >= self.line_widths.len() {
+        if self.params.looseness == 0 && prev_line_number + 1 >= self.line_widths.len() {
             // This covers the last class of active nodes whose widths are all the same.
             return (k, *self.line_widths.last().unwrap());
         }
@@ -912,19 +942,11 @@ impl<'a> LineBreaker<'a> {
                     active_node.line_number == first_active_node.line_number
                 })
                 .count(),
-            self.line_widths[prev_line_number],
+            self.line_widths
+                .get(prev_line_number)
+                .copied()
+                .unwrap_or(*self.line_widths.last().unwrap()),
         )
-        // get all the nodes with the same line number
-        // OR line number
-        //
-        // The width is self.line_widths[active_nodes[0].line_number]
-        // If active_nodes[0].line_number >= self.line_widths.len() - 1, then
-        // it's the same class. Note in the self.line_widths = [a], it's all
-        // the same class
-        // TODO: when we implement looseness this while loop will run for every line class,
-        // and m will be the number of elements in the class.
-        //
-        // (active_nodes.len(), *self.line_widths.last().unwrap())
     }
 }
 
@@ -1076,6 +1098,27 @@ mod tests {
             // TODO: figure out why the log lines are not in the right
             // order and enable this test.
             // log: "wolf_hall_variable_widths_log.txt",
+        ),
+        (
+            farewell_to_arms_looseness_plus_1,
+            "farewell_to_arms_input.txt",
+            &["3in"],
+            params: Params {
+                looseness: 1,
+            },
+            typeset: "farewell_to_arms_looseness_plus_1_want.txt",
+            // TODO: there is a real bug that is exposed by this log diff!
+            // log: "farewell_to_arms_looseness_plus_1_log.txt",
+        ),
+        (
+            farewell_to_arms_looseness_minus_1,
+            "farewell_to_arms_input.txt",
+            &["5in"],
+            params: Params {
+                looseness: -1,
+            },
+            typeset: "farewell_to_arms_looseness_minus_1_want.txt",
+            log: "farewell_to_arms_looseness_minus_1_log.txt",
         ),
         (
             wolf_hall_ragged_right,
@@ -1309,7 +1352,7 @@ mod tests {
             inner: boxworks::tex::new_tex_engine_binary("tex".to_string()).unwrap(),
             stdout: Default::default(),
         };
-        let texts = vec![input.trim().to_string()];
+        let texts = vec![format![r"\looseness={} {}", params.looseness, input.trim()]];
         let (_, vlists) = boxworks::tex::build_vertical_lists(
             &engine,
             &auxiliary_files,

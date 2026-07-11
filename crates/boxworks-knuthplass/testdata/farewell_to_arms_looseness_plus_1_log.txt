@@ -1,0 +1,512 @@
+@firstpass
+@secondpass
+The next year there were many vic-to-ries. The
+@ via @@0 b=105 p=0 d=23225
+@@1: line 1.0 t=23225 -> @@0
+moun-tain that was be-yond the val-ley and the hill-
+@\discretionary via @@1 b=4 p=50 d=12696
+@@2: line 2.2- t=35921 -> @@1
+side where the chest-nut for-est grew was cap-tured
+@ via @@2 b=0 p=0 d=100
+@@3: line 3.2 t=36021 -> @@2
+and there were vic-to-ries be-yond the plain on the
+@ via @@3 b=3 p=0 d=169
+@@4: line 4.2 t=36190 -> @@3
+plateau to the south and we crossed the river in
+@ via @@4 b=9 p=0 d=361
+@@5: line 5.2 t=36551 -> @@4
+Au-gust and lived in a house in Go-rizia that had
+@ via @@5 b=7 p=0 d=289
+@@6: line 6.2 t=36840 -> @@5
+a
+@ via @@5 b=1 p=0 d=121
+@@7: line 6.2 t=36672 -> @@5
+foun-tain and many thick shady trees in a walled
+@ via @@7 b=7 p=0 d=289
+@ via @@6 b=2 p=0 d=144
+@@8: line 7.2 t=36961 -> @@7
+gar-den and a wis-taria vine pur-ple on the side of
+@ via @@8 b=8 p=0 d=324
+@@9: line 8.2 t=37285 -> @@8
+the
+@ via @@8 b=86 p=0 d=9216
+@@10: line 8.3 t=46177 -> @@8
+house. Now the fight-ing was in the next moun-
+@\discretionary via @@10 b=23 p=50 d=13589
+@\discretionary via @@9 b=41 p=50 d=5101
+@@11: line 9.3- t=42386 -> @@9
+tains
+@ via @@10 b=70 p=0 d=6400
+@@12: line 9.3 t=52577 -> @@10
+be-yond and was not a mile away. The town
+@ via @@11 b=0 p=0 d=100
+@@13: line 10.2 t=42486 -> @@11
+was
+@ via @@12 b=4 p=0 d=196
+@@14: line 10.2 t=52773 -> @@12
+very nice and our house was very fine. The
+@ via @@13 b=11 p=0 d=441
+@@15: line 11.2 t=42927 -> @@13
+river
+@ via @@14 b=2 p=0 d=144
+@@16: line 11.2 t=52917 -> @@14
+ran be-hind us and the town had been cap-
+@\discretionary via @@15 b=10 p=50 d=2900
+@@17: line 12.2- t=45827 -> @@15
+tured
+@ via @@16 b=46 p=0 d=3136
+@@18: line 12.1 t=56053 -> @@16
+very hand-somely but the moun-tains be-yond
+@ via @@17 b=4 p=0 d=196
+@@19: line 13.2 t=46023 -> @@17
+it could not be taken and I was very glad the
+@ via @@19 b=133 p=0 d=30449
+@@20: line 14.0 t=76472 -> @@19
+Aus-
+@\discretionary via @@19 b=8 p=50 d=2824
+@@21: line 14.2- t=48847 -> @@19
+tri-ans seemed to want to come back to the
+@ via @@20 b=92 p=0 d=10404
+@@22: line 15.1 t=86876 -> @@20
+town
+@ via @@21 b=4 p=0 d=196
+@@23: line 15.2 t=49043 -> @@21
+some time, if the war should end, be-cause
+@ via @@22 b=24 p=0 d=1156
+@@24: line 16.1 t=88032 -> @@22
+they
+@ via @@23 b=47 p=0 d=3249
+@@25: line 16.1 t=52292 -> @@23
+did
+@ via @@23 b=27 p=0 d=1369
+@@26: line 16.3 t=50412 -> @@23
+not bom-bard it to de-stroy it but only
+@ via @@24 b=62 p=0 d=5184
+@@27: line 17.1 t=93216 -> @@24
+a
+@ via @@24 b=2 p=0 d=144
+@@28: line 17.2 t=88176 -> @@24
+lit-
+@\discretionary via @@25 b=27 p=50 d=3869
+@\discretionary via @@24 b=86 p=50 d=21716
+@@29: line 17.1- t=56161 -> @@25
+tle
+@ via @@25 b=1 p=0 d=121
+@@30: line 17.2 t=52413 -> @@25
+in
+@ via @@26 b=14 p=0 d=10576
+@ via @@25 b=34 p=0 d=11936
+@@31: line 17.1 t=60988 -> @@26
+@@32: line 17.3 t=64228 -> @@25
+a
+@ via @@26 b=0 p=0 d=100
+@@33: line 17.2 t=50512 -> @@26
+mil-i-tary way. Peo-ple lived on in it
+@ via @@27 b=42 p=0 d=2704
+@@34: line 18.1 t=95920 -> @@27
+and
+@ via @@29 b=29 p=0 d=1521
+@ via @@28 b=1 p=0 d=121
+@ via @@27 b=6 p=0 d=256
+@@35: line 18.1 t=57682 -> @@29
+there
+@ via @@31 b=43 p=0 d=2809
+@ via @@32 b=43 p=0 d=12809
+@ via @@30 b=0 p=0 d=100
+@@36: line 18.2 t=52513 -> @@30
+were
+@ via @@33 b=0 p=0 d=100
+@ via @@31 b=70 p=0 d=16400
+@ via @@32 b=70 p=0 d=6400
+@@37: line 18.2 t=50612 -> @@33
+hos-pi-tals and cafes and ar-tillery
+@ via @@34 b=46 p=0 d=3136
+@@38: line 19.1 t=99056 -> @@34
+up
+@ via @@35 b=174 p=0 d=33856
+@ via @@34 b=22 p=0 d=11024
+@@39: line 19.0 t=91538 -> @@35
+side
+@ via @@35 b=31 p=0 d=11681
+@@40: line 19.3 t=69363 -> @@35
+streets
+@ via @@37 b=79 p=0 d=7921
+@@41: line 19.1 t=58533 -> @@37
+and
+@ via @@37 b=90 p=0 d=10000
+@@42: line 19.3 t=60612 -> @@37
+two bawdy houses, one for
+@ via @@38 b=146 p=0 d=24336
+@@43: line 20.0 t=123392 -> @@38
+troops
+@ via @@39 b=0 p=0 d=10100
+@@44: line 20.2 t=101638 -> @@39
+and
+@ via @@40 b=0 p=0 d=100
+@@45: line 20.2 t=69463 -> @@40
+one
+@ via @@41 b=89 p=0 d=9801
+@@46: line 20.1 t=68334 -> @@41
+for
+@ via @@41 b=1 p=0 d=121
+@@47: line 20.2 t=58654 -> @@41
+of-fi
+@\discretionary via @@42 b=1 p=50 d=2621
+@@48: line 20.2- t=63233 -> @@42
+-
+@\discretionary via @@42 b=2 p=50 d=2644
+@@49: line 20.2- t=63256 -> @@42
+cers, and with the end of
+@ via @@43 b=29 p=0 d=1521
+@@50: line 21.1 t=124913 -> @@43
+the
+@ via @@43 b=26 p=0 d=11296
+@@51: line 21.3 t=134688 -> @@43
+sum-
+@\discretionary via @@45 b=182 p=50 d=49364
+@\discretionary via @@44 b=0 p=50 d=2600
+@@52: line 21.2- t=104238 -> @@44
+mer,
+@ via @@45 b=1 p=0 d=121
+@@53: line 21.2 t=69584 -> @@45
+the
+@ via @@46 b=1 p=0 d=121
+@@54: line 21.2 t=68455 -> @@46
+cool
+@ via @@49 b=40 p=0 d=2500
+@ via @@48 b=6 p=0 d=256
+@ via @@47 b=1 p=0 d=121
+@@55: line 21.1 t=65756 -> @@49
+@@56: line 21.2 t=58775 -> @@47
+nights, the fight-ing in the
+@ via @@50 b=27 p=0 d=1369
+@@57: line 22.1 t=126282 -> @@50
+moun-
+@\discretionary via @@52 b=78 p=50 d=20244
+@\discretionary via @@51 b=17 p=50 d=3229
+@@58: line 22.1- t=124482 -> @@52
+tains
+@ via @@52 b=14 p=0 d=576
+@@59: line 22.3 t=104814 -> @@52
+be-
+@\discretionary via @@53 b=0 p=50 d=2600
+@@60: line 22.2- t=72184 -> @@53
+yond
+@ via @@54 b=0 p=0 d=100
+@@61: line 22.2 t=68555 -> @@54
+the
+@ via @@55 b=5 p=0 d=225
+@ via @@56 b=5 p=0 d=225
+@@62: line 22.2 t=59000 -> @@56
+town, the shell-marked iron
+@ via @@57 b=27 p=0 d=11369
+@@63: line 23.3 t=137651 -> @@57
+of
+@ via @@58 b=36 p=0 d=2116
+@@64: line 23.1 t=126598 -> @@58
+the
+@ via @@58 b=98 p=0 d=21664
+@@65: line 23.3 t=146146 -> @@58
+rail-
+@\discretionary via @@60 b=5 p=50 d=12725
+@\discretionary via @@59 b=22 p=50 d=3524
+@@66: line 23.2- t=84909 -> @@60
+way
+@ via @@60 b=97 p=0 d=11449
+@@67: line 23.3 t=83633 -> @@60
+bridge,
+@ via @@62 b=0 p=0 d=100
+@@68: line 23.2 t=59100 -> @@62
+the smashed tun-nel by the
+@ via @@64 b=200 p=0 d=44100
+@ via @@63 b=2 p=0 d=144
+@@69: line 24.2 t=137795 -> @@63
+river
+@ via @@65 b=42 p=0 d=12704
+@ via @@64 b=82 p=0 d=18464
+@@70: line 24.3 t=145062 -> @@64
+where
+@ via @@67 b=187 p=0 d=48809
+@ via @@66 b=23 p=0 d=1089
+@@71: line 24.3 t=85998 -> @@66
+the
+@ via @@67 b=2 p=0 d=144
+@@72: line 24.2 t=83777 -> @@67
+fight-
+@\discretionary via @@68 b=4 p=50 d=2696
+@@73: line 24.2- t=61796 -> @@68
+ing
+@ via @@68 b=22 p=0 d=1024
+@@74: line 24.3 t=60124 -> @@68
+had been, the trees around
+@ via @@69 b=46 p=0 d=3136
+@@75: line 25.3 t=140931 -> @@69
+the
+@ via @@70 b=0 p=0 d=100
+@@76: line 25.2 t=145162 -> @@70
+square
+@ via @@72 b=158 p=0 d=38224
+@ via @@71 b=5 p=0 d=225
+@@77: line 25.2 t=86223 -> @@71
+and
+@ via @@73 b=114 p=0 d=25376
+@ via @@72 b=23 p=0 d=1089
+@@78: line 25.0 t=87172 -> @@73
+@@79: line 25.3 t=84866 -> @@72
+the
+@ via @@74 b=101 p=0 d=22321
+@ via @@73 b=2 p=0 d=144
+@@80: line 25.2 t=61940 -> @@73
+long
+@ via @@74 b=51 p=0 d=3721
+@@81: line 25.3 t=63845 -> @@74
+av-enue of trees that led
+@ via @@75 b=11 p=0 d=441
+@@82: line 26.2 t=141372 -> @@75
+to
+@ via @@76 b=53 p=0 d=3969
+@ via @@75 b=9 p=0 d=361
+@@83: line 26.1 t=149131 -> @@76
+@@84: line 26.2 t=141292 -> @@75
+the
+@ via @@76 b=9 p=0 d=361
+@@85: line 26.2 t=145523 -> @@76
+square;
+@ via @@78 b=46 p=0 d=3136
+@ via @@79 b=46 p=0 d=13136
+@ via @@77 b=34 p=0 d=1936
+@@86: line 26.1 t=90308 -> @@78
+@@87: line 26.3 t=88159 -> @@77
+these
+@ via @@80 b=1 p=0 d=121
+@@88: line 26.2 t=62061 -> @@80
+with
+@ via @@81 b=0 p=0 d=100
+@@89: line 26.2 t=63945 -> @@81
+there be-ing girls in the
+@ via @@83 b=175 p=0 d=34225
+@ via @@84 b=175 p=0 d=44225
+@ via @@82 b=3 p=0 d=169
+@@90: line 27.2 t=141541 -> @@82
+town,
+@ via @@85 b=11 p=0 d=441
+@@91: line 27.2 t=145964 -> @@85
+the King
+@ via @@86 b=0 p=0 d=100
+@ via @@87 b=0 p=0 d=100
+@@92: line 27.2 t=88259 -> @@87
+pass-
+@\discretionary via @@88 b=0 p=50 d=2600
+@@93: line 27.2- t=64661 -> @@88
+ing
+@ via @@89 b=78 p=0 d=7744
+@@94: line 27.1 t=71689 -> @@89
+in
+@ via @@89 b=0 p=0 d=100
+@@95: line 27.2 t=64045 -> @@89
+his mo-tor car, some-
+@\discretionary via @@90 b=50 p=50 d=6100
+@@96: line 28.1- t=147641 -> @@90
+times now
+@ via @@91 b=1 p=0 d=121
+@@97: line 28.2 t=146085 -> @@91
+see-ing
+@ via @@92 b=57 p=0 d=4489
+@@98: line 28.1 t=92748 -> @@92
+his
+@ via @@93 b=81 p=0 d=8281
+@ via @@92 b=27 p=0 d=1369
+@@99: line 28.1 t=72942 -> @@93
+face
+@ via @@94 b=30 p=0 d=1600
+@ via @@93 b=43 p=0 d=2809
+@@100: line 28.1 t=73289 -> @@94
+@@101: line 28.3 t=67470 -> @@93
+and
+@ via @@95 b=0 p=0 d=100
+@@102: line 28.2 t=64145 -> @@95
+lit-tle long necked
+@ via @@96 b=38 p=0 d=2304
+@@103: line 29.1 t=149945 -> @@96
+body and
+@ via @@97 b=83 p=0 d=8649
+@@104: line 29.1 t=154734 -> @@97
+gray
+@ via @@97 b=91 p=0 d=10201
+@@105: line 29.3 t=156286 -> @@97
+beard
+@ via @@99 b=16 p=0 d=676
+@ via @@98 b=57 p=0 d=14489
+@@106: line 29.1 t=73618 -> @@99
+like
+@ via @@100 b=33 p=0 d=1849
+@ via @@101 b=33 p=0 d=11849
+@@107: line 29.1 t=75138 -> @@100
+a
+@ via @@100 b=0 p=0 d=100
+@ via @@101 b=0 p=0 d=100
+@@108: line 29.2 t=67570 -> @@101
+goat's
+@ via @@102 b=63 p=0 d=5329
+@@109: line 29.3 t=69474 -> @@102
+chin tuft; all
+@ via @@103 b=40 p=0 d=2500
+@@110: line 30.1 t=152445 -> @@103
+these with
+@ via @@104 b=13 p=0 d=529
+@@111: line 30.1 t=155263 -> @@104
+the
+@ via @@105 b=55 p=0 d=14225
+@ via @@104 b=63 p=0 d=15329
+@@112: line 30.1 t=170511 -> @@105
+@@113: line 30.3 t=170063 -> @@104
+sud-
+@\discretionary via @@106 b=184 p=50 d=40136
+@\discretionary via @@105 b=52 p=50 d=6344
+@@114: line 30.0- t=113754 -> @@106
+den
+@ via @@106 b=9 p=0 d=361
+@@115: line 30.2 t=73979 -> @@106
+in-
+@\discretionary via @@107 b=29 p=50 d=4021
+@\discretionary via @@106 b=38 p=50 d=14804
+@@116: line 30.1- t=79159 -> @@107
+@@117: line 30.3- t=88422 -> @@106
+te-
+@\discretionary via @@108 b=44 p=50 d=5416
+@\discretionary via @@107 b=0 p=50 d=2600
+@@118: line 30.1- t=72986 -> @@108
+@@119: line 30.2- t=77738 -> @@107
+ri-
+@\discretionary via @@108 b=2 p=50 d=2644
+@\discretionary via @@107 b=8 p=50 d=2824
+@@120: line 30.2- t=70214 -> @@108
+ors
+@ via @@108 b=25 p=0 d=1225
+@@121: line 30.3 t=68795 -> @@108
+of
+@ via @@109 b=63 p=0 d=15329
+@@122: line 30.1 t=84803 -> @@109
+houses that had
+@ via @@110 b=4 p=0 d=196
+@@123: line 31.2 t=152641 -> @@110
+lost a wall
+@ via @@112 b=129 p=0 d=19321
+@ via @@113 b=129 p=0 d=29321
+@ via @@111 b=2 p=0 d=144
+@@124: line 31.2 t=155407 -> @@111
+through
+@ via @@115 b=51 p=0 d=3721
+@ via @@114 b=55 p=0 d=14225
+@@125: line 31.1 t=77700 -> @@115
+shelling,
+@ via @@121 b=56 p=0 d=14356
+@ via @@120 b=14 p=0 d=576
+@@126: line 31.3 t=70790 -> @@120
+with
+@ via @@122 b=0 p=0 d=100
+@@127: line 31.2 t=84903 -> @@122
+plas-ter and rub-
+@\discretionary via @@123 b=1 p=50 d=2621
+@@128: line 32.2- t=155262 -> @@123
+ble in their
+@ via @@124 b=0 p=0 d=100
+@@129: line 32.2 t=155507 -> @@124
+gar-dens
+@ via @@125 b=1 p=0 d=121
+@@130: line 32.2 t=77821 -> @@125
+and some-
+@\discretionary via @@126 b=34 p=50 d=4436
+@@131: line 32.3- t=75226 -> @@126
+times
+@ via @@127 b=9 p=0 d=361
+@@132: line 32.2 t=85264 -> @@127
+in the street,
+@ via @@128 b=3 p=0 d=169
+@@133: line 33.2 t=155431 -> @@128
+and the whole thing
+@ via @@130 b=0 p=0 d=100
+@@134: line 33.2 t=77921 -> @@130
+go-ing
+@ via @@131 b=161 p=0 d=39241
+@@135: line 33.0 t=114467 -> @@131
+well
+@ via @@131 b=8 p=0 d=324
+@@136: line 33.2 t=75550 -> @@131
+on
+@ via @@132 b=18 p=0 d=784
+@@137: line 33.1 t=86048 -> @@132
+the
+@ via @@132 b=48 p=0 d=3364
+@@138: line 33.3 t=88628 -> @@132
+Carso made
+@ via @@133 b=7 p=0 d=289
+@@139: line 34.2 t=155720 -> @@133
+the fall very dif-f
+@\discretionary via @@134 b=62 p=50 d=7684
+@@140: line 34.1- t=85605 -> @@134
+er-
+@\discretionary via @@134 b=0 p=50 d=2600
+@@141: line 34.2- t=80521 -> @@134
+ent
+@ via @@134 b=63 p=0 d=5329
+@@142: line 34.3 t=83250 -> @@134
+from
+@ via @@136 b=133 p=0 d=30449
+@ via @@135 b=17 p=0 d=10729
+@@143: line 34.0 t=105999 -> @@136
+the
+@ via @@137 b=62 p=0 d=5184
+@ via @@136 b=2 p=0 d=144
+@@144: line 34.2 t=75694 -> @@136
+last
+@ via @@138 b=37 p=0 d=12209
+@ via @@137 b=43 p=0 d=12809
+@@145: line 34.1 t=100837 -> @@138
+@@146: line 34.3 t=98857 -> @@137
+fall
+@ via @@138 b=38 p=0 d=2304
+@@147: line 34.3 t=90932 -> @@138
+when we
+@ via @@139 b=10 p=0 d=400
+@@148: line 35.2 t=156120 -> @@139
+had been in the
+@ via @@141 b=55 p=0 d=4225
+@ via @@140 b=0 p=0 d=100
+@@149: line 35.1 t=84746 -> @@141
+@@150: line 35.2 t=85705 -> @@140
+coun-
+@\discretionary via @@142 b=1 p=50 d=2621
+@@151: line 35.2- t=85871 -> @@142
+try.
+@ via @@143 b=113 p=0 d=15129
+@ via @@142 b=37 p=0 d=2209
+@@152: line 35.3 t=85459 -> @@142
+The
+@ via @@144 b=22 p=0 d=1024
+@ via @@143 b=20 p=0 d=10900
+@@153: line 35.1 t=76718 -> @@144
+war
+@ via @@145 b=21 p=0 d=961
+@ via @@146 b=21 p=0 d=10961
+@ via @@144 b=46 p=0 d=3136
+@@154: line 35.3 t=78830 -> @@144
+was
+@ via @@147 b=10 p=0 d=400
+@ via @@145 b=51 p=0 d=13721
+@ via @@146 b=51 p=0 d=3721
+@@155: line 35.2 t=91332 -> @@147
+changed
+@ via @@148 b=27 p=0 d=1369
+@@156: line 36.1 t=157489 -> @@148
+too.
+@\par via @@155 b=0 p=-10000 d=100
+@\par via @@154 b=0 p=-10000 d=100
+@\par via @@153 b=0 p=-10000 d=100
+@\par via @@152 b=0 p=-10000 d=100
+@\par via @@151 b=0 p=-10000 d=5100
+@\par via @@149 b=0 p=-10000 d=100
+@\par via @@150 b=0 p=-10000 d=100
+@@157: line 36.2- t=76818 -> @@153
+@\par via @@156 b=0 p=-10000 d=100
+@@158: line 37.2- t=157589 -> @@156
