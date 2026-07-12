@@ -597,7 +597,7 @@ impl<'a> LineBreaker<'a> {
 
             let mut n = active_nodes.len();
             while n > 0 {
-                let (mut m, line_width) = self.determine_class(&active_nodes, n);
+                let mut m = self.num_nodes_for_next_class(&active_nodes, n);
                 n -= m;
 
                 // TeX.2021.833
@@ -622,6 +622,13 @@ impl<'a> LineBreaker<'a> {
                     let active_node = active_nodes.pop_front().expect("active nodes to consider");
                     // This is the key formula that essentially defines what we're doing with diffs.
                     let line_diffs = diffs.clone() - active_node.diffs.clone() + background.clone();
+                    let line_width = self
+                        .line_widths
+                        // The index here is actually line_index = (line_number - 1)
+                        // = (previous_line_number + 1 - 1) = previous_line_number.
+                        .get(active_node.line_number)
+                        .copied()
+                        .unwrap_or(*self.line_widths.last().unwrap());
 
                     // TeX.2021.851
                     let shortfall = Scaled64(line_width.0 as i64)
@@ -932,30 +939,31 @@ impl<'a> LineBreaker<'a> {
         d
     }
 
-    fn determine_class(
-        &self,
-        active_nodes: &VecDeque<ActiveNode>,
-        k: usize,
-    ) -> (usize, common::Scaled) {
+    /// Returns the number of active nodes at the head of the list that will all create
+    /// new active nodes of the same line class.
+    ///
+    /// Note that the active nodes at the head grouped in this was may not all have the
+    /// same line class themselves. For example,
+    /// if the line widths are [5,4,3], then there are 3 line classes: line 1, line 2, and
+    /// remaining lines. Active nodes in line 1 create active nodes in line 2. But active
+    /// nodes in line 2 and remaining lines create active nodes in remaining lines. Thus in
+    /// the grouping here, active nodes for line 2 and remaining nodes are returned
+    /// together.
+    ///
+    /// This "subtlety" is covered by unit tests and was in fact discovered by a failing
+    /// unit test.
+    fn num_nodes_for_next_class(&self, active_nodes: &VecDeque<ActiveNode>, k: usize) -> usize {
         let first_active_node = active_nodes.front().expect("active nodes are non-empty");
         let prev_line_number = first_active_node.line_number;
-        if self.params.looseness == 0 && prev_line_number + 1 >= self.line_widths.len() {
+        if self.params.looseness == 0 && prev_line_number + 2 >= self.line_widths.len() {
             // This covers the last class of active nodes whose widths are all the same.
-            return (k, *self.line_widths.last().unwrap());
+            return k;
         }
-        (
-            active_nodes
-                .iter()
-                .zip(0..k) // TODO, better way?
-                .take_while(|(active_node, _)| {
-                    active_node.line_number == first_active_node.line_number
-                })
-                .count(),
-            self.line_widths
-                .get(prev_line_number)
-                .copied()
-                .unwrap_or(*self.line_widths.last().unwrap()),
-        )
+        active_nodes
+            .iter()
+            .take(k)
+            .take_while(|active_node| active_node.line_number == first_active_node.line_number)
+            .count()
     }
 }
 
@@ -1105,9 +1113,7 @@ mod tests {
             "wolf_hall_input.txt",
             &["5in", "4in", "3in", "4in"],
             typeset: "wolf_hall_variable_widths_want.txt",
-            // TODO: figure out why the log lines are not in the right
-            // order and enable this test.
-            // log: "wolf_hall_variable_widths_log.txt",
+            log: "wolf_hall_variable_widths_log.txt",
         ),
         (
             farewell_to_arms_looseness_plus_1,
@@ -1117,7 +1123,12 @@ mod tests {
                 looseness: 1,
             },
             typeset: "farewell_to_arms_looseness_plus_1_want.txt",
-            // TODO: there is a real bug that is exposed by this log diff!
+            // TODO: there is a real bug that is exposed by this log diff: at
+            // breaks following a hyphenated word with a ligature after the
+            // hyphen ("of-fi..."), our badness disagrees with TeX (b=40 vs
+            // b=6) and a later node picks a different predecessor. Likely
+            // the unimplemented post-break width adjustment for
+            // discretionaries (the TeX.2021.840 TODO in break_line).
             // log: "farewell_to_arms_looseness_plus_1_log.txt",
         ),
         (
