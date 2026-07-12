@@ -11,6 +11,7 @@ keywords = ["tex", "texcraft"]
 [dependencies]
 common = { path = "../common", features=[] }
 ariadne = {version="0.5.0", default-features = false, optional = true}
+tempfile = {version="3", optional=true}
 
 [dev-dependencies]
 pretty_assertions = {version = "1.4.1" }
@@ -18,6 +19,7 @@ pretty_assertions = {version = "1.4.1" }
 [features]
 default = []
 ariadne = ["dep:ariadne"]
+tempfile = ["dep:tempfile"]
 
 [lints]
 workspace = true

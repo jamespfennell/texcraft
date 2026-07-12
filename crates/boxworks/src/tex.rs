@@ -19,7 +19,12 @@ use std::{collections::HashMap, path::PathBuf};
 /// Implementations of this trait can run TeX source code and return stdout.
 pub trait TexEngine {
     /// Run the provided TeX source code and return stdout.
-    fn run(&self, tex_source_code: &str, auxiliary_files: &HashMap<PathBuf, Vec<u8>>) -> String;
+    ///
+    /// The method accepts a mutable reference to that implementations of this trait
+    /// can assume there are not concurrent runs of the engine. This is useful for real
+    /// TeX engines which need to write files to disk.
+    fn run(&mut self, tex_source_code: &str, auxiliary_files: &HashMap<PathBuf, Vec<u8>>)
+        -> String;
 }
 
 /// Error return when a binary on the host computer was not found.
@@ -44,7 +49,7 @@ impl std::error::Error for BinaryNotFound {}
 /// A TeX engine binary on the host computer, like `tex` or `pdftex`.
 pub fn new_tex_engine_binary(binary_name: String) -> Result<Box<dyn TexEngine>, BinaryNotFound> {
     #[allow(clippy::expect_fun_call)]
-    if std::process::Command::new("which")
+    if !std::process::Command::new("which")
         .arg(&binary_name)
         .stdout(std::process::Stdio::null())
         .spawn()
@@ -53,17 +58,41 @@ pub fn new_tex_engine_binary(binary_name: String) -> Result<Box<dyn TexEngine>, 
         .expect(&format!["failed to run `which {binary_name}`"])
         .success()
     {
-        Ok(Box::new(TexEngineBinary(binary_name)))
-    } else {
-        Err(BinaryNotFound { binary_name })
+        return Err(BinaryNotFound { binary_name });
+    }
+    #[cfg(feature = "tempfile")]
+    {
+        let tempfile_handle = tempfile::TempDir::new().unwrap();
+        let dir: std::path::PathBuf = tempfile_handle.path().into();
+        Ok(Box::new(TexEngineBinary {
+            binary_name,
+            _tempfile_handle: tempfile_handle,
+            dir,
+        }))
+    }
+    #[cfg(not(feature = "tempfile"))]
+    {
+        Ok(Box::new(TexEngineBinary {
+            binary_name,
+            dir: std::env::temp_dir(),
+        }))
     }
 }
 
-struct TexEngineBinary(String);
+struct TexEngineBinary {
+    binary_name: String,
+    #[cfg(feature = "tempfile")]
+    _tempfile_handle: tempfile::TempDir,
+    dir: std::path::PathBuf,
+}
 
 impl TexEngine for TexEngineBinary {
-    fn run(&self, tex_source_code: &str, auxiliary_files: &HashMap<PathBuf, Vec<u8>>) -> String {
-        let mut dir = std::env::temp_dir();
+    fn run(
+        &mut self,
+        tex_source_code: &str,
+        auxiliary_files: &HashMap<PathBuf, Vec<u8>>,
+    ) -> String {
+        let mut dir = self.dir.clone();
         let thread = std::thread::current();
         let thread_name = thread
             .name()
@@ -91,7 +120,7 @@ impl TexEngine for TexEngineBinary {
         eprintln!("writing to {}", input_path.as_os_str().to_string_lossy());
         std::fs::write(&input_path, tex_source_code).expect("Unable to write file");
 
-        let output = std::process::Command::new(&self.0)
+        let output = std::process::Command::new(&self.binary_name)
             .current_dir(&dir)
             .arg(&input_path)
             .output()
@@ -116,7 +145,7 @@ const HBOX_TEMPLATE: &str = include_str!("hbox_template.tex");
 /// This function is the inverse of TeX.2021.173 and onwards
 /// (part 12 of TeX: displaying boxes).
 pub fn build_horizontal_lists(
-    tex_engine: &dyn TexEngine,
+    tex_engine: &mut dyn TexEngine,
     auxiliary_files: &HashMap<PathBuf, Vec<u8>>,
     preamble: &str,
     contents: &mut dyn Iterator<Item = &String>,
@@ -209,7 +238,7 @@ pub fn build_horizontal_lists(
 /// This function is the inverse of TeX.2021.173 and onwards
 /// (part 12 of TeX: displaying boxes).
 pub fn build_vertical_lists(
-    tex_engine: &dyn TexEngine,
+    tex_engine: &mut dyn TexEngine,
     auxiliary_files: &HashMap<PathBuf, Vec<u8>>,
     preamble: &str,
     widths: &[common::Scaled],
@@ -502,12 +531,17 @@ fn parse_disc_elem(
                     num_fonts
                 }
             };
-            let mut words = tail.split_ascii_whitespace();
-            let char = parse_char(words.next().ok_or(Error {
-                kind: ErrorKind::MissingCharAfterFont,
-                line_number,
-            })?);
-            Ok(ds::DiscretionaryElem::Char(ds::Char { char, font }))
+            Ok(match parse_char(tail, line_number)? {
+                ParsedChar::Char(char) => ds::Char { char, font }.into(),
+                ParsedChar::Lig(char, og_chars) => ds::Ligature {
+                    included_left_boundary: false,
+                    included_right_boundary: false,
+                    char,
+                    font,
+                    original_chars: og_chars.into(),
+                }
+                .into(),
+            })
         }
     }
 }
@@ -679,30 +713,16 @@ fn parse_h_box_list(
                         num_fonts
                     }
                 };
-                let mut words = tail.split_ascii_whitespace();
-                let char = parse_char(words.next().ok_or(Error {
-                    kind: ErrorKind::MissingCharAfterFont,
-                    line_number,
-                })?);
-                if words.next() == Some("(ligature") {
-                    let og_chars = words.next().ok_or(Error {
-                        kind: ErrorKind::LigatureMissingOriginalChars,
-                        line_number,
-                    })?;
-                    let og_chars = og_chars.strip_suffix(')').ok_or(Error {
-                        kind: ErrorKind::LigatureMissingClosingParen,
-                        line_number,
-                    })?;
-                    ds::Ligature {
+                match parse_char(tail, line_number)? {
+                    ParsedChar::Char(char) => ds::Char { char, font }.into(),
+                    ParsedChar::Lig(char, og_chars) => ds::Ligature {
                         included_left_boundary: false,
                         included_right_boundary: false,
                         char,
                         font,
                         original_chars: og_chars.into(),
                     }
-                    .into()
-                } else {
-                    ds::Char { char, font }.into()
+                    .into(),
                 }
             }
         };
@@ -887,9 +907,19 @@ fn parse_glue_set(s: &str) -> (ds::GlueRatio, common::GlueOrder) {
     (ratio, order)
 }
 
-fn parse_char(s: &str) -> char {
+enum ParsedChar<'a> {
+    Char(char),
+    Lig(char, &'a str),
+}
+
+fn parse_char<'a>(s: &'a str, line_number: usize) -> Result<ParsedChar<'a>, Error> {
+    let mut words = s.split_ascii_whitespace();
+    let s = words.next().ok_or(Error {
+        kind: ErrorKind::MissingCharAfterFont,
+        line_number,
+    })?;
     let mut cs = s.chars();
-    match cs.next().expect("char has one character") {
+    let c = match cs.next().expect("char has one character") {
         '^' => {
             assert_eq!(cs.next(), Some('^'));
             let raw_c = cs.next().expect("char of the form ^^X") as u32;
@@ -902,7 +932,20 @@ fn parse_char(s: &str) -> char {
             .expect("TeX describes a valid character")
         }
         c => c,
-    }
+    };
+    Ok(if words.next() == Some("(ligature") {
+        let og_chars = words.next().ok_or(Error {
+            kind: ErrorKind::LigatureMissingOriginalChars,
+            line_number,
+        })?;
+        let og_chars = og_chars.strip_suffix(')').ok_or(Error {
+            kind: ErrorKind::LigatureMissingClosingParen,
+            line_number,
+        })?;
+        ParsedChar::Lig(c, og_chars)
+    } else {
+        ParsedChar::Char(c)
+    })
 }
 
 fn parse_scaled(s: &str) -> common::Scaled {
@@ -991,6 +1034,7 @@ We add some text at the end.
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     fn parse_hbox_lang(source: &str) -> ds::HBox {
         let mut list = crate::lang::parse_horizontal_list(source).unwrap();
@@ -1020,7 +1064,7 @@ mod tests {
     struct MockTexEngine(String);
 
     impl TexEngine for MockTexEngine {
-        fn run(&self, _: &str, _: &HashMap<PathBuf, Vec<u8>>) -> String {
+        fn run(&mut self, _: &str, _: &HashMap<PathBuf, Vec<u8>>) -> String {
             self.0.clone()
         }
     }
@@ -1029,9 +1073,9 @@ mod tests {
     fn test_build_horizontal_lists() {
         let log = include_str!("hbox_template_1.log");
 
-        let tex_engine = MockTexEngine(log.to_string());
+        let mut tex_engine = MockTexEngine(log.to_string());
         let (got_fonts, got_list) = build_horizontal_lists(
-            &tex_engine,
+            &mut tex_engine,
             &Default::default(),
             &"",
             &mut vec!["".to_string()].iter(),
@@ -1071,10 +1115,11 @@ mod tests {
 \hbox(6.94444+0.0)x10.0
 .\discretionary replacing 3
 ..\tenrm d
-..\tenrm e
+..\tenrm ^^L (ligature fi)
 ..\tenrm f
-.|\tenrm g
-.|\tenrm h
+..\tenrm -
+.|\tenrm ^^L (ligature fi)
+.\tenrm ^^N (ligature ffi)
 ";
         let mut fonts = Default::default();
         let got = parse_h_box(&mut TexOutputIter::new(input), &mut fonts).unwrap();
@@ -1084,10 +1129,17 @@ mod tests {
                 width=10.0pt,
                 content=[
                     disc(
-                        pre_break=[chars("def", font=0)],
-                        post_break=[chars("gh", font=0)],
+                        pre_break=[
+                            chars("d")
+                            lig("\u{c}", "fi")
+                            chars("f-")
+                        ],
+                        post_break=[
+                            lig("\u{c}", "fi")
+                        ],
                         replace_count=3,
                     )
+                    lig("\u{e}", "ffi")
                 ]
             )"#,
         );
@@ -1135,9 +1187,9 @@ Texcraft: end
 No pages of output.
 Transcript written on test.log.
 "#;
-        let tex_engine = MockTexEngine(log.to_string());
+        let mut tex_engine = MockTexEngine(log.to_string());
         let (got_fonts, got_list) = build_vertical_lists(
-            &tex_engine,
+            &mut tex_engine,
             &Default::default(),
             &"",
             &[common::Scaled::ONE * 41],
@@ -1230,9 +1282,9 @@ No pages of output.
 Transcript written on test.log.
 "#;
 
-        let tex_engine = MockTexEngine(log.to_string());
+        let mut tex_engine = MockTexEngine(log.to_string());
         let (got_fonts, got_list) = build_vertical_lists(
-            &tex_engine,
+            &mut tex_engine,
             &Default::default(),
             &"",
             &[common::Scaled::ONE * 41],

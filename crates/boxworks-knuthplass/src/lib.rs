@@ -246,7 +246,7 @@ impl<'a> boxworks::LineBreaker for LineBreaker<'a> {
         v_list: &mut Vec<ds::Vertical>,
         h_list: &mut Vec<ds::Horizontal>,
     ) {
-        // This function is analagous to TeX.2021.815.
+        // This function is analogous to TeX.2021.815.
 
         // TeX.2021.816
         if matches!(h_list.last(), Some(ds::Horizontal::Glue(_))) {
@@ -750,9 +750,9 @@ impl<'a> LineBreaker<'a> {
                         match elem {
                             Discretionary(discretionary) => {
                                 // TeX.2021.840
-                                // TODO: also need to factor in the post_break adjustment.
                                 let mut j = i + 1;
                                 while j < i + 1 + discretionary.replace_count as usize {
+                                    // TeX.2021.841
                                     diffs.width += match &list[j] {
                                         Char(ds::Char { char, font })
                                         | Ligature(ds::Ligature { char, font, .. }) => {
@@ -771,6 +771,20 @@ impl<'a> LineBreaker<'a> {
                                         }
                                     };
                                     j += 1;
+                                }
+                                for elem in &discretionary.post_break {
+                                    // TeX.2021.842
+                                    use ds::DiscretionaryElem::*;
+                                    diffs.width -= match elem {
+                                        Char(ds::Char { char, font })
+                                        | Ligature(ds::Ligature { char, font, .. }) => {
+                                            font_repo.width(*char, *font).unwrap_or(Scaled::ZERO)
+                                        }
+                                        HBox(ds::HBox { width, .. })
+                                        | VBox(ds::VBox { width, .. })
+                                        | Rule(ds::Rule { width, .. })
+                                        | Kern(ds::Kern { width, .. }) => *width,
+                                    }
                                 }
                             }
                             Math(_math) => {
@@ -1123,13 +1137,10 @@ mod tests {
                 looseness: 1,
             },
             typeset: "farewell_to_arms_looseness_plus_1_want.txt",
-            // TODO: there is a real bug that is exposed by this log diff: at
-            // breaks following a hyphenated word with a ligature after the
-            // hyphen ("of-fi..."), our badness disagrees with TeX (b=40 vs
-            // b=6) and a later node picks a different predecessor. Likely
-            // the unimplemented post-break width adjustment for
-            // discretionaries (the TeX.2021.840 TODO in break_line).
-            // log: "farewell_to_arms_looseness_plus_1_log.txt",
+            // There is a bug here to do with the printing of post-break material.
+            // Knuth prints the -fi after the discretionary. But right now I don't
+            // know how he gets the ligature replacement text.
+            log: "farewell_to_arms_looseness_plus_1_log.txt",
         ),
         (
             farewell_to_arms_looseness_minus_1,
@@ -1316,17 +1327,17 @@ mod tests {
     /// the `\tracingparagraphs` trace appears in this output.
     struct RecordingTexEngine {
         inner: Box<dyn boxworks::tex::TexEngine>,
-        stdout: RefCell<String>,
+        stdout: String,
     }
 
     impl boxworks::tex::TexEngine for RecordingTexEngine {
         fn run(
-            &self,
+            &mut self,
             tex_source_code: &str,
             auxiliary_files: &std::collections::HashMap<std::path::PathBuf, Vec<u8>>,
         ) -> String {
             let output = self.inner.run(tex_source_code, auxiliary_files);
-            *self.stdout.borrow_mut() = output.clone();
+            self.stdout = output.clone();
             output
         }
     }
@@ -1369,20 +1380,20 @@ mod tests {
         std::env::set_var("max_print_line", "10000");
 
         let widths = parse_widths(widths);
-        let engine = RecordingTexEngine {
+        let mut engine = RecordingTexEngine {
             inner: boxworks::tex::new_tex_engine_binary("tex".to_string()).unwrap(),
             stdout: Default::default(),
         };
         let texts = vec![format![r"\looseness={} {}", params.looseness, input.trim()]];
         let (_, vlists) = boxworks::tex::build_vertical_lists(
-            &engine,
+            &mut engine,
             &auxiliary_files,
             &preamble,
             &widths,
             &mut texts.iter(),
         );
         let [vlist]: [ds::VBox; 1] = vlists.try_into().expect("one text in, one vlist out");
-        (vlist, engine.stdout.into_inner())
+        (vlist, engine.stdout)
     }
 
     /// Extracts the `\tracingparagraphs` trace from TeX's terminal output:

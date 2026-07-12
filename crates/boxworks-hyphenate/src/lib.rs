@@ -331,7 +331,7 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                 (1, format!["{}-", &s[prev_chars_pushed..hyph_next]])
             };
 
-            // This us the loop in TeX.2021.344.
+            // This is the loop in TeX.2021.344.
             loop {
                 let pre_break: Vec<ds::DiscretionaryElem> = hyphenater
                     .lig_kern_program
@@ -348,13 +348,12 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                                 kind: ds::KernKind::Normal,
                             }
                             .into(),
-                            // In discretionary elements here Knuth does not put ligatures.
-                            // I guess the reason is that ligature nodes exist so that we can
-                            // break them apart during hyphenation. But after the hyphenation
-                            // routine here we will never do this.
-                            RunItem::Ligature(ligature) => ds::Char {
+                            RunItem::Ligature(ligature) => ds::Ligature {
                                 char: ligature.c,
                                 font: hyphenation_font,
+                                included_left_boundary: false,  // TODO
+                                included_right_boundary: false, // TODO
+                                original_chars: ligature.original.clone(),
                             }
                             .into(),
                         };
@@ -406,13 +405,12 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                                     kind: ds::KernKind::Normal,
                                 }
                                 .into(),
-                                // In discretionary elements here Knuth does not put ligatures.
-                                // I guess the reason is that ligature nodes exist so that we can
-                                // break them apart during hyphenation. But after the hyphenation
-                                // routine here we will never do this.
-                                RunItem::Ligature(ligature) => ds::Char {
+                                RunItem::Ligature(ligature) => ds::Ligature {
                                     char: ligature.c,
                                     font: hyphenation_font,
+                                    included_left_boundary: false, // TODO
+                                    included_right_boundary: false, // TODO
+                                    original_chars: ligature.original.clone(),
                                 }
                                 .into(),
                             });
@@ -441,8 +439,8 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                                 RunItem::Ligature(ligature) => ds::Ligature {
                                     char: ligature.c,
                                     font: hyphenation_font,
-                                    included_left_boundary: false,
-                                    included_right_boundary: false,
+                                    included_left_boundary: false, // TODO
+                                    included_right_boundary: false, // TODO
                                     original_chars: ligature.original,
                                 }
                                 .into(),
@@ -549,9 +547,9 @@ mod tests {
                 hyphenation_patterns,
                 tc.left_hyphen_min.unwrap_or(1),
             ];
-            let tex_engine = boxworks::tex::new_tex_engine_binary("tex".to_string()).unwrap();
+            let mut tex_engine = boxworks::tex::new_tex_engine_binary("tex".to_string()).unwrap();
             let (_, tex_got) = boxworks::tex::build_horizontal_lists(
-                tex_engine.as_ref(),
+                tex_engine.as_mut(),
                 &auxiliary_files,
                 &preamble,
                 &mut vec![tex_input.clone()].iter(),
@@ -680,7 +678,8 @@ mod tests {
                 want: r#"
                     disc(
                       pre_break=[
-                        chars("ax")
+                        chars("a")
+                        lig("x", "")
                         chars("-")
                       ],
                       replace_count=1,
@@ -701,7 +700,8 @@ mod tests {
                 want: r#"
                     disc(
                       pre_break=[
-                        chars("ax")
+                        chars("a")
+                        lig("x", "")
                         chars("-")
                       ],
                       post_break=[
@@ -771,7 +771,8 @@ mod tests {
                     chars("a")
                     disc(
                       pre_break=[
-                        chars("-c")
+                        chars("-")
+                        lig("c", "")
                       ],
                     )
                     chars("b")
@@ -818,7 +819,7 @@ mod tests {
                         chars("-")
                       ],
                       post_break=[
-                        chars("z")
+                        lig("z", "bc")
                       ],
                       replace_count=1,
                     )
@@ -837,7 +838,7 @@ mod tests {
                 want: r#"
                     disc(
                       pre_break=[
-                        chars("x")
+                        lig("x", "ab")
                         chars("-")
                       ],
                       post_break=[
@@ -1000,7 +1001,9 @@ mod tests {
                         chars("a-")
                       ],
                       post_break=[
-                        chars("ywf")
+                        lig("y", "bc")
+                        lig("w", "de")
+                        chars("f")
                       ],
                       replace_count=3,
                     )
@@ -1029,7 +1032,9 @@ mod tests {
                         chars("a-")
                       ],
                       post_break=[
-                        chars("ywf")
+                        lig("y", "bc")
+                        lig("w", "de")
+                        chars("f")
                       ],
                       replace_count=3,
                     )
@@ -1065,9 +1070,8 @@ mod tests {
                         chars("a-")
                       ],
                       post_break=[
-                        # these are duplicated from the main list.
-                        # we could have nothing here and replace_count=0
-                        chars("yz")
+                        lig("y", "bc")
+                        lig("z", "")
                       ],
                       replace_count=2,
                     )

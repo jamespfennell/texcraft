@@ -12,6 +12,9 @@ fn run_box(args: &[&str], texts_file: &str) -> String {
         cmd.arg(arg);
     }
     cmd.arg(format!("--texts-file={}", texts_file_path.display()));
+    if std::env::var("TEXCRAFT_VERIFY").unwrap_or("".to_string()) == "tex" {
+        cmd.arg("--tex-engine=tex");
+    }
     let output = cmd.output().unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(
@@ -19,6 +22,8 @@ fn run_box(args: &[&str], texts_file: &str) -> String {
         "failed to run box command: {}",
         stderr
     );
+    eprintln!("{stderr}");
+    assert!(!output.stdout.is_empty(), "box output is empty");
     String::from_utf8(output.stdout).unwrap()
 }
 

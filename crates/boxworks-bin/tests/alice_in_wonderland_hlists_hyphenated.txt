@@ -36565,7 +36565,7 @@ hbox(
         chars("-", font=0)
       ],
       post_break=[
-        chars("\u{c}", font=0)
+        lig("\u{c}", "fi", font=0)
       ],
       replace_count=1,
     )
@@ -44937,7 +44937,7 @@ hbox(
         chars("-", font=0)
       ],
       post_break=[
-        chars("\u{c}", font=0)
+        lig("\u{c}", "fi", font=0)
       ],
       replace_count=1,
     )
@@ -56186,7 +56186,7 @@ hbox(
         chars("-", font=0)
       ],
       post_break=[
-        chars("\u{c}", font=0)
+        lig("\u{c}", "fi", font=0)
       ],
       replace_count=1,
     )
@@ -78873,7 +78873,7 @@ hbox(
         chars("-", font=0)
       ],
       post_break=[
-        chars("\u{c}", font=0)
+        lig("\u{c}", "fi", font=0)
       ],
       replace_count=1,
     )
@@ -79647,7 +79647,7 @@ hbox(
         chars("-", font=0)
       ],
       post_break=[
-        chars("\u{c}", font=0)
+        lig("\u{c}", "fi", font=0)
       ],
       replace_count=1,
     )
@@ -82274,7 +82274,7 @@ hbox(
         chars("-", font=0)
       ],
       post_break=[
-        chars("\u{c}", font=0)
+        lig("\u{c}", "fi", font=0)
       ],
       replace_count=1,
     )
@@ -82953,7 +82953,7 @@ hbox(
         chars("-", font=0)
       ],
       post_break=[
-        chars("\u{c}", font=0)
+        lig("\u{c}", "fi", font=0)
       ],
       replace_count=1,
     )
@@ -111224,7 +111224,7 @@ hbox(
         chars("-", font=0)
       ],
       post_break=[
-        chars("\u{c}", font=0)
+        lig("\u{c}", "fi", font=0)
       ],
       replace_count=1,
     )
@@ -112816,7 +112816,7 @@ hbox(
         chars("-", font=0)
       ],
       post_break=[
-        chars("\u{c}", font=0)
+        lig("\u{c}", "fi", font=0)
       ],
       replace_count=1,
     )
@@ -113159,7 +113159,7 @@ hbox(
         chars("-", font=0)
       ],
       post_break=[
-        chars("\u{c}", font=0)
+        lig("\u{c}", "fi", font=0)
       ],
       replace_count=1,
     )
@@ -113788,7 +113788,7 @@ hbox(
         chars("-", font=0)
       ],
       post_break=[
-        chars("\u{c}", font=0)
+        lig("\u{c}", "fi", font=0)
       ],
       replace_count=1,
     )
@@ -113849,7 +113849,7 @@ hbox(
         chars("-", font=0)
       ],
       post_break=[
-        chars("\u{c}", font=0)
+        lig("\u{c}", "fi", font=0)
       ],
       replace_count=1,
     )

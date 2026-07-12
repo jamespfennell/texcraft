@@ -169,8 +169,8 @@ impl Hbox {
         };
         let labels = make_labels(self.texts.len(), num_direct, &file_line_numbers);
         let hboxs = match tex_engine {
-            Some(engine) => run_tex_hboxs(
-                engine.as_ref(),
+            Some(mut engine) => run_tex_hboxs(
+                engine.as_mut(),
                 self.texts,
                 self.font_metrics,
                 self.hyphenate,
@@ -350,10 +350,10 @@ impl Linebreak {
         let vlists = match self.tex_engine {
             None => run_box_vlists(self.texts, self.font_metrics, &widths, text_params, &params)?,
             Some(tex_engine) => {
-                let engine =
+                let mut engine =
                     bwt::new_tex_engine_binary(tex_engine).map_err(|err| format!["{err}"])?;
                 run_tex_vlists(
-                    engine.as_ref(),
+                    engine.as_mut(),
                     self.texts,
                     self.font_metrics,
                     &widths,
@@ -475,7 +475,7 @@ fn run_box_hboxs(
 }
 
 fn run_tex_hboxs(
-    tex_engine: &dyn bwt::TexEngine,
+    tex_engine: &mut dyn bwt::TexEngine,
     texts: Vec<String>,
     font_metrics: Option<PathBuf>,
     hyphenated: bool,
@@ -545,7 +545,7 @@ fn run_box_vlists(
 }
 
 fn run_tex_vlists(
-    tex_engine: &dyn bwt::TexEngine,
+    tex_engine: &mut dyn bwt::TexEngine,
     texts: Vec<String>,
     font_metrics: Option<PathBuf>,
     widths: &[common::Scaled],

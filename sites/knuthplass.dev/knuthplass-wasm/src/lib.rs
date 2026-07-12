@@ -754,10 +754,7 @@ mod tests {
         // An impossible tolerance forces a solution; the forced breaks get
         // artificially zeroed demerits (TeX.2021.854) and are flagged so
         // the UI can distinguish them from genuine zeros.
-        let v = run(
-            ALICE,
-            r#"{"width_pt":100,"tolerance":1,"pre_tolerance":1}"#,
-        );
+        let v = run(ALICE, r#"{"width_pt":100,"tolerance":1,"pre_tolerance":1}"#);
         let lines = v["lines"].as_array().unwrap();
         assert!(
             lines.iter().any(|l| l["artificial_demerits"] == true),
