@@ -23,9 +23,25 @@ typeset paragraph on the right.
   toggles, vivid overlay colors), plus a full bug/cleanliness audit pass.
   Wasm grew a `passes` field (stats say "hyphenation skipped" when the
   first pass wins) and glue parse errors name their parameter.
-- Remaining work: two v1.1 feature items and v2 introspection, below.
+- **Per-line widths done** (2026-07-12): width modes uniform | variable
+  (a third "shapes" mode is planned, below). The show chips are
+  split into two rows: *overlays* (marks painted on the sheet: kerns,
+  ligatures, glue, widths) and *data* (the numeric annotations: line
+  numbers, badness, demerits, glue set, inter-line penalty). New toggles,
+  both on by default: "widths" (triangle swatch; URL key `widthmarkers` —
+  plain `widths` is taken by the per-line list) hides all width markers,
+  and "line numbers" (the gutter stays reserved so the paragraph never
+  shifts). Variable mode is a
+  comma-separated per-line list — last entry repeats, matching the
+  `line_widths` convention — plus a per-line margin stop triangle on every
+  galley line that drags that line's width live; double-pressing a stop
+  gives every line below it that line's width (detected manually in
+  pointerdown — preventDefault there cancels native dblclick). Wasm
+  accepts `line_widths_pt` (array) alongside `width_pt`.
+- Remaining work: two v1.1 feature items, shapes mode, and v2
+  introspection, below.
 - Local dev: `caddy start --config Caddyfile.local` (port 8767), then
-  `npm test` (7 puppeteer smoke tests).
+  `npm test` (8 puppeteer smoke tests).
 
 ## Architecture (short reference — the code is the truth)
 
@@ -82,8 +98,15 @@ zeroes (TeX.2021.854), shown as "0*" in the galley.
   adds presentational leading so the kern hover dots have a lane between
   lines. Set it to 0 to restore exact `\baselineskip` geometry. Breaks,
   badness, and glue values are unaffected.
-- **Single width for v1** (+ maybe `\parindent`); shaped paragraphs via
-  `line_widths`/`line_indents` are future work.
+- **Per-line width state is the raw text of the widths box** (encoded in
+  the URL verbatim), not a parsed list: an invalid list round-trips and
+  is marked invalid rather than silently normalized. Dragging a line's
+  margin materializes the repeating tail one entry *past* that line when
+  lines exist below (dragging line 5 of `[300]` writes
+  `300, 300, 300, 300, N, 300`), so the drag moves that line only —
+  editing the bare last entry would drag every line below along. Only
+  the last rendered line keeps sharing its entry with the tail.
+  `\parindent`/`line_indents` remain future work.
 - **No debounce**: the wasm call runs on every input event with no visible
   lag.
 - Default text is the opening paragraph of *A Farewell to Arms*,
@@ -114,10 +137,14 @@ zeroes (TeX.2021.854), shown as "0*" in the galley.
 - **Deduplicate the glue parsing code** shared by `knuthplass-wasm` and
   `box linebreak` (`crates/boxworks-bin/src/box.rs`) — the copies carry a
   "keep in sync" comment today.
-- **Per-line widths and indents**, once implemented in
-  boxworks-knuthplass (`line_widths`/`line_indents`): expose them in the
-  UI — there is probably something nice to do in the galley (e.g. drag
-  individual line margins, shaped-paragraph presets).
+- **Shapes width mode**: a third option in the width mode row (uniform |
+  variable | **shapes** — the row shipped with a disabled placeholder,
+  removed 2026-07-12 until the feature is real): preset paragraph shapes
+  — circle, diamond, … — where the site computes the per-line width list
+  automatically from the shape and the text length. Probably needs
+  `line_indents` too (a centered circle indents each line, it doesn't
+  just shorten it), and widths below the current 72pt floor. `\parindent`
+  via `line_indents` is also still unexposed.
 - **An "about"/documentation popup** explaining what the site shows and
   how to read the galley. Must cover the notations that are currently
   unexplained in the UI: the "0*" artificial-demerits marker in the

@@ -54,6 +54,12 @@
                 padding: 0;
             }
 
+            /* Some rows below carry their own display rules, which would
+               otherwise beat the UA's [hidden] style. */
+            [hidden] {
+                display: none !important;
+            }
+
             body {
                 background-color: var(--bg);
                 color: var(--text);
@@ -207,6 +213,25 @@
                 outline-offset: -1px;
             }
 
+            /* Width mode selector: the same segmented chip row as the
+               looseness param, but with text cells sized to their labels.
+               (The square-cell sizing is scoped to .param-grid, so it does
+               not apply here.) */
+            #width-mode-row {
+                width: fit-content;
+                margin-bottom: 0.55rem;
+            }
+
+            #width-mode-row label {
+                position: relative;
+                display: flex;
+                align-items: center;
+                padding: 0.3rem 0.6rem;
+                font-size: 0.8rem;
+                cursor: pointer;
+                user-select: none;
+            }
+
             #width-row {
                 display: flex;
                 align-items: center;
@@ -221,6 +246,18 @@
 
             #width-number {
                 width: 4.5rem;
+            }
+
+            /* Variable mode: the comma-separated per-line widths list. */
+            #widths-row {
+                display: flex;
+                align-items: center;
+                gap: 0.6rem;
+                font-size: 0.85rem;
+            }
+
+            #widths-input {
+                flex: 1;
             }
 
             /* Parameter groups are flat and always open: a subhead over a
@@ -525,7 +562,7 @@
                 border-bottom: 1px solid var(--accent);
             }
 
-            #overlay-toggles {
+            .toggle-row {
                 display: flex;
                 flex-wrap: wrap;
                 gap: 0.4rem 0.5rem;
@@ -537,7 +574,7 @@
                light teal chip — teal is this UI's "active" color — while a
                disabled one sits directly on the paper, showing a faint chip
                on hover. The swatches carry the overlay colors. */
-            #overlay-toggles label {
+            .toggle-row label {
                 display: flex;
                 align-items: center;
                 gap: 0.35rem;
@@ -550,7 +587,7 @@
 
             /* The chip lives on a pseudo-element behind the content, so it
                can fade without dimming the text. */
-            #overlay-toggles label::after {
+            .toggle-row label::after {
                 content: "";
                 position: absolute;
                 inset: 0;
@@ -563,24 +600,24 @@
             /* Hover hint only on devices that actually hover, so a tap on
                a touch screen doesn't leave a half-lit chip behind. */
             @media (hover: hover) {
-                #overlay-toggles label:hover::after {
+                .toggle-row label:hover::after {
                     opacity: 0.5;
                 }
             }
 
-            #overlay-toggles label:has(input:checked)::after {
+            .toggle-row label:has(input:checked)::after {
                 opacity: 1;
             }
 
             /* The real checkboxes stay in the DOM for keyboard use and the
                existing JS, but render invisibly. */
-            #overlay-toggles input {
+            .toggle-row input {
                 position: absolute;
                 opacity: 0;
                 pointer-events: none;
             }
 
-            #overlay-toggles label:has(input:focus-visible) {
+            .toggle-row label:has(input:focus-visible) {
                 outline: 2px solid var(--accent);
                 outline-offset: 2px;
             }
@@ -590,6 +627,14 @@
                 width: 0.7rem;
                 height: 0.7rem;
                 border-radius: 2px;
+            }
+
+            /* The widths toggle's swatch is the galley's margin stop: a
+               downward triangle in the same muted gray. */
+            .swatch.stop {
+                height: 0.5rem;
+                border-radius: 0;
+                clip-path: polygon(0 0, 100% 0, 50% 100%);
             }
 
             /* The galley: the one white surface on the page, running from
@@ -642,6 +687,22 @@
 
             #sheet.margin-hover .margin-rule,
             #sheet.margin-dragging .margin-rule {
+                stroke: var(--muted);
+            }
+
+            /* Per-line margin selectors (variable width mode): every line
+               gets its own stop triangle, always-visible width label, and
+               grab strip. Hover/drag state lives on the line's group, not
+               the sheet, so only that line's chrome lights up. */
+            .line-margin.hover .margin-stop,
+            .line-margin.dragging .margin-stop,
+            .line-margin.hover .line-width-label,
+            .line-margin.dragging .line-width-label {
+                fill: var(--text);
+            }
+
+            .line-margin.hover .margin-rule,
+            .line-margin.dragging .margin-rule {
                 stroke: var(--muted);
             }
 
@@ -822,9 +883,27 @@
                 <div>
                     <div
                         class="section-label fit"
-                        data-tooltip="The line width the paragraph is broken to (TeX's \hsize). You can also drag the right margin of the typeset output."
+                        data-tooltip="The line width the paragraph is broken to (TeX's \hsize). Uniform applies one width to every line — drag the right margin of the typeset output to change it. Variable gives each line its own width (the last repeats for further lines) — drag any line's own margin selector, or double-click one to give every line below it that line's width."
                     >
                         width
+                    </div>
+                    <div
+                        id="width-mode-row"
+                        class="chip-radio-row"
+                        role="radiogroup"
+                        aria-label="width mode"
+                    >
+                        <label>
+                            <input type="radio" name="width-mode" value="uniform" checked />
+                            uniform
+                        </label>
+                        <label>
+                            <input type="radio" name="width-mode" value="variable" />
+                            variable
+                        </label>
+                        <!-- A third "shapes" mode (preset paragraph shapes,
+                             widths computed automatically) is planned; see
+                             PLAN.md. -->
                     </div>
                     <div id="width-row">
                         <input
@@ -842,6 +921,17 @@
                             min="72"
                             max="500"
                             step="1"
+                        />
+                        <span>pt</span>
+                    </div>
+                    <div id="widths-row" hidden>
+                        <input
+                            type="text"
+                            id="widths-input"
+                            aria-label="per-line widths in points, comma-separated"
+                            spellcheck="false"
+                            autocomplete="off"
+                            placeholder="300, 250, 200"
                         />
                         <span>pt</span>
                     </div>
@@ -863,8 +953,10 @@
 
             <div id="output-panel">
                 <div id="output-header">
-                <div id="overlay-toggles">
-                    <span class="section-label inline">show:</span>
+                <!-- Overlays are marks painted on the typeset sheet; data
+                     is the numeric annotations beside it. -->
+                <div id="overlay-toggles" class="toggle-row">
+                    <span class="section-label inline">overlays:</span>
                     <label>
                         <input type="checkbox" id="toggle-kerns" />
                         <span class="swatch" aria-hidden="true" style="background: var(--kern-pos-fill)"></span>
@@ -880,6 +972,18 @@
                         <input type="checkbox" id="toggle-glue" />
                         <span class="swatch" aria-hidden="true" style="background: var(--glue-fill)"></span>
                         glue
+                    </label>
+                    <label>
+                        <input type="checkbox" id="toggle-widthmarkers" checked />
+                        <span class="swatch stop" aria-hidden="true" style="background: var(--muted)"></span>
+                        widths
+                    </label>
+                </div>
+                <div id="data-toggles" class="toggle-row">
+                    <span class="section-label inline">data:</span>
+                    <label>
+                        <input type="checkbox" id="toggle-linenumbers" checked />
+                        line numbers
                     </label>
                     <label>
                         <input type="checkbox" id="toggle-badness" />
@@ -1066,6 +1170,23 @@
             const textInput = document.getElementById("text-input");
             const widthSlider = document.getElementById("width-slider");
             const widthNumber = document.getElementById("width-number");
+            const widthRow = document.getElementById("width-row");
+            const widthsRow = document.getElementById("widths-row");
+            const widthsInput = document.getElementById("widths-input");
+            const widthModeRadios = [
+                ...document.querySelectorAll('input[name="width-mode"]'),
+            ];
+            // "uniform" (one width for the whole paragraph) or "variable"
+            // (the per-line list in widthsInput; last entry repeats).
+            let widthMode = "uniform";
+            // The active margin drag: { startX, startWidthPt, line }, where
+            // line is a line index in variable mode and null for the global
+            // margin. Module-level so render() can re-mark the dragged
+            // line's chrome when the SVG is rebuilt mid-drag.
+            let marginDrag = null;
+            // How many lines the galley currently shows; setLineWidth needs
+            // it to know whether lines exist below the edited one.
+            let renderedLineCount = 0;
             const paramGroupsEl = document.getElementById("param-groups");
             const outputSvg = document.getElementById("output-svg");
             const outputError = document.getElementById("output-error");
@@ -1073,6 +1194,11 @@
                 kerns: document.getElementById("toggle-kerns"),
                 ligs: document.getElementById("toggle-ligs"),
                 glue: document.getElementById("toggle-glue"),
+                // The width markers (stop triangles + labels); the key
+                // differs from the label because the "widths" URL param is
+                // the per-line width list.
+                widthmarkers: document.getElementById("toggle-widthmarkers"),
+                linenumbers: document.getElementById("toggle-linenumbers"),
                 badness: document.getElementById("toggle-badness"),
                 demerits: document.getElementById("toggle-demerits"),
                 glueset: document.getElementById("toggle-glueset"),
@@ -1332,6 +1458,8 @@
                 kerns: false,
                 ligs: false,
                 glue: false,
+                widthmarkers: true,
+                linenumbers: true,
                 badness: false,
                 demerits: true,
                 glueset: true,
@@ -1341,7 +1469,14 @@
             function encodeState() {
                 const p = new URLSearchParams();
                 if (textInput.value !== DEFAULT_TEXT) p.set("text", textInput.value);
-                if (Number(widthNumber.value) !== DEFAULT_WIDTH) p.set("width", widthNumber.value);
+                // Each width mode encodes only its own state: the uniform
+                // width and the per-line list are separate controls.
+                if (widthMode === "variable") {
+                    p.set("widthmode", "variable");
+                    p.set("widths", widthsInput.value);
+                } else if (Number(widthNumber.value) !== DEFAULT_WIDTH) {
+                    p.set("width", widthNumber.value);
+                }
                 for (const [name, { input, def }] of Object.entries(paramInputs)) {
                     // While forcing hyphenation, pre_tolerance reads -1; encode
                     // the value it will revert to instead.
@@ -1368,6 +1503,10 @@
                 // instead of desyncing the controls.
                 const w = Number(p.get("width") ?? DEFAULT_WIDTH);
                 setWidth(Number.isFinite(w) ? w : DEFAULT_WIDTH);
+                if (p.get("widthmode") === "variable") {
+                    widthsInput.value = p.get("widths") ?? "";
+                    setWidthMode("variable");
+                }
                 for (const [name, entry] of Object.entries(paramInputs)) {
                     if (p.has(name)) {
                         entry.input.value = p.get(name);
@@ -1385,8 +1524,25 @@
 
             // ── Run the algorithm ──────────────────────────────────────────
 
+            // Returns { params } on success or { error } when some input is
+            // invalid (the culprit is marked with the .invalid class).
             function collectParams() {
-                const params = { width_pt: Number(widthNumber.value) };
+                const params = {};
+                widthsInput.classList.remove("invalid");
+                if (widthMode === "variable") {
+                    const widths = parseWidths();
+                    if (widths === null) {
+                        widthsInput.classList.add("invalid");
+                        return {
+                            error:
+                                "line widths must be a comma-separated list of " +
+                                `numbers between ${WIDTH_MIN} and ${WIDTH_MAX}`,
+                        };
+                    }
+                    params.line_widths_pt = widths;
+                } else {
+                    params.width_pt = Number(widthNumber.value);
+                }
                 let anyInvalid = false;
                 for (const [name, { input, def, glue }] of Object.entries(paramInputs)) {
                     input.classList.remove("invalid");
@@ -1403,13 +1559,15 @@
                         params[name] = v;
                     }
                 }
-                return anyInvalid ? null : params;
+                return anyInvalid
+                    ? { error: "some parameter values are not valid integers" }
+                    : { params };
             }
 
             function runBreaker() {
-                const params = collectParams();
-                if (params === null) {
-                    return { error: "some parameter values are not valid integers" };
+                const { params, error } = collectParams();
+                if (error) {
+                    return { error };
                 }
                 try {
                     return JSON.parse(break_paragraph(textInput.value, JSON.stringify(params)));
@@ -1555,6 +1713,7 @@
                 }
 
                 const lines = result.lines;
+                renderedLineCount = lines.length;
                 outputSvg.replaceChildren();
                 if (lines.length === 0) {
                     if (textInput.value.trim()) {
@@ -1564,7 +1723,11 @@
                     return;
                 }
 
-                const width = Number(widthNumber.value);
+                // Every line's target width comes back from the wasm layer
+                // (each hbox is packed to exactly its target), so the
+                // geometry below is per-line and works the same in both
+                // width modes.
+                const maxWidthPt = Math.max(...lines.map((l) => l.width_pt));
                 const last = lines[lines.length - 1];
                 const totalHeight =
                     last.baseline_pt + last.depth_pt + lines.length * LINE_EXTRA_PT;
@@ -1650,29 +1813,43 @@
                     (line, i) =>
                         contentEnds[i] + (line.badness >= 1000000 ? SLUG_PT : 0),
                 );
-                const maxEndPt = Math.max(width, ...lineEnds);
-                const badnessX = maxEndPt + MARGIN_GAP;
+                const maxEndPt = Math.max(maxWidthPt, ...lineEnds);
+                // In variable mode each stop triangle carries a width label
+                // to its right; widen the gap so a label on the widest line
+                // clears the annotation columns.
+                const widthMarkers = toggles.widthmarkers.checked;
+                const marginGap =
+                    MARGIN_GAP +
+                    (widthMode === "variable" && widthMarkers ? 12 : 0);
+                const badnessX = maxEndPt + marginGap;
                 const demeritsX = badnessX + (badnessCol ? badnessCol + COL_GAP : 0);
                 const gluesetX = demeritsX + (demeritsCol ? demeritsCol + COL_GAP : 0);
                 const penaltyX = gluesetX + (gluesetCol ? gluesetCol + COL_GAP : 0);
-                let gutter = maxEndPt - width;
+                let gutter = maxEndPt - maxWidthPt;
                 const colWidths = [badnessCol, demeritsCol, gluesetCol, penaltyCol].filter(
                     (w) => w > 0,
                 );
                 if (colWidths.length) {
                     gutter +=
-                        MARGIN_GAP +
+                        marginGap +
                         colWidths.reduce((a, w) => a + w) +
                         (colWidths.length - 1) * COL_GAP;
+                } else if (widthMode === "variable" && widthMarkers) {
+                    // No column reserves the gap; keep room for the hover
+                    // width labels anyway.
+                    gutter += 28;
                 }
                 // Line-number gutter to the left of the text; numbers are
-                // zero-padded to at least two digits (1 → 01).
+                // zero-padded to at least two digits (1 → 01). The gutter
+                // stays reserved when the numbers are toggled off, so the
+                // paragraph never shifts — and a generous left margin
+                // suits the galley anyway.
                 const numDigits = Math.max(2, String(lines.length).length);
                 const leftGutter = numDigits * LABEL_CHAR_PT + COL_GAP;
                 // HEADER_ROW_PT is always reserved (for the column headers
                 // and the width annotation), so toggling the annotation
                 // columns never shifts the paragraph vertically.
-                const viewWidth = width + 2 * PAD + leftGutter + gutter;
+                const viewWidth = maxWidthPt + 2 * PAD + leftGutter + gutter;
                 const viewHeight = totalHeight + 2 * PAD + HEADER_ROW_PT;
                 outputSvg.setAttribute(
                     "viewBox",
@@ -1690,49 +1867,57 @@
                 outputSvg.appendChild(textLayer);
                 outputSvg.appendChild(hoverLayer);
 
-                // Margin chrome: a stop marker at the right text margin,
-                // like the margin stop of a typewriter. The grab strip sits
-                // just outside the margin (so it never shadows hover on
-                // line-final glyphs) and drags \hsize with the stop.
+                // Margin chrome. Uniform mode: one stop marker at the right
+                // text margin, like the margin stop of a typewriter, whose
+                // grab strip drags \hsize. Variable mode: per-line stops,
+                // built in the line loop below. Grab strips sit just outside
+                // the margin so they never shadow hover on line-final glyphs.
                 const marginTop = -PAD - HEADER_ROW_PT;
                 const chrome = svgEl("g", {});
-                chrome.appendChild(
-                    svgEl("polygon", {
-                        class: "margin-stop margin-grab",
-                        points: `${width - STOP_HALF_W},${marginTop} ${width + STOP_HALF_W},${marginTop} ${width},${marginTop + STOP_H}`,
-                    }),
-                );
-                // Width annotation in the header row, ending just left of
-                // the margin stop; updates live while dragging.
-                annotation(
-                    chrome,
-                    width - STOP_HALF_W - 2.3,
-                    HEADER_BASELINE,
-                    `width: ${width}pt`,
-                    {
-                        class: "badness-label margin-width-label",
-                        "font-weight": 600,
-                        "text-anchor": "end",
-                    },
-                );
-                chrome.appendChild(
-                    svgEl("line", {
-                        class: "margin-rule",
-                        x1: width,
-                        y1: marginTop + STOP_H,
-                        x2: width,
-                        y2: totalHeight + PAD,
-                    }),
-                );
-                chrome.appendChild(
-                    svgEl("rect", {
-                        class: "margin-handle margin-grab",
-                        x: width,
-                        y: marginTop,
-                        width: HANDLE_W,
-                        height: viewHeight,
-                    }),
-                );
+                if (widthMode === "uniform" && widthMarkers) {
+                    const width = Number(widthNumber.value);
+                    // The same stop as variable mode's first-line one: a
+                    // downward triangle whose tip sits just above the first
+                    // line.
+                    const stopTip = lines[0].baseline_pt - lines[0].height_pt - 1;
+                    chrome.appendChild(
+                        svgEl("polygon", {
+                            class: "margin-stop margin-grab",
+                            points: `${width - STOP_HALF_W},${stopTip - STOP_H} ${width + STOP_HALF_W},${stopTip - STOP_H} ${width},${stopTip}`,
+                        }),
+                    );
+                    // Width annotation above the stop, its right edge flush
+                    // with the marker; updates live while dragging.
+                    annotation(
+                        chrome,
+                        width + STOP_HALF_W,
+                        HEADER_BASELINE,
+                        `width: ${width}pt`,
+                        {
+                            class: "badness-label margin-width-label",
+                            "font-weight": 600,
+                            "text-anchor": "end",
+                        },
+                    );
+                    chrome.appendChild(
+                        svgEl("line", {
+                            class: "margin-rule",
+                            x1: width,
+                            y1: stopTip,
+                            x2: width,
+                            y2: totalHeight + PAD,
+                        }),
+                    );
+                    chrome.appendChild(
+                        svgEl("rect", {
+                            class: "margin-handle margin-grab",
+                            x: width,
+                            y: marginTop,
+                            width: HANDLE_W,
+                            height: viewHeight,
+                        }),
+                    );
+                }
                 outputSvg.appendChild(chrome);
 
                 // The badness header right-aligns with its numbers; the
@@ -1773,6 +1958,53 @@
                     const baseline = line.baseline_pt + lineIndex * LINE_EXTRA_PT;
                     const top = baseline - line.height_pt;
                     const boxHeight = line.height_pt + line.depth_pt;
+
+                    if (widthMode === "variable" && widthMarkers) {
+                        // This line's own margin selector, styled like the
+                        // uniform-mode stop: a downward triangle just above
+                        // the line at its right margin, a rule spanning just
+                        // this line that shows while highlighted, a grab
+                        // strip spanning the line's slot, and the line's
+                        // width beside the triangle. Re-mark the dragged
+                        // line's group — the SVG is rebuilt on every width
+                        // change mid-drag.
+                        const w = line.width_pt;
+                        const stopTip = top - 1; // triangle tip, above the line
+                        const g = svgEl("g", {
+                            class:
+                                "line-margin" +
+                                (marginDrag?.line === lineIndex ? " dragging" : ""),
+                            "data-line": lineIndex,
+                        });
+                        g.appendChild(
+                            svgEl("polygon", {
+                                class: "margin-stop margin-grab",
+                                points: `${w - STOP_HALF_W},${stopTip - STOP_H} ${w + STOP_HALF_W},${stopTip - STOP_H} ${w},${stopTip}`,
+                            }),
+                        );
+                        g.appendChild(
+                            svgEl("line", {
+                                class: "margin-rule",
+                                x1: w,
+                                y1: stopTip,
+                                x2: w,
+                                y2: top + boxHeight,
+                            }),
+                        );
+                        g.appendChild(
+                            svgEl("rect", {
+                                class: "margin-handle margin-grab",
+                                x: w,
+                                y: top - LINE_EXTRA_PT / 2,
+                                width: HANDLE_W,
+                                height: boxHeight + LINE_EXTRA_PT,
+                            }),
+                        );
+                        annotation(g, w + STOP_HALF_W + 2, stopTip, `${fmtPt(w)}pt`, {
+                            class: "badness-label line-width-label",
+                        });
+                        chrome.appendChild(g);
+                    }
                     // The last glyph of the line, for hyphenation counting.
                     let lastGlyph = null;
                     // The glyph a kern would attach to; unlike lastGlyph it
@@ -1890,13 +2122,15 @@
                         hoverLayer.appendChild(hover);
                     }
 
-                    annotation(
-                        textLayer,
-                        -COL_GAP,
-                        baseline,
-                        String(lineIndex + 1).padStart(numDigits, "0"),
-                        { "text-anchor": "end" },
-                    );
+                    if (toggles.linenumbers.checked) {
+                        annotation(
+                            textLayer,
+                            -COL_GAP,
+                            baseline,
+                            String(lineIndex + 1).padStart(numDigits, "0"),
+                            { "text-anchor": "end" },
+                        );
+                    }
 
                     if (line.badness >= 1000000) {
                         overfullLines += 1;
@@ -1910,7 +2144,7 @@
                             width: SLUG_PT,
                             height: boxHeight,
                         });
-                        slug.dataset.info = `overfull line\ncontent exceeds the width by ${fmtPt(contentEnds[lineIndex] - width)}pt`;
+                        slug.dataset.info = `overfull line\ncontent exceeds the width by ${fmtPt(contentEnds[lineIndex] - line.width_pt)}pt`;
                         textLayer.appendChild(slug);
                     }
 
@@ -2009,6 +2243,70 @@
                 }
             });
 
+            // ── Width modes ────────────────────────────────────────────────
+
+            function setWidthMode(mode) {
+                widthMode = mode;
+                for (const r of widthModeRadios) r.checked = r.value === mode;
+                widthRow.hidden = mode !== "uniform";
+                widthsRow.hidden = mode !== "variable";
+                // Seed the per-line list from the uniform width the first
+                // time variable mode is entered.
+                if (mode === "variable" && !widthsInput.value.trim()) {
+                    widthsInput.value = widthNumber.value;
+                }
+            }
+
+            for (const r of widthModeRadios) {
+                r.addEventListener("change", () => {
+                    setWidthMode(r.value);
+                    render();
+                });
+            }
+
+            widthsInput.addEventListener("input", render);
+
+            // Parses the per-line widths box into an array of numbers, or
+            // null when the list is invalid. A single trailing comma is
+            // tolerated — it appears mid-typing.
+            function parseWidths() {
+                const parts = widthsInput.value.split(",").map((s) => s.trim());
+                if (parts.length > 1 && parts[parts.length - 1] === "") parts.pop();
+                if (parts.some((p) => p === "")) return null;
+                const widths = parts.map(Number);
+                if (
+                    widths.some(
+                        (w) => !Number.isFinite(w) || w < WIDTH_MIN || w > WIDTH_MAX,
+                    )
+                ) {
+                    return null;
+                }
+                return widths;
+            }
+
+            // The one place a single line's width is written (per-line
+            // margin drag): materializes the repeating tail up to — and,
+            // when lines exist below, one past — the edited line, so the
+            // edit moves that line only. (Editing the bare last entry would
+            // drag every line below along with it. When the edited line IS
+            // the last one, the tail is the line itself and stays shared.)
+            function setLineWidth(lineIndex, pt) {
+                const widths = parseWidths();
+                if (widths === null) return;
+                const materializeTo =
+                    lineIndex < renderedLineCount - 1 ? lineIndex + 1 : lineIndex;
+                while (widths.length <= materializeTo) {
+                    widths.push(widths[widths.length - 1]);
+                }
+                const w = Math.round(
+                    Math.max(WIDTH_MIN, Math.min(WIDTH_MAX, pt)),
+                );
+                if (widths[lineIndex] === w) return;
+                widths[lineIndex] = w;
+                widthsInput.value = widths.join(", ");
+                render();
+            }
+
             for (const t of Object.values(toggles)) {
                 t.addEventListener("change", render);
             }
@@ -2062,6 +2360,8 @@
             document.querySelector("h1").addEventListener("click", () => {
                 textInput.value = DEFAULT_TEXT;
                 setWidth(DEFAULT_WIDTH);
+                widthsInput.value = "";
+                setWidthMode("uniform");
                 applyPreset("plain");
             });
 
@@ -2137,41 +2437,102 @@
                 });
             }
 
-            // ── Draggable right margin (\hsize) ────────────────────────────
+            // ── Draggable right margins ────────────────────────────────────
 
-            // Listeners live on the sheet, which survives re-renders; the
-            // margin-handle rect inside the SVG is rebuilt on every render.
+            // Uniform mode drags the one global margin (\hsize); variable
+            // mode drags a single line's width. Listeners live on the sheet,
+            // which survives re-renders; the grab elements inside the SVG
+            // are rebuilt on every render, so hover/drag classes for
+            // per-line chrome are re-applied from marginDrag in render().
             {
                 const sheet = document.getElementById("sheet");
-                let drag = null; // { startX, startWidthPt }
 
                 sheet.addEventListener("pointerover", (e) => {
-                    sheet.classList.toggle(
-                        "margin-hover",
-                        !!e.target.closest?.(".margin-grab"),
-                    );
+                    if (marginDrag) return;
+                    const grab = e.target.closest?.(".margin-grab");
+                    const lineGroup = grab?.closest("g.line-margin") ?? null;
+                    // The sheet-wide class lights the global chrome only;
+                    // a line's chrome lights via its own group class.
+                    sheet.classList.toggle("margin-hover", !!grab && !lineGroup);
+                    for (const g of sheet.querySelectorAll("g.line-margin.hover")) {
+                        if (g !== lineGroup) g.classList.remove("hover");
+                    }
+                    lineGroup?.classList.add("hover");
                 });
                 sheet.addEventListener("pointerleave", () => {
                     sheet.classList.remove("margin-hover");
+                    for (const g of sheet.querySelectorAll("g.line-margin.hover")) {
+                        g.classList.remove("hover");
+                    }
                 });
+                // Double-clicking a line's selector gives every line below
+                // it that line's width: truncating the list right after
+                // this line makes its entry the repeating last one.
+                // Detected manually — preventDefault on pointerdown (needed
+                // against text selection) cancels the browser's own
+                // click/dblclick events.
+                let lastLineDown = null; // { line, x, t } of the last pointerdown
+                function isDoublePress(line, e) {
+                    const prev = lastLineDown;
+                    lastLineDown = { line, x: e.clientX, t: e.timeStamp };
+                    return (
+                        prev !== null &&
+                        prev.line === line &&
+                        e.timeStamp - prev.t < 400 &&
+                        Math.abs(e.clientX - prev.x) < 4
+                    );
+                }
+
                 sheet.addEventListener("pointerdown", (e) => {
-                    if (!e.target.closest?.(".margin-grab")) return;
+                    const grab = e.target.closest?.(".margin-grab");
+                    if (!grab) return;
+                    const lineGroup = grab.closest("g.line-margin");
+                    let line = null;
+                    let startWidthPt;
+                    if (lineGroup) {
+                        const widths = parseWidths();
+                        if (widths === null) return;
+                        line = Number(lineGroup.dataset.line);
+                        if (isDoublePress(line, e)) {
+                            e.preventDefault();
+                            while (widths.length <= line) {
+                                widths.push(widths[widths.length - 1]);
+                            }
+                            widths.length = line + 1;
+                            widthsInput.value = widths.join(", ");
+                            render();
+                            return;
+                        }
+                        startWidthPt = widths[Math.min(line, widths.length - 1)];
+                    } else {
+                        startWidthPt = Number(widthNumber.value);
+                        sheet.classList.add("margin-dragging");
+                    }
                     e.preventDefault();
                     sheet.setPointerCapture(e.pointerId);
-                    drag = { startX: e.clientX, startWidthPt: Number(widthNumber.value) };
-                    sheet.classList.add("margin-dragging");
+                    marginDrag = { startX: e.clientX, startWidthPt, line };
+                    lineGroup?.classList.add("dragging");
                     document.body.style.userSelect = "none";
                 });
                 sheet.addEventListener("pointermove", (e) => {
-                    if (!drag) return;
-                    const dPt = (e.clientX - drag.startX) / PX_PER_PT;
-                    const before = Number(widthNumber.value);
-                    if (setWidth(drag.startWidthPt + dPt) !== before) render();
+                    if (!marginDrag) return;
+                    const target =
+                        marginDrag.startWidthPt +
+                        (e.clientX - marginDrag.startX) / PX_PER_PT;
+                    if (marginDrag.line === null) {
+                        const before = Number(widthNumber.value);
+                        if (setWidth(target) !== before) render();
+                    } else {
+                        setLineWidth(marginDrag.line, target);
+                    }
                 });
                 const endDrag = () => {
-                    if (!drag) return;
-                    drag = null;
+                    if (!marginDrag) return;
+                    marginDrag = null;
                     sheet.classList.remove("margin-dragging");
+                    for (const g of sheet.querySelectorAll("g.line-margin.dragging")) {
+                        g.classList.remove("dragging");
+                    }
                     document.body.style.userSelect = "";
                 };
                 sheet.addEventListener("pointerup", endDrag);

@@ -21,8 +21,11 @@ const LINE_SKIP_LIMIT_PT: f64 = 0.0;
 /// Breaks a paragraph of text into lines and returns the typeset result as JSON.
 ///
 /// `params_json` holds the fields of [`boxworks_knuthplass::Params`] plus
-/// `width_pt` and the [`boxworks_text::Params`] glue fields `space_skip` and
-/// `extra_space_skip`; omitted fields take their plain TeX default values.
+/// the line width and the [`boxworks_text::Params`] glue fields `space_skip`
+/// and `extra_space_skip`; omitted fields take their plain TeX default
+/// values. The line width is either `width_pt` (a single number, every line
+/// the same) or `line_widths_pt` (an array; the last entry repeats for all
+/// further lines). `line_widths_pt` wins if both are given.
 /// Glue parameters are strings in TeX glue syntax, e.g. `"0pt plus 1fil"`.
 ///
 /// Note: the line breaker panics if no feasible solution exists within
@@ -41,6 +44,7 @@ pub fn break_paragraph(text: &str, params_json: &str) -> String {
 #[serde(deny_unknown_fields)]
 struct ParamsInput {
     width_pt: Option<f64>,
+    line_widths_pt: Option<Vec<f64>>,
     adj_demerits: Option<i32>,
     broken_penalty: Option<i32>,
     club_penalty: Option<i32>,
@@ -226,12 +230,21 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
     let input: ParamsInput =
         serde_json::from_str(params_json).map_err(|err| format!("invalid parameters: {err}"))?;
     let params = build_params(&input)?;
-    let width = match input.width_pt {
-        None => return Err("width_pt is required".into()),
-        Some(w) if !(1.0..=10000.0).contains(&w) => {
-            return Err("width_pt must be between 1 and 10000".into())
+    // Per-line widths follow the boxworks-knuthplass convention: entry i
+    // applies to line i+1, and the last entry repeats for all further
+    // lines. A lone width_pt is the constant-width special case.
+    let line_widths: Vec<Scaled> = match (&input.line_widths_pt, input.width_pt) {
+        (Some(widths), _) => {
+            if widths.is_empty() {
+                return Err("line_widths_pt must not be empty".into());
+            }
+            widths
+                .iter()
+                .map(|&w| scaled_width("line_widths_pt", w))
+                .collect::<Result<_, _>>()?
         }
-        Some(w) => Scaled((w * 65536.0).round() as i32),
+        (None, Some(w)) => vec![scaled_width("width_pt", w)?],
+        (None, None) => return Err("width_pt is required".into()),
     };
 
     let (tfm_result, _) = tfm::File::deserialize(CMR10_TFM);
@@ -278,7 +291,6 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
     }
 
     let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us(lig_kern_program);
-    let line_widths = [width];
     let mut pass_recorder = PassRecorder::default();
     let lb = boxworks_knuthplass::LineBreaker {
         params: &params,
@@ -299,6 +311,13 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
         pass_recorder.attempts,
         &pass_recorder.line_demerits(),
     ))
+}
+
+fn scaled_width(name: &str, w: f64) -> Result<Scaled, String> {
+    if !(1.0..=10000.0).contains(&w) {
+        return Err(format!("{name} must be between 1 and 10000"));
+    }
+    Ok(Scaled((w * 65536.0).round() as i32))
 }
 
 fn build_params(input: &ParamsInput) -> Result<boxworks_knuthplass::Params, String> {
@@ -765,6 +784,38 @@ mod tests {
                 assert_eq!(line["demerits"], 0, "{line}");
             }
         }
+    }
+
+    #[test]
+    fn per_line_widths_apply_and_last_repeats() {
+        let v = run(ALICE, r#"{"line_widths_pt":[150,250,350]}"#);
+        let widths: Vec<f64> = v["lines"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|l| l["width_pt"].as_f64().unwrap())
+            .collect();
+        assert!(widths.len() > 4, "{widths:?}");
+        assert_eq!(widths[0], 150.0, "{widths:?}");
+        assert_eq!(widths[1], 250.0, "{widths:?}");
+        // The last entry repeats for every remaining line.
+        for w in &widths[2..] {
+            assert_eq!(*w, 350.0, "{widths:?}");
+        }
+    }
+
+    #[test]
+    fn line_widths_errors() {
+        let v = run("hello world", r#"{"line_widths_pt":[]}"#);
+        assert!(v["error"]
+            .as_str()
+            .unwrap()
+            .contains("line_widths_pt must not be empty"));
+        let v = run("hello world", r#"{"line_widths_pt":[300,0.5]}"#);
+        assert!(v["error"]
+            .as_str()
+            .unwrap()
+            .contains("line_widths_pt must be between 1 and 10000"));
     }
 
     #[test]

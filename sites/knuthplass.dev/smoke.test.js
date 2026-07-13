@@ -343,6 +343,124 @@ async function main() {
       await page.close();
     }
 
+    // Test 7: variable width mode. Per-line widths load from the URL, each
+    // line gets its own margin selector, and dragging one selector rewrites
+    // that line's entry in the widths list (and the URL).
+    {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 1400, height: 900 });
+      await page.goto(
+        `http://localhost:${PORT}/?widthmode=variable&widths=150,250,350`,
+      );
+      await page.waitForSelector("#output-svg .line-margin");
+
+      const state = await page.evaluate(() => {
+        const stops = [
+          ...document.querySelectorAll("#output-svg .line-margin .margin-stop"),
+        ];
+        return {
+          widthsBox: document.getElementById("widths-input").value,
+          constantRowHidden: document.getElementById("width-row").hidden,
+          stops: stops.length,
+          lines: new Set(
+            [...document.querySelectorAll("#output-svg text:not(.badness-label)")].map(
+              (t) => t.getAttribute("y"),
+            ),
+          ).size,
+          firstStopX: stops[0]?.getBoundingClientRect().x,
+          secondStopX: stops[1]?.getBoundingClientRect().x,
+        };
+      });
+      if (state.widthsBox !== "150,250,350" || !state.constantRowHidden) {
+        throw new Error(`variable mode not loaded from URL: ${JSON.stringify(state)}`);
+      }
+      if (state.stops !== state.lines || state.stops < 4) {
+        throw new Error(
+          `expected a margin stop per line: ${state.stops} stops, ${state.lines} lines`,
+        );
+      }
+      // Lines 1 and 2 have different widths, so their stops sit ~100pt apart.
+      if (!(state.secondStopX > state.firstStopX + 150)) {
+        throw new Error(
+          `expected staggered stops: x1=${state.firstStopX} x2=${state.secondStopX}`,
+        );
+      }
+
+      // Drag the second line's grab strip 100px right: 100px / PX_PER_PT
+      // ≈ 50pt, so entry 2 goes from 250 to ≈300.
+      const handle = await page.evaluate(() => {
+        const h = document.querySelectorAll(
+          "#output-svg .line-margin .margin-handle",
+        )[1];
+        const r = h.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      });
+      await page.mouse.move(handle.x, handle.y);
+      await page.mouse.down();
+      await page.mouse.move(handle.x + 100, handle.y, { steps: 4 });
+      await page.mouse.up();
+      const after = await page.evaluate(() => ({
+        widths: document.getElementById("widths-input").value,
+        url: new URLSearchParams(location.search).get("widths"),
+      }));
+      const entries = after.widths.split(",").map(Number);
+      if (!(entries[1] > 270 && entries[1] < 330)) {
+        throw new Error(`expected entry 2 near 300 after drag: "${after.widths}"`);
+      }
+      if (entries[0] !== 150 || entries[2] !== 350) {
+        throw new Error(`drag should only change entry 2: "${after.widths}"`);
+      }
+      if (after.url !== after.widths) {
+        throw new Error(
+          `URL should track the widths box: url="${after.url}" box="${after.widths}"`,
+        );
+      }
+
+      // Drag line 3, whose width is the repeating last entry ("…, 350").
+      // The tail must split off first so the lines below keep 350 instead
+      // of following the drag.
+      const handle3 = await page.evaluate(() => {
+        const h = document.querySelectorAll(
+          "#output-svg .line-margin .margin-handle",
+        )[2];
+        const r = h.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      });
+      await page.mouse.move(handle3.x, handle3.y);
+      await page.mouse.down();
+      await page.mouse.move(handle3.x - 100, handle3.y, { steps: 4 });
+      await page.mouse.up();
+      const tail = await page.evaluate(
+        () => document.getElementById("widths-input").value,
+      );
+      const tailEntries = tail.split(",").map(Number);
+      if (tailEntries.length !== 4 || tailEntries[3] !== 350) {
+        throw new Error(
+          `dragging the last-entry line should split the tail off: "${tail}"`,
+        );
+      }
+      if (!(tailEntries[2] > 270 && tailEntries[2] < 330)) {
+        throw new Error(`expected entry 3 near 300 after drag: "${tail}"`);
+      }
+
+      // The widths toggle (on by default) hides all width markers.
+      const stopsOff = await page.evaluate(() => {
+        const t = document.getElementById("toggle-widthmarkers");
+        t.checked = false;
+        t.dispatchEvent(new Event("change"));
+        return document.querySelectorAll("#output-svg .margin-stop").length;
+      });
+      if (stopsOff !== 0) {
+        throw new Error(`expected no width markers when toggled off: ${stopsOff}`);
+      }
+
+      console.log(
+        `PASS test 7: variable widths: ${state.stops} per-line stops, ` +
+          `drag -> "${after.widths}", last-entry drag -> "${tail}", toggle-off OK`,
+      );
+      await page.close();
+    }
+
     console.log("all smoke tests passed");
   } finally {
     await browser.close();
