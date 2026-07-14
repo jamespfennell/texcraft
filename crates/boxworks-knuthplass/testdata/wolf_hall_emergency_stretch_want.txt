@@ -1,0 +1,1161 @@
+vbox(
+  height=0.0pt,
+  width=0.0pt,
+  depth=0.0pt,
+  shift_amount=0.0pt,
+  content=[
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.27042",
+      glue_order="normal",
+      content=[
+        chars("He", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("thinks,", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("if", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(150)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=0.0pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.0",
+      glue_order="normal",
+      content=[
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("ere", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("b", font=0)
+        kern(0.27779pt)
+        chars("orn", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("in", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("Put", font=0)
+        disc(
+          pre_break=[],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("-", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(7.69446pt, 0.0pt, 0.0pt)
+    hbox(
+      height=4.30554pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="4.51645",
+      glue_order="normal",
+      content=[
+        chars("ney", font=0)
+        kern(-0.83334pt)
+        chars(",", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("sa", font=0)
+        kern(-0.27779pt)
+        chars("w", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="2.57265",
+      glue_order="normal",
+      content=[
+        chars("the", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("riv", font=0)
+        kern(-0.27779pt)
+        chars("er", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("e", font=0)
+        disc(
+          pre_break=[
+            chars("v", font=0)
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=2,
+        )
+        chars("v", font=0)
+        kern(-0.27779pt)
+        chars("ery", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="2.01271",
+      glue_order="normal",
+      content=[
+        chars("da", font=0)
+        kern(-0.27779pt)
+        chars("y", font=0)
+        kern(-0.83334pt)
+        chars(",", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("and", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("imag", font=0)
+        disc(
+          pre_break=[],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("-", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.5143",
+      glue_order="normal",
+      content=[
+        chars("ined", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("it", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("widen", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ing", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=0.0pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.77621",
+      glue_order="normal",
+      content=[
+        chars("out", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("to", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("the", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("sea.", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(5.05556pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.59286",
+      glue_order="normal",
+      content=[
+        chars("Ev", font=0)
+        kern(-0.27779pt)
+        chars("en", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("if", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("had", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=0.0pt,
+      shift_amount=0.0pt,
+      glue_ratio="2.98933",
+      glue_order="normal",
+      content=[
+        chars("nev", font=0)
+        kern(-0.27779pt)
+        chars("er", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("seen", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("the", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(5.05556pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.1762",
+      glue_order="normal",
+      content=[
+        chars("o", font=0)
+        kern(0.27779pt)
+        chars("cean", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("had", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("a", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.72621",
+      glue_order="normal",
+      content=[
+        chars("pic", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ture", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("of", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("it", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("in", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.58096",
+      glue_order="normal",
+      content=[
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("our", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("head", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("from", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="3.68098",
+      glue_order="normal",
+      content=[
+        chars("what", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("had", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.32738",
+      glue_order="normal",
+      content=[
+        chars("b", font=0)
+        kern(0.27779pt)
+        chars("een", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("told", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("b", font=0)
+        kern(-0.27779pt)
+        chars("y", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("for", font=0)
+        disc(
+          pre_break=[],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("-", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.59763",
+      glue_order="normal",
+      content=[
+        chars("eign", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("p", font=0)
+        kern(0.27779pt)
+        chars("eo", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ple", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("who", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.37697pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.67859pt,
+      width=72.26999pt,
+      depth=0.0pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.96193",
+      glue_order="normal",
+      content=[
+        chars("some", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("times", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("came", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(5.16669pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.83331pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="3.33177",
+      glue_order="normal",
+      content=[
+        chars("up", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("riv", font=0)
+        kern(-0.27779pt)
+        chars("er.", font=0)
+        glue(4.44444pt, 4.99997pt, 0.37036pt)
+        chars("Y", font=0)
+        kern(-0.83334pt)
+        chars("ou", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=0.0pt,
+      shift_amount=0.0pt,
+      glue_ratio="2.93098",
+      glue_order="normal",
+      content=[
+        chars("knew", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("that", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("one", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(5.05556pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="2.59764",
+      glue_order="normal",
+      content=[
+        chars("da", font=0)
+        kern(-0.27779pt)
+        chars("y", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("ould", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.37697pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.67859pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="3.17621",
+      glue_order="normal",
+      content=[
+        chars("go", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("out", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("in", font=0)
+        kern(-0.27779pt)
+        chars("to", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("a", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=0.0pt,
+      shift_amount=0.0pt,
+      glue_ratio="3.831",
+      glue_order="normal",
+      content=[
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("orld", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("of", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("mar", font=0)
+        disc(
+          pre_break=[],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("-", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(5.05556pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="6.32864",
+      glue_order="normal",
+      content=[
+        chars("ble", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("pa", font=0)
+        kern(-0.27779pt)
+        chars("v", font=0)
+        kern(-0.27779pt)
+        chars("e", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("men", font=0)
+        kern(-0.27779pt)
+        chars("ts", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.07196",
+      glue_order="normal",
+      content=[
+        chars("and", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("p", font=0)
+        kern(0.27779pt)
+        chars("ea", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("co", font=0)
+        kern(0.27779pt)
+        chars("c", font=0)
+        kern(-0.27779pt)
+        chars("ks,", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("of", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.62859",
+      glue_order="normal",
+      content=[
+        chars("hill", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("sides", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("buzzing", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="2.82755",
+      glue_order="normal",
+      content=[
+        chars("with", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("heat,", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("the", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.0",
+      glue_order="normal",
+      content=[
+        chars("fra", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("grance", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("of", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("crushed", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.0",
+      glue_order="normal",
+      content=[
+        chars("herbs", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("ris", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ing", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("around", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.0",
+      glue_order="normal",
+      content=[
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("as", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("alk", font=0)
+        kern(-0.27779pt)
+        chars("ed.", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.5893",
+      glue_order="normal",
+      content=[
+        chars("Y", font=0)
+        kern(-0.83334pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("planned", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("for", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.08096",
+      glue_order="normal",
+      content=[
+        chars("what", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("our", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("jour", font=0)
+        disc(
+          pre_break=[],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("-", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.0",
+      glue_order="normal",
+      content=[
+        chars("neys", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("ould", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("bring", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.62065",
+      glue_order="normal",
+      content=[
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou:", font=0)
+        glue(4.44444pt, 3.33331pt, 0.55556pt)
+        chars("the", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("touc", font=0)
+        kern(-0.27779pt)
+        chars("h", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=0.0pt,
+      shift_amount=0.0pt,
+      glue_ratio="2.65599",
+      glue_order="normal",
+      content=[
+        chars("of", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("arm", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("ter", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ra", font=0)
+        disc(
+          pre_break=[],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("-", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(5.05556pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.12383",
+      glue_order="normal",
+      content=[
+        chars("cotta,", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("the", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("nigh", font=0)
+        kern(-0.27779pt)
+        chars("t", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="2.90598",
+      glue_order="normal",
+      content=[
+        chars("sky", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("of", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("an", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("other", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="6.6896",
+      glue_order="normal",
+      content=[
+        chars("cli", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("mate,", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("alien", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.0",
+      glue_order="normal",
+      content=[
+        lig("\r", "fl", font=0)
+        chars("o", font=0)
+        kern(-0.27779pt)
+        disc(
+          pre_break=[
+            chars("w", font=0)
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=2,
+        )
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("ers,", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("the", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("stone", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.0",
+      glue_order="normal",
+      content=[
+        chars("ey", font=0)
+        kern(-0.27779pt)
+        chars("ed", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("gaze", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("of", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("other", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="5.59529",
+      glue_order="normal",
+      content=[
+        chars("p", font=0)
+        kern(0.27779pt)
+        chars("eo", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ples", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("sain", font=0)
+        kern(-0.27779pt)
+        chars("ts.", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.92065",
+      glue_order="normal",
+      content=[
+        chars("But", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("if", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("ere", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=0.0pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.40596",
+      glue_order="normal",
+      content=[
+        chars("b", font=0)
+        kern(0.27779pt)
+        chars("orn", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("in", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("Aslo", font=0)
+        kern(0.27779pt)
+        chars("c", font=0)
+        kern(-0.27779pt)
+        chars("k", font=0)
+        disc(
+          pre_break=[],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("-", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(5.05556pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.00255",
+      glue_order="normal",
+      content=[
+        chars("ton,", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("in", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        lig("\r", "fl", font=0)
+        chars("at", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        lig("\u{c}", "fi", font=0)
+        chars("elds", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=0.0pt,
+      shift_amount=0.0pt,
+      glue_ratio="4.67267",
+      glue_order="normal",
+      content=[
+        chars("un", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("der", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("a", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("wide", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(5.05556pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="2.22012",
+      glue_order="normal",
+      content=[
+        chars("sky", font=0)
+        kern(-0.83334pt)
+        chars(",", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("migh", font=0)
+        kern(-0.27779pt)
+        chars("t", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.77621",
+      glue_order="normal",
+      content=[
+        chars("just", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("b", font=0)
+        kern(0.27779pt)
+        chars("e", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("able", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("to", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    glue(3.22224pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.83331pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="6.6953",
+      glue_order="normal",
+      content=[
+        chars("imag", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ine", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("Ca", font=0)
+        disc(
+          pre_break=[],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("m-", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="1.72064",
+      glue_order="normal",
+      content=[
+        chars("bridge:", font=0)
+        glue(4.44444pt, 3.33331pt, 0.55556pt)
+        chars("no", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("far", font=0)
+        disc(
+          pre_break=[],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("-", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(250)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=72.26999pt,
+      depth=0.0pt,
+      shift_amount=0.0pt,
+      glue_ratio="51.68661",
+      glue_order="fil",
+      content=[
+        chars("ther.", font=0)
+        penalty(10000)
+        glue(0.0pt, 1.0fil, 0.0pt)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+  ],
+)

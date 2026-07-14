@@ -20,6 +20,7 @@ pub struct Params {
     pub broken_penalty: i32,
     pub double_hyphen_demerits: i32,
     pub club_penalty: i32,
+    pub emergency_stretch: Scaled,
     pub ex_hyphen_penalty: i32,
     pub final_hyphen_demerits: i32,
     // TODO: this is actually different for each invocation. Make it so!
@@ -48,6 +49,7 @@ impl Params {
             broken_penalty: 100,
             double_hyphen_demerits: 10000,
             club_penalty: 150,
+            emergency_stretch: Scaled::ZERO,
             ex_hyphen_penalty: 50,
             final_hyphen_demerits: 5000,
             final_widow_penalty: 150,
@@ -76,9 +78,10 @@ impl Params {
             broken_penalty,
             double_hyphen_demerits,
             club_penalty,
+            emergency_stretch,
             ex_hyphen_penalty,
             final_hyphen_demerits,
-            final_widow_penalty: _,
+            final_widow_penalty,
             hyphen_penalty,
             inter_line_penalty,
             left_skip,
@@ -95,6 +98,7 @@ impl Params {
             \brokenpenalty={broken_penalty}
             \clubpenalty={club_penalty}
             \doublehyphendemerits={double_hyphen_demerits}
+            \emergencystretch={emergency_stretch}
             \exhyphenpenalty={ex_hyphen_penalty}
             \finalhyphendemerits={final_hyphen_demerits}
             \hyphenpenalty={hyphen_penalty}
@@ -106,6 +110,7 @@ impl Params {
             \pretolerance={pre_tolerance}
             \rightskip={right_skip}
             \tolerance={tolerance}
+            \widowpenalty={final_widow_penalty}
         "
         )
     }
@@ -1035,7 +1040,9 @@ mod tests {
                 $( params: Params {
                     $( $param_name: ident: $param_value: expr, )+
                 }, )?
-                $( typeset: $want: expr, )?
+                $( typeset: $want: expr,
+                    $( not_typeset: $not_want: expr, )?
+                )?
                 $( log: $want_log: expr, )?
             ), )+
         ) => {
@@ -1059,6 +1066,17 @@ mod tests {
                             params(),
                         );
                     }
+                    $(
+                    /// Verifies that the parameters under test actually change
+                    /// the output: the expected output must differ from the
+                    /// expected output with default parameters (`not_typeset`).
+                    #[test]
+                    fn not_typeset() {
+                        let want = include_str!(concat!("../testdata/", $want));
+                        let not_want = include_str!(concat!("../testdata/", $not_want));
+                        assert_typeset_ne(want, not_want);
+                    }
+                    )?
                     )?
                     $(
                     #[test]
@@ -1122,6 +1140,36 @@ mod tests {
             typeset: "wolf_hall_2in_want.txt",
             log: "wolf_hall_2in_log.txt",
         ),
+        /*
+        (
+            // At this width the second pass fails and, since
+            // \emergencystretch is zero by default, TeX gives up and emits
+            // overfull/very loose lines. This test mainly exists so that its
+            // want file can serve as the not_typeset baseline of the
+            // emergency_stretch test below.
+            wolf_hall_1in,
+            "wolf_hall_input.txt",
+            &["1in"],
+            typeset: "wolf_hall_1in_want.txt",
+            log: "wolf_hall_1in_log.txt",
+        ),
+        (
+            // With a non-zero \emergencystretch, the failing second pass is
+            // followed by a third pass in which every line gets the extra
+            // stretchability.
+            // This test currently fails: Boxworks does not implement the
+            // third pass yet (see the TODO in break_line_all_attempts).
+            wolf_hall_emergency_stretch,
+            "wolf_hall_input.txt",
+            &["1in"],
+            params: Params {
+                emergency_stretch: common::Scaled::parse_from_string("10.0pt").unwrap(),
+            },
+            typeset: "wolf_hall_emergency_stretch_want.txt",
+            not_typeset: "wolf_hall_1in_want.txt",
+            log: "wolf_hall_emergency_stretch_log.txt",
+        ),
+        */
         (
             wolf_hall_variable_widths,
             "wolf_hall_input.txt",
@@ -1197,6 +1245,211 @@ mod tests {
                 },
             },
             typeset: "wolf_hall_ragged_right_margin.txt",
+        ),
+        // The following tests each modify a single parameter from the plain TeX
+        // defaults. In each case the parameter value is chosen such that the
+        // typeset output differs from the output with default parameters at the
+        // same line width.
+        (
+            // The optimal breaks for this text pay no adjacent-fitness demerits
+            // at any of the standard widths, so no positive value of the
+            // parameter changes the output. Instead a negative value is used to
+            // reward fitness class jumps.
+            // TODO: find a better (positive) parameter value, perhaps with a
+            // non-standard line width.
+            wolf_hall_adj_demerits,
+            "wolf_hall_input.txt",
+            &["3in"],
+            params: Params {
+                adj_demerits: -10000,
+            },
+            typeset: "wolf_hall_adj_demerits_want.txt",
+            not_typeset: "wolf_hall_3in_want.txt",
+            log: "wolf_hall_adj_demerits_log.txt",
+        ),
+        (
+            wolf_hall_broken_penalty,
+            "wolf_hall_input.txt",
+            &["3in"],
+            params: Params {
+                broken_penalty: 500,
+            },
+            typeset: "wolf_hall_broken_penalty_want.txt",
+            not_typeset: "wolf_hall_3in_want.txt",
+            log: "wolf_hall_broken_penalty_log.txt",
+        ),
+        (
+            wolf_hall_club_penalty,
+            "wolf_hall_input.txt",
+            &["3in"],
+            params: Params {
+                club_penalty: 1000,
+            },
+            typeset: "wolf_hall_club_penalty_want.txt",
+            not_typeset: "wolf_hall_3in_want.txt",
+            log: "wolf_hall_club_penalty_log.txt",
+        ),
+        (
+            // The optimal breaks for this text contain no consecutive
+            // hyphenated lines at any of the standard widths, so no positive
+            // value of the parameter changes the output. Instead a negative
+            // value is used to reward consecutive hyphenated lines.
+            // TODO: find a better (positive) parameter value, perhaps with a
+            // non-standard line width.
+            wolf_hall_double_hyphen_demerits,
+            "wolf_hall_input.txt",
+            &["3in"],
+            params: Params {
+                double_hyphen_demerits: -100000,
+            },
+            typeset: "wolf_hall_double_hyphen_demerits_want.txt",
+            not_typeset: "wolf_hall_3in_want.txt",
+            log: "wolf_hall_double_hyphen_demerits_log.txt",
+        ),
+        (
+            // Default parameters for the stone-eyed variant of the Wolf Hall
+            // text (see the ex_hyphen_penalty test below). This test exists
+            // mainly to keep the want file, which serves as the not_typeset
+            // baseline of the ex_hyphen_penalty test, verifiable against TeX.
+            wolf_hall_stone_eyed,
+            "wolf_hall_stone_eyed_input.txt",
+            &["3in"],
+            typeset: "wolf_hall_stone_eyed_want.txt",
+            log: "wolf_hall_stone_eyed_log.txt",
+        ),
+        (
+            // This test uses a variant of the Wolf Hall text in which the
+            // original hyphen in "stone-eyed" is restored, because
+            // \exhyphenpenalty only applies at explicit hyphens.
+            // The optimal breaks never break at that hyphen, so no positive
+            // value of the parameter changes the output. Instead an eject
+            // penalty is used to force a break there.
+            // TODO: find a better (positive) parameter value.
+            wolf_hall_ex_hyphen_penalty,
+            "wolf_hall_stone_eyed_input.txt",
+            &["3in"],
+            params: Params {
+                ex_hyphen_penalty: -10000,
+            },
+            typeset: "wolf_hall_ex_hyphen_penalty_want.txt",
+            not_typeset: "wolf_hall_stone_eyed_want.txt",
+            log: "wolf_hall_ex_hyphen_penalty_log.txt",
+        ),
+        (
+            wolf_hall_final_hyphen_demerits,
+            "wolf_hall_input.txt",
+            &["3in"],
+            params: Params {
+                final_hyphen_demerits: 0,
+            },
+            typeset: "wolf_hall_final_hyphen_demerits_want.txt",
+            not_typeset: "wolf_hall_3in_want.txt",
+            log: "wolf_hall_final_hyphen_demerits_log.txt",
+        ),
+        (
+            wolf_hall_final_widow_penalty,
+            "wolf_hall_input.txt",
+            &["3in"],
+            params: Params {
+                final_widow_penalty: 1000,
+            },
+            typeset: "wolf_hall_final_widow_penalty_want.txt",
+            not_typeset: "wolf_hall_3in_want.txt",
+            log: "wolf_hall_final_widow_penalty_log.txt",
+        ),
+        (
+            wolf_hall_hyphen_penalty,
+            "wolf_hall_input.txt",
+            &["3in"],
+            params: Params {
+                hyphen_penalty: 10000,
+            },
+            typeset: "wolf_hall_hyphen_penalty_want.txt",
+            not_typeset: "wolf_hall_3in_want.txt",
+            log: "wolf_hall_hyphen_penalty_log.txt",
+        ),
+        (
+            wolf_hall_inter_line_penalty,
+            "wolf_hall_input.txt",
+            &["3in"],
+            params: Params {
+                inter_line_penalty: 100,
+            },
+            typeset: "wolf_hall_inter_line_penalty_want.txt",
+            not_typeset: "wolf_hall_3in_want.txt",
+            log: "wolf_hall_inter_line_penalty_log.txt",
+        ),
+        (
+            wolf_hall_left_skip,
+            "wolf_hall_input.txt",
+            &["3in"],
+            params: Params {
+                left_skip: common::Glue {
+                    width: common::Scaled::parse_from_string("20.0pt").unwrap(),
+                    ..Default::default()
+                },
+            },
+            typeset: "wolf_hall_left_skip_want.txt",
+            not_typeset: "wolf_hall_3in_want.txt",
+            log: "wolf_hall_left_skip_log.txt",
+        ),
+        (
+            wolf_hall_line_penalty,
+            "wolf_hall_input.txt",
+            &["3in"],
+            params: Params {
+                line_penalty: 100,
+            },
+            typeset: "wolf_hall_line_penalty_want.txt",
+            not_typeset: "wolf_hall_3in_want.txt",
+            log: "wolf_hall_line_penalty_log.txt",
+        ),
+        (
+            wolf_hall_par_fill_skip,
+            "wolf_hall_input.txt",
+            &["3in"],
+            params: Params {
+                par_fill_skip: common::Glue::ZERO,
+            },
+            typeset: "wolf_hall_par_fill_skip_want.txt",
+            not_typeset: "wolf_hall_3in_want.txt",
+            log: "wolf_hall_par_fill_skip_log.txt",
+        ),
+        (
+            wolf_hall_pre_tolerance,
+            "wolf_hall_input.txt",
+            &["3in"],
+            params: Params {
+                pre_tolerance: 10000,
+            },
+            typeset: "wolf_hall_pre_tolerance_want.txt",
+            not_typeset: "wolf_hall_3in_want.txt",
+            log: "wolf_hall_pre_tolerance_log.txt",
+        ),
+        (
+            wolf_hall_right_skip,
+            "wolf_hall_input.txt",
+            &["3in"],
+            params: Params {
+                right_skip: common::Glue {
+                    stretch: common::Scaled::parse_from_string("20.00003pt").unwrap(),
+                    ..Default::default()
+                },
+            },
+            typeset: "wolf_hall_right_skip_want.txt",
+            not_typeset: "wolf_hall_3in_want.txt",
+            log: "wolf_hall_right_skip_log.txt",
+        ),
+        (
+            wolf_hall_tolerance,
+            "wolf_hall_input.txt",
+            &["3in"],
+            params: Params {
+                tolerance: 45,
+            },
+            typeset: "wolf_hall_tolerance_want.txt",
+            not_typeset: "wolf_hall_3in_want.txt",
+            log: "wolf_hall_tolerance_log.txt",
         ),
         (
             alice_paragraph_1_10in,
@@ -1295,7 +1548,7 @@ mod tests {
     ) {
         if verify_with_tex() {
             let (_, stdout) = run_tex(tfm_bytes, input, widths, text_params, params);
-            let trace = extract_paragraph_trace(&stdout);
+            let trace = boxworks::tex::extract_paragraph_trace(&stdout);
             let want = normalize(want_log);
             let got = normalize(&trace);
             if std::env::var("TEXCRAFT_VERIFY_OVERWRITE").unwrap_or_default() == "true" {
@@ -1311,6 +1564,22 @@ mod tests {
         assert_eq!(normalize(want_log), normalize(&got_log));
     }
 
+    /// Asserts that two expected typeset outputs are different, ignoring
+    /// comment lines and blank lines.
+    fn assert_typeset_ne(want: &str, not_want: &str) {
+        fn normalize(s: &str) -> Vec<&str> {
+            s.lines()
+                .map(str::trim_end)
+                .filter(|l| !l.is_empty() && !l.starts_with('#'))
+                .collect()
+        }
+        assert_ne!(
+            normalize(want),
+            normalize(not_want),
+            "expected the outputs in the typeset and not_typeset files to differ",
+        );
+    }
+
     fn parse_widths(widths: &[&str]) -> Vec<common::Scaled> {
         widths
             .iter()
@@ -1320,26 +1589,6 @@ mod tests {
 
     fn verify_with_tex() -> bool {
         std::env::var("TEXCRAFT_VERIFY").unwrap_or_default() == "tex"
-    }
-
-    /// A [`boxworks::tex::TexEngine`] that records the terminal output of the
-    /// inner engine. The box-building templates set `\tracingonline=1`, so
-    /// the `\tracingparagraphs` trace appears in this output.
-    struct RecordingTexEngine {
-        inner: Box<dyn boxworks::tex::TexEngine>,
-        stdout: String,
-    }
-
-    impl boxworks::tex::TexEngine for RecordingTexEngine {
-        fn run(
-            &mut self,
-            tex_source_code: &str,
-            auxiliary_files: &std::collections::HashMap<std::path::PathBuf, Vec<u8>>,
-        ) -> String {
-            let output = self.inner.run(tex_source_code, auxiliary_files);
-            self.stdout = output.clone();
-            output
-        }
     }
 
     /// Runs TeX on the input and returns the resulting vertical list and the
@@ -1357,34 +1606,20 @@ mod tests {
         let mut auxiliary_files: HashMap<PathBuf, Vec<u8>> = Default::default();
         auxiliary_files.insert("customFont.tfm".into(), tfm_bytes.to_vec());
         let preamble = format![
-            r"
-            \tracingparagraphs=1
-
-            % Boxworks does not yet append the \overfullrule rule to overfull
-            % boxes (TeX.2021.666), so suppress it in TeX's output for now.
-            \hfuzz=\maxdimen
-
-            \font \customFont customFont
-
-            \customFont
-            {}
-            {}
-            ",
+            "{}\n{}\n{}",
+            boxworks::tex::diagnostic_preamble("customFont"),
             text_params.tex(),
             params.tex(),
         ];
 
-        // By default TeX wraps terminal output at 79 characters, which would
-        // split long \tracingparagraphs lines. The testdata log files are
-        // unwrapped, so raise the limit; the spawned tex process inherits it.
-        std::env::set_var("max_print_line", "10000");
-
         let widths = parse_widths(widths);
-        let mut engine = RecordingTexEngine {
-            inner: boxworks::tex::new_tex_engine_binary("tex".to_string()).unwrap(),
-            stdout: Default::default(),
-        };
-        let texts = vec![format![r"\looseness={} {}", params.looseness, input.trim()]];
+        let mut engine = boxworks::tex::RecordingTexEngine::new(
+            boxworks::tex::new_tex_engine_binary("tex".to_string()).unwrap(),
+        );
+        let texts = vec![boxworks::tex::prepend_looseness(
+            params.looseness,
+            input.trim(),
+        )];
         let (_, vlists) = boxworks::tex::build_vertical_lists(
             &mut engine,
             &auxiliary_files,
@@ -1393,27 +1628,7 @@ mod tests {
             &mut texts.iter(),
         );
         let [vlist]: [ds::VBox; 1] = vlists.try_into().expect("one text in, one vlist out");
-        (vlist, engine.stdout)
-    }
-
-    /// Extracts the `\tracingparagraphs` trace from TeX's terminal output:
-    /// everything from `@firstpass` (or `@secondpass`, if the first pass is
-    /// skipped) up to the box display that follows the paragraph.
-    fn extract_paragraph_trace(stdout: &str) -> String {
-        let mut lines = vec![];
-        let mut in_trace = false;
-        for line in stdout.lines() {
-            if !in_trace && (line.starts_with("@firstpass") || line.starts_with("@secondpass")) {
-                in_trace = true;
-            }
-            if line.starts_with("Texcraft: begin") {
-                break;
-            }
-            if in_trace {
-                lines.push(line);
-            }
-        }
-        lines.join("\n")
+        (vlist, engine.stdout().to_string())
     }
 
     fn normalize(s: &str) -> String {

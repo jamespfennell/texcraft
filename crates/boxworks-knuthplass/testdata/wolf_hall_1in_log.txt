@@ -1,0 +1,128 @@
+@firstpass
+He thinks, if you
+@ via @@0 b=2 p=0 d=144
+@@1: line 1.2 t=144 -> @@0
+@secondpass
+He thinks, if you
+@ via @@0 b=2 p=0 d=144
+@@1: line 1.2 t=144 -> @@0
+were born in Put-
+@\discretionary via @@1 b=* p=50 d=*
+@@2: line 2.3- t=144 -> @@1
+ney, you saw the
+@ via @@2 b=0 p=0 d=100
+@@3: line 3.2 t=244 -> @@2
+river ev-ery day, and
+@ via @@3 b=* p=0 d=*
+@@4: line 4.3 t=244 -> @@3
+imag-ined it widen-
+@\discretionary via @@4 b=* p=50 d=*
+@@5: line 5.3- t=244 -> @@4
+ing out to the sea.
+@ via @@5 b=* p=0 d=*
+@@6: line 6.3 t=244 -> @@5
+Even if you had
+@ via @@6 b=21 p=0 d=10961
+@@7: line 7.1 t=11205 -> @@6
+never seen the ocean
+@ via @@7 b=* p=0 d=*
+@@8: line 8.3 t=11205 -> @@7
+you had a pic-ture
+@ via @@8 b=* p=0 d=*
+@@9: line 9.3 t=11205 -> @@8
+of it in your head
+@ via @@9 b=81 p=0 d=8281
+@@10: line 10.3 t=19486 -> @@9
+from what you had
+@ via @@10 b=* p=0 d=*
+@@11: line 11.3 t=19486 -> @@10
+been told by for-
+@\discretionary via @@11 b=3 p=50 d=2669
+@@12: line 12.2- t=22155 -> @@11
+eign peo-ple who
+@ via @@12 b=21 p=0 d=961
+@@13: line 13.1 t=23116 -> @@12
+some-times came
+@ via @@13 b=88 p=0 d=9604
+@@14: line 14.1 t=32720 -> @@13
+up-river. You knew
+@ via @@14 b=* p=0 d=*
+@@15: line 15.3 t=32720 -> @@14
+that one day you
+@ via @@15 b=27 p=0 d=1369
+@@16: line 16.3 t=34089 -> @@15
+would go out into
+@ via @@16 b=* p=0 d=*
+@@17: line 17.3 t=34089 -> @@16
+a world of mar-
+@\discretionary via @@17 b=69 p=50 d=18741
+@@18: line 18.1- t=52830 -> @@17
+ble pave-ments and
+@ via @@18 b=* p=0 d=*
+@@19: line 19.3 t=52830 -> @@18
+pea-cocks, of hill-
+@\discretionary via @@19 b=7 p=50 d=2789
+@@20: line 20.2- t=55619 -> @@19
+sides buzzing with
+@ via @@20 b=* p=0 d=*
+@@21: line 21.3 t=55619 -> @@20
+heat, the fra-grance
+@ via @@21 b=* p=0 d=*
+@@22: line 22.3 t=55619 -> @@21
+of crushed herbs
+@ via @@22 b=1 p=0 d=121
+@@23: line 23.2 t=55740 -> @@22
+ris-ing around you
+@ via @@23 b=* p=0 d=*
+@@24: line 24.3 t=55740 -> @@23
+as you walked. You
+@ via @@24 b=* p=0 d=*
+@@25: line 25.3 t=55740 -> @@24
+planned for what
+@ via @@25 b=* p=0 d=*
+@@26: line 26.3 t=55740 -> @@25
+your jour-neys would
+@ via @@26 b=* p=0 d=*
+@@27: line 27.3 t=55740 -> @@26
+bring you: the touch
+@ via @@27 b=* p=0 d=*
+@@28: line 28.3 t=55740 -> @@27
+of warm ter-ra-cotta,
+@ via @@28 b=* p=0 d=*
+@@29: line 29.3 t=55740 -> @@28
+the night sky of
+@ via @@29 b=29 p=0 d=11521
+@@30: line 30.1 t=67261 -> @@29
+an-other cli-mate,
+@ via @@30 b=31 p=0 d=1681
+@@31: line 31.1 t=68942 -> @@30
+alien flow-ers, the
+@ via @@31 b=19 p=0 d=10841
+@@32: line 32.3 t=79783 -> @@31
+stone eyed gaze of
+@ via @@32 b=* p=0 d=*
+@@33: line 33.3 t=79783 -> @@32
+other peo-ples saints.
+@ via @@33 b=* p=0 d=*
+@@34: line 34.3 t=79783 -> @@33
+But if you were
+@ via @@34 b=78 p=0 d=17744
+@@35: line 35.1 t=97527 -> @@34
+born in Aslock-ton,
+@ via @@35 b=* p=0 d=*
+@@36: line 36.3 t=97527 -> @@35
+in flat fields un-
+@\discretionary via @@36 b=17 p=50 d=13229
+@@37: line 37.1- t=110756 -> @@36
+der a wide sky, you
+@ via @@37 b=* p=0 d=*
+@@38: line 38.3 t=110756 -> @@37
+might just be able
+@ via @@38 b=* p=0 d=*
+@@39: line 39.3 t=110756 -> @@38
+to imag-ine Cam-
+@\discretionary via @@39 b=11 p=50 d=2941
+@@40: line 40.2- t=113697 -> @@39
+bridge: no far-ther.
+@\par via @@40 b=* p=-10000 d=*
+@@41: line 41.3- t=113697 -> @@40

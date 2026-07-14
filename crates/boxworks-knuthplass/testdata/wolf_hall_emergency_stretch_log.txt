@@ -1,0 +1,307 @@
+@firstpass
+He thinks, if you
+@ via @@0 b=2 p=0 d=144
+@@1: line 1.2 t=144 -> @@0
+@secondpass
+He thinks, if you
+@ via @@0 b=2 p=0 d=144
+@@1: line 1.2 t=144 -> @@0
+@emergencypass
+He thinks, if you
+@ via @@0 b=2 p=0 d=144
+@@1: line 1.2 t=144 -> @@0
+were born in Put-
+@\discretionary via @@1 b=* p=50 d=*
+@@2: line 2.3- t=144 -> @@1
+ney, you saw
+@ via @@2 b=185 p=0 d=48025
+@@3: line 3.0 t=48169 -> @@2
+the
+@ via @@2 b=0 p=0 d=100
+@@4: line 3.2 t=244 -> @@2
+river ev-ery
+@ via @@3 b=27 p=0 d=1369
+@@5: line 4.1 t=49538 -> @@3
+day,
+@ via @@4 b=5 p=0 d=225
+@@6: line 4.2 t=469 -> @@4
+and imag-
+@\discretionary via @@5 b=17 p=50 d=3229
+@@7: line 5.1- t=52767 -> @@5
+ined
+@ via @@6 b=150 p=0 d=35600
+@@8: line 5.0 t=36069 -> @@6
+it
+@ via @@6 b=2 p=0 d=144
+@@9: line 5.2 t=613 -> @@6
+widen-
+@\discretionary via @@7 b=67 p=50 d=18429
+@@10: line 6.1- t=71196 -> @@7
+ing
+@ via @@7 b=0 p=0 d=100
+@@11: line 6.2 t=52867 -> @@7
+out
+@ via @@8 b=7 p=0 d=10289
+@@12: line 6.2 t=46358 -> @@8
+to
+@ via @@9 b=2 p=0 d=144
+@@13: line 6.2 t=757 -> @@9
+the
+@ via @@10 b=47 p=0 d=3249
+@@14: line 7.1 t=74445 -> @@10
+sea.
+@ via @@11 b=20 p=0 d=900
+@@15: line 7.1 t=53767 -> @@11
+Even
+@ via @@12 b=0 p=0 d=100
+@ via @@13 b=43 p=0 d=2809
+@@16: line 7.1 t=3566 -> @@13
+if
+@ via @@13 b=1 p=0 d=121
+@ via @@14 b=190 p=0 d=40000
+@@17: line 7.2 t=878 -> @@13
+you
+@ via @@14 b=0 p=0 d=100
+@@18: line 8.2 t=74545 -> @@14
+had
+@ via @@15 b=1 p=0 d=121
+@@19: line 8.2 t=53888 -> @@15
+never
+@ via @@16 b=0 p=0 d=100
+@ via @@17 b=50 p=0 d=3600
+@@20: line 8.1 t=4478 -> @@17
+@@21: line 8.2 t=3666 -> @@16
+seen
+@ via @@18 b=19 p=0 d=841
+@@22: line 9.1 t=75386 -> @@18
+the
+@ via @@19 b=41 p=0 d=2601
+@@23: line 9.1 t=56489 -> @@19
+ocean
+@ via @@20 b=27 p=0 d=1369
+@ via @@21 b=27 p=0 d=1369
+@@24: line 9.1 t=5035 -> @@21
+you
+@ via @@22 b=63 p=0 d=5329
+@@25: line 10.1 t=80715 -> @@22
+had
+@ via @@23 b=33 p=0 d=1849
+@@26: line 10.1 t=58338 -> @@23
+a
+@ via @@23 b=0 p=0 d=100
+@@27: line 10.2 t=56589 -> @@23
+pic-
+@\discretionary via @@24 b=25 p=50 d=3725
+@@28: line 10.1- t=8760 -> @@24
+ture
+@ via @@25 b=113 p=0 d=15129
+@@29: line 11.0 t=95844 -> @@25
+of
+@ via @@25 b=0 p=0 d=100
+@@30: line 11.2 t=80815 -> @@25
+it
+@ via @@26 b=50 p=0 d=3600
+@@31: line 11.1 t=61938 -> @@26
+in
+@ via @@26 b=0 p=0 d=100
+@ via @@27 b=19 p=0 d=841
+@@32: line 11.1 t=57430 -> @@27
+@@33: line 11.2 t=58438 -> @@26
+your
+@ via @@28 b=3 p=0 d=169
+@@34: line 11.2 t=8929 -> @@28
+head
+@ via @@29 b=81 p=0 d=18281
+@ via @@30 b=11 p=0 d=441
+@@35: line 12.2 t=81256 -> @@30
+from
+@ via @@32 b=6 p=0 d=256
+@ via @@33 b=6 p=0 d=256
+@@36: line 12.2 t=57686 -> @@32
+what
+@ via @@34 b=1 p=0 d=121
+@@37: line 12.2 t=9050 -> @@34
+you
+@ via @@35 b=22 p=0 d=1024
+@@38: line 13.1 t=82280 -> @@35
+had
+@ via @@36 b=78 p=0 d=7744
+@@39: line 13.1 t=65430 -> @@36
+been
+@ via @@37 b=107 p=0 d=23689
+@@40: line 13.0 t=32739 -> @@37
+told
+@ via @@38 b=73 p=0 d=6889
+@@41: line 14.1 t=89169 -> @@38
+by
+@ via @@38 b=18 p=0 d=10784
+@@42: line 14.3 t=93064 -> @@38
+for-
+@\discretionary via @@39 b=3 p=50 d=2669
+@@43: line 14.2- t=68099 -> @@39
+eign
+@ via @@40 b=22 p=0 d=1024
+@@44: line 14.1 t=33763 -> @@40
+peo-
+@\discretionary via @@41 b=12 p=50 d=2984
+@@45: line 15.2- t=92153 -> @@41
+ple
+@ via @@42 b=86 p=0 d=19216
+@@46: line 15.1 t=112280 -> @@42
+who
+@ via @@43 b=0 p=0 d=100
+@@47: line 15.2 t=68199 -> @@43
+some-
+@\discretionary via @@45 b=42 p=50 d=15204
+@@48: line 16.1- t=107357 -> @@45
+times
+@ via @@46 b=14 p=0 d=576
+@@49: line 16.1 t=112856 -> @@46
+came
+@ via @@47 b=0 p=0 d=100
+@@50: line 16.2 t=68299 -> @@47
+up-
+@\discretionary via @@48 b=7 p=50 d=12789
+@@51: line 17.2- t=120146 -> @@48
+river.
+@ via @@49 b=131 p=0 d=19881
+@@52: line 17.0 t=132737 -> @@49
+You
+@ via @@50 b=136 p=0 d=31316
+@@53: line 17.0 t=99615 -> @@50
+knew
+@ via @@51 b=0 p=0 d=100
+@@54: line 18.2 t=120246 -> @@51
+that
+@ via @@52 b=18 p=0 d=784
+@@55: line 18.1 t=133521 -> @@52
+one
+@ via @@53 b=39 p=0 d=2401
+@@56: line 18.1 t=102016 -> @@53
+day
+@ via @@54 b=196 p=0 d=52436
+@@57: line 19.0 t=172682 -> @@54
+you
+@ via @@54 b=27 p=0 d=1369
+@@58: line 19.3 t=121615 -> @@54
+would
+@ via @@56 b=27 p=0 d=1369
+@@59: line 19.1 t=103385 -> @@56
+go
+@ via @@57 b=120 p=0 d=16900
+@@60: line 20.0 t=189582 -> @@57
+out
+@ via @@58 b=151 p=0 d=35921
+@@61: line 20.0 t=157536 -> @@58
+into a
+@ via @@59 b=118 p=0 d=16384
+@@62: line 20.0 t=119769 -> @@59
+world
+@ via @@60 b=0 p=0 d=10100
+@@63: line 21.2 t=199682 -> @@60
+of
+@ via @@61 b=15 p=0 d=625
+@@64: line 21.1 t=158161 -> @@61
+mar-
+@\discretionary via @@62 b=87 p=50 d=11909
+@@65: line 21.1- t=131678 -> @@62
+ble
+@ via @@62 b=2 p=0 d=10144
+@@66: line 21.2 t=129913 -> @@62
+pave-
+@\discretionary via @@63 b=4 p=50 d=2696
+@@67: line 22.2- t=202378 -> @@63
+ments
+@ via @@65 b=73 p=0 d=6889
+@@68: line 22.1 t=138567 -> @@65
+and
+@ via @@66 b=23 p=0 d=1089
+@@69: line 22.1 t=131002 -> @@66
+pea-
+@\discretionary via @@67 b=5 p=50 d=12725
+@@70: line 23.2- t=215103 -> @@67
+cocks,
+@ via @@68 b=99 p=0 d=11881
+@@71: line 23.1 t=150448 -> @@68
+of
+@ via @@68 b=0 p=0 d=100
+@@72: line 23.2 t=138667 -> @@68
+hill-
+@\discretionary via @@69 b=7 p=50 d=2789
+@\discretionary via @@70 b=115 p=50 d=38125
+@@73: line 23.2- t=133791 -> @@69
+sides buzzing
+@ via @@72 b=0 p=0 d=100
+@@74: line 24.2 t=138767 -> @@72
+with heat, the
+@ via @@74 b=46 p=0 d=3136
+@@75: line 25.1 t=141903 -> @@74
+fra-grance of crushed
+@ via @@75 b=* p=0 d=*
+@@76: line 26.3 t=141903 -> @@75
+herbs ris-ing around
+@ via @@76 b=* p=0 d=*
+@@77: line 27.3 t=141903 -> @@76
+you as you walked.
+@ via @@77 b=* p=0 d=*
+@@78: line 28.3 t=141903 -> @@77
+You planned for
+@ via @@78 b=0 p=0 d=100
+@@79: line 29.2 t=142003 -> @@78
+what your jour-
+@\discretionary via @@79 b=2 p=50 d=2644
+@@80: line 30.2- t=144647 -> @@79
+neys would bring
+@ via @@80 b=* p=0 d=*
+@@81: line 31.3 t=144647 -> @@80
+you: the touch
+@ via @@81 b=16 p=0 d=10676
+@@82: line 32.1 t=155323 -> @@81
+of warm ter-ra-
+@\discretionary via @@82 b=29 p=50 d=4021
+@@83: line 33.1- t=159344 -> @@82
+cotta, the night
+@ via @@83 b=3 p=0 d=169
+@@84: line 34.2 t=159513 -> @@83
+sky of an-other
+@ via @@84 b=38 p=0 d=2304
+@@85: line 35.1 t=161817 -> @@84
+cli-mate, alien
+@ via @@85 b=153 p=0 d=26569
+@@86: line 36.0 t=188386 -> @@85
+flow-ers, the stone
+@ via @@86 b=* p=0 d=*
+@@87: line 37.3 t=188386 -> @@86
+eyed gaze of other
+@ via @@87 b=* p=0 d=*
+@@88: line 38.3 t=188386 -> @@87
+peo-ples saints.
+@ via @@88 b=51 p=0 d=13721
+@@89: line 39.1 t=202107 -> @@88
+But if you were
+@ via @@89 b=3 p=0 d=169
+@@90: line 40.2 t=202276 -> @@89
+born in Aslock-
+@\discretionary via @@90 b=4 p=50 d=2696
+@@91: line 41.2- t=204972 -> @@90
+ton, in flat fields
+@ via @@91 b=0 p=0 d=100
+@@92: line 42.2 t=205072 -> @@91
+un-der a wide
+@ via @@92 b=158 p=0 d=38224
+@@93: line 43.0 t=243296 -> @@92
+sky, you might
+@ via @@93 b=22 p=0 d=1024
+@@94: line 44.1 t=244320 -> @@93
+just be able to
+@ via @@94 b=20 p=0 d=900
+@@95: line 45.1 t=245220 -> @@94
+imag-ine Cam-
+@\discretionary via @@95 b=87 p=50 d=11909
+@@96: line 46.1- t=257129 -> @@95
+bridge: no far-
+@\discretionary via @@96 b=19 p=50 d=13341
+@@97: line 47.1- t=270470 -> @@96
+ther.
+@\par via @@97 b=0 p=-10000 d=*
+@@98: line 48.2- t=270470 -> @@97

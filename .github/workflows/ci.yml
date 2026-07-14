@@ -33,6 +33,35 @@ jobs:
       - name: Compile the fuzz targets
         run: cargo build --bin fuzz_tftopl
 
+  tex-verification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+
+      - name: Install TeX
+        # The tests only need the tex binary and the plain format, both of
+        # which are provided by texlive-base. (The font metrics files the
+        # tests use are provided to TeX as auxiliary files, so no TeX fonts
+        # are needed.)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends texlive-base
+
+      - name: Check TeX works
+        run: tex -interaction=nonstopmode '\message{TeX works}\end'
+
+      - name: Run the tests against TeX
+        # Tests that compare Texcraft's output against Knuth's TeX run the
+        # tex binary when this environment variable is set; all other tests
+        # run as usual.
+        run: cargo test
+        env:
+          TEXCRAFT_VERIFY: tex
+
   style-enforcement:
     runs-on: ubuntu-latest
     steps:

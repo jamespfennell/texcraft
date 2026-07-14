@@ -16,6 +16,7 @@ struct Cli {
 }
 
 #[derive(Parser)]
+#[allow(clippy::large_enum_variant)]
 enum SubCommand {
     Check(Check),
     Fmt(Fmt),
@@ -215,9 +216,22 @@ struct Linebreak {
     #[clap(long)]
     adj_demerits: Option<i32>,
 
+    /// Penalty added to the vertical list after a line ending in a hyphen (default: 100).
+    #[clap(long)]
+    broken_penalty: Option<i32>,
+
+    /// Penalty added to the vertical list after the first line (default: 150).
+    #[clap(long)]
+    club_penalty: Option<i32>,
+
     /// Demerits for two consecutive hyphenated lines (default: 10000).
     #[clap(long)]
     double_hyphen_demerits: Option<i32>,
+
+    /// Extra stretchability given to every line, e.g. "10pt", if line breaking
+    /// fails otherwise (default: "0pt").
+    #[clap(long)]
+    emergency_stretch: Option<String>,
 
     /// Penalty for an explicit hyphen (default: 50).
     #[clap(long)]
@@ -227,9 +241,17 @@ struct Linebreak {
     #[clap(long)]
     final_hyphen_demerits: Option<i32>,
 
+    /// Penalty added to the vertical list before the last line (default: 150).
+    #[clap(long)]
+    final_widow_penalty: Option<i32>,
+
     /// Penalty for a discretionary hyphen (default: 50).
     #[clap(long)]
     hyphen_penalty: Option<i32>,
+
+    /// Penalty added to the vertical list between each pair of lines (default: 0).
+    #[clap(long)]
+    inter_line_penalty: Option<i32>,
 
     /// Glue added to the left of every line, e.g. "6pt" or "0pt plus 1fil" (default: "0pt").
     #[clap(long)]
@@ -303,8 +325,17 @@ impl Linebreak {
         if let Some(v) = self.adj_demerits {
             params.adj_demerits = v;
         }
+        if let Some(v) = self.broken_penalty {
+            params.broken_penalty = v;
+        }
+        if let Some(v) = self.club_penalty {
+            params.club_penalty = v;
+        }
         if let Some(v) = self.double_hyphen_demerits {
             params.double_hyphen_demerits = v;
+        }
+        if let Some(ref s) = self.emergency_stretch {
+            params.emergency_stretch = common::Scaled::parse_from_string(s)?;
         }
         if let Some(v) = self.ex_hyphen_penalty {
             params.ex_hyphen_penalty = v;
@@ -312,8 +343,14 @@ impl Linebreak {
         if let Some(v) = self.final_hyphen_demerits {
             params.final_hyphen_demerits = v;
         }
+        if let Some(v) = self.final_widow_penalty {
+            params.final_widow_penalty = v;
+        }
         if let Some(v) = self.hyphen_penalty {
             params.hyphen_penalty = v;
+        }
+        if let Some(v) = self.inter_line_penalty {
+            params.inter_line_penalty = v;
         }
         if let Some(ref s) = self.left_skip {
             params.left_skip = parse_glue(s)?;
@@ -407,23 +444,9 @@ fn build_tex_context(
     font_metrics: Option<PathBuf>,
 ) -> Result<(HashMap<PathBuf, Vec<u8>>, String), String> {
     let mut auxiliary_files: HashMap<PathBuf, Vec<u8>> = Default::default();
-    let mut preamble: String = Default::default();
     let (source, file_name) = load_font_metrics(font_metrics)?;
     let file_stem = file_name.file_stem().unwrap().to_string_lossy();
-    preamble.push_str(&format![
-        r"
-
-\tracingparagraphs=1
-
-% Boxworks does not yet append the \overfullrule rule to overfull boxes
-% (TeX.2021.666), so suppress it in TeX's output for now.
-\hfuzz=\maxdimen
-
-            \font \customFont {file_stem}
-
-            \customFont
-            "
-    ]);
+    let preamble = bwt::diagnostic_preamble(&file_stem);
     auxiliary_files.insert(file_name, source);
     Ok((auxiliary_files, preamble))
 }
@@ -555,6 +578,12 @@ fn run_tex_vlists(
     let (auxiliary_files, mut preamble) = build_tex_context(font_metrics)?;
     preamble.push_str(&text_params.tex());
     preamble.push_str(&params.tex());
+    // \looseness resets after each paragraph, so the value in the preamble
+    // only applies to the first text.
+    let texts: Vec<String> = texts
+        .into_iter()
+        .map(|text| bwt::prepend_looseness(params.looseness, &text))
+        .collect();
     let (_, vlists) = bwt::build_vertical_lists(
         tex_engine,
         &auxiliary_files,

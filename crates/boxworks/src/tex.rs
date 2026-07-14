@@ -122,6 +122,11 @@ impl TexEngine for TexEngineBinary {
 
         let output = std::process::Command::new(&self.binary_name)
             .current_dir(&dir)
+            // By default TeX wraps terminal output at 79 characters, which
+            // would split long diagnostic lines such as those in the
+            // \tracingparagraphs trace. The output parsers in this module and
+            // its consumers assume unwrapped lines.
+            .env("max_print_line", "10000")
             .arg(&input_path)
             .output()
             .expect("failed to run tex command");
@@ -133,6 +138,109 @@ impl TexEngine for TexEngineBinary {
         }
         stdout
     }
+}
+
+/// A [`TexEngine`] that records the terminal output of the most recent run
+/// of the inner engine.
+///
+/// This is useful for inspecting diagnostic output (like the
+/// `\tracingparagraphs` trace; see [`extract_paragraph_trace`]) that the
+/// functions in this module don't themselves return.
+pub struct RecordingTexEngine {
+    inner: Box<dyn TexEngine>,
+    stdout: String,
+}
+
+impl RecordingTexEngine {
+    pub fn new(inner: Box<dyn TexEngine>) -> Self {
+        Self {
+            inner,
+            stdout: String::new(),
+        }
+    }
+    /// Returns the terminal output of the most recent run.
+    pub fn stdout(&self) -> &str {
+        &self.stdout
+    }
+}
+
+impl TexEngine for RecordingTexEngine {
+    fn run(
+        &mut self,
+        tex_source_code: &str,
+        auxiliary_files: &HashMap<PathBuf, Vec<u8>>,
+    ) -> String {
+        self.stdout = self.inner.run(tex_source_code, auxiliary_files);
+        self.stdout.clone()
+    }
+}
+
+/// Returns the TeX preamble to use when comparing Boxworks output to TeX's.
+///
+/// The preamble enables `\tracingparagraphs`, works around diagnostics that
+/// Boxworks does not implement yet, and activates the font whose metrics
+/// file (e.g. `cmr10.tfm` for a `font_file_stem` of `cmr10`) must be
+/// provided as an auxiliary file when the engine runs.
+pub fn diagnostic_preamble(font_file_stem: &str) -> String {
+    format!(
+        r"
+\tracingparagraphs=1
+
+% Boxworks does not yet append the \overfullrule rule to overfull boxes
+% (TeX.2021.666), so suppress it in TeX's output for now.
+\hfuzz=\maxdimen
+
+\font \customFont {font_file_stem}
+
+\customFont
+"
+    )
+}
+
+/// Extracts the `\tracingparagraphs` trace from TeX's terminal output:
+/// everything from `@firstpass` (or `@secondpass`, if the first pass is
+/// skipped) up to the end of the trace.
+///
+/// After the trace, TeX may print underfull/overfull box warnings when it
+/// packages the broken lines (TeX.2021.660 and TeX.2021.663). These are
+/// not part of the line breaking trace, so extraction stops there too.
+pub fn extract_paragraph_trace(stdout: &str) -> String {
+    let mut lines = vec![];
+    let mut in_trace = false;
+    for line in stdout.lines() {
+        if !in_trace && (line.starts_with("@firstpass") || line.starts_with("@secondpass")) {
+            in_trace = true;
+        }
+        if line.starts_with("Texcraft: begin")
+            || [
+                "Underfull \\hbox",
+                "Overfull \\hbox",
+                "Loose \\hbox",
+                "Tight \\hbox",
+            ]
+            .iter()
+            .any(|warning| line.starts_with(warning))
+        {
+            break;
+        }
+        if in_trace {
+            lines.push(line);
+        }
+    }
+    lines.join("\n")
+}
+
+/// Prepends `\looseness=<looseness>` to the provided text.
+///
+/// TeX resets `\looseness` to zero after every paragraph, so setting it in
+/// the preamble only affects the first paragraph. To apply a looseness value
+/// to every paragraph, transform each text with this function.
+///
+/// The number is terminated with an empty group rather than a space:
+/// otherwise, if the text starts with a space, TeX's number scanner would
+/// consume it and the text would lose its leading interword glue.
+pub fn prepend_looseness(looseness: i32, text: &str) -> String {
+    format![r"\looseness={looseness}{{}}{text}"]
 }
 
 const HBOX_TEMPLATE: &str = include_str!("hbox_template.tex");

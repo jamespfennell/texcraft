@@ -1,0 +1,147 @@
+@firstpass
+He thinks, if you were born in Putney, you saw
+@ via @@0 b=28 p=0 d=1444
+@@1: line 1.1 t=1444 -> @@0
+the
+@ via @@0 b=26 p=0 d=1296
+@@2: line 1.3 t=1296 -> @@0
+river every day, and imagined it widening out
+@ via @@1 b=0 p=0 d=100
+@@3: line 2.2 t=1544 -> @@1
+to
+@ via @@2 b=5 p=0 d=225
+@@4: line 2.2 t=1521 -> @@2
+the sea. Even if you had never seen the ocean
+@ via @@3 b=1 p=0 d=121
+@ via @@4 b=66 p=0 d=5776
+@@5: line 3.1 t=7297 -> @@4
+@@6: line 3.2 t=1665 -> @@3
+you
+@ via @@4 b=2 p=0 d=144
+@@7: line 3.2 t=1665 -> @@4
+had a picture of it in your head from what
+@ via @@5 b=30 p=0 d=1600
+@ via @@6 b=30 p=0 d=1600
+@@8: line 4.1 t=3265 -> @@6
+you
+@ via @@5 b=25 p=0 d=11225
+@ via @@6 b=25 p=0 d=1225
+@ via @@7 b=30 p=0 d=1600
+@@9: line 4.1 t=3265 -> @@7
+@@10: line 4.3 t=2890 -> @@6
+had
+@ via @@7 b=31 p=0 d=1681
+@@11: line 4.3 t=3346 -> @@7
+been told by foreign people who sometimes
+@ via @@9 b=40 p=0 d=2500
+@ via @@10 b=40 p=0 d=12500
+@@12: line 5.1 t=5765 -> @@9
+came
+@ via @@11 b=1 p=0 d=121
+@@13: line 5.2 t=3467 -> @@11
+upriver. You knew that one day you would
+@ via @@12 b=1 p=0 d=121
+@@14: line 6.2 t=5886 -> @@12
+go
+@ via @@13 b=73 p=0 d=6889
+@@15: line 6.1 t=10356 -> @@13
+out
+@ via @@13 b=2 p=0 d=144
+@@16: line 6.2 t=3611 -> @@13
+into a world of marble pavements and peacocks,
+@ via @@16 b=16 p=0 d=676
+@@17: line 7.1 t=4287 -> @@16
+of
+@ via @@16 b=19 p=0 d=841
+@@18: line 7.3 t=4452 -> @@16
+@secondpass
+He thinks, if you were born in Put-ney, you saw
+@ via @@0 b=28 p=0 d=1444
+@@1: line 1.1 t=1444 -> @@0
+the
+@ via @@0 b=26 p=0 d=1296
+@@2: line 1.3 t=1296 -> @@0
+river ev-ery day, and imag-ined it widen-ing out
+@ via @@1 b=0 p=0 d=100
+@@3: line 2.2 t=1544 -> @@1
+to
+@ via @@2 b=5 p=0 d=225
+@@4: line 2.2 t=1521 -> @@2
+the sea. Even if you had never seen the ocean
+@ via @@3 b=1 p=0 d=121
+@ via @@4 b=66 p=0 d=5776
+@@5: line 3.1 t=7297 -> @@4
+@@6: line 3.2 t=1665 -> @@3
+you
+@ via @@4 b=2 p=0 d=144
+@@7: line 3.2 t=1665 -> @@4
+had a pic-ture of it in your head from what
+@ via @@5 b=30 p=0 d=1600
+@ via @@6 b=30 p=0 d=1600
+@@8: line 4.1 t=3265 -> @@6
+you
+@ via @@5 b=25 p=0 d=11225
+@ via @@6 b=25 p=0 d=1225
+@ via @@7 b=30 p=0 d=1600
+@@9: line 4.1 t=3265 -> @@7
+@@10: line 4.3 t=2890 -> @@6
+had
+@ via @@7 b=31 p=0 d=1681
+@@11: line 4.3 t=3346 -> @@7
+been told by for-eign peo-ple who some-times
+@ via @@9 b=40 p=0 d=2500
+@ via @@10 b=40 p=0 d=12500
+@@12: line 5.1 t=5765 -> @@9
+came
+@ via @@11 b=1 p=0 d=121
+@@13: line 5.2 t=3467 -> @@11
+up-river. You knew that one day you would
+@ via @@12 b=1 p=0 d=121
+@@14: line 6.2 t=5886 -> @@12
+go
+@ via @@13 b=73 p=0 d=6889
+@@15: line 6.1 t=10356 -> @@13
+out
+@ via @@13 b=2 p=0 d=144
+@@16: line 6.2 t=3611 -> @@13
+into a world of mar-ble pave-ments and pea-cocks,
+@ via @@16 b=16 p=0 d=676
+@@17: line 7.1 t=4287 -> @@16
+of
+@ via @@16 b=19 p=0 d=841
+@@18: line 7.3 t=4452 -> @@16
+hill-sides buzzing with heat, the fra-grance of
+@ via @@17 b=159 p=0 d=28561
+@@19: line 8.0 t=32848 -> @@17
+crushed herbs ris-ing around you as you walked.
+@ via @@19 b=54 p=0 d=4096
+@@20: line 9.1 t=36944 -> @@19
+You planned for what your jour-neys would bring
+@ via @@20 b=2 p=0 d=144
+@@21: line 10.2 t=37088 -> @@20
+you: the touch of warm ter-ra-cotta, the night sky
+@ via @@21 b=1 p=0 d=121
+@@22: line 11.2 t=37209 -> @@21
+of
+@ via @@21 b=66 p=0 d=5776
+@@23: line 11.3 t=42864 -> @@21
+an-other cli-mate, alien flow-ers, the stone eyed
+@ via @@22 b=32 p=0 d=1764
+@@24: line 12.1 t=38973 -> @@22
+gaze
+@ via @@23 b=3 p=0 d=169
+@@25: line 12.2 t=43033 -> @@23
+of other peo-ples saints. But if you were born
+@ via @@24 b=1 p=0 d=121
+@ via @@25 b=187 p=0 d=48809
+@@26: line 13.2 t=39094 -> @@24
+in
+@ via @@25 b=11 p=0 d=441
+@@27: line 13.2 t=43474 -> @@25
+Aslock-ton, in flat fields un-der a wide sky, you
+@ via @@26 b=4 p=0 d=196
+@ via @@27 b=169 p=0 d=42041
+@@28: line 14.2 t=39290 -> @@26
+might just be able to imag-ine Cam-bridge: no far-ther.
+@\par via @@28 b=* p=-10000 d=*
+@@29: line 15.3- t=39290 -> @@28

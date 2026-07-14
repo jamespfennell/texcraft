@@ -1,17 +1,18 @@
 # Box CLI E2E tests
 
-Regenerate the golden files with:
+Each test runs the `box` binary and compares its output to a golden file.
+The golden files contain TeX's output for the same invocation
+(via `--tex-engine=tex`), so the tests verify that Box matches TeX.
+
+To verify the golden files against TeX:
 
 ```
-cargo run --bin box \
-  hlists \
-  --texts-file=crates/boxworks-bin/tests/alice_in_wonderland.txt \
-  --tex-engine=tex > crates/boxworks-bin/tests/alice_in_wonderland_hlists.txt
+TEXCRAFT_VERIFY=tex cargo test --package boxworks-bin
 ```
 
+To regenerate the golden files from TeX (e.g. after adding a test with an
+empty golden file, or changing a test's arguments):
+
 ```
-cargo run --bin box \
-  linebreak --widths=10in \
-  --texts-file=crates/boxworks-bin/tests/alice_in_wonderland.txt \
-  --tex-engine=tex > crates/boxworks-bin/tests/alice_in_wonderland_linebreak.txt
+TEXCRAFT_VERIFY=tex TEXCRAFT_VERIFY_OVERWRITE=true cargo test --package boxworks-bin
 ```

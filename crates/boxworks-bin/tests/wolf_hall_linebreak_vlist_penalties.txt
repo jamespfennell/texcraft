@@ -1,0 +1,820 @@
+#
+# vlist 1
+vbox(
+  height=0.0pt,
+  width=0.0pt,
+  depth=0.0pt,
+  shift_amount=0.0pt,
+  content=[
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.6564",
+      glue_order="normal",
+      content=[
+        chars("He", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("thinks,", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("if", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("ere", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("b", font=0)
+        kern(0.27779pt)
+        chars("orn", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("in", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("Put", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ney", font=0)
+        kern(-0.83334pt)
+        chars(",", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("sa", font=0)
+        kern(-0.27779pt)
+        chars("w", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(1100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.00433",
+      glue_order="normal",
+      content=[
+        chars("the", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("riv", font=0)
+        kern(-0.27779pt)
+        chars("er", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("e", font=0)
+        disc(
+          pre_break=[
+            chars("v", font=0)
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=2,
+        )
+        chars("v", font=0)
+        kern(-0.27779pt)
+        chars("ery", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("da", font=0)
+        kern(-0.27779pt)
+        chars("y", font=0)
+        kern(-0.83334pt)
+        chars(",", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("and", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("imag", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ined", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("it", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("widen", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ing", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("out", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.18771",
+      glue_order="normal",
+      content=[
+        chars("to", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("the", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("sea.", font=0)
+        glue(4.44444pt, 4.99997pt, 0.37036pt)
+        chars("Ev", font=0)
+        kern(-0.27779pt)
+        chars("en", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("if", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("had", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("nev", font=0)
+        kern(-0.27779pt)
+        chars("er", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("seen", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("the", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("o", font=0)
+        kern(0.27779pt)
+        chars("cean", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.67024",
+      glue_order="normal",
+      content=[
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("had", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("a", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("pic", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ture", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("of", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("it", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("in", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("our", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("head", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("from", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("what", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.73364",
+      glue_order="normal",
+      content=[
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("had", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("b", font=0)
+        kern(0.27779pt)
+        chars("een", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("told", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("b", font=0)
+        kern(-0.27779pt)
+        chars("y", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("for", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("eign", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("p", font=0)
+        kern(0.27779pt)
+        chars("eo", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ple", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("who", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("some", font=0)
+        disc(
+          pre_break=[],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("-", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(350)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.31857",
+      glue_order="normal",
+      content=[
+        chars("times", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("came", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("up", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("riv", font=0)
+        kern(-0.27779pt)
+        chars("er.", font=0)
+        glue(4.44444pt, 4.99997pt, 0.37036pt)
+        chars("Y", font=0)
+        kern(-0.83334pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("knew", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("that", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("one", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("da", font=0)
+        kern(-0.27779pt)
+        chars("y", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.7524",
+      glue_order="normal",
+      content=[
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("ould", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("go", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("out", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("in", font=0)
+        kern(-0.27779pt)
+        chars("to", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("a", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("orld", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("of", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("mar", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ble", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("pa", font=0)
+        kern(-0.27779pt)
+        chars("v", font=0)
+        kern(-0.27779pt)
+        chars("e", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("men", font=0)
+        kern(-0.27779pt)
+        chars("ts", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.42033",
+      glue_order="normal",
+      content=[
+        chars("and", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("p", font=0)
+        kern(0.27779pt)
+        chars("ea", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("co", font=0)
+        kern(0.27779pt)
+        chars("c", font=0)
+        kern(-0.27779pt)
+        chars("ks,", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("of", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("hill", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("sides", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("buzzing", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("with", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("heat,", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("the", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.78845",
+      glue_order="normal",
+      content=[
+        chars("fra", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("grance", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("of", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("crushed", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("herbs", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("ris", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ing", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("around", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("as", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.18546",
+      glue_order="normal",
+      content=[
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("alk", font=0)
+        kern(-0.27779pt)
+        chars("ed.", font=0)
+        glue(4.44444pt, 4.99997pt, 0.37036pt)
+        chars("Y", font=0)
+        kern(-0.83334pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("planned", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("for", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("what", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("our", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("jour", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("neys", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.66905",
+      glue_order="normal",
+      content=[
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("ould", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("bring", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou:", font=0)
+        glue(4.44444pt, 3.33331pt, 0.55556pt)
+        chars("the", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("touc", font=0)
+        kern(-0.27779pt)
+        chars("h", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("of", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("arm", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("ter", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ra", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("cotta,", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.39755",
+      glue_order="normal",
+      content=[
+        chars("the", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("nigh", font=0)
+        kern(-0.27779pt)
+        chars("t", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("sky", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("of", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("an", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("other", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("cli", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("mate,", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("alien", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        lig("\r", "fl", font=0)
+        chars("o", font=0)
+        kern(-0.27779pt)
+        disc(
+          pre_break=[
+            chars("w", font=0)
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=2,
+        )
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("ers,", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("the", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.41656",
+      glue_order="normal",
+      content=[
+        chars("stone", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("ey", font=0)
+        kern(-0.27779pt)
+        chars("ed", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("gaze", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("of", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("other", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("p", font=0)
+        kern(0.27779pt)
+        chars("eo", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ples", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("sain", font=0)
+        kern(-0.27779pt)
+        chars("ts.", font=0)
+        glue(4.44444pt, 4.99997pt, 0.37036pt)
+        chars("But", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("if", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.28935",
+      glue_order="normal",
+      content=[
+        chars("w", font=0)
+        kern(-0.27779pt)
+        chars("ere", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("b", font=0)
+        kern(0.27779pt)
+        chars("orn", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("in", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("Aslo", font=0)
+        kern(0.27779pt)
+        chars("c", font=0)
+        kern(-0.27779pt)
+        chars("k", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ton,", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("in", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        lig("\r", "fl", font=0)
+        chars("at", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        lig("\u{c}", "fi", font=0)
+        chars("elds", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("un", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("der", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("a", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("wide", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(100)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=1.94444pt,
+      shift_amount=0.0pt,
+      glue_ratio="0.5444",
+      glue_order="normal",
+      content=[
+        chars("sky", font=0)
+        kern(-0.83334pt)
+        chars(",", font=0)
+        glue(3.33333pt, 2.08331pt, 0.88889pt)
+        chars("y", font=0)
+        kern(-0.27779pt)
+        chars("ou", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("migh", font=0)
+        kern(-0.27779pt)
+        chars("t", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("just", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("b", font=0)
+        kern(0.27779pt)
+        chars("e", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("able", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("to", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("imag", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ine", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("Ca", font=0)
+        disc(
+          pre_break=[
+            chars("m", font=0)
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=2,
+        )
+        chars("m", font=0)
+        kern(-0.27779pt)
+        chars("bridge:", font=0)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+    penalty(600)
+    glue(3.11111pt, 0.0pt, 0.0pt)
+    hbox(
+      height=6.94444pt,
+      width=216.81pt,
+      depth=0.0pt,
+      shift_amount=0.0pt,
+      glue_ratio="170.36545",
+      glue_order="fil",
+      content=[
+        chars("no", font=0)
+        glue(3.33333pt, 1.66666pt, 1.11111pt)
+        chars("far", font=0)
+        disc(
+          pre_break=[
+            chars("-", font=0)
+          ],
+          post_break=[],
+          replace_count=0,
+        )
+        chars("ther.", font=0)
+        penalty(10000)
+        glue(0.0pt, 1.0fil, 0.0pt)
+        glue(0.0pt, 0.0pt, 0.0pt)
+      ],
+    )
+  ],
+)
+
