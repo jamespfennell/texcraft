@@ -185,8 +185,8 @@ impl PassRecorder {
 }
 
 impl boxworks_knuthplass::debug::Logger for PassRecorder {
-    fn log_attempt(&mut self, attempt_number: u8) {
-        self.attempts = self.attempts.max(attempt_number);
+    fn log_attempt(&mut self, attempt: boxworks_knuthplass::debug::Attempt) {
+        self.attempts = self.attempts.max(attempt.number());
         self.nodes.clear();
         self.selected = None;
     }

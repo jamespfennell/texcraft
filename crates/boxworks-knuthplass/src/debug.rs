@@ -22,7 +22,7 @@ pub struct NewActiveNode {
 }
 
 pub trait Logger {
-    fn log_attempt(&mut self, attempt_number: u8);
+    fn log_attempt(&mut self, attempt: Attempt);
     fn log_feasible_breakpoint(&mut self, list: &[ds::Horizontal], fb: FeasibleBreakpoint);
     fn log_new_active_node(&mut self, an: NewActiveNode);
     /// Called with the node index of the active node the algorithm chose
@@ -47,19 +47,42 @@ impl TexLogger {
     }
 }
 
+/// Attempts made at line breaking.
+#[derive(Clone, Copy)]
+pub enum Attempt {
+    First,
+    Second,
+    Emergency,
+}
+
+impl Attempt {
+    pub fn number(self) -> u8 {
+        use Attempt::*;
+        match self {
+            First => 1,
+            Second => 2,
+            Emergency => 3,
+        }
+    }
+}
+
+impl std::fmt::Display for Attempt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Attempt::*;
+        let s = match self {
+            First => "firstpass",
+            Second => "secondpass",
+            Emergency => "emergencypass",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 impl Logger for TexLogger {
-    fn log_attempt(&mut self, attempt_number: u8) {
+    fn log_attempt(&mut self, attempt: Attempt) {
         self.next_elem_to_write = 0;
         // TeX.2021.863
-        let _ = writeln!(
-            self.writer.borrow_mut(),
-            "@{}",
-            match attempt_number {
-                1 => "firstpass",
-                2 => "secondpass",
-                _ => "emergencypass",
-            }
-        );
+        let _ = writeln!(self.writer.borrow_mut(), "@{}", attempt);
     }
     fn log_feasible_breakpoint(&mut self, list: &[ds::Horizontal], fb: FeasibleBreakpoint) {
         if self.next_elem_to_write <= fb.elem_index {

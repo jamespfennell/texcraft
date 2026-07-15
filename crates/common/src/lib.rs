@@ -36,6 +36,10 @@ impl Scaled {
     /// Representation of the number 2 as a [Scaled].
     pub const TWO: Scaled = Scaled(1 << 17);
 
+    pub fn is_zero(&self) -> bool {
+        *self == Scaled::ZERO
+    }
+
     /// Maximum possible dimension in TeX, which is (2^30-1)/2^16.
     ///
     /// This is _not_ the maximum size of the Rust scaled number type, which is (2^31-1)/2^16.

@@ -432,24 +432,47 @@ impl<'a> LineBreaker<'a> {
     ) -> Vec<usize> {
         // We manually unroll the "loop" in TeX.2021.863.
         if let Some(debug_logger) = self.debug_logger.as_deref_mut() {
-            debug_logger.log_attempt(1);
+            debug_logger.log_attempt(debug::Attempt::First);
         }
-        if let Some(v) =
-            self.break_line_single_attempt(h_list, font_repo, self.params.pre_tolerance, false)
-        {
+        if let Some(v) = self.break_line_single_attempt(
+            h_list,
+            font_repo,
+            self.params.pre_tolerance,
+            common::Scaled::ZERO,
+            false,
+        ) {
             return v;
         }
         if let Some(debug_logger) = self.debug_logger.as_deref_mut() {
-            debug_logger.log_attempt(2);
+            debug_logger.log_attempt(debug::Attempt::Second);
         }
         hyphenator.hyphenate(h_list);
-        if let Some(v) =
-            self.break_line_single_attempt(h_list, font_repo, self.params.tolerance, true)
-        {
+        // The only difference between the second and third passes is that in
+        // the third pass emergency stretch is added. If the emergency stretch
+        // is zero, then the two passes are the same. In this case, as an
+        // optimization, we skip the third pass. This optimization is in Knuth's
+        // TeX as well.
+        let second_pass_is_final_pass = self.params.emergency_stretch.is_zero();
+        if let Some(v) = self.break_line_single_attempt(
+            h_list,
+            font_repo,
+            self.params.tolerance,
+            common::Scaled::ZERO,
+            second_pass_is_final_pass,
+        ) {
             return v;
         }
-        // TODO: implement \emergencystretch and final pass
-        panic!("need emergency attempt");
+        if let Some(debug_logger) = self.debug_logger.as_deref_mut() {
+            debug_logger.log_attempt(debug::Attempt::Emergency);
+        }
+        self.break_line_single_attempt(
+            h_list,
+            font_repo,
+            self.params.tolerance,
+            self.params.emergency_stretch,
+            true,
+        )
+        .expect("force_solution=true")
     }
 
     pub fn break_line_single_attempt<F: boxworks::FontRepo>(
@@ -457,6 +480,7 @@ impl<'a> LineBreaker<'a> {
         list: &[ds::Horizontal],
         font_repo: &F,
         tolerance: i32,
+        emergency_stretch: common::Scaled,
         force_solution: bool,
     ) -> Option<Vec<usize>> {
         let mut auto_breaking = true;
@@ -470,6 +494,7 @@ impl<'a> LineBreaker<'a> {
             let mut b: Diffs = Default::default();
             b.update_from_glue(&self.params.left_skip);
             b.update_from_glue(&self.params.right_skip);
+            b.stretchabilities[common::GlueOrder::Normal as usize] += emergency_stretch;
             b
         };
         let mut active_nodes = VecDeque::<ActiveNode>::from([
@@ -1140,7 +1165,6 @@ mod tests {
             typeset: "wolf_hall_2in_want.txt",
             log: "wolf_hall_2in_log.txt",
         ),
-        /*
         (
             // At this width the second pass fails and, since
             // \emergencystretch is zero by default, TeX gives up and emits
@@ -1157,8 +1181,6 @@ mod tests {
             // With a non-zero \emergencystretch, the failing second pass is
             // followed by a third pass in which every line gets the extra
             // stretchability.
-            // This test currently fails: Boxworks does not implement the
-            // third pass yet (see the TODO in break_line_all_attempts).
             wolf_hall_emergency_stretch,
             "wolf_hall_input.txt",
             &["1in"],
@@ -1169,7 +1191,20 @@ mod tests {
             not_typeset: "wolf_hall_1in_want.txt",
             log: "wolf_hall_emergency_stretch_log.txt",
         ),
-        */
+    (
+        // With a non-zero \emergencystretch, the failing second pass is
+        // followed by a third pass in which every line gets the extra
+        // stretchability.
+        wolf_hall_emergency_stretch_2,
+        "wolf_hall_input.txt",
+        &["3in"],
+        params: Params {
+            emergency_stretch: common::Scaled::parse_from_string("10.0pt").unwrap(),
+        },
+        typeset: "wolf_hall_emergency_stretch_2_want.txt",
+        // not_typeset: "wolf_hall_1in_want.txt",
+        log: "wolf_hall_emergency_stretch_2_log.txt",
+    ),
         (
             wolf_hall_variable_widths,
             "wolf_hall_input.txt",
