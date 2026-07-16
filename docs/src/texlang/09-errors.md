@@ -64,11 +64,11 @@ TeX aborts in such rare cases.
 ## Handling errors in Texlang
 
 For a given error case you first need to define a Rust type for that case.
-This type must implement then [`error::TexError`] trait.
+This type must implement the [`error::TexError`] trait.
 At a minimum you must provide an error kind and a title.
 
 Suppose you're writing a Texlang function to parse a yes/no answer.
-The function will accept `Y` or `y` to mean to mean yes,
+The function will accept `Y` or `y` to mean yes,
     and `N` or `n` to mean no.
 The error that can occur here is that the user provides a different
     character like `A`.
@@ -98,7 +98,7 @@ impl error::TexError for YesOrNoError {
 
 Next, in the function that parses the yes/no,
     on the error path first construct the error,
-    pass it to the [`TokenStream::error`] method of the function input.
+    then pass it to the [`TokenStream::error`] method of the function input.
 If that doesn't error out, return the default value.
 
 ```rust
@@ -120,7 +120,7 @@ If that doesn't error out, return the default value.
 # }
 /// Parses a yes (character 'Y' or 'y') or no (character 'N' or 'n').
 /// Returns true if the parsed value is "yes".
-fn parse_yes_or_now<S: TexlangState>(input: &mut vm::ExecutionInput<S>) -> txl::Result<bool> {
+fn parse_yes_or_no<S: TexlangState>(input: &mut vm::ExecutionInput<S>) -> txl::Result<bool> {
     let token = input.next()?.expect("input has not ended");
     let yes = match token.value() {
         token::Value::Letter('Y' | 'y') => true,
@@ -130,7 +130,7 @@ fn parse_yes_or_now<S: TexlangState>(input: &mut vm::ExecutionInput<S>) -> txl::
             // here and then propagated using the `?` operator.
             input.error(YesOrNoError{token})?;
             // Otherwise, the VM has treated the error as recoverable and we
-            // fallback to the recovery behavior.
+            // fall back to the recovery behavior.
             false
         }
     };

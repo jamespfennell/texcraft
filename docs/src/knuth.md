@@ -27,7 +27,7 @@ Texcraft code is frequently annotated with the analogous TeX section
 14 | Copying boxes | N/A. Copying is done via implementations of Rust's `Clone` trait.
 15 | The command codes | N/A. Texlang doesn't have global command codes. [Texlang's command tags feature](texlang/05-primitive-tags.md) is used for cases when the command needs to be identified.
 16 | The semantic nest 
-17 | The table of equivalents | N/A. Texlang's doesn't have a global table of state. Instead, the [component pattern](texlang/04-stateful-primitives.md) is used for per-command state.
+17 | The table of equivalents | N/A. Texlang doesn't have a global table of state. Instead, the [component pattern](texlang/04-stateful-primitives.md) is used for per-command state.
 18 | The hash table | Mostly N/A because Texcraft uses Rust's stdlib data structures. But `command/map.rs` in `texlang` is the equivalent thing. The hash table is related to string interning, which in Texcraft is in `collections/interner.rs` in `texcraft-stdext`.
 19 | Saving and restoring equivalents  | Implemented via `collections/groupingmap.rs` in `texcraft-stdext`.
 20 | Token lists | Generally N/A because Texcraft just uses Rust's vector type. But `texmacro.rs` in `texlang` is related.

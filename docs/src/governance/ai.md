@@ -13,7 +13,7 @@ There are a few reasons for this:
   We think this is currently a task that requires a lot of quality human judgment.
 
 - We have the highest possible code quality standards for this code, and in our
-  experience the AI cannot (yet?) achieve it.
+  experience the AI cannot (yet?) achieve them.
 
 - Specifically for the last point: there is a tension between writing the code
   in a way very similar to Knuth's TeX (very few data structures, no abstractions, highly procedural) and writing it in a more modern way.

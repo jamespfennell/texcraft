@@ -5,8 +5,8 @@ Before writing any custom TeX primitives it's good to know how to run the
 This way you can manually test the primitives you write
     to ensure they're working as you expect.
 In the long run you may decide to lean more
-    on [unit testing](unit-testing.md), even when initially developing commands,
-    rather than manual testing things out.
+    on [unit testing](10-unit-testing.md), even when initially developing commands,
+    rather than manually testing things out.
 But it's still good to know how to run the VM.
 
 If you just want to see the minimal code to do this, jump down to the first code listing.
@@ -18,8 +18,8 @@ Running the VM is generally a four step process:
 1. Initialize the VM using its [`new`](https://docs.rs/texlang/latest/texlang/vm/struct.VM.html#method.new) constructor.
     At this point you will need to decide which concrete state type you're using.
     The state concept was described in high-level terms in 
-        [the previous section](introduction.md), and we will gain hands-on experience with it
-        [the primitives with state section](stateful-primitives.md).
+        [the previous section](01-introduction.md), and we will gain hands-on experience with it in
+        [the primitives with state section](04-stateful-primitives.md).
     For the moment, to keep things simple, we're just going to use a
         pre-existing state type that exists in the Texlang standard library crate:
         [`::texlang_stdlib::testing::State`](https://docs.rs/texlang-stdlib/latest/texlang_stdlib/testing/struct.State.html).
@@ -34,7 +34,7 @@ These are Rust functions that tell the VM what to do when it encounters certain
     kinds of TeX tokens.
 For example, when a real typesetting VM sees the character `a`,
     it typesets the character `a`.
-Handlers are described in detail in the [VM hooks and handlers section](hooks-and-handlers.md).
+Handlers are described in detail in the [VM hooks and handlers section](06-hooks-and-handlers.md).
 For the moment, we're going to get around the handlers problem entirely
     by instead running the VM using the [`::texlang_stdlib::script::run`](https://docs.rs/texlang-stdlib/latest/texlang_stdlib/script/fn.run.html) function.
 This function automatically provides handlers such that when the VM sees a character,
@@ -57,7 +57,7 @@ let built_in_commands = std::collections::HashMap::new();
 // 2. Initialize the VM.
 let mut vm = vm::VM::<StdLibState>::new_with_built_in_commands(built_in_commands);
 
-// 3. Add some TeX source code the VM.
+// 3. Add some TeX source code to the VM.
 vm.push_source("input.tex", r"Hello, World.");
 
 // 4. Run the VM and write the results to stdout.
@@ -80,7 +80,7 @@ To see the VM doing a little work at least, change the source code to this:
 # extern crate texlang;
 # use texlang::{vm, command};
 # let mut vm = vm::VM::<()>::new_with_built_in_commands(Default::default());
-// 3. Add some TeX source code the VM.
+// 3. Add some TeX source code to the VM.
 vm.push_source("input.tex", r"Hello, {World}.");
 ```
 
@@ -105,7 +105,7 @@ Changing the VM setup to the following:
 # use texlang_stdlib::StdLibState;
 # use texlang_stdlib::script;
 # let mut vm = vm::VM::<StdLibState>::new_with_built_in_commands(Default::default());
-// 3. Add some TeX source code the VM.
+// 3. Add some TeX source code to the VM.
 vm.push_source("input.tex", r"\controlSequence");
 
 // 4. Run the VM and write the results to stdout.

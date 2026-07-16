@@ -27,7 +27,7 @@ It is impossible to reuse subparts of the code,
 
 Texcraft was started with the observation: we've been here before.
 In the late 1990s the GCC project
-    simultaneously dominated open-source C/C++ compiler space
+    simultaneously dominated the open-source C/C++ compiler space
     but also had a software architecture that made it difficult to evolve.
 When Chris Lattner started the LLVM project, one of his ideas
     was to implement a compiler as a loosely coupled collection of libraries:
@@ -53,10 +53,10 @@ with a modular library-based software architecture.
 As part of this, there is an opportunity to improve some of the user-experience around TeX,
     like returning better error messages or being smarter about
     when a recompilation is needed.
-However we think the most promise of the project is how such a base could be built upon.
+However we think the greatest promise of the project is how such a base could be built upon.
 A modular code base would make it possible to:
 
-1. Make small improvement to existing TeX engines,
+1. Make small improvements to existing TeX engines,
     or even non-trivial improvements like adding new pagination algorithms.
 
 1. Develop new languages that perform typesetting by using the existing
@@ -99,8 +99,8 @@ This means that we can't run the lexer, or TeX macro expander, or line-breaker, 
     in isolation: they must all run concurrently.
 
 
-However, after a few years of working on Texcraft we think the TeX source code is extremely amendable to 
-    modularization, once all the modules can be be made to run together.
+However, after a few years of working on Texcraft we think the TeX source code is extremely amenable to 
+    modularization, once all the modules can be made to run together.
 At the highest possible level, TeX can be divided into two parts
     following a traditional frontend/backend split:
 
@@ -135,9 +135,9 @@ For correctness, TeX clearly falls under [Hyrum's law](https://www.hyrumslaw.com
 It doesn't matter what Knuth _says_ in the TeXBook:
 after 45 years in production, every observable behavior of the TeX system
     is probably relied upon by someone.
-The Texcraft's project goal is to exactly replicate the output of TeX.
+The Texcraft project's goal is to exactly replicate the output of TeX.
 This is fairly non-trivial because TeX is, ultimately, 
-[a fragile language](https://jpfennell.com/posts/tex-expansion-edge-case/]).
+[a fragile language](https://jpfennell.com/posts/tex-expansion-edge-case/).
 To achieve this, Texcraft development generally works by closely examining the Pascal/WEB source code
     and sometimes translating it by hand.
 

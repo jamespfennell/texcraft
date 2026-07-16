@@ -1,7 +1,7 @@
 # Texcraft
 
 Texcraft is a research project to reimplement TeX typesetting software
-  in the form a fully modular, LLVM-style framework.
+  in the form of a fully modular, LLVM-style framework.
 We say "research project" because the work is somewhat speculative,
   though over time the goal seems more and more attainable.
 
@@ -10,7 +10,7 @@ Existing TeX engines (Knuth's original TeX '82, pdfTeX, XeTeX, etc.)
 These engines are hard to modify
   and essentially impossible to use outside the context of compiling full documents.
 They are not [malleable](https://www.inkandswitch.com/essay/malleable-software/).
-The goal of Texcraft is change this by doing for TeX engines what
+The goal of Texcraft is to change this by doing for TeX engines what
     [LLVM](https://en.wikipedia.org/wiki/LLVM) did for compilers.
 In Texcraft, a TeX engine is implemented as a loose collection of libraries that compose together
     using well-defined APIs.
@@ -33,13 +33,13 @@ The project is divided into two main sub-projects:
     Texlang's standard library contains implementations of many TeX primitives like `\count`, `\def` and `\expandafter`.
 
 There are other smaller parts of the project, for example
-    a Rust crates for
+    Rust crates for
     [TeX font metric data](https://texcraft.dev/reference/tfm/),
     [DVI output files](https://texcraft.dev/reference/dvi/)
     and [hyphenation](https://texcraft.dev/reference/hyphenate/).
 
 The [project manifesto](https://texcraft.dev/manifesto.html)
-  describes goals of the project in greater depth.
+  describes the goals of the project in greater depth.
 
 ## Trying it out
 
@@ -50,7 +50,7 @@ We have developed a bunch of websites using Texcraft code that demonstrate this:
 - [knuthplass.dev](https://knuthplass.dev): interactive demo of the Knuth-Plass line breaker in TeX.
 - [Texcraft playground](https://play.texcraft.dev): run TeX "scripts" in the browser.
 - [ligkern.dev](https://ligkern.dev): run and analyze ligature/kern programs.
-- [hyphenate.dev](https://ligkern.dev): demo of the hyphenation algorithm inside TeX.
+- [hyphenate.dev](https://hyphenate.dev): demo of the hyphenation algorithm inside TeX.
 
 All these websites compile some subset of the Texcraft Rust code to WASM so that it can run in the browser.
 
@@ -71,7 +71,7 @@ These all work with the limited subset of TeX commands that have been implemente
 Run `cargo run --bin texcraft doc` for a list of available commands.
 
 The `box` binary is for typesetting.
-There is no support yet for outputting PDFs or DVIs is not yet built.
+There is no support yet for outputting PDFs or DVIs.
 In the interim
 you can see the data structures Boxworks builds when e.g. line breaking:
 
@@ -105,16 +105,16 @@ See the project's [AI coding policy](https://texcraft.dev/governance/ai.html) fo
 
 - [New Typesetting System](https://github.com/jamespfennell/new-typesetting-system):
     fully functional implementation of TeX82, written in Java and completed in 2001.
-    This project turned out be to non-viable for some reasons like performance, but the source code is an excellent
+    This project turned out to be non-viable for some reasons like performance, but the source code is an excellent
     reference for those who are writing their own TeX implementations.
     
 - [KeenType](https://gitlab.com/DaveJarvis/KeenType):
     a modernized version of the New Typesetting System
-    than can be used for typesetting math formulae.
+    that can be used for typesetting math formulae.
 
 ### Non-TeX Typesetting
 
-There are number of active projects that are building typesetters
+There are a number of active projects that are building typesetters
     based on non-TeX languages.
 The TeX language itself is very complex and certain features like
     incremental compilation are hard or impossible to implement.
@@ -125,6 +125,6 @@ The TeX language itself is very complex and certain features like
 
 ## License
 
-Licensed under either of Apache License, Version 2.0 or MIT license at your option.
+Licensed under either of the Apache License, Version 2.0 or the MIT license at your option.
 
 There is more information about our licensing [on the documentation site](https://texcraft.dev/license.html).

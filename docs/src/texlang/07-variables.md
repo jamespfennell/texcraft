@@ -1,6 +1,6 @@
 # TeX variables
 
-The documentation so far has covered two of three type of primitives in TeX:
+The documentation so far has covered two of the three types of primitives in TeX:
     expansion primitives and execution primitives.
 In this section we discuss the third type: variables.
 
@@ -8,7 +8,7 @@ The TeX language includes typed variables.
 There are a few possible types [which are listed below](#tex-variable-types).
 The Texlang variables API is the mechanism by which TeX variables
     are implemented in Texlang.
-Ultimately the API provides a way for memory in Rust to be reference in
+Ultimately the API provides a way for memory in Rust to be referenced in
     TeX source code.
 
 
@@ -29,14 +29,14 @@ For example, on page 271 when describing the grammar of the TeX language,
     ...
 ```
 
-This makes it seems that an "integer parameter"
+This makes it seem that an "integer parameter"
 behaves differently to a "special integer", or to a register accessed via `\count`,
     even though all of these variables have the same concrete type (a 32 bit integer).
 To the best of our current knowledge, this is not the case at all!
 It appears that there is a uniform way to handle all variables of the same concrete type in TeX,
     and this is what Texlang does.
 The benefit of this approach is that it makes for a much simpler API,
-    both for adding new variables to a TeX engine or for
+    both for adding new variables to a TeX engine and for
     consuming variables.
 
 
@@ -59,7 +59,7 @@ The command itself has enough information to identify the memory being pointed a
 For array variables, resolving a command involves determining the index of the variable within the array.
 The index has type [`Index`](), which is a wrapper around Rust's `usize`.
 The index is determined using the command's index resolver, which has enum type [`IndexResolver`]().
-There are a two different ways the index can be resolved, corresponding to different
+There are two different ways the index can be resolved, corresponding to different
     variants in the enum type.
 
 

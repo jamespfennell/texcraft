@@ -14,14 +14,14 @@ This is not great for two reasons.
 First, global mutable state is just bad in general.
 Among the general criticisms, we mention specifically that global mutable state
     makes software very hard to reason about
-    because it blocs real separation of concerns.
+    because it blocks real separation of concerns.
 Any two parts of the system can potentially interact implicitly through the shared state.
 
 Second, each TeX distribution makes assumptions about the specific structure of the global state
   and the distribution's code has to follow these assumptions.
 For example, Knuth's original TeX has 256 integer registers which correspond to a
     globally mutable 256-element array.
-On the other hand, pdfTex has over 15 thousand registers and its associated
+On the other hand, pdfTeX has over 15 thousand registers and its associated
   globally mutable array is that much larger.
 It is difficult or impossible for these different TeX implementations to share code because
   of these different global assumptions.
@@ -31,31 +31,31 @@ It is difficult or impossible for these different TeX implementations to share c
 Texlang's solution to this problem is based on the runtime environment type.
 Roughly speaking, all of the shared mutable state in TeX is lifted from the global
   namespace into the environment type.
-This environment type is then passed around interally so different parts of the system
-  and read and write to it.
+This environment type is then passed around internally so different parts of the system
+  can read and write to it.
 
 This by itself does not solve the global mutable state problem.
-The environment type is a sort of "God object" that is accesible everywhere and so is
+The environment type is a sort of "God object" that is accessible everywhere and so is
   still basically global.
-However, putting the state in type does have the advantages that:
+However, putting the state in a type does have the advantages that:
 
 1.  Different state structures can coexist in the same binary.
     To take the registers example above, you could imagine the environment type
-    having a const generic parameter that specifies the number of registrs to
+    having a const generic parameter that specifies the number of registers to
     allocate.
     States with different numbers of registers could easily be handled together.
 
 2.  The same binary can process multiple TeX documents concurrently.
     A use case here is an HTTP server that accepts TeX source code and returns
     the compiled document.
-    Each HTTP request spawns its own thread which initalizes its own environment
+    Each HTTP request spawns its own thread which initializes its own environment
     object.
     Global state precludes this from happening.
 
 
 As mentioned before, the environment type does not solve the global mutable state problem.
 To solve this, Texlang has a number of different strategies.
-All of these strategies use Rust's name visibilty rules to
+All of these strategies use Rust's name visibility rules to
   restrict the scope of code that can modify certain parts of the environment.
 
 In order to describe these strategies,
@@ -68,7 +68,7 @@ These 4 components correspond to the 4 fields of the Rust type.
     For example, the commands map is a map from control sequence names to commands, and is part of the state.
     TeX's `\def` command alters this map by associating a control sequence with a user defined macro.
 
-    The base state contains all of the state that is required to Texlang to process TeX.
+    The base state contains all of the state that is required for Texlang to process TeX.
     The commands map is an element of the base state, because Texlang has to be able
       to retrieve commands from somewhere in order to process a TeX file.
     The category codes map is also in the base state because it is needed for lexing.
@@ -76,12 +76,12 @@ These 4 components correspond to the 4 fields of the Rust type.
 1.  **Custom state**.
     Any other state needed by a specific TeX engine is placed in the custom state.
     In Rust terms, the custom state appears as a generic parameter `S` basically everywhere.
-    Each engine defines its own `S`; there are no restrictions on it whatsover.
+    Each engine defines its own `S`; there are no restrictions on it whatsoever.
 
 1.  **Expansion controller**.
     State is concerned with non-expansion commands (generally called execution commands).
     Some expansion commands are also stateful.
-    The principle examples are TeX's conditional commands (`\ifnum`, `\else`, `\fi`, etc.)
+    The principal examples are TeX's conditional commands (`\ifnum`, `\else`, `\fi`, etc.)
       which need to keep track of which conditional branches the input is currently in.
     This kind of information is kept in the expansion controller, which
       can be freely edited by expansion commands.
@@ -105,23 +105,23 @@ By Rust's visibility rules, these can only be mutated from within the runtime mo
 The internal environment can, of course, be changed indirectly.
 For example, the environment type has a push_source method which is used to add a new
   input source to the environment.
-This is ultimitaley stored in the internal environment.
+This is ultimately stored in the internal environment.
 
 ### Runtime input streams
 
 The environment type is passed around everywhere in Texlang.
-Done naively, would allow arbitrary access and mutation to its contents.
-However the environment is never passed around directy:
+Done naively, this would allow arbitrary access and mutation to its contents.
+However the environment is never passed around directly:
   instead it is wrapped in one of Texlang's input streams.
-These streams limit which parts of environment can be mutably accessed
+These streams limit which parts of the environment can be mutably accessed
   depending on the context in which the streams appear.
 They are also used to read the next token of input - hence the name stream.
 
 The streams are:
 
 -   **Execution input**.
-    This is the most permissible stream.
-    It is used as the input the execution commands.
+    This is the most permissive stream.
+    It is used as the input to execution commands.
     This stream permits mutable access to the base state and the custom state
       (this is how `\def` is able to mutate the commands map).
     It does not permit mutations to the expansion controller.
@@ -142,7 +142,7 @@ The streams are:
     and tokens read from it have been expanded.
 
 -   **Unexpanded input**.
-    In terms of permissions, this stream is the same as to expanded input.
+    In terms of permissions, this stream is the same as the expanded input.
     The difference is that tokens read from the stream are not expanded.
 
     This stream is responsible for lexing new tokens.
@@ -150,7 +150,7 @@ The streams are:
 
 ### Trait bounds on the custom state
 
-Each of a TeX engine only needs access to a small part of the state.
+Each command of a TeX engine only needs access to a small part of the state.
 As an example let's consider the register commands which are implemented in
   Texlang's standard library's [registers module](#todo).
 (The `\count` command is used to get and set the Nth register.)
@@ -194,7 +194,7 @@ impl HasRegisters for MyState {
 }
 ```
 To access the registers object, the `\count` command then uses the trait methods.
-Automatically, this implemention of `\count` will work with any state object that
+Automatically, this implementation of `\count` will work with any state object that
    has a registers component in it.
 
 Next, we make the fields of the registers component private to the Rust module it is in.

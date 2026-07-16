@@ -22,12 +22,12 @@ In order to mitigate the risk of dependency bloat,
 
 - It is okay if a Cargo feature corresponding to a dependency is default enabled.
     For example, the Texlang standard library default enables the `time`
-    feature which uses the third-party Crate `chrono`.
+    feature which uses the third-party crate `chrono`.
     In this case disabling the feature by default would be a footgun because
     the values of `\day`, `\month`, etc. would not be initialized correctly.
 
 - There is a small curated collection of
-    third-party Rust crates are always okay to use.
+    third-party Rust crates that are always okay to use.
     (But if they are used in a Texcraft library, they must be gated behind a Cargo feature.)
     If you want to use one of these crates, don't think twice:
         the project is already deeply invested in using them,

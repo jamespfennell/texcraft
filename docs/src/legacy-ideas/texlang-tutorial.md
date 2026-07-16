@@ -12,7 +12,7 @@ title: Building a TeX interpreter with Texlang
 ## Adding some state
 
 - Add an i32 number
-- Add an `\increment` command and print the value when its incremented
+- Add an `\increment` command and print the value when it's incremented
 - Exercise: add a `\square` command that squares the number
 
 ## Add a print command

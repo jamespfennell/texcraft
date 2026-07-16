@@ -1,7 +1,7 @@
 # Texcraft
 
 Texcraft is an experimental project to create a composable, LLVM-style framework for building TeX and other typesetting software.
-The [project manifesto](manifesto.md) describes the big-picture ideas and goals behind project.
+The [project manifesto](manifesto.md) describes the big-picture ideas and goals behind the project.
 
 As of 2025, the project is divided into two main sub-projects:
 
@@ -15,7 +15,7 @@ As of 2025, the project is divided into two main sub-projects:
     One of the main goals of Boxworks is to support creating new non-TeX typesetting languages
     that use the engine for typesetting.
 
-The [Texcraft playground](https://play.texcraft.dev) is example of what can be built with Texcraft.
+The [Texcraft playground](https://play.texcraft.dev) is an example of what can be built with Texcraft.
 In the long run the goal is to produce re-implementations of TeX, pdfTeX and other TeX engines using Texcraft.
 
 ## Design of the documentation
@@ -29,9 +29,9 @@ In this taxonomy, there are four kinds of documentation: tutorials, how-to guide
 Because Texcraft is a small project so far, we don't have significant documentation of each type.
 Right now we have:
 
-- The Texlang user guide, which is mostly a grounds-up _tutorial_ on how to use Texlang.
+- The Texlang user guide, which is mostly a ground-up _tutorial_ on how to use Texlang.
     The goal is for it to be possible to read the user guide from
-        [the starting introduction](texlang/introduction.md) through to the end.
+        [the starting introduction](texlang/01-introduction.md) through to the end.
     But we also hope that you can jump into arbitrary sections that interest you,
         without having to slog through the prior chapters.
 
@@ -58,5 +58,5 @@ The name Texcraft is written using the letter casing rule for proper nouns share
 To quote [Robert Bringhurst](https://en.wikipedia.org/wiki/The_Elements_of_Typographic_Style), 
     "an increasing number of persons and institutions, from archy and mehitabel,
     to PostScript and TrueType, come to the typographer in search of special treatment
-    \[...\] Logotypes and logograms push typography in the direction of heiroglyphics, which
+    \[...\] Logotypes and logograms push typography in the direction of hieroglyphics, which
     tend to be looked at rather than read."

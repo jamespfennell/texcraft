@@ -55,12 +55,12 @@ Whether or not you can serialize or deserialize the VM
 We will start by discussing serialization.
 
 If the state `S` implements [`::serde::Serialize`] then
-    the Texlang VM `vm::V<S>` satisfies the [`::serde::Serialize`] trait too.
+    the Texlang VM `vm::VM<S>` satisfies the [`::serde::Serialize`] trait too.
 VMs can thus be serialized using the standard Serde infrastructure.
-Note that making `S` serializable with Serde us usually very easy
+Note that making `S` serializable with Serde is usually very easy
     and just involves adding type annotations.
 
-Here's a simply example of serializing a VM to JSON:
+Here's a simple example of serializing a VM to JSON:
 
 ```rust
 # extern crate serde;
@@ -81,7 +81,7 @@ println!["{serialized_vm}"];
 
 ## Deserializing VMs
 
-Deserialization is a little more tricky that serialization
+Deserialization is a little more tricky than serialization
     because the serialized bytes
     are not enough to fully reconstruct the VM.
 Specifically, the VM's built-in primitives are missing from the serialized bytes
@@ -95,7 +95,7 @@ This trait provides the default set of built-in commands for that state.
 
 If the state `S` implements [`::serde::Deserialize`] and
     this trait [`super::HasDefaultBuiltInCommands`],
-    the Texlang VM `vm::V<S>` satisfies the [`::serde::Deserialize`] trait too.
+    the Texlang VM `vm::VM<S>` satisfies the [`::serde::Deserialize`] trait too.
 In this case deserialization can be done in the usual way with Serde:
 
 ```rust
