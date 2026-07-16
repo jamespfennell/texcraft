@@ -1,15 +1,16 @@
 # Texcraft
 
-Texcraft is a research project to develop a fully modular, LLVM-style framework for
-  building TeX typesetting software.
+Texcraft is a research project to reimplement TeX typesetting software
+  in the form a fully modular, LLVM-style framework.
 We say "research project" because the work is somewhat speculative,
   though over time the goal seems more and more attainable.
 
 Existing TeX engines (Knuth's original TeX '82, pdfTeX, XeTeX, etc.)
-  all have monolithic software architectures that are hard to change
+  all have highly monolithic software architectures.
+These engines are hard to modify
   and essentially impossible to use outside the context of compiling full documents.
 They are not [malleable](https://www.inkandswitch.com/essay/malleable-software/).
-The goal of Texcraft is change this by essentially doing for TeX engines what
+The goal of Texcraft is change this by doing for TeX engines what
     [LLVM](https://en.wikipedia.org/wiki/LLVM) did for compilers.
 In Texcraft, a TeX engine is implemented as a loose collection of libraries that compose together
     using well-defined APIs.
@@ -42,11 +43,20 @@ The [project manifesto](https://texcraft.dev/manifesto.html)
 
 ## Trying it out
 
-The [Texcraft playground](https://play.texcraft.dev) is built with Texcraft
-    and can be used to run TeX scripts in the browser.
+Texcraft is designed to be _malleable_: it can be used for purposes other than the
+  traditional document compilation process.
+We have developed a bunch of websites using Texcraft code that demonstrate this:
 
-Locally, with the Git repo checked out,
-    the Texcraft binary can also be used to run TeX scripts; e.g.,
+- [knuthplass.dev](https://knuthplass.dev): interactive demo of the Knuth-Plass line breaker in TeX.
+- [Texcraft playground](https://play.texcraft.dev): run TeX "scripts" in the browser.
+- [ligkern.dev](https://ligkern.dev): run and analyze ligature/kern programs.
+- [hyphenate.dev](https://ligkern.dev): demo of the hyphenation algorithm inside TeX.
+
+All these websites compile some subset of the Texcraft Rust code to WASM so that it can run in the browser.
+
+There are also a bunch of CLI tools.
+In TeX language land, you can use
+    the `texcraft` binary to run TeX scripts; e.g.,
 
 ```
 cargo run --bin texcraft run performance/benches/digits_of_pi.tex
@@ -60,9 +70,16 @@ cargo run --bin texcraft repl
 These all work with the limited subset of TeX commands that have been implemented.
 Run `cargo run --bin texcraft doc` for a list of available commands.
 
-Note the main point of Texcraft is not to produce specific binaries, but rather to be 
-    a library for building TeX software.
-The [documentation website](https://texcraft.dev) has more information.
+The `box` binary is for typesetting.
+There is no support yet for outputting PDFs or DVIs is not yet built.
+In the interim
+you can see the data structures Boxworks builds when e.g. line breaking:
+
+```
+cargo run --bin box -- \
+  linebreak --width 300pt \
+  --texts-file crates/boxworks-bin/tests/wolf_hall.txt
+```
 
 ## Getting involved
 
@@ -70,6 +87,14 @@ The contribution bar for Texcraft is unfortunately high right now.
 Texcraft is being built to produce identical output to Knuth's TeX, so working
   on the project largely involves studying [Knuth's TeX source code](https://tug.ctan.org/info/knuth-pdf/tex/tex.pdf)
   and strategizing ways to write diff tests.
+If that sounds interesting, get in touch. :)
+
+## AI coding policy
+
+The core Texcraft Rust libraries are written by hand without AI.
+Claude Code is being used to help build some non-core parts of the project,
+  for debugging, and for some mechanical refactorings.
+See the project's [AI coding policy](https://texcraft.dev/governance/ai.html) for more detail.
 
 ## Related projects
 

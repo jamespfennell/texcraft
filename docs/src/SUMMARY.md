@@ -38,6 +38,8 @@
 
 - [Dependencies policy](governance/dependencies.md)
 
+- [AI coding policy](governance/ai.md)
+
 - [License information](governance/license.md)
 
 # Texcraft Rust reference
