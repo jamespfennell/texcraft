@@ -275,7 +275,7 @@ pub struct RunIter<'a> {
     // A ligature can be built up from multiple lig/kern passes - e.g.
     // repeated LIG commands. This field stores information about the pending
     // ligature before it is written out (e.g. by a LIG/> or the absence of
-    // a replacmenet).
+    // a replacement).
     ligature: Option<PendingLigature>,
 
     // Intermediate ops: if the slice is non-empty the next step is to
@@ -382,9 +382,8 @@ impl<'a> Iterator for RunIter<'a> {
             }
             NextLeft::None => return None,
         };
-        self.left = left;
         let right = self.word.next();
-        if self.left.is_none() && right.is_none() {
+        if left.is_none() && right.is_none() {
             // TODO: remove this check?
             return None;
         }
@@ -394,11 +393,9 @@ impl<'a> Iterator for RunIter<'a> {
         };
         // self.left is None if we're at the left boundary
         // self.right is None if we're at the right boundary
-        match self
-            .program
-            .get_replacement_utf8(self.left, right_for_lookup)
-        {
+        match self.program.get_replacement_utf8(left, right_for_lookup) {
             Some(replacement) => {
+                self.left = left;
                 self.consumes_left = left_in_original;
                 self.intermediate_ops = &replacement.0;
                 self.next_left = match (replacement.1.is_lig, right) {
@@ -409,13 +406,11 @@ impl<'a> Iterator for RunIter<'a> {
                 };
             }
             None => {
-                let old_left = self.left;
-                self.left = right;
                 self.next_left = match right {
                     None => NextLeft::None,
                     Some(right) => NextLeft::Char(right),
                 };
-                if let Some(left) = old_left {
+                if let Some(left) = left {
                     return Some(match self.ligature.take() {
                         Some(l) => RunItem::Ligature(l.into_ligature(left)),
                         None => RunItem::Char(left),
