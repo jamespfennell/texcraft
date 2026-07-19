@@ -222,11 +222,8 @@ impl CompiledProgram {
             })
     }
 
-    pub fn run_iter<'a>(
-        &'a self,
-        word: &'a str,
-        right_boundary_override: Option<char>,
-    ) -> RunIter<'a> {
+    /// Run the lig/kern program for the provided word.
+    pub fn run<'a>(&'a self, word: &'a str, right_boundary_override: Option<char>) -> RunIter<'a> {
         RunIter {
             program: self,
             word: word.chars(),
@@ -240,6 +237,7 @@ impl CompiledProgram {
     }
 }
 
+/// Replacement elements of a word in a lig/kern program.
 #[derive(PartialEq, Debug)]
 pub enum RunItem {
     Char(char),
@@ -253,6 +251,7 @@ struct PendingLigature {
     includes_left_boundary: bool,
     includes_right_boundary: bool,
 }
+
 impl PendingLigature {
     fn into_ligature(self, c: char) -> Ligature {
         Ligature {
@@ -264,6 +263,7 @@ impl PendingLigature {
     }
 }
 
+/// Iterator over the replacement elements of a word in a lig/kern program.
 pub struct RunIter<'a> {
     // First two fields are fixed for the iteration.
     program: &'a CompiledProgram,
@@ -487,7 +487,7 @@ mod tests {
         }
 
         let program = CompiledProgram::compile_from_pl_file(&pl_file).0;
-        let got: Vec<RunItem> = program.run_iter(input, None).collect();
+        let got: Vec<RunItem> = program.run(input, None).collect();
         assert_eq!(got, want);
     }
 

@@ -504,7 +504,7 @@ impl LigKernDescribe {
                     format!["{l}{r}"]
                 }
             };
-            for elem in lig_kern_program.run_iter(&s, None) {
+            for elem in lig_kern_program.run(&s, None) {
                 use tfm::ligkern::RunItem::*;
                 match elem {
                     Char(c) => {
@@ -537,7 +537,7 @@ struct LigKernRun {
 impl LigKernRun {
     fn run(&self) -> Result<(), String> {
         let lig_kern_program = compile_lig_kern_program(&self.path)?;
-        for elem in lig_kern_program.run_iter(&self.input, None) {
+        for elem in lig_kern_program.run(&self.input, None) {
             use tfm::ligkern::RunItem::*;
             match elem {
                 Char(c) => {

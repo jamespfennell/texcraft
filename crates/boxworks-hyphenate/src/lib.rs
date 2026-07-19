@@ -252,7 +252,7 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
         };
         let mut next_or = indices.next();
 
-        let mut main_iter = hyphenater.lig_kern_program.run_iter(&s, right_boundary);
+        let mut main_iter = hyphenater.lig_kern_program.run(&s, right_boundary);
         use tfm::ligkern::RunItem;
         let mut chars_pushed = 0;
         // This corresponds to the loop in TeX.2021.913 but not 1-1.
@@ -335,7 +335,7 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
             loop {
                 let pre_break: Vec<ds::DiscretionaryElem> = hyphenater
                     .lig_kern_program
-                    .run_iter(&pre_break_text, None)
+                    .run(&pre_break_text, None)
                     .map(|elem| {
                         let d: ds::DiscretionaryElem = match elem {
                             RunItem::Char(c) => ds::Char {
@@ -365,7 +365,7 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                 let post_break_text = &s[hyph_next..];
                 let mut post_break_iter = hyphenater
                     .lig_kern_program
-                    .run_iter(post_break_text, right_boundary);
+                    .run(post_break_text, right_boundary);
                 let mut post_break: Vec<ds::DiscretionaryElem> = vec![];
                 let mut post_chars_pushed = hyph_next;
 

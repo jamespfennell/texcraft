@@ -147,7 +147,7 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
 
     fn add_word(&mut self, word: &str, list: &mut Vec<ds::Horizontal>) {
         let font = &self.fonts[self.current_font as usize];
-        for elem in font.lig_kern_program.run_iter(word, None) {
+        for elem in font.lig_kern_program.run(word, None) {
             use ligkern::RunItem::*;
             match elem {
                 Char(c) => {
