@@ -43,46 +43,17 @@ struct Pending(Option<C>, C, Option<C>);
 pub struct C {
     pub c: Char,
     pub is_lig: bool,
-    pub consumes_left: bool,
-    pub consumes_right: bool,
 }
 
 impl C {
     fn left_char(c: LeftChar) -> Option<Self> {
         match c {
-            LeftChar::Char(c) => Some(Self {
-                c,
-                is_lig: false,
-                consumes_left: true,
-                consumes_right: false,
-            }),
+            LeftChar::Char(c) => Some(Self { c, is_lig: false }),
             LeftChar::BoundaryChar => None,
         }
     }
-
-    fn char(c: Char, is_left_char: bool) -> Self {
-        Self {
-            c,
-            is_lig: false,
-            consumes_left: is_left_char,
-            consumes_right: !is_left_char,
-        }
-    }
-    fn merge(&self, left: &Option<C>, right: &C) -> Self {
-        let (left_is_lig, left_consumes_left, left_consumes_right) = match left {
-            None => (false, true, false),
-            Some(left) => (left.is_lig, left.consumes_left, left.consumes_right),
-        };
-        C {
-            c: self.c,
-            is_lig: self.is_lig
-                || (self.consumes_left && left_is_lig)
-                || (self.consumes_right && right.is_lig),
-            consumes_left: (self.consumes_left && left_consumes_left)
-                || (self.consumes_right && right.consumes_left),
-            consumes_right: (self.consumes_left && left_consumes_right)
-                || (self.consumes_right && right.consumes_right),
-        }
+    fn char(c: Char) -> Self {
+        Self { c, is_lig: false }
     }
 }
 
@@ -109,12 +80,6 @@ impl LeftChar {
         match self {
             LeftChar::Char(c) => Some(*c),
             LeftChar::BoundaryChar => None,
-        }
-    }
-    fn is_boundary(&self) -> bool {
-        match self {
-            LeftChar::Char(_) => false,
-            LeftChar::BoundaryChar => true,
         }
     }
 }
@@ -227,7 +192,7 @@ fn calculate_replacements(
                                 IntermediateOp::Kern(kern.to_scaled(design_size)),
                             ],
                         },
-                        C::char(right, false),
+                        C::char(right),
                     ),
                 );
                 continue;
@@ -244,7 +209,7 @@ fn calculate_replacements(
                                 IntermediateOp::Kern(kern.to_scaled(design_size)),
                             ],
                         },
-                        C::char(right, false),
+                        C::char(right),
                     ),
                 );
                 continue;
@@ -266,10 +231,8 @@ fn calculate_replacements(
                         C {
                             c: char_to_insert,
                             is_lig: true,
-                            consumes_left: false,
-                            consumes_right: false,
                         },
-                        Some(C::char(right, false)),
+                        Some(C::char(right)),
                     )),
                 ),
                 lang::PostLigOperation::RetainBothMoveToInserted => (
@@ -280,10 +243,8 @@ fn calculate_replacements(
                         Some(C {
                             c: char_to_insert,
                             is_lig: true,
-                            consumes_left: left.is_boundary(),
-                            consumes_right: false,
                         }),
-                        C::char(right, false),
+                        C::char(right),
                         None,
                     )),
                 ),
@@ -294,10 +255,8 @@ fn calculate_replacements(
                         C {
                             c: char_to_insert,
                             is_lig: true,
-                            consumes_left: left.is_boundary(),
-                            consumes_right: false,
                         },
-                        C::char(right, false),
+                        C::char(right),
                     ],
                     // pending
                     None,
@@ -310,10 +269,8 @@ fn calculate_replacements(
                         Some(C {
                             c: char_to_insert,
                             is_lig: true,
-                            consumes_left: true,
-                            consumes_right: false,
                         }),
-                        C::char(right, false),
+                        C::char(right),
                         None,
                     )),
                 ),
@@ -323,10 +280,8 @@ fn calculate_replacements(
                         C {
                             c: char_to_insert,
                             is_lig: true,
-                            consumes_left: true,
-                            consumes_right: false,
                         },
-                        C::char(right, false),
+                        C::char(right),
                     ],
                     // pending
                     None,
@@ -340,8 +295,6 @@ fn calculate_replacements(
                         C {
                             c: char_to_insert,
                             is_lig: true,
-                            consumes_left: false,
-                            consumes_right: true,
                         },
                         None,
                     )),
@@ -353,8 +306,6 @@ fn calculate_replacements(
                         C {
                             c: char_to_insert,
                             is_lig: true,
-                            consumes_left: left.is_boundary(),
-                            consumes_right: true,
                         },
                     ],
                     // pending
@@ -365,8 +316,6 @@ fn calculate_replacements(
                     vec![C {
                         c: char_to_insert,
                         is_lig: true,
-                        consumes_left: true,
-                        consumes_right: true,
                     }],
                     // pending
                     None,
@@ -398,29 +347,40 @@ fn calculate_replacements(
         let last = match result.get(&child) {
             None => {
                 // There is no lig/kern rule for this pair.
-                let mut last = calc.pending.1.clone();
                 match calc.pending.0.clone() {
                     None => {
-                        // We are dropping the left node on the floor.
-                        last.consumes_left = true;
+                        // We are dropping the left boundary on the floor.
                     }
                     Some(left) => {
                         calc.finalized.push(IntermediateOp::C(left));
                     }
                 }
-                last
+                calc.pending.1.clone()
             }
             Some(replacement) => {
-                let left = calc.pending.0.clone();
-                let right = calc.pending.1.clone();
-                for elem in &replacement.0 {
-                    let elem = match elem {
-                        IntermediateOp::Kern(_) => elem.clone(),
-                        IntermediateOp::C(c) => IntermediateOp::C(c.merge(&left, &right)),
-                    };
-                    calc.finalized.push(elem);
+                // In the replacement we need to update the is_lig fields in case
+                // either the left or right character is a lig.
+                let mut consumes_left_lig = match calc.pending.0 {
+                    None => false,
+                    Some(left) => left.is_lig,
+                };
+                calc.finalized
+                    .extend(replacement.0.iter().map(|elem| match elem {
+                        IntermediateOp::Kern(kern) => IntermediateOp::Kern(*kern),
+                        IntermediateOp::C(c) => {
+                            let op = IntermediateOp::C(C {
+                                c: c.c,
+                                is_lig: c.is_lig || consumes_left_lig,
+                            });
+                            consumes_left_lig = false;
+                            op
+                        }
+                    }));
+                let right_is_lig = calc.pending.1.is_lig;
+                C {
+                    c: replacement.1.c,
+                    is_lig: replacement.1.is_lig || consumes_left_lig || right_is_lig,
                 }
-                replacement.1.merge(&left, &right)
             }
         };
         match calc.pending.2 {
@@ -596,10 +556,10 @@ mod tests {
                 'A',
                 'V',
                 vec![
-                    IntermediateOp::C(C::char(Char::A, true)),
+                    IntermediateOp::C(C::char(Char::A)),
                     IntermediateOp::Kern(common::Scaled::ONE)
                 ],
-                C::char(Char::V, false),
+                C::char(Char::V),
             )],
         ),
         (
@@ -611,19 +571,19 @@ mod tests {
                     'A',
                     'V',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::Kern(common::Scaled::ONE)
                     ],
-                    C::char(Char::V, false),
+                    C::char(Char::V),
                 ),
                 (
                     'B',
                     'V',
                     vec![
-                        IntermediateOp::C(C::char(Char::B, true)),
+                        IntermediateOp::C(C::char(Char::B)),
                         IntermediateOp::Kern(common::Scaled::ONE)
                     ],
-                    C::char(Char::V, false),
+                    C::char(Char::V),
                 ),
             ],
         ),
@@ -638,10 +598,10 @@ mod tests {
                 'A',
                 'V',
                 vec![
-                    IntermediateOp::C(C::char(Char::A, true)),
+                    IntermediateOp::C(C::char(Char::A)),
                     IntermediateOp::Kern(common::Scaled::ONE * 2)
                 ],
-                C::char(Char::V, false),
+                C::char(Char::V),
             ),],
         ),
         (
@@ -657,37 +617,37 @@ mod tests {
                     'A',
                     'V',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::Kern(common::Scaled::ONE * 2)
                     ],
-                    C::char(Char::V, false),
+                    C::char(Char::V),
                 ),
                 (
                     'A',
                     'W',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::Kern(common::Scaled::ONE * 3)
                     ],
-                    C::char(Char::W, false),
+                    C::char(Char::W),
                 ),
                 (
                     'B',
                     'W',
                     vec![
-                        IntermediateOp::C(C::char(Char::B, true)),
+                        IntermediateOp::C(C::char(Char::B)),
                         IntermediateOp::Kern(common::Scaled::ONE * 3)
                     ],
-                    C::char(Char::W, false),
+                    C::char(Char::W),
                 ),
                 (
                     'C',
                     'X',
                     vec![
-                        IntermediateOp::C(C::char(Char::C, true)),
+                        IntermediateOp::C(C::char(Char::C)),
                         IntermediateOp::Kern(common::Scaled::ONE * 4)
                     ],
-                    C::char(Char::X, false),
+                    C::char(Char::X),
                 ),
             ],
         ),
@@ -702,8 +662,6 @@ mod tests {
                 C {
                     c: Char::Z,
                     is_lig: true,
-                    consumes_left: true,
-                    consumes_right: true,
                 }
             ),],
         ),
@@ -718,22 +676,20 @@ mod tests {
                 (
                     'A',
                     'B',
-                    vec![IntermediateOp::C(C::char(Char::A, true)),],
+                    vec![IntermediateOp::C(C::char(Char::A)),],
                     C {
                         c: Char::Z,
                         is_lig: true,
-                        consumes_left: false,
-                        consumes_right: true,
                     }
                 ),
                 (
                     'A',
                     'Z',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::Kern(common::Scaled::ONE)
                     ],
-                    C::char(Char::Z, false),
+                    C::char(Char::Z),
                 ),
             ],
         ),
@@ -749,24 +705,22 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::Kern(common::Scaled::ONE),
                     ],
                     C {
                         c: Char::Z,
                         is_lig: true,
-                        consumes_left: false,
-                        consumes_right: true,
                     }
                 ),
                 (
                     'A',
                     'Z',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::Kern(common::Scaled::ONE),
                     ],
-                    C::char(Char::Z, false),
+                    C::char(Char::Z),
                 ),
             ],
         ),
@@ -777,12 +731,10 @@ mod tests {
             vec![(
                 'A',
                 'B',
-                vec![IntermediateOp::C(C::char(Char::A, true)),],
+                vec![IntermediateOp::C(C::char(Char::A)),],
                 C {
                     c: Char::Z,
                     is_lig: true,
-                    consumes_left: false,
-                    consumes_right: true,
                 }
             ),],
         ),
@@ -801,21 +753,19 @@ mod tests {
                         IntermediateOp::C(C {
                             c: Char::Z,
                             is_lig: true,
-                            consumes_left: true,
-                            consumes_right: false,
                         }),
                         IntermediateOp::Kern(common::Scaled::ONE),
                     ],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
                 (
                     'Z',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::Z, true)),
+                        IntermediateOp::C(C::char(Char::Z)),
                         IntermediateOp::Kern(common::Scaled::ONE),
                     ],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
             ],
         ),
@@ -833,19 +783,17 @@ mod tests {
                     vec![IntermediateOp::C(C {
                         c: Char::Z,
                         is_lig: true,
-                        consumes_left: true,
-                        consumes_right: false,
                     })],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
                 (
                     'Z',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::Z, true)),
+                        IntermediateOp::C(C::char(Char::Z)),
                         IntermediateOp::Kern(common::Scaled::ONE),
                     ],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
             ],
         ),
@@ -862,35 +810,33 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::Kern(common::Scaled::ONE * 2),
                         IntermediateOp::C(C {
                             c: Char::Z,
                             is_lig: true,
-                            consumes_left: false,
-                            consumes_right: false,
                         }),
                         IntermediateOp::Kern(common::Scaled::ONE * 3),
                     ],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
                 (
                     'A',
                     'Z',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::Kern(common::Scaled::ONE * 2),
                     ],
-                    C::char(Char::Z, false),
+                    C::char(Char::Z),
                 ),
                 (
                     'Z',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::Z, true)),
+                        IntermediateOp::C(C::char(Char::Z)),
                         IntermediateOp::Kern(common::Scaled::ONE * 3),
                     ],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
             ],
         ),
@@ -902,15 +848,13 @@ mod tests {
                 'A',
                 'B',
                 vec![
-                    IntermediateOp::C(C::char(Char::A, true)),
+                    IntermediateOp::C(C::char(Char::A)),
                     IntermediateOp::C(C {
                         c: Char::Z,
                         is_lig: true,
-                        consumes_left: false,
-                        consumes_right: false,
                     }),
                 ],
-                C::char(Char::B, false),
+                C::char(Char::B),
             ),],
         ),
         (
@@ -925,15 +869,13 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::C(C {
                             c: Char::Y,
                             is_lig: true,
-                            consumes_left: false,
-                            consumes_right: false,
                         }),
                     ],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
                 (
                     'Z',
@@ -941,10 +883,8 @@ mod tests {
                     vec![IntermediateOp::C(C {
                         c: Char::Y,
                         is_lig: true,
-                        consumes_left: true,
-                        consumes_right: false,
                     }),],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
             ],
         ),
@@ -960,39 +900,31 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::C(C {
                             c: Char::Y,
                             is_lig: true,
-                            consumes_left: false,
-                            consumes_right: false,
                         }),
                         IntermediateOp::C(C {
                             c: Char::Z,
                             is_lig: true,
-                            consumes_left: false,
-                            consumes_right: false,
                         }),
                     ],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
                 (
                     'A',
                     'Z',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::C(C {
                             c: Char::Y,
                             is_lig: true,
-                            consumes_left: false,
-                            consumes_right: false,
                         }),
                     ],
                     C {
                         c: Char::Z,
                         is_lig: false,
-                        consumes_left: false,
-                        consumes_right: true,
                     }
                 ),
             ],
@@ -1010,34 +942,32 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::C(C {
                             c: Char::Z,
                             is_lig: true,
-                            consumes_left: false,
-                            consumes_right: false,
                         }),
                         IntermediateOp::Kern(common::Scaled::ONE * 3),
                     ],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
                 (
                     'A',
                     'Z',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::Kern(common::Scaled::ONE * 2),
                     ],
-                    C::char(Char::Z, false),
+                    C::char(Char::Z),
                 ),
                 (
                     'Z',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::Z, true)),
+                        IntermediateOp::C(C::char(Char::Z)),
                         IntermediateOp::Kern(common::Scaled::ONE * 3),
                     ],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
             ],
         ),
@@ -1053,15 +983,13 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::C(C {
                             c: Char::Y,
                             is_lig: true,
-                            consumes_left: false,
-                            consumes_right: false,
                         }),
                     ],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
                 (
                     'Z',
@@ -1069,10 +997,8 @@ mod tests {
                     vec![IntermediateOp::C(C {
                         c: Char::Y,
                         is_lig: true,
-                        consumes_left: true,
-                        consumes_right: false,
                     }),],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
             ],
         ),
@@ -1084,15 +1010,13 @@ mod tests {
                 'A',
                 'B',
                 vec![
-                    IntermediateOp::C(C::char(Char::A, true)),
+                    IntermediateOp::C(C::char(Char::A)),
                     IntermediateOp::C(C {
                         c: Char::Z,
                         is_lig: true,
-                        consumes_left: false,
-                        consumes_right: false,
                     }),
                 ],
-                C::char(Char::B, false),
+                C::char(Char::B),
             ),],
         ),
         (
@@ -1107,15 +1031,13 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::C(C {
                             c: Char::Y,
                             is_lig: true,
-                            consumes_left: false,
-                            consumes_right: false,
                         }),
                     ],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
                 (
                     'Z',
@@ -1123,10 +1045,8 @@ mod tests {
                     vec![IntermediateOp::C(C {
                         c: Char::Y,
                         is_lig: true,
-                        consumes_left: true,
-                        consumes_right: false,
                     }),],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
             ],
         ),
@@ -1143,33 +1063,31 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::C(C {
                             c: Char::Z,
                             is_lig: true,
-                            consumes_left: false,
-                            consumes_right: false,
                         }),
                     ],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
                 (
                     'A',
                     'Z',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::Kern(common::Scaled::ONE * 2),
                     ],
-                    C::char(Char::Z, false),
+                    C::char(Char::Z),
                 ),
                 (
                     'Z',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::Z, true)),
+                        IntermediateOp::C(C::char(Char::Z)),
                         IntermediateOp::Kern(common::Scaled::ONE * 3),
                     ],
-                    C::char(Char::B, false),
+                    C::char(Char::B),
                 ),
             ],
         ),
@@ -1185,30 +1103,24 @@ mod tests {
                     'A',
                     'B',
                     vec![
-                        IntermediateOp::C(C::char(Char::A, true)),
+                        IntermediateOp::C(C::char(Char::A)),
                         IntermediateOp::C(C {
                             c: Char::Y,
                             is_lig: true,
-                            consumes_left: false,
-                            consumes_right: false,
                         }),
                     ],
                     C {
                         c: Char::Z,
                         is_lig: true,
-                        consumes_left: false,
-                        consumes_right: true,
                     },
                 ),
                 (
                     'Y',
                     'B',
-                    vec![IntermediateOp::C(C::char(Char::Y, true)),],
+                    vec![IntermediateOp::C(C::char(Char::Y)),],
                     C {
                         c: Char::Z,
                         is_lig: true,
-                        consumes_left: false,
-                        consumes_right: true,
                     }
                 ),
             ],
@@ -1227,14 +1139,10 @@ mod tests {
                     vec![IntermediateOp::C(C {
                         c: Char::Z,
                         is_lig: true,
-                        consumes_left: true,
-                        consumes_right: false,
                     }),],
                     C {
                         c: Char::Y,
                         is_lig: true,
-                        consumes_left: false,
-                        consumes_right: true,
                     },
                 ),
                 (
@@ -1243,10 +1151,8 @@ mod tests {
                     vec![IntermediateOp::C(C {
                         c: Char::Z,
                         is_lig: true,
-                        consumes_left: true,
-                        consumes_right: false,
                     }),],
-                    C::char(Char::Y, false)
+                    C::char(Char::Y)
                 ),
             ],
         ),

@@ -1530,20 +1530,24 @@ mod tests {
             }],
         ),
         /*
-        TODO: re-enable when the bug is fixed
         (
             invalid_character_value_tab,
             "(BOUNDARYCHAR C \t)",
+            // TODO: double check this test case value.
+            // pltotf maps illegal characters to code 127 and continues, so the
+            // tab becomes the character value and there is no "empty character
+            // value" warning.
             vec![Root::BoundaryChar(SingleValue {
-                data: Char(0), // probably Char(127)
+                data: Char(127),
                 data_span: 14..16
             })],
-            vec![
-                ParseWarning::NonVisibleAsciiCharacter('\t', 16),
-                ParseWarning::EmptyCharacterValue { span: 16..16 }
-            ],
+            vec![ParseWarning {
+                span: 16..17,
+                knuth_pltotf_offset: Some(17),
+                kind: ParseWarningKind::NonVisibleAsciiCharacter { character: '\t' },
+            }],
         ),
-         */
+        */
         (
             one_byte_octal,
             r"(BOUNDARYCHAR O 77)",

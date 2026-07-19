@@ -705,6 +705,8 @@ functions!(
             char: char,
             original_chars: Cow<'a, str>,
             font: i32,
+            includes_left_boundary: bool,
+            includes_right_boundary: bool,
         }
         impl Func {
             func_name: "lig",
@@ -983,6 +985,24 @@ trait Value<'a>: Sized {
     }
 
     fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>>;
+}
+
+impl<'a> Value<'a> for bool {
+    const DESCRIPTION: &'static str = "a boolean (\"true\" or \"false\")";
+    fn try_cast_string(s: Cow<'a, str>) -> Option<Self> {
+        match s.as_ref() {
+            "true" => Some(true),
+            "false" => Some(false),
+            _ => None,
+        }
+    }
+    fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>> {
+        cst::ArgsItem::Regular {
+            key,
+            value: cst::Value::String(if *self { "true" } else { "false" }.into()),
+            value_source: "".into(),
+        }
+    }
 }
 
 impl<'a> Value<'a> for common::GlueOrder {

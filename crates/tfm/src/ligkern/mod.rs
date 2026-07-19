@@ -222,137 +222,6 @@ impl CompiledProgram {
             })
     }
 
-    /// Run this lig/kern program.
-    pub fn run<T: Emitter>(&self, word: &str, emitter: &mut T) {
-        struct PendingLigature {
-            s: String,
-            includes_left_boundary: bool,
-            includes_right_boundary: bool,
-        }
-        impl PendingLigature {
-            fn into_ligature(self, c: char) -> Ligature {
-                Ligature {
-                    c,
-                    original: self.s.into(),
-                    includes_left_boundary: self.includes_left_boundary,
-                    includes_right_boundary: self.includes_right_boundary,
-                }
-            }
-        }
-        let mut ligature: Option<PendingLigature> = None;
-        let mut iter = word.chars();
-        let mut left: Option<char> = None;
-        let mut left_in_original = true;
-        loop {
-            let right = iter.next();
-            if left.is_none() && right.is_none() {
-                break;
-            }
-
-            match self.get_replacement_utf8(left, right) {
-                Some(replacement) => {
-                    for op in &replacement.0 {
-                        match op {
-                            IntermediateOp::Kern(kern) => emitter.emit_kern(*kern),
-                            IntermediateOp::C(compiler::C {
-                                c,
-                                is_lig: false,
-                                consumes_left,
-                                consumes_right,
-                            }) => {
-                                debug_assert!(consumes_left);
-                                debug_assert!(!consumes_right);
-                                match ligature.take() {
-                                    Some(l) => {
-                                        // This happens when left is a ligature.
-                                        emitter.emit_ligature(l.into_ligature((*c).into()));
-                                    }
-                                    None => {
-                                        emitter.emit_character((*c).into());
-                                    }
-                                }
-                            }
-                            IntermediateOp::C(compiler::C {
-                                c,
-                                is_lig: true,
-                                consumes_left,
-                                consumes_right,
-                            }) => {
-                                let mut s = ligature.take().unwrap_or(PendingLigature {
-                                    s: Default::default(),
-                                    includes_left_boundary: false,
-                                    includes_right_boundary: false,
-                                });
-                                if *consumes_left && left_in_original {
-                                    // TODO: figure out where in TeX the '|' comes from!
-                                    s.s.push(left.unwrap_or('|'));
-                                    s.includes_left_boundary = left.is_none();
-                                }
-                                if *consumes_right {
-                                    s.s.push(right.unwrap_or('|'));
-                                    s.includes_right_boundary = right.is_none();
-                                }
-                                emitter.emit_ligature(s.into_ligature((*c).into()));
-                            }
-                        }
-                    }
-                    match replacement.1 {
-                        compiler::C {
-                            c,
-                            is_lig: false,
-                            consumes_left: _,
-                            consumes_right,
-                        } => {
-                            debug_assert!(consumes_right);
-                            if right.is_none() {
-                                left = None;
-                            } else {
-                                left = Some(c.into());
-                                left_in_original = true; // = consumes_right;
-                            }
-                        }
-                        compiler::C {
-                            c,
-                            is_lig: true,
-                            consumes_left,
-                            consumes_right,
-                        } => {
-                            let s = ligature.get_or_insert(PendingLigature {
-                                s: Default::default(),
-                                includes_left_boundary: false,
-                                includes_right_boundary: false,
-                            });
-                            if consumes_left && left_in_original {
-                                s.s.push(left.unwrap_or('|'));
-                                s.includes_left_boundary = left.is_none();
-                            }
-                            if consumes_right {
-                                s.s.push(right.unwrap_or('|'));
-                                s.includes_right_boundary = right.is_none();
-                            }
-                            left = Some(c.into());
-                            left_in_original = false;
-                        }
-                    }
-                }
-                None => {
-                    if let Some(left) = left {
-                        match ligature.take() {
-                            Some(l) => {
-                                emitter.emit_ligature(l.into_ligature(left));
-                            }
-                            None => {
-                                emitter.emit_character(left);
-                            }
-                        }
-                    }
-                    left = right;
-                    left_in_original = true;
-                }
-            }
-        }
-    }
-
     pub fn run_iter<'a>(
         &'a self,
         word: &'a str,
@@ -361,12 +230,11 @@ impl CompiledProgram {
         RunIter {
             program: self,
             word: word.chars(),
+            consumes_left: true,
             intermediate_ops: &[],
-            terminal_op: None,
+            next_left: NextLeft::Boundary,
             ligature: None,
-            left_in_original: true,
             left: None,
-            right: None,
             right_boundary_override,
         }
     }
@@ -379,6 +247,7 @@ pub enum RunItem {
     Ligature(Ligature),
 }
 
+#[derive(Default)]
 struct PendingLigature {
     s: String,
     includes_left_boundary: bool,
@@ -396,20 +265,48 @@ impl PendingLigature {
 }
 
 pub struct RunIter<'a> {
+    // First two fields are fixed for the iteration.
     program: &'a CompiledProgram,
-    word: std::str::Chars<'a>,
-    intermediate_ops: &'a [IntermediateOp],
-    terminal_op: Option<compiler::C>,
-    ligature: Option<PendingLigature>,
-    left_in_original: bool, // default true
-    left: Option<char>,
-    right: Option<char>,
     right_boundary_override: Option<char>,
+
+    // The word we're iterating over: gets consumed as we iterate.
+    word: std::str::Chars<'a>,
+
+    // A ligature can be built up from multiple lig/kern passes - e.g.
+    // repeated LIG commands. This field stores information about the pending
+    // ligature before it is written out (e.g. by a LIG/> or the absence of
+    // a replacement).
+    ligature: Option<PendingLigature>,
+
+    // Intermediate ops: if the slice is non-empty the next step is to
+    // process is.
+    // consumes_left=true if the first character or ligature should be
+    // marked as consuming the left character used in the replacement
+    // (or left hand boundary).
+    // left is the character that was used as the left-hand side in the
+    // replacement, or None if it was the left hand boundary.
+    intermediate_ops: &'a [IntermediateOp],
+    consumes_left: bool,
+    left: Option<char>,
+
+    // If intermediate ops is empty, the next step is to evaluate the
+    // lig/kern program with the left character as specified in the enum.
+    next_left: NextLeft,
+}
+
+#[derive(Debug)]
+enum NextLeft {
+    Boundary,
+    Char(char),
+    Lig(char, char),
+    FinalLig(char),
+    None,
 }
 
 impl<'a> RunIter<'a> {
     pub fn is_separation_point(&self) -> bool {
-        self.intermediate_ops.is_empty() && self.left_in_original
+        self.intermediate_ops.is_empty()
+            && !matches!(self.next_left, NextLeft::Lig(_, _) | NextLeft::FinalLig(_))
     }
 }
 
@@ -417,18 +314,12 @@ impl<'a> Iterator for RunIter<'a> {
     type Item = RunItem;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let next = if let Some((op, tail)) = self.intermediate_ops.split_first() {
+        if let Some((op, tail)) = self.intermediate_ops.split_first() {
             self.intermediate_ops = tail;
-            Some(match op {
+            return Some(match op {
                 IntermediateOp::Kern(kern) => RunItem::Kern(*kern),
-                IntermediateOp::C(compiler::C {
-                    c,
-                    is_lig: false,
-                    consumes_left,
-                    consumes_right,
-                }) => {
-                    debug_assert!(consumes_left);
-                    debug_assert!(!consumes_right);
+                IntermediateOp::C(compiler::C { c, is_lig: false }) => {
+                    self.consumes_left = false;
                     match self.ligature.take() {
                         Some(l) => {
                             // This happens when left is a ligature.
@@ -437,102 +328,85 @@ impl<'a> Iterator for RunIter<'a> {
                         None => RunItem::Char((*c).into()),
                     }
                 }
-                IntermediateOp::C(compiler::C {
-                    c,
-                    is_lig: true,
-                    consumes_left,
-                    consumes_right,
-                }) => {
-                    debug_assert!(!consumes_right);
-                    let mut s = self.ligature.take().unwrap_or(PendingLigature {
-                        s: Default::default(),
-                        includes_left_boundary: false,
-                        includes_right_boundary: false,
-                    });
-                    if *consumes_left && self.left_in_original {
-                        // TODO: figure out where in TeX the '|' comes from!
-                        s.s.push(self.left.unwrap_or('|'));
-                        s.includes_left_boundary = self.left.is_none();
+                IntermediateOp::C(compiler::C { c, is_lig: true }) => {
+                    let mut s = self.ligature.take().unwrap_or_default();
+                    if self.consumes_left {
+                        if let Some(left) = self.left {
+                            s.s.push(left);
+                        } else {
+                            s.includes_left_boundary = true;
+                        }
                     }
-                    if *consumes_right {
-                        s.s.push(self.right.unwrap_or('|'));
-                        s.includes_right_boundary = self.right.is_none();
-                    }
+                    self.consumes_left = false;
+                    s.includes_right_boundary = matches!(self.next_left, NextLeft::None)
+                        && matches!(
+                            (tail.first(), tail.get(1)),
+                            (None, None) | (Some(IntermediateOp::Kern(_)), None)
+                        );
                     RunItem::Ligature(s.into_ligature((*c).into()))
                 }
-            })
-        } else {
-            None
+            });
         };
-        if self.intermediate_ops.is_empty() {
-            if let Some(op) = self.terminal_op.take() {
-                match op {
-                    compiler::C {
-                        c,
-                        is_lig: false,
-                        consumes_left: _,
-                        consumes_right,
-                    } => {
-                        debug_assert!(consumes_right);
-                        if self.right.is_none() {
-                            self.left = None;
-                        } else {
-                            self.left = Some(c.into());
-                            self.left_in_original = true; // = consumes_right;
-                        }
-                    }
-                    compiler::C {
-                        c,
-                        is_lig: true,
-                        consumes_left,
-                        consumes_right,
-                    } => {
-                        debug_assert!(consumes_right);
-                        let s = self.ligature.get_or_insert(PendingLigature {
-                            s: Default::default(),
-                            includes_left_boundary: false,
-                            includes_right_boundary: false,
-                        });
-                        if consumes_left && self.left_in_original {
-                            s.s.push(self.left.unwrap_or('|'));
-                            s.includes_left_boundary = self.left.is_none();
-                        }
-                        if consumes_right {
-                            s.s.push(self.right.unwrap_or('|'));
-                            s.includes_right_boundary = self.right.is_none();
-                        }
-                        self.left = Some(c.into());
-                        self.left_in_original = false;
+        let (left, left_in_original): (Option<char>, bool) = match &self.next_left {
+            NextLeft::Boundary => (None, true),
+            NextLeft::Char(c) => (Some(*c), true),
+            NextLeft::Lig(c, right) => {
+                let s = self.ligature.get_or_insert_default();
+                if self.consumes_left {
+                    if let Some(left) = self.left {
+                        s.s.push(left);
+                    } else {
+                        s.includes_left_boundary = true;
                     }
                 }
+                s.s.push(*right);
+                (Some(*c), false)
             }
-        }
-        if let Some(next) = next {
-            return Some(next);
-        }
-        self.right = self.word.next();
-        if self.left.is_none() && self.right.is_none() {
+            NextLeft::FinalLig(c) => {
+                let mut s = self.ligature.take().unwrap_or_default();
+                if self.consumes_left {
+                    if let Some(left) = self.left {
+                        s.s.push(left);
+                    } else {
+                        s.includes_left_boundary = true;
+                    }
+                }
+                s.includes_right_boundary = true;
+                let lig = RunItem::Ligature(s.into_ligature(*c));
+                self.next_left = NextLeft::None;
+                return Some(lig);
+            }
+            NextLeft::None => return None,
+        };
+        let right = self.word.next();
+        if left.is_none() && right.is_none() {
+            // TODO: remove this check?
             return None;
         }
-        let right_for_lookup = match self.right {
+        let right_for_lookup = match right {
             Some(r) => Some(r),
             None => self.right_boundary_override,
         };
         // self.left is None if we're at the left boundary
         // self.right is None if we're at the right boundary
-        match self
-            .program
-            .get_replacement_utf8(self.left, right_for_lookup)
-        {
+        match self.program.get_replacement_utf8(left, right_for_lookup) {
             Some(replacement) => {
+                self.left = left;
+                self.consumes_left = left_in_original;
                 self.intermediate_ops = &replacement.0;
-                self.terminal_op = Some(replacement.1.clone());
+                self.next_left = match (replacement.1.is_lig, right) {
+                    (false, None) => NextLeft::None,
+                    (false, Some(_)) => NextLeft::Char(replacement.1.c.into()),
+                    (true, Some(right)) => NextLeft::Lig(replacement.1.c.into(), right),
+                    (true, None) => NextLeft::FinalLig(replacement.1.c.into()),
+                };
             }
             None => {
-                let old_left = self.left;
-                self.left = self.right;
-                self.left_in_original = true;
-                if let Some(left) = old_left {
+                self.next_left = match right {
+                    None => NextLeft::None,
+                    Some(right) => NextLeft::Char(right),
+                };
+                if let Some(left) = left {
                     return Some(match self.ligature.take() {
                         Some(l) => RunItem::Ligature(l.into_ligature(left)),
                         None => RunItem::Char(left),
@@ -544,20 +418,12 @@ impl<'a> Iterator for RunIter<'a> {
     }
 }
 
-/// Implementations of this trait determine how characters, kerns and ligatures
-/// are handled when running a lig/kern program.
-pub trait Emitter {
-    fn emit_character(&mut self, c: char);
-    fn emit_kern(&mut self, kern: common::Scaled);
-    fn emit_ligature(&mut self, ligature: Ligature);
-}
-
 #[derive(PartialEq, Debug)]
 pub struct Ligature {
     pub c: char,
     pub original: Rc<str>,
-    includes_left_boundary: bool,
-    includes_right_boundary: bool,
+    pub includes_left_boundary: bool,
+    pub includes_right_boundary: bool,
 }
 
 /// An error returned from lig/kern compilation.
@@ -607,36 +473,166 @@ mod tests {
 
     use super::Ligature as L;
     use super::*;
+    use pretty_assertions::assert_eq;
 
     const LIGAROO: &'static str = include_str!["ligaroo.plst"];
-
-    #[derive(Default)]
-    struct ElementEmitter(Vec<RunItem>);
-
-    impl Emitter for ElementEmitter {
-        fn emit_character(&mut self, c: char) {
-            self.0.push(RunItem::Char(c))
-        }
-
-        fn emit_kern(&mut self, kern: common::Scaled) {
-            self.0.push(RunItem::Kern(kern))
-        }
-
-        fn emit_ligature(&mut self, ligature: L) {
-            self.0.push(RunItem::Ligature(ligature))
-        }
-    }
 
     fn run_test(program: &str, input: &str, want: Vec<RunItem>) {
         let source = LIGAROO.replace("(LIGTABLE", &format!["(LIGTABLE\n{program}"]);
         let pl_file = crate::pl::File::from_pl_source_code(&source).0;
-        let program = CompiledProgram::compile_from_pl_file(&pl_file).0;
-        let mut emitter: ElementEmitter = Default::default();
-        program.run(input, &mut emitter);
-        assert_eq!(emitter.0, want);
 
+        if std::env::var("TEXCRAFT_VERIFY").unwrap_or_default() == "tex" {
+            verify_against_tex(pl_file, input, want);
+            return;
+        }
+
+        let program = CompiledProgram::compile_from_pl_file(&pl_file).0;
         let got: Vec<RunItem> = program.run_iter(input, None).collect();
         assert_eq!(got, want);
+    }
+
+    /// Verify the expected output of a test case against a real TeX engine.
+    ///
+    /// The property list file is converted to a TFM file, TeX builds an
+    /// `\hbox` from the input word set in a font backed by that TFM file,
+    /// and the box contents (dumped with `\showbox`) are parsed back into
+    /// run items and compared to the expected ones.
+    fn verify_against_tex(pl_file: crate::pl::File, input: &str, want: Vec<RunItem>) {
+        let tfm_file: crate::File = pl_file.into();
+        let stdout = run_tex(&tfm_file.serialize(), input);
+        let got = parse_showbox_output(&stdout);
+        let want: Vec<RunItem> = want.into_iter().map(normalize_for_tex).collect();
+        assert_eq!(got, want);
+    }
+
+    /// Run the `tex` binary on an `\hbox` containing the input word, set in
+    /// a font backed by the provided TFM bytes, and return the terminal
+    /// output which includes a `\showbox` dump of the box.
+    fn run_tex(tfm_bytes: &[u8], input: &str) -> String {
+        let mut dir = std::env::temp_dir();
+        dir.push("texcraft_tfm_ligkern");
+        // The thread name is the name of the unit test being run, so tests
+        // running in parallel get distinct directories.
+        dir.push(
+            std::thread::current()
+                .name()
+                .unwrap_or("texcraft_unknown_thread_name")
+                .replace("::", "__"),
+        );
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("ligaroo.tfm"), tfm_bytes).unwrap();
+
+        let tex_source = format!(
+            r"\nonstopmode
+\tracingonline=1
+\showboxbreadth=1000000
+\showboxdepth=100
+\font\ligkernfont=ligaroo
+\ligkernfont
+\setbox253=\hbox{{{input}}}
+\showbox253
+\end
+"
+        );
+        let input_path = dir.join("tex-input.tex");
+        std::fs::write(&input_path, tex_source).unwrap();
+
+        let output = std::process::Command::new("tex")
+            .current_dir(&dir)
+            // By default TeX wraps terminal output at 79 characters, which
+            // would split long box dump lines.
+            .env("max_print_line", "10000")
+            .arg(&input_path)
+            .output()
+            .expect("failed to run the `tex` binary");
+        // The exit status is not checked: `\showbox` counts as an error in
+        // TeX's book-keeping ("! OK.") and makes the exit status non-zero.
+        String::from_utf8(output.stdout).expect("stdout of TeX is utf-8")
+    }
+
+    /// Parse the contents of the box dumped with `\showbox253` into run items.
+    fn parse_showbox_output(stdout: &str) -> Vec<RunItem> {
+        let mut lines = stdout.lines();
+        for line in lines.by_ref() {
+            if line.starts_with(r"> \box253=") {
+                break;
+            }
+        }
+        let dimens_line = lines.next().expect(r"box dump contains an \hbox line");
+        assert!(
+            dimens_line.starts_with(r"\hbox("),
+            r"expected an \hbox dimensions line, got {dimens_line:?}"
+        );
+        // The box contents are the following lines, prefixed with a period
+        // because they are one level deep in the dumped box.
+        lines
+            .map_while(|line| line.strip_prefix('.'))
+            .map(parse_run_item)
+            .collect()
+    }
+
+    /// Parse one line of the box dump into a run item.
+    fn parse_run_item(line: &str) -> RunItem {
+        // Kern lines look like `\kern1.0` (or `\kern 1.0` for explicit kerns).
+        if let Some(width) = line.strip_prefix(r"\kern") {
+            let width = common::Scaled::parse_no_units(width.trim())
+                .expect("kern width fits in a scaled number");
+            return RunItem::Kern(width);
+        }
+        // Character lines look like `\ligkernfont A`, and ligature lines
+        // like `\ligkernfont 1 (ligature AB)`.
+        let tail = line
+            .strip_prefix(r"\ligkernfont ")
+            .expect(r"box content line is a \kern or a character in the test font");
+        let parse_char = |s: &str| {
+            let mut chars = s.chars();
+            let c = chars.next().expect("a character follows the font name");
+            assert_eq!(chars.next(), None, "expected a single character in {s:?}");
+            c
+        };
+        match tail.split_once(" (ligature ") {
+            None => RunItem::Char(parse_char(tail)),
+            Some((c, original)) => {
+                let original = original
+                    .strip_suffix(')')
+                    .expect("ligature original chars end with `)`");
+                RunItem::Ligature(Ligature {
+                    c: parse_char(c),
+                    original: original.into(),
+                    includes_left_boundary: false,
+                    includes_right_boundary: false,
+                })
+            }
+        }
+    }
+
+    /// Normalize a run item to the form in which it appears in TeX's box dump.
+    ///
+    /// TeX's box display marks a boundary character in a ligature's original
+    /// characters with a `|`. A `|` next to an empty original is ambiguous
+    /// between the left and the right boundary, so instead of parsing the
+    /// markers back into the boundary fields, the comparison happens on the
+    /// marked-up original characters with the boundary fields cleared.
+    fn normalize_for_tex(item: RunItem) -> RunItem {
+        match item {
+            RunItem::Ligature(ligature) => {
+                let mut original = String::new();
+                if ligature.includes_left_boundary {
+                    original.push('|');
+                }
+                original.push_str(&ligature.original);
+                if ligature.includes_right_boundary {
+                    original.push('|');
+                }
+                RunItem::Ligature(Ligature {
+                    c: ligature.c,
+                    original: original.into(),
+                    includes_left_boundary: false,
+                    includes_right_boundary: false,
+                })
+            }
+            item => item,
+        }
     }
 
     macro_rules! tests {
@@ -645,6 +641,7 @@ mod tests {
         )+ ) => { $(
             #[test]
             fn $name() {
+                #[allow(unused_imports)]
                 use RunItem::*;
                 let program = $program;
                 let input = $input;
@@ -655,6 +652,7 @@ mod tests {
     }
 
     tests!(
+        (empty_input, "", "", vec![],),
         // AB -> ^1
         (
             single_lig_1,
@@ -1098,7 +1096,7 @@ mod tests {
             "A",
             vec![Ligature(L {
                 c: '1',
-                original: "|A".into(),
+                original: "A".into(),
                 includes_left_boundary: true,
                 includes_right_boundary: false,
             }),],
@@ -1114,7 +1112,7 @@ mod tests {
             vec![
                 Ligature(L {
                     c: '2',
-                    original: "|".into(),
+                    original: "".into(),
                     includes_left_boundary: true,
                     includes_right_boundary: false,
                 }),
@@ -1137,63 +1135,375 @@ mod tests {
             vec![
                 Ligature(L {
                     c: '1',
-                    original: "|".into(),
+                    original: "".into(),
                     includes_left_boundary: true,
                     includes_right_boundary: false,
                 }),
                 Char('A'),
             ],
         ),
-        /*
+        // |A -> ^|1
         (
-            right_boundary_char_1,
+            left_boundary_char_4,
             "
-                (LABEL C M)
-                (/LIG/ C L C N)
-                (STOP)
+                (LABEL BOUNDARYCHAR)
+                (/LIG C A C 1)
             ",
-            "N",
-            vec![Char('N'), Ligature(L { c: 'Q', original: "|".into() }),],
+            "A",
+            vec![Ligature(L {
+                c: '1',
+                original: "A".into(),
+                includes_left_boundary: true,
+                includes_right_boundary: false,
+            }),],
         ),
+        // |A -> |^1
         (
-            right_boundary_char_2,
+            left_boundary_char_5,
             "
-                (LABEL C N)
-                (/LIG/ C L C Q)
-                (STOP)
+                (LABEL BOUNDARYCHAR)
+                (/LIG> C A C 1)
             ",
-            "M",
+            "A",
+            vec![Ligature(L {
+                c: '1',
+                original: "A".into(),
+                includes_left_boundary: true,
+                includes_right_boundary: false,
+            }),],
+        ),
+        // |A -> ^1A
+        (
+            left_boundary_char_6,
+            "
+                (LABEL BOUNDARYCHAR)
+                (LIG/ C A C 1)
+            ",
+            "A",
             vec![
-                Char('M'),
-                Ligature(L { c: 'N', original: "".into() }),
-                Ligature(L { c: 'Q', original: "|".into() }),
+                Ligature(L {
+                    c: '1',
+                    original: "".into(),
+                    includes_left_boundary: true,
+                    includes_right_boundary: false,
+                }),
+                Char('A'),
             ],
         ),
-        */
+        // |A -> 1^A
         (
-            right_boundary_char_3,
+            left_boundary_char_7,
+            "
+                (LABEL BOUNDARYCHAR)
+                (LIG/> C A C 1)
+            ",
+            "A",
+            vec![
+                Ligature(L {
+                    c: '1',
+                    original: "".into(),
+                    includes_left_boundary: true,
+                    includes_right_boundary: false,
+                }),
+                Char('A'),
+            ],
+        ),
+        // |A -> |^1A
+        (
+            left_boundary_char_8,
+            "
+                (LABEL BOUNDARYCHAR)
+                (/LIG/> C A C 1)
+            ",
+            "A",
+            vec![
+                Ligature(L {
+                    c: '1',
+                    original: "".into(),
+                    includes_left_boundary: true,
+                    includes_right_boundary: false,
+                }),
+                Char('A'),
+            ],
+        ),
+        // |A -> |1^A
+        (
+            left_boundary_char_9,
+            "
+                (LABEL BOUNDARYCHAR)
+                (/LIG/>> C A C 1)
+            ",
+            "A",
+            vec![
+                Ligature(L {
+                    c: '1',
+                    original: "".into(),
+                    includes_left_boundary: true,
+                    includes_right_boundary: false,
+                }),
+                Char('A'),
+            ],
+        ),
+        (
+            right_boundary_char_lig_1,
             "
                 (LABEL C A)
-                (LIG C L C 1)
+                (LIG C R C 1)
                 (STOP)
             ",
             "A",
             vec![Ligature(L {
                 c: '1',
-                original: "A|".into(),
+                original: "A".into(),
+                includes_left_boundary: false,
+                includes_right_boundary: true,
+            }),],
+        ),
+        // AR -> ^AB
+        (
+            right_boundary_char_lig_2,
+            "
+                (LABEL C A)
+                (/LIG C R C B)
+                (STOP)
+            ",
+            "A",
+            vec![
+                Char('A'),
+                Ligature(L {
+                    c: 'B',
+                    original: "".into(),
+                    includes_left_boundary: false,
+                    includes_right_boundary: true,
+                }),
+            ],
+        ),
+        // AR -> A^B
+        (
+            right_boundary_char_lig_3,
+            "
+                (LABEL C A)
+                (/LIG> C R C B)
+                (STOP)
+            ",
+            "A",
+            vec![
+                Char('A'),
+                Ligature(L {
+                    c: 'B',
+                    original: "".into(),
+                    includes_left_boundary: false,
+                    includes_right_boundary: true,
+                }),
+            ],
+        ),
+        (
+            right_boundary_char_lig_4,
+            "
+                (LABEL C A)
+                (/LIG/ C R C B)
+                (STOP)
+            ",
+            "A",
+            vec![
+                Char('A'),
+                Ligature(L {
+                    c: 'B',
+                    original: "".into(),
+                    includes_left_boundary: false,
+                    includes_right_boundary: true,
+                }),
+            ],
+        ),
+        // AR -> ^BR
+        (
+            right_boundary_char_lig_5,
+            "
+                (LABEL C A)
+                (LIG/ C R C B)
+                (STOP)
+            ",
+            "A",
+            vec![Ligature(L {
+                c: 'B',
+                original: "A".into(),
+                includes_left_boundary: false,
+                includes_right_boundary: true,
+            }),],
+        ),
+        // AR -> BR^
+        (
+            right_boundary_char_lig_6,
+            "
+                (LABEL C A)
+                (LIG/> C R C B)
+                (STOP)
+            ",
+            "A",
+            vec![Ligature(L {
+                c: 'B',
+                original: "A".into(),
+                includes_left_boundary: false,
+                includes_right_boundary: true,
+            }),],
+        ),
+        // AR -> A^BR
+        (
+            right_boundary_char_lig_7,
+            "
+                (LABEL C A)
+                (/LIG/> C R C B)
+                (STOP)
+            ",
+            "A",
+            vec![
+                Char('A'),
+                Ligature(L {
+                    c: 'B',
+                    original: "".into(),
+                    includes_left_boundary: false,
+                    includes_right_boundary: true,
+                }),
+            ],
+        ),
+        // AR -> AB^R
+        (
+            right_boundary_char_lig_8,
+            "
+                (LABEL C A)
+                (/LIG/>> C R C B)
+                (STOP)
+            ",
+            "A",
+            vec![
+                Char('A'),
+                Ligature(L {
+                    c: 'B',
+                    original: "".into(),
+                    includes_left_boundary: false,
+                    includes_right_boundary: true,
+                }),
+            ],
+        ),
+        (
+            right_boundary_char_lig_9,
+            "
+                (LABEL C A)
+                (LIG C R C B)
+                (LABEL C B)
+                (LIG C R C C)
+                (STOP)
+            ",
+            "A",
+            vec![Ligature(L {
+                c: 'B',
+                original: "A".into(),
                 includes_left_boundary: false,
                 includes_right_boundary: true,
             }),],
         ),
         (
-            right_boundary_char_4,
+            right_boundary_char_lig_10,
             "
                 (LABEL C A)
-                (KRN C L R 1)
+                (LIG/ C R C B)
+                (LABEL C B)
+                (LIG/ C R C C)
+                (STOP)
+            ",
+            "A",
+            vec![Ligature(L {
+                c: 'C',
+                original: "A".into(),
+                includes_left_boundary: false,
+                includes_right_boundary: true,
+            }),],
+        ),
+        (
+            right_boundary_char_lig_11,
+            "
+                (LABEL C A)
+                (LIG C R C B)
+                (LABEL C B)
+                (LIG/ C R C C)
+                (STOP)
+            ",
+            "A",
+            vec![Ligature(L {
+                c: 'B',
+                original: "A".into(),
+                includes_left_boundary: false,
+                includes_right_boundary: true,
+            }),],
+        ),
+        (
+            right_boundary_char_lig_12,
+            "
+                (LABEL C A)
+                (LIG/ C R C B)
+                (LABEL C B)
+                (LIG C R C C)
+                (STOP)
+            ",
+            "A",
+            vec![Ligature(L {
+                c: 'C',
+                original: "A".into(),
+                includes_left_boundary: false,
+                includes_right_boundary: true,
+            }),],
+        ),
+        (
+            right_boundary_char_kern_1,
+            "
+                (LABEL C A)
+                (KRN C R R 1)
                 (STOP)
             ",
             "A",
             vec![Char('A'), Kern(Scaled::ONE * 10),],
+        ),
+        (
+            right_boundary_char_kern_2,
+            "
+                (LABEL C A)
+                (LIG/ C R C B)
+                (LABEL C B)
+                (LIG/ C R C C)
+                (LABEL C C)
+                (KRN C R R 1)
+                (STOP)
+            ",
+            "A",
+            vec![
+                Ligature(L {
+                    c: 'C',
+                    original: "A".into(),
+                    includes_left_boundary: false,
+                    includes_right_boundary: true,
+                }),
+                Kern(Scaled::ONE * 10),
+            ],
+        ),
+        (
+            right_boundary_char_kern_3,
+            "
+                (LABEL C A)
+                (LIG C B C C)
+                (LABEL C C)
+                (KRN C R R 1)
+                (STOP)
+            ",
+            "AB",
+            vec![
+                Ligature(L {
+                    c: 'C',
+                    original: "AB".into(),
+                    includes_left_boundary: false,
+                    includes_right_boundary: false,
+                }),
+                Kern(Scaled::ONE * 10),
+            ],
         ),
     );
 }

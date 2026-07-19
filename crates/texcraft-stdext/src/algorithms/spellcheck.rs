@@ -328,7 +328,7 @@ mod tests {
     fn find_close_words_test() {
         let dictionary = vec!["james", "laura", "mint"];
         let word = "janes";
-        let result = find_close_words(&dictionary, &word);
+        let result = find_close_words(&dictionary, word);
 
         assert_eq![result[0].right(), "james"];
         assert_eq![result[1].right(), "laura"];

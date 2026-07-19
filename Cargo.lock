@@ -194,6 +194,7 @@ dependencies = [
  "boxworks",
  "boxworks-hyphenate",
  "boxworks-knuthplass",
+ "boxworks-testing",
  "boxworks-text",
  "clap 4.4.8",
  "common",
@@ -1537,6 +1538,7 @@ dependencies = [
  "arbitrary",
  "ariadne",
  "common",
+ "pretty_assertions",
 ]
 
 [[package]]

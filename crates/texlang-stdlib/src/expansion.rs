@@ -385,7 +385,7 @@ mod test {
         let options = vec![TestOption::BuiltInCommandsDyn(Box::new(|| {
             built_in_commands(optimized)
         }))];
-        run_fatal_error_test(&input, &options, false);
+        run_fatal_error_test(input, &options, false);
     }
 
     #[macro_export]

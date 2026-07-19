@@ -504,22 +504,20 @@ impl LigKernDescribe {
                     format!["{l}{r}"]
                 }
             };
-            struct Emitter;
-            impl tfm::ligkern::Emitter for Emitter {
-                fn emit_character(&mut self, c: char) {
-                    print!("{}", c.escape_debug())
-                }
-
-                fn emit_kern(&mut self, kern: common::Scaled) {
-                    print!("[{}]", kern.0);
-                }
-
-                fn emit_ligature(&mut self, ligature: tfm::ligkern::Ligature) {
-                    print!("{}", ligature.c.escape_debug());
+            for elem in lig_kern_program.run_iter(&s, None) {
+                use tfm::ligkern::RunItem::*;
+                match elem {
+                    Char(c) => {
+                        print!("{}", c.escape_debug())
+                    }
+                    Kern(scaled) => {
+                        print!("[{}]", scaled);
+                    }
+                    Ligature(ligature) => {
+                        print!("{}", ligature.c.escape_debug());
+                    }
                 }
             }
-            let mut emitter = Emitter {};
-            lig_kern_program.run(&s, &mut emitter);
             println!();
         }
         Ok(())
@@ -539,19 +537,20 @@ struct LigKernRun {
 impl LigKernRun {
     fn run(&self) -> Result<(), String> {
         let lig_kern_program = compile_lig_kern_program(&self.path)?;
-        struct Emitter;
-        impl tfm::ligkern::Emitter for Emitter {
-            fn emit_character(&mut self, c: char) {
-                print!("{c}")
-            }
-            fn emit_kern(&mut self, kern: common::Scaled) {
-                print!("[{}]", kern.0);
-            }
-            fn emit_ligature(&mut self, ligature: tfm::ligkern::Ligature) {
-                print!("{}", ligature.c);
+        for elem in lig_kern_program.run_iter(&self.input, None) {
+            use tfm::ligkern::RunItem::*;
+            match elem {
+                Char(c) => {
+                    print!("{c}")
+                }
+                Kern(scaled) => {
+                    print!("[{}]", scaled);
+                }
+                Ligature(ligature) => {
+                    print!("{}", ligature.c);
+                }
             }
         }
-        lig_kern_program.run(&self.input, &mut Emitter);
         println!();
         Ok(())
     }

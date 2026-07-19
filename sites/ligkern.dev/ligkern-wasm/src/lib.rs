@@ -1,4 +1,4 @@
-use tfm::ligkern::{CompiledProgram, Emitter, Ligature};
+use tfm::ligkern::CompiledProgram;
 use wasm_bindgen::prelude::*;
 
 const CMR10_TFM: &[u8] = include_bytes!("../../../../crates/tfm/corpus/computer-modern/cmr10.tfm");
@@ -47,9 +47,33 @@ fn run_tfm_bytes(bytes: &[u8], text: &str) -> String {
 }
 
 fn run_program(program: &CompiledProgram, text: &str) -> String {
-    let mut out = JsonOutput::default();
-    program.run(text, &mut out);
-    out.finish()
+    let mut elements: Vec<String> = vec![];
+    for elem in program.run_iter(text, None) {
+        use tfm::ligkern::RunItem::*;
+        match elem {
+            Char(c) => {
+                elements.push(format!(
+                    r#"{{"type":"char","char":"{}"}}"#,
+                    escape_json(&c.to_string())
+                ));
+            }
+            Kern(kern) => {
+                let value_pt = kern.0 as f64 / 65536.0;
+                elements.push(format!(
+                    r#"{{"type":"kern","value_scaled":{},"value_pt":{:.4}}}"#,
+                    kern.0, value_pt
+                ));
+            }
+            Ligature(ligature) => {
+                elements.push(format!(
+                    r#"{{"type":"ligature","char_hex":"{:04X}","original":"{}"}}"#,
+                    ligature.c as u32,
+                    escape_json(&ligature.original)
+                ));
+            }
+        }
+    }
+    format!(r#"{{"elements":[{}]}}"#, elements.join(","))
 }
 
 fn make_error(msg: &str) -> String {
@@ -69,40 +93,4 @@ fn escape_json(s: &str) -> String {
         }
     }
     out
-}
-
-#[derive(Default)]
-struct JsonOutput {
-    elements: Vec<String>,
-}
-
-impl JsonOutput {
-    fn finish(self) -> String {
-        format!(r#"{{"elements":[{}]}}"#, self.elements.join(","))
-    }
-}
-
-impl Emitter for JsonOutput {
-    fn emit_character(&mut self, c: char) {
-        self.elements.push(format!(
-            r#"{{"type":"char","char":"{}"}}"#,
-            escape_json(&c.to_string())
-        ));
-    }
-
-    fn emit_kern(&mut self, kern: common::Scaled) {
-        let value_pt = kern.0 as f64 / 65536.0;
-        self.elements.push(format!(
-            r#"{{"type":"kern","value_scaled":{},"value_pt":{:.4}}}"#,
-            kern.0, value_pt
-        ));
-    }
-
-    fn emit_ligature(&mut self, ligature: Ligature) {
-        self.elements.push(format!(
-            r#"{{"type":"ligature","char_hex":"{:04X}","original":"{}"}}"#,
-            ligature.c as u32,
-            escape_json(&ligature.original)
-        ));
-    }
 }

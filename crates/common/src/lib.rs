@@ -170,6 +170,53 @@ impl Scaled {
             .map_err(|_| format!("dimension {s:?} is out of range"))
     }
 
+    /// Parses a scaled number from the unitless decimal format printed by TeX.
+    ///
+    /// This is the format produced by TeX's `print_scaled` routine
+    ///     (TeX.2021.103) and by [`Scaled::display_no_units`]:
+    ///     an optional minus sign, an integer part, a decimal point,
+    ///     and a non-empty fractional part, with no unit suffix.
+    /// For example: `1.0`, `-0.27779`.
+    /// Dimensions appear in this format in TeX's diagnostic output,
+    ///     such as the box dumps produced by `\showbox`.
+    /// To parse a dimension with a unit suffix like `72.27pt`,
+    ///     use [`Scaled::parse_from_string`] instead.
+    ///
+    /// An overflow error is returned if the number is too large to
+    ///     be represented as a scaled number.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the string is not of the expected format.
+    pub fn parse_no_units(s: &str) -> Result<Scaled, OverflowError> {
+        let (neg, s) = match s.strip_prefix('-') {
+            Some(s) => (true, s),
+            None => (false, s),
+        };
+        let mut parts = s.split('.');
+        let i: i32 = parts
+            .next()
+            .expect("scaled has an integer part")
+            .parse()
+            .expect("integer part is an integer");
+        let mut f = [0_u8; 17];
+        for (k, c) in parts
+            .next()
+            .expect("scaled has a fractional part")
+            .chars()
+            .enumerate()
+        {
+            f[k] = c
+                .to_digit(10)
+                .expect("fractional part are digits")
+                .try_into()
+                .expect("digits are in the range [0,10) and always fit in u8");
+        }
+        let f = Scaled::from_decimal_digits(&f);
+        let sc = Scaled::new(i, f, ScaledUnit::Point)?;
+        Ok(if neg { -sc } else { sc })
+    }
+
     pub fn integer_part(self) -> i32 {
         self.0 / Scaled::ONE.0
     }
@@ -234,7 +281,7 @@ impl Scaled {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct OverflowError;
 
 impl std::fmt::Display for Scaled {
@@ -605,6 +652,33 @@ mod tests {
         bad_unit:      "10xx"   => Err("invalid unit \"xx\" in dimension \"10xx\"".to_string()),
         bad_number:    "abpt"   => Err("invalid number \"ab\" in dimension \"abpt\"".to_string()),
         bad_fraction:  "1.xpt"  => Err("invalid fractional part \"x\" in dimension \"1.xpt\"".to_string()),
+    }
+
+    macro_rules! parse_no_units_tests {
+        ( $( $name:ident : $input:expr => $expected:expr, )* ) => {
+            $(
+                #[test]
+                fn $name() {
+                    assert_eq!(Scaled::parse_no_units($input), $expected);
+                }
+            )*
+        };
+    }
+
+    parse_no_units_tests! {
+        no_units_one:      "1.0"      => Ok(Scaled::ONE),
+        no_units_zero:     "0.0"      => Ok(Scaled::ZERO),
+        no_units_negative: "-2.5"     => Ok(-(Scaled::ONE * 5) / 2),
+        no_units_fraction: "0.27779"  => Ok(Scaled::from_decimal_digits(&[2, 7, 7, 7, 9])),
+        no_units_overflow: "16384.0"  => Err(OverflowError),
+    }
+
+    #[test]
+    fn parse_no_units_round_trips_display_no_units() {
+        for sc in [Scaled(1), Scaled(-1), Scaled(18205), Scaled::MAX_DIMEN] {
+            let printed = format!("{}", sc.display_no_units());
+            assert_eq!(Scaled::parse_no_units(&printed), Ok(sc));
+        }
     }
 
     #[test]

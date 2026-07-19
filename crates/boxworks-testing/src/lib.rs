@@ -60,6 +60,24 @@ macro_rules! is_box_eq {
     }};
 }
 
+#[macro_export]
+macro_rules! assert_box_lossy_eq {
+    ($left:expr, $right:expr$(,)?) => {{
+        let lhs: boxworks_testing::Value = $left.into();
+        let rhs: boxworks_testing::Value = $right.into();
+        boxworks_testing::assert_lossy_eq(lhs, rhs);
+    }};
+}
+
+#[macro_export]
+macro_rules! is_box_lossy_eq {
+    ($left:expr, $right:expr$(,)?) => {{
+        let lhs: boxworks_testing::Value = $left.into();
+        let rhs: boxworks_testing::Value = $right.into();
+        boxworks_testing::is_lossy_eq(lhs, rhs)
+    }};
+}
+
 pub enum Value {
     String(String),
     Box(Vec<ds::Horizontal>),
@@ -96,14 +114,30 @@ impl From<Vec<ds::Horizontal>> for Value {
 }
 
 pub fn is_eq(lhs: Value, rhs: Value) -> bool {
-    let (lhs_list, _) = normalize(lhs, "lhs.box");
-    let (rhs_list, _) = normalize(rhs, "rhs.box");
+    is_eq_impl(lhs, rhs, false)
+}
+
+pub fn is_lossy_eq(lhs: Value, rhs: Value) -> bool {
+    is_eq_impl(lhs, rhs, true)
+}
+
+fn is_eq_impl(lhs: Value, rhs: Value, standardize_lossy: bool) -> bool {
+    let (lhs_list, _) = normalize(lhs, "lhs.box", standardize_lossy);
+    let (rhs_list, _) = normalize(rhs, "rhs.box", standardize_lossy);
     lhs_list == rhs_list
 }
 
 pub fn assert_eq(lhs: Value, rhs: Value) {
-    let (lhs_list, lhs_s) = normalize(lhs, "lhs.box");
-    let (rhs_list, rhs_s) = normalize(rhs, "rhs.box");
+    assert_eq_impl(lhs, rhs, false);
+}
+
+pub fn assert_lossy_eq(lhs: Value, rhs: Value) {
+    assert_eq_impl(lhs, rhs, true);
+}
+
+fn assert_eq_impl(lhs: Value, rhs: Value, standardize_lossy: bool) {
+    let (lhs_list, lhs_s) = normalize(lhs, "lhs.box", standardize_lossy);
+    let (rhs_list, rhs_s) = normalize(rhs, "rhs.box", standardize_lossy);
     // We first diff the boxlang representation because this is clearer.
     use pretty_assertions::assert_eq;
     assert_eq!(lhs_s, rhs_s);
@@ -112,8 +146,8 @@ pub fn assert_eq(lhs: Value, rhs: Value) {
     assert_eq!(rhs_list, lhs_list);
 }
 
-fn normalize(val: Value, side: &str) -> (Vec<ds::Horizontal>, String) {
-    let list = match val {
+fn normalize(val: Value, side: &str, standardize_lossy: bool) -> (Vec<ds::Horizontal>, String) {
+    let mut list = match val {
         Value::String(s) => match lang::parse_horizontal_list(&s.clone()) {
             Ok(v) => v,
             Err(err) => {
@@ -127,10 +161,64 @@ fn normalize(val: Value, side: &str) -> (Vec<ds::Horizontal>, String) {
         },
         Value::Box(v) => v,
     };
+    if standardize_lossy {
+        standardize_lossy_h_list(&mut list);
+    }
     let mut s = String::new();
     for elem in &list {
         use std::fmt::Write;
         write!(&mut s, "{}", elem.to_box_lang()).unwrap();
     }
     (list, s)
+}
+
+fn standardize_lossy_h_list(v: &mut [ds::Horizontal]) {
+    for elem in v.iter_mut() {
+        use ds::Horizontal::*;
+        match elem {
+            HBox(hbox) => {
+                standardize_lossy_h_list(&mut hbox.list);
+            }
+            VBox(vbox) => {
+                standardize_lossy_v_list(&mut vbox.list);
+            }
+            Discretionary(disc) => {
+                standardize_lossy_d_list(&mut disc.pre_break);
+                standardize_lossy_d_list(&mut disc.post_break);
+            }
+            Ligature(ligature) => ligature.standardize_lossy(),
+            _ => {}
+        }
+    }
+}
+
+fn standardize_lossy_v_list(v: &mut [ds::Vertical]) {
+    for elem in v.iter_mut() {
+        use ds::Vertical::*;
+        match elem {
+            HBox(hbox) => {
+                standardize_lossy_h_list(&mut hbox.list);
+            }
+            VBox(vbox) => {
+                standardize_lossy_v_list(&mut vbox.list);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn standardize_lossy_d_list(v: &mut [ds::DiscretionaryElem]) {
+    for elem in v.iter_mut() {
+        use ds::DiscretionaryElem::*;
+        match elem {
+            HBox(hbox) => {
+                standardize_lossy_h_list(&mut hbox.list);
+            }
+            VBox(vbox) => {
+                standardize_lossy_v_list(&mut vbox.list);
+            }
+            Ligature(ligature) => ligature.standardize_lossy(),
+            _ => {}
+        }
+    }
 }

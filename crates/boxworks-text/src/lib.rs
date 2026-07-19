@@ -147,54 +147,52 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
 
     fn add_word(&mut self, word: &str, list: &mut Vec<ds::Horizontal>) {
         let font = &self.fonts[self.current_font as usize];
-
-        struct Emitter<'a>(&'a mut Vec<ds::Horizontal>, u32);
-        impl<'a> ligkern::Emitter for Emitter<'a> {
-            fn emit_character(&mut self, c: char) {
-                self.0.push(
-                    ds::Char {
-                        char: c,
-                        font: self.1,
+        for elem in font.lig_kern_program.run_iter(word, None) {
+            use ligkern::RunItem::*;
+            match elem {
+                Char(c) => {
+                    list.push(
+                        ds::Char {
+                            char: c,
+                            font: self.current_font,
+                        }
+                        .into(),
+                    );
+                    // TeX.2021.1035
+                    // TODO: \hyphenchar
+                    if c == '-' {
+                        list.push(ds::Discretionary::default().into());
                     }
-                    .into(),
-                );
-                // TeX.2021.1035
-                // TODO: \hyphenchar
-                if c == '-' {
-                    self.0.push(ds::Discretionary::default().into());
                 }
-            }
-            fn emit_kern(&mut self, kern: common::Scaled) {
-                self.0.push(
-                    ds::Kern {
-                        width: kern,
-                        kind: ds::KernKind::Normal,
+                Kern(kern) => {
+                    list.push(
+                        ds::Kern {
+                            width: kern,
+                            kind: ds::KernKind::Normal,
+                        }
+                        .into(),
+                    );
+                }
+                Ligature(ligature) => {
+                    let ins_disc = ligature.original.as_ref().ends_with('-');
+                    list.push(
+                        ds::Ligature {
+                            char: ligature.c,
+                            font: self.current_font,
+                            original_chars: ligature.original,
+                            includes_left_boundary: ligature.includes_left_boundary,
+                            includes_right_boundary: ligature.includes_right_boundary,
+                        }
+                        .into(),
+                    );
+                    // TeX.2021.1035
+                    // TODO: \hyphenchar
+                    if ins_disc {
+                        list.push(ds::Discretionary::default().into());
                     }
-                    .into(),
-                );
-            }
-            fn emit_ligature(&mut self, ligature: ligkern::Ligature) {
-                let ins_disc = ligature.original.as_ref().ends_with('-');
-                self.0.push(
-                    ds::Ligature {
-                        included_left_boundary: false,
-                        included_right_boundary: false,
-                        char: ligature.c,
-                        font: self.1,
-                        original_chars: ligature.original,
-                    }
-                    .into(),
-                );
-                // TeX.2021.1035
-                // TODO: \hyphenchar
-                if ins_disc {
-                    self.0.push(ds::Discretionary::default().into());
                 }
             }
         }
-
-        let mut e = Emitter(list, self.current_font);
-        font.lig_kern_program.run(word, &mut e);
         // TODO: consider merging this loop with the loop in the lig/kern program.
         // We can change the run method to accept a callback that is invoked for
         // each character.
@@ -294,6 +292,7 @@ mod tests {
     use boxworks::TextPreprocessor;
     use boxworks_testing;
     use boxworks_testing::assert_box_eq;
+    use boxworks_testing::assert_box_lossy_eq;
 
     macro_rules! preprocessor_tests {
         (
@@ -337,59 +336,59 @@ mod tests {
             basic,
             "second",
             r#"
-                chars("second", font=0)
+                chars("second")
             "#,
         ),
         (
             basic_with_space,
             "sec ond",
             r#"
-                chars("sec", font=0)
+                chars("sec")
                 glue(3.33333pt, 1.66666pt, 1.11111pt)
-                chars("ond", font=0)
+                chars("ond")
             "#,
         ),
         (
             kern_ao,
             "AO",
             r#"
-                chars("A", font=0)
+                chars("A")
                 kern(-0.27779pt)
-                chars("O", font=0)
+                chars("O")
             "#,
         ),
         (
             kern_av,
             "AV",
             r#"
-                chars("A", font=0)
+                chars("A")
                 kern(-1.11113pt)
-                chars("V", font=0)
+                chars("V")
             "#,
         ),
         (
             ligature_1,
             "ff",
             r#"
-                lig("\u{b}", "ff", font=0)
+                lig("\u{b}", "ff")
             "#,
         ),
         (
             ligature_2,
             "ffi",
             r#"
-                lig("\u{e}", "ffi", font=0)
+                lig("\u{e}", "ffi")
             "#,
         ),
         (
             ragged_right,
             "a b. c",
             r##"
-                chars("a", font=0)
+                chars("a")
                 glue(3.33298pt, 0.0pt, 0.0pt)
-                chars("b.", font=0)
+                chars("b.")
                 glue(5.0pt, 0.0pt, 0.0pt)
-                chars("c", font=0)
+                chars("c")
             "##,
             params: Params {
                 space_skip: common::Glue {
@@ -413,9 +412,9 @@ mod tests {
                         let tfm = super::TFM_CMR10;
                         let input = format!["{} a", $input];
                         let want =  format![r#"
-                            chars("{}", font=0)
+                            chars("{}")
                             {}
-                            chars("a", font=0)
+                            chars("a")
                         "#, $input, $want];
                         super::run_preprocessor_test(tfm, Default::default(), &input, &want)
                     }
@@ -526,49 +525,75 @@ mod tests {
             basic_with_space,
             "sec ond",
             r#"
-                chars("sec", font=0)
+                chars("sec")
                 glue(4.78204pt, 2.39102pt, 1.19551pt)
-                chars("on", font=0)
+                chars("on")
                 kern(-0.49814pt)
-                chars("d", font=0)
+                chars("d")
             "#,
         ),
         (
             numbers_start_of_word,
             "123B",
             r##"
-                lig("$", "|", font=0)
-                chars("123", font=0)
-                lig("#", "", font=0)
-                chars("B", font=0)
+                lig("$", "", includes_left_boundary="true")
+                chars("123")
+                lig("#", "")
+                chars("B")
             "##,
         ),
         (
             numbers_mid_word,
             "A123B",
             r##"
-                chars("A", font=0)
-                lig("$", "", font=0)
-                chars("123", font=0)
-                lig("#", "", font=0)
-                chars("B", font=0)
+                chars("A")
+                lig("$", "")
+                chars("123")
+                lig("#", "")
+                chars("B")
             "##,
         ),
-        /*
         (
             numbers_end_of_word,
             "A123",
             r##"
-                chars("A", font=0)
-                lig("$", "", font=0)
-                chars("123", font=0)
-                lig("#", "|", font=0)
+                chars("A")
+                lig("$", "")
+                chars("123")
+                lig("#", "", includes_right_boundary="true")
             "##,
         ),
-        */
     );
 
     fn run_preprocessor_test(tfm_bytes: &[u8], params: Params, input: &str, want: &str) {
+        if std::env::var("TEXCRAFT_VERIFY").unwrap_or_default() == "tex" {
+            use std::path::PathBuf;
+            let mut auxiliary_files: HashMap<PathBuf, Vec<u8>> = Default::default();
+            auxiliary_files.insert("customFont.tfm".into(), tfm_bytes.to_vec());
+            let preamble = format!(
+                r"
+                {}
+                \font \customFont customFont
+                \customFont
+                ",
+                params.tex(),
+            );
+            let mut tex_engine = boxworks::tex::new_tex_engine_binary("tex".to_string()).unwrap();
+            let (_, mut tex_got) = boxworks::tex::build_horizontal_lists(
+                tex_engine.as_mut(),
+                &auxiliary_files,
+                &preamble,
+                &mut [input.to_string()].iter(),
+                /*hyphenate=*/ false,
+            );
+            let tex_got = tex_got.remove(0).list;
+            // The lossy comparison is used because TeX's box dumps represent
+            // the boundary character in a ligature's original characters with
+            // a `|` marker rather than as separate fields.
+            assert_box_lossy_eq!(want, tex_got);
+            return;
+        }
+
         let mut tfm_file = tfm::File::deserialize(tfm_bytes).0.unwrap();
         let lig_kern_program =
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;

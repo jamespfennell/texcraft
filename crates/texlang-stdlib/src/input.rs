@@ -438,7 +438,7 @@ mod tests {
     }
 
     fn custom_vm_initialization(vm: &mut vm::VM<State>) {
-        let mut fs = common::InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
+        let mut fs = common::InMemoryFileSystem::new(vm.working_directory.as_ref().unwrap());
         fs.add_string_file("file1.tex", "content1\n");
         fs.add_string_file("file2.tex", "content2%\n");
         fs.add_string_file("file3.tex", r"\input nested/file4");
@@ -467,7 +467,7 @@ mod tests {
     );
 
     fn end_input_vm_initialization(vm: &mut vm::VM<State>) {
-        let mut fs = common::InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
+        let mut fs = common::InMemoryFileSystem::new(vm.working_directory.as_ref().unwrap());
         fs.add_string_file(
             "file1.tex",
             "Hello\\def\\Macro{Hola\\endinput Mundo}\\Macro World\n",
@@ -489,7 +489,7 @@ mod tests {
     );
 
     fn read_vm_initialization(vm: &mut vm::VM<State>) {
-        let mut fs = common::InMemoryFileSystem::new(&vm.working_directory.as_ref().unwrap());
+        let mut fs = common::InMemoryFileSystem::new(vm.working_directory.as_ref().unwrap());
         fs.add_string_file("file1.tex", "1\n2%\n3");
         fs.add_string_file("file2.tex", "1{\n2\n3}");
         fs.add_string_file("file3.tex", "1}1\n2");

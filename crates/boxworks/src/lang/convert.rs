@@ -277,11 +277,11 @@ impl<'a> ToBoxworks for ast::Ligature<'a> {
 
     fn to_boxworks(&self) -> Self::Output {
         ds::Ligature {
-            included_left_boundary: false,  // TODO
-            included_right_boundary: false, // TODO,
             char: self.char.value,
             font: self.font.value as u32,
             original_chars: self.original_chars.value.clone().into(),
+            includes_left_boundary: self.includes_left_boundary.value,
+            includes_right_boundary: self.includes_right_boundary.value,
         }
     }
 }
@@ -294,6 +294,8 @@ impl ToBoxLang for ds::Ligature {
             char: self.char.into(),
             original_chars: Cow::<'static, str>::Owned(format!["{}", self.original_chars]).into(),
             font: (self.font as i32).into(),
+            includes_left_boundary: self.includes_left_boundary.into(),
+            includes_right_boundary: self.includes_right_boundary.into(),
         }
     }
 }
