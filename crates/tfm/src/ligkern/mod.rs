@@ -323,13 +323,11 @@ impl<'a> Iterator for RunIter<'a> {
                         }
                     }
                     self.consumes_left = false;
-                    if self.right.is_none() {
-                        s.includes_right_boundary = matches!(self.next_left, NextLeft::None)
-                            && match (tail.get(0), tail.get(1)) {
-                                (None, None) | (Some(IntermediateOp::Kern(_)), None) => true,
-                                _ => false,
-                            };
-                    }
+                    s.includes_right_boundary = matches!(self.next_left, NextLeft::None)
+                        && match (tail.get(0), tail.get(1)) {
+                            (None, None) | (Some(IntermediateOp::Kern(_)), None) => true,
+                            _ => false,
+                        };
                     RunItem::Ligature(s.into_ligature((*c).into()))
                 }
             });
