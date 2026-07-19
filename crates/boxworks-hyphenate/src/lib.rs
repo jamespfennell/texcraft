@@ -331,7 +331,7 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                 (1, format!["{}-", &s[prev_chars_pushed..hyph_next]])
             };
 
-            // This is the loop in TeX.2021.344.
+            // This is the loop in TeX.2021.914.
             loop {
                 let pre_break: Vec<ds::DiscretionaryElem> = hyphenater
                     .lig_kern_program
@@ -380,14 +380,21 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
 
                 // This is the loop in TeX.2021.916.
                 // We want to achieve synchronization for the two iterators.
+                //
+                // The following boolean handles the first if statement in TeX.2021.916.
+                let mut post_char_left_boundary = hyphenater
+                    .lig_kern_program
+                    .has_replacement(None, post_break_text.chars().next());
                 loop {
-                    if post_chars_pushed == chars_pushed
+                    if !post_char_left_boundary
+                        && post_chars_pushed == chars_pushed
                         && post_break_iter.is_separation_point()
                         && main_iter.is_separation_point()
                     {
                         break;
                     }
-                    if post_chars_pushed < chars_pushed {
+                    if post_char_left_boundary || post_chars_pushed < chars_pushed {
+                        post_char_left_boundary = false;
                         while let Some(elem) = post_break_iter.next() {
                             post_chars_pushed += match &elem {
                                 RunItem::Char(_) => 1,
@@ -721,11 +728,8 @@ mod tests {
                 "#,
             },
         },
-        /*
         {
-            // BUG: handled in TeX.2021.916. If there is a left boundary char
-            // synchronization cannot be a no-op as it is currently.
-            left_boundary_char,
+            left_boundary_char_1,
             TestCase {
                 input: "a-b",
                 lig_kern_program: "
@@ -738,14 +742,36 @@ mod tests {
                         chars("-")
                       ],
                       post_break=[
-                        lig("c", "|b")
+                        lig("c", "b", includes_left_boundary="true")
                       ],
                       replace_count=1,
                     )
                     chars("b")
                 "#,
             },
+            lossy: true,
         },
+        {
+            left_boundary_char_2,
+            TestCase {
+                input: "a-b",
+                lig_kern_program: "
+                    |d -> |c^_
+                ",
+                want: r#"
+                    chars("a")
+                    disc(
+                      pre_break=[
+                        chars("-")
+                      ],
+                      post_break=[],
+                      replace_count=0,
+                    )
+                    chars("b")
+                "#,
+            },
+        },
+        /*
         {
             // BUG: we're running the hyphen lig kern program without disabling
             // left char behaviour. Need to change run_iter to factor this in.
