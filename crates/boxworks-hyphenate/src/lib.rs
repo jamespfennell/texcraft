@@ -308,7 +308,7 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                     ),
                     RunItem::Ligature(ligature) => (
                         ligature.original.chars().count(),
-                        ligature.original.chars().last(),
+                        Some(ligature.c),
                         ds::Ligature {
                             includes_left_boundary: ligature.includes_left_boundary,
                             includes_right_boundary: ligature.includes_right_boundary,
@@ -983,10 +983,7 @@ mod tests {
                 "#,
             },
         },
-        /*
         {
-            // BUG: probably how the simple case looks for the lig rule "b-" rather than "x-" but
-            // I'm not sure.
             big_lig_with_hyphen,
             TestCase {
                 input: "ab-c",
@@ -1010,7 +1007,6 @@ mod tests {
                 "#,
             },
         },
-        */
         {
             big_lig_with_hyphen_2,
             TestCase {
