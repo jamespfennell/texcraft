@@ -1,4 +1,5 @@
 use boxworks::ds;
+use tfm::ligkern::RunOptions;
 
 pub struct Hyphenator {
     // TODOs:
@@ -139,7 +140,7 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
         let mut s = String::new();
         // Accumulate the word to be hyphenated.
         // TeX.2021.897
-        let right_boundary: Option<char> =
+        let right_boundary_override: Option<char> =
             loop {
                 let Some(elem) = list.get(i) else { break None };
                 use ds::Horizontal::*;
@@ -252,13 +253,21 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
         };
         let mut next_or = indices.next();
 
-        let mut main_iter = hyphenater.lig_kern_program.run(&s, right_boundary);
+        let mut main_iter = hyphenater.lig_kern_program.run_with_options(
+            &s,
+            RunOptions {
+                disable_left_boundary: false,
+                right_boundary_override,
+            },
+        );
         use tfm::ligkern::RunItem;
         let mut chars_pushed = 0;
         // This corresponds to the loop in TeX.2021.913 but not 1-1.
         //
         // TeX's loop is across all cut prefixes whereas this loop is over each
         // individual lig/kern element that is emitted.
+        // TODO: in order to fix pre_break_lig_kern_starts_from_separation_point we will probably
+        // need to turn this into a loop over cut prefixes.
         //
         // Knuth's reconstitute method sets hyphen_passed>0 if either the main lig/kern
         // program ran over a hyphen while processing the cut prefix,
@@ -325,7 +334,9 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
             } else {
                 // regime 2: either the hyphen was in the middle of the lig element OR there is a hyphen lig/kern
                 // program. In this case we need to put the element in afterwards.
-                // TODO: is this enough or do we need to reverse the atom entirely?
+                // TODO: is this enough or do we need to reverse to the last separation point entirely?
+                // currently we're just reversing the last ligature. I think pre_break_lig_kern_starts_from_separation_point
+                // is failing for this reason
                 // TODO: we are indexing string using chars bad bad bad.
                 // Some simple unicode tests will show this :)
                 (1, format!["{}-", &s[prev_chars_pushed..hyph_next]])
@@ -335,7 +346,18 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
             loop {
                 let pre_break: Vec<ds::DiscretionaryElem> = hyphenater
                     .lig_kern_program
-                    .run(&pre_break_text, None)
+                    .run_with_options(
+                        &pre_break_text,
+                        RunOptions {
+                            // The pre-break text always starts at a separation point so we don't
+                            // need to do any left boundary processing. Moreover, if we did the default
+                            // left boundary processing we would get the wrong result because the pre-
+                            // break text is not preceded by the start of a word.
+                            // This is all covered in unit tests.
+                            disable_left_boundary: true,
+                            right_boundary_override: None,
+                        },
+                    )
                     .map(|elem| {
                         let d: ds::DiscretionaryElem = match elem {
                             RunItem::Char(c) => ds::Char {
@@ -363,9 +385,13 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
 
                 let hyph_next = next_or.unwrap_or(usize::MAX);
                 let post_break_text = &s[hyph_next..];
-                let mut post_break_iter = hyphenater
-                    .lig_kern_program
-                    .run(post_break_text, right_boundary);
+                let mut post_break_iter = hyphenater.lig_kern_program.run_with_options(
+                    post_break_text,
+                    RunOptions {
+                        disable_left_boundary: false,
+                        right_boundary_override,
+                    },
+                );
                 let mut post_break: Vec<ds::DiscretionaryElem> = vec![];
                 let mut post_chars_pushed = hyph_next;
 
@@ -771,11 +797,8 @@ mod tests {
                 "#,
             },
         },
-        /*
         {
-            // BUG: we're running the hyphen lig kern program without disabling
-            // left char behaviour. Need to change run_iter to factor this in.
-            left_boundary_char_does_not_change_hyphen,
+            left_boundary_char_and_pre_break_1,
             TestCase {
                 input: "a-b",
                 lig_kern_program: "
@@ -789,6 +812,59 @@ mod tests {
                       ],
                     )
                     chars("b")
+                "#,
+            },
+        },
+        {
+            left_boundary_char_and_pre_break_2,
+            TestCase {
+                input: "ab-c",
+                lig_kern_program: "
+                    bc -> _z^_
+                    |b -> |d^_
+                ",
+                want: r#"
+                    chars("a")
+                    disc(
+                      pre_break=[
+                        chars("b")
+                        chars("-")
+                      ],
+                      post_break=[
+                        chars("c")
+                      ],
+                      replace_count=1,
+                    )
+                    lig("z", "bc")
+                "#,
+            },
+        },
+        /*
+        BUG: when we collect the pre-break material we need to go back to the last
+        separation point.
+        {
+            pre_break_lig_kern_starts_from_separation_point,
+            TestCase {
+                input: "abc-d",
+                lig_kern_program: "
+                    ab -> ax^_
+                    xc -> _y^_
+                    yd -> _z^_
+                ",
+                want: r#"
+                    disc(
+                      pre_break=[
+                        chars("a")
+                        lig("y", "bc")
+                        chars("-")
+                      ],
+                      post_break=[
+                        chars("d")
+                      ],
+                      replace_count=2,
+                    )
+                    chars("a")
+                    lig("z", "bcd")
                 "#,
             },
         },

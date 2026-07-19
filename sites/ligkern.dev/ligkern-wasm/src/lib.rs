@@ -48,7 +48,7 @@ fn run_tfm_bytes(bytes: &[u8], text: &str) -> String {
 
 fn run_program(program: &CompiledProgram, text: &str) -> String {
     let mut elements: Vec<String> = vec![];
-    for elem in program.run(text, None) {
+    for elem in program.run(text) {
         use tfm::ligkern::RunItem::*;
         match elem {
             Char(c) => {

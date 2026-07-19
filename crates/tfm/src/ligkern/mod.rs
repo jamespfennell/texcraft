@@ -223,18 +223,39 @@ impl CompiledProgram {
     }
 
     /// Run the lig/kern program for the provided word.
-    pub fn run<'a>(&'a self, word: &'a str, right_boundary_override: Option<char>) -> RunIter<'a> {
+    pub fn run<'a>(&'a self, word: &'a str) -> RunIter<'a> {
+        self.run_with_options(word, Default::default())
+    }
+
+    /// Run the lig/kern program for the provided word with the provided options.
+    pub fn run_with_options<'a>(&'a self, word: &'a str, options: RunOptions) -> RunIter<'a> {
+        let mut word = word.chars();
+        let next_left = if options.disable_left_boundary {
+            match word.next() {
+                Some(c) => NextLeft::Char(c),
+                None => NextLeft::None,
+            }
+        } else {
+            NextLeft::Boundary
+        };
         RunIter {
             program: self,
-            word: word.chars(),
+            word,
             consumes_left: true,
             intermediate_ops: &[],
-            next_left: NextLeft::Boundary,
+            next_left,
             ligature: None,
             left: None,
-            right_boundary_override,
+            right_boundary_override: options.right_boundary_override,
         }
     }
+}
+
+/// Options for the [CompiledProgram::run_with_options] method
+#[derive(Default, Debug)]
+pub struct RunOptions {
+    pub disable_left_boundary: bool,
+    pub right_boundary_override: Option<char>,
 }
 
 /// Replacement elements of a word in a lig/kern program.
@@ -487,7 +508,7 @@ mod tests {
         }
 
         let program = CompiledProgram::compile_from_pl_file(&pl_file).0;
-        let got: Vec<RunItem> = program.run(input, None).collect();
+        let got: Vec<RunItem> = program.run(input).collect();
         assert_eq!(got, want);
     }
 

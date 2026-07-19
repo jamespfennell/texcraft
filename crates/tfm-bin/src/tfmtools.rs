@@ -4,6 +4,7 @@ use clap::Parser;
 
 mod shared;
 use shared::*;
+use tfm::ligkern::RunOptions;
 
 fn main() {
     if let Err(err) = Cli::parse().run() {
@@ -504,7 +505,7 @@ impl LigKernDescribe {
                     format!["{l}{r}"]
                 }
             };
-            for elem in lig_kern_program.run(&s, None) {
+            for elem in lig_kern_program.run(&s) {
                 use tfm::ligkern::RunItem::*;
                 match elem {
                     Char(c) => {
@@ -532,12 +533,26 @@ struct LigKernRun {
 
     /// The string to run through the lig/kern program.
     input: String,
+
+    /// Whether to disable left boundary processing.
+    #[arg(long)]
+    disable_left_boundary: bool,
+
+    /// Character to use for right boundary processing.
+    #[arg(long)]
+    right_boundary_override: Option<char>,
 }
 
 impl LigKernRun {
     fn run(&self) -> Result<(), String> {
         let lig_kern_program = compile_lig_kern_program(&self.path)?;
-        for elem in lig_kern_program.run(&self.input, None) {
+        for elem in lig_kern_program.run_with_options(
+            &self.input,
+            RunOptions {
+                disable_left_boundary: self.disable_left_boundary,
+                right_boundary_override: self.right_boundary_override,
+            },
+        ) {
             use tfm::ligkern::RunItem::*;
             match elem {
                 Char(c) => {
