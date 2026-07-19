@@ -172,7 +172,7 @@ fn normalize(val: Value, side: &str, standardize_lossy: bool) -> (Vec<ds::Horizo
     (list, s)
 }
 
-fn standardize_lossy_h_list(v: &mut Vec<ds::Horizontal>) {
+fn standardize_lossy_h_list(v: &mut [ds::Horizontal]) {
     for elem in v.iter_mut() {
         use ds::Horizontal::*;
         match elem {
@@ -192,7 +192,7 @@ fn standardize_lossy_h_list(v: &mut Vec<ds::Horizontal>) {
     }
 }
 
-fn standardize_lossy_v_list(v: &mut Vec<ds::Vertical>) {
+fn standardize_lossy_v_list(v: &mut [ds::Vertical]) {
     for elem in v.iter_mut() {
         use ds::Vertical::*;
         match elem {
@@ -207,7 +207,7 @@ fn standardize_lossy_v_list(v: &mut Vec<ds::Vertical>) {
     }
 }
 
-fn standardize_lossy_d_list(v: &mut Vec<ds::DiscretionaryElem>) {
+fn standardize_lossy_d_list(v: &mut [ds::DiscretionaryElem]) {
     for elem in v.iter_mut() {
         use ds::DiscretionaryElem::*;
         match elem {

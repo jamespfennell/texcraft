@@ -908,7 +908,7 @@ mod tests {
 
     fn run_deserialize_test(b: Vec<u8>, want: Op) {
         let mut result = Ok(());
-        let got: Vec<Op> = Deserializer::new(&b, &mut result).into_iter().collect();
+        let got: Vec<Op> = Deserializer::new(&b, &mut result).collect();
         assert_eq!(Ok(()), result);
         assert_eq!(got, vec![want]);
     }
@@ -1170,7 +1170,7 @@ mod tests {
         (
             op_code_158_least_negative,
             [158, 255, 127],
-            Op::Down(-1 * 2_i32.pow(7) - 1)
+            Op::Down(-2_i32.pow(7) - 1)
         ),
         (
             op_code_158_most_positive,
@@ -1180,7 +1180,7 @@ mod tests {
         (
             op_code_158_most_negative,
             [158, 128, 0],
-            Op::Down(-1 * 2_i32.pow(15))
+            Op::Down(-2_i32.pow(15))
         ),
         (
             op_code_159_least_positive,
@@ -1190,7 +1190,7 @@ mod tests {
         (
             op_code_159_least_negative,
             [159, 255, 127, 255],
-            Op::Down(-1 * 2_i32.pow(15) - 1)
+            Op::Down(-2_i32.pow(15) - 1)
         ),
         (
             op_code_159_most_positive,
@@ -1200,7 +1200,7 @@ mod tests {
         (
             op_code_159_most_negative,
             [159, 128, 0, 0],
-            Op::Down(-1 * 2_i32.pow(23))
+            Op::Down(-2_i32.pow(23))
         ),
         (
             op_code_160_least_positive,
@@ -1210,7 +1210,7 @@ mod tests {
         (
             op_code_160_least_negative,
             [160, 255, 127, 255, 255],
-            Op::Down(-1 * 2_i32.pow(23) - 1)
+            Op::Down(-2_i32.pow(23) - 1)
         ),
         (
             op_code_160_most_positive,
@@ -1318,7 +1318,7 @@ mod tests {
                 dvi_format: 2,
                 unit_numerator: 3,
                 unit_denominator: 5,
-                magnification: 1 * 256 * 256 * 256 + 2 * 256 * 256 + 3 * 256 + 4,
+                magnification: 256 * 256 * 256 + 2 * 256 * 256 + 3 * 256 + 4,
                 comment: "ABC".to_string(),
             }
         ),

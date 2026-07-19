@@ -82,12 +82,6 @@ impl LeftChar {
             LeftChar::BoundaryChar => None,
         }
     }
-    fn is_boundary(&self) -> bool {
-        match self {
-            LeftChar::Char(_) => false,
-            LeftChar::BoundaryChar => true,
-        }
-    }
 }
 
 impl From<Char> for LeftChar {

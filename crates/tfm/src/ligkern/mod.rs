@@ -306,11 +306,7 @@ enum NextLeft {
 impl<'a> RunIter<'a> {
     pub fn is_separation_point(&self) -> bool {
         self.intermediate_ops.is_empty()
-            && match self.next_left {
-                NextLeft::Lig(_, _) => false,
-                NextLeft::FinalLig(_) => false,
-                _ => true,
-            }
+            && !matches!(self.next_left, NextLeft::Lig(_, _) | NextLeft::FinalLig(_))
     }
 }
 
@@ -343,10 +339,10 @@ impl<'a> Iterator for RunIter<'a> {
                     }
                     self.consumes_left = false;
                     s.includes_right_boundary = matches!(self.next_left, NextLeft::None)
-                        && match (tail.get(0), tail.get(1)) {
-                            (None, None) | (Some(IntermediateOp::Kern(_)), None) => true,
-                            _ => false,
-                        };
+                        && matches!(
+                            (tail.first(), tail.get(1)),
+                            (None, None) | (Some(IntermediateOp::Kern(_)), None)
+                        );
                     RunItem::Ligature(s.into_ligature((*c).into()))
                 }
             });
@@ -364,7 +360,7 @@ impl<'a> Iterator for RunIter<'a> {
                     }
                 }
                 s.s.push(*right);
-                (Some((*c).into()), false)
+                (Some(*c), false)
             }
             NextLeft::FinalLig(c) => {
                 let mut s = self.ligature.take().unwrap_or_default();
@@ -376,7 +372,7 @@ impl<'a> Iterator for RunIter<'a> {
                     }
                 }
                 s.includes_right_boundary = true;
-                let lig = RunItem::Ligature(s.into_ligature((*c).into()));
+                let lig = RunItem::Ligature(s.into_ligature(*c));
                 self.next_left = NextLeft::None;
                 return Some(lig);
             }

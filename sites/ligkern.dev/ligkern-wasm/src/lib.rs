@@ -1,4 +1,4 @@
-use tfm::ligkern::{CompiledProgram, Ligature};
+use tfm::ligkern::CompiledProgram;
 use wasm_bindgen::prelude::*;
 
 const CMR10_TFM: &[u8] = include_bytes!("../../../../crates/tfm/corpus/computer-modern/cmr10.tfm");
