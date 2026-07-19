@@ -235,7 +235,6 @@ impl CompiledProgram {
             next_left: NextLeft::Boundary,
             ligature: None,
             left: None,
-            right: None,
             right_boundary_override,
         }
     }
@@ -273,7 +272,6 @@ pub struct RunIter<'a> {
     next_left: NextLeft,
     ligature: Option<PendingLigature>,
     left: Option<char>,
-    right: Option<char>,
     right_boundary_override: Option<char>,
 }
 
@@ -281,7 +279,8 @@ pub struct RunIter<'a> {
 enum NextLeft {
     Boundary,
     Char(char),
-    Lig(char),
+    Lig(char, char),
+    FinalLig(char),
     None,
 }
 
@@ -289,7 +288,8 @@ impl<'a> RunIter<'a> {
     pub fn is_separation_point(&self) -> bool {
         self.intermediate_ops.is_empty()
             && match self.next_left {
-                NextLeft::Lig(_) => false,
+                NextLeft::Lig(_, _) => false,
+                NextLeft::FinalLig(_) => false,
                 _ => true,
             }
     }
@@ -335,43 +335,41 @@ impl<'a> Iterator for RunIter<'a> {
         let (left, left_in_original): (Option<char>, bool) = match &self.next_left {
             NextLeft::Boundary => (None, true),
             NextLeft::Char(c) => (Some(*c), true),
-            NextLeft::Lig(op) => match (op, self.right) {
-                (c, Some(right)) => {
-                    let s = self.ligature.get_or_insert_default();
-                    if self.consumes_left {
-                        if let Some(left) = self.left {
-                            s.s.push(left);
-                        } else {
-                            s.includes_left_boundary = true;
-                        }
+            NextLeft::Lig(c, right) => {
+                let s = self.ligature.get_or_insert_default();
+                if self.consumes_left {
+                    if let Some(left) = self.left {
+                        s.s.push(left);
+                    } else {
+                        s.includes_left_boundary = true;
                     }
-                    s.s.push(right);
-                    (Some((*c).into()), false)
                 }
-                (c, None) => {
-                    let mut s = self.ligature.take().unwrap_or_default();
-                    if self.consumes_left {
-                        if let Some(left) = self.left {
-                            s.s.push(left);
-                        } else {
-                            s.includes_left_boundary = true;
-                        }
+                s.s.push(*right);
+                (Some((*c).into()), false)
+            }
+            NextLeft::FinalLig(c) => {
+                let mut s = self.ligature.take().unwrap_or_default();
+                if self.consumes_left {
+                    if let Some(left) = self.left {
+                        s.s.push(left);
+                    } else {
+                        s.includes_left_boundary = true;
                     }
-                    s.includes_right_boundary = true;
-                    let lig = RunItem::Ligature(s.into_ligature((*c).into()));
-                    self.next_left = NextLeft::None;
-                    return Some(lig);
                 }
-            },
+                s.includes_right_boundary = true;
+                let lig = RunItem::Ligature(s.into_ligature((*c).into()));
+                self.next_left = NextLeft::None;
+                return Some(lig);
+            }
             NextLeft::None => return None,
         };
         self.left = left;
-        self.right = self.word.next();
-        if self.left.is_none() && self.right.is_none() {
+        let right = self.word.next();
+        if self.left.is_none() && right.is_none() {
             // TODO: remove this check?
             return None;
         }
-        let right_for_lookup = match self.right {
+        let right_for_lookup = match right {
             Some(r) => Some(r),
             None => self.right_boundary_override,
         };
@@ -384,16 +382,17 @@ impl<'a> Iterator for RunIter<'a> {
             Some(replacement) => {
                 self.consumes_left = left_in_original;
                 self.intermediate_ops = &replacement.0;
-                self.next_left = match (replacement.1.is_lig, self.right) {
+                self.next_left = match (replacement.1.is_lig, right) {
                     (false, None) => NextLeft::None,
                     (false, Some(_)) => NextLeft::Char(replacement.1.c.into()),
-                    (true, _) => NextLeft::Lig(replacement.1.c.into()),
+                    (true, Some(right)) => NextLeft::Lig(replacement.1.c.into(), right),
+                    (true, None) => NextLeft::FinalLig(replacement.1.c.into()),
                 };
             }
             None => {
                 let old_left = self.left;
-                self.left = self.right;
-                self.next_left = match self.right {
+                self.left = right;
+                self.next_left = match right {
                     None => NextLeft::None,
                     Some(right) => NextLeft::Char(right),
                 };
