@@ -326,16 +326,11 @@ impl<'a> Iterator for RunIter<'a> {
                     }
                     self.consumes_left = false;
                     if self.right.is_none() {
-                        s.includes_right_boundary = matches!(
-                            self.next_left,
-                            NextLeft::ReplacedChar(compiler::C {
-                                c: _,
-                                is_lig: false
-                            })
-                        ) && match (tail.get(0), tail.get(1)) {
-                            (None, None) | (Some(IntermediateOp::Kern(_)), None) => true,
-                            _ => false,
-                        };
+                        s.includes_right_boundary = matches!(self.next_left, NextLeft::None)
+                            && match (tail.get(0), tail.get(1)) {
+                                (None, None) | (Some(IntermediateOp::Kern(_)), None) => true,
+                                _ => false,
+                            };
                     }
                     RunItem::Ligature(s.into_ligature((*c).into()))
                 }
@@ -394,7 +389,11 @@ impl<'a> Iterator for RunIter<'a> {
             Some(replacement) => {
                 self.consumes_left = left_in_original;
                 self.intermediate_ops = &replacement.0;
-                self.next_left = NextLeft::ReplacedChar(replacement.1.clone());
+                self.next_left = match (replacement.1.is_lig, self.right) {
+                    (false, None) => NextLeft::None,
+                    (false, Some(_)) => NextLeft::OriginalChar(replacement.1.c.into()),
+                    (true, _) => NextLeft::ReplacedChar(replacement.1.clone()),
+                };
             }
             None => {
                 let old_left = self.left;
