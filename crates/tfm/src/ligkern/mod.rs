@@ -265,14 +265,33 @@ impl PendingLigature {
 }
 
 pub struct RunIter<'a> {
+    // First two fields are fixed for the iteration.
     program: &'a CompiledProgram,
-    word: std::str::Chars<'a>,
-    consumes_left: bool,
-    intermediate_ops: &'a [IntermediateOp],
-    next_left: NextLeft,
-    ligature: Option<PendingLigature>,
-    left: Option<char>,
     right_boundary_override: Option<char>,
+
+    // The word we're iterating over: gets consumed as we iterate.
+    word: std::str::Chars<'a>,
+
+    // A ligature can be built up from multiple lig/kern passes - e.g.
+    // repeated LIG commands. This field stores information about the pending
+    // ligature before it is written out (e.g. by a LIG/> or the absence of
+    // a replacmenet).
+    ligature: Option<PendingLigature>,
+
+    // Intermediate ops: if the slice is non-empty the next step is to
+    // process is.
+    // consumes_left=true if the first character or ligature should be
+    // marked as consuming the left character used in the replacement
+    // (or left hand boundary).
+    // left is the character that was used as the left-hand side in the
+    // replacement, or None if it was the left hand boundary.
+    intermediate_ops: &'a [IntermediateOp],
+    consumes_left: bool,
+    left: Option<char>,
+
+    // If intermediate ops is empty, the next step is to evaluate the
+    // lig/kern program with the left character as specified in the enum.
+    next_left: NextLeft,
 }
 
 #[derive(Debug)]
