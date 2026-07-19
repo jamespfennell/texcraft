@@ -52,7 +52,8 @@ macro_rules! tests {
                     }
                     return;
                 }
-                similar_asserts::assert_eq!(got: normalize(&box_output), want: normalize(GOLDEN));
+                use boxworks_testing::assert_box_eq;
+                assert_box_eq!(box_output, GOLDEN);
             }
         )+
     };

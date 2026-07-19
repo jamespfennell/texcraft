@@ -1,1 +1,4 @@
-words = ["texcraft"]
+words = [
+    "lossy",
+    "texcraft",
+]

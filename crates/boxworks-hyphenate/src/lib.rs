@@ -291,8 +291,8 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                 }
                 .into(),
                 RunItem::Ligature(ligature) => ds::Ligature {
-                    included_left_boundary: false,
-                    included_right_boundary: false,
+                    includes_left_boundary: ligature.includes_left_boundary,
+                    includes_right_boundary: ligature.includes_right_boundary,
                     char: ligature.c,
                     font: hyphenation_font,
                     original_chars: ligature.original,
@@ -351,8 +351,8 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                             RunItem::Ligature(ligature) => ds::Ligature {
                                 char: ligature.c,
                                 font: hyphenation_font,
-                                included_left_boundary: false,  // TODO
-                                included_right_boundary: false, // TODO
+                                includes_left_boundary: ligature.includes_left_boundary,
+                                includes_right_boundary: ligature.includes_right_boundary,
                                 original_chars: ligature.original.clone(),
                             }
                             .into(),
@@ -408,8 +408,8 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                                 RunItem::Ligature(ligature) => ds::Ligature {
                                     char: ligature.c,
                                     font: hyphenation_font,
-                                    included_left_boundary: false, // TODO
-                                    included_right_boundary: false, // TODO
+                                    includes_left_boundary: ligature.includes_left_boundary,
+                                    includes_right_boundary: ligature.includes_right_boundary,
                                     original_chars: ligature.original.clone(),
                                 }
                                 .into(),
@@ -439,8 +439,8 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                                 RunItem::Ligature(ligature) => ds::Ligature {
                                     char: ligature.c,
                                     font: hyphenation_font,
-                                    included_left_boundary: false, // TODO
-                                    included_right_boundary: false, // TODO
+                                    includes_left_boundary: ligature.includes_left_boundary,
+                                    includes_right_boundary: ligature.includes_left_boundary,
                                     original_chars: ligature.original,
                                 }
                                 .into(),
@@ -511,11 +511,12 @@ mod tests {
     use super::*;
     use boxworks::TextPreprocessor;
     use boxworks_testing::assert_box_eq;
+    use boxworks_testing::assert_box_lossy_eq;
     use boxworks_text as bwt;
 
     const TFM_CMR10: &'static [u8] = include_bytes!("../../tfm/corpus/computer-modern/cmr10.tfm");
 
-    fn run_hyphenation_test(tc: TestCase) {
+    fn run_hyphenation_test(tc: TestCase, lossy: bool) {
         let unhyphenated: String = tc.input.chars().filter(|c| *c != '-').collect();
         let hyphenation_patterns = tc.hyphenation_patterns.unwrap_or(&tc.input);
 
@@ -558,7 +559,11 @@ mod tests {
             let tex_got: Vec<boxworks::ds::Horizontal> =
                 tex_got[0].list[2..].iter().cloned().collect();
 
-            assert_box_eq!(tc.want, tex_got);
+            if lossy {
+                assert_box_lossy_eq!(tc.want, tex_got);
+            } else {
+                assert_box_eq!(tc.want, tex_got);
+            }
             return;
         }
 
@@ -597,7 +602,8 @@ mod tests {
             $name: ident,
             TestCase {
                 $( $field: ident: $value: expr, )*
-            }
+            },
+            $(lossy: $lossy: expr,)?
         }, )* ) => {
             $(
                 #[test]
@@ -606,7 +612,8 @@ mod tests {
                         $( $field: $value, )*
                         ..Default::default()
                     };
-                    run_hyphenation_test(test_case);
+                    let lossy = false $( || $lossy )?;
+                    run_hyphenation_test(test_case, lossy);
                 }
             )*
         };
@@ -630,7 +637,7 @@ mod tests {
                 want: r#"
                     chars("mint")
                 "#,
-            }
+            },
         },
         {
             most_simple_case,
@@ -646,7 +653,7 @@ mod tests {
                     )
                     chars("b")
                 "#,
-            }
+            },
         },
         {
             lig_1,
@@ -666,7 +673,7 @@ mod tests {
                     lig("x", "")
                     chars("b")
                 "#,
-            }
+            },
         },
         {
             lig_with_hyphen,
@@ -687,7 +694,7 @@ mod tests {
                     chars("a")
                     chars("b")
                 "#,
-            }
+            },
         },
         {
             lig_with_hyphen_and_letters,
@@ -712,9 +719,8 @@ mod tests {
                     chars("a")
                     lig("c", "b")
                 "#,
-            }
+            },
         },
-        /* TODO: fix the bug
         {
             // BUG: handled in TeX.2021.916. If there is a left boundary char
             // synchronization cannot be a no-op as it is currently.
@@ -731,13 +737,13 @@ mod tests {
                         chars("-")
                       ],
                       post_break=[
-                        chars("c")
+                        lig("c", "|b")
                       ],
                       replace_count=1,
                     )
                     chars("b")
                 "#,
-            }
+            },
         },
         {
             // BUG: we're running the hyphen lig kern program without disabling
@@ -757,11 +763,8 @@ mod tests {
                     )
                     chars("b")
                 "#,
-            }
+            },
         },
-        */
-        /*
-        TODO: the original_chars in the lig doesn't match TeX.
         {
             right_boundary_char_after_hyphen,
             TestCase {
@@ -774,14 +777,14 @@ mod tests {
                     disc(
                       pre_break=[
                         chars("-")
-                        lig("c", "")
+                        lig("c", "", includes_right_boundary="true")
                       ],
                     )
                     chars("b")
                 "#,
-            }
+            },
+            lossy: true,
         },
-        */
         {
             big_lig_1,
             TestCase {
@@ -804,7 +807,7 @@ mod tests {
                     )
                     lig("y", "abc")
                 "#,
-            }
+            },
         },
         {
             big_lig_2,
@@ -828,7 +831,7 @@ mod tests {
                     )
                     lig("y", "abc")
                 "#,
-            }
+            },
         },
         {
             big_lig_3,
@@ -851,7 +854,7 @@ mod tests {
                     )
                     lig("y", "abc")
                 "#,
-            }
+            },
         },
         {
             big_lig_4,
@@ -871,10 +874,8 @@ mod tests {
                     )
                     chars("c")
                 "#,
-            }
+            },
         },
-        /*
-         * TODO: fix the bug
         {
             // BUG: probably how the simple case looks for the lig rule "b-" rather than "x-" but
             // I'm not sure.
@@ -888,7 +889,9 @@ mod tests {
                 want: r#"
                     disc(
                       pre_break=[
-                        chars("axy")
+                        chars("a")
+                        lig("x", "b")
+                        lig("y", "")
                         chars("-")
                       ],
                       replace_count=2,
@@ -897,9 +900,8 @@ mod tests {
                     lig("x", "b")
                     chars("c")
                 "#,
-            }
+            },
         },
-        */
         {
             big_lig_with_hyphen_2,
             TestCase {
@@ -920,7 +922,7 @@ mod tests {
                     )
                     chars("c")
                 "#,
-            }
+            },
         },
         {
             empty_lig_before,
@@ -941,7 +943,7 @@ mod tests {
                     lig("x", "")
                     chars("b")
                 "#,
-            }
+            },
         },
         {
             simple_kern,
@@ -962,7 +964,7 @@ mod tests {
                     kern(0.00095pt)
                     chars("b")
                 "#,
-            }
+            },
         },
         {
             same_kern,
@@ -985,7 +987,7 @@ mod tests {
                     kern(0.00095pt)
                     chars("b")
                 "#,
-            }
+            },
         },
         {
             synchronization_1,
@@ -1016,7 +1018,7 @@ mod tests {
                     # synchronization point
                     chars("gh", font=0)
                 "#,
-            }
+            },
         },
         {
             synchronization_2,
@@ -1055,7 +1057,7 @@ mod tests {
                     )
                     chars("gh", font=0)
                 "#,
-            }
+            },
         },
         {
             synchronization_3,
@@ -1082,7 +1084,7 @@ mod tests {
                     lig("z", "")
                     chars("de", font=0)
                 "#,
-            }
+            },
         },
         {
             word_ends_in_comma_1,
@@ -1098,7 +1100,7 @@ mod tests {
                     chars(",")
                 "#,
                 hyphenation_patterns: Some("baby"),
-            }
+            },
         },
         {
             word_ends_in_comma_2,
@@ -1120,9 +1122,8 @@ mod tests {
                     chars(",")
                 "#,
                 hyphenation_patterns: Some("ba-by"),
-            }
+            },
         },
-        /* TODO: fix the bugs
         {
             right_boundary_char_override_1,
             TestCase {
@@ -1138,11 +1139,14 @@ mod tests {
                       ],
                     )
                     chars("by")
-                    lig(".", "|")
+                    lig(".", "", includes_right_boundary="true")
                 "#,
-            }
+            },
+            lossy: true,
         },
         {
+            // BUG: not sure but this may cover the bug in TeX which
+            // we still have to think about.
             right_boundary_char_override_2,
             TestCase {
                 input: "ab.",
@@ -1157,14 +1161,15 @@ mod tests {
                         chars("-")
                       ],
                       post_break=[
-                        chars("c,")
+                        lig("c", "|b")
+                        lig(",", "|")
                       ],
                       replace_count=1,
                     )
                     chars("b.")
                 "#,
                 hyphenation_patterns: Some("a-b"),
-            }
+            },
         },
         {
             right_boundary_char_override_3,
@@ -1182,14 +1187,14 @@ mod tests {
                       ],
                     )
                     chars("ney")
-                    lig(",", "|")
+                    lig(",", "", includes_right_boundary="true")
                     lig(",", ".")
-                    lig("?", "|")
+                    lig("?", "", includes_right_boundary="true")
                 "#,
                 hyphenation_patterns: Some(""),
-            }
+            },
+            lossy: true,
         },
-        */
         {
             right_boundary_char_override_4,
             TestCase {
@@ -1206,13 +1211,13 @@ mod tests {
                       ],
                     )
                     chars("ney")
-                    lig("?", "|")
+                    lig("?", "", includes_right_boundary="true")
                     lig("?", ".")
                 "#,
                 hyphenation_patterns: Some(""),
-            }
+            },
+            lossy: true,
         },
-
         {
             right_boundary_char_override_5,
             TestCase {
@@ -1228,11 +1233,12 @@ mod tests {
                       ],
                     )
                     chars("ney")
-                    lig(",", "|")
+                    lig(",", "", includes_right_boundary="true")
                     lig(",", ".")
                 "#,
                 hyphenation_patterns: Some(""),
-            }
+            },
+            lossy: true,
         },
         {
             right_boundary_char_override_6,
@@ -1251,11 +1257,12 @@ mod tests {
                     )
                     chars("ney")
                     lig("?", "")
-                    lig(",", "|")
+                    lig(",", "", includes_right_boundary="true")
                     lig(",", ".")
                 "#,
                 hyphenation_patterns: Some(""),
-            }
+            },
+            lossy: true,
         },
         {
             sneezing,
@@ -1276,7 +1283,7 @@ mod tests {
                 "#,
                 hyphenation_patterns: Some(""),
                 left_hyphen_min: Some(3),
-            }
+            },
         },
         {
             difficult,
@@ -1307,7 +1314,7 @@ mod tests {
                 "#,
                 hyphenation_patterns: Some(""),
                 left_hyphen_min: Some(3),
-            }
+            },
         },
     ];
 }

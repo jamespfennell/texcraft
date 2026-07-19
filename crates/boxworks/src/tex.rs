@@ -642,8 +642,8 @@ fn parse_disc_elem(
             Ok(match parse_char(tail, line_number)? {
                 ParsedChar::Char(char) => ds::Char { char, font }.into(),
                 ParsedChar::Lig(char, og_chars) => ds::Ligature {
-                    included_left_boundary: false,
-                    included_right_boundary: false,
+                    includes_left_boundary: false,
+                    includes_right_boundary: false,
                     char,
                     font,
                     original_chars: og_chars.into(),
@@ -824,8 +824,8 @@ fn parse_h_box_list(
                 match parse_char(tail, line_number)? {
                     ParsedChar::Char(char) => ds::Char { char, font }.into(),
                     ParsedChar::Lig(char, og_chars) => ds::Ligature {
-                        included_left_boundary: false,
-                        included_right_boundary: false,
+                        includes_left_boundary: false,
+                        includes_right_boundary: false,
                         char,
                         font,
                         original_chars: og_chars.into(),
@@ -1057,42 +1057,17 @@ fn parse_char<'a>(s: &'a str, line_number: usize) -> Result<ParsedChar<'a>, Erro
 }
 
 fn parse_scaled(s: &str) -> common::Scaled {
-    let (neg, s) = match s.strip_prefix('-') {
-        Some(s) => (true, s),
-        None => (false, s),
-    };
-    let mut parts = s.split('.');
-    let i: i32 = parts
-        .next()
-        .expect("scaled has an integer part")
-        .parse()
-        .expect("integer part is an integer");
-    let mut f = [0_u8; 17];
-    for (k, c) in parts
-        .next()
-        .expect("scaled has a fractional part")
-        .chars()
-        .enumerate()
-    {
-        f[k] = c
-            .to_digit(10)
-            .expect("fractional part are digits")
-            .try_into()
-            .expect("digits are in the range [0,10) and always fit in u8");
-    }
-    let f = common::Scaled::from_decimal_digits(&f);
-    let sc = common::Scaled::new(i, f, common::ScaledUnit::Point).unwrap_or_else(|_| {
+    common::Scaled::parse_no_units(s).unwrap_or_else(|_| {
         eprintln!(
             "scaled number '{s}pt' is too big to parse; replacing with the largest scaled value {}",
             common::Scaled::MAX_DIMEN
         );
-        common::Scaled::MAX_DIMEN
-    });
-    if neg {
-        -sc
-    } else {
-        sc
-    }
+        if s.starts_with('-') {
+            -common::Scaled::MAX_DIMEN
+        } else {
+            common::Scaled::MAX_DIMEN
+        }
+    })
 }
 
 const CONVERT_TEXT_TEMPLATE: &str = r"

@@ -12,6 +12,8 @@ use common::GlueOrder;
 use common::Scaled as Number;
 use std::rc::Rc;
 
+use crate::lang::convert::ToBoxLang;
+
 /// Element of a horizontal list.
 #[derive(Debug, Clone)]
 pub enum Horizontal {
@@ -68,6 +70,12 @@ horizontal_impl!(
     Kern,
     Penalty,
 );
+
+impl std::fmt::Display for Horizontal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_box_lang())
+    }
+}
 
 /// Element of a vertical list.
 #[derive(Clone, Debug)]
@@ -525,8 +533,6 @@ pub struct Adjust {
 /// Described in TeX.2021.143.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ligature {
-    pub included_left_boundary: bool,
-    pub included_right_boundary: bool,
     pub char: char,
     pub font: u32,
     /// The original characters that were replaced by the ligature.
@@ -537,6 +543,83 @@ pub struct Ligature {
     /// lig/kern programming language allows for a single ligature to come
     /// from arbitrarily many characters.
     pub original_chars: Rc<str>,
+    pub includes_left_boundary: bool,
+    pub includes_right_boundary: bool,
+}
+
+impl Ligature {
+    /// Puts the ligature into a lossy standard form.
+    ///
+    /// What follows is the motivation for this method.
+    ///
+    /// TeX supports logging its internal typesetting data structures.
+    /// All of these data structures are reimplemented in this module,
+    /// and can be reconstructed from TeX's log output using the [Boxworks TeX log parsing logic](crate::tex).
+    /// This system used throughout Boxworks to verify that
+    /// Boxworks's typesetting code gives the identical results to TeX's.
+    ///
+    /// Unfortunately, however, TeX's display logic for ligatures specifically is
+    /// lossy. In the TeX's logging format the line
+    /// ```text
+    /// ..\tenrm a (ligature |)
+    /// ```
+    /// can mean one of three things:
+    /// - a ligature 'a' that replaces the character `|`,
+    /// - a ligature 'a' that replaces the left boundary, or
+    /// - a ligature 'a' that replaces the right boundary.
+    ///
+    /// This means that it's not possible to reconstruct fully the internal
+    /// ligature data structure from the logging output.
+    /// [Boxworks TeX log parsing logic](crate::tex) assumes the first
+    /// interpretation holds: the log line is parsed into the following value:
+    /// ```
+    /// # use boxworks::ds::Ligature;
+    /// Ligature {
+    ///     char: 'a',
+    ///     font: 0,
+    ///     original_chars: "|".into(),
+    ///     includes_left_boundary: false,
+    ///     includes_right_boundary: false,
+    /// };
+    /// ```
+    ///
+    /// This specifically presents issues when we want to verify TeX's output with
+    /// Boxworks where the correct value is, say,
+    /// ```
+    /// # use boxworks::ds::Ligature;
+    /// Ligature {
+    ///     char: 'a',
+    ///     font: 0,
+    ///     original_chars: "".into(),
+    ///     includes_left_boundary: false,
+    ///     includes_right_boundary: true,
+    /// };
+    /// ```
+    ///
+    /// A unit test that compares these outputs will fail.
+    ///
+    /// This method is designed to help write unit tests that pass.
+    /// It standardizes the ligature into the from parse from TeX.
+    /// We can then compare the standardized form with TeX's output.
+    /// This does mean that such unit tests can't verify which form is the right one.
+    pub fn standardize_lossy(&mut self) {
+        if !self.includes_left_boundary && !self.includes_right_boundary {
+            return;
+        }
+        self.original_chars = format![
+            "{}{}{}",
+            if self.includes_left_boundary { "|" } else { "" },
+            self.original_chars,
+            if self.includes_right_boundary {
+                "|"
+            } else {
+                ""
+            }
+        ]
+        .into();
+        self.includes_left_boundary = false;
+        self.includes_right_boundary = false;
+    }
 }
 
 // Two constructors for ligature nodes are provided in TeX.2021.144

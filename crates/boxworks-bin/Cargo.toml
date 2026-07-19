@@ -26,6 +26,7 @@ path = "src/box.rs"
 [dev-dependencies]
 assert_cmd = "2.0.12"
 similar-asserts = "1.5.0"
+boxworks-testing = {path="../boxworks-testing"}
 
 [lints]
 workspace = true

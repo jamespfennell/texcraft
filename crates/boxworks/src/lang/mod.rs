@@ -153,6 +153,7 @@
 //! |------|-------------|---------|
 //! | String | Arbitrary UTF-8 characters between double quotes. Currently the string can't contain a double quote character. | `"a string"` |
 //! | Integer | Decimal integer in the range (-2^31,2^31). | `123`, `-456` |
+//! | Boolean | True or false, provided as string. | `"true"`, `"false"`   |
 //! | Dimension | Decimal number with a unit attached. The format and the allowable units are the same as in TeX. | `1pt`, `2.04in`, `-10sp` |
 //! | Glue stretch or shrink | A dimension where the unit can alternatively be an infinite stretch/shrink unit. | `1fil`, `-2fill`, `3filll` |
 //! | Character | A string containing exactly one UTF-8 character. | `"A"`, `"ñ"` |
@@ -252,6 +253,8 @@
 //! | 1      | `char`           | character | `"\0"`   |
 //! | 2      | `original_chars` | string    | `""`     |
 //! | 3      | `font`           | integer   | `0`      |
+//! | 4      | `includes_left_char`  | boolean   | false      |
+//! | 5      | `includes_right_char` | boolean   | false      |
 //!
 //! #### `vbox`: add a vertical box to the current list
 //!
