@@ -232,8 +232,7 @@ impl CompiledProgram {
             word: word.chars(),
             consumes_left: true,
             intermediate_ops: &[],
-            last_lig: usize::MAX,
-            next_left: NextLeft::LeftBoundary,
+            next_left: NextLeft::Boundary,
             ligature: None,
             left: None,
             right: None,
@@ -270,7 +269,6 @@ pub struct RunIter<'a> {
     program: &'a CompiledProgram,
     word: std::str::Chars<'a>,
     consumes_left: bool,
-    last_lig: usize,
     intermediate_ops: &'a [IntermediateOp],
     next_left: NextLeft,
     ligature: Option<PendingLigature>,
@@ -281,9 +279,9 @@ pub struct RunIter<'a> {
 
 #[derive(Debug)]
 enum NextLeft {
-    LeftBoundary,
-    OriginalChar(char),
-    ReplacedChar(compiler::C),
+    Boundary,
+    Char(char),
+    Lig(char),
     None,
 }
 
@@ -291,7 +289,7 @@ impl<'a> RunIter<'a> {
     pub fn is_separation_point(&self) -> bool {
         self.intermediate_ops.is_empty()
             && match self.next_left {
-                NextLeft::ReplacedChar(compiler::C { c: _, is_lig }) => !is_lig,
+                NextLeft::Lig(_) => false,
                 _ => true,
             }
     }
@@ -337,11 +335,10 @@ impl<'a> Iterator for RunIter<'a> {
             });
         };
         let (left, left_in_original): (Option<char>, bool) = match &self.next_left {
-            NextLeft::LeftBoundary => (None, true),
-            NextLeft::OriginalChar(c) => (Some(*c), true),
-            NextLeft::ReplacedChar(op) => match (op, self.right) {
-                (compiler::C { c, is_lig: false }, _) => (self.right.map(|_| (*c).into()), true),
-                (compiler::C { c, is_lig: true }, Some(right)) => {
+            NextLeft::Boundary => (None, true),
+            NextLeft::Char(c) => (Some(*c), true),
+            NextLeft::Lig(op) => match (op, self.right) {
+                (c, Some(right)) => {
                     let s = self.ligature.get_or_insert_default();
                     if self.consumes_left {
                         if let Some(left) = self.left {
@@ -353,7 +350,7 @@ impl<'a> Iterator for RunIter<'a> {
                     s.s.push(right);
                     (Some((*c).into()), false)
                 }
-                (compiler::C { c, is_lig: true }, None) => {
+                (c, None) => {
                     let mut s = self.ligature.take().unwrap_or_default();
                     if self.consumes_left {
                         if let Some(left) = self.left {
@@ -391,8 +388,8 @@ impl<'a> Iterator for RunIter<'a> {
                 self.intermediate_ops = &replacement.0;
                 self.next_left = match (replacement.1.is_lig, self.right) {
                     (false, None) => NextLeft::None,
-                    (false, Some(_)) => NextLeft::OriginalChar(replacement.1.c.into()),
-                    (true, _) => NextLeft::ReplacedChar(replacement.1.clone()),
+                    (false, Some(_)) => NextLeft::Char(replacement.1.c.into()),
+                    (true, _) => NextLeft::Lig(replacement.1.c.into()),
                 };
             }
             None => {
@@ -400,7 +397,7 @@ impl<'a> Iterator for RunIter<'a> {
                 self.left = self.right;
                 self.next_left = match self.right {
                     None => NextLeft::None,
-                    Some(right) => NextLeft::OriginalChar(right),
+                    Some(right) => NextLeft::Char(right),
                 };
                 if let Some(left) = old_left {
                     return Some(match self.ligature.take() {
