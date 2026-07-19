@@ -254,7 +254,7 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
         let mut next_or = indices.next();
 
         let mut main_iter = hyphenater.lig_kern_program.run_with_options(
-            &s,
+            s.chars(),
             RunOptions {
                 disable_left_boundary: false,
                 right_boundary_override,
@@ -349,12 +349,13 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
             // This is the loop in TeX.2021.914.
             loop {
                 let hyph_next = next_or.unwrap_or(usize::MAX);
-                // TODO: avoid the allocation here by writing a customer iterator over the chars
-                let pre_break_text = format!["{}-", &s[start_of_separation_point..hyph_next]];
+                let pre_break_text = s[start_of_separation_point..hyph_next]
+                    .chars()
+                    .chain("-".chars());
                 let pre_break: Vec<ds::DiscretionaryElem> = hyphenater
                     .lig_kern_program
                     .run_with_options(
-                        &pre_break_text,
+                        pre_break_text,
                         RunOptions {
                             // The pre-break text always starts at a separation point so we don't
                             // need to do any left boundary processing. Moreover, if we did the default
@@ -392,7 +393,7 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
 
                 let post_break_text = &s[hyph_next..];
                 let mut post_break_iter = hyphenater.lig_kern_program.run_with_options(
-                    post_break_text,
+                    post_break_text.chars(),
                     RunOptions {
                         disable_left_boundary: false,
                         right_boundary_override,

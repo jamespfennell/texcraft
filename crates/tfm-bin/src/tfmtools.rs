@@ -547,7 +547,7 @@ impl LigKernRun {
     fn run(&self) -> Result<(), String> {
         let lig_kern_program = compile_lig_kern_program(&self.path)?;
         for elem in lig_kern_program.run_with_options(
-            &self.input,
+            self.input.chars(),
             RunOptions {
                 disable_left_boundary: self.disable_left_boundary,
                 right_boundary_override: self.right_boundary_override,

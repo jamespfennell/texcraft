@@ -223,13 +223,22 @@ impl CompiledProgram {
     }
 
     /// Run the lig/kern program for the provided word.
-    pub fn run<'a>(&'a self, word: &'a str) -> RunIter<'a> {
-        self.run_with_options(word, Default::default())
+    pub fn run<'a>(&'a self, word: &'a str) -> RunIter<'a, std::str::Chars<'a>> {
+        self.run_with_options(word.chars(), Default::default())
     }
 
     /// Run the lig/kern program for the provided word with the provided options.
-    pub fn run_with_options<'a>(&'a self, word: &'a str, options: RunOptions) -> RunIter<'a> {
-        let mut word = word.chars();
+    ///
+    /// This method also supports providing an arbitrary iterator over characters, rather
+    /// than a string slice. This facility is used in Boxworks to avoid allocations.
+    pub fn run_with_options<'a, Word>(
+        &'a self,
+        mut word: Word,
+        options: RunOptions,
+    ) -> RunIter<'a, Word>
+    where
+        Word: Iterator<Item = char>,
+    {
         let next_left = if options.disable_left_boundary {
             match word.next() {
                 Some(c) => NextLeft::Char(c),
@@ -285,13 +294,13 @@ impl PendingLigature {
 }
 
 /// Iterator over the replacement elements of a word in a lig/kern program.
-pub struct RunIter<'a> {
+pub struct RunIter<'a, Word> {
     // First two fields are fixed for the iteration.
     program: &'a CompiledProgram,
     right_boundary_override: Option<char>,
 
     // The word we're iterating over: gets consumed as we iterate.
-    word: std::str::Chars<'a>,
+    word: Word,
 
     // A ligature can be built up from multiple lig/kern passes - e.g.
     // repeated LIG commands. This field stores information about the pending
@@ -324,14 +333,17 @@ enum NextLeft {
     None,
 }
 
-impl<'a> RunIter<'a> {
+impl<'a, Word> RunIter<'a, Word> {
     pub fn is_separation_point(&self) -> bool {
         self.intermediate_ops.is_empty()
             && !matches!(self.next_left, NextLeft::Lig(_, _) | NextLeft::FinalLig(_))
     }
 }
 
-impl<'a> Iterator for RunIter<'a> {
+impl<'a, Word> Iterator for RunIter<'a, Word>
+where
+    Word: Iterator<Item = char>,
+{
     type Item = RunItem;
 
     fn next(&mut self) -> Option<Self::Item> {
