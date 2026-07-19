@@ -260,14 +260,18 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                 right_boundary_override,
             },
         );
+
         use tfm::ligkern::RunItem;
+
         let mut chars_pushed = 0;
+        let mut elements_since_separation_point = 0_usize;
+        let mut start_of_separation_point = 0_usize;
         // This corresponds to the loop in TeX.2021.913 but not 1-1.
         //
         // TeX's loop is across all cut prefixes whereas this loop is over each
         // individual lig/kern element that is emitted.
-        // TODO: in order to fix pre_break_lig_kern_starts_from_separation_point we will probably
-        // need to turn this into a loop over cut prefixes.
+        // We iterate over all elements, but do have some logic at the start of the
+        // loop if we are at a separation point.
         //
         // Knuth's reconstitute method sets hyphen_passed>0 if either the main lig/kern
         // program ran over a hyphen while processing the cut prefix,
@@ -275,41 +279,53 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
         // thus needs to run. His reconstitute method does *not* consider the regular case where the
         // hyphen does not interact with the lig/kern program; this case is handled in the
         // body of section 913.
-        while let Some(elem) = main_iter.next() {
-            let prev_chars_pushed = chars_pushed;
-            // TODO: don't have 3 matches...
-            chars_pushed += match &elem {
-                RunItem::Char(_) => 1,
-                RunItem::Ligature(ligature) => ligature.original.chars().count(),
-                RunItem::Kern(_) => 0,
-            };
-            let last_char = match &elem {
-                RunItem::Char(c) => Some(*c),
-                RunItem::Ligature(ligature) => ligature.original.chars().last(),
-                RunItem::Kern(_) => None,
-            };
-            let original_elem: ds::Horizontal = match elem {
-                RunItem::Char(c) => ds::Char {
-                    char: c,
-                    font: hyphenation_font,
-                }
-                .into(),
-                RunItem::Kern(scaled) => ds::Kern {
-                    width: scaled,
-                    kind: ds::KernKind::Normal,
-                }
-                .into(),
-                RunItem::Ligature(ligature) => ds::Ligature {
-                    includes_left_boundary: ligature.includes_left_boundary,
-                    includes_right_boundary: ligature.includes_right_boundary,
-                    char: ligature.c,
-                    font: hyphenation_font,
-                    original_chars: ligature.original,
-                }
-                .into(),
-            };
-            // TODO: debug assert this is equal to the original element in the list
+        loop {
+            if main_iter.is_separation_point() {
+                elements_since_separation_point = 0;
+                start_of_separation_point = chars_pushed;
+            }
+            let Some(elem) = main_iter.next() else { break };
+
+            let (num_chars, last_char, original_elem): (usize, Option<char>, ds::Horizontal) =
+                match elem {
+                    RunItem::Char(c) => (
+                        1,
+                        Some(c),
+                        ds::Char {
+                            char: c,
+                            font: hyphenation_font,
+                        }
+                        .into(),
+                    ),
+                    RunItem::Kern(scaled) => (
+                        0,
+                        None,
+                        ds::Kern {
+                            width: scaled,
+                            kind: ds::KernKind::Normal,
+                        }
+                        .into(),
+                    ),
+                    RunItem::Ligature(ligature) => (
+                        ligature.original.chars().count(),
+                        ligature.original.chars().last(),
+                        ds::Ligature {
+                            includes_left_boundary: ligature.includes_left_boundary,
+                            includes_right_boundary: ligature.includes_right_boundary,
+                            char: ligature.c,
+                            font: hyphenation_font,
+                            original_chars: ligature.original,
+                        }
+                        .into(),
+                    ),
+                };
+            // It would be nice to debug assert that this is equal to the original element in the list,
+            // but there are buggy cases in TeX in which this is not the case.
+            // The unit tests cover these cases.
             out.push(original_elem);
+            chars_pushed += num_chars;
+            elements_since_separation_point += 1;
+            let Some(last_char) = last_char else { continue };
 
             let hyph_next = next_or.unwrap_or(usize::MAX);
             if hyph_next > chars_pushed {
@@ -317,33 +333,24 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                 continue;
             }
 
-            // TODO: I'm sure we can remove this expect by piping the char from the matches above.
-            let last_char =
-                last_char.expect("we are seeing this hyphen because we have passed a character");
             let is_hyphen_rule = hyphenater
                 .lig_kern_program
                 .has_replacement(Some(last_char), Some('-'));
 
-            let (mut pop_before_disc, mut pre_break_text) = if hyph_next == chars_pushed
-                && main_iter.is_separation_point()
-                && !is_hyphen_rule
-            {
-                // regime 1: the hyphen is exactly on a lig/kern atom boundary, there is no hyphen lig/kern program.
-                // In this case we put the element now, and then insert the discretionary.
-                (0, "-".into())
-            } else {
-                // regime 2: either the hyphen was in the middle of the lig element OR there is a hyphen lig/kern
-                // program. In this case we need to put the element in afterwards.
-                // TODO: is this enough or do we need to reverse to the last separation point entirely?
-                // currently we're just reversing the last ligature. I think pre_break_lig_kern_starts_from_separation_point
-                // is failing for this reason
-                // TODO: we are indexing string using chars bad bad bad.
-                // Some simple unicode tests will show this :)
-                (1, format!["{}-", &s[prev_chars_pushed..hyph_next]])
-            };
+            // If the hyphen is exactly at a separation point and if the lig/kern program with
+            // the hyphen is also at a separation point (e.g. is_hyphen_rule=false) then we advance
+            // to this separation point. Otherwise, the discretionary is built from looking at
+            // material since the last separation point.
+            if hyph_next == chars_pushed && main_iter.is_separation_point() && !is_hyphen_rule {
+                elements_since_separation_point = 0;
+                start_of_separation_point = chars_pushed;
+            }
 
             // This is the loop in TeX.2021.914.
             loop {
+                let hyph_next = next_or.unwrap_or(usize::MAX);
+                // TODO: avoid the allocation here by writing a customer iterator over the chars
+                let pre_break_text = format!["{}-", &s[start_of_separation_point..hyph_next]];
                 let pre_break: Vec<ds::DiscretionaryElem> = hyphenater
                     .lig_kern_program
                     .run_with_options(
@@ -383,7 +390,6 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                     })
                     .collect();
 
-                let hyph_next = next_or.unwrap_or(usize::MAX);
                 let post_break_text = &s[hyph_next..];
                 let mut post_break_iter = hyphenater.lig_kern_program.run_with_options(
                     post_break_text,
@@ -395,14 +401,10 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                 let mut post_break: Vec<ds::DiscretionaryElem> = vec![];
                 let mut post_chars_pushed = hyph_next;
 
-                let mut post_disc: Vec<ds::Horizontal> = vec![];
-                // TODO: if pop_before_disc is only ever in [0,1], change it to a boolean and simplify this code.
-                // This all hinges on the other TODO about whether we need to actually add all the elements
-                // since the last synchronization pt.
-                for _ in 0..pop_before_disc {
-                    post_disc.push(out.pop().unwrap());
-                    post_disc.reverse();
-                }
+                let disc_insert_point = out
+                    .len()
+                    .checked_sub(elements_since_separation_point)
+                    .expect("not popping more elements than have been pushed");
 
                 // This is the loop in TeX.2021.916.
                 // We want to achieve synchronization for the two iterators.
@@ -458,7 +460,7 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                                 RunItem::Kern(_) => 0,
                                 RunItem::Ligature(ligature) => ligature.original.chars().count(),
                             };
-                            post_disc.push(match elem {
+                            out.push(match elem {
                                 RunItem::Char(c) => ds::Char {
                                     char: c,
                                     font: hyphenation_font,
@@ -484,15 +486,19 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                         }
                     }
                 }
-                out.push(
+                let replace_count = out
+                    .len()
+                    .checked_sub(disc_insert_point)
+                    .expect("have only added to out since calculating disc_insert_point");
+                out.insert(
+                    disc_insert_point,
                     ds::Discretionary {
                         pre_break,
                         post_break,
-                        replace_count: post_disc.len().try_into().unwrap(),
+                        replace_count: replace_count.try_into().unwrap(),
                     }
                     .into(),
                 );
-                out.append(&mut post_disc);
 
                 // We increment the hyphen index at least once to account for the hyphen we have just inserted.
                 next_or = indices.next();
@@ -504,8 +510,8 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                     // We need to consume more characters before trying more hyphens
                     break;
                 }
-                pop_before_disc = 0;
-                pre_break_text = "-".into();
+                elements_since_separation_point = 0;
+                start_of_separation_point = chars_pushed;
             }
         }
     }
@@ -839,9 +845,6 @@ mod tests {
                 "#,
             },
         },
-        /*
-        BUG: when we collect the pre-break material we need to go back to the last
-        separation point.
         {
             pre_break_lig_kern_starts_from_separation_point,
             TestCase {
@@ -868,7 +871,6 @@ mod tests {
                 "#,
             },
         },
-        */
         {
             right_boundary_char_after_hyphen,
             TestCase {
