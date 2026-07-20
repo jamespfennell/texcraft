@@ -1249,10 +1249,7 @@ mod tests {
             },
             lossy: true,
         },
-        /*
         {
-            // BUG: not sure but this may cover the bug in TeX which
-            // we still have to think about.
             right_boundary_char_override_2,
             TestCase {
                 input: "ab.",
@@ -1267,8 +1264,8 @@ mod tests {
                         chars("-")
                       ],
                       post_break=[
-                        lig("c", "|b")
-                        lig(",", "|")
+                        lig("c", "b", includes_left_boundary="true")
+                        lig(",", "", includes_right_boundary="true")
                       ],
                       replace_count=1,
                     )
@@ -1276,8 +1273,8 @@ mod tests {
                 "#,
                 hyphenation_patterns: Some("a-b"),
             },
+            lossy: true,
         },
-        */
         {
             right_boundary_char_override_3,
             TestCase {
