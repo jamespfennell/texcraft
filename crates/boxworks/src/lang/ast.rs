@@ -850,6 +850,15 @@ impl<'a> std::fmt::Display for VBox<'a> {
     }
 }
 
+impl<'a> std::fmt::Display for HBox<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let v_box: HBox<'a> = self.clone();
+        let tree = CstTreeIter::Other(&Horizontal::HBox(v_box));
+        cst::pretty_print(f, tree)?;
+        Ok(())
+    }
+}
+
 /// An argument of type `T` to a function.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct Arg<'a, T> {

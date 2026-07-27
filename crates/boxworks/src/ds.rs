@@ -422,6 +422,13 @@ impl Default for HBox {
     }
 }
 
+impl std::fmt::Display for HBox {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use crate::lang::convert::ToBoxLang;
+        write!(f, "{}", self.to_box_lang())
+    }
+}
+
 /// A box made from a vertical list.
 ///
 /// This is the same as [HBox], except the list inside holds [Vertical] nodes

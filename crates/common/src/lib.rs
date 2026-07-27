@@ -146,28 +146,32 @@ impl Scaled {
     pub fn parse_from_string(s: &str) -> Result<Scaled, String> {
         if s.len() < 3 {
             return Err(format!(
-                "invalid dimension {s:?}: expected <number><unit> (e.g. 100pt)"
+                "invalid dimension \"{s}\": expected <number><unit> (e.g. 100pt)"
             ));
         }
         let (value_str, unit_str) = s.split_at(s.len() - 2);
         let unit = ScaledUnit::parse(unit_str)
-            .ok_or_else(|| format!("invalid unit {unit_str:?} in dimension {s:?}"))?;
-        let (int_str, frac_str) = match value_str.find('.') {
-            Some(pos) => (&value_str[..pos], &value_str[pos + 1..]),
-            None => (value_str, ""),
+            .ok_or_else(|| format!("invalid unit \"{unit_str}\" in dimension \"{s}\""))?;
+        Self::parse_from_string_with_unit(value_str, unit)
+    }
+
+    fn parse_from_string_with_unit(s: &str, unit: ScaledUnit) -> Result<Scaled, String> {
+        let (int_str, frac_str) = match s.find('.') {
+            Some(pos) => (&s[..pos], &s[pos + 1..]),
+            None => (s, ""),
         };
         let integer_part: i32 = int_str
             .parse()
-            .map_err(|_| format!("invalid number {int_str:?} in dimension {s:?}"))?;
+            .map_err(|_| format!("invalid number \"{int_str}\" in dimension \"{s}{unit}\""))?;
         let frac_digits: Vec<u8> = frac_str.chars().map(|c| c as u8 - b'0').collect();
         if frac_digits.iter().any(|&d| d > 9) {
             return Err(format!(
-                "invalid fractional part {frac_str:?} in dimension {s:?}"
+                "invalid fractional part \"{frac_str}\" in dimension \"{s}{unit}\""
             ));
         }
         let fractional_part = Scaled::from_decimal_digits(&frac_digits);
         Scaled::new(integer_part, fractional_part, unit)
-            .map_err(|_| format!("dimension {s:?} is out of range"))
+            .map_err(|_| format!("dimension \"{s}{unit}\" is out of range"))
     }
 
     /// Parses a scaled number from the unitless decimal format printed by TeX.
@@ -376,7 +380,29 @@ pub enum ScaledUnit {
     ScaledPoint,
 }
 
+impl std::fmt::Display for ScaledUnit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.abbreviation())
+    }
+}
+
 impl ScaledUnit {
+    /// Returns the unit's two-character abbreviation e.g. `pt` or `in`.
+    pub fn abbreviation(&self) -> &'static str {
+        use ScaledUnit::*;
+        match self {
+            Point => "pt",
+            Pica => "pc",
+            Inch => "in",
+            BigPoint => "bp",
+            Centimeter => "cm",
+            Millimeter => "mm",
+            DidotPoint => "dd",
+            Cicero => "cc",
+            ScaledPoint => "sp",
+        }
+    }
+
     /// Parses a unit from a two character abbreviation.
     ///
     /// E.g., `"pc"` is parsed to [`ScaledUnit::Pica`].
@@ -530,6 +556,51 @@ impl Glue {
             shrink: self.shrink.checked_div(rhs)?,
             shrink_order: self.shrink_order,
         })
+    }
+
+    pub fn parse_from_string(s: &str) -> Result<Glue, String> {
+        let mut glue = Glue::ZERO;
+        let (width_str, rest) = match s.find(" plus ").or_else(|| s.find(" minus ")) {
+            Some(pos) => (&s[..pos], s[pos..].trim()),
+            None => (s, ""),
+        };
+        glue.width = Scaled::parse_from_string(width_str.trim())?;
+        let rest = if let Some(r) = rest.strip_prefix("plus ") {
+            let (stretch_str, minus_rest) = match r.find(" minus ") {
+                Some(pos) => (&r[..pos], r[pos..].trim()),
+                None => (r, ""),
+            };
+            let (stretch, order) = Glue::parse_scaled_inf(stretch_str.trim())?;
+            glue.stretch = stretch;
+            glue.stretch_order = order;
+            minus_rest
+        } else {
+            rest
+        };
+        if let Some(shrink_str) = rest.strip_prefix("minus ") {
+            let (shrink, order) = Glue::parse_scaled_inf(shrink_str.trim())?;
+            glue.shrink = shrink;
+            glue.shrink_order = order;
+        } else if !rest.is_empty() {
+            return Err(format!("invalid glue {s:?}"));
+        }
+        Ok(glue)
+    }
+
+    fn parse_scaled_inf(s: &str) -> Result<(Scaled, GlueOrder), String> {
+        for (suffix, order) in [
+            ("filll", GlueOrder::Filll),
+            ("fill", GlueOrder::Fill),
+            ("fil", GlueOrder::Fil),
+        ] {
+            if let Some(num_str) = s.strip_suffix(suffix) {
+                return Ok((
+                    Scaled::parse_from_string_with_unit(num_str, ScaledUnit::Point)?,
+                    order,
+                ));
+            }
+        }
+        Ok((Scaled::parse_from_string(s)?, GlueOrder::Normal))
     }
 }
 

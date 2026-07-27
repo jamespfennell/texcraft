@@ -361,7 +361,7 @@ fn build_params(input: &ParamsInput) -> Result<boxworks_knuthplass::Params, Stri
 /// Parses a glue parameter, prefixing any error with the parameter name so
 /// the UI can say (and mark) which input is at fault.
 fn parse_named_glue(name: &str, s: &str) -> Result<common::Glue, String> {
-    parse_glue(s).map_err(|err| format!("{name}: {err}"))
+    common::Glue::parse_from_string(s).map_err(|err| format!("{name}: {err}"))
 }
 
 fn build_output(
@@ -826,55 +826,4 @@ mod tests {
             narrow["lines"].as_array().unwrap().len() > wide["lines"].as_array().unwrap().len()
         );
     }
-}
-
-// The glue parsing below is copied from `box linebreak`
-// (crates/boxworks-bin/src/box.rs); the two should stay in sync.
-
-fn parse_glue(s: &str) -> Result<common::Glue, String> {
-    let mut glue = common::Glue::ZERO;
-    let (width_str, rest) = match s.find(" plus ").or_else(|| s.find(" minus ")) {
-        Some(pos) => (&s[..pos], s[pos..].trim()),
-        None => (s, ""),
-    };
-    glue.width = common::Scaled::parse_from_string(width_str.trim())?;
-    let rest = if let Some(r) = rest.strip_prefix("plus ") {
-        let (stretch_str, minus_rest) = match r.find(" minus ") {
-            Some(pos) => (&r[..pos], r[pos..].trim()),
-            None => (r, ""),
-        };
-        let (stretch, order) = parse_scaled_inf(stretch_str.trim())?;
-        glue.stretch = stretch;
-        glue.stretch_order = order;
-        minus_rest
-    } else {
-        rest
-    };
-    if let Some(shrink_str) = rest.strip_prefix("minus ") {
-        let (shrink, order) = parse_scaled_inf(shrink_str.trim())?;
-        glue.shrink = shrink;
-        glue.shrink_order = order;
-    } else if !rest.is_empty() {
-        return Err(format!("invalid glue {s:?}"));
-    }
-    Ok(glue)
-}
-
-fn parse_scaled_inf(s: &str) -> Result<(common::Scaled, common::GlueOrder), String> {
-    for (suffix, order) in [
-        ("filll", common::GlueOrder::Filll),
-        ("fill", common::GlueOrder::Fill),
-        ("fil", common::GlueOrder::Fil),
-    ] {
-        if let Some(num_str) = s.strip_suffix(suffix) {
-            return Ok((
-                common::Scaled::parse_from_string(&format!("{num_str}pt"))?,
-                order,
-            ));
-        }
-    }
-    Ok((
-        common::Scaled::parse_from_string(s)?,
-        common::GlueOrder::Normal,
-    ))
 }

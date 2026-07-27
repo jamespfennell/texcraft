@@ -76,13 +76,13 @@ tests!(
         alice_hbox_unhyphenated,
         "alice_in_wonderland_hlists.txt",
         "alice_in_wonderland.txt",
-        ["hbox"],
+        ["text"],
     ),
     (
         alice_hbox_hyphenated,
         "alice_in_wonderland_hlists_hyphenated.txt",
         "alice_in_wonderland.txt",
-        ["hbox", "--hyphenate"],
+        ["text", "--hyphenate"],
     ),
     (
         alice_linebreak,
