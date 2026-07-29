@@ -9,12 +9,11 @@ use texlang::error;
 use texlang::prelude as txl;
 use texlang::token;
 use texlang::traits::*;
-use texlang::types;
 use texlang::vm;
 
 /// Get the `\nullfont` command.
 pub fn get_nullfont<S>() -> command::BuiltIn<S> {
-    command::BuiltIn::new_font(texlang::types::Font::NULL_FONT)
+    command::BuiltIn::new_font(common::FontId::NULL)
 }
 
 static FONT_TAG: command::StaticTag = command::StaticTag::new();
@@ -23,13 +22,13 @@ static FONT_TAG: command::StaticTag = command::StaticTag::new();
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FontComponent {
     font_infos: Vec<FontInfo>,
-    next_id: types::Font,
+    next_id: common::FontId,
 }
 
 impl FontComponent {
     pub fn get_command_ref_for_font<S: HasComponent<FontComponent>>(
         state: &S,
-        font: types::Font,
+        font: common::FontId,
     ) -> Option<token::CommandRef> {
         // TODO: this needs to return the special frozen command ref
         // Main problem: where is this registered?
@@ -70,7 +69,7 @@ impl Default for FontComponent {
     fn default() -> Self {
         Self {
             font_infos: vec![],
-            next_id: types::Font(1),
+            next_id: common::FontId(1),
         }
     }
 }
@@ -95,7 +94,7 @@ pub trait HasFontRepo {
 pub trait FontRepo {
     /// Format of files that are store in this repo
     type Format: common::FontFormat;
-    fn add_font(&mut self, id: types::Font, font: Self::Format);
+    fn add_font(&mut self, id: common::FontId, font: Self::Format);
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -110,7 +109,7 @@ impl<T> Default for NoOpFontRepo<T> {
 impl<T: common::FontFormat> FontRepo for NoOpFontRepo<T> {
     type Format = T;
 
-    fn add_font(&mut self, _: types::Font, _: Self::Format) {}
+    fn add_font(&mut self, _: common::FontId, _: Self::Format) {}
 }
 
 /// TeX.2014.1257
@@ -154,7 +153,7 @@ where
     // TODO: does this happen before or after file reading?
     let component = input.state_mut().component_mut();
     let id = component.next_id;
-    component.next_id = types::Font(component.next_id.0.checked_add(1).unwrap());
+    component.next_id = common::FontId(component.next_id.0.checked_add(1).unwrap());
 
     input.state_mut().font_repo_mut().add_font(id, font);
     input.state_mut().component_mut().font_infos.push(FontInfo {
@@ -202,7 +201,7 @@ fn fontname_primitive_fn<S>(
 where
     S: HasComponent<FontComponent>,
 {
-    let font = types::Font::parse(input)?;
+    let font = common::FontId::parse(input)?;
     let font_info = input
         .state()
         .component()
@@ -220,7 +219,7 @@ pub struct ScriptFontMarker;
 
 /// Get the `\scriptfont` command.
 pub fn get_scriptfont<
-    S: HasComponent<texlang_stdlib::registers::Component<types::Font, 16, ScriptFontMarker>>,
+    S: HasComponent<texlang_stdlib::registers::Component<common::FontId, 16, ScriptFontMarker>>,
 >() -> command::BuiltIn<S> {
     texlang_stdlib::registers::new_registers_command()
 }
@@ -230,7 +229,7 @@ pub struct ScriptScriptFontMarker;
 
 /// Get the `\scriptscriptfont` command.
 pub fn get_scriptscriptfont<
-    S: HasComponent<texlang_stdlib::registers::Component<types::Font, 16, ScriptScriptFontMarker>>,
+    S: HasComponent<texlang_stdlib::registers::Component<common::FontId, 16, ScriptScriptFontMarker>>,
 >() -> command::BuiltIn<S> {
     texlang_stdlib::registers::new_registers_command()
 }
@@ -240,7 +239,7 @@ pub struct TextFontMarker;
 
 /// Get the `\textfont` command.
 pub fn get_textfont<
-    S: HasComponent<texlang_stdlib::registers::Component<types::Font, 16, TextFontMarker>>,
+    S: HasComponent<texlang_stdlib::registers::Component<common::FontId, 16, TextFontMarker>>,
 >() -> command::BuiltIn<S> {
     texlang_stdlib::registers::new_registers_command()
 }
@@ -276,8 +275,8 @@ mod tests {
 
     #[derive(Debug, PartialEq, Eq)]
     enum Record {
-        AddFont(types::Font, MockFont),
-        EnableFont(types::Font),
+        AddFont(common::FontId, MockFont),
+        EnableFont(common::FontId),
     }
     #[derive(Default)]
     struct Recorder {
@@ -285,7 +284,7 @@ mod tests {
     }
     impl FontRepo for Recorder {
         type Format = MockFont;
-        fn add_font(&mut self, id: types::Font, font: Self::Format) {
+        fn add_font(&mut self, id: common::FontId, font: Self::Format) {
             self.records.push(Record::AddFont(id, font));
         }
     }
@@ -294,17 +293,17 @@ mod tests {
     struct State {
         records: Recorder,
         font: FontComponent,
-        script_font: texlang_stdlib::registers::Component<types::Font, 16, ScriptFontMarker>,
+        script_font: texlang_stdlib::registers::Component<common::FontId, 16, ScriptFontMarker>,
         script_script_font:
-            texlang_stdlib::registers::Component<types::Font, 16, ScriptScriptFontMarker>,
-        text_font: texlang_stdlib::registers::Component<types::Font, 16, TextFontMarker>,
+            texlang_stdlib::registers::Component<common::FontId, 16, ScriptScriptFontMarker>,
+        text_font: texlang_stdlib::registers::Component<common::FontId, 16, TextFontMarker>,
         registers: texlang_stdlib::registers::Component<i32, 256>,
         prefix: texlang_stdlib::prefix::Component,
         testing: texlang_testing::TestingComponent,
         file_system: Rc<RefCell<texlang_common::InMemoryFileSystem>>,
     }
     impl TexlangState for State {
-        fn enable_font_hook(&mut self, font: types::Font) {
+        fn enable_font_hook(&mut self, font: common::FontId) {
             self.records.records.push(Record::EnableFont(font));
         }
         fn variable_assignment_scope_hook(
@@ -323,15 +322,15 @@ mod tests {
         }
     }
     impl texlang_stdlib::the::TheCompatible for State {
-        fn get_command_ref_for_font(&self, font: types::Font) -> Option<token::CommandRef> {
+        fn get_command_ref_for_font(&self, font: common::FontId) -> Option<token::CommandRef> {
             FontComponent::get_command_ref_for_font(self, font)
         }
     }
     implement_has_component![State {
         font: FontComponent,
-        script_font: texlang_stdlib::registers::Component<types::Font, 16, ScriptFontMarker>,
-        script_script_font: texlang_stdlib::registers::Component<types::Font, 16, ScriptScriptFontMarker>,
-        text_font: texlang_stdlib::registers::Component<types::Font, 16, TextFontMarker>,
+        script_font: texlang_stdlib::registers::Component<common::FontId, 16, ScriptFontMarker>,
+        script_script_font: texlang_stdlib::registers::Component<common::FontId, 16, ScriptScriptFontMarker>,
+        text_font: texlang_stdlib::registers::Component<common::FontId, 16, TextFontMarker>,
         registers: texlang_stdlib::registers::Component<i32, 256>,
         prefix: texlang_stdlib::prefix::Component,
         testing: texlang_testing::TestingComponent,
@@ -393,66 +392,66 @@ mod tests {
                 nullfont,
                 r"\nullfont",
                 want_records(vec![
-                    Record::EnableFont(types::Font(0)),
+                    Record::EnableFont(common::FontId::NULL),
                 ]),
             ),
             (
                 load_one_font,
                 r"\font \fontA a \fontA",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::EnableFont(types::Font(1)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::EnableFont(common::FontId(1)),
                 ]),
             ),
             (
                 load_one_font_extension,
                 r"\font \fontA a.mock \fontA",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::EnableFont(types::Font(1)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::EnableFont(common::FontId(1)),
                 ])
             ),
             (
                 enable_nesting_1,
                 r"\font \fontA a \nullfont{\fontA}",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::EnableFont(types::Font(0)),
-                    Record::EnableFont(types::Font(1)),
-                    Record::EnableFont(types::Font(0)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::EnableFont(common::FontId::NULL),
+                    Record::EnableFont(common::FontId(1)),
+                    Record::EnableFont(common::FontId::NULL),
                 ])
             ),
             (
                 enable_nesting_2,
                 r"\font\fontA a \font\fontB b \nullfont\fontB{\fontA}",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::AddFont(types::Font(2), MockFont(2)),
-                    Record::EnableFont(types::Font(0)),
-                    Record::EnableFont(types::Font(2)),
-                    Record::EnableFont(types::Font(1)),
-                    Record::EnableFont(types::Font(2)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::AddFont(common::FontId(2), MockFont(2)),
+                    Record::EnableFont(common::FontId::NULL),
+                    Record::EnableFont(common::FontId(2)),
+                    Record::EnableFont(common::FontId(1)),
+                    Record::EnableFont(common::FontId(2)),
                 ])
             ),
             (
                 enable_nesting_3,
                 r"\font\fontA a \font\fontB b \nullfont{\fontA\fontB}",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::AddFont(types::Font(2), MockFont(2)),
-                    Record::EnableFont(types::Font(0)),
-                    Record::EnableFont(types::Font(1)),
-                    Record::EnableFont(types::Font(2)),
-                    Record::EnableFont(types::Font(0)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::AddFont(common::FontId(2), MockFont(2)),
+                    Record::EnableFont(common::FontId::NULL),
+                    Record::EnableFont(common::FontId(1)),
+                    Record::EnableFont(common::FontId(2)),
+                    Record::EnableFont(common::FontId::NULL),
                 ])
             ),
             (
                 local_definition_and_enable,
                 r"\def\fontA{macro}{\font\fontA a \fontA}\fontA",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::EnableFont(types::Font(1)),
-                    Record::EnableFont(types::Font(0)),  // end group
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::EnableFont(common::FontId(1)),
+                    Record::EnableFont(common::FontId::NULL),  // end group
                     // The second \fontA expands the macro, doesn't enable the font
                 ])
             ),
@@ -460,8 +459,8 @@ mod tests {
                 global_enable,
                 r"{\font\fontA a \global\fontA}",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::EnableFont(types::Font(1)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::EnableFont(common::FontId(1)),
                     // End group doesn't re-enable the null font.
                 ])
             ),
@@ -469,101 +468,101 @@ mod tests {
                 global_definition,
                 r"\def\fontA{macro}{\global\font\fontA a \fontA}\fontA",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::EnableFont(types::Font(1)),
-                    Record::EnableFont(types::Font(0)),  // end group
-                    Record::EnableFont(types::Font(1)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::EnableFont(common::FontId(1)),
+                    Record::EnableFont(common::FontId::NULL),  // end group
+                    Record::EnableFont(common::FontId(1)),
                 ])
             ),
             (
                 variable_defaults_to_null_font,
                 r"\the\textfont3",
                 want_records(vec![
-                    Record::EnableFont(types::Font::NULL_FONT),
+                    Record::EnableFont(common::FontId::NULL),
                 ])
             ),
             (
                 current_font_defaults_to_null_font,
                 r"\the\font",
                 want_records(vec![
-                    Record::EnableFont(types::Font::NULL_FONT),
+                    Record::EnableFont(common::FontId::NULL),
                 ])
             ),
             (
                 current_font_after_change,
                 r"\font\fontA a \fontA \the\font",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::EnableFont(types::Font(1)),
-                    Record::EnableFont(types::Font(1)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::EnableFont(common::FontId(1)),
+                    Record::EnableFont(common::FontId(1)),
                 ])
             ),
             (
                 variable_assignment_1,
                 r"\font\fontA a \textfont3=\fontA \the\textfont3",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::EnableFont(types::Font(1)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::EnableFont(common::FontId(1)),
                 ])
             ),
             (
                 variable_assignment_1_with_the,
                 r"\font\fontA a \textfont3=\the\fontA \the\textfont3",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::EnableFont(types::Font(1)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::EnableFont(common::FontId(1)),
                 ])
             ),
             (
                 variable_assignment_2,
                 r"\font\fontA a \scriptfont3=\fontA \textfont3=\scriptfont3 \the\textfont3",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::EnableFont(types::Font(1)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::EnableFont(common::FontId(1)),
                 ])
             ),
             (
                 variable_assignment_2_with_the,
                 r"\font\fontA a \scriptfont3=\fontA \textfont3=\the\scriptfont3 \the\textfont3",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::EnableFont(types::Font(1)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::EnableFont(common::FontId(1)),
                 ])
             ),
             (
                 variable_assignment_3,
                 r"\font\fontA a \fontA \textfont3=\font \the\textfont3",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::EnableFont(types::Font(1)),
-                    Record::EnableFont(types::Font(1)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::EnableFont(common::FontId(1)),
+                    Record::EnableFont(common::FontId(1)),
                 ])
             ),
             (
                 variable_assignment_3_with_the,
                 r"\font\fontA a \fontA \textfont3=\the\font \the\textfont3",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::EnableFont(types::Font(1)),
-                    Record::EnableFont(types::Font(1)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::EnableFont(common::FontId(1)),
+                    Record::EnableFont(common::FontId(1)),
                 ])
             ),
             (
                 variable_nesting,
                 r"\font\fontA a \font\fontB b \textfont3=\fontA { \textfont3=\fontB } \the\textfont3",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::AddFont(types::Font(2), MockFont(2)),
-                    Record::EnableFont(types::Font(1)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::AddFont(common::FontId(2), MockFont(2)),
+                    Record::EnableFont(common::FontId(1)),
                 ])
             ),
             (
                 variable_global,
                 r"\font\fontA a \font\fontB b \textfont3=\fontA { \global\textfont3=\fontB } \the\textfont3",
                 want_records(vec![
-                    Record::AddFont(types::Font(1), MockFont(1)),
-                    Record::AddFont(types::Font(2), MockFont(2)),
-                    Record::EnableFont(types::Font(2)),
+                    Record::AddFont(common::FontId(1), MockFont(1)),
+                    Record::AddFont(common::FontId(2), MockFont(2)),
+                    Record::EnableFont(common::FontId(2)),
                 ])
             ),
         ),

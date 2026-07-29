@@ -9,19 +9,10 @@ use crate::traits::*;
 pub use catcode::CatCode;
 pub use mathcode::MathCode;
 
-/// A reference to a font that has been loaded.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
-pub struct Font(pub u16);
-
-impl Font {
-    /// The null font.
-    pub const NULL_FONT: Font = Font(0);
-}
-
-impl Parsable for Font {
+impl Parsable for common::FontId {
     fn parse_impl<S: TexlangState>(input: &mut crate::vm::ExpandedStream<S>) -> txl::Result<Self> {
-        match Option::<Font>::parse(input)? {
+        // Corresponds to scan_font_ident in TeX.2021.577.
+        match parse_font_or(input)? {
             None => {
                 let token_or = input.peek()?;
                 input.error(
@@ -31,49 +22,49 @@ impl Parsable for Font {
                     r"a font reference can either be the current font (e.g. \font), a font variable (e.g. \textfont 1) or the result of loading a font (e.g. \a after \font \a path/to/font)",
                     )
                 )?;
-                Ok(Font::NULL_FONT)
+                Ok(common::FontId::NULL)
             }
             Some(font) => Ok(font),
         }
     }
 }
 
-impl Parsable for Option<Font> {
-    fn parse_impl<S: TexlangState>(input: &mut crate::vm::ExpandedStream<S>) -> txl::Result<Self> {
-        let Some(token) = input.next()? else {
-            return Ok(None);
-        };
-        let crate::token::Value::CommandRef(command_ref) = token.value() else {
-            input.back(token);
-            return Ok(None);
-        };
-        match input.commands_map().get_command(&command_ref) {
-            Some(command::Command::Font(f)) => {
-                let f = *f;
-                Ok(Some(f))
-            }
-            Some(command::Command::Variable(var)) => {
-                let var = var.clone();
-                match var.resolve_type::<Font>(token, input)? {
-                    None => {
-                        input.back(token);
-                        Ok(None)
-                    }
-                    Some(typed_variable) => Ok(Some(*typed_variable.get(input.state()))),
-                }
-            }
-            Some(command::Command::Execution(_, Some(tag))) => {
-                if input.state().is_current_font_command(*tag) {
-                    Ok(Some(input.vm().current_font()))
-                } else {
+fn parse_font_or<S: TexlangState>(
+    input: &mut crate::vm::ExpandedStream<S>,
+) -> txl::Result<Option<common::FontId>> {
+    let Some(token) = input.next()? else {
+        return Ok(None);
+    };
+    let crate::token::Value::CommandRef(command_ref) = token.value() else {
+        input.back(token);
+        return Ok(None);
+    };
+    match input.commands_map().get_command(&command_ref) {
+        Some(command::Command::Font(f)) => {
+            let f = *f;
+            Ok(Some(f))
+        }
+        Some(command::Command::Variable(var)) => {
+            let var = var.clone();
+            match var.resolve_type::<common::FontId>(token, input)? {
+                None => {
                     input.back(token);
                     Ok(None)
                 }
+                Some(typed_variable) => Ok(Some(*typed_variable.get(input.state()))),
             }
-            _ => {
+        }
+        Some(command::Command::Execution(_, Some(tag))) => {
+            if input.state().is_current_font_command(*tag) {
+                Ok(Some(input.vm().current_font()))
+            } else {
                 input.back(token);
                 Ok(None)
             }
+        }
+        _ => {
+            input.back(token);
+            Ok(None)
         }
     }
 }

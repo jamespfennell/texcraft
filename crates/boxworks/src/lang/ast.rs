@@ -326,11 +326,22 @@ fn parse_dlist_using_cst<'a>(
     v
 }
 
+/// Returns the provided default value, or the type's [`Default`] value
+/// if no default was provided.
+macro_rules! default_or {
+    () => {
+        Default::default()
+    };
+    ($default: expr) => {
+        $default
+    };
+}
+
 macro_rules! functions {
     ( $( (
         struct $name: ident <$lifetime: lifetime>  {
             $(
-                $field_name: ident : $field_type: ty,
+                $field_name: ident : $field_type: ty $( = $field_default: expr)?,
             )+
         }
         impl Func {
@@ -354,11 +365,23 @@ macro_rules! functions {
         )?
     ), )+ ) => {
         $(
-        #[derive(Debug, Default, PartialEq, Eq, Clone)]
+        #[derive(Debug, PartialEq, Eq, Clone)]
         pub struct $name <$lifetime> {
             $(
                 pub $field_name : Arg<$lifetime, $field_type>,
             )+
+        }
+        impl<$lifetime> Default for $name <$lifetime> {
+            fn default() -> Self {
+                Self {
+                    $(
+                        $field_name: {
+                            let value: $field_type = default_or![$($field_default)?];
+                            value.into()
+                        },
+                    )+
+                }
+            }
         }
         impl<$lifetime> Func for $name <$lifetime> {
             const NAME: &'static str = "todo";
@@ -613,7 +636,7 @@ functions!(
     (
         struct Chars<'a> {
             content: Cow<'a, str>,
-            font: common::FontId,
+            font: common::FontId = common::FontId::ONE,
         }
         impl Func {
             func_name: "chars",
@@ -704,7 +727,7 @@ functions!(
         struct Ligature<'a> {
             char: char,
             original_chars: Cow<'a, str>,
-            font: common::FontId,
+            font: common::FontId = common::FontId::ONE,
             includes_left_boundary: bool,
             includes_right_boundary: bool,
         }

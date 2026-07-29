@@ -110,7 +110,7 @@
 //! "#;
 //! assert_eq![
 //!     bwl::parse_horizontal_list(&source),
-//!     Ok(vec![ds::Char{char: 'B', font: common::FontId::new(2).unwrap()}.into()])
+//!     Ok(vec![ds::Char{char: 'B', font: common::FontId(2)}.into()])
 //! ];
 //! ```
 //!
@@ -124,7 +124,7 @@
 //! "#;
 //! assert_eq![
 //!     bwl::parse_horizontal_list(&source),
-//!     Ok(vec![ds::Char{char: 'C', font: common::FontId::new(3).unwrap()}.into()])
+//!     Ok(vec![ds::Char{char: 'C', font: common::FontId(3)}.into()])
 //! ];
 //! ```
 //!

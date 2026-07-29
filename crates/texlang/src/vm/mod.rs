@@ -444,7 +444,7 @@ pub trait TexlangState: Sized {
     /// a group ends.
     ///
     /// The default implementation is a no-op.
-    fn enable_font_hook(&mut self, font: types::Font) {
+    fn enable_font_hook(&mut self, font: common::FontId) {
         _ = font
     }
 
@@ -638,7 +638,7 @@ impl<S> VM<S> {
     pub(crate) fn stack_pop(&mut self) {
         self.internal.execution_stack.pop();
     }
-    pub fn current_font(&self) -> types::Font {
+    pub fn current_font(&self) -> common::FontId {
         self.internal.current_font
     }
 }
@@ -689,8 +689,8 @@ struct Internal<S> {
     #[cfg_attr(feature = "serde", serde(skip))]
     save_stack: Vec<variable::SaveStackElement<S>>,
 
-    current_font: types::Font,
-    fonts_save_stack: Vec<Option<types::Font>>,
+    current_font: common::FontId,
+    fonts_save_stack: Vec<Option<common::FontId>>,
     execution_stack: Vec<(error::OperationKind, Token)>,
 
     // We assume the VM is never saved during shutdown.
@@ -707,7 +707,7 @@ impl<S> Internal<S> {
             tracer: Default::default(),
             token_buffers: Default::default(),
             save_stack: Default::default(),
-            current_font: types::Font::NULL_FONT,
+            current_font: common::FontId::NULL,
             fonts_save_stack: Default::default(),
             execution_stack: Default::default(),
             shutdown_status: Default::default(),

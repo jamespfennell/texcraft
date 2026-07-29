@@ -670,7 +670,7 @@ supported_type_impl!(
         recycle_fn: recycle_token_list,
     },
     {
-        rust_type: types::Font,
+        rust_type: common::FontId,
         enum_variant: Font,
         save_stack_field: font,
     },

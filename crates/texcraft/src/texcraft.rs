@@ -320,7 +320,7 @@ impl texlang_common::HasTerminalIn for State {
     }
 }
 impl texlang_stdlib::the::TheCompatible for State {
-    fn get_command_ref_for_font(&self, font: types::Font) -> Option<token::CommandRef> {
+    fn get_command_ref_for_font(&self, font: common::FontId) -> Option<token::CommandRef> {
         texlang_font::FontComponent::get_command_ref_for_font(self, font)
     }
 }

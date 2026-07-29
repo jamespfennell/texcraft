@@ -29,11 +29,11 @@ impl FontId {
 }
 
 impl Default for FontId {
-    /// The default font ID is [`FontId::ONE`], not the null font,
-    /// so that data structures like Box language lists
-    /// default to referring to a real font.
+    /// The default font ID is the null font,
+    /// matching TeX's behavior for font variables that have not been set
+    /// (TeX.2021.222).
     fn default() -> Self {
-        FontId::ONE
+        FontId::NULL
     }
 }
 

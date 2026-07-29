@@ -97,7 +97,7 @@ pub enum Command<S> {
     MathCharacter(types::MathCode),
 
     /// A command that enables a font.
-    Font(types::Font),
+    Font(common::FontId),
 }
 
 impl<S> std::fmt::Display for Command<S> {
@@ -157,7 +157,7 @@ impl<S> BuiltIn<S> {
     }
 
     /// Create a new font built-in command.
-    pub fn new_font(font: types::Font) -> BuiltIn<S> {
+    pub fn new_font(font: common::FontId) -> BuiltIn<S> {
         Command::Font(font).into()
     }
 
