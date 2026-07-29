@@ -1513,8 +1513,8 @@ mod tests {
         let lig_kern_program =
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
         let mut tp = bwt::TextPreprocessorImpl::new(text_params);
-        tp.register_font(0, &tfm_file, lig_kern_program.clone());
-        tp.activate_font(0);
+        tp.register_font(common::FontId::ONE, &tfm_file, lig_kern_program.clone());
+        tp.activate_font(common::FontId::ONE);
         let mut list = vec![];
         for word in input.split_ascii_whitespace() {
             tp.add_word(word.trim_matches(' '), &mut list);
@@ -1522,7 +1522,7 @@ mod tests {
         }
 
         let mut font_repo: bwt::TfmFontRepo = Default::default();
-        font_repo.register_font(0, tfm_file);
+        font_repo.register_font(common::FontId::ONE, tfm_file);
         let widths = parse_widths(widths);
 
         let log: Rc<RefCell<String>> = Default::default();

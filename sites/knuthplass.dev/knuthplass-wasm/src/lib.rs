@@ -258,10 +258,10 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
         text_params.extra_space_skip = parse_named_glue("extra_space_skip", s)?;
     }
     let mut tp = boxworks_text::TextPreprocessorImpl::new(text_params);
-    tp.register_font(0, &tfm_file, lig_kern_program.clone());
-    tp.activate_font(0);
+    tp.register_font(common::FontId::ONE, &tfm_file, lig_kern_program.clone());
+    tp.activate_font(common::FontId::ONE);
     let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
-    font_repo.register_font(0, tfm_file);
+    font_repo.register_font(common::FontId::ONE, tfm_file);
 
     // Reject characters the font has no glyph for; they would otherwise be
     // silently dropped or typeset with zero width.
@@ -272,7 +272,7 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
             if c.is_whitespace() || missing.contains(&c) {
                 continue;
             }
-            if font_repo.width(c, 0).is_none() {
+            if font_repo.width(c, common::FontId::ONE).is_none() {
                 missing.push(c);
             }
         }

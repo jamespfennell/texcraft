@@ -124,7 +124,7 @@ vertical_impl!(HBox, VBox, Rule, Mark, Insertion, Math, Glue, Kern, Penalty,);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Char {
     pub char: char,
-    pub font: u32,
+    pub font: common::FontId,
 }
 
 /// A box made from a horizontal list.
@@ -541,7 +541,7 @@ pub struct Adjust {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ligature {
     pub char: char,
-    pub font: u32,
+    pub font: common::FontId,
     /// The original characters that were replaced by the ligature.
     /// This is used if the engine needs to break apart the ligature
     /// in order to perform hyphenation.
@@ -583,7 +583,7 @@ impl Ligature {
     /// # use boxworks::ds::Ligature;
     /// Ligature {
     ///     char: 'a',
-    ///     font: 0,
+    ///     font: common::FontId::ONE,
     ///     original_chars: "|".into(),
     ///     includes_left_boundary: false,
     ///     includes_right_boundary: false,
@@ -596,7 +596,7 @@ impl Ligature {
     /// # use boxworks::ds::Ligature;
     /// Ligature {
     ///     char: 'a',
-    ///     font: 0,
+    ///     font: common::FontId::ONE,
     ///     original_chars: "".into(),
     ///     includes_left_boundary: false,
     ///     includes_right_boundary: true,

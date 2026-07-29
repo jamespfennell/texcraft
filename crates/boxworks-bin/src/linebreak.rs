@@ -245,10 +245,10 @@ fn run_box_vlists(
     let mut tfm_file = tfm::File::deserialize(&tfm_bytes).0.unwrap();
     let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
     let mut tp = boxworks_text::TextPreprocessorImpl::new(text_params);
-    tp.register_font(0, &tfm_file, lig_kern_program.clone());
-    tp.activate_font(0);
+    tp.register_font(common::FontId::ONE, &tfm_file, lig_kern_program.clone());
+    tp.activate_font(common::FontId::ONE);
     let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
-    font_repo.register_font(0, tfm_file);
+    font_repo.register_font(common::FontId::ONE, tfm_file);
 
     let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us(lig_kern_program);
     use boxworks::ds;

@@ -13,6 +13,42 @@ pub trait FontFormat: Sized {
     fn parse(b: &[u8]) -> Result<Self, Self::Error>;
 }
 
+/// Identifier for a font.
+///
+/// Font IDs start at 1.
+/// The zero value is excluded so that `Option<FontId>` has the same
+/// size as a [`FontId`].
+#[derive(PartialEq, Eq, Debug, Copy, Clone, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct FontId(pub std::num::NonZeroU32);
+
+impl FontId {
+    /// The first font ID.
+    pub const ONE: FontId = FontId(std::num::NonZeroU32::MIN);
+
+    /// Create a font ID from a number, returning [`None`] if the number is not positive.
+    pub fn new<N: TryInto<u32>>(n: N) -> Option<FontId> {
+        std::num::NonZeroU32::new(n.try_into().ok()?).map(FontId)
+    }
+
+    /// Get the number of this font ID.
+    pub fn get(self) -> u32 {
+        self.0.get()
+    }
+}
+
+impl Default for FontId {
+    fn default() -> Self {
+        FontId::ONE
+    }
+}
+
+impl std::fmt::Display for FontId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// Scaled numbers.
 ///
 /// This is a fixed-width numeric type used in throughout TeX.

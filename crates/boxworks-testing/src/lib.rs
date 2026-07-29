@@ -15,8 +15,8 @@
 //! let v_box = ds::VBox {
 //!     list: vec![ds::HBox {
 //!         list: vec![
-//!             ds::Char { char: 'A', font: 33 }.into(),
-//!             ds::Char { char: 'Z', font: 33 }.into(),
+//!             ds::Char { char: 'A', font: common::FontId::new(33).unwrap() }.into(),
+//!             ds::Char { char: 'Z', font: common::FontId::new(33).unwrap() }.into(),
 //!         ],
 //!         ..Default::default()
 //!     }.into()],

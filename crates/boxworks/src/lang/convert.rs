@@ -59,16 +59,15 @@ impl ToBoxLang for Vec<ds::Horizontal> {
     type Output = Vec<ast::Horizontal<'static>>;
     fn to_box_lang(&self) -> Self::Output {
         let mut out = vec![];
-        let mut current_font: Option<u32> = None;
+        let mut current_font: Option<common::FontId> = None;
         let mut buf: String = Default::default();
         let flush_chars = |out: &mut Vec<ast::Horizontal<'static>>,
-                           current_font: &mut Option<u32>,
+                           current_font: &mut Option<common::FontId>,
                            buf: &mut String| {
             let Some(current_font) = current_font.take() else {
                 // Nothing to flush.
                 return;
             };
-            let current_font: i32 = current_font.try_into().unwrap();
             out.push(ast::Horizontal::Chars(ast::Chars {
                 content: Cow::<str>::Owned(buf.clone()).into(),
                 font: current_font.into(),
@@ -278,7 +277,7 @@ impl<'a> ToBoxworks for ast::Ligature<'a> {
     fn to_boxworks(&self) -> Self::Output {
         ds::Ligature {
             char: self.char.value,
-            font: self.font.value as u32,
+            font: self.font.value,
             original_chars: self.original_chars.value.clone().into(),
             includes_left_boundary: self.includes_left_boundary.value,
             includes_right_boundary: self.includes_right_boundary.value,
@@ -293,7 +292,7 @@ impl ToBoxLang for ds::Ligature {
         ast::Ligature {
             char: self.char.into(),
             original_chars: Cow::<'static, str>::Owned(format!["{}", self.original_chars]).into(),
-            font: (self.font as i32).into(),
+            font: self.font.into(),
             includes_left_boundary: self.includes_left_boundary.into(),
             includes_right_boundary: self.includes_right_boundary.into(),
         }
@@ -305,7 +304,7 @@ impl ToBoxLang for ds::Char {
     fn to_box_lang(&self) -> Self::Output {
         ast::Chars {
             content: Cow::<'static, str>::Owned(format!["{}", self.char]).into(),
-            font: (self.font as i32).into(),
+            font: self.font.into(),
         }
     }
 }
@@ -319,7 +318,7 @@ impl<'a> ToBoxworks for ast::Chars<'a> {
             .map(|c| {
                 ds::Horizontal::Char(ds::Char {
                     char: c,
-                    font: self.font.value as u32,
+                    font: self.font.value,
                 })
             })
             .collect()
@@ -334,7 +333,7 @@ fn chars_to_discretionary_elems<'a>(chars: &ast::Chars<'a>) -> Vec<ds::Discretio
         .map(|c| {
             ds::DiscretionaryElem::Char(ds::Char {
                 char: c,
-                font: chars.font.value as u32,
+                font: chars.font.value,
             })
         })
         .collect()
@@ -546,6 +545,14 @@ impl<'a> ToBoxworks for ast::Math<'a> {
 mod tests {
     use super::*;
 
+    /// The first font.
+    const F1: common::FontId = common::FontId::ONE;
+
+    /// The second font, used in tests that involve more than one font.
+    fn f2() -> common::FontId {
+        common::FontId::new(2_u32).unwrap()
+    }
+
     macro_rules! tests {
         ( $( ($name: ident, $input: expr, $want: expr,), )+ ) => {
             $(
@@ -564,34 +571,66 @@ mod tests {
         (
             chars_same_font,
             vec![
-                ds::Char { char: 'B', font: 0 }.into(),
-                ds::Char { char: 'o', font: 0 }.into(),
-                ds::Char { char: 'x', font: 0 }.into(),
+                ds::Char {
+                    char: 'B',
+                    font: F1
+                }
+                .into(),
+                ds::Char {
+                    char: 'o',
+                    font: F1
+                }
+                .into(),
+                ds::Char {
+                    char: 'x',
+                    font: F1
+                }
+                .into(),
             ],
             vec![ast::Chars {
                 content: Cow::Borrowed("Box").into(),
-                font: 0_i32.into(),
+                font: F1.into(),
             }
             .into()],
         ),
         (
             chars_different_font,
             vec![
-                ds::Char { char: 'B', font: 0 }.into(),
-                ds::Char { char: 'o', font: 0 }.into(),
-                ds::Char { char: 'x', font: 0 }.into(),
-                ds::Char { char: 'e', font: 1 }.into(),
-                ds::Char { char: 'd', font: 1 }.into(),
+                ds::Char {
+                    char: 'B',
+                    font: F1
+                }
+                .into(),
+                ds::Char {
+                    char: 'o',
+                    font: F1
+                }
+                .into(),
+                ds::Char {
+                    char: 'x',
+                    font: F1
+                }
+                .into(),
+                ds::Char {
+                    char: 'e',
+                    font: f2()
+                }
+                .into(),
+                ds::Char {
+                    char: 'd',
+                    font: f2()
+                }
+                .into(),
             ],
             vec![
                 ast::Chars {
                     content: Cow::Borrowed("Box").into(),
-                    font: 0_i32.into(),
+                    font: F1.into(),
                 }
                 .into(),
                 ast::Chars {
                     content: Cow::Borrowed("ed").into(),
-                    font: 1_i32.into(),
+                    font: f2().into(),
                 }
                 .into(),
             ],

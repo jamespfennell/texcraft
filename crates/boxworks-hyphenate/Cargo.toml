@@ -12,6 +12,7 @@ keywords = ["tex", "texcraft"]
 # Texcraft
 hyphenate = { path = "../hyphenate" }
 boxworks = { path = "../boxworks" }
+common = { path = "../common", features=[] }
 tfm = { path = "../tfm" }
 
 [dev-dependencies]

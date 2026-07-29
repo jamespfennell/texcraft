@@ -31,9 +31,9 @@
 //! "#;
 //! let got = bwl::parse_horizontal_list(&source);
 //! let want: Vec<ds::Horizontal> = vec![
-//!     ds::Char{char: 'B', font: 0}.into(),
-//!     ds::Char{char: 'o', font: 0}.into(),
-//!     ds::Char{char: 'x', font: 0}.into(),
+//!     ds::Char{char: 'B', font: common::FontId::ONE}.into(),
+//!     ds::Char{char: 'o', font: common::FontId::ONE}.into(),
+//!     ds::Char{char: 'x', font: common::FontId::ONE}.into(),
 //!     ds::Glue{
 //!         kind: ds::GlueKind::Normal,
 //!         value: common::Glue{
@@ -56,7 +56,7 @@
 //!             shrink_order: common::GlueOrder::Normal,
 //!         }
 //!     }.into(),
-//!     ds::Char{char: 'A', font: 0}.into(),
+//!     ds::Char{char: 'A', font: common::FontId::ONE}.into(),
 //!     ds::Kern{
 //!         kind: ds::KernKind::Normal,
 //!         width: -common::Scaled::new(
@@ -65,7 +65,7 @@
 //!                 common::ScaledUnit::Point,  // units
 //!             ).unwrap(),
 //!     }.into(),
-//!     ds::Char{char: 'V', font: 0}.into(),
+//!     ds::Char{char: 'V', font: common::FontId::ONE}.into(),
 //! ];
 //! assert_eq![got, Ok(want)];
 //! ```
@@ -96,7 +96,7 @@
 //! "#;
 //! assert_eq![
 //!     bwl::parse_horizontal_list(&source),
-//!     Ok(vec![ds::Char{char: 'A', font: 1}.into()])
+//!     Ok(vec![ds::Char{char: 'A', font: common::FontId::ONE}.into()])
 //! ];
 //! ```
 //!
@@ -110,7 +110,7 @@
 //! "#;
 //! assert_eq![
 //!     bwl::parse_horizontal_list(&source),
-//!     Ok(vec![ds::Char{char: 'B', font: 2}.into()])
+//!     Ok(vec![ds::Char{char: 'B', font: common::FontId::new(2).unwrap()}.into()])
 //! ];
 //! ```
 //!
@@ -124,7 +124,7 @@
 //! "#;
 //! assert_eq![
 //!     bwl::parse_horizontal_list(&source),
-//!     Ok(vec![ds::Char{char: 'C', font: 3}.into()])
+//!     Ok(vec![ds::Char{char: 'C', font: common::FontId::new(3).unwrap()}.into()])
 //! ];
 //! ```
 //!
@@ -181,7 +181,7 @@
 //! | Number | Name      | Type    | Default |
 //! |--------|-----------|---------|---------|
 //! | 1      | `content` | string  | `""`    |
-//! | 2      | `font`    | integer | `0`     |
+//! | 2      | `font`    | font ID (a positive integer) | `1`     |
 //!
 //! #### `glue`: add a glue node to the current list
 //!
@@ -252,7 +252,7 @@
 //! |--------|------------------|-----------|----------|
 //! | 1      | `char`           | character | `"\0"`   |
 //! | 2      | `original_chars` | string    | `""`     |
-//! | 3      | `font`           | integer   | `0`      |
+//! | 3      | `font`           | font ID (a positive integer)   | `1`      |
 //! | 4      | `includes_left_char`  | boolean   | false      |
 //! | 5      | `includes_right_char` | boolean   | false      |
 //!

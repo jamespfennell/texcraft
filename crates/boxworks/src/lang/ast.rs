@@ -613,7 +613,7 @@ functions!(
     (
         struct Chars<'a> {
             content: Cow<'a, str>,
-            font: i32,
+            font: common::FontId,
         }
         impl Func {
             func_name: "chars",
@@ -704,7 +704,7 @@ functions!(
         struct Ligature<'a> {
             char: char,
             original_chars: Cow<'a, str>,
-            font: i32,
+            font: common::FontId,
             includes_left_boundary: bool,
             includes_right_boundary: bool,
         }
@@ -1105,6 +1105,20 @@ impl<'a> Value<'a> for i32 {
     }
 }
 
+impl<'a> Value<'a> for common::FontId {
+    const DESCRIPTION: &'static str = "a font ID (a positive integer)";
+    fn try_cast_integer(i: i32) -> Option<Self> {
+        common::FontId::new(i)
+    }
+    fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>> {
+        cst::ArgsItem::Regular {
+            key,
+            value: cst::Value::Integer(self.get() as i32),
+            value_source: "".into(),
+        }
+    }
+}
+
 impl<'a> Value<'a> for common::Scaled {
     const DESCRIPTION: &'static str = "a number";
     fn try_cast_scaled(s: common::Scaled) -> Option<Self> {
@@ -1237,7 +1251,7 @@ mod tests {
                         source: Some(r#""Hello""#.into()),
                     },
                     font: Arg {
-                        value: 0,
+                        value: common::FontId::ONE,
                         source: None,
                     },
                     ..Default::default()

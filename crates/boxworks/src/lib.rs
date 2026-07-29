@@ -32,7 +32,7 @@ pub trait TextPreprocessor {
 
 #[derive(Default, Debug)]
 pub struct SimpleTextPreprocessor {
-    font: u32,
+    font: common::FontId,
 }
 
 impl TextPreprocessor for SimpleTextPreprocessor {
@@ -66,11 +66,11 @@ impl TextPreprocessor for SimpleTextPreprocessor {
 }
 
 pub trait FontRepo {
-    fn width(&self, c: char, font: u32) -> Option<common::Scaled>;
-    fn height(&self, c: char, font: u32) -> Option<common::Scaled>;
-    fn depth(&self, c: char, font: u32) -> Option<common::Scaled>;
+    fn width(&self, c: char, font: common::FontId) -> Option<common::Scaled>;
+    fn height(&self, c: char, font: common::FontId) -> Option<common::Scaled>;
+    fn depth(&self, c: char, font: common::FontId) -> Option<common::Scaled>;
 
-    fn width_height_depth(&self, c: char, font: u32) -> Option<[common::Scaled; 3]> {
+    fn width_height_depth(&self, c: char, font: common::FontId) -> Option<[common::Scaled; 3]> {
         Some([
             self.width(c, font)?,
             self.height(c, font).unwrap_or(common::Scaled::ZERO),

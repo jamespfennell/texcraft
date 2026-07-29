@@ -58,8 +58,7 @@ impl Params {
 pub struct TextPreprocessorImpl {
     fonts: Vec<Font>,
     // TODO: should be initialized to the null font
-    // TODO: should current_font be some kind of specific font identifier type.
-    current_font: u32,
+    current_font: common::FontId,
     space_factor: SpaceFactor,
     pub params: Params,
 }
@@ -68,7 +67,7 @@ impl TextPreprocessorImpl {
     pub fn new(params: Params) -> Self {
         Self {
             fonts: vec![],
-            current_font: 0,
+            current_font: common::FontId::ONE,
             space_factor: Default::default(),
             params,
         }
@@ -135,8 +134,16 @@ impl SpaceFactor {
 }
 
 impl TextPreprocessorImpl {
-    pub fn activate_font(&mut self, font: u32) {
+    pub fn activate_font(&mut self, font: common::FontId) {
         self.current_font = font;
+    }
+
+    /// Returns the metrics of the current font.
+    ///
+    /// Font IDs are 1-based indices into the fonts vector;
+    /// this is enforced by [`TextPreprocessorImpl::register_font`].
+    fn current_font(&self) -> &Font {
+        &self.fonts[self.current_font.get() as usize - 1]
     }
 }
 
@@ -146,7 +153,7 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
     }
 
     fn add_word(&mut self, word: &str, list: &mut Vec<ds::Horizontal>) {
-        let font = &self.fonts[self.current_font as usize];
+        let font = self.current_font();
         for elem in font.lig_kern_program.run(word) {
             use ligkern::RunItem::*;
             match elem {
@@ -208,7 +215,7 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
                 self.params.space_skip
             } else {
                 // TeX.2021.1042
-                self.fonts[self.current_font as usize].default_space
+                self.current_font().default_space
             }
         } else {
             // TeX.2021.1043
@@ -218,10 +225,10 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
                 self.params.space_skip
             } else {
                 // TeX.2021.1042
-                let mut g = self.fonts[self.current_font as usize].default_space;
+                let mut g = self.current_font().default_space;
                 // TeX.2021.1044
                 if self.space_factor.0 >= 2000 {
-                    g.width += self.fonts[self.current_font as usize].extra_space;
+                    g.width += self.current_font().extra_space;
                 }
                 g.stretch = g.stretch.xn_over_d(self.space_factor.0, 1000).unwrap().0;
                 g.shrink = g.shrink.xn_over_d(1000, self.space_factor.0).unwrap().0;
@@ -235,11 +242,11 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
 impl TextPreprocessorImpl {
     pub fn register_font(
         &mut self,
-        id: u32,
+        id: common::FontId,
         tfm_file: &tfm::File,
         lig_kern_program: tfm::ligkern::CompiledProgram,
     ) {
-        assert_eq!(id as usize, self.fonts.len());
+        assert_eq!(id.get() as usize, self.fonts.len() + 1);
         self.fonts.push(Font {
             default_space: common::Glue {
                 width: tfm_file
@@ -264,24 +271,24 @@ impl TextPreprocessorImpl {
 
 #[derive(Debug, Default)]
 pub struct TfmFontRepo {
-    fonts: HashMap<u32, tfm::File>,
+    fonts: HashMap<common::FontId, tfm::File>,
 }
 
 impl TfmFontRepo {
-    pub fn register_font(&mut self, id: u32, tfm_file: tfm::File) {
-        assert_eq!(id as usize, self.fonts.len());
+    pub fn register_font(&mut self, id: common::FontId, tfm_file: tfm::File) {
+        assert_eq!(id.get() as usize, self.fonts.len() + 1);
         self.fonts.insert(id, tfm_file);
     }
 }
 
 impl boxworks::FontRepo for TfmFontRepo {
-    fn width(&self, c: char, font: u32) -> Option<common::Scaled> {
+    fn width(&self, c: char, font: common::FontId) -> Option<common::Scaled> {
         self.fonts[&font].width_utf8(c)
     }
-    fn height(&self, c: char, font: u32) -> Option<common::Scaled> {
+    fn height(&self, c: char, font: common::FontId) -> Option<common::Scaled> {
         self.fonts[&font].height_utf8(c)
     }
-    fn depth(&self, c: char, font: u32) -> Option<common::Scaled> {
+    fn depth(&self, c: char, font: common::FontId) -> Option<common::Scaled> {
         self.fonts[&font].depth_utf8(c)
     }
 }
@@ -599,8 +606,8 @@ mod tests {
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
 
         let mut tp = TextPreprocessorImpl::new(params);
-        tp.register_font(0, &tfm_file, lig_kern_program);
-        tp.activate_font(0);
+        tp.register_font(common::FontId::ONE, &tfm_file, lig_kern_program);
+        tp.activate_font(common::FontId::ONE);
         let mut got = vec![];
         for word in input.split_inclusive(' ') {
             tp.add_word(word.trim_matches(' '), &mut got);

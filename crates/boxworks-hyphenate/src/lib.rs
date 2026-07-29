@@ -57,10 +57,10 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
 
         // Find the place to start hyphenating
         // TeX.2021.896
-        let hyphenation_font: Option<u32> = loop {
+        let hyphenation_font: Option<common::FontId> = loop {
             let Some(elem) = list.get(i) else { break None };
             enum Action {
-                Start { font: u32 },
+                Start { font: common::FontId },
                 Continue,
                 // Equivalent to done1 in Knuth's TeX.
                 Abort,
@@ -610,8 +610,8 @@ mod tests {
         let lig_kern_program =
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
         let mut tp = bwt::TextPreprocessorImpl::new(bwt::Params::plain_tex_defaults());
-        tp.register_font(0, &tfm_file, lig_kern_program.clone());
-        tp.activate_font(0);
+        tp.register_font(common::FontId::ONE, &tfm_file, lig_kern_program.clone());
+        tp.activate_font(common::FontId::ONE);
         let mut list = vec![];
         for word in tex_input.split_ascii_whitespace() {
             tp.add_word(word.trim_matches(' '), &mut list);
@@ -620,7 +620,7 @@ mod tests {
         list.pop();
 
         let mut font_repo: bwt::TfmFontRepo = Default::default();
-        font_repo.register_font(0, tfm_file);
+        font_repo.register_font(common::FontId::ONE, tfm_file);
 
         let mut hyphenator = Hyphenator::plain_tex_en_us(lig_kern_program);
         hyphenator
@@ -1121,7 +1121,7 @@ mod tests {
                     lig("z", "cd")
                     lig("v", "ef")
                     # synchronization point
-                    chars("gh", font=0)
+                    chars("gh", font=1)
                 "#,
             },
         },
@@ -1160,7 +1160,7 @@ mod tests {
                       post_break=[
                       ],
                     )
-                    chars("gh", font=0)
+                    chars("gh", font=1)
                 "#,
             },
         },
@@ -1187,7 +1187,7 @@ mod tests {
                     )
                     lig("y", "abc")
                     lig("z", "")
-                    chars("de", font=0)
+                    chars("de", font=1)
                 "#,
             },
         },
