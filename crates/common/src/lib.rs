@@ -15,29 +15,23 @@ pub trait FontFormat: Sized {
 
 /// Identifier for a font.
 ///
-/// Font IDs start at 1.
-/// The zero value is excluded so that `Option<FontId>` has the same
-/// size as a [`FontId`].
+/// The zero value is the null font; real fonts start at 1.
 #[derive(PartialEq, Eq, Debug, Copy, Clone, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct FontId(pub std::num::NonZeroU32);
+pub struct FontId(pub u32);
 
 impl FontId {
-    /// The first font ID.
-    pub const ONE: FontId = FontId(std::num::NonZeroU32::MIN);
+    /// The null font.
+    pub const NULL: FontId = FontId(0);
 
-    /// Create a font ID from a number, returning [`None`] if the number is not positive.
-    pub fn new<N: TryInto<u32>>(n: N) -> Option<FontId> {
-        std::num::NonZeroU32::new(n.try_into().ok()?).map(FontId)
-    }
-
-    /// Get the number of this font ID.
-    pub fn get(self) -> u32 {
-        self.0.get()
-    }
+    /// The first non-null font ID.
+    pub const ONE: FontId = FontId(1);
 }
 
 impl Default for FontId {
+    /// The default font ID is [`FontId::ONE`], not the null font,
+    /// so that data structures like Box language lists
+    /// default to referring to a real font.
     fn default() -> Self {
         FontId::ONE
     }

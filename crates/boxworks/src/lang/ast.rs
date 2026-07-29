@@ -1106,14 +1106,14 @@ impl<'a> Value<'a> for i32 {
 }
 
 impl<'a> Value<'a> for common::FontId {
-    const DESCRIPTION: &'static str = "a font ID (a positive integer)";
+    const DESCRIPTION: &'static str = "a font ID (a non-negative integer)";
     fn try_cast_integer(i: i32) -> Option<Self> {
-        common::FontId::new(i)
+        Some(common::FontId(i as u32))
     }
     fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>> {
         cst::ArgsItem::Regular {
             key,
-            value: cst::Value::Integer(self.get() as i32),
+            value: cst::Value::Integer(self.0 as i32),
             value_source: "".into(),
         }
     }

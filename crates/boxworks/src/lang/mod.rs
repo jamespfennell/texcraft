@@ -181,7 +181,7 @@
 //! | Number | Name      | Type    | Default |
 //! |--------|-----------|---------|---------|
 //! | 1      | `content` | string  | `""`    |
-//! | 2      | `font`    | font ID (a positive integer) | `1`     |
+//! | 2      | `font`    | font ID (a non-negative integer) | `1`     |
 //!
 //! #### `glue`: add a glue node to the current list
 //!
@@ -252,7 +252,7 @@
 //! |--------|------------------|-----------|----------|
 //! | 1      | `char`           | character | `"\0"`   |
 //! | 2      | `original_chars` | string    | `""`     |
-//! | 3      | `font`           | font ID (a positive integer)   | `1`      |
+//! | 3      | `font`           | font ID (a non-negative integer)   | `1`      |
 //! | 4      | `includes_left_char`  | boolean   | false      |
 //! | 5      | `includes_right_char` | boolean   | false      |
 //!

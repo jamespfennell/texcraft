@@ -550,7 +550,7 @@ mod tests {
 
     /// The second font, used in tests that involve more than one font.
     fn f2() -> common::FontId {
-        common::FontId::new(2_u32).unwrap()
+        common::FontId(2)
     }
 
     macro_rules! tests {

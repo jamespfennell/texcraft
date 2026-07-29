@@ -143,7 +143,7 @@ impl TextPreprocessorImpl {
     /// Font IDs are 1-based indices into the fonts vector;
     /// this is enforced by [`TextPreprocessorImpl::register_font`].
     fn current_font(&self) -> &Font {
-        &self.fonts[self.current_font.get() as usize - 1]
+        &self.fonts[self.current_font.0 as usize - 1]
     }
 }
 
@@ -246,7 +246,7 @@ impl TextPreprocessorImpl {
         tfm_file: &tfm::File,
         lig_kern_program: tfm::ligkern::CompiledProgram,
     ) {
-        assert_eq!(id.get() as usize, self.fonts.len() + 1);
+        assert_eq!(id.0 as usize, self.fonts.len() + 1);
         self.fonts.push(Font {
             default_space: common::Glue {
                 width: tfm_file
@@ -276,7 +276,7 @@ pub struct TfmFontRepo {
 
 impl TfmFontRepo {
     pub fn register_font(&mut self, id: common::FontId, tfm_file: tfm::File) {
-        assert_eq!(id.get() as usize, self.fonts.len() + 1);
+        assert_eq!(id.0 as usize, self.fonts.len() + 1);
         self.fonts.insert(id, tfm_file);
     }
 }

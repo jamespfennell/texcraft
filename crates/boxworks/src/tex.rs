@@ -615,7 +615,11 @@ impl std::error::Error for Error {}
 ///
 /// Font IDs start at 1 and are assigned in the order the fonts are encountered.
 fn next_font_id(fonts: &HashMap<String, common::FontId>) -> common::FontId {
-    common::FontId::new(fonts.len() + 1).expect("no more than 2^32-1 fonts")
+    common::FontId(
+        (fonts.len() + 1)
+            .try_into()
+            .expect("no more than 2^32-1 fonts"),
+    )
 }
 
 fn parse_disc_elem(
