@@ -246,7 +246,7 @@ enum SerializableCommand {
     CharacterTokenAlias(token::Value),
     Character(char),
     MathCharacter(types::MathCode),
-    Font(common::FontId),
+    Font(font::Id),
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

@@ -7,9 +7,10 @@ use crate::parse;
 use crate::prelude as txl;
 use crate::traits::*;
 pub use catcode::CatCode;
+use common::font;
 pub use mathcode::MathCode;
 
-impl Parsable for common::FontId {
+impl Parsable for font::Id {
     fn parse_impl<S: TexlangState>(input: &mut crate::vm::ExpandedStream<S>) -> txl::Result<Self> {
         // Corresponds to scan_font_ident in TeX.2021.577.
         match parse_font_or(input)? {
@@ -22,7 +23,7 @@ impl Parsable for common::FontId {
                     r"a font reference can either be the current font (e.g. \font), a font variable (e.g. \textfont 1) or the result of loading a font (e.g. \a after \font \a path/to/font)",
                     )
                 )?;
-                Ok(common::FontId::NULL)
+                Ok(font::Id::NULL)
             }
             Some(font) => Ok(font),
         }
@@ -31,7 +32,7 @@ impl Parsable for common::FontId {
 
 fn parse_font_or<S: TexlangState>(
     input: &mut crate::vm::ExpandedStream<S>,
-) -> txl::Result<Option<common::FontId>> {
+) -> txl::Result<Option<font::Id>> {
     let Some(token) = input.next()? else {
         return Ok(None);
     };
@@ -46,7 +47,7 @@ fn parse_font_or<S: TexlangState>(
         }
         Some(command::Command::Variable(var)) => {
             let var = var.clone();
-            match var.resolve_type::<common::FontId>(token, input)? {
+            match var.resolve_type::<font::Id>(token, input)? {
                 None => {
                     input.back(token);
                     Ok(None)

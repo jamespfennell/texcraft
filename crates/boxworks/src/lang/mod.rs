@@ -18,6 +18,7 @@
 //! ```
 //! use boxworks::ds;
 //! use boxworks::lang as bwl;
+//! use common::font;
 //!
 //! let source = r#"
 //!     ## The chars() function typesets characters.
@@ -31,9 +32,9 @@
 //! "#;
 //! let got = bwl::parse_horizontal_list(&source);
 //! let want: Vec<ds::Horizontal> = vec![
-//!     ds::Char{char: 'B', font: common::FontId::ONE}.into(),
-//!     ds::Char{char: 'o', font: common::FontId::ONE}.into(),
-//!     ds::Char{char: 'x', font: common::FontId::ONE}.into(),
+//!     ds::Char{char: 'B', font: font::Id::ONE}.into(),
+//!     ds::Char{char: 'o', font: font::Id::ONE}.into(),
+//!     ds::Char{char: 'x', font: font::Id::ONE}.into(),
 //!     ds::Glue{
 //!         kind: ds::GlueKind::Normal,
 //!         value: common::Glue{
@@ -56,7 +57,7 @@
 //!             shrink_order: common::GlueOrder::Normal,
 //!         }
 //!     }.into(),
-//!     ds::Char{char: 'A', font: common::FontId::ONE}.into(),
+//!     ds::Char{char: 'A', font: font::Id::ONE}.into(),
 //!     ds::Kern{
 //!         kind: ds::KernKind::Normal,
 //!         width: -common::Scaled::new(
@@ -65,7 +66,7 @@
 //!                 common::ScaledUnit::Point,  // units
 //!             ).unwrap(),
 //!     }.into(),
-//!     ds::Char{char: 'V', font: common::FontId::ONE}.into(),
+//!     ds::Char{char: 'V', font: font::Id::ONE}.into(),
 //! ];
 //! assert_eq![got, Ok(want)];
 //! ```
@@ -91,12 +92,13 @@
 //! ```
 //! # use boxworks::lang as bwl;
 //! # use boxworks::ds;
+//! # use common::font;
 //! let source = r#"
 //!     chars("A", 1)
 //! "#;
 //! assert_eq![
 //!     bwl::parse_horizontal_list(&source),
-//!     Ok(vec![ds::Char{char: 'A', font: common::FontId::ONE}.into()])
+//!     Ok(vec![ds::Char{char: 'A', font: font::Id::ONE}.into()])
 //! ];
 //! ```
 //!
@@ -105,12 +107,13 @@
 //! ```
 //! # use boxworks::lang as bwl;
 //! # use boxworks::ds;
+//! # use common::font;
 //! let source = r#"
 //!     chars(font=2, content="B")
 //! "#;
 //! assert_eq![
 //!     bwl::parse_horizontal_list(&source),
-//!     Ok(vec![ds::Char{char: 'B', font: common::FontId(2)}.into()])
+//!     Ok(vec![ds::Char{char: 'B', font: font::Id(2)}.into()])
 //! ];
 //! ```
 //!
@@ -119,12 +122,13 @@
 //! ```
 //! # use boxworks::lang as bwl;
 //! # use boxworks::ds;
+//! # use common::font;
 //! let source = r#"
 //!     chars("C", font=3)
 //! "#;
 //! assert_eq![
 //!     bwl::parse_horizontal_list(&source),
-//!     Ok(vec![ds::Char{char: 'C', font: common::FontId(3)}.into()])
+//!     Ok(vec![ds::Char{char: 'C', font: font::Id(3)}.into()])
 //! ];
 //! ```
 //!
@@ -134,6 +138,7 @@
 //! ```
 //! # use boxworks::lang as bwl;
 //! # use boxworks::ds;
+//! # use common::font;
 //! let source = r#"
 //!     chars(content="C", 3)
 //! "#;

@@ -3,6 +3,7 @@
 //!
 
 use std::fmt::Write;
+pub mod font;
 
 /// Trait satisfied by font formats (like .tfm files).
 pub trait FontFormat: Sized {
@@ -11,36 +12,6 @@ pub trait FontFormat: Sized {
 
     /// Parse binary data into a font.
     fn parse(b: &[u8]) -> Result<Self, Self::Error>;
-}
-
-/// Identifier for a font.
-///
-/// The zero value is the null font; real fonts start at 1.
-#[derive(PartialEq, Eq, Debug, Copy, Clone, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct FontId(pub u32);
-
-impl FontId {
-    /// The null font.
-    pub const NULL: FontId = FontId(0);
-
-    /// The first non-null font ID.
-    pub const ONE: FontId = FontId(1);
-}
-
-impl Default for FontId {
-    /// The default font ID is the null font,
-    /// matching TeX's behavior for font variables that have not been set
-    /// (TeX.2021.222).
-    fn default() -> Self {
-        FontId::NULL
-    }
-}
-
-impl std::fmt::Display for FontId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
 }
 
 /// Scaled numbers.

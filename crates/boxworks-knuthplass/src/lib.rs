@@ -6,12 +6,13 @@ use boxworks::ds::{self, KernKind};
 use common::{GlueOrder, Scaled};
 pub mod debug;
 
-pub struct LineBreaker<'a> {
+pub struct LineBreaker<'a, F> {
     pub params: &'a Params,
     pub line_widths: &'a [Scaled],
     pub line_indents: &'a [Scaled],
     pub debug_logger: Option<&'a mut dyn debug::Logger>,
     pub hyphenator: &'a dyn boxworks::Hyphenator,
+    pub font_repo: &'a F,
 }
 
 #[derive(Debug)]
@@ -244,13 +245,8 @@ struct PassiveNode {
     previous_node_index: usize,
 }
 
-impl<'a> boxworks::LineBreaker for LineBreaker<'a> {
-    fn break_line<F: boxworks::FontRepo>(
-        mut self,
-        font_repo: &F,
-        v_list: &mut Vec<ds::Vertical>,
-        h_list: &mut Vec<ds::Horizontal>,
-    ) {
+impl<'a, F: boxworks::FontRepo> boxworks::LineBreaker for LineBreaker<'a, F> {
+    fn break_line(mut self, v_list: &mut Vec<ds::Vertical>, h_list: &mut Vec<ds::Horizontal>) {
         // This function is analogous to TeX.2021.815.
 
         // TeX.2021.816
@@ -263,15 +259,14 @@ impl<'a> boxworks::LineBreaker for LineBreaker<'a> {
             value: self.params.par_fill_skip,
         }));
 
-        let break_points = self.break_line_all_attempts(font_repo, self.hyphenator, v_list, h_list);
-        self.post_line_break(font_repo, v_list, h_list, &break_points);
+        let break_points = self.break_line_all_attempts(self.hyphenator, h_list);
+        self.post_line_break(v_list, h_list, &break_points);
     }
 }
 
-impl<'a> LineBreaker<'a> {
-    fn post_line_break<F: boxworks::FontRepo>(
+impl<'a, F: boxworks::FontRepo> LineBreaker<'a, F> {
+    fn post_line_break(
         &self,
-        font_repo: &F,
         v_list: &mut Vec<ds::Vertical>,
         h_list: &[ds::Horizontal],
         break_points: &[usize],
@@ -362,7 +357,8 @@ impl<'a> LineBreaker<'a> {
                 .copied()
                 .unwrap_or(self.line_indents.last().copied().unwrap_or(Scaled::ZERO));
             let h_box = {
-                let mut b = ds::HBox::pack(font_repo, inner_list, ds::PackWidth::Exact(*width));
+                let mut b =
+                    ds::HBox::pack(self.font_repo, inner_list, ds::PackWidth::Exact(*width));
                 b.shift_amount = indent;
                 b
             };
@@ -423,11 +419,9 @@ impl<'a> LineBreaker<'a> {
             }
         }
     }
-    pub fn break_line_all_attempts<F: boxworks::FontRepo>(
+    pub fn break_line_all_attempts(
         &mut self,
-        font_repo: &F,
         hyphenator: &dyn boxworks::Hyphenator,
-        _v_list: &mut Vec<ds::Vertical>,
         h_list: &mut Vec<ds::Horizontal>,
     ) -> Vec<usize> {
         // We manually unroll the "loop" in TeX.2021.863.
@@ -436,7 +430,6 @@ impl<'a> LineBreaker<'a> {
         }
         if let Some(v) = self.break_line_single_attempt(
             h_list,
-            font_repo,
             self.params.pre_tolerance,
             common::Scaled::ZERO,
             false,
@@ -455,7 +448,6 @@ impl<'a> LineBreaker<'a> {
         let second_pass_is_final_pass = self.params.emergency_stretch.is_zero();
         if let Some(v) = self.break_line_single_attempt(
             h_list,
-            font_repo,
             self.params.tolerance,
             common::Scaled::ZERO,
             second_pass_is_final_pass,
@@ -467,7 +459,6 @@ impl<'a> LineBreaker<'a> {
         }
         self.break_line_single_attempt(
             h_list,
-            font_repo,
             self.params.tolerance,
             self.params.emergency_stretch,
             true,
@@ -475,10 +466,9 @@ impl<'a> LineBreaker<'a> {
         .expect("force_solution=true")
     }
 
-    pub fn break_line_single_attempt<F: boxworks::FontRepo>(
+    pub fn break_line_single_attempt(
         &mut self,
         list: &[ds::Horizontal],
-        font_repo: &F,
         tolerance: i32,
         emergency_stretch: common::Scaled,
         force_solution: bool,
@@ -532,7 +522,7 @@ impl<'a> LineBreaker<'a> {
                     Char(ds::Char { char, font }) | Ligature(ds::Ligature { char, font, .. }) => {
                         // TeX.2021.867 has an optimization in which subsequent chars are read
                         // here. I'm not convinced it's worth it.
-                        diffs.width += font_repo.width(*char, *font).unwrap_or(Scaled::ZERO);
+                        diffs.width += self.font_repo.width(*char, *font).unwrap_or(Scaled::ZERO);
                         continue;
                     }
                     HBox(ds::HBox { width, .. })
@@ -550,7 +540,7 @@ impl<'a> LineBreaker<'a> {
                         disc_width = discretionary
                             .pre_break
                             .iter()
-                            .map(|e| e.width(font_repo))
+                            .map(|e| e.width(self.font_repo))
                             .sum();
                         (
                             if discretionary.pre_break.is_empty() {
@@ -785,9 +775,10 @@ impl<'a> LineBreaker<'a> {
                                     // TeX.2021.841
                                     diffs.width += match &list[j] {
                                         Char(ds::Char { char, font })
-                                        | Ligature(ds::Ligature { char, font, .. }) => {
-                                            font_repo.width(*char, *font).unwrap_or(Scaled::ZERO)
-                                        }
+                                        | Ligature(ds::Ligature { char, font, .. }) => self
+                                            .font_repo
+                                            .width(*char, *font)
+                                            .unwrap_or(Scaled::ZERO),
                                         HBox(ds::HBox { width, .. })
                                         | VBox(ds::VBox { width, .. })
                                         | Rule(ds::Rule { width, .. })
@@ -807,9 +798,10 @@ impl<'a> LineBreaker<'a> {
                                     use ds::DiscretionaryElem::*;
                                     diffs.width -= match elem {
                                         Char(ds::Char { char, font })
-                                        | Ligature(ds::Ligature { char, font, .. }) => {
-                                            font_repo.width(*char, *font).unwrap_or(Scaled::ZERO)
-                                        }
+                                        | Ligature(ds::Ligature { char, font, .. }) => self
+                                            .font_repo
+                                            .width(*char, *font)
+                                            .unwrap_or(Scaled::ZERO),
                                         HBox(ds::HBox { width, .. })
                                         | VBox(ds::VBox { width, .. })
                                         | Rule(ds::Rule { width, .. })
@@ -1048,6 +1040,7 @@ mod tests {
     use super::*;
     use boxworks::TextPreprocessor;
     use boxworks_text as bwt;
+    use common::font;
     use pretty_assertions::assert_eq;
     use std::{cell::RefCell, rc::Rc};
 
@@ -1513,8 +1506,8 @@ mod tests {
         let lig_kern_program =
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
         let mut tp = bwt::TextPreprocessorImpl::new(text_params);
-        tp.register_font(common::FontId::ONE, &tfm_file, lig_kern_program.clone());
-        tp.activate_font(common::FontId::ONE);
+        tp.register_font(font::Id::ONE, &tfm_file, lig_kern_program.clone());
+        tp.activate_font(font::Id::ONE);
         let mut list = vec![];
         for word in input.split_ascii_whitespace() {
             tp.add_word(word.trim_matches(' '), &mut list);
@@ -1522,7 +1515,7 @@ mod tests {
         }
 
         let mut font_repo: bwt::TfmFontRepo = Default::default();
-        font_repo.register_font(common::FontId::ONE, tfm_file);
+        font_repo.register_font(font::Id::ONE, tfm_file);
         let widths = parse_widths(widths);
 
         let log: Rc<RefCell<String>> = Default::default();
@@ -1536,10 +1529,11 @@ mod tests {
             line_indents: &[],
             debug_logger: Some(&mut logger),
             hyphenator: &hyphenator,
+            font_repo: &font_repo,
         };
         let mut v_list = vec![];
         use boxworks::LineBreaker;
-        line_breaker.break_line(&font_repo, &mut v_list, &mut list);
+        line_breaker.break_line(&mut v_list, &mut list);
 
         let v_box = ds::VBox {
             list: v_list,

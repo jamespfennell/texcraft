@@ -3,6 +3,7 @@ use boxworks::ds;
 use boxworks::tex as bwt;
 use boxworks::TextPreprocessor;
 use clap::Parser;
+use common::font;
 use std::fs;
 use std::path::PathBuf;
 
@@ -117,10 +118,10 @@ fn run_box_hboxs(
     let mut tfm_file = tfm::File::deserialize(&tfm_bytes).0.unwrap();
     let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
     let mut tp = boxworks_text::TextPreprocessorImpl::new(params);
-    tp.register_font(common::FontId::ONE, &tfm_file, lig_kern_program.clone());
-    tp.activate_font(common::FontId::ONE);
+    tp.register_font(font::Id::ONE, &tfm_file, lig_kern_program.clone());
+    tp.activate_font(font::Id::ONE);
     let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
-    font_repo.register_font(common::FontId::ONE, tfm_file);
+    font_repo.register_font(font::Id::ONE, tfm_file);
     use boxworks::ds;
     let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us(lig_kern_program);
     Ok(texts

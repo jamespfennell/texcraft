@@ -49,7 +49,7 @@ fn run_tfm_bytes(bytes: &[u8], text: &str) -> String {
 fn run_program(program: &CompiledProgram, text: &str) -> String {
     let mut elements: Vec<String> = vec![];
     for elem in program.run(text) {
-        use tfm::ligkern::RunItem::*;
+        use common::font::TextItem::*;
         match elem {
             Char(c) => {
                 elements.push(format!(
@@ -64,11 +64,11 @@ fn run_program(program: &CompiledProgram, text: &str) -> String {
                     kern.0, value_pt
                 ));
             }
-            Ligature(ligature) => {
+            Ligature { c, original, .. } => {
                 elements.push(format!(
                     r#"{{"type":"ligature","char_hex":"{:04X}","original":"{}"}}"#,
-                    ligature.c as u32,
-                    escape_json(&ligature.original)
+                    c as u32,
+                    escape_json(&original)
                 ));
             }
         }

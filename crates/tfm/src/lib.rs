@@ -156,11 +156,75 @@ mod deserialize;
 mod serialize;
 mod validate;
 
+use common::font;
 pub use deserialize::DeserializationError;
 pub use deserialize::DeserializationWarning;
 pub use deserialize::RawFile;
 pub use deserialize::SubFileSizes;
 pub use validate::ValidationWarning;
+
+#[derive(Debug, Default)]
+pub struct Font {
+    file: File,
+    lig_kern_program: ligkern::CompiledProgram,
+}
+
+const TFM_CMR10: &[u8] = include_bytes!("../corpus/computer-modern/cmr10.tfm");
+
+impl Font {
+    pub fn build(
+        tfm_bytes: &[u8],
+    ) -> Result<
+        (
+            Self,
+            Vec<DeserializationWarning>,
+            Vec<ligkern::InfiniteLoopError>,
+        ),
+        DeserializationError,
+    > {
+        let (mut file, deserialization_warnings) = match File::deserialize(tfm_bytes) {
+            (Err(err), _) => return Err(err),
+            (Ok(file), warnings) => (file, warnings),
+        };
+        let (lig_kern_program, lig_kern_warnings) =
+            ligkern::CompiledProgram::compile_from_tfm_file(&mut file);
+        let font = Font {
+            file,
+            lig_kern_program,
+        };
+        Ok((font, deserialization_warnings, lig_kern_warnings))
+    }
+    pub fn cmr10() -> Self {
+        Self::build(TFM_CMR10).expect("cmr10 parses").0
+    }
+}
+
+impl font::Format for Font {
+    fn null() -> Self {
+        Default::default()
+    }
+    fn width(&self, c: char) -> Option<common::Scaled> {
+        self.file.width_utf8(c)
+    }
+    fn height(&self, c: char) -> Option<common::Scaled> {
+        self.file.height_utf8(c)
+    }
+    fn depth(&self, c: char) -> Option<common::Scaled> {
+        self.file.depth_utf8(c)
+    }
+}
+
+impl font::TextBuilder for Font {
+    type TextIter<'a, Word: Iterator<Item = char>> = ligkern::RunIter<'a, Word>;
+
+    fn build_text<'a, Word: Iterator<Item = char>>(
+        &'a self,
+        word: Word,
+    ) -> Self::TextIter<'a, Word> {
+        self.lig_kern_program
+            .run_with_options(word, Default::default())
+    }
+}
 
 /// Complete contents of a TeX font metric (.tfm) file.
 ///

@@ -1,4 +1,5 @@
 use clap::Parser;
+use common::font;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::PathBuf;
@@ -231,7 +232,7 @@ pub struct State {
     pub end_line_char: endlinechar::Component,
     pub error_mode: errormode::Component,
     pub font_repo: texlang_font::NoOpFontRepo<tfm::File>,
-    pub fonts: texlang_font::FontComponent,
+    pub fonts: texlang_font::Component,
     pub input: input::Component<16>,
     pub job: job::Component,
     pub prefix: prefix::Component,
@@ -298,7 +299,7 @@ implement_has_component![State{
     conditional: conditional::Component,
     end_line_char: endlinechar::Component,
     error_mode: errormode::Component,
-    fonts: texlang_font::FontComponent,
+    fonts: texlang_font::Component,
     input: input::Component<16>,
     job: job::Component,
     prefix: prefix::Component,
@@ -320,8 +321,8 @@ impl texlang_common::HasTerminalIn for State {
     }
 }
 impl texlang_stdlib::the::TheCompatible for State {
-    fn get_command_ref_for_font(&self, font: common::FontId) -> Option<token::CommandRef> {
-        texlang_font::FontComponent::get_command_ref_for_font(self, font)
+    fn get_command_ref_for_font(&self, font: font::Id) -> Option<token::CommandRef> {
+        texlang_font::Component::get_command_ref_for_font(self, font)
     }
 }
 

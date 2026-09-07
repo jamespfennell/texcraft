@@ -8,6 +8,7 @@
 //! This module implements the entirety of TeX.2021 part 10, "data structures
 //! for boxes and their friends".
 
+use common::font;
 use common::GlueOrder;
 use common::Scaled as Number;
 use std::rc::Rc;
@@ -124,7 +125,17 @@ vertical_impl!(HBox, VBox, Rule, Mark, Insertion, Math, Glue, Kern, Penalty,);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Char {
     pub char: char,
-    pub font: common::FontId,
+    /// Id of the font.
+    ///
+    /// Information about the font (e.g. the width of this character) is obtained
+    /// by looking up the font in a [font repo](font::Repo). It would be nice to
+    /// directly include the font here (e.g. with some kind of shared smart pointer)
+    /// to avoid this lookup. The problem is that right now Boxworks is
+    /// being designed to be support multiple font formats and from a code
+    /// perspective we want to be generic over the font type. If we put the font
+    /// here we would need to introduce a generic parameter which would make all
+    /// the code more complex.
+    pub font: font::Id,
 }
 
 /// A box made from a horizontal list.
@@ -541,7 +552,7 @@ pub struct Adjust {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ligature {
     pub char: char,
-    pub font: common::FontId,
+    pub font: font::Id,
     /// The original characters that were replaced by the ligature.
     /// This is used if the engine needs to break apart the ligature
     /// in order to perform hyphenation.
@@ -581,9 +592,10 @@ impl Ligature {
     /// interpretation holds: the log line is parsed into the following value:
     /// ```
     /// # use boxworks::ds::Ligature;
+    /// # use common::font;
     /// Ligature {
     ///     char: 'a',
-    ///     font: common::FontId::ONE,
+    ///     font: font::Id::ONE,
     ///     original_chars: "|".into(),
     ///     includes_left_boundary: false,
     ///     includes_right_boundary: false,
@@ -594,9 +606,10 @@ impl Ligature {
     /// Boxworks where the correct value is, say,
     /// ```
     /// # use boxworks::ds::Ligature;
+    /// # use common::font;
     /// Ligature {
     ///     char: 'a',
-    ///     font: common::FontId::ONE,
+    ///     font: font::Id::ONE,
     ///     original_chars: "".into(),
     ///     includes_left_boundary: false,
     ///     includes_right_boundary: true,

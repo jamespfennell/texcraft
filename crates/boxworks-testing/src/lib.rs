@@ -12,11 +12,12 @@
 //! ```rust
 //! # use boxworks::ds;
 //! # use boxworks_testing::assert_box_eq;
+//! # use common::font;
 //! let v_box = ds::VBox {
 //!     list: vec![ds::HBox {
 //!         list: vec![
-//!             ds::Char { char: 'A', font: common::FontId(33) }.into(),
-//!             ds::Char { char: 'Z', font: common::FontId(33) }.into(),
+//!             ds::Char { char: 'A', font: font::Id(33) }.into(),
+//!             ds::Char { char: 'Z', font: font::Id(33) }.into(),
 //!         ],
 //!         ..Default::default()
 //!     }.into()],

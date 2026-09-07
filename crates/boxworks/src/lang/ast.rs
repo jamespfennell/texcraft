@@ -3,6 +3,7 @@
 
 use super::cst::TreeIter;
 use super::ErrorAccumulator;
+use common::font;
 
 use super::cst;
 use super::error::Error;
@@ -636,7 +637,7 @@ functions!(
     (
         struct Chars<'a> {
             content: Cow<'a, str>,
-            font: common::FontId = common::FontId::ONE,
+            font: font::Id = font::Id::ONE,
         }
         impl Func {
             func_name: "chars",
@@ -727,7 +728,7 @@ functions!(
         struct Ligature<'a> {
             char: char,
             original_chars: Cow<'a, str>,
-            font: common::FontId = common::FontId::ONE,
+            font: font::Id = font::Id::ONE,
             includes_left_boundary: bool,
             includes_right_boundary: bool,
         }
@@ -1128,10 +1129,10 @@ impl<'a> Value<'a> for i32 {
     }
 }
 
-impl<'a> Value<'a> for common::FontId {
+impl<'a> Value<'a> for font::Id {
     const DESCRIPTION: &'static str = "a font ID (a non-negative integer)";
     fn try_cast_integer(i: i32) -> Option<Self> {
-        Some(common::FontId(i as u32))
+        Some(font::Id(i as u32))
     }
     fn lower<'b>(&'b self, key: Option<Str<'a>>) -> cst::ArgsItem<'a, CstTreeIter<'a, 'b>> {
         cst::ArgsItem::Regular {
@@ -1274,7 +1275,7 @@ mod tests {
                         source: Some(r#""Hello""#.into()),
                     },
                     font: Arg {
-                        value: common::FontId::ONE,
+                        value: font::Id::ONE,
                         source: None,
                     },
                     ..Default::default()

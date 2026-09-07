@@ -20,6 +20,7 @@ use crate::token::Token;
 use crate::token::Value;
 use crate::types;
 use crate::variable;
+use common::font;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use texcraft_stdext::collections::groupingmap;
@@ -444,7 +445,7 @@ pub trait TexlangState: Sized {
     /// a group ends.
     ///
     /// The default implementation is a no-op.
-    fn enable_font_hook(&mut self, font: common::FontId) {
+    fn enable_font_hook(&mut self, font: font::Id) {
         _ = font
     }
 
@@ -638,7 +639,7 @@ impl<S> VM<S> {
     pub(crate) fn stack_pop(&mut self) {
         self.internal.execution_stack.pop();
     }
-    pub fn current_font(&self) -> common::FontId {
+    pub fn current_font(&self) -> font::Id {
         self.internal.current_font
     }
 }
@@ -689,8 +690,8 @@ struct Internal<S> {
     #[cfg_attr(feature = "serde", serde(skip))]
     save_stack: Vec<variable::SaveStackElement<S>>,
 
-    current_font: common::FontId,
-    fonts_save_stack: Vec<Option<common::FontId>>,
+    current_font: font::Id,
+    fonts_save_stack: Vec<Option<font::Id>>,
     execution_stack: Vec<(error::OperationKind, Token)>,
 
     // We assume the VM is never saved during shutdown.
@@ -707,7 +708,7 @@ impl<S> Internal<S> {
             tracer: Default::default(),
             token_buffers: Default::default(),
             save_stack: Default::default(),
-            current_font: common::FontId::NULL,
+            current_font: font::Id::NULL,
             fonts_save_stack: Default::default(),
             execution_stack: Default::default(),
             shutdown_status: Default::default(),

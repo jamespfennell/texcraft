@@ -1,5 +1,6 @@
 //! Conversions between Box language and Boxworks data structures
 
+use common::font;
 use std::borrow::Cow;
 
 use super::ast;
@@ -59,10 +60,10 @@ impl ToBoxLang for Vec<ds::Horizontal> {
     type Output = Vec<ast::Horizontal<'static>>;
     fn to_box_lang(&self) -> Self::Output {
         let mut out = vec![];
-        let mut current_font: Option<common::FontId> = None;
+        let mut current_font: Option<font::Id> = None;
         let mut buf: String = Default::default();
         let flush_chars = |out: &mut Vec<ast::Horizontal<'static>>,
-                           current_font: &mut Option<common::FontId>,
+                           current_font: &mut Option<font::Id>,
                            buf: &mut String| {
             let Some(current_font) = current_font.take() else {
                 // Nothing to flush.
@@ -546,11 +547,11 @@ mod tests {
     use super::*;
 
     /// The first font.
-    const F1: common::FontId = common::FontId::ONE;
+    const F1: font::Id = font::Id::ONE;
 
     /// The second font, used in tests that involve more than one font.
-    fn f2() -> common::FontId {
-        common::FontId(2)
+    fn f2() -> font::Id {
+        font::Id(2)
     }
 
     macro_rules! tests {

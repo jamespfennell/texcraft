@@ -506,7 +506,7 @@ impl LigKernDescribe {
                 }
             };
             for elem in lig_kern_program.run(&s) {
-                use tfm::ligkern::RunItem::*;
+                use common::font::TextItem::*;
                 match elem {
                     Char(c) => {
                         print!("{}", c.escape_debug())
@@ -514,8 +514,8 @@ impl LigKernDescribe {
                     Kern(scaled) => {
                         print!("[{}]", scaled);
                     }
-                    Ligature(ligature) => {
-                        print!("{}", ligature.c.escape_debug());
+                    Ligature { c, .. } => {
+                        print!("{}", c.escape_debug());
                     }
                 }
             }
@@ -553,7 +553,7 @@ impl LigKernRun {
                 right_boundary_override: self.right_boundary_override,
             },
         ) {
-            use tfm::ligkern::RunItem::*;
+            use common::font::TextItem::*;
             match elem {
                 Char(c) => {
                     print!("{c}")
@@ -561,8 +561,8 @@ impl LigKernRun {
                 Kern(scaled) => {
                     print!("[{}]", scaled);
                 }
-                Ligature(ligature) => {
-                    print!("{}", ligature.c);
+                Ligature { c, .. } => {
+                    print!("{c}");
                 }
             }
         }

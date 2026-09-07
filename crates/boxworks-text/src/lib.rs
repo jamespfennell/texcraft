@@ -6,8 +6,8 @@
 //! TeX (starting in TeX.2021.1029).
 
 use boxworks::ds;
+use common::font;
 use std::collections::HashMap;
-use tfm::ligkern;
 
 #[derive(Debug)]
 struct Font {
@@ -58,7 +58,7 @@ impl Params {
 pub struct TextPreprocessorImpl {
     fonts: Vec<Font>,
     // TODO: should be initialized to the null font
-    current_font: common::FontId,
+    current_font: font::Id,
     space_factor: SpaceFactor,
     pub params: Params,
 }
@@ -67,7 +67,7 @@ impl TextPreprocessorImpl {
     pub fn new(params: Params) -> Self {
         Self {
             fonts: vec![],
-            current_font: common::FontId::ONE,
+            current_font: font::Id::ONE,
             space_factor: Default::default(),
             params,
         }
@@ -134,7 +134,7 @@ impl SpaceFactor {
 }
 
 impl TextPreprocessorImpl {
-    pub fn activate_font(&mut self, font: common::FontId) {
+    pub fn activate_font(&mut self, font: font::Id) {
         self.current_font = font;
     }
 
@@ -155,7 +155,7 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
     fn add_word(&mut self, word: &str, list: &mut Vec<ds::Horizontal>) {
         let font = self.current_font();
         for elem in font.lig_kern_program.run(word) {
-            use ligkern::RunItem::*;
+            use font::TextItem::*;
             match elem {
                 Char(c) => {
                     list.push(
@@ -180,15 +180,20 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
                         .into(),
                     );
                 }
-                Ligature(ligature) => {
-                    let ins_disc = ligature.original.as_ref().ends_with('-');
+                Ligature {
+                    c,
+                    original,
+                    includes_left_boundary,
+                    includes_right_boundary,
+                } => {
+                    let ins_disc = original.as_ref().ends_with('-');
                     list.push(
                         ds::Ligature {
-                            char: ligature.c,
+                            char: c,
                             font: self.current_font,
-                            original_chars: ligature.original,
-                            includes_left_boundary: ligature.includes_left_boundary,
-                            includes_right_boundary: ligature.includes_right_boundary,
+                            original_chars: original,
+                            includes_left_boundary,
+                            includes_right_boundary,
                         }
                         .into(),
                     );
@@ -242,7 +247,7 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
 impl TextPreprocessorImpl {
     pub fn register_font(
         &mut self,
-        id: common::FontId,
+        id: font::Id,
         tfm_file: &tfm::File,
         lig_kern_program: tfm::ligkern::CompiledProgram,
     ) {
@@ -271,24 +276,24 @@ impl TextPreprocessorImpl {
 
 #[derive(Debug, Default)]
 pub struct TfmFontRepo {
-    fonts: HashMap<common::FontId, tfm::File>,
+    fonts: HashMap<font::Id, tfm::File>,
 }
 
 impl TfmFontRepo {
-    pub fn register_font(&mut self, id: common::FontId, tfm_file: tfm::File) {
+    pub fn register_font(&mut self, id: font::Id, tfm_file: tfm::File) {
         assert_eq!(id.0 as usize, self.fonts.len() + 1);
         self.fonts.insert(id, tfm_file);
     }
 }
 
 impl boxworks::FontRepo for TfmFontRepo {
-    fn width(&self, c: char, font: common::FontId) -> Option<common::Scaled> {
+    fn width(&self, c: char, font: font::Id) -> Option<common::Scaled> {
         self.fonts[&font].width_utf8(c)
     }
-    fn height(&self, c: char, font: common::FontId) -> Option<common::Scaled> {
+    fn height(&self, c: char, font: font::Id) -> Option<common::Scaled> {
         self.fonts[&font].height_utf8(c)
     }
-    fn depth(&self, c: char, font: common::FontId) -> Option<common::Scaled> {
+    fn depth(&self, c: char, font: font::Id) -> Option<common::Scaled> {
         self.fonts[&font].depth_utf8(c)
     }
 }
@@ -606,8 +611,8 @@ mod tests {
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
 
         let mut tp = TextPreprocessorImpl::new(params);
-        tp.register_font(common::FontId::ONE, &tfm_file, lig_kern_program);
-        tp.activate_font(common::FontId::ONE);
+        tp.register_font(font::Id::ONE, &tfm_file, lig_kern_program);
+        tp.activate_font(font::Id::ONE);
         let mut got = vec![];
         for word in input.split_inclusive(' ') {
             tp.add_word(word.trim_matches(' '), &mut got);

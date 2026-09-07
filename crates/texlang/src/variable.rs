@@ -13,6 +13,7 @@ use crate::token;
 use crate::traits::*;
 use crate::types;
 use crate::vm;
+use common::font;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -670,7 +671,7 @@ supported_type_impl!(
         recycle_fn: recycle_token_list,
     },
     {
-        rust_type: common::FontId,
+        rust_type: font::Id,
         enum_variant: Font,
         save_stack_field: font,
     },

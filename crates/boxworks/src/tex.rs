@@ -14,6 +14,7 @@
 //!     because they ultimately invoke TeX to generate the right diagnostic information.
 
 use crate::ds;
+use common::font;
 use std::{collections::HashMap, path::PathBuf};
 
 /// Implementations of this trait can run TeX source code and return stdout.
@@ -258,7 +259,7 @@ pub fn build_horizontal_lists(
     preamble: &str,
     contents: &mut dyn Iterator<Item = &String>,
     hyphenate: bool,
-) -> (HashMap<String, common::FontId>, Vec<ds::HBox>) {
+) -> (HashMap<String, font::Id>, Vec<ds::HBox>) {
     let macro_calls: Vec<String> = contents
         .map(|s| format!(r#"\buildAndPrintBoxes{{{s}}}"#))
         .collect();
@@ -267,7 +268,7 @@ pub fn build_horizontal_lists(
         .replace("<print_calls>", &macro_calls.join("\n\n"));
     let output = tex_engine.run(&tex_source_code, auxiliary_files);
 
-    let mut fonts: HashMap<String, common::FontId> = Default::default();
+    let mut fonts: HashMap<String, font::Id> = Default::default();
     let mut tail: &str = &output;
     let mut line_number = 0_usize;
     enum Next {
@@ -351,7 +352,7 @@ pub fn build_vertical_lists(
     preamble: &str,
     widths: &[common::Scaled],
     contents: &mut dyn Iterator<Item = &String>,
-) -> (HashMap<String, common::FontId>, Vec<ds::VBox>) {
+) -> (HashMap<String, font::Id>, Vec<ds::VBox>) {
     let last_width = *widths.last().expect("widths is non-empty");
     let box_template = if widths.len() == 1 {
         format!(r"\vbox{{\noindent \hsize={} #1}}", last_width)
@@ -371,7 +372,7 @@ pub fn build_vertical_lists(
         .replace("<print_calls>", &macro_calls.join("\n\n"));
     let output = tex_engine.run(&tex_source_code, auxiliary_files);
     let segments = extract_texcraft_segments(&output);
-    let mut fonts: HashMap<String, common::FontId> = Default::default();
+    let mut fonts: HashMap<String, font::Id> = Default::default();
     let vlists = segments
         .map(|s| parse_v_box(&mut TexOutputIter::new(s), &mut fonts).unwrap())
         .collect();
@@ -614,8 +615,8 @@ impl std::error::Error for Error {}
 /// Returns the ID to assign to the next font discovered in the TeX output.
 ///
 /// Font IDs start at 1 and are assigned in the order the fonts are encountered.
-fn next_font_id(fonts: &HashMap<String, common::FontId>) -> common::FontId {
-    common::FontId(
+fn next_font_id(fonts: &HashMap<String, font::Id>) -> font::Id {
+    font::Id(
         (fonts.len() + 1)
             .try_into()
             .expect("no more than 2^32-1 fonts"),
@@ -625,7 +626,7 @@ fn next_font_id(fonts: &HashMap<String, common::FontId>) -> common::FontId {
 fn parse_disc_elem(
     line: &str,
     line_number: usize,
-    fonts: &mut HashMap<String, common::FontId>,
+    fonts: &mut HashMap<String, font::Id>,
 ) -> Result<ds::DiscretionaryElem, Error> {
     let (keyword, tail) = keyword_and_tail(line).unwrap();
     match keyword {
@@ -670,7 +671,7 @@ fn parse_disc_elem(
 /// The `fonts` map is updated in place as new fonts are encountered.
 fn parse_h_box(
     iter: &mut TexOutputIter,
-    fonts: &mut HashMap<String, common::FontId>,
+    fonts: &mut HashMap<String, font::Id>,
 ) -> Result<ds::HBox, Error> {
     let mut h_box = {
         let line_number_hint = iter.line_number;
@@ -719,7 +720,7 @@ fn parse_h_box(
 
 fn parse_h_box_list(
     iter: &mut TexOutputIter,
-    fonts: &mut HashMap<String, common::FontId>,
+    fonts: &mut HashMap<String, font::Id>,
 ) -> Result<Vec<ds::Horizontal>, Error> {
     let mut list = vec![];
     while let Some((line_number, line)) = iter.peek() {
@@ -856,7 +857,7 @@ fn parse_h_box_list(
 /// Parse a single raw vlist segment into a vlist.
 fn parse_v_box(
     iter: &mut TexOutputIter,
-    fonts: &mut HashMap<String, common::FontId>,
+    fonts: &mut HashMap<String, font::Id>,
 ) -> Result<ds::VBox, Error> {
     let mut vlist = {
         let line_number_hint = iter.line_number;
@@ -903,7 +904,7 @@ fn parse_v_box(
 
 fn parse_v_box_list(
     iter: &mut TexOutputIter,
-    fonts: &mut HashMap<String, common::FontId>,
+    fonts: &mut HashMap<String, font::Id>,
 ) -> Result<Vec<ds::Vertical>, Error> {
     let mut list = vec![];
     while let Some((line_number, line)) = iter.peek() {
@@ -1195,7 +1196,7 @@ mod tests {
         );
         let want_fonts = {
             let mut m = HashMap::new();
-            m.insert("customFont".to_string(), common::FontId::ONE);
+            m.insert("customFont".to_string(), font::Id::ONE);
             m
         };
 
@@ -1329,7 +1330,7 @@ Transcript written on test.log.
         );
         let want_fonts = {
             let mut m = HashMap::new();
-            m.insert("tenrm".to_string(), common::FontId::ONE);
+            m.insert("tenrm".to_string(), font::Id::ONE);
             m
         };
 
@@ -1440,7 +1441,7 @@ Transcript written on test.log.
         );
         let want_fonts = {
             let mut m = HashMap::new();
-            m.insert("tenrm".to_string(), common::FontId::ONE);
+            m.insert("tenrm".to_string(), font::Id::ONE);
             m
         };
 

@@ -4,6 +4,7 @@ use boxworks::tex as bwt;
 use boxworks::LineBreaker;
 use boxworks::TextPreprocessor;
 use clap::Parser;
+use common::font;
 use std::fs;
 use std::path::PathBuf;
 
@@ -245,10 +246,10 @@ fn run_box_vlists(
     let mut tfm_file = tfm::File::deserialize(&tfm_bytes).0.unwrap();
     let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
     let mut tp = boxworks_text::TextPreprocessorImpl::new(text_params);
-    tp.register_font(common::FontId::ONE, &tfm_file, lig_kern_program.clone());
-    tp.activate_font(common::FontId::ONE);
+    tp.register_font(font::Id::ONE, &tfm_file, lig_kern_program.clone());
+    tp.activate_font(font::Id::ONE);
     let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
-    font_repo.register_font(common::FontId::ONE, tfm_file);
+    font_repo.register_font(font::Id::ONE, tfm_file);
 
     let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us(lig_kern_program);
     use boxworks::ds;
@@ -261,12 +262,13 @@ fn run_box_vlists(
                 line_indents: &[],
                 debug_logger: None,
                 hyphenator: &hyphenator,
+                font_repo: &font_repo,
             };
             let mut vlist = vec![];
 
             let mut h_list = vec![];
             tp.add_text(&text, &mut h_list);
-            lb.break_line(&font_repo, &mut vlist, &mut h_list);
+            lb.break_line(&mut vlist, &mut h_list);
             ds::VBox {
                 height: common::Scaled::ZERO,
                 width: common::Scaled::ZERO,

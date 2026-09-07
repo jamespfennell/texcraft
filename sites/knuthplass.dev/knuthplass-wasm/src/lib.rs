@@ -8,6 +8,7 @@
 use boxworks::ds;
 use boxworks::LineBreaker as _;
 use boxworks::TextPreprocessor as _;
+use common::font;
 use common::Scaled;
 use wasm_bindgen::prelude::*;
 
@@ -258,10 +259,10 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
         text_params.extra_space_skip = parse_named_glue("extra_space_skip", s)?;
     }
     let mut tp = boxworks_text::TextPreprocessorImpl::new(text_params);
-    tp.register_font(common::FontId::ONE, &tfm_file, lig_kern_program.clone());
-    tp.activate_font(common::FontId::ONE);
+    tp.register_font(font::Id::ONE, &tfm_file, lig_kern_program.clone());
+    tp.activate_font(font::Id::ONE);
     let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
-    font_repo.register_font(common::FontId::ONE, tfm_file);
+    font_repo.register_font(font::Id::ONE, tfm_file);
 
     // Reject characters the font has no glyph for; they would otherwise be
     // silently dropped or typeset with zero width.
@@ -272,7 +273,7 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
             if c.is_whitespace() || missing.contains(&c) {
                 continue;
             }
-            if font_repo.width(c, common::FontId::ONE).is_none() {
+            if font_repo.width(c, font::Id::ONE).is_none() {
                 missing.push(c);
             }
         }
@@ -298,12 +299,13 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
         line_indents: &[],
         debug_logger: Some(&mut pass_recorder),
         hyphenator: &hyphenator,
+        font_repo: &font_repo,
     };
 
     let mut h_list = vec![];
     tp.add_text(text, &mut h_list);
     let mut v_list = vec![];
-    lb.break_line(&font_repo, &mut v_list, &mut h_list);
+    lb.break_line(&mut v_list, &mut h_list);
 
     Ok(build_output(
         &v_list,

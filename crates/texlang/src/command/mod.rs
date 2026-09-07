@@ -36,6 +36,7 @@ use crate::token;
 use crate::types;
 use crate::variable;
 use crate::vm;
+use common::font;
 use std::num;
 use std::rc;
 use std::sync;
@@ -97,7 +98,7 @@ pub enum Command<S> {
     MathCharacter(types::MathCode),
 
     /// A command that enables a font.
-    Font(common::FontId),
+    Font(font::Id),
 }
 
 impl<S> std::fmt::Display for Command<S> {
@@ -157,7 +158,7 @@ impl<S> BuiltIn<S> {
     }
 
     /// Create a new font built-in command.
-    pub fn new_font(font: common::FontId) -> BuiltIn<S> {
+    pub fn new_font(font: font::Id) -> BuiltIn<S> {
         Command::Font(font).into()
     }
 

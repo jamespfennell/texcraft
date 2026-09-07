@@ -1,14 +1,14 @@
 //! Implementation of TeX primitives relating to text transforming (hyphenation, upper and lower casing).
 //!
 //! The theme of the primitives here (`\lccode`, `\lowercase`, `\patterns`) is that
-//! they're all related to "tex transformation" (case change, hyphenation).
+//! they're all related to "text transformation" (case change, hyphenation).
 //! However the real reason they're grouped is that the hyphenator hyphenates based on
 //! each character's lower case, and so has a dependency on `\lccode` which defines
 //! these cases.
 //!
 //! This crate is also a good experiment in how defining registers works outside of the
 //! standard lib. At time of writing (May 2026) I can say that it's not really great.
-//! The problem is that having the exact component specified is a but too rigid.
+//! The problem is that having the exact component specified is a bit too rigid.
 //! For example, I might like multiple registers in the same component.
 
 use texlang::prelude as txl;

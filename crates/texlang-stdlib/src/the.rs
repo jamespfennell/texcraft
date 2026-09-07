@@ -1,5 +1,6 @@
 //! The `\the` primitive
 
+use common::font;
 use std::char;
 use texlang::prelude as txl;
 use texlang::traits::*;
@@ -9,7 +10,7 @@ pub const THE_DOC: &str = "Output text describing some inputted tokens";
 
 /// Trait satisfied by states that can be used with the control sequence `\the`
 pub trait TheCompatible: TexlangState {
-    fn get_command_ref_for_font(&self, font: common::FontId) -> Option<token::CommandRef> {
+    fn get_command_ref_for_font(&self, font: font::Id) -> Option<token::CommandRef> {
         _ = font;
         None
     }
@@ -102,7 +103,7 @@ fn the_primitive_fn<S: TheCompatible>(
 fn font_to_tokens<S: TexlangState + TheCompatible>(
     the_token: token::Token,
     input: &mut vm::ExpansionInput<S>,
-    font: common::FontId,
+    font: font::Id,
 ) {
     let command_ref = input.state().get_command_ref_for_font(font).unwrap();
     let font_token = token::Token::new_command_ref(command_ref, the_token.trace_key());

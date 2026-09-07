@@ -81,8 +81,9 @@ mod compiler;
 use crate::ligkern::compiler::Replacement;
 use crate::Char;
 use crate::FixWord;
+use common::font;
+use common::font::TextItem;
 use std::collections::HashMap;
-use std::rc::Rc;
 pub mod lang;
 
 /// A compiled lig/kern program.
@@ -267,14 +268,6 @@ pub struct RunOptions {
     pub right_boundary_override: Option<char>,
 }
 
-/// Replacement elements of a word in a lig/kern program.
-#[derive(PartialEq, Debug)]
-pub enum RunItem {
-    Char(char),
-    Kern(common::Scaled),
-    Ligature(Ligature),
-}
-
 #[derive(Default)]
 struct PendingLigature {
     s: String,
@@ -283,8 +276,8 @@ struct PendingLigature {
 }
 
 impl PendingLigature {
-    fn into_ligature(self, c: char) -> Ligature {
-        Ligature {
+    fn into_text_item(self, c: char) -> TextItem {
+        TextItem::Ligature {
             c,
             original: self.s.into(),
             includes_left_boundary: self.includes_left_boundary,
@@ -340,25 +333,35 @@ impl<'a, Word> RunIter<'a, Word> {
     }
 }
 
+impl<'a, Word> font::TextIter for RunIter<'a, Word>
+where
+    Word: Iterator<Item = char>,
+{
+    fn is_separation_point(&self) -> bool {
+        self.intermediate_ops.is_empty()
+            && !matches!(self.next_left, NextLeft::Lig(_, _) | NextLeft::FinalLig(_))
+    }
+}
+
 impl<'a, Word> Iterator for RunIter<'a, Word>
 where
     Word: Iterator<Item = char>,
 {
-    type Item = RunItem;
+    type Item = TextItem;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((op, tail)) = self.intermediate_ops.split_first() {
             self.intermediate_ops = tail;
             return Some(match op {
-                IntermediateOp::Kern(kern) => RunItem::Kern(*kern),
+                IntermediateOp::Kern(kern) => TextItem::Kern(*kern),
                 IntermediateOp::C(compiler::C { c, is_lig: false }) => {
                     self.consumes_left = false;
                     match self.ligature.take() {
                         Some(l) => {
                             // This happens when left is a ligature.
-                            RunItem::Ligature(l.into_ligature((*c).into()))
+                            l.into_text_item((*c).into())
                         }
-                        None => RunItem::Char((*c).into()),
+                        None => TextItem::Char((*c).into()),
                     }
                 }
                 IntermediateOp::C(compiler::C { c, is_lig: true }) => {
@@ -376,7 +379,7 @@ where
                             (tail.first(), tail.get(1)),
                             (None, None) | (Some(IntermediateOp::Kern(_)), None)
                         );
-                    RunItem::Ligature(s.into_ligature((*c).into()))
+                    s.into_text_item((*c).into())
                 }
             });
         };
@@ -405,7 +408,7 @@ where
                     }
                 }
                 s.includes_right_boundary = true;
-                let lig = RunItem::Ligature(s.into_ligature(*c));
+                let lig = s.into_text_item(*c);
                 self.next_left = NextLeft::None;
                 return Some(lig);
             }
@@ -441,22 +444,14 @@ where
                 };
                 if let Some(left) = left {
                     return Some(match self.ligature.take() {
-                        Some(l) => RunItem::Ligature(l.into_ligature(left)),
-                        None => RunItem::Char(left),
+                        Some(l) => l.into_text_item(left),
+                        None => TextItem::Char(left),
                     });
                 }
             }
         }
         self.next()
     }
-}
-
-#[derive(PartialEq, Debug)]
-pub struct Ligature {
-    pub c: char,
-    pub original: Rc<str>,
-    pub includes_left_boundary: bool,
-    pub includes_right_boundary: bool,
 }
 
 /// An error returned from lig/kern compilation.
@@ -504,13 +499,12 @@ pub struct InfiniteLoopStep {
 mod tests {
     use common::Scaled;
 
-    use super::Ligature as L;
     use super::*;
     use pretty_assertions::assert_eq;
 
     const LIGAROO: &'static str = include_str!["ligaroo.plst"];
 
-    fn run_test(program: &str, input: &str, want: Vec<RunItem>) {
+    fn run_test(program: &str, input: &str, want: Vec<TextItem>) {
         let source = LIGAROO.replace("(LIGTABLE", &format!["(LIGTABLE\n{program}"]);
         let pl_file = crate::pl::File::from_pl_source_code(&source).0;
 
@@ -520,7 +514,7 @@ mod tests {
         }
 
         let program = CompiledProgram::compile_from_pl_file(&pl_file).0;
-        let got: Vec<RunItem> = program.run(input).collect();
+        let got: Vec<TextItem> = program.run(input).collect();
         assert_eq!(got, want);
     }
 
@@ -530,11 +524,11 @@ mod tests {
     /// `\hbox` from the input word set in a font backed by that TFM file,
     /// and the box contents (dumped with `\showbox`) are parsed back into
     /// run items and compared to the expected ones.
-    fn verify_against_tex(pl_file: crate::pl::File, input: &str, want: Vec<RunItem>) {
+    fn verify_against_tex(pl_file: crate::pl::File, input: &str, want: Vec<TextItem>) {
         let tfm_file: crate::File = pl_file.into();
         let stdout = run_tex(&tfm_file.serialize(), input);
         let got = parse_showbox_output(&stdout);
-        let want: Vec<RunItem> = want.into_iter().map(normalize_for_tex).collect();
+        let want: Vec<TextItem> = want.into_iter().map(normalize_for_tex).collect();
         assert_eq!(got, want);
     }
 
@@ -584,7 +578,7 @@ mod tests {
     }
 
     /// Parse the contents of the box dumped with `\showbox253` into run items.
-    fn parse_showbox_output(stdout: &str) -> Vec<RunItem> {
+    fn parse_showbox_output(stdout: &str) -> Vec<TextItem> {
         let mut lines = stdout.lines();
         for line in lines.by_ref() {
             if line.starts_with(r"> \box253=") {
@@ -605,12 +599,12 @@ mod tests {
     }
 
     /// Parse one line of the box dump into a run item.
-    fn parse_run_item(line: &str) -> RunItem {
+    fn parse_run_item(line: &str) -> TextItem {
         // Kern lines look like `\kern1.0` (or `\kern 1.0` for explicit kerns).
         if let Some(width) = line.strip_prefix(r"\kern") {
             let width = common::Scaled::parse_no_units(width.trim())
                 .expect("kern width fits in a scaled number");
-            return RunItem::Kern(width);
+            return TextItem::Kern(width);
         }
         // Character lines look like `\ligkernfont A`, and ligature lines
         // like `\ligkernfont 1 (ligature AB)`.
@@ -624,17 +618,17 @@ mod tests {
             c
         };
         match tail.split_once(" (ligature ") {
-            None => RunItem::Char(parse_char(tail)),
+            None => TextItem::Char(parse_char(tail)),
             Some((c, original)) => {
                 let original = original
                     .strip_suffix(')')
                     .expect("ligature original chars end with `)`");
-                RunItem::Ligature(Ligature {
+                TextItem::Ligature {
                     c: parse_char(c),
                     original: original.into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                })
+                }
             }
         }
     }
@@ -646,23 +640,28 @@ mod tests {
     /// between the left and the right boundary, so instead of parsing the
     /// markers back into the boundary fields, the comparison happens on the
     /// marked-up original characters with the boundary fields cleared.
-    fn normalize_for_tex(item: RunItem) -> RunItem {
+    fn normalize_for_tex(item: TextItem) -> TextItem {
         match item {
-            RunItem::Ligature(ligature) => {
+            TextItem::Ligature {
+                c,
+                original: lig_original,
+                includes_left_boundary,
+                includes_right_boundary,
+            } => {
                 let mut original = String::new();
-                if ligature.includes_left_boundary {
+                if includes_left_boundary {
                     original.push('|');
                 }
-                original.push_str(&ligature.original);
-                if ligature.includes_right_boundary {
+                original.push_str(&lig_original);
+                if includes_right_boundary {
                     original.push('|');
                 }
-                RunItem::Ligature(Ligature {
-                    c: ligature.c,
+                TextItem::Ligature {
+                    c,
                     original: original.into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                })
+                }
             }
             item => item,
         }
@@ -675,7 +674,7 @@ mod tests {
             #[test]
             fn $name() {
                 #[allow(unused_imports)]
-                use RunItem::*;
+                use TextItem::*;
                 let program = $program;
                 let input = $input;
                 let want = $want;
@@ -700,12 +699,12 @@ mod tests {
                 (STOP)
             ",
             "AB",
-            vec![Ligature(L {
+            vec![Ligature {
                 c: '1',
                 original: "AB".into(),
                 includes_left_boundary: false,
                 includes_right_boundary: false,
-            })],
+            }],
         ),
         // AB -> ^A1
         (
@@ -724,12 +723,12 @@ mod tests {
             vec![
                 Char('A'),
                 Kern(Scaled::ONE),
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "B".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                })
+                }
             ],
         ),
         // AB -> A^1
@@ -748,12 +747,12 @@ mod tests {
             "AB",
             vec![
                 Char('A'),
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "B".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
             ],
         ),
         // AB -> ^1B
@@ -771,12 +770,12 @@ mod tests {
             ",
             "AB",
             vec![
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "A".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
                 Kern(Scaled::ONE * 3),
                 Char('B'),
             ],
@@ -796,12 +795,12 @@ mod tests {
             ",
             "AB",
             vec![
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "A".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
                 Char('B'),
             ],
         ),
@@ -822,12 +821,12 @@ mod tests {
             vec![
                 Char('A'),
                 Kern(Scaled::ONE),
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
                 Kern(Scaled::ONE * 3),
                 Char('B'),
             ],
@@ -848,12 +847,12 @@ mod tests {
             "AB",
             vec![
                 Char('A'),
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
                 Kern(Scaled::ONE * 3),
                 Char('B'),
             ],
@@ -874,12 +873,12 @@ mod tests {
             "AB",
             vec![
                 Char('A'),
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
                 Char('B'),
             ],
         ),
@@ -896,12 +895,12 @@ mod tests {
             ",
             "AB",
             vec![
-                Ligature(L {
+                Ligature {
                     c: 'A',
                     original: "A".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
                 Char('B'),
             ],
         ),
@@ -917,12 +916,12 @@ mod tests {
                 (STOP)
             ",
             "ABC",
-            vec![Ligature(L {
+            vec![Ligature {
                 c: '2',
                 original: "ABC".into(),
                 includes_left_boundary: false,
                 includes_right_boundary: false,
-            }),],
+            },],
         ),
         // AB -> ^A1B, 1B -> 2
         (
@@ -937,12 +936,12 @@ mod tests {
             "AB",
             vec![
                 Char('A'),
-                Ligature(L {
+                Ligature {
                     c: '2',
                     original: "B".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
             ],
         ),
         // AA -> 1^A multiple times
@@ -955,30 +954,30 @@ mod tests {
             ",
             "AAAAA",
             vec![
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "A".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
-                Ligature(L {
+                },
+                Ligature {
                     c: '1',
                     original: "A".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
-                Ligature(L {
+                },
+                Ligature {
                     c: '1',
                     original: "A".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
-                Ligature(L {
+                },
+                Ligature {
                     c: '1',
                     original: "A".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
                 Char('A'),
             ],
         ),
@@ -991,12 +990,12 @@ mod tests {
                 (STOP)
             ",
             "AAAAAA",
-            vec![Ligature(L {
+            vec![Ligature {
                 c: 'A',
                 original: "AAAAAA".into(),
                 includes_left_boundary: false,
                 includes_right_boundary: false,
-            }),],
+            },],
         ),
         // AB -> ^A1, A1 -> ^21
         (
@@ -1009,18 +1008,18 @@ mod tests {
             ",
             "AB",
             vec![
-                Ligature(L {
+                Ligature {
                     c: '2',
                     original: "A".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
-                Ligature(L {
+                },
+                Ligature {
                     c: '1',
                     original: "B".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
             ],
         ),
         // AB -> ^A1, A1 -> ^21, 21 -> 3
@@ -1035,12 +1034,12 @@ mod tests {
                 (STOP)
             ",
             "AB",
-            vec![Ligature(L {
+            vec![Ligature {
                 c: '3',
                 original: "AB".into(),
                 includes_left_boundary: false,
                 includes_right_boundary: false,
-            })],
+            }],
         ),
         // AB -> ^1, 1C -> 12^C
         (
@@ -1056,18 +1055,18 @@ mod tests {
             ",
             "ABC",
             vec![
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "AB".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
-                Ligature(L {
+                },
+                Ligature {
                     c: '2',
                     original: "".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
                 Char('C'),
             ],
         ),
@@ -1083,12 +1082,12 @@ mod tests {
             ",
             "ABC",
             vec![
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "AB".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
                 Kern(Scaled::ONE),
                 Char('C'),
             ],
@@ -1105,19 +1104,19 @@ mod tests {
             ",
             "ABAB",
             vec![
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "AB".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
                 Kern(Scaled::ONE),
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "AB".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
             ],
         ),
         (
@@ -1127,12 +1126,12 @@ mod tests {
                 (LIG C A C 1)
             ",
             "A",
-            vec![Ligature(L {
+            vec![Ligature {
                 c: '1',
                 original: "A".into(),
                 includes_left_boundary: true,
                 includes_right_boundary: false,
-            }),],
+            },],
         ),
         (
             left_boundary_char_2,
@@ -1143,18 +1142,18 @@ mod tests {
             ",
             "A",
             vec![
-                Ligature(L {
+                Ligature {
                     c: '2',
                     original: "".into(),
                     includes_left_boundary: true,
                     includes_right_boundary: false,
-                }),
-                Ligature(L {
+                },
+                Ligature {
                     c: '1',
                     original: "".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
                 Char('A'),
             ],
         ),
@@ -1166,12 +1165,12 @@ mod tests {
             ",
             "A",
             vec![
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "".into(),
                     includes_left_boundary: true,
                     includes_right_boundary: false,
-                }),
+                },
                 Char('A'),
             ],
         ),
@@ -1183,12 +1182,12 @@ mod tests {
                 (/LIG C A C 1)
             ",
             "A",
-            vec![Ligature(L {
+            vec![Ligature {
                 c: '1',
                 original: "A".into(),
                 includes_left_boundary: true,
                 includes_right_boundary: false,
-            }),],
+            },],
         ),
         // |A -> |^1
         (
@@ -1198,12 +1197,12 @@ mod tests {
                 (/LIG> C A C 1)
             ",
             "A",
-            vec![Ligature(L {
+            vec![Ligature {
                 c: '1',
                 original: "A".into(),
                 includes_left_boundary: true,
                 includes_right_boundary: false,
-            }),],
+            },],
         ),
         // |A -> ^1A
         (
@@ -1214,12 +1213,12 @@ mod tests {
             ",
             "A",
             vec![
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "".into(),
                     includes_left_boundary: true,
                     includes_right_boundary: false,
-                }),
+                },
                 Char('A'),
             ],
         ),
@@ -1232,12 +1231,12 @@ mod tests {
             ",
             "A",
             vec![
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "".into(),
                     includes_left_boundary: true,
                     includes_right_boundary: false,
-                }),
+                },
                 Char('A'),
             ],
         ),
@@ -1250,12 +1249,12 @@ mod tests {
             ",
             "A",
             vec![
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "".into(),
                     includes_left_boundary: true,
                     includes_right_boundary: false,
-                }),
+                },
                 Char('A'),
             ],
         ),
@@ -1268,12 +1267,12 @@ mod tests {
             ",
             "A",
             vec![
-                Ligature(L {
+                Ligature {
                     c: '1',
                     original: "".into(),
                     includes_left_boundary: true,
                     includes_right_boundary: false,
-                }),
+                },
                 Char('A'),
             ],
         ),
@@ -1285,12 +1284,12 @@ mod tests {
                 (STOP)
             ",
             "A",
-            vec![Ligature(L {
+            vec![Ligature {
                 c: '1',
                 original: "A".into(),
                 includes_left_boundary: false,
                 includes_right_boundary: true,
-            }),],
+            },],
         ),
         // AR -> ^AB
         (
@@ -1303,12 +1302,12 @@ mod tests {
             "A",
             vec![
                 Char('A'),
-                Ligature(L {
+                Ligature {
                     c: 'B',
                     original: "".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: true,
-                }),
+                },
             ],
         ),
         // AR -> A^B
@@ -1322,12 +1321,12 @@ mod tests {
             "A",
             vec![
                 Char('A'),
-                Ligature(L {
+                Ligature {
                     c: 'B',
                     original: "".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: true,
-                }),
+                },
             ],
         ),
         (
@@ -1340,12 +1339,12 @@ mod tests {
             "A",
             vec![
                 Char('A'),
-                Ligature(L {
+                Ligature {
                     c: 'B',
                     original: "".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: true,
-                }),
+                },
             ],
         ),
         // AR -> ^BR
@@ -1357,12 +1356,12 @@ mod tests {
                 (STOP)
             ",
             "A",
-            vec![Ligature(L {
+            vec![Ligature {
                 c: 'B',
                 original: "A".into(),
                 includes_left_boundary: false,
                 includes_right_boundary: true,
-            }),],
+            },],
         ),
         // AR -> BR^
         (
@@ -1373,12 +1372,12 @@ mod tests {
                 (STOP)
             ",
             "A",
-            vec![Ligature(L {
+            vec![Ligature {
                 c: 'B',
                 original: "A".into(),
                 includes_left_boundary: false,
                 includes_right_boundary: true,
-            }),],
+            },],
         ),
         // AR -> A^BR
         (
@@ -1391,12 +1390,12 @@ mod tests {
             "A",
             vec![
                 Char('A'),
-                Ligature(L {
+                Ligature {
                     c: 'B',
                     original: "".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: true,
-                }),
+                },
             ],
         ),
         // AR -> AB^R
@@ -1410,12 +1409,12 @@ mod tests {
             "A",
             vec![
                 Char('A'),
-                Ligature(L {
+                Ligature {
                     c: 'B',
                     original: "".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: true,
-                }),
+                },
             ],
         ),
         (
@@ -1428,12 +1427,12 @@ mod tests {
                 (STOP)
             ",
             "A",
-            vec![Ligature(L {
+            vec![Ligature {
                 c: 'B',
                 original: "A".into(),
                 includes_left_boundary: false,
                 includes_right_boundary: true,
-            }),],
+            },],
         ),
         (
             right_boundary_char_lig_10,
@@ -1445,12 +1444,12 @@ mod tests {
                 (STOP)
             ",
             "A",
-            vec![Ligature(L {
+            vec![Ligature {
                 c: 'C',
                 original: "A".into(),
                 includes_left_boundary: false,
                 includes_right_boundary: true,
-            }),],
+            },],
         ),
         (
             right_boundary_char_lig_11,
@@ -1462,12 +1461,12 @@ mod tests {
                 (STOP)
             ",
             "A",
-            vec![Ligature(L {
+            vec![Ligature {
                 c: 'B',
                 original: "A".into(),
                 includes_left_boundary: false,
                 includes_right_boundary: true,
-            }),],
+            },],
         ),
         (
             right_boundary_char_lig_12,
@@ -1479,12 +1478,12 @@ mod tests {
                 (STOP)
             ",
             "A",
-            vec![Ligature(L {
+            vec![Ligature {
                 c: 'C',
                 original: "A".into(),
                 includes_left_boundary: false,
                 includes_right_boundary: true,
-            }),],
+            },],
         ),
         (
             right_boundary_char_kern_1,
@@ -1509,12 +1508,12 @@ mod tests {
             ",
             "A",
             vec![
-                Ligature(L {
+                Ligature {
                     c: 'C',
                     original: "A".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: true,
-                }),
+                },
                 Kern(Scaled::ONE * 10),
             ],
         ),
@@ -1529,12 +1528,12 @@ mod tests {
             ",
             "AB",
             vec![
-                Ligature(L {
+                Ligature {
                     c: 'C',
                     original: "AB".into(),
                     includes_left_boundary: false,
                     includes_right_boundary: false,
-                }),
+                },
                 Kern(Scaled::ONE * 10),
             ],
         ),

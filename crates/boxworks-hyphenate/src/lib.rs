@@ -1,4 +1,5 @@
 use boxworks::ds;
+use common::font;
 use tfm::ligkern::RunOptions;
 
 pub struct Hyphenator {
@@ -9,6 +10,7 @@ pub struct Hyphenator {
     // abstractions.
     // (2) Support changing the font!
     pub lig_kern_program: tfm::ligkern::CompiledProgram,
+    // TODO: Support changing the language
     pub hyphenator: hyphenate::Hyphenator,
     pub left_hyphen_min: i32,
     pub right_hyphen_min: i32,
@@ -57,10 +59,10 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
 
         // Find the place to start hyphenating
         // TeX.2021.896
-        let hyphenation_font: Option<common::FontId> = loop {
+        let hyphenation_font: Option<font::Id> = loop {
             let Some(elem) = list.get(i) else { break None };
             enum Action {
-                Start { font: common::FontId },
+                Start { font: font::Id },
                 Continue,
                 // Equivalent to done1 in Knuth's TeX.
                 Abort,
@@ -261,7 +263,7 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
             },
         );
 
-        use tfm::ligkern::RunItem;
+        use common::font::TextItem;
 
         let mut chars_pushed = 0;
         let mut elements_since_separation_point = 0_usize;
@@ -288,7 +290,7 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
 
             let (num_chars, last_char, original_elem): (usize, Option<char>, ds::Horizontal) =
                 match elem {
-                    RunItem::Char(c) => (
+                    TextItem::Char(c) => (
                         1,
                         Some(c),
                         ds::Char {
@@ -297,7 +299,7 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                         }
                         .into(),
                     ),
-                    RunItem::Kern(scaled) => (
+                    TextItem::Kern(scaled) => (
                         0,
                         None,
                         ds::Kern {
@@ -306,15 +308,20 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                         }
                         .into(),
                     ),
-                    RunItem::Ligature(ligature) => (
-                        ligature.original.chars().count(),
-                        Some(ligature.c),
+                    TextItem::Ligature {
+                        c,
+                        original,
+                        includes_left_boundary,
+                        includes_right_boundary,
+                    } => (
+                        original.chars().count(),
+                        Some(c),
                         ds::Ligature {
-                            includes_left_boundary: ligature.includes_left_boundary,
-                            includes_right_boundary: ligature.includes_right_boundary,
-                            char: ligature.c,
+                            includes_left_boundary,
+                            includes_right_boundary,
+                            char: c,
                             font: hyphenation_font,
-                            original_chars: ligature.original,
+                            original_chars: original,
                         }
                         .into(),
                     ),
@@ -368,22 +375,27 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                     )
                     .map(|elem| {
                         let d: ds::DiscretionaryElem = match elem {
-                            RunItem::Char(c) => ds::Char {
+                            TextItem::Char(c) => ds::Char {
                                 char: c,
                                 font: hyphenation_font,
                             }
                             .into(),
-                            RunItem::Kern(scaled) => ds::Kern {
+                            TextItem::Kern(scaled) => ds::Kern {
                                 width: scaled,
                                 kind: ds::KernKind::Normal,
                             }
                             .into(),
-                            RunItem::Ligature(ligature) => ds::Ligature {
-                                char: ligature.c,
+                            TextItem::Ligature {
+                                c,
+                                original,
+                                includes_left_boundary,
+                                includes_right_boundary,
+                            } => ds::Ligature {
+                                char: c,
                                 font: hyphenation_font,
-                                includes_left_boundary: ligature.includes_left_boundary,
-                                includes_right_boundary: ligature.includes_right_boundary,
-                                original_chars: ligature.original.clone(),
+                                includes_left_boundary,
+                                includes_right_boundary,
+                                original_chars: original,
                             }
                             .into(),
                         };
@@ -426,27 +438,32 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                         post_char_left_boundary = false;
                         while let Some(elem) = post_break_iter.next() {
                             post_chars_pushed += match &elem {
-                                RunItem::Char(_) => 1,
-                                RunItem::Kern(_) => 0,
-                                RunItem::Ligature(ligature) => ligature.original.chars().count(),
+                                TextItem::Char(_) => 1,
+                                TextItem::Kern(_) => 0,
+                                TextItem::Ligature { original, .. } => original.chars().count(),
                             };
                             post_break.push(match elem {
-                                RunItem::Char(c) => ds::Char {
+                                TextItem::Char(c) => ds::Char {
                                     char: c,
                                     font: hyphenation_font,
                                 }
                                 .into(),
-                                RunItem::Kern(scaled) => ds::Kern {
+                                TextItem::Kern(scaled) => ds::Kern {
                                     width: scaled,
                                     kind: ds::KernKind::Normal,
                                 }
                                 .into(),
-                                RunItem::Ligature(ligature) => ds::Ligature {
-                                    char: ligature.c,
+                                TextItem::Ligature {
+                                    c,
+                                    original,
+                                    includes_left_boundary,
+                                    includes_right_boundary,
+                                } => ds::Ligature {
+                                    char: c,
                                     font: hyphenation_font,
-                                    includes_left_boundary: ligature.includes_left_boundary,
-                                    includes_right_boundary: ligature.includes_right_boundary,
-                                    original_chars: ligature.original.clone(),
+                                    includes_left_boundary,
+                                    includes_right_boundary,
+                                    original_chars: original,
                                 }
                                 .into(),
                             });
@@ -457,27 +474,32 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                     } else {
                         while let Some(elem) = main_iter.next() {
                             chars_pushed += match &elem {
-                                RunItem::Char(_) => 1,
-                                RunItem::Kern(_) => 0,
-                                RunItem::Ligature(ligature) => ligature.original.chars().count(),
+                                TextItem::Char(_) => 1,
+                                TextItem::Kern(_) => 0,
+                                TextItem::Ligature { original, .. } => original.chars().count(),
                             };
                             out.push(match elem {
-                                RunItem::Char(c) => ds::Char {
+                                TextItem::Char(c) => ds::Char {
                                     char: c,
                                     font: hyphenation_font,
                                 }
                                 .into(),
-                                RunItem::Kern(scaled) => ds::Kern {
+                                TextItem::Kern(scaled) => ds::Kern {
                                     width: scaled,
                                     kind: ds::KernKind::Normal,
                                 }
                                 .into(),
-                                RunItem::Ligature(ligature) => ds::Ligature {
-                                    char: ligature.c,
+                                TextItem::Ligature {
+                                    c,
+                                    original,
+                                    includes_left_boundary,
+                                    includes_right_boundary,
+                                } => ds::Ligature {
+                                    char: c,
                                     font: hyphenation_font,
-                                    includes_left_boundary: ligature.includes_left_boundary,
-                                    includes_right_boundary: ligature.includes_left_boundary,
-                                    original_chars: ligature.original,
+                                    includes_left_boundary,
+                                    includes_right_boundary,
+                                    original_chars: original,
                                 }
                                 .into(),
                             });
@@ -610,8 +632,8 @@ mod tests {
         let lig_kern_program =
             tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
         let mut tp = bwt::TextPreprocessorImpl::new(bwt::Params::plain_tex_defaults());
-        tp.register_font(common::FontId::ONE, &tfm_file, lig_kern_program.clone());
-        tp.activate_font(common::FontId::ONE);
+        tp.register_font(font::Id::ONE, &tfm_file, lig_kern_program.clone());
+        tp.activate_font(font::Id::ONE);
         let mut list = vec![];
         for word in tex_input.split_ascii_whitespace() {
             tp.add_word(word.trim_matches(' '), &mut list);
@@ -620,7 +642,7 @@ mod tests {
         list.pop();
 
         let mut font_repo: bwt::TfmFontRepo = Default::default();
-        font_repo.register_font(common::FontId::ONE, tfm_file);
+        font_repo.register_font(font::Id::ONE, tfm_file);
 
         let mut hyphenator = Hyphenator::plain_tex_en_us(lig_kern_program);
         hyphenator
@@ -888,6 +910,40 @@ mod tests {
                       ],
                     )
                     chars("b")
+                "#,
+            },
+            lossy: true,
+        },
+        {
+            right_boundary_char_during_synchronization,
+            TestCase {
+                // The lig/kern program of the post-break text runs ahead of the main
+                // program: it turns all of "bcd" into a single ligature while the main
+                // program has only emitted the "ab" ligature.
+                // The main program then has to catch up in the synchronization loop of
+                // TeX.2021.916, and the last element it emits while catching up is a
+                // ligature built from the right boundary.
+                input: "a-bcd",
+                lig_kern_program: "
+                    ab -> _x^_
+                    bc -> _z^_
+                    zd -> _q^_
+                    d| -> _w^|
+                ",
+                want: r#"
+                    disc(
+                      pre_break=[
+                        chars("a")
+                        chars("-")
+                      ],
+                      post_break=[
+                        lig("q", "bcd")
+                      ],
+                      replace_count=3,
+                    )
+                    lig("x", "ab")
+                    chars("c")
+                    lig("w", "d", includes_right_boundary="true")
                 "#,
             },
             lossy: true,
