@@ -115,13 +115,14 @@ fn run_box_hboxs(
     params: boxworks_text::Params,
 ) -> Result<Vec<ds::HBox>, String> {
     let (tfm_bytes, _) = shared::load_font_metrics(font_metrics)?;
+    let tfm_font = tfm::Font::build(&tfm_bytes).expect("tfm file is valid").0;
     let mut tfm_file = tfm::File::deserialize(&tfm_bytes).0.unwrap();
     let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
     let mut tp = boxworks_text::TextPreprocessorImpl::new(params);
     tp.register_font(font::Id::ONE, &tfm_file, lig_kern_program.clone());
     tp.activate_font(font::Id::ONE);
-    let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
-    font_repo.register_font(font::Id::ONE, tfm_file);
+    let mut font_repo: font::Repo<tfm::Font> = Default::default();
+    font_repo.register(tfm_font);
     use boxworks::ds;
     let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us(lig_kern_program);
     Ok(texts

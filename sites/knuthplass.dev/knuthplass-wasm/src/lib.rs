@@ -9,6 +9,7 @@ use boxworks::ds;
 use boxworks::LineBreaker as _;
 use boxworks::TextPreprocessor as _;
 use common::font;
+use common::font::Format;
 use common::Scaled;
 use wasm_bindgen::prelude::*;
 
@@ -248,6 +249,7 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
         (None, None) => return Err("width_pt is required".into()),
     };
 
+    let tfm_font = tfm::Font::cmr10();
     let (tfm_result, _) = tfm::File::deserialize(CMR10_TFM);
     let mut tfm_file = tfm_result.map_err(|err| format!("{err:?}"))?;
     let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
@@ -261,19 +263,19 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
     let mut tp = boxworks_text::TextPreprocessorImpl::new(text_params);
     tp.register_font(font::Id::ONE, &tfm_file, lig_kern_program.clone());
     tp.activate_font(font::Id::ONE);
-    let mut font_repo: boxworks_text::TfmFontRepo = Default::default();
-    font_repo.register_font(font::Id::ONE, tfm_file);
+    let mut font_repo: font::Repo<tfm::Font> = Default::default();
+    let font_id = font_repo.register(tfm_font);
 
     // Reject characters the font has no glyph for; they would otherwise be
     // silently dropped or typeset with zero width.
     {
-        use boxworks::FontRepo;
         let mut missing: Vec<char> = vec![];
+        let font = font_repo.get(font_id);
         for c in text.chars() {
             if c.is_whitespace() || missing.contains(&c) {
                 continue;
             }
-            if font_repo.width(c, font::Id::ONE).is_none() {
+            if font.width(c).is_none() {
                 missing.push(c);
             }
         }
@@ -368,7 +370,7 @@ fn parse_named_glue(name: &str, s: &str) -> Result<common::Glue, String> {
 
 fn build_output(
     v_list: &[ds::Vertical],
-    font_repo: &boxworks_text::TfmFontRepo,
+    font_repo: &font::Repo<tfm::Font>,
     passes: u8,
     line_demerits: &[(i32, bool)],
 ) -> Output {
@@ -431,14 +433,13 @@ fn build_output(
 }
 
 /// Returns the elements of the line and the x position at which they end.
-fn build_elements(hbox: &ds::HBox, font_repo: &boxworks_text::TfmFontRepo) -> (Vec<Element>, f64) {
-    use boxworks::FontRepo;
+fn build_elements(hbox: &ds::HBox, font_repo: &font::Repo<tfm::Font>) -> (Vec<Element>, f64) {
     let mut elements = vec![];
     let mut x_pt = 0.0;
     for elem in &hbox.list {
         match elem {
             ds::Horizontal::Char(c) => {
-                let width_pt = pt(font_repo.width(c.char, c.font).unwrap_or(Scaled::ZERO));
+                let width_pt = pt(font_repo.get(c.font).width(c.char).unwrap_or(Scaled::ZERO));
                 elements.push(Element::Char {
                     x_pt,
                     width_pt,
@@ -447,7 +448,7 @@ fn build_elements(hbox: &ds::HBox, font_repo: &boxworks_text::TfmFontRepo) -> (V
                 x_pt += width_pt;
             }
             ds::Horizontal::Ligature(l) => {
-                let width_pt = pt(font_repo.width(l.char, l.font).unwrap_or(Scaled::ZERO));
+                let width_pt = pt(font_repo.get(l.font).width(l.char).unwrap_or(Scaled::ZERO));
                 elements.push(Element::Lig {
                     x_pt,
                     width_pt,

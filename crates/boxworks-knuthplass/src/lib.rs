@@ -3,16 +3,16 @@
 use std::{collections::VecDeque, ops::AddAssign};
 
 use boxworks::ds::{self, KernKind};
-use common::{GlueOrder, Scaled};
+use common::{font, GlueOrder, Scaled};
 pub mod debug;
 
-pub struct LineBreaker<'a, F> {
+pub struct LineBreaker<'a, Font> {
     pub params: &'a Params,
     pub line_widths: &'a [Scaled],
     pub line_indents: &'a [Scaled],
     pub debug_logger: Option<&'a mut dyn debug::Logger>,
     pub hyphenator: &'a dyn boxworks::Hyphenator,
-    pub font_repo: &'a F,
+    pub font_repo: &'a font::Repo<Font>,
 }
 
 #[derive(Debug)]
@@ -245,7 +245,7 @@ struct PassiveNode {
     previous_node_index: usize,
 }
 
-impl<'a, F: boxworks::FontRepo> boxworks::LineBreaker for LineBreaker<'a, F> {
+impl<'a, Font: font::Format> boxworks::LineBreaker for LineBreaker<'a, Font> {
     fn break_line(mut self, v_list: &mut Vec<ds::Vertical>, h_list: &mut Vec<ds::Horizontal>) {
         // This function is analogous to TeX.2021.815.
 
@@ -264,7 +264,7 @@ impl<'a, F: boxworks::FontRepo> boxworks::LineBreaker for LineBreaker<'a, F> {
     }
 }
 
-impl<'a, F: boxworks::FontRepo> LineBreaker<'a, F> {
+impl<'a, Font: font::Format> LineBreaker<'a, Font> {
     fn post_line_break(
         &self,
         v_list: &mut Vec<ds::Vertical>,
@@ -522,7 +522,11 @@ impl<'a, F: boxworks::FontRepo> LineBreaker<'a, F> {
                     Char(ds::Char { char, font }) | Ligature(ds::Ligature { char, font, .. }) => {
                         // TeX.2021.867 has an optimization in which subsequent chars are read
                         // here. I'm not convinced it's worth it.
-                        diffs.width += self.font_repo.width(*char, *font).unwrap_or(Scaled::ZERO);
+                        diffs.width += self
+                            .font_repo
+                            .get(*font)
+                            .width(*char)
+                            .unwrap_or(Scaled::ZERO);
                         continue;
                     }
                     HBox(ds::HBox { width, .. })
@@ -777,7 +781,8 @@ impl<'a, F: boxworks::FontRepo> LineBreaker<'a, F> {
                                         Char(ds::Char { char, font })
                                         | Ligature(ds::Ligature { char, font, .. }) => self
                                             .font_repo
-                                            .width(*char, *font)
+                                            .get(*font)
+                                            .width(*char)
                                             .unwrap_or(Scaled::ZERO),
                                         HBox(ds::HBox { width, .. })
                                         | VBox(ds::VBox { width, .. })
@@ -800,7 +805,8 @@ impl<'a, F: boxworks::FontRepo> LineBreaker<'a, F> {
                                         Char(ds::Char { char, font })
                                         | Ligature(ds::Ligature { char, font, .. }) => self
                                             .font_repo
-                                            .width(*char, *font)
+                                            .get(*font)
+                                            .width(*char)
                                             .unwrap_or(Scaled::ZERO),
                                         HBox(ds::HBox { width, .. })
                                         | VBox(ds::VBox { width, .. })
@@ -1502,11 +1508,13 @@ mod tests {
         text_params: boxworks_text::Params,
         params: Params,
     ) -> (ds::VBox, String) {
-        let mut tfm_file = tfm::File::deserialize(tfm_bytes).0.unwrap();
-        let lig_kern_program =
-            tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
+        let tfm_font = tfm::Font::build(tfm_bytes).expect("tfm file is valid").0;
         let mut tp = bwt::TextPreprocessorImpl::new(text_params);
-        tp.register_font(font::Id::ONE, &tfm_file, lig_kern_program.clone());
+        tp.register_font(
+            font::Id::ONE,
+            &tfm_font.file,
+            tfm_font.lig_kern_program.clone(),
+        );
         tp.activate_font(font::Id::ONE);
         let mut list = vec![];
         for word in input.split_ascii_whitespace() {
@@ -1514,14 +1522,15 @@ mod tests {
             tp.add_space(&mut list);
         }
 
-        let mut font_repo: bwt::TfmFontRepo = Default::default();
-        font_repo.register_font(font::Id::ONE, tfm_file);
+        let hyphenator =
+            boxworks_hyphenate::Hyphenator::plain_tex_en_us(tfm_font.lig_kern_program.clone());
+
+        let mut font_repo: font::Repo<tfm::Font> = Default::default();
+        font_repo.register(tfm_font);
         let widths = parse_widths(widths);
 
         let log: Rc<RefCell<String>> = Default::default();
         let mut logger = debug::TexLogger::new(log.clone());
-
-        let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us(lig_kern_program);
 
         let line_breaker = super::LineBreaker {
             params: &params,

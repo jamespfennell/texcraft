@@ -67,6 +67,7 @@ impl TextPreprocessor for SimpleTextPreprocessor {
     }
 }
 
+// TODO: destroy
 pub trait FontRepo {
     fn width(&self, c: char, font: font::Id) -> Option<common::Scaled>;
     fn height(&self, c: char, font: font::Id) -> Option<common::Scaled>;

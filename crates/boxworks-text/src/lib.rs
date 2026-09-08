@@ -55,6 +55,7 @@ impl Params {
         }
     }
 }
+
 pub struct TextPreprocessorImpl {
     fonts: Vec<Font>,
     // TODO: should be initialized to the null font

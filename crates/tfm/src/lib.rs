@@ -165,8 +165,8 @@ pub use validate::ValidationWarning;
 
 #[derive(Debug, Default)]
 pub struct Font {
-    file: File,
-    lig_kern_program: ligkern::CompiledProgram,
+    pub file: File,
+    pub lig_kern_program: ligkern::CompiledProgram,
 }
 
 const TFM_CMR10: &[u8] = include_bytes!("../corpus/computer-modern/cmr10.tfm");
@@ -195,7 +195,7 @@ impl Font {
         Ok((font, deserialization_warnings, lig_kern_warnings))
     }
     pub fn cmr10() -> Self {
-        Self::build(TFM_CMR10).expect("cmr10 parses").0
+        Self::build(TFM_CMR10).expect("cmr10.tfm is valid").0
     }
 }
 

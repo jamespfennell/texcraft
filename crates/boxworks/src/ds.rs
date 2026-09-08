@@ -168,8 +168,8 @@ pub enum PackWidth {
 impl HBox {
     /// Create a horizontal from a vertical list.
     ///
-    pub fn pack<F: super::FontRepo>(
-        font_repo: &F,
+    pub fn pack<Font: font::Format>(
+        font_repo: &font::Repo<Font>,
         list: Vec<Horizontal>,
         pack_width: PackWidth,
     ) -> HBox {
@@ -186,7 +186,7 @@ impl HBox {
             let [w, h, d] = match elem {
                 H::Ligature(Ligature { char, font, .. }) | H::Char(Char { char, font }) => {
                     // TeX.2021.654
-                    let Some([w, h, d]) = font_repo.width_height_depth(*char, *font) else {
+                    let Some([w, h, d]) = font_repo.get(*font).width_height_depth(*char) else {
                         continue;
                     };
                     [w, h, d]
@@ -719,17 +719,19 @@ impl From<DiscretionaryElem> for Horizontal {
 }
 
 impl DiscretionaryElem {
-    pub fn width<F: super::FontRepo>(&self, font_width: &F) -> Number {
+    pub fn width<Font: font::Format>(&self, font_repo: &font::Repo<Font>) -> Number {
         use DiscretionaryElem::*;
         match self {
-            Char(char) => font_width
-                .width(char.char, char.font)
+            Char(char) => font_repo
+                .get(char.font)
+                .width(char.char)
                 .unwrap_or(common::Scaled::ZERO),
             HBox(hlist) => hlist.width,
             VBox(vlist) => vlist.width,
             Rule(rule) => rule.width,
-            Ligature(ligature) => font_width
-                .width(ligature.char, ligature.font)
+            Ligature(ligature) => font_repo
+                .get(ligature.font)
+                .width(ligature.char)
                 .unwrap_or(common::Scaled::ZERO),
             Kern(kern) => kern.width,
         }
