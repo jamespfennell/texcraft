@@ -113,7 +113,15 @@ pub trait TextBuilder {
     fn build_text<'a, Word: Iterator<Item = char>>(
         &'a self,
         word: Word,
+        options: BuildTextOptions,
     ) -> Self::TextIter<'a, Word>;
+
+    fn has_replacement(&self, left: Option<char>, right: Option<char>) -> bool;
+}
+
+pub struct BuildTextOptions {
+    pub disable_left_boundary: bool,
+    pub right_boundary_override: Option<char>,
 }
 
 pub struct DefaultTextIter<Word> {

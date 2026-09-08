@@ -275,6 +275,7 @@ impl TextPreprocessorImpl {
     }
 }
 
+// TODO: destroy
 #[derive(Debug, Default)]
 pub struct TfmFontRepo {
     fonts: HashMap<font::Id, tfm::File>,

@@ -172,7 +172,17 @@ pub struct Font {
 const TFM_CMR10: &[u8] = include_bytes!("../corpus/computer-modern/cmr10.tfm");
 
 impl Font {
-    pub fn build(
+    pub fn build_from_file(mut file: File) -> (Self, Vec<ligkern::InfiniteLoopError>) {
+        let (lig_kern_program, lig_kern_warnings) =
+            ligkern::CompiledProgram::compile_from_tfm_file(&mut file);
+        let font = Font {
+            file,
+            lig_kern_program,
+        };
+        (font, lig_kern_warnings)
+    }
+
+    pub fn build_from_bytes(
         tfm_bytes: &[u8],
     ) -> Result<
         (
@@ -182,20 +192,17 @@ impl Font {
         ),
         DeserializationError,
     > {
-        let (mut file, deserialization_warnings) = match File::deserialize(tfm_bytes) {
+        let (file, deserialization_warnings) = match File::deserialize(tfm_bytes) {
             (Err(err), _) => return Err(err),
             (Ok(file), warnings) => (file, warnings),
         };
-        let (lig_kern_program, lig_kern_warnings) =
-            ligkern::CompiledProgram::compile_from_tfm_file(&mut file);
-        let font = Font {
-            file,
-            lig_kern_program,
-        };
+        let (font, lig_kern_warnings) = Self::build_from_file(file);
         Ok((font, deserialization_warnings, lig_kern_warnings))
     }
     pub fn cmr10() -> Self {
-        Self::build(TFM_CMR10).expect("cmr10.tfm is valid").0
+        Self::build_from_bytes(TFM_CMR10)
+            .expect("cmr10.tfm is valid")
+            .0
     }
 }
 
@@ -220,9 +227,19 @@ impl font::TextBuilder for Font {
     fn build_text<'a, Word: Iterator<Item = char>>(
         &'a self,
         word: Word,
+        options: font::BuildTextOptions,
     ) -> Self::TextIter<'a, Word> {
-        self.lig_kern_program
-            .run_with_options(word, Default::default())
+        self.lig_kern_program.run_with_options(
+            word,
+            ligkern::RunOptions {
+                disable_left_boundary: options.disable_left_boundary,
+                right_boundary_override: options.right_boundary_override,
+            },
+        )
+    }
+
+    fn has_replacement(&self, left: Option<char>, right: Option<char>) -> bool {
+        self.lig_kern_program.has_replacement(left, right)
     }
 }
 

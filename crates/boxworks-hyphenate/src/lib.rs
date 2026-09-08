@@ -1,32 +1,25 @@
 use boxworks::ds;
 use common::font;
-use tfm::ligkern::RunOptions;
+use common::font::TextIter;
 
-pub struct Hyphenator {
-    // TODOs:
-    // (1) Don't depend on the tfm crate. There should be kind of abstraction here
-    // so that this works with all font types. Maybe the solution is to have a ligkern
-    // crate that contains the non-tfm logic for lig/kern programs. Or some boxworks
-    // abstractions.
-    // (2) Support changing the font!
-    pub lig_kern_program: tfm::ligkern::CompiledProgram,
+pub struct State {
     // TODO: Support changing the language
     pub hyphenator: hyphenate::Hyphenator,
     pub left_hyphen_min: i32,
     pub right_hyphen_min: i32,
 }
-
-impl Hyphenator {
-    /// Creates a hyphenator with plain TeX's English patterns and defaults.
-    ///
+pub struct Hyphenator<'a, Font> {
+    pub state: &'a State,
     /// The lig/kern program of the font being hyphenated is required because
     /// hyphenation breaks ligatures apart to insert discretionaries, and the
     /// program is needed to reconstitute ligatures and kerns in the result.
-    /// Passing the wrong program (e.g. an empty one) silently produces
-    /// un-ligatured output.
-    pub fn plain_tex_en_us(lig_kern_program: tfm::ligkern::CompiledProgram) -> Self {
+    pub font_repo: &'a font::Repo<Font>,
+}
+
+impl State {
+    /// Creates a hyphenator state with plain TeX's English patterns and defaults.
+    pub fn plain_tex_en_us() -> Self {
         Self {
-            lig_kern_program,
             hyphenator: hyphenate::Hyphenator::plain_tex_en_us(),
             left_hyphen_min: 2,
             right_hyphen_min: 3,
@@ -34,14 +27,17 @@ impl Hyphenator {
     }
 }
 
-impl boxworks::Hyphenator for Hyphenator {
+impl<'a, Font: font::TextBuilder> boxworks::Hyphenator for Hyphenator<'a, Font> {
     fn hyphenate(&self, list: &mut Vec<ds::Horizontal>) {
         let out = hyphenate_impl(self, list);
         *list = out;
     }
 }
 
-fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::Horizontal> {
+fn hyphenate_impl<'a, Font: font::TextBuilder>(
+    hyphenater: &Hyphenator<'a, Font>,
+    list: &[ds::Horizontal],
+) -> Vec<ds::Horizontal> {
     let lower_caser = hyphenate::AsciiLowerCaser::default();
     let mut out = vec![];
     let mut i = 0;
@@ -134,6 +130,7 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
         let Some(hyphenation_font) = hyphenation_font else {
             continue;
         };
+        let font = hyphenater.font_repo.get(hyphenation_font);
         // It's still possible we won't hyphenate based on the node that ends the
         // string of characters. So we save this `i` value here; if hyphenation is skipped
         // we set `i` back to this.
@@ -240,13 +237,16 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
         let l = s.chars().count();
 
         let mut indices = {
-            let indices = hyphenater.hyphenator.calculate_indices(&lower_caser, &s);
+            let indices = hyphenater
+                .state
+                .hyphenator
+                .calculate_indices(&lower_caser, &s);
             // TeX.2021.1200
-            let left_hyphen_min: usize = match hyphenater.left_hyphen_min.try_into() {
+            let left_hyphen_min: usize = match hyphenater.state.left_hyphen_min.try_into() {
                 Ok(0) | Err(_) => 1,
                 Ok(i) => i,
             };
-            let right_hyphen_min: usize = match hyphenater.right_hyphen_min.try_into() {
+            let right_hyphen_min: usize = match hyphenater.state.right_hyphen_min.try_into() {
                 Ok(0) | Err(_) => 1,
                 Ok(i) => i,
             };
@@ -255,9 +255,9 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
         };
         let mut next_or = indices.next();
 
-        let mut main_iter = hyphenater.lig_kern_program.run_with_options(
+        let mut main_iter = font.build_text(
             s.chars(),
-            RunOptions {
+            font::BuildTextOptions {
                 disable_left_boundary: false,
                 right_boundary_override,
             },
@@ -340,9 +340,7 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                 continue;
             }
 
-            let is_hyphen_rule = hyphenater
-                .lig_kern_program
-                .has_replacement(Some(last_char), Some('-'));
+            let is_hyphen_rule = font.has_replacement(Some(last_char), Some('-'));
 
             // If the hyphen is exactly at a separation point and if the lig/kern program with
             // the hyphen is also at a separation point (e.g. is_hyphen_rule=false) then we advance
@@ -359,11 +357,10 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                 let pre_break_text = s[start_of_separation_point..hyph_next]
                     .chars()
                     .chain("-".chars());
-                let pre_break: Vec<ds::DiscretionaryElem> = hyphenater
-                    .lig_kern_program
-                    .run_with_options(
+                let pre_break: Vec<ds::DiscretionaryElem> = font
+                    .build_text(
                         pre_break_text,
-                        RunOptions {
+                        font::BuildTextOptions {
                             // The pre-break text always starts at a separation point so we don't
                             // need to do any left boundary processing. Moreover, if we did the default
                             // left boundary processing we would get the wrong result because the pre-
@@ -404,9 +401,9 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                     .collect();
 
                 let post_break_text = &s[hyph_next..];
-                let mut post_break_iter = hyphenater.lig_kern_program.run_with_options(
+                let mut post_break_iter = font.build_text(
                     post_break_text.chars(),
-                    RunOptions {
+                    font::BuildTextOptions {
                         disable_left_boundary: false,
                         right_boundary_override,
                     },
@@ -423,9 +420,8 @@ fn hyphenate_impl(hyphenater: &Hyphenator, list: &[ds::Horizontal]) -> Vec<ds::H
                 // We want to achieve synchronization for the two iterators.
                 //
                 // The following boolean handles the first if statement in TeX.2021.916.
-                let mut post_char_left_boundary = hyphenater
-                    .lig_kern_program
-                    .has_replacement(None, post_break_text.chars().next());
+                let mut post_char_left_boundary =
+                    font.has_replacement(None, post_break_text.chars().next());
                 loop {
                     if !post_char_left_boundary
                         && post_chars_pushed == chars_pushed
@@ -591,6 +587,8 @@ mod tests {
             let (p, e) = tfm::ligkern::lang::Program::parse_compact(tc.lig_kern_program).unwrap();
             tfm_file.replace_lig_kern_program(p, e);
         }
+        // TODO: remove the clone when boxworks-text is migrated to the new font API.
+        let tfm_font = tfm::Font::build_from_file(tfm_file.clone()).0;
 
         if std::env::var("TEXCRAFT_VERIFY").unwrap_or("".to_string()) == "tex" {
             let tfm_bytes = tfm_file.serialize();
@@ -641,15 +639,17 @@ mod tests {
         }
         list.pop();
 
-        let mut font_repo: bwt::TfmFontRepo = Default::default();
-        font_repo.register_font(font::Id::ONE, tfm_file);
+        let mut font_repo: font::Repo<tfm::Font> = Default::default();
+        font_repo.register(tfm_font);
 
-        let mut hyphenator = Hyphenator::plain_tex_en_us(lig_kern_program);
-        hyphenator
-            .hyphenator
-            .insert_exceptions(hyphenation_patterns);
-        hyphenator.left_hyphen_min = tc.left_hyphen_min.unwrap_or(1);
-        hyphenator.right_hyphen_min = 1;
+        let mut state = State::plain_tex_en_us();
+        state.hyphenator.insert_exceptions(hyphenation_patterns);
+        state.left_hyphen_min = tc.left_hyphen_min.unwrap_or(1);
+        state.right_hyphen_min = 1;
+        let hyphenator = Hyphenator {
+            state: &state,
+            font_repo: &font_repo,
+        };
         {
             use boxworks::Hyphenator;
             hyphenator.hyphenate(&mut list)

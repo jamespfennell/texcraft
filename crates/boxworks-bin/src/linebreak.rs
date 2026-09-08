@@ -243,7 +243,9 @@ fn run_box_vlists(
     params: &boxworks_knuthplass::Params,
 ) -> Result<Vec<ds::VBox>, String> {
     let (tfm_bytes, _) = shared::load_font_metrics(font_metrics)?;
-    let tfm_font = tfm::Font::build(&tfm_bytes).expect("tfm file is valid").0;
+    let tfm_font = tfm::Font::build_from_bytes(&tfm_bytes)
+        .expect("tfm file is valid")
+        .0;
     let mut tfm_file = tfm::File::deserialize(&tfm_bytes).0.unwrap();
     let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
     let mut tp = boxworks_text::TextPreprocessorImpl::new(text_params);
@@ -252,11 +254,15 @@ fn run_box_vlists(
     let mut font_repo: font::Repo<tfm::Font> = Default::default();
     font_repo.register(tfm_font);
 
-    let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us(lig_kern_program);
+    let hyphenator_state = boxworks_hyphenate::State::plain_tex_en_us();
     use boxworks::ds;
     Ok(texts
         .into_iter()
         .map(|text| {
+            let hyphenator = boxworks_hyphenate::Hyphenator {
+                state: &hyphenator_state,
+                font_repo: &font_repo,
+            };
             let lb = boxworks_knuthplass::LineBreaker {
                 params,
                 line_widths: widths,

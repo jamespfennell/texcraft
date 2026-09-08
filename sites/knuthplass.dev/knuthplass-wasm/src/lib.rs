@@ -293,7 +293,11 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
         }
     }
 
-    let hyphenator = boxworks_hyphenate::Hyphenator::plain_tex_en_us(lig_kern_program);
+    let hyphenator_state = boxworks_hyphenate::State::plain_tex_en_us();
+    let hyphenator = boxworks_hyphenate::Hyphenator {
+        state: &hyphenator_state,
+        font_repo: &font_repo,
+    };
     let mut pass_recorder = PassRecorder::default();
     let lb = boxworks_knuthplass::LineBreaker {
         params: &params,

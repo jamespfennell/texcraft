@@ -1508,7 +1508,9 @@ mod tests {
         text_params: boxworks_text::Params,
         params: Params,
     ) -> (ds::VBox, String) {
-        let tfm_font = tfm::Font::build(tfm_bytes).expect("tfm file is valid").0;
+        let tfm_font = tfm::Font::build_from_bytes(tfm_bytes)
+            .expect("tfm file is valid")
+            .0;
         let mut tp = bwt::TextPreprocessorImpl::new(text_params);
         tp.register_font(
             font::Id::ONE,
@@ -1522,8 +1524,7 @@ mod tests {
             tp.add_space(&mut list);
         }
 
-        let hyphenator =
-            boxworks_hyphenate::Hyphenator::plain_tex_en_us(tfm_font.lig_kern_program.clone());
+        let hyphenator_state = boxworks_hyphenate::State::plain_tex_en_us();
 
         let mut font_repo: font::Repo<tfm::Font> = Default::default();
         font_repo.register(tfm_font);
@@ -1532,6 +1533,10 @@ mod tests {
         let log: Rc<RefCell<String>> = Default::default();
         let mut logger = debug::TexLogger::new(log.clone());
 
+        let hyphenator = boxworks_hyphenate::Hyphenator {
+            state: &hyphenator_state,
+            font_repo: &font_repo,
+        };
         let line_breaker = super::LineBreaker {
             params: &params,
             line_widths: &widths,
