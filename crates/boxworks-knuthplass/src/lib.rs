@@ -1044,7 +1044,6 @@ fn badness(shortfall: Scaled64, stretchability: Scaled64) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use boxworks::TextPreprocessor;
     use boxworks_text as bwt;
     use common::font;
     use pretty_assertions::assert_eq;
@@ -1511,27 +1510,23 @@ mod tests {
         let tfm_font = tfm::Font::build_from_bytes(tfm_bytes)
             .expect("tfm file is valid")
             .0;
-        let mut tp = bwt::TextPreprocessorImpl::new(text_params);
-        tp.register_font(
-            font::Id::ONE,
-            &tfm_font.file,
-            tfm_font.lig_kern_program.clone(),
-        );
-        tp.activate_font(font::Id::ONE);
-        let mut list = vec![];
-        for word in input.split_ascii_whitespace() {
-            tp.add_word(word.trim_matches(' '), &mut list);
-            tp.add_space(&mut list);
-        }
 
         let hyphenator_state = boxworks_hyphenate::State::plain_tex_en_us();
 
         let mut font_repo: font::Repo<tfm::Font> = Default::default();
-        font_repo.register(tfm_font);
+        let font_id = font_repo.register(tfm_font);
         let widths = parse_widths(widths);
 
         let log: Rc<RefCell<String>> = Default::default();
         let mut logger = debug::TexLogger::new(log.clone());
+
+        let mut tp = bwt::TextPreprocessor::new(text_params);
+        tp.activate_font(font_id);
+        let mut list = vec![];
+        for word in input.split_ascii_whitespace() {
+            tp.add_word(&font_repo, word.trim_matches(' '), &mut list);
+            tp.add_space(&font_repo, &mut list);
+        }
 
         let hyphenator = boxworks_hyphenate::Hyphenator {
             state: &hyphenator_state,

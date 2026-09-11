@@ -4,13 +4,13 @@ use texlang::traits::*;
 use texlang::*;
 
 pub struct Component {
-    text_preprocessor: bwt::TextPreprocessorImpl,
+    text_preprocessor: bwt::TextPreprocessor,
 }
 
 impl Default for Component {
     fn default() -> Self {
         Self {
-            text_preprocessor: bwt::TextPreprocessorImpl::new(bwt::Params::plain_tex_defaults()),
+            text_preprocessor: bwt::TextPreprocessor::new(bwt::Params::plain_tex_defaults()),
         }
     }
 }

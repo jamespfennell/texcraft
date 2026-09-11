@@ -1,6 +1,6 @@
 //! Fonts and font repositories.
 
-use crate::Scaled;
+use crate::{Glue, Scaled};
 
 /// Identifier for a font.
 ///
@@ -88,6 +88,9 @@ pub trait Format {
             self.depth(c).unwrap_or(Scaled::ZERO),
         ])
     }
+
+    fn default_space(&self) -> Glue;
+    fn extra_space(&self) -> Scaled;
 }
 
 #[derive(PartialEq, Debug)]
@@ -119,6 +122,7 @@ pub trait TextBuilder {
     fn has_replacement(&self, left: Option<char>, right: Option<char>) -> bool;
 }
 
+#[derive(Default)]
 pub struct BuildTextOptions {
     pub disable_left_boundary: bool,
     pub right_boundary_override: Option<char>,
@@ -147,10 +151,3 @@ impl<Word: Iterator<Item = char>> TextIter for DefaultTextIter<Word> {
         true
     }
 }
-
-/*
-TODO:
-- Add a boxworks-tfm crate that wraps TFM and implements all the traits here
-- This will have null_font and cmr10 factory methods
-- Migrate boxworks-knuthplass -text and -hyphenate to use the new mechanisms
- */

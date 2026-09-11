@@ -219,6 +219,26 @@ impl font::Format for Font {
     fn depth(&self, c: char) -> Option<common::Scaled> {
         self.file.depth_utf8(c)
     }
+    fn default_space(&self) -> common::Glue {
+        common::Glue {
+            width: self.file.named_param_scaled(NamedParameter::Space).unwrap(),
+            stretch: self
+                .file
+                .named_param_scaled(NamedParameter::Stretch)
+                .unwrap(),
+            stretch_order: common::GlueOrder::Normal,
+            shrink: self
+                .file
+                .named_param_scaled(NamedParameter::Shrink)
+                .unwrap(),
+            shrink_order: common::GlueOrder::Normal,
+        }
+    }
+    fn extra_space(&self) -> common::Scaled {
+        self.file
+            .named_param_scaled(NamedParameter::ExtraSpace)
+            .unwrap()
+    }
 }
 
 impl font::TextBuilder for Font {

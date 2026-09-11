@@ -7,13 +7,10 @@
 
 use boxworks::ds;
 use boxworks::LineBreaker as _;
-use boxworks::TextPreprocessor as _;
 use common::font;
 use common::font::Format;
 use common::Scaled;
 use wasm_bindgen::prelude::*;
-
-const CMR10_TFM: &[u8] = include_bytes!("../../../../crates/tfm/corpus/computer-modern/cmr10.tfm");
 
 // Plain TeX vertical spacing defaults, used to compute line baselines.
 const BASELINE_SKIP_PT: f64 = 12.0;
@@ -250,9 +247,6 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
     };
 
     let tfm_font = tfm::Font::cmr10();
-    let (tfm_result, _) = tfm::File::deserialize(CMR10_TFM);
-    let mut tfm_file = tfm_result.map_err(|err| format!("{err:?}"))?;
-    let lig_kern_program = tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
     let mut text_params = boxworks_text::Params::plain_tex_defaults();
     if let Some(ref s) = input.space_skip {
         text_params.space_skip = parse_named_glue("space_skip", s)?;
@@ -260,11 +254,10 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
     if let Some(ref s) = input.extra_space_skip {
         text_params.extra_space_skip = parse_named_glue("extra_space_skip", s)?;
     }
-    let mut tp = boxworks_text::TextPreprocessorImpl::new(text_params);
-    tp.register_font(font::Id::ONE, &tfm_file, lig_kern_program.clone());
-    tp.activate_font(font::Id::ONE);
     let mut font_repo: font::Repo<tfm::Font> = Default::default();
     let font_id = font_repo.register(tfm_font);
+    let mut tp = boxworks_text::TextPreprocessor::new(text_params);
+    tp.activate_font(font_id);
 
     // Reject characters the font has no glyph for; they would otherwise be
     // silently dropped or typeset with zero width.
@@ -309,7 +302,7 @@ fn break_paragraph_impl(text: &str, params_json: &str) -> Result<Output, String>
     };
 
     let mut h_list = vec![];
-    tp.add_text(text, &mut h_list);
+    tp.add_text(&font_repo, text, &mut h_list);
     let mut v_list = vec![];
     lb.break_line(&mut v_list, &mut h_list);
 

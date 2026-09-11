@@ -567,7 +567,6 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use boxworks::TextPreprocessor;
     use boxworks_testing::assert_box_eq;
     use boxworks_testing::assert_box_lossy_eq;
     use boxworks_text as bwt;
@@ -627,21 +626,18 @@ mod tests {
             return;
         }
 
-        let lig_kern_program =
-            tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
-        let mut tp = bwt::TextPreprocessorImpl::new(bwt::Params::plain_tex_defaults());
-        tp.register_font(font::Id::ONE, &tfm_file, lig_kern_program.clone());
-        tp.activate_font(font::Id::ONE);
+        let mut font_repo: font::Repo<tfm::Font> = Default::default();
+        let font_id = font_repo.register(tfm_font);
+
+        let mut tp = bwt::TextPreprocessor::new(bwt::Params::plain_tex_defaults());
+        tp.activate_font(font_id);
         let mut list = vec![];
         for word in tex_input.split_ascii_whitespace() {
-            tp.add_word(word.trim_matches(' '), &mut list);
-            tp.add_space(&mut list);
+            tp.add_word(&font_repo, word.trim_matches(' '), &mut list);
+            tp.add_space(&font_repo, &mut list);
         }
+
         list.pop();
-
-        let mut font_repo: font::Repo<tfm::Font> = Default::default();
-        font_repo.register(tfm_font);
-
         let mut state = State::plain_tex_en_us();
         state.hyphenator.insert_exceptions(hyphenation_patterns);
         state.left_hyphen_min = tc.left_hyphen_min.unwrap_or(1);

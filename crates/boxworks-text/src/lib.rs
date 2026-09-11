@@ -7,14 +7,6 @@
 
 use boxworks::ds;
 use common::font;
-use std::collections::HashMap;
-
-#[derive(Debug)]
-struct Font {
-    default_space: common::Glue,
-    extra_space: common::Scaled,
-    lig_kern_program: tfm::ligkern::CompiledProgram,
-}
 
 pub struct Params {
     pub space_factor_codes: SpaceFactorCodes,
@@ -56,19 +48,16 @@ impl Params {
     }
 }
 
-pub struct TextPreprocessorImpl {
-    fonts: Vec<Font>,
-    // TODO: should be initialized to the null font
+pub struct TextPreprocessor {
     current_font: font::Id,
     space_factor: SpaceFactor,
     pub params: Params,
 }
 
-impl TextPreprocessorImpl {
+impl TextPreprocessor {
     pub fn new(params: Params) -> Self {
         Self {
-            fonts: vec![],
-            current_font: font::Id::ONE,
+            current_font: font::Id::NULL,
             space_factor: Default::default(),
             params,
         }
@@ -134,28 +123,24 @@ impl SpaceFactor {
     }
 }
 
-impl TextPreprocessorImpl {
+impl TextPreprocessor {
     pub fn activate_font(&mut self, font: font::Id) {
         self.current_font = font;
     }
 
-    /// Returns the metrics of the current font.
-    ///
-    /// Font IDs are 1-based indices into the fonts vector;
-    /// this is enforced by [`TextPreprocessorImpl::register_font`].
-    fn current_font(&self) -> &Font {
-        &self.fonts[self.current_font.0 as usize - 1]
-    }
-}
-
-impl boxworks::TextPreprocessor for TextPreprocessorImpl {
-    fn new_paragraph(&mut self) {
+    pub fn new_paragraph(&mut self) {
         self.space_factor = Default::default();
     }
 
-    fn add_word(&mut self, word: &str, list: &mut Vec<ds::Horizontal>) {
-        let font = self.current_font();
-        for elem in font.lig_kern_program.run(word) {
+    pub fn add_word<Font: font::TextBuilder>(
+        &mut self,
+        font_repo: &font::Repo<Font>,
+        word: &str,
+        list: &mut Vec<ds::Horizontal>,
+    ) {
+        // TeX.2021.1034
+        let font = font_repo.get(self.current_font);
+        for elem in font.build_text(word.chars(), Default::default()) {
             use font::TextItem::*;
             match elem {
                 Char(c) => {
@@ -214,14 +199,18 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
         }
     }
 
-    fn add_space(&mut self, list: &mut Vec<ds::Horizontal>) {
+    pub fn add_space<Font: font::Format>(
+        &mut self,
+        font_repo: &font::Repo<Font>,
+        list: &mut Vec<ds::Horizontal>,
+    ) {
         let g = if self.space_factor == SpaceFactor::default() {
             // TeX.2021.1041
             if !self.params.space_skip.is_zero() {
                 self.params.space_skip
             } else {
                 // TeX.2021.1042
-                self.current_font().default_space
+                font_repo.get(self.current_font).default_space()
             }
         } else {
             // TeX.2021.1043
@@ -231,10 +220,10 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
                 self.params.space_skip
             } else {
                 // TeX.2021.1042
-                let mut g = self.current_font().default_space;
+                let mut g = font_repo.get(self.current_font).default_space();
                 // TeX.2021.1044
                 if self.space_factor.0 >= 2000 {
-                    g.width += self.current_font().extra_space;
+                    g.width += font_repo.get(self.current_font).extra_space();
                 }
                 g.stretch = g.stretch.xn_over_d(self.space_factor.0, 1000).unwrap().0;
                 g.shrink = g.shrink.xn_over_d(1000, self.space_factor.0).unwrap().0;
@@ -243,67 +232,31 @@ impl boxworks::TextPreprocessor for TextPreprocessorImpl {
         };
         list.push(ds::Horizontal::Glue(g.into()));
     }
-}
 
-impl TextPreprocessorImpl {
-    pub fn register_font(
+    pub fn add_text<Font: font::Format + font::TextBuilder>(
         &mut self,
-        id: font::Id,
-        tfm_file: &tfm::File,
-        lig_kern_program: tfm::ligkern::CompiledProgram,
+        font_repo: &font::Repo<Font>,
+        text: &str,
+        list: &mut Vec<ds::Horizontal>,
     ) {
-        assert_eq!(id.0 as usize, self.fonts.len() + 1);
-        self.fonts.push(Font {
-            default_space: common::Glue {
-                width: tfm_file
-                    .named_param_scaled(tfm::NamedParameter::Space)
-                    .unwrap(),
-                stretch: tfm_file
-                    .named_param_scaled(tfm::NamedParameter::Stretch)
-                    .unwrap(),
-                stretch_order: common::GlueOrder::Normal,
-                shrink: tfm_file
-                    .named_param_scaled(tfm::NamedParameter::Shrink)
-                    .unwrap(),
-                shrink_order: common::GlueOrder::Normal,
-            },
-            extra_space: tfm_file
-                .named_param_scaled(tfm::NamedParameter::ExtraSpace)
-                .unwrap(),
-            lig_kern_program,
-        });
-    }
-}
-
-// TODO: destroy
-#[derive(Debug, Default)]
-pub struct TfmFontRepo {
-    fonts: HashMap<font::Id, tfm::File>,
-}
-
-impl TfmFontRepo {
-    pub fn register_font(&mut self, id: font::Id, tfm_file: tfm::File) {
-        assert_eq!(id.0 as usize, self.fonts.len() + 1);
-        self.fonts.insert(id, tfm_file);
-    }
-}
-
-impl boxworks::FontRepo for TfmFontRepo {
-    fn width(&self, c: char, font: font::Id) -> Option<common::Scaled> {
-        self.fonts[&font].width_utf8(c)
-    }
-    fn height(&self, c: char, font: font::Id) -> Option<common::Scaled> {
-        self.fonts[&font].height_utf8(c)
-    }
-    fn depth(&self, c: char, font: font::Id) -> Option<common::Scaled> {
-        self.fonts[&font].depth_utf8(c)
+        self.new_paragraph();
+        let mut pending_space = text.chars().next().unwrap_or(' ').is_ascii_whitespace();
+        for word in text.split_ascii_whitespace() {
+            if pending_space {
+                self.add_space(font_repo, list);
+            }
+            let word = word.trim_matches(' ');
+            self.add_word(font_repo, word.trim_matches(' '), list);
+            pending_space = true;
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
-    use boxworks::TextPreprocessor;
     use boxworks_testing;
     use boxworks_testing::assert_box_eq;
     use boxworks_testing::assert_box_lossy_eq;
@@ -608,18 +561,19 @@ mod tests {
             return;
         }
 
-        let mut tfm_file = tfm::File::deserialize(tfm_bytes).0.unwrap();
-        let lig_kern_program =
-            tfm::ligkern::CompiledProgram::compile_from_tfm_file(&mut tfm_file).0;
+        let tfm_font = tfm::Font::build_from_bytes(tfm_bytes)
+            .expect("tfm file is valid")
+            .0;
+        let mut font_repo: font::Repo<tfm::Font> = Default::default();
+        let font_id = font_repo.register(tfm_font);
 
-        let mut tp = TextPreprocessorImpl::new(params);
-        tp.register_font(font::Id::ONE, &tfm_file, lig_kern_program);
-        tp.activate_font(font::Id::ONE);
+        let mut tp = TextPreprocessor::new(params);
+        tp.activate_font(font_id);
         let mut got = vec![];
         for word in input.split_inclusive(' ') {
-            tp.add_word(word.trim_matches(' '), &mut got);
+            tp.add_word(&font_repo, word.trim_matches(' '), &mut got);
             if word.ends_with(" ") {
-                tp.add_space(&mut got);
+                tp.add_space(&font_repo, &mut got);
             }
         }
 
