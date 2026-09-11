@@ -188,7 +188,7 @@ fn hyphenate_impl<'a, Font: font::TextBuilder>(
                     }
                     Kern(kern) => match kern.kind {
                         ds::KernKind::Normal => {
-                            // TODO: set up the lig/kern program correctly.
+                            // Kerns from the font's lig/kern program are part of the word (TeX.2021.897).
                         }
                         _ => break None,
                     },
@@ -215,7 +215,7 @@ fn hyphenate_impl<'a, Font: font::TextBuilder>(
                 }
                 Kern(kern) => match kern.kind {
                     ds::KernKind::Normal => {
-                        // TODO: set up the lig/kern program correctly.
+                        // Kerns from the font's lig/kern program don't end the word (TeX.2021.899).
                     }
                     _ => break true,
                 },
@@ -586,9 +586,6 @@ mod tests {
             let (p, e) = tfm::ligkern::lang::Program::parse_compact(tc.lig_kern_program).unwrap();
             tfm_file.replace_lig_kern_program(p, e);
         }
-        // TODO: remove the clone when boxworks-text is migrated to the new font API.
-        let tfm_font = tfm::Font::build_from_file(tfm_file.clone()).0;
-
         if std::env::var("TEXCRAFT_VERIFY").unwrap_or("".to_string()) == "tex" {
             let tfm_bytes = tfm_file.serialize();
             let mut auxiliary_files: HashMap<PathBuf, Vec<u8>> = Default::default();
@@ -626,6 +623,7 @@ mod tests {
             return;
         }
 
+        let tfm_font = tfm::Font::build_from_file(tfm_file).0;
         let mut font_repo: font::Repo<tfm::Font> = Default::default();
         let font_id = font_repo.register(tfm_font);
 
@@ -887,6 +885,26 @@ mod tests {
                     )
                     chars("a")
                     lig("z", "bcd")
+                "#,
+            },
+        },
+        {
+            kern_inside_word,
+            TestCase {
+                input: "ab-c",
+                lig_kern_program: "
+                    ab -> a[65536]b
+                ",
+                want: r#"
+                    chars("a")
+                    kern(0.625pt)
+                    chars("b")
+                    disc(
+                      pre_break=[
+                        chars("-")
+                      ],
+                    )
+                    chars("c")
                 "#,
             },
         },

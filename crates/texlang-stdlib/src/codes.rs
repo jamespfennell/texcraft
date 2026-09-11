@@ -168,6 +168,11 @@ mod tests {
                 r"11-0"
             ),
             (mathcode_default, r"\the\mathcode 48", r"0"),
+            (
+                mathcode_math_active,
+                r#"\mathcode 48 "8000 \the\mathcode 48"#,
+                r"32768"
+            ),
         ),
         serde_tests(
             (catcode_serde_low, r"\catcode 48 11 ", r"\the\catcode 48"),
@@ -203,6 +208,11 @@ mod tests {
             (
                 mathcode_value_too_large,
                 r"\mathcode 48 33000 \the\mathcode 48",
+                "0"
+            ),
+            (
+                mathcode_value_just_too_large,
+                r#"\mathcode 48 "8001 \the\mathcode 48"#,
                 "0"
             ),
             (

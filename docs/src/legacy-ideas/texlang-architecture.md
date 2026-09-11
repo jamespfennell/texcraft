@@ -3,7 +3,7 @@ title: Architecture of Texlang
 weight: 20
 ---
 
-This page mostly discusses code in Texlang's [runtime module](#todo).
+This page mostly discusses code in Texlang's runtime module.
 
 ## Historical context
 
@@ -125,7 +125,7 @@ The streams are:
     This stream permits mutable access to the base state and the custom state
       (this is how `\def` is able to mutate the commands map).
     It does not permit mutations to the expansion controller.
-    Using the [expanded method](#todo), it can be converted into an expanded input stream.
+    Using the expanded method, it can be converted into an expanded input stream.
 
     Tokens read from the execution input have been expanded.
 
@@ -152,11 +152,11 @@ The streams are:
 
 Each command of a TeX engine only needs access to a small part of the state.
 As an example let's consider the register commands which are implemented in
-  Texlang's standard library's [registers module](#todo).
+  Texlang's standard library's registers module.
 (The `\count` command is used to get and set the Nth register.)
 Commands in this module only need to access the registers themselves,
   and need nothing else from the environment.
-The registers are stored as an array in a [registers component](#todo).
+The registers are stored as an array in a registers component.
 
 The registers component could be included as a public field of the custom state object.
 The `\count` command could then modify the registers through the custom state.
@@ -205,8 +205,8 @@ Other code can impose the `HasRegisters` trait, but even with a reference to the
 
 ## Executing TeX code
 
-In order to actually run TeX code, the runtime module's [run](#todo) function is invoked.
+In order to actually run TeX code, the runtime module's run function is invoked.
 Before doing this, an environment needs to be instantiated and
-  TeX source code loaded using the environment's [push_source](#todo) method.
+  TeX source code loaded using the environment's push_source method.
 The environment is then wrapped in an execution input type, and provided to the run function.
 

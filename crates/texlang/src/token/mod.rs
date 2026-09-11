@@ -96,7 +96,6 @@ impl Value {
         }
     }
 
-    /// TODO: should have a char_and_catcode function
     pub fn char(&self) -> Option<char> {
         Some(self.char_and_cat_code()?.0)
     }

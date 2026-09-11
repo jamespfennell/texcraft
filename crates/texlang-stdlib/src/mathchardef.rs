@@ -13,11 +13,13 @@ fn mathchardef_primitive_fn<S: TexlangState>(
     input: &mut vm::ExecutionInput<S>,
 ) -> txl::Result<()> {
     let scope = TexlangState::variable_assignment_scope_hook(input.state_mut());
+    // TeX.2021.1224: unlike `\mathcode`, the value is a 15-bit integer so `"8000` is not valid.
     let (cmd_ref_or, _, c) = <(
         Option<token::CommandRef>,
         parse::OptionalEquals,
-        types::MathCode,
+        parse::Uint<32768>,
     )>::parse(input)?;
+    let c = types::MathCode(c.0.try_into().unwrap());
     if let Some(cmd_ref) = cmd_ref_or {
         input
             .commands_map_mut()
@@ -65,5 +67,10 @@ mod test {
             ),
         ),
         serde_tests((basic_case, r"\mathchardef\Hello = `\+ ", r"\Hello"),),
+        recoverable_failure_tests((
+            value_too_large,
+            r#"\mathchardef\Hello = "8000 \the\Hello"#,
+            "0"
+        ),),
     ];
 }

@@ -3,7 +3,7 @@ use crate::{parse, traits::*};
 
 /// A math code.
 ///
-/// The inner value is in the range [0, 32768).
+/// The inner value is in the range [0, 32768].
 ///
 /// See chapter 17 of the TeXBook for information on this type.
 /// The TeXBook presents an _interpretation_ of the inner value.
@@ -15,10 +15,12 @@ use crate::{parse, traits::*};
 pub struct MathCode(pub u16);
 
 impl MathCode {
-    /// The maximum value of the inner value. This is 2^15-1.
+    /// The maximum value of the inner value. This is 2^15.
     ///
-    /// Defined in TeX.2021.1233 as 0o100000 which is different. TODO: figure this out.
-    pub const MAX: usize = 32767;
+    /// Defined in TeX.2021.1232 as 0o100000.
+    /// This is one larger than a regular 15-bit math character because the value
+    /// 0o100000 (`"8000`) is valid for `\mathcode` and means "math active".
+    pub const MAX: usize = 32768;
 }
 
 impl Parsable for MathCode {

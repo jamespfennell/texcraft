@@ -530,7 +530,6 @@ mod stream {
         fn cat_code(&self, c: char) -> crate::types::CatCode {
             self.cat_code(c)
         }
-        // TODO: implement \endlinechar
         #[inline]
         fn end_line_char(&self) -> Option<char> {
             self.end_line_char()

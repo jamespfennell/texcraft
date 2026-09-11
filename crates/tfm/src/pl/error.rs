@@ -116,21 +116,6 @@ impl ParseWarning {
     }
 }
 
-/* TODO
-impl ParseError {
-    fn pltotf_section(&self) -> (u8, u8) {
-        use ParseError::*;
-        match self {
-            // TODO
-            DecimalTooLarge { .. } => (64, 1),
-            LigTableTooLong { .. } => (101, 1),
-            NotReallySevenBitSafe => (110, 1),
-            _ => (0, 0)
-        }
-    }
-}
- */
-
 impl ParseWarningKind {
     fn data(&self) -> Data {
         use ParseWarningKind::*;

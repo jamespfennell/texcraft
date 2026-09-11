@@ -583,6 +583,11 @@ mod tests {
                 r"\fontname\nullfont",
                 r"nullfont",
             ),
+            (
+                fontname_the_font,
+                r"\font\fontA a \fontA \fontname\the\font",
+                r"a",
+            ),
         ),
         recoverable_failure_tests(
             (
@@ -644,7 +649,6 @@ Similar:
 
 
 
-fontname: \fontname \the \font etc.
 \skewchar\fontA?
 
 integer_cast_fails: \count 1 = \fontA  (\fontA still gets enabled)
