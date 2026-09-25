@@ -4,8 +4,23 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-clap = {version="4.4.8", features=["derive", "wrap_help"]}
+# Texcraft
 dvi = { version = "0.1", path = "../dvi"}
+
+# Third-party
+clap = {version="4.4.8", features=["derive", "wrap_help"]}
+diffy = { version = "0.5.2", default-features = false, features = ["std"] }
+
+[features]
+# Colored output in the diff subcommand.
+# This is default enabled because a diff without colors is much harder to read.
+# The feature uses the anstyle crate, which is already a dependency of clap.
+default = ["color"]
+color = ["diffy/color"]
+
+[dev-dependencies]
+assert_cmd = "2.0.12"
+tempfile = "3.9.0"
 
 [[bin]]
 name = "dvitools"

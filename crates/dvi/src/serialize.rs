@@ -3,7 +3,7 @@ use super::*;
 pub fn serialize(op: &Op, b: &mut Vec<u8>) {
     let mut w = Writer { b };
     match op {
-        Op::TypesetChar { char: c, move_h } => match (move_h, (*c).try_into()) {
+        Op::Char { char: c, move_h } => match (move_h, (*c).try_into()) {
             // Fast path: small ASCII character
             (true, Ok(u @ 0..128)) => {
                 w.u8(u);
@@ -14,7 +14,7 @@ pub fn serialize(op: &Op, b: &mut Vec<u8>) {
                 w.u32_var(min_op_code, *c);
             }
         },
-        Op::TypesetRule {
+        Op::Rule {
             height,
             width,
             move_h,

@@ -6,48 +6,48 @@ pub fn deserialize(b: &[u8]) -> Result<Option<(Op, &[u8])>, InvalidDviData> {
     };
     let mut d = Deserializer { op_code, b: tail };
     let op = match op_code {
-        0..128 => Op::TypesetChar {
+        0..128 => Op::Char {
             char: op_code as u32,
             move_h: true,
         },
-        128 => Op::TypesetChar {
+        128 => Op::Char {
             char: d.u8()?.into(),
             move_h: true,
         },
-        129 => Op::TypesetChar {
+        129 => Op::Char {
             char: d.u16()?.into(),
             move_h: true,
         },
-        130 => Op::TypesetChar {
+        130 => Op::Char {
             char: d.u24()?,
             move_h: true,
         },
-        131 => Op::TypesetChar {
+        131 => Op::Char {
             char: d.u32()?,
             move_h: true,
         },
-        132 => Op::TypesetRule {
+        132 => Op::Rule {
             height: d.i32()?,
             width: d.i32()?,
             move_h: true,
         },
-        133 => Op::TypesetChar {
+        133 => Op::Char {
             char: d.u8()?.into(),
             move_h: false,
         },
-        134 => Op::TypesetChar {
+        134 => Op::Char {
             char: d.u16()?.into(),
             move_h: false,
         },
-        135 => Op::TypesetChar {
+        135 => Op::Char {
             char: d.u24()?,
             move_h: false,
         },
-        136 => Op::TypesetChar {
+        136 => Op::Char {
             char: d.u32()?,
             move_h: false,
         },
-        137 => Op::TypesetRule {
+        137 => Op::Rule {
             height: d.i32()?,
             width: d.i32()?,
             move_h: false,

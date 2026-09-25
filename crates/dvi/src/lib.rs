@@ -31,7 +31,7 @@
 //! is the operation code, and this code is followed by zero or more bytes
 //! that provide parameters to the command. The parameters themselves may consist
 //! of several consecutive bytes; for example, the `set_rule` command
-//! ([`Op::TypesetRule`] with `move_h=true`) has two
+//! ([`Op::Rule`] with `move_h=true`) has two
 //! parameters, each of which is four bytes long. Parameters are usually
 //! regarded as nonnegative integers; but four-byte-long parameters,
 //! and shorter parameters that denote distances, can be
@@ -71,6 +71,7 @@
 //! very first `bop`, i.e., the one starting in byte 100, has a pointer of -1.)
 
 mod deserialize;
+pub mod display;
 mod serialize;
 pub mod transforms;
 
@@ -124,7 +125,7 @@ pub enum Var {
 /// However the variants don't map one-to-one on to commands as described
 /// there. Instead, commands that are logically connected are represented
 /// in the same variant. For example, `set_char_0`, `set1` and `put1` are
-/// all represented using the [`Op::TypesetChar`] variant.
+/// all represented using the [`Op::Char`] variant.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Op {
     /// Typeset the specified character from the current font _f_
@@ -132,7 +133,7 @@ pub enum Op {
     ///
     /// This op corresponds to the DVI commands `set_char_N`, `set_N`
     /// and `put_N`.
-    TypesetChar {
+    Char {
         /// The character to typeset.
         char: u32,
         /// If true, after typesetting the character,
@@ -169,7 +170,7 @@ pub enum Op {
     ///    precisely those raster positions whose MeatFont coordinates satisfy
     ///    0≤_x_<_wa_ and 0≤_y_<_ha_, where _a_ is the number
     ///    of pixels per DVI unit.
-    TypesetRule {
+    Rule {
         /// Height of the rule.
         height: i32,
         /// Width of the rule.
@@ -469,11 +470,11 @@ impl Op {
     /// ```
     /// let data = vec![128, 4, 129, 1, 0];
     /// let (op, tail) = dvi::Op::deserialize(&data).unwrap().unwrap();
-    /// assert_eq![op, dvi::Op::TypesetChar{char: 4, move_h: true}];
+    /// assert_eq![op, dvi::Op::Char{char: 4, move_h: true}];
     /// assert_eq![tail, &[129, 1, 0]];
     ///
     /// let (op, tail) = dvi::Op::deserialize(&tail).unwrap().unwrap();
-    /// assert_eq![op, dvi::Op::TypesetChar{char: 256, move_h: true}];
+    /// assert_eq![op, dvi::Op::Char{char: 256, move_h: true}];
     /// assert_eq![tail, &[]];
     /// ```
     ///
@@ -557,9 +558,9 @@ impl std::fmt::Display for InvalidDviData {
 ///     ops,
 ///     vec![
 ///         dvi::Op::Down(256),
-///         dvi::Op::TypesetChar{char: 'D' as u32, move_h: true},
-///         dvi::Op::TypesetChar{char: 'V' as u32, move_h: true},
-///         dvi::Op::TypesetChar{char: 'I' as u32, move_h: true},
+///         dvi::Op::Char{char: 'D' as u32, move_h: true},
+///         dvi::Op::Char{char: 'V' as u32, move_h: true},
+///         dvi::Op::Char{char: 'I' as u32, move_h: true},
 ///     ],
 /// ];
 /// ```
@@ -582,13 +583,40 @@ impl std::fmt::Display for InvalidDviData {
 /// ```
 pub struct Deserializer<'a> {
     b: &'a [u8],
+    byte_offset: usize,
     result: &'a mut Result<(), InvalidDviData>,
 }
 
 impl<'a> Deserializer<'a> {
     /// Create a new iterator from the provided binary slice.
     pub fn new(b: &'a [u8], result: &'a mut Result<(), InvalidDviData>) -> Self {
-        Self { b, result }
+        Self {
+            b,
+            byte_offset: 0,
+            result,
+        }
+    }
+    /// Get the offset in the DVI data of the next operation
+    /// that will be returned by the iterator.
+    ///
+    /// ```
+    /// let data: Vec<u8> = vec![158, 1, 0, 68];
+    /// let mut result = Ok(());
+    /// let mut deserializer = dvi::Deserializer::new(&data, &mut result);
+    ///
+    /// // The three byte down(256) operation starts at offset 0.
+    /// assert_eq![deserializer.byte_offset(), 0];
+    /// assert_eq![deserializer.next(), Some(dvi::Op::Down(256))];
+    ///
+    /// // The one byte char('D') operation starts at offset 3.
+    /// assert_eq![deserializer.byte_offset(), 3];
+    /// assert_eq![deserializer.next(), Some(dvi::Op::Char{char: 'D' as u32, move_h: true})];
+    ///
+    /// assert_eq![deserializer.byte_offset(), 4];
+    /// assert_eq![deserializer.next(), None];
+    /// ```
+    pub fn byte_offset(&self) -> usize {
+        self.byte_offset
     }
 }
 
@@ -599,6 +627,7 @@ impl<'a> Iterator for Deserializer<'a> {
         match Op::deserialize(self.b) {
             Ok(None) => None,
             Ok(Some((op, b))) => {
+                self.byte_offset += self.b.len() - b.len();
                 self.b = b;
                 Some(op)
             }
@@ -615,9 +644,9 @@ impl<'a> Iterator for Deserializer<'a> {
 /// ```
 /// let ops = vec![
 ///     dvi::Op::Down(256),
-///     dvi::Op::TypesetChar{char: 'D' as u32, move_h: true},
-///     dvi::Op::TypesetChar{char: 'V' as u32, move_h: true},
-///     dvi::Op::TypesetChar{char: 'I' as u32, move_h: true},
+///     dvi::Op::Char{char: 'D' as u32, move_h: true},
+///     dvi::Op::Char{char: 'V' as u32, move_h: true},
+///     dvi::Op::Char{char: 'I' as u32, move_h: true},
 /// ];
 /// let data = dvi::serialize(ops);
 /// assert_eq!(data, vec![158, 1, 0, 68, 86, 73]);
@@ -726,7 +755,7 @@ impl Values {
     /// Update the values by applying the provided operation.
     pub fn update(&mut self, op: &Op) -> bool {
         match op {
-            Op::TypesetChar { char, move_h } => {
+            Op::Char { char, move_h } => {
                 if *move_h {
                     self.top.h_chars.push((*char, self.f()));
                     true
@@ -734,7 +763,7 @@ impl Values {
                     false
                 }
             }
-            Op::TypesetRule {
+            Op::Rule {
                 height: _,
                 width,
                 move_h,
@@ -854,9 +883,9 @@ impl Values {
     /// // set the font
     /// values.update(&dvi::Op::EnableFont(2));
     /// // typeset DVI and move h each time
-    /// values.update(&dvi::Op::TypesetChar{char: 'D' as u32, move_h: true});
-    /// values.update(&dvi::Op::TypesetChar{char: 'V' as u32, move_h: true});
-    /// values.update(&dvi::Op::TypesetChar{char: 'I' as u32, move_h: true});
+    /// values.update(&dvi::Op::Char{char: 'D' as u32, move_h: true});
+    /// values.update(&dvi::Op::Char{char: 'V' as u32, move_h: true});
+    /// values.update(&dvi::Op::Char{char: 'I' as u32, move_h: true});
     ///
     /// assert_eq![
     ///     values.h(),
@@ -893,6 +922,31 @@ impl Values {
     /// Get the current value of the variable _z_.
     pub fn z(&self) -> i32 {
         self.var(Var::Z)
+    }
+    /// Get the current depth of the stack,
+    /// i.e. the number of [`Op::Push`] operations that have not yet
+    /// been matched by a [`Op::Pop`] operation.
+    ///
+    /// The depth is reset to zero by [`Op::BeginPage`] because
+    /// that operation empties the stack.
+    ///
+    /// ```
+    /// let mut values: dvi::Values = Default::default();
+    /// assert_eq!(values.stack_depth(), 0);
+    ///
+    /// values.update(&dvi::Op::Push);
+    /// values.update(&dvi::Op::Push);
+    /// assert_eq!(values.stack_depth(), 2);
+    ///
+    /// values.update(&dvi::Op::Pop);
+    /// assert_eq!(values.stack_depth(), 1);
+    /// ```
+    ///
+    /// Note that a [`Op::Pop`] operation that is not matched by a preceding
+    /// [`Op::Push`] operation is invalid DVI data.
+    /// Such an operation leaves the depth at zero.
+    pub fn stack_depth(&self) -> usize {
+        self.tail.len()
     }
 }
 
@@ -939,7 +993,7 @@ mod tests {
         (
             op_code_0,
             [0],
-            Op::TypesetChar {
+            Op::Char {
                 char: 0,
                 move_h: true
             }
@@ -947,7 +1001,7 @@ mod tests {
         (
             op_code_1,
             [1],
-            Op::TypesetChar {
+            Op::Char {
                 char: 1,
                 move_h: true
             }
@@ -955,7 +1009,7 @@ mod tests {
         (
             op_code_127,
             [127],
-            Op::TypesetChar {
+            Op::Char {
                 char: 127,
                 move_h: true
             }
@@ -963,7 +1017,7 @@ mod tests {
         (
             op_code_128_case_1,
             [128, 128],
-            Op::TypesetChar {
+            Op::Char {
                 char: 128,
                 move_h: true
             }
@@ -971,7 +1025,7 @@ mod tests {
         (
             op_code_128_case_2,
             [128, 129],
-            Op::TypesetChar {
+            Op::Char {
                 char: 129,
                 move_h: true
             }
@@ -979,7 +1033,7 @@ mod tests {
         (
             op_code_128_case_3,
             [128, 255],
-            Op::TypesetChar {
+            Op::Char {
                 char: 255,
                 move_h: true
             }
@@ -987,7 +1041,7 @@ mod tests {
         (
             op_code_129_case_1,
             [129, 1, 0],
-            Op::TypesetChar {
+            Op::Char {
                 char: 256,
                 move_h: true
             }
@@ -995,7 +1049,7 @@ mod tests {
         (
             op_code_129_case_2,
             [129, 1, 2],
-            Op::TypesetChar {
+            Op::Char {
                 char: 256 + 2,
                 move_h: true
             }
@@ -1003,7 +1057,7 @@ mod tests {
         (
             op_code_129_case_3,
             [129, 255, 255],
-            Op::TypesetChar {
+            Op::Char {
                 char: 256 * 256 - 1,
                 move_h: true
             }
@@ -1011,7 +1065,7 @@ mod tests {
         (
             op_code_130_case_1,
             [130, 1, 0, 0],
-            Op::TypesetChar {
+            Op::Char {
                 char: 256 * 256,
                 move_h: true
             }
@@ -1019,7 +1073,7 @@ mod tests {
         (
             op_code_130_case_2,
             [130, 1, 2, 3],
-            Op::TypesetChar {
+            Op::Char {
                 char: 256 * 256 + 2 * 256 + 3,
                 move_h: true
             }
@@ -1027,7 +1081,7 @@ mod tests {
         (
             op_code_130_case_3,
             [130, 255, 255, 255],
-            Op::TypesetChar {
+            Op::Char {
                 char: 256 * 256 * 256 - 1,
                 move_h: true
             }
@@ -1035,7 +1089,7 @@ mod tests {
         (
             op_code_131_case_1,
             [131, 1, 0, 0, 0],
-            Op::TypesetChar {
+            Op::Char {
                 char: 256 * 256 * 256,
                 move_h: true
             }
@@ -1043,7 +1097,7 @@ mod tests {
         (
             op_code_131_case_2,
             [131, 1, 2, 3, 4],
-            Op::TypesetChar {
+            Op::Char {
                 char: 256 * 256 * 256 + 2 * 256 * 256 + 3 * 256 + 4,
                 move_h: true
             }
@@ -1051,7 +1105,7 @@ mod tests {
         (
             op_code_131_case_3,
             [131, 255, 255, 255, 255],
-            Op::TypesetChar {
+            Op::Char {
                 char: u32::MAX,
                 move_h: true
             }
@@ -1059,7 +1113,7 @@ mod tests {
         (
             op_code_132,
             [132, 0, 0, 0, 1, 0, 0, 0, 2],
-            Op::TypesetRule {
+            Op::Rule {
                 height: 1,
                 width: 2,
                 move_h: true
@@ -1068,7 +1122,7 @@ mod tests {
         (
             op_code_133,
             [133, 1],
-            Op::TypesetChar {
+            Op::Char {
                 char: 1,
                 move_h: false,
             }
@@ -1076,7 +1130,7 @@ mod tests {
         (
             op_code_134,
             [134, 255, 255],
-            Op::TypesetChar {
+            Op::Char {
                 char: 256 * 256 - 1,
                 move_h: false,
             }
@@ -1084,7 +1138,7 @@ mod tests {
         (
             op_code_135,
             [135, 255, 255, 255],
-            Op::TypesetChar {
+            Op::Char {
                 char: 256 * 256 * 256 - 1,
                 move_h: false,
             }
@@ -1092,7 +1146,7 @@ mod tests {
         (
             op_code_136,
             [136, 255, 255, 255, 255],
-            Op::TypesetChar {
+            Op::Char {
                 char: u32::MAX,
                 move_h: false,
             }
@@ -1100,7 +1154,7 @@ mod tests {
         (
             op_code_137,
             [137, 0, 0, 0, 1, 0, 0, 0, 2],
-            Op::TypesetRule {
+            Op::Rule {
                 height: 1,
                 width: 2,
                 move_h: false,
@@ -1553,19 +1607,19 @@ mod tests {
         ),
         (
             rule_1,
-            [Op::TypesetRule{height: 2, width: 3, move_h: true}],
+            [Op::Rule{height: 2, width: 3, move_h: true}],
             [true],
             h: 3,
         ),
         (
             rule_2,
-            [Op::TypesetRule{height: 2, width: 0, move_h: true}],
+            [Op::Rule{height: 2, width: 0, move_h: true}],
             [false],
             h: 0,
         ),
         (
             rule_3,
-            [Op::TypesetRule{height: 2, width: 3, move_h: false}],
+            [Op::Rule{height: 2, width: 3, move_h: false}],
             [false],
             h: 0,
         ),
@@ -1611,21 +1665,21 @@ mod tests {
         ),
         (
             typeset_char_1,
-            [Op::TypesetChar{char: 1, move_h: true}],
+            [Op::Char{char: 1, move_h: true}],
             [true],
             h: 0,
             h_chars: vec![(1, 0)],
         ),
         (
             typeset_char_2,
-            [Op::TypesetChar{char: 1, move_h: false}],
+            [Op::Char{char: 1, move_h: false}],
             [false],
             h: 0,
             h_chars: vec![],
         ),
         (
             typeset_char_3,
-            [Op::Push, Op::TypesetChar{char: 1, move_h: true}, Op::Pop],
+            [Op::Push, Op::Char{char: 1, move_h: true}, Op::Pop],
             [false, true, true],
             h: 0,
             h_chars: vec![],

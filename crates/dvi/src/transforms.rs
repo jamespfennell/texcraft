@@ -7,14 +7,14 @@
 //! vec![
 //!     dvi::Op::SetVar(dvi::Var::X, 3),
 //!     dvi::Op::Move(dvi::Var::X),
-//!     dvi::Op::TypesetChar{char: 'D' as u32, move_h: false},
+//!     dvi::Op::Char{char: 'D' as u32, move_h: false},
 //! ];
 //! ```
 //! describes the same document as this list of operations:
 //! ```
 //! vec![
 //!     dvi::Op::Right(6),
-//!     dvi::Op::TypesetChar{char: 'D' as u32, move_h: false},
+//!     dvi::Op::Char{char: 'D' as u32, move_h: false},
 //! ];
 //! ```
 //! In both cases, the result of the DVI operations is a document
