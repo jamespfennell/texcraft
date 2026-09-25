@@ -1,30 +1,46 @@
 use assert_cmd::prelude::*;
 use std::process::Command;
 
-/// Write the provided ops to a DVI file in the directory and return its path.
-fn write_dvi_file(dir: &tempfile::TempDir, name: &str, ops: Vec<dvi::Op>) -> std::path::PathBuf {
-    let path = dir.path().join(name);
-    std::fs::write(&path, dvi::serialize(ops)).unwrap();
-    path
+/// Write the provided ops to a DVI file in the directory.
+fn write_dvi_file(dir: &tempfile::TempDir, name: &str, ops: Vec<dvi::Op>) {
+    std::fs::write(dir.path().join(name), dvi::serialize(ops)).unwrap();
+}
+
+/// Build a `dvitools` command that runs inside the provided directory.
+///
+/// The command is run inside the directory so that the file paths passed to
+/// it are just file names, with no directory separators in them.
+/// The paths appear in the output of the diff subcommand, and if they
+/// contained separators the output would be different on Windows.
+/// (It would in fact be doubly different, because the diff format escapes
+/// the backslash separators and wraps the escaped path in quotes.)
+fn command(dir: &tempfile::TempDir) -> Command {
+    let mut cmd = Command::cargo_bin("dvitools").unwrap();
+    cmd.current_dir(dir.path());
+    cmd
+}
+
+/// Convert output of the command to a string.
+///
+/// Line endings are normalized because they are different on Windows.
+fn output_to_string(b: Vec<u8>) -> String {
+    String::from_utf8(b).unwrap().replace("\r\n", "\n")
 }
 
 /// Run `dvitools diff` on the two lists of ops and return the exit code
 /// and the output printed to stdout.
 fn run_diff(left: Vec<dvi::Op>, right: Vec<dvi::Op>, args: &[&str]) -> (i32, String) {
     let dir = tempfile::TempDir::new().unwrap();
-    let left = write_dvi_file(&dir, "left.dvi", left);
-    let right = write_dvi_file(&dir, "right.dvi", right);
+    write_dvi_file(&dir, "left.dvi", left);
+    write_dvi_file(&dir, "right.dvi", right);
 
-    let mut cmd = Command::cargo_bin("dvitools").unwrap();
-    cmd.arg("diff").arg(&left).arg(&right).args(args);
+    let mut cmd = command(&dir);
+    cmd.args(["diff", "left.dvi", "right.dvi"]).args(args);
     let output = cmd.output().unwrap();
-    // The paths of the temporary files appear in the diff header. Replace
-    // them so that the output can be compared against a fixed string.
-    let stdout = String::from_utf8(output.stdout)
-        .unwrap()
-        .replace(left.to_str().unwrap(), "left.dvi")
-        .replace(right.to_str().unwrap(), "right.dvi");
-    (output.status.code().unwrap(), stdout)
+    (
+        output.status.code().unwrap(),
+        output_to_string(output.stdout),
+    )
 }
 
 fn char(c: char) -> dvi::Op {
@@ -145,29 +161,27 @@ fn indentation_inflates_the_diff() {
 #[test]
 fn missing_file() {
     let dir = tempfile::TempDir::new().unwrap();
-    let left = write_dvi_file(&dir, "left.dvi", vec![char('a')]);
-    let mut cmd = Command::cargo_bin("dvitools").unwrap();
-    cmd.arg("diff").arg(&left).arg(dir.path().join("right.dvi"));
-    let output = cmd.output().unwrap();
+    write_dvi_file(&dir, "left.dvi", vec![char('a')]);
+
+    let output = command(&dir)
+        .args(["diff", "left.dvi", "right.dvi"])
+        .output()
+        .unwrap();
     assert_eq!(output.status.code().unwrap(), 1);
-    assert!(String::from_utf8(output.stderr)
-        .unwrap()
-        .contains("failed to read"));
+    assert!(output_to_string(output.stderr).contains("failed to read"));
 }
 
 #[test]
 fn invalid_dvi_data() {
     let dir = tempfile::TempDir::new().unwrap();
-    let left = write_dvi_file(&dir, "left.dvi", vec![char('a')]);
-    let right = dir.path().join("right.dvi");
+    write_dvi_file(&dir, "left.dvi", vec![char('a')]);
     // 254 is not a valid DVI op code.
-    std::fs::write(&right, [254]).unwrap();
+    std::fs::write(dir.path().join("right.dvi"), [254]).unwrap();
 
-    let mut cmd = Command::cargo_bin("dvitools").unwrap();
-    cmd.arg("diff").arg(&left).arg(&right);
-    let output = cmd.output().unwrap();
+    let output = command(&dir)
+        .args(["diff", "left.dvi", "right.dvi"])
+        .output()
+        .unwrap();
     assert_eq!(output.status.code().unwrap(), 1);
-    assert!(String::from_utf8(output.stderr)
-        .unwrap()
-        .contains("invalid op code 254"));
+    assert!(output_to_string(output.stderr).contains("invalid op code 254"));
 }
